@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/simple-trade-tracker/static/js/main.38391c52.js",
+    "main.js": "/simple-trade-tracker/static/js/main.d8483901.js",
     "index.html": "/simple-trade-tracker/index.html",
-    "main.38391c52.js.map": "/simple-trade-tracker/static/js/main.38391c52.js.map"
+    "main.d8483901.js.map": "/simple-trade-tracker/static/js/main.d8483901.js.map"
   },
   "entrypoints": [
-    "static/js/main.38391c52.js"
+    "static/js/main.d8483901.js"
   ]
 }
