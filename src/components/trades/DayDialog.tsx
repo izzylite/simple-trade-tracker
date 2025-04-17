@@ -26,7 +26,7 @@ interface DayDialogProps {
   onTagUpdated?: (oldTag: string, newTag: string) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
   onAccountBalanceChange?: (balance: number) => void;
-  setZoomedImage: (url: string) => void;
+  setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   setNewMainTrade: (prev: (trade: NewTradeForm) => NewTradeForm | null) => void
   allTrades?: Trade[];
   riskPerTrade?: number;

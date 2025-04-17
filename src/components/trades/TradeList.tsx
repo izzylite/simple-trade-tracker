@@ -5,9 +5,20 @@ import {
   IconButton,
   Chip,
   Stack,
-  Tooltip
+  Tooltip,
+  SxProps,
+  Theme
 } from '@mui/material';
-import { Edit as EditIcon, Delete as DeleteIcon, ExpandMore as ExpandIcon, ExpandLess as CollapseIcon, Image as ImageIcon, Note as NoteIcon } from '@mui/icons-material';
+import {
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  ExpandMore as ExpandIcon,
+  ExpandLess as CollapseIcon,
+  Image as ImageIcon,
+  Note as NoteIcon,
+  Balance as RiskIcon,
+  Schedule as SessionIcon
+} from '@mui/icons-material';
 import { Trade } from '../../types/trade';
 import { TradeListItem, TradeInfo, TradeActions } from '../StyledComponents';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../../utils/tagColors';
@@ -20,8 +31,10 @@ interface TradeListProps {
   onTradeClick: (tradeId: string) => void;
   onEditClick: (trade: Trade) => void;
   onDeleteClick: (tradeId: string) => void;
-  onZoomedImage: (url: string) => void;
+  onZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
+  hideActions?: boolean; // New prop to hide edit/delete buttons
+  sx?: SxProps<Theme>; // Allow styling from parent component
 }
 
 const TradeList: React.FC<TradeListProps> = ({
@@ -31,11 +44,13 @@ const TradeList: React.FC<TradeListProps> = ({
   onEditClick,
   onDeleteClick,
   onZoomedImage,
-  onUpdateTradeProperty
+  onUpdateTradeProperty,
+  hideActions = false, // Default to showing actions
+  sx
 }) => {
   const theme = useTheme();
   return (
-    <Box sx={{ mt: 2 }}>
+    <Box sx={{ mt: 2, ...sx }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
         <Typography variant="subtitle1" sx={{ mr: 1 }}>
           Trades
@@ -99,30 +114,90 @@ const TradeList: React.FC<TradeListProps> = ({
                       }}>
                         ${Math.abs(trade.amount).toLocaleString()}
                       </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1.5, alignItems: 'center', mt: 0.5, flexWrap: 'wrap' }}>
                         {trade.images && trade.images.length > 0 && (
                           <Tooltip title={`${trade.images.length} image${trade.images.length > 1 ? 's' : ''}`}>
-                            <ImageIcon
-                              fontSize="small"
-                              sx={{
-                                opacity: 0.8,
-                                fontSize: '1rem',
-                                verticalAlign: 'middle'
-                              }}
-                            />
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <ImageIcon
+                                fontSize="small"
+                                sx={{
+                                  opacity: 0.8,
+                                  fontSize: '1rem',
+                                  verticalAlign: 'middle',
+                                  color: theme.palette.primary.main
+                                }}
+                              />
+                            </Box>
                           </Tooltip>
                         )}
 
                         {trade.notes && (
                           <Tooltip title={trade.notes}>
-                            <NoteIcon
-                              fontSize="small"
-                              sx={{
-                                opacity: 0.8,
-                                fontSize: '1rem',
-                                verticalAlign: 'middle'
-                              }}
-                            />
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <NoteIcon
+                                fontSize="small"
+                                sx={{
+                                  opacity: 0.8,
+                                  fontSize: '1rem',
+                                  verticalAlign: 'middle',
+                                  color: theme.palette.info.main
+                                }}
+                              />
+                            </Box>
+                          </Tooltip>
+                        )}
+
+                        {trade.riskToReward && (
+                          <Tooltip title={`Risk to Reward: ${trade.riskToReward}`}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <RiskIcon
+                                fontSize="small"
+                                sx={{
+                                  opacity: 0.8,
+                                  fontSize: '1rem',
+                                  verticalAlign: 'middle',
+                                  color: theme.palette.warning.main
+                                }}
+                              />
+                              <Typography variant="caption" sx={{
+                                fontSize: '0.7rem',
+                                color: 'text.secondary',
+                                fontWeight: 500,
+                                bgcolor: theme => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+                                px: 0.5,
+                                py: 0.2,
+                                borderRadius: 0.5
+                              }}>
+                                {trade.riskToReward}R
+                              </Typography>
+                            </Box>
+                          </Tooltip>
+                        )}
+
+                        {trade.session && (
+                          <Tooltip title={`Session: ${trade.session}`}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <SessionIcon
+                                fontSize="small"
+                                sx={{
+                                  opacity: 0.8,
+                                  fontSize: '1rem',
+                                  verticalAlign: 'middle',
+                                  color: theme.palette.secondary.main
+                                }}
+                              />
+                              <Typography variant="caption" sx={{
+                                fontSize: '0.7rem',
+                                color: 'text.secondary',
+                                fontWeight: 500,
+                                bgcolor: theme => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+                                px: 0.5,
+                                py: 0.2,
+                                borderRadius: 0.5
+                              }}>
+                                {trade.session}
+                              </Typography>
+                            </Box>
                           </Tooltip>
                         )}
                       </Box>
@@ -212,26 +287,28 @@ const TradeList: React.FC<TradeListProps> = ({
                   </Box>
                 </TradeInfo>
 
-                <TradeActions>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditClick(trade);
-                    }}
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteClick(trade.id);
-                    }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </TradeActions>
+                {!hideActions && (
+                  <TradeActions>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditClick(trade);
+                      }}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteClick(trade.id);
+                      }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </TradeActions>
+                )}
               </TradeListItem>
 
               {expandedTradeId === trade.id && (

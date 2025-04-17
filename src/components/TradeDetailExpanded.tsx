@@ -27,7 +27,7 @@ import { TradeImage } from './trades/TradeForm';
 interface TradeDetailExpandedProps {
   trade: Trade;
   isExpanded: boolean;
-  setZoomedImage: (url: string) => void;
+  setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
 }
 
@@ -445,7 +445,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                     zIndex: 1
                                   }}
                                 >
-                                  
+
                                 </Box>
                               )}
 
@@ -526,7 +526,18 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                     cursor: 'pointer',
                                     zIndex: 3
                                   }}
-                                  onClick={() => setZoomedImage(image.url)}
+                                  onClick={() => {
+                                    // Get all non-pending image URLs
+                                    const allImageUrls = trade.images
+                                      ?.filter(img => !isPendingImage(img))
+                                      .map(img => img.url) || [];
+
+                                    // Find the index of the current image
+                                    const currentIndex = allImageUrls.findIndex(url => url === image.url);
+
+                                    // Pass all images and the current index to the zoom dialog
+                                    setZoomedImage(image.url, allImageUrls, currentIndex);
+                                  }}
                                 >
                                   <ZoomInIcon sx={{ color: 'white', fontSize: 32 }} />
                                 </Box>

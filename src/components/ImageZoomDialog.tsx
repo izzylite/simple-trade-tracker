@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Dialog,
   Box,
@@ -8,20 +8,29 @@ import {
 import {
   Close as CloseIcon,
   ZoomIn as ZoomInIcon,
-  RestartAlt as RestartAltIcon
+  RestartAlt as RestartAltIcon,
+  ArrowBackIos as ArrowBackIcon,
+  ArrowForwardIos as ArrowForwardIcon
 } from '@mui/icons-material';
 
 interface ImageZoomDialogProps {
   open: boolean;
   onClose: () => void;
-  imageUrl: string | null;
+  imageUrl?: string | null; // For backward compatibility
+  images?: string[];
+  initialIndex?: number;
 }
 
 const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
   open,
   onClose,
-  imageUrl
+  imageUrl,
+  images = [],
+  initialIndex = 0
 }) => {
+  // For backward compatibility, if imageUrl is provided but not images
+  const imageArray = images.length > 0 ? images : (imageUrl ? [imageUrl] : []);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const theme = useTheme();
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -59,7 +68,7 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
     const newY = e.clientY - dragStart.y;
 
     if (imageRef.current && containerRef.current) {
-      const containerRect = containerRef.current.getBoundingClientRect();
+      // We only need the image rect for calculating bounds
       const imageRect = imageRef.current.getBoundingClientRect();
 
       const maxX = (imageRect.width * (scale - 1)) / 2;
@@ -90,12 +99,43 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
     setPosition({ x: 0, y: 0 });
   };
 
+  // Navigation functions
+  const navigateNext = useCallback(() => {
+    if (imageArray.length <= 1) return;
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % imageArray.length);
+  }, [imageArray.length]);
+
+  const navigatePrevious = useCallback(() => {
+    if (imageArray.length <= 1) return;
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + imageArray.length) % imageArray.length);
+  }, [imageArray.length]);
+
   // Reset zoom when image changes
   useEffect(() => {
     if (open) {
       resetZoom();
     }
-  }, [open, imageUrl]);
+  }, [open, currentIndex]);
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!open) return;
+
+      if (e.key === 'ArrowLeft') {
+        navigatePrevious();
+      } else if (e.key === 'ArrowRight') {
+        navigateNext();
+      } else if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, currentIndex, imageArray.length, navigatePrevious, navigateNext, onClose]);
 
   // Add event listeners for mouse up on document level
   useEffect(() => {
@@ -144,8 +184,86 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
         }
       }}
     >
-      {imageUrl && (
-        <Box
+      {imageArray.length > 0 && (
+        <>
+          {/* Navigation buttons */}
+          {imageArray.length > 1 && (
+            <>
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: 16,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1200
+                }}
+              >
+                <IconButton
+                  onClick={navigatePrevious}
+                  sx={{
+                    color: 'white',
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)'
+                    }
+                  }}
+                >
+                  <ArrowBackIcon />
+                </IconButton>
+              </Box>
+              <Box
+                sx={{
+                  position: 'absolute',
+                  right: 16,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1200
+                }}
+              >
+                <IconButton
+                  onClick={navigateNext}
+                  sx={{
+                    color: 'white',
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)'
+                    }
+                  }}
+                >
+                  <ArrowForwardIcon />
+                </IconButton>
+              </Box>
+            </>
+          )}
+
+          {/* Image counter */}
+          {imageArray.length > 1 && (
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: 16,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                color: 'white',
+                borderRadius: 1,
+                px: 1.5,
+                py: 0.5,
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                zIndex: 1200
+              }}
+            >
+              {currentIndex + 1} / {imageArray.length}
+            </Box>
+          )}
+          <Box
           ref={containerRef}
           sx={{
             position: 'relative',
@@ -175,8 +293,8 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
           >
             <img
               ref={imageRef}
-              src={imageUrl}
-              alt="Trade"
+              src={imageArray[currentIndex]}
+              alt={`Trade Image ${currentIndex + 1} of ${imageArray.length}`}
               style={{
                 maxWidth: '100%',
                 maxHeight: '100%',
@@ -186,6 +304,9 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
               }}
             />
           </Box>
+
+
+          {/* Controls */}
           <Box
             sx={{
               position: 'absolute',
@@ -247,6 +368,7 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
             </IconButton>
           </Box>
         </Box>
+        </>
       )}
     </Dialog>
   );

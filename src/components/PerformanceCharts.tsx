@@ -59,6 +59,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   });
 
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [zoomedImages, setZoomedImages] = useState<string[]>([]);
+  const [zoomedImageIndex, setZoomedImageIndex] = useState<number>(0);
 
   const handleTimePeriodChange = (newValue: TimePeriod) => {
     setTimePeriod(newValue);
@@ -482,8 +484,15 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     }));
   };
 
-  const handleZoomImage = (imageUrl: string) => {
+  const handleZoomImage = (imageUrl: string, allImages?: string[], initialIndex?: number) => {
     setZoomedImage(imageUrl);
+    if (allImages && allImages.length > 0) {
+      setZoomedImages(allImages);
+      setZoomedImageIndex(initialIndex || 0);
+    } else {
+      setZoomedImages([imageUrl]);
+      setZoomedImageIndex(0);
+    }
   };
 
   const handleTagAnalysisTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -543,6 +552,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         open={!!zoomedImage}
         onClose={() => setZoomedImage(null)}
         imageUrl={zoomedImage}
+        images={zoomedImages}
+        initialIndex={zoomedImageIndex}
       />
 
       {/* Trades Dialog */}

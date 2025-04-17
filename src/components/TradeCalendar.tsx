@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { FC } from 'react';
 import {
@@ -6,21 +6,21 @@ import {
   Typography,
   IconButton,
   Button,
-  Dialog, 
+  Dialog,
   Stack,
   useTheme,
-  alpha, 
-  Tooltip, 
+  alpha,
+  Tooltip,
   SxProps,
   Theme,
   AppBar,
   Toolbar,
-  Avatar, 
+  Avatar,
 } from '@mui/material';
 import {
   ChevronLeft,
-  ChevronRight, 
-  TrendingUp, 
+  ChevronRight,
+  TrendingUp,
   Today,
   ArrowBack,
   Brightness4 as DarkModeIcon,
@@ -432,10 +432,24 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
   const [selectedTagGroup, setSelectedTagGroup] = useState<string>('');
-  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [zoomedImage, setZoomedImageState] = useState<string | null>(null);
+  const [zoomedImages, setZoomedImages] = useState<string[]>([]);
+  const [zoomedImageIndex, setZoomedImageIndex] = useState<number>(0);
+
+  // Custom function to handle setting zoomed image and related state
+  const setZoomedImage = useCallback((url: string, allImages?: string[], initialIndex?: number) => {
+    setZoomedImageState(url);
+    if (allImages && allImages.length > 0) {
+      setZoomedImages(allImages);
+      setZoomedImageIndex(initialIndex || 0);
+    } else {
+      setZoomedImages([url]);
+      setZoomedImageIndex(0);
+    }
+  }, []);
   const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
-   
+
   const theme = useTheme();
   const navigate = useNavigate();
   const { calendarId } = useParams();
@@ -478,7 +492,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   // Calculate total profit based on filtered trades or use pre-calculated value
   const totalProfit = useMemo(() => {
-     
+
 
     // If no tag filtering is applied and pre-calculated totalPnL is available, use it
     if (selectedTags.length === 0 && totalPnL !== undefined) {
@@ -522,7 +536,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       // Reset to use actual amounts set to false before adding any trade
       setIsDynamicRiskToggled(true);
       if (onToggleDynamicRisk) {
-        onToggleDynamicRisk(true); 
+        onToggleDynamicRisk(true);
       }
       return;
     }
@@ -708,7 +722,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   // Update local state first
                   setIsDynamicRiskToggled(useActualAmounts);
                   if (onToggleDynamicRisk) {
-                    onToggleDynamicRisk(useActualAmounts); 
+                    onToggleDynamicRisk(useActualAmounts);
                   }
                 }}
                 isDynamicRiskToggled={isDynamicRiskToggled}
@@ -1061,8 +1075,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         {/* Image Zoom Dialog */}
         <ImageZoomDialog
           open={!!zoomedImage}
-          onClose={() => setZoomedImage(null)}
+          onClose={() => setZoomedImageState(null)}
           imageUrl={zoomedImage}
+          images={zoomedImages}
+          initialIndex={zoomedImageIndex}
         />
 
         <SelectDateDialog
