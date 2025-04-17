@@ -1,6 +1,6 @@
 # Trade Tracker
 
-A comprehensive React application for tracking and analyzing trading activities with a clean, modern UI.
+A React application for tracking and analyzing trading activities.
 
 ![Trade Tracker Dashboard](docs/images/calendar_list.png)
 
@@ -16,7 +16,7 @@ A comprehensive React application for tracking and analyzing trading activities 
 <p align="center">
   <img src="docs/images/trade_journal.png" alt="Trade Journal" width="700">
   <br>
-  <em>Trade journal with detailed fields and image upload capabilities</em>
+  <em>Trade journal with detailed fields and image upload</em>
 </p>
 
 ### Calendar and Notes
@@ -41,12 +41,12 @@ A comprehensive React application for tracking and analyzing trading activities 
 - View comprehensive statistics including win rate, profit factor, and drawdown
 - Analyze performance by day of week, tag, and time period
 - Track progress toward weekly, monthly, and yearly targets
-- Visualize performance with interactive charts and graphs
+- Visualize performance with charts and graphs
 
 <p align="center">
   <img src="docs/images/calendar_performance.png" alt="Performance Analytics" width="700">
   <br>
-  <em>Interactive performance charts showing trading metrics and analysis</em>
+  <em>Performance charts showing trading metrics and analysis</em>
 </p>
 
 ### User Experience
