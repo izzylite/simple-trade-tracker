@@ -39,6 +39,14 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
     breakEven: '#ff9800'
   };
 
+  // Define session-specific colors
+  const SESSION_COLORS = {
+    'Asia': '#2962ff',
+    'London': '#388e3c',
+    'NY AM': '#f57c00',
+    'NY PM': '#9c27b0'
+  };
+
   return (
     <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>
@@ -52,8 +60,8 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
               sx={{
                 p: 2,
                 border: `1px solid ${alpha(
-                  session.totalPnL > 0 ? theme.palette.success.main : theme.palette.error.main,
-                  0.1
+                  SESSION_COLORS[session.session as keyof typeof SESSION_COLORS],
+                  0.3
                 )}`,
                 borderRadius: 2,
                 bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)',
@@ -82,7 +90,11 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                 }
               }}
             >
-              <Typography variant="subtitle2" gutterBottom>
+              <Typography
+                variant="subtitle2"
+                gutterBottom
+                sx={{ color: SESSION_COLORS[session.session as keyof typeof SESSION_COLORS] }}
+              >
                 {session.session}
               </Typography>
 
@@ -172,6 +184,14 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                     }}
                   />
                 </Box>
+                <Box
+                  sx={{
+                    height: 3,
+                    bgcolor: alpha(SESSION_COLORS[session.session as keyof typeof SESSION_COLORS], 0.2),
+                    borderRadius: 1,
+                    mt: 1
+                  }}
+                />
               </Stack>
             </Paper>
           ))}
@@ -203,7 +223,13 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                   const data = payload[0].payload;
                   return (
                     <Paper sx={{ p: 1.5, bgcolor: 'background.paper' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 'bold',
+                          color: SESSION_COLORS[label as keyof typeof SESSION_COLORS]
+                        }}
+                      >
                         {label}
                       </Typography>
                       <Typography variant="body2" sx={{ color: COLORS.win }}>
@@ -260,7 +286,7 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
               {sessionStats.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={entry.winRate >= 50 ? COLORS.win : COLORS.loss}
+                  fill={SESSION_COLORS[entry.session as keyof typeof SESSION_COLORS]}
                   fillOpacity={0.8}
                 />
               ))}
