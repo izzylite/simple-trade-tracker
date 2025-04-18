@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -28,6 +28,24 @@ const DayHeader: React.FC<DayHeaderProps> = ({
 }) => {
   const theme = useTheme();
   
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!title) return;
+
+      if (e.key === 'ArrowLeft') {
+        onPrevDay();
+      } else if (e.key === 'ArrowRight') {
+        onNextDay();
+      }  
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [title]);
+  
   return (
     <Box sx={{ mb: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -36,9 +54,9 @@ const DayHeader: React.FC<DayHeaderProps> = ({
         </IconButton>}
         
         
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        {title && <Typography variant="h6" sx={{ fontWeight: 600 }}>
           {title}
-        </Typography>
+        </Typography>}
         
         {!formInputVisible && <IconButton onClick={onNextDay} size="small">
           <ChevronRight />
