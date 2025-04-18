@@ -56,7 +56,7 @@ const processTagsForSubmission = (tags: string[]): string[] => {
       return tags;
 };
 
-
+// Calculate cumulative PnL up to a given date
 export const calculateCumulativePnL = (date: Date, allTrades : Trade[]) => {
 
   // Calculate total profit from all trades before the current date
