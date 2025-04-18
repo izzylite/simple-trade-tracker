@@ -16,6 +16,8 @@ import {
   AppBar,
   Toolbar,
   Avatar,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -115,6 +117,8 @@ interface TradeCalendarProps {
   totalPnL?: number;
   // Dynamic risk toggle
   onToggleDynamicRisk?: (useActualAmounts: boolean) => void;
+  // Loading state
+  isLoadingTrades?: boolean;
 }
 
 
@@ -423,26 +427,30 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     // Pre-calculated statistics
     totalPnL,
     // Dynamic risk toggle
-    onToggleDynamicRisk
+    onToggleDynamicRisk,
+    // Loading state
+    isLoadingTrades = false
   } = props;
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isDayNotesDialogOpen, setIsDayNotesDialogOpen] = useState<string | null>(null);
   const [isMonthSelectorOpen, setIsMonthSelectorOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null); 
-  const [zoomedImages, setZoomedImagesState] = useState<ImageZoomProp | null>(null); 
-   
+  const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
+  const [zoomedImages, setZoomedImagesState] = useState<ImageZoomProp | null>(null);
 
- 
+
+
 
   // Custom function to handle setting zoomed image and related state
   const setZoomedImage = useCallback((url: string, allImages?: string[], initialIndex?: number) => {
     setZoomedImagesState({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
-  
+
   }, []);
   const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const theme = useTheme();
   const navigate = useNavigate();
@@ -526,6 +534,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   };
 
   const handleDayClick = (date: Date) => {
+    // Prevent adding new trades when app is loading all trades
+    if (isLoadingTrades) {
+      console.log('Cannot add trade while trades are loading');
+      setSnackbarMessage('Cannot add trade while trades are loading. Please wait...');
+      setSnackbarOpen(true);
+      return;
+    }
+
     if(!isDynamicRiskToggled){
       // Reset to use actual amounts set to false before adding any trade
       setIsDynamicRiskToggled(true);
@@ -539,8 +555,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       setNewTrade(createNewTradeData)
     }
     setSelectedDate(date);
-
-
   };
   const handleDayChange = (date: Date) => {
     setSelectedDate(date);
@@ -567,6 +581,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setSelectedTags(tags);
   };
 
+
+  const handleSnackbarClose = () => {
+    setSnackbarOpen(false);
+  };
 
   return (
     <Box>
@@ -1070,7 +1088,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         {zoomedImages && <ImageZoomDialog
           open={!!zoomedImages}
           onClose={() => setZoomedImagesState(null)}
-          imageProp={zoomedImages} 
+          imageProp={zoomedImages}
         />}
 
         <SelectDateDialog
@@ -1125,7 +1143,22 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           </DialogContentStyled>
         </Dialog>
 
-
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={4000}
+          onClose={handleSnackbarClose}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert
+            onClose={handleSnackbarClose}
+            severity="warning"
+            variant="filled"
+            sx={{ width: '100%' }}
+          >
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
       </Box>
     </Box>
   );

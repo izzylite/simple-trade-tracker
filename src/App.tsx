@@ -84,9 +84,9 @@ function AppContent() {
           });
         }
       }
-  
-      
-      
+
+
+
       // Update the calendar with all loaded trades
       setCalendars(prevCalendars => {
         return prevCalendars.map(cal => {
@@ -106,7 +106,7 @@ function AppContent() {
             }
 
             return {
-              ...cal, 
+              ...cal,
               loadedYears: uniqueYears,
               cachedTrades: allTrades
             };
@@ -199,7 +199,7 @@ function AppContent() {
     if (useActualAmounts) {
       console.log('Resetting to actual trade amounts...');
       // Reload all trades for the calendar to get the original values
-      loadAllTrades(calendarId,true); 
+      loadAllTrades(calendarId,true);
       return;
     }
 
@@ -268,18 +268,18 @@ function AppContent() {
       });
       const stats = calendarService.calculateCalendarStats(updatedTrades, calendar);
       // Calculate new total profit
-      
+
 
       // Update the calendar state with recalculated trades and the new total profit
       updateCalendarState(calendarId, {
         cachedTrades: updatedTrades,
         ...stats
       });
- 
+
     };
 
     // Execute the recalculation and get the results
-     recalculateTrades(); 
+     recalculateTrades();
   };
 
   return (
@@ -327,6 +327,7 @@ function AppContent() {
                 setLoadingCalendarName={setLoadingCalendarName}
                 setLoadingAction={setLoadingAction}
                 onToggleDynamicRisk={handleToggleDynamicRisk}
+                isLoadingTrades={isLoadingTrades}
               />
             }
           />
@@ -363,6 +364,7 @@ interface CalendarRouteProps {
   setLoadingCalendarName: React.Dispatch<React.SetStateAction<string | undefined>>;
   setLoadingAction: React.Dispatch<React.SetStateAction<'loading' | 'importing' | 'exporting'>>;
   onToggleDynamicRisk: (calendarId: string, useActualAmounts: boolean) => void;
+  isLoadingTrades: boolean;
 }
 
 
@@ -375,7 +377,8 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
   setIsImportingTrades,
   setLoadingCalendarName,
   setLoadingAction,
-  onToggleDynamicRisk
+  onToggleDynamicRisk,
+  isLoadingTrades
 }) => {
   const { calendarId } = useParams<{ calendarId: string }>();
   const calendar = calendars.find((c: Calendar) => c.id === calendarId);
@@ -564,6 +567,8 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       totalPnL={calendar.totalPnL}
       // Dynamic risk toggle handler
       onToggleDynamicRisk={(useActualAmounts) => onToggleDynamicRisk(calendar.id, useActualAmounts)}
+      // Pass loading state
+      isLoadingTrades={isLoadingTrades}
     />
   );
 };
