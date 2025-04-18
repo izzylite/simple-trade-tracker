@@ -529,6 +529,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
           return {
             url: img.preview,
             pending: true,
+            calendarId : calendarId,
             id: img.id,
             width: img.width,
             height: img.height,
@@ -584,6 +585,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
 
       // Upload the image with progress tracking
       const uploadedImage = await calendarService.uploadImage(
+        calendarId,
         image.id!!,
         image.file,
         image.width,
@@ -925,6 +927,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
             ...newTrade!.pendingImages.map(img => ({
               url: img.preview || '',
               id: img.id!,
+              calendarId: calendarId,
               pending: true,
               caption: img.caption || '',
               width: img.width || 0,
@@ -936,6 +939,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
             ...newTrade!.uploadedImages.map(img => ({
               url: img.url || '',
               id: img.id,
+              calendarId: calendarId,
               pending: img.pending,
               caption: img.caption || '',
               width: img.width || 0,

@@ -65,9 +65,6 @@ const HEADING_OPTIONS = [
   { label: 'Heading 3', style: 'header-three' },
 ];
 
-// Add character limit constant
-const MAX_CHARACTER_LIMIT = 2024;
-
 export interface RichTextEditorProps {
   value?: string;
   onChange?: (value: string) => void;
@@ -274,30 +271,17 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   // Handle editor state changes
   const handleEditorChange = (state: EditorState) => {
-    // Get the current content state
-    const contentState = state.getCurrentContent();
-    
-    // Check if content has changed
-    if (contentState !== editorState.getCurrentContent()) {
-      // Get plain text to check length
-      const plainText = contentState.getPlainText();
-      
-      // If text exceeds limit, don't update the state
-      if (plainText.length > MAX_CHARACTER_LIMIT) {
-        return;
-      }
-      
-      setEditorState(state);
-      
-      if (onChange) {
-        // Check if there's any content
-        const hasText = contentState.hasText();
-        if (!hasText && contentState.getBlockMap().size === 1) {
-          onChange('');
-        } else {
+    setEditorState(state);
+    // Update toolbar position based on cursor movement within the selection
+    // checkSelectionAndPositionToolbar(); // Debounce or throttle this if performance is an issue
+
+    if (onChange) {
+      // Convert the content to a JSON string
+      const contentState = state.getCurrentContent();
+      // Only save if content has actually changed (prevents unnecessary updates)
+      if (contentState !== editorState.getCurrentContent()) {
           const rawContent = convertToRaw(contentState);
           onChange(JSON.stringify(rawContent));
-        }
       }
     }
   };
@@ -1030,7 +1014,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           position: 'relative', // Crucial for absolute positioning of toolbar
            
           overflow: 'hidden', // Clip potential overflows (like toolbar if not positioned carefully)
-          transition: 'border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out'
+          transition: 'border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+          backgroundColor: theme.palette.background.paper
         }}
       >
         {/* Editor Scrollable Area */}
@@ -1112,19 +1097,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             readOnly={disabled}
             spellCheck={true}
           />
-        </Box>
-
-        {/* Character count indicator */}
-        <Box sx={{ 
-          position: 'absolute', 
-          bottom: 8, 
-          right: 8, 
-          fontSize: '0.75rem', 
-          color: theme.palette.text.secondary,
-          opacity: 0.7,
-          pointerEvents: 'none'
-        }}>
-          {editorState.getCurrentContent().getPlainText().length}/{MAX_CHARACTER_LIMIT}
         </Box>
 
         {/* Render the floating toolbar absolutely positioned relative to the main wrapper */}

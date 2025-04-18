@@ -964,6 +964,7 @@ export const generateImageId = (file: File): string => {
 
 // Upload a single image and return its details
 export const uploadImage = async (
+  calendarId: string,
   filename: string,
   file: File,
   width?: number,
@@ -982,7 +983,7 @@ export const uploadImage = async (
     const uploadTask = uploadBytesResumable(storageRef, file);
 
     // Return a promise that resolves when the upload is complete
-    return new Promise<{ url: string; id: string; width?: number; height?: number; caption?: string }>((resolve, reject) => {
+    return new Promise<TradeImage>((resolve, reject) => {
       uploadTask.on(
         'state_changed',
         (snapshot: any) => {
@@ -1003,6 +1004,7 @@ export const uploadImage = async (
           resolve({
             url: downloadURL,
             id: filename,
+            calendarId: calendarId,
             width,
             height,
             caption

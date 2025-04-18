@@ -174,7 +174,10 @@ async function cleanupRemovedImagesHelper(change: functions.Change<functions.fir
       if (trade.images && Array.isArray(trade.images)) {
         trade.images.forEach((image: any) => {
           if (image && image.id && !afterImagesMap.has(image.id)) {
-            imagesToDelete.push(image.id);
+            if(!image.calendarId || !trade.calendarId || image.calendarId === trade.calendarId){
+              imagesToDelete.push(image.id);
+            }
+           
           }
         });
       }
