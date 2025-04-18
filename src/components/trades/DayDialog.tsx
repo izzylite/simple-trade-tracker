@@ -4,7 +4,7 @@ import {
   Snackbar,
   Alert
 } from '@mui/material';
-import { isAfter, startOfDay } from 'date-fns';
+import { format, isAfter, startOfDay } from 'date-fns';
 import { Trade } from '../../types/trade';
 import { BaseDialog, ConfirmationDialog } from '../common';
 import * as calendarService from '../../services/calendarService';
@@ -1033,7 +1033,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
         <Box sx={{ p: 3 }}>
 
           <DayHeader
-            date={date}
+            title={format(date, 'EEEE, MMMM d, yyyy')}
             accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(),allTrades)}
             formInputVisible={showAddForm}
             totalPnL={trades.reduce((sum, trade) => sum + trade.amount, 0)}

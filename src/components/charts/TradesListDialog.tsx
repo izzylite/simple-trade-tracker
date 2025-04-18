@@ -83,7 +83,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
       <Box sx={{ p: 2 }}>
         {/* DayHeader with navigation buttons hidden */}
         <DayHeader
-          date={dateObj}
+          title={''}
           accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(),allTrades)}
           formInputVisible={true} // Set to true to hide navigation buttons
           totalPnL={totalPnL}

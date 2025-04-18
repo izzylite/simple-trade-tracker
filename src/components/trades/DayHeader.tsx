@@ -10,19 +10,19 @@ import { format } from 'date-fns';
 import { alpha } from '@mui/material/styles';
 
 interface DayHeaderProps {
-  date: Date;
   formInputVisible: boolean;
   accountBalance: number;
+  title:string,
   totalPnL: number;
   onPrevDay: () => void;
   onNextDay: () => void;
 }
 
 const DayHeader: React.FC<DayHeaderProps> = ({
-  date,
   accountBalance,
   formInputVisible,
   totalPnL,
+  title,
   onPrevDay,
   onNextDay
 }) => {
@@ -37,7 +37,7 @@ const DayHeader: React.FC<DayHeaderProps> = ({
         
         
         <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          {format(date, 'EEEE, MMMM d, yyyy')}
+          {title}
         </Typography>
         
         {!formInputVisible && <IconButton onClick={onNextDay} size="small">
