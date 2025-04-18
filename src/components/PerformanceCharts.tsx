@@ -58,7 +58,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     expandedTradeId: null
   });
 
-  const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null); 
+  const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
 
 
   const handleTimePeriodChange = (newValue: TimePeriod) => {
@@ -392,7 +392,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod).filter(trade => trade.session !== undefined);
 
     const sessions = ['Asia', 'London', 'NY AM', 'NY PM'];
-    
+
 
     return sessions.map(sessionName => {
       const sessionTrades = filteredTrades.filter(trade => trade.session === sessionName);
@@ -485,7 +485,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   };
 
   const handleZoomImage = (imageUrl: string, allImages?: string[], initialIndex?: number) => {
-    setZoomedImages({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [imageUrl] }); 
+    setZoomedImages({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [imageUrl] });
   };
 
   const handleTagAnalysisTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -558,6 +558,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         onClose={() => setMultipleTradesDialog(prev => ({ ...prev, open: false }))}
         onTradeExpand={handleTradeExpand}
         onZoomImage={handleZoomImage}
+        accountBalance={accountBalance}
+        allTrades={trades}
       />
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>

@@ -56,6 +56,21 @@ const processTagsForSubmission = (tags: string[]): string[] => {
       return tags;
 };
 
+
+export const calculateCumulativePnL = (date: Date, allTrades : Trade[]) => {
+
+  // Calculate total profit from all trades before the current date
+  const total = allTrades.reduce((acc, trade) => {
+
+    const tradeDate = new Date(trade.date);
+    if (tradeDate < date) {
+      acc += trade.amount;
+    }
+    return acc;
+  }, 0);
+  return total;
+};
+
 const DayDialog: React.FC<DayDialogProps> = ({
   open,
   onClose,
@@ -91,19 +106,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
 
-  const calculateCumulativePnL = (date: Date) => {
 
-    // Calculate total profit from all trades before the current date
-    const total = allTrades.reduce((acc, trade) => {
-
-      const tradeDate = new Date(trade.date);
-      if (tradeDate < date) {
-        acc += trade.amount;
-      }
-      return acc;
-    }, 0);
-    return total;
-  };
   useEffect(() => {
     setShowAddForm(showForm);
   }, [showForm]);
@@ -330,7 +333,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
     if (riskPerTrade && trade.riskToReward && !trade.partialsTaken) {
       const rr = parseFloat(trade.riskToReward);
       if (!isNaN(rr)) {
-        const calculatedAmount = calculateAmountFromRiskToReward(rr, calculateCumulativePnL(trade.date || date));
+        const calculatedAmount = calculateAmountFromRiskToReward(rr, calculateCumulativePnL(trade.date || date,allTrades));
         // Apply sign based on trade type
         return trade.type === 'loss' ? -Math.abs(calculatedAmount) : Math.abs(calculatedAmount);
       }
@@ -1031,7 +1034,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
 
           <DayHeader
             date={date}
-            accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay())}
+            accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(),allTrades)}
             formInputVisible={showAddForm}
             totalPnL={trades.reduce((sum, trade) => sum + trade.amount, 0)}
             onPrevDay={handlePrevDay}
@@ -1042,7 +1045,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
             <Box>
               <TradeForm
                 accountBalance={accountBalance}
-                calculateCumulativePnl={(newTrade) => calculateCumulativePnL(newTrade?.date || new Date())}
+                calculateCumulativePnl={(newTrade) => calculateCumulativePnL(newTrade?.date || new Date(),allTrades)}
                 dynamicRiskEnabled={dynamicRiskEnabled}
                 increasedRiskPercentage={increasedRiskPercentage}
                 profitThresholdPercentage={profitThresholdPercentage}

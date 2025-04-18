@@ -744,7 +744,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                         aspectRatio: pendingImg?.width && pendingImg?.height ? `${pendingImg.width}/${pendingImg.height}` : '16/9', // Default aspect ratio
                                     }}
                                 >
-                                {/* Progress Indicator.uploadProgress == 0 means preparing, > 0 means uploading, -1 means default  */}
+                                {/* Progress Indicator.uploadProgress == 0 means preparing, > 0 means uploading, -1 or undefined means default  */}
                                 {pendingImg?.uploadProgress !== undefined && pendingImg.uploadProgress >= 0 && pendingImg.uploadProgress < 100 && (
                                     <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 2 }}>
                                         <Box sx={{ position: 'relative', display: 'inline-flex' }}>
