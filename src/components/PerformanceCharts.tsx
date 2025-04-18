@@ -3,7 +3,7 @@ import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth, parse
 import { Box, Typography, useTheme, Tabs, Tab, Paper } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { Trade } from '../types/trade';
-import ImageZoomDialog from './ImageZoomDialog';
+import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
 import {
   CumulativePnLChart,
   DailyPnLChart,
@@ -58,9 +58,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     expandedTradeId: null
   });
 
-  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
-  const [zoomedImages, setZoomedImages] = useState<string[]>([]);
-  const [zoomedImageIndex, setZoomedImageIndex] = useState<number>(0);
+  const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null); 
+
 
   const handleTimePeriodChange = (newValue: TimePeriod) => {
     setTimePeriod(newValue);
@@ -393,6 +392,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod).filter(trade => trade.session !== undefined);
 
     const sessions = ['Asia', 'London', 'NY AM', 'NY PM'];
+    
 
     return sessions.map(sessionName => {
       const sessionTrades = filteredTrades.filter(trade => trade.session === sessionName);
@@ -485,14 +485,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   };
 
   const handleZoomImage = (imageUrl: string, allImages?: string[], initialIndex?: number) => {
-    setZoomedImage(imageUrl);
-    if (allImages && allImages.length > 0) {
-      setZoomedImages(allImages);
-      setZoomedImageIndex(initialIndex || 0);
-    } else {
-      setZoomedImages([imageUrl]);
-      setZoomedImageIndex(0);
-    }
+    setZoomedImages({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [imageUrl] }); 
   };
 
   const handleTagAnalysisTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -548,13 +541,13 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   return (
     <Box sx={{ p: 2 }}>
       {/* Image Zoom Dialog */}
-      <ImageZoomDialog
-        open={!!zoomedImage}
-        onClose={() => setZoomedImage(null)}
-        imageUrl={zoomedImage}
-        images={zoomedImages}
-        initialIndex={zoomedImageIndex}
-      />
+      {zoomedImages && (
+        <ImageZoomDialog
+          open={!!zoomedImages}
+          onClose={() => setZoomedImages(null)}
+          imageProp={zoomedImages}
+        />
+      )}
 
       {/* Trades Dialog */}
       <TradesListDialog

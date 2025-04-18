@@ -16,21 +16,28 @@ import {
 interface ImageZoomDialogProps {
   open: boolean;
   onClose: () => void;
-  imageUrl?: string | null; // For backward compatibility
-  images?: string[];
-  initialIndex?: number;
+  imageProp: ImageZoomProp; 
+}
+
+export interface ImageZoomProp{
+  selectetdImageIndex: number;
+  allImages: string[];
 }
 
 const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
   open,
   onClose,
-  imageUrl,
-  images = [],
-  initialIndex = 0
+  imageProp, 
 }) => {
   // For backward compatibility, if imageUrl is provided but not images
+  const images = imageProp?.allImages || [];
+  const imageUrl = imageProp?.allImages[imageProp?.selectetdImageIndex || 0];
+   
   const imageArray = images.length > 0 ? images : (imageUrl ? [imageUrl] : []);
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [imageData, setImageData] = useState<ImageZoomProp>(imageProp);
+ if(imageData==null && imageProp){
+  setImageData(imageProp);
+ }
   const theme = useTheme();
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -102,12 +109,28 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
   // Navigation functions
   const navigateNext = useCallback(() => {
     if (imageArray.length <= 1) return;
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % imageArray.length);
+    setImageData((prev) => {
+      if (prev) {
+        return {
+          ...prev,
+          selectetdImageIndex: (prev.selectetdImageIndex + 1) % imageArray.length
+        };
+      }
+      return prev;
+    });
   }, [imageArray.length]);
 
   const navigatePrevious = useCallback(() => {
     if (imageArray.length <= 1) return;
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + imageArray.length) % imageArray.length);
+    setImageData((prev) => {
+      if (prev) {
+        return {
+          ...prev,
+          selectetdImageIndex: (prev.selectetdImageIndex - 1 + imageArray.length) % imageArray.length
+        };
+      }
+      return prev;
+    });
   }, [imageArray.length]);
 
   // Reset zoom when image changes
@@ -115,7 +138,7 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
     if (open) {
       resetZoom();
     }
-  }, [open, currentIndex]);
+  }, [open, imageData]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -135,7 +158,7 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, currentIndex, imageArray.length, navigatePrevious, navigateNext, onClose]);
+  }, [open, imageData, imageArray.length, navigatePrevious, navigateNext, onClose]);
 
   // Add event listeners for mouse up on document level
   useEffect(() => {
@@ -148,7 +171,7 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
       document.removeEventListener('mouseup', handleGlobalMouseUp);
     };
   }, []);
-
+  console.log(imageData);
   return (
     <Dialog
       open={open}
@@ -260,7 +283,7 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
                 zIndex: 1200
               }}
             >
-              {currentIndex + 1} / {imageArray.length}
+              {imageData?.selectetdImageIndex!! + 1} / {imageArray.length}
             </Box>
           )}
           <Box
@@ -293,8 +316,8 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
           >
             <img
               ref={imageRef}
-              src={imageArray[currentIndex]}
-              alt={`Trade Image ${currentIndex + 1} of ${imageArray.length}`}
+              src={imageArray[imageData?.selectetdImageIndex || 0]}
+              alt={`Trade Image ${imageData?.selectetdImageIndex!! + 1} of ${imageArray.length}`}
               style={{
                 maxWidth: '100%',
                 maxHeight: '100%',

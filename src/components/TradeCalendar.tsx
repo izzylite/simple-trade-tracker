@@ -76,7 +76,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { dialogProps } from '../styles/dialogStyles';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { useAuth } from '../contexts/AuthContext';
-import ImageZoomDialog from './ImageZoomDialog';
+import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
 import { NewTradeForm, TradeImage } from './trades/TradeForm';
 import DayNotesDialog from './DayNotesDialog';
 import { Calendar } from '../types/calendar';
@@ -430,22 +430,16 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [isDayNotesDialogOpen, setIsDayNotesDialogOpen] = useState<string | null>(null);
   const [isMonthSelectorOpen, setIsMonthSelectorOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
-  const [selectedTagGroup, setSelectedTagGroup] = useState<string>('');
-  const [zoomedImage, setZoomedImageState] = useState<string | null>(null);
-  const [zoomedImages, setZoomedImages] = useState<string[]>([]);
-  const [zoomedImageIndex, setZoomedImageIndex] = useState<number>(0);
+  const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null); 
+  const [zoomedImages, setZoomedImagesState] = useState<ImageZoomProp | null>(null); 
+   
+
+ 
 
   // Custom function to handle setting zoomed image and related state
   const setZoomedImage = useCallback((url: string, allImages?: string[], initialIndex?: number) => {
-    setZoomedImageState(url);
-    if (allImages && allImages.length > 0) {
-      setZoomedImages(allImages);
-      setZoomedImageIndex(initialIndex || 0);
-    } else {
-      setZoomedImages([url]);
-      setZoomedImageIndex(0);
-    }
+    setZoomedImagesState({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
+  
   }, []);
   const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
@@ -1073,13 +1067,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
         {/* Image Zoom Dialog */}
-        <ImageZoomDialog
-          open={!!zoomedImage}
-          onClose={() => setZoomedImageState(null)}
-          imageUrl={zoomedImage}
-          images={zoomedImages}
-          initialIndex={zoomedImageIndex}
-        />
+        {zoomedImages && <ImageZoomDialog
+          open={!!zoomedImages}
+          onClose={() => setZoomedImagesState(null)}
+          imageProp={zoomedImages} 
+        />}
 
         <SelectDateDialog
           open={isMonthSelectorOpen}
