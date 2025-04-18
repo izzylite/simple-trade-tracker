@@ -355,13 +355,14 @@ const convertCalendarToFirestoreData = (calendar: Omit<Calendar, 'id' | 'cachedT
 };
 
 // Convert Trade object to Firestore data
-const convertTradeToFirestoreData = (trade: Trade) => {
+const convertTradeToFirestoreData = (trade: Trade,calendarId : string) => {
   // Create base object with required fields
   const baseData = {
     id: trade.id,
     date: Timestamp.fromDate(new Date(trade.date)),
     amount: trade.amount,
-    type: trade.type
+    type: trade.type,
+    calendarId: calendarId
   };
 
   // Process images to ensure no undefined values
@@ -499,11 +500,11 @@ const convertFirestoreDataToYearlyTrades = (doc: DocumentData): YearlyTrades => 
 };
 
 // Convert YearlyTrades object to Firestore data
-const convertYearlyTradesToFirestoreData = (yearlyTrades: YearlyTrades) => {
+const convertYearlyTradesToFirestoreData = (yearlyTrades: YearlyTrades,calendarId : string) => {
   return {
     year: yearlyTrades.year,
     lastModified: Timestamp.fromDate(yearlyTrades.lastModified),
-    trades: yearlyTrades.trades.map(trade => convertTradeToFirestoreData(trade))
+    trades: yearlyTrades.trades.map(trade => convertTradeToFirestoreData(trade,calendarId))
   };
 };
 
@@ -651,7 +652,7 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
         yearlyTrades.trades.push(trade);
         yearlyTrades.lastModified = new Date();
 
-        transaction.update(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades));
+        transaction.update(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades,calendarId));
       } else {
         // Year document doesn't exist, create it
         const yearlyTrades: YearlyTrades = {
@@ -660,7 +661,7 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
           trades: [trade]
         };
 
-        transaction.set(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades));
+        transaction.set(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades,calendarId));
       }
 
       // Update the calendar with stats
@@ -796,7 +797,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       if (yearDoc.exists()) {
         // Update existing year document
         transaction.update(yearDocRef, {
-          trades: yearTrades.map(trade => convertTradeToFirestoreData(trade)),
+          trades: yearTrades.map(trade => convertTradeToFirestoreData(trade,calendarId)),
           lastModified: Timestamp.fromDate(new Date())
         });
       } else {
@@ -804,7 +805,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
         console.log(`Creating new year document for year ${year}`);
         transaction.set(yearDocRef, {
           year,
-          trades: yearTrades.map(trade => convertTradeToFirestoreData(trade)),
+          trades: yearTrades.map(trade => convertTradeToFirestoreData(trade,calendarId)),
           lastModified: Timestamp.fromDate(new Date())
         });
       }
@@ -863,7 +864,7 @@ export const clearMonthTrades = async (calendarId: string, month: number, year: 
     // Calculate stats
     const stats = calculateCalendarStats(allTrades, calendar);
 
-    await updateDoc(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades));
+    await updateDoc(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades,calendarId));
 
     // Update the calendar with stats and lastModified timestamp
     await updateCalendarStats(calendarRef, stats);
@@ -919,7 +920,7 @@ export const importTrades = async (calendarId: string, trades: Trade[]): Promise
     };
 
     const yearDocRef = doc(db, CALENDARS_COLLECTION, calendarId, YEARS_SUBCOLLECTION, year);
-    await setDoc(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades));
+    await setDoc(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades,calendarId));
   }
 
   // Update the calendar with stats and lastModified timestamp
@@ -929,10 +930,7 @@ export const importTrades = async (calendarId: string, trades: Trade[]): Promise
   return stats;
 };
 
-export const deleteImage = async (imageId: string) => {
-  const imageRef = ref(storage, `users/${auth.currentUser?.uid}/trade-images/${imageId}`);
-  await deleteObject(imageRef);
-};
+
 
 
 

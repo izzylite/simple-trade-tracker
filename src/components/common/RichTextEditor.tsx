@@ -796,8 +796,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onClick={() => applyHeading(option.style)}
             selected={currentBlock === option.style}
             sx={{
-                fontWeight: option.style.includes('header') ? 'bold' : 'normal',
-                fontSize: option.style === 'header-one' ? '1.4rem' : option.style === 'header-two' ? '1.2rem' : option.style === 'header-three' ? '1.1rem' : 'inherit',
+                fontWeight: option.style.includes('header') ? 'bold' : 500, // Use bold for headers, medium for normal text
+                fontSize: option.style === 'header-one' ? '1.4rem' : option.style === 'header-two' ? '1.2rem' : option.style === 'header-three' ? '1rem' : '0.85rem',
+                fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
             }}
           >
             {option.label}
@@ -1012,7 +1013,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         sx={{
           opacity: disabled ? 0.6 : 1,
           position: 'relative', // Crucial for absolute positioning of toolbar
-           
+
           overflow: 'hidden', // Clip potential overflows (like toolbar if not positioned carefully)
           transition: 'border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
           backgroundColor: theme.palette.background.paper
@@ -1023,7 +1024,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           ref={editorWrapperRef}
           onClick={focusEditor}
           sx={{
-            padding: theme.spacing(1.5, 2), // Adjust padding
+            padding: theme.spacing(1.2, 1.8), // Reduced padding to match smaller text
             minHeight,
             maxHeight,
             overflow: 'auto', // Keep scrolling internal to this Box
@@ -1035,17 +1036,20 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             '& .public-DraftEditorPlaceholder-root': {
                 color: theme.palette.text.disabled,
                 position: 'absolute',
-                top: theme.spacing(1.5), // Match padding
-                left: theme.spacing(2), // Match padding
+                top: theme.spacing(1.2), // Match reduced padding
+                left: theme.spacing(1.8), // Match reduced padding
                 zIndex: 0, // Below content
                 pointerEvents: 'none', // Don't interfere with clicks
                 opacity: 0.8,
+                fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
+                fontWeight: 500, // Medium weight for thicker text
             },
             '& .public-DraftEditor-content': {
               minHeight: typeof minHeight === 'number' ? `calc(${minHeight}px - ${theme.spacing(3)})` : `calc(${minHeight} - ${theme.spacing(3)})`, // Adjust minHeight based on padding
-              fontFamily: theme.typography.fontFamily,
+              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
               fontSize: '1rem',
-              lineHeight: 1.6,
+              lineHeight: 1.3, // Reduced line height to match the image
+              fontWeight: 500, // Medium weight for thicker text
               color: theme.palette.text.primary,
               position: 'relative',
               zIndex: 1, // Above placeholder
@@ -1056,26 +1060,30 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             },
             // Custom Block Styles
             '& .RichEditor-h1': {
-              fontSize: '1.75rem', fontWeight: 'bold', margin: '1rem 0 0.5rem',
-              color: theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.primary.dark,
-              paddingBottom: '0.3rem', borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+              fontSize: '1.4rem', fontWeight: 'bold', margin: '0.8rem 0 0.4rem',
+              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
             },
             '& .RichEditor-h2': {
-              fontSize: '1.4rem', fontWeight: 'bold', margin: '0.8rem 0 0.4rem',
-              color: theme.palette.mode === 'dark' ? theme.palette.secondary.light : theme.palette.secondary.dark,
+              fontSize: '1.2rem', fontWeight: 'bold', margin: '0.6rem 0 0.3rem',
+              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
             },
             '& .RichEditor-h3': {
-              fontSize: '1.2rem', fontWeight: 'bold', margin: '0.6rem 0 0.3rem', fontStyle: 'italic',
+              fontSize: '1rem', fontWeight: 'bold', margin: '0.5rem 0 0.25rem', fontStyle: 'italic',
+              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
             },
             '& .RichEditor-ul, & .RichEditor-ol': {
-              marginLeft: '1.8rem', // Indentation for lists
-              marginBlockStart: '0.5em',
-              marginBlockEnd: '0.5em',
+              marginLeft: '1.5rem', // Reduced indentation for lists
+              marginBlockStart: '0.4em',
+              marginBlockEnd: '0.4em',
               paddingInlineStart: '0', // Reset browser default padding
+              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
+              fontWeight: 500, // Medium weight for thicker text
             },
             '& .RichEditor-ul li, & .RichEditor-ol li': {
-              margin: '0.25rem 0',
-              paddingLeft: '0.5rem', // Space between bullet/number and text
+              margin: '0.2rem 0',
+              paddingLeft: '0.4rem', // Reduced space between bullet/number and text
+              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
+              fontWeight: 500, // Medium weight for thicker text
             },
              '& .RichEditor-ul li::marker': { // Style bullets if needed
                  // content: '"• "';
