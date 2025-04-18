@@ -232,7 +232,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
   const isAnyImageUploading = (): boolean => {
     return pendingImages.some(img =>
       img.uploadProgress !== undefined &&
-      img.uploadProgress > 0 &&
+      img.uploadProgress >= 0 && // default uploadProgress state is -1 or undefined 
       img.uploadProgress < 100
     );
   };
@@ -744,11 +744,11 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                         aspectRatio: pendingImg?.width && pendingImg?.height ? `${pendingImg.width}/${pendingImg.height}` : '16/9', // Default aspect ratio
                                     }}
                                 >
-                                {/* Progress Indicator */}
-                                {pendingImg?.uploadProgress !== undefined && pendingImg.uploadProgress > 0 && pendingImg.uploadProgress < 100 && (
+                                {/* Progress Indicator.uploadProgress == 0 means preparing, > 0 means uploading, -1 means default  */}
+                                {pendingImg?.uploadProgress !== undefined && pendingImg.uploadProgress >= 0 && pendingImg.uploadProgress < 100 && (
                                     <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 2 }}>
                                         <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                                            <CircularProgress variant="determinate" value={pendingImg.uploadProgress} size={60} sx={{ color: 'white' }} />
+                                            <CircularProgress variant={pendingImg.uploadProgress === 0 ? 'indeterminate' : 'determinate'} value={pendingImg.uploadProgress} size={80} sx={{ color: 'white' }} />
                                             <Box
                                                 sx={{
                                                     top: 0,
@@ -761,8 +761,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                                     justifyContent: 'center',
                                                 }}
                                             >
-                                                <Typography variant="caption" component="div" sx={{ color: 'white', fontWeight: 'bold' }}>
-                                                    {`${Math.round(pendingImg.uploadProgress)}%`}
+                                                <Typography variant="caption" component="div" sx={{ color: 'white', fontSize: `${pendingImg.uploadProgress === 0 ? '0.55rem' : undefined}`, fontWeight: 'bold' }}>
+                                                    {pendingImg.uploadProgress === 0 ? 'Preparing...' : `${Math.round(pendingImg.uploadProgress)}%`}
                                                 </Typography>
                                             </Box>
                                         </Box>
@@ -793,7 +793,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                     maxRows={20} // Large number to effectively disable scrolling
                                     fullWidth
                                     // Disable the field when image is uploading
-                                    disabled={pendingImg?.uploadProgress !== undefined && pendingImg.uploadProgress > 0 && pendingImg.uploadProgress < 100}
+                                    disabled={pendingImg?.uploadProgress !== undefined && pendingImg.uploadProgress >= 0 && pendingImg.uploadProgress < 100}
                                     sx={{
                                         px: 1,
                                         py: 0.5,

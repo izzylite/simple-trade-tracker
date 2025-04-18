@@ -171,7 +171,6 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
       document.removeEventListener('mouseup', handleGlobalMouseUp);
     };
   }, []);
-  console.log(imageData);
   return (
     <Dialog
       open={open}
