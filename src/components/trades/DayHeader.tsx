@@ -28,23 +28,7 @@ const DayHeader: React.FC<DayHeaderProps> = ({
 }) => {
   const theme = useTheme();
   
-  // Handle keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!title) return;
-
-      if (e.key === 'ArrowLeft') {
-        onPrevDay();
-      } else if (e.key === 'ArrowRight') {
-        onNextDay();
-      }  
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [title]);
+   
   
   return (
     <Box sx={{ mb: 3 }}>

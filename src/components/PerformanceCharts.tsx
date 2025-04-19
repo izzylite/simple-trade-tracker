@@ -99,6 +99,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     }
   }, [trades, multipleTradesDialog.open, multipleTradesDialog.trades]);
 
+  
+
   const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
 
 
