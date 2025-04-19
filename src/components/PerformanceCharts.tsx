@@ -65,13 +65,29 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   // Keep multipleTradesDialog.trades in sync with the main trades array
   useEffect(() => {
     if (multipleTradesDialog.open && multipleTradesDialog.trades.length > 0) {
-      // Update the trades in the dialog with the latest data from the main trades array
-      const updatedDialogTrades = multipleTradesDialog.trades.map(dialogTrade => {
-        // Find the corresponding trade in the main trades array
-        const updatedTrade = trades.find(t => t.id === dialogTrade.id);
-        // Return the updated trade if found, otherwise return the original dialog trade
-        return updatedTrade || dialogTrade;
-      });
+      // Filter out deleted trades and update remaining ones
+      const updatedDialogTrades = multipleTradesDialog.trades
+        .filter(dialogTrade => {
+          // Keep the trade only if it still exists in the main trades array
+          // or if it doesn't have isDeleted flag set to true
+          const stillExists = trades.some(t => t.id === dialogTrade.id);
+          return stillExists && !dialogTrade.isDeleted;
+        })
+        .map(dialogTrade => {
+          // Find the corresponding trade in the main trades array
+          const updatedTrade = trades.find(t => t.id === dialogTrade.id);
+          // Return the updated trade if found, otherwise return the original dialog trade
+          return updatedTrade || dialogTrade;
+        });
+
+      // If all trades were deleted, close the dialog
+      if (updatedDialogTrades.length === 0) {
+        setMultipleTradesDialog(prev => ({
+          ...prev,
+          open: false
+        }));
+        return;
+      }
 
       // Only update if there are actual changes
       if (JSON.stringify(updatedDialogTrades) !== JSON.stringify(multipleTradesDialog.trades)) {
