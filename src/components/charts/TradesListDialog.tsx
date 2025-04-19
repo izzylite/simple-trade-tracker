@@ -6,8 +6,8 @@ import {
 import { Trade } from '../../types/trade';
 import TradeList from '../trades/TradeList';
 import { BaseDialog } from '../common';
-import DayHeader from '../trades/DayHeader';
-import { calculateCumulativePnL } from '../trades/DayDialog';
+import DayHeader from '../trades/DayHeader'; 
+import { calculateCumulativePnL, startOfNextDay } from '../trades/TradeFormDialog';
 
 interface TradesDialogProps {
   open: boolean;
@@ -17,8 +17,10 @@ interface TradesDialogProps {
   onClose: () => void;
   onTradeExpand: (tradeId: string) => void;
   onZoomImage: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
-  accountBalance: number;  
+  accountBalance: number;
   allTrades: Trade[];
+  onEditClick?: (trade: Trade) => void;
+  onDeleteClick?: (tradeId: string) => void;
 }
 
 const TradesListDialog: React.FC<TradesDialogProps> = ({
@@ -30,15 +32,12 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   onTradeExpand,
   onZoomImage,
   accountBalance,
-  allTrades
+  allTrades,
+  onEditClick,
+  onDeleteClick
 }) => {
-  // Convert string date to Date object if it's a date string
-  const startOfNextDay = (): Date => {
-    const nextDay = new Date(date);
-    nextDay.setDate(nextDay.getDate() + 1);
-    return nextDay;
-  }
-  
+   
+
   const dateObj = React.useMemo(() => {
     try {
       // Try to parse the date string
@@ -84,7 +83,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
         {/* DayHeader with navigation buttons hidden */}
         <DayHeader
           title={''}
-          accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(),allTrades)}
+          accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(date),allTrades)}
           formInputVisible={true} // Set to true to hide navigation buttons
           totalPnL={totalPnL}
           onPrevDay={() => {}} // Empty function since we're hiding the buttons
@@ -96,10 +95,10 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
           trades={trades}
           expandedTradeId={expandedTradeId}
           onTradeClick={onTradeExpand}
-          onEditClick={() => {}} // No-op function since we don't want edit functionality
-          onDeleteClick={() => {}} // No-op function since we don't want delete functionality
+          onEditClick={onEditClick || (() => {})} // Use provided handler or no-op
+          onDeleteClick={onDeleteClick || (() => {})} // Use provided handler or no-op
           onZoomedImage={onZoomImage}
-          hideActions={true} // New prop to hide edit/delete buttons
+          hideActions={!onEditClick && !onDeleteClick} // Hide actions only if both handlers are not provided
         />
       </Box>
     </BaseDialog>

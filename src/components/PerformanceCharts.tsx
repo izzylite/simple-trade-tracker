@@ -26,6 +26,8 @@ interface PerformanceChartsProps {
   onTimePeriodChange?: (period: TimePeriod) => void;
   onPrimaryTagsChange?: (tags: string[]) => void;
   onSecondaryTagsChange?: (tags: string[]) => void;
+  onEditTrade?: (trade: Trade) => void;
+  onDeleteTrade?: (tradeId: string) => void;
 }
 
 type TimePeriod = 'month' | 'year' | 'all';
@@ -38,7 +40,9 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   maxDailyDrawdown,
   onTimePeriodChange,
   onPrimaryTagsChange = () => {},
-  onSecondaryTagsChange = () => {}
+  onSecondaryTagsChange = () => {},
+  onEditTrade,
+  onDeleteTrade
 }) => {
   const theme = useTheme();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
@@ -560,6 +564,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         onZoomImage={handleZoomImage}
         accountBalance={accountBalance}
         allTrades={trades}
+        onEditClick={onEditTrade}
+        onDeleteClick={onDeleteTrade}
       />
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>

@@ -57,7 +57,7 @@ import {
 import { formatCurrency } from '../utils/formatters';
 import CalendarNote from './CalendarNote';
 import { Trade } from '../types/trade';
-import DayDialog from './trades/DayDialog';
+import DayDialog from './trades/DayDialog'; 
 import SelectDateDialog from './SelectDateDialog';
 import PerformanceCharts from './PerformanceCharts';
 import TagFilterDialog from './TagFilterDialog';
@@ -85,6 +85,7 @@ import { Calendar } from '../types/calendar';
 import MonthlyStats from './MonthlyStats';
 import AccountStats from './AccountStats';
 import DayNoteCard from './DayNoteCard';
+import TradeFormDialog, { createEditTradeData } from './trades/TradeFormDialog';
 
 interface TradeCalendarProps {
   trades: Trade[];
@@ -100,7 +101,7 @@ interface TradeCalendarProps {
   onAddTrade?: (trade: Trade) => Promise<void>;
   onEditTrade?: (trade: Trade) => Promise<void>;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar ) => Promise<void>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
 
   onImageUpload?: (tradeId: string, image: TradeImage, add: boolean) => Promise<void>;
   onDeleteTrade?: (tradeId: string) => Promise<void>;
@@ -236,22 +237,22 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ date, trades, monthStart, weekInd
 
 
 
-  export const createNewTradeData = (): NewTradeForm => ({
-    id: uuidv4()!!,
-    name: '',
-    amount: '',
-    type: 'win',
-    entry: '',
-    date: null,
-    exit: '',
-    tags: [],
-    riskToReward: '',
-    partialsTaken: false,
-    session: '',
-    notes: '',
-    pendingImages: [],
-    uploadedImages: [],
-  });
+export const createNewTradeData = (): NewTradeForm => ({
+  id: uuidv4()!!,
+  name: '',
+  amount: '',
+  type: 'win',
+  entry: '',
+  date: null,
+  exit: '',
+  tags: [],
+  riskToReward: '',
+  partialsTaken: false,
+  session: '',
+  notes: '',
+  pendingImages: [],
+  uploadedImages: [],
+});
 
 const calculateDayStats = (
   trades: Trade[],
@@ -277,10 +278,10 @@ const calculateDayStats = (
   let effectiveMaxDailyDrawdown = maxDailyDrawdown;
 
   if (dynamicRiskEnabled &&
-      increasedRiskPercentage &&
-      profitThresholdPercentage &&
-      totalPnL !== undefined &&
-      accountBalance > 0) {
+    increasedRiskPercentage &&
+    profitThresholdPercentage &&
+    totalPnL !== undefined &&
+    accountBalance > 0) {
     // Calculate profit percentage based on account balance + totalPnL
     const profitPercentage = (totalPnL / accountBalance) * 100;
 
@@ -437,6 +438,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [isMonthSelectorOpen, setIsMonthSelectorOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
+  const [showAddForm, setShowAddForm] = useState<{ open: boolean,date: Date, editTrade?: Trade | null, createTempTrade?: boolean, showDayDialogWhenDone : boolean } | null>(null);
   const [zoomedImages, setZoomedImagesState] = useState<ImageZoomProp | null>(null);
 
 
@@ -542,7 +544,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       return;
     }
 
-    if(!isDynamicRiskToggled){
+    if (!isDynamicRiskToggled) {
       // Reset to use actual amounts set to false before adding any trade
       setIsDynamicRiskToggled(true);
       if (onToggleDynamicRisk) {
@@ -551,10 +553,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       return;
     }
     const trades = filteredTrades.filter(trade => isSameDay(new Date(trade.date), date));
-    if(trades.length==0){
-      setNewTrade(createNewTradeData)
+    if (trades.length == 0) {
+      setNewTrade(createNewTradeData);
+      setShowAddForm({ open: true, date: date,showDayDialogWhenDone: true });
     }
-    setSelectedDate(date);
+    else {
+      setSelectedDate(date);
+    }
   };
   const handleDayChange = (date: Date) => {
     setSelectedDate(date);
@@ -1038,9 +1043,33 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         </Box>
 
         <DayDialog
-          open={!!selectedDate}
+          open={!!selectedDate && !showAddForm?.open}
           onClose={() => {
             setSelectedDate(null);
+          }}
+          showAddForm={(trade) => {
+            if (trade !== null) {
+              setNewTrade(() => (createEditTradeData(trade!!)));
+            }
+            setShowAddForm({ open: true,date: selectedDate!!, editTrade: trade, createTempTrade: trade === null, showDayDialogWhenDone: true});
+          }}
+          date={selectedDate || new Date()}
+          trades={selectedDate ? tradesForSelectedDay : []}
+          onUpdateTradeProperty={onUpdateTradeProperty}
+          calendarId={calendarId!!}
+          onDateChange={handleDayChange}
+          setZoomedImage={setZoomedImage}
+          accountBalance={accountBalance}
+          allTrades={trades} /* Pass all trades for tag suggestions */
+
+        />
+
+
+        <TradeFormDialog
+          open={!!showAddForm?.date && showAddForm?.open || false}
+          onClose={() => {
+            setSelectedDate(null);
+            setShowAddForm(null);
             if (newTrade != null && newTrade.pendingImages) {
               // Release object URLs to avoid memory leaks
               newTrade.pendingImages.forEach(image => {
@@ -1049,16 +1078,22 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               setNewTrade(null);
             }
           }}
-          showForm={newTrade!=null}
-          date={selectedDate || new Date()}
-          trades={selectedDate ? tradesForSelectedDay : []}
+          onCancel={() => {
+            if(showAddForm?.showDayDialogWhenDone){
+              setSelectedDate(null);
+              setSelectedDate(showAddForm?.date!!); // show the day dialog
+            }
+            setShowAddForm(null);
+          }}
+          showForm={{ open: showAddForm?.open || false, editTrade: showAddForm?.editTrade || null, createTempTrade: showAddForm?.createTempTrade || false }}
+          date={showAddForm?.date || new Date()}
+          trades={showAddForm?.date ? tradesForSelectedDay : []}
           onAddTrade={handleAddTrade}
           onTagUpdated={onTagUpdated}
           newMainTrade={newTrade}
           setNewMainTrade={prev => setNewTrade(prev(newTrade!!))}
           onUpdateTradeProperty={onUpdateTradeProperty}
           calendarId={calendarId!!}
-          onDateChange={handleDayChange}
           setZoomedImage={setZoomedImage}
           accountBalance={accountBalance}
           onAccountBalanceChange={onAccountBalanceChange}
@@ -1069,19 +1104,19 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           profitThresholdPercentage={profitThresholdPercentage}
         />
 
-          {/* Day Notes Dialog */}
-          {isDayNotesDialogOpen && (
-            <DayNotesDialog
-              open={!!isDayNotesDialogOpen}
-              onClose={() => {
-                setIsDayNotesDialogOpen(null);
-              }}
-              notes={calendarDayNotes && isDayNotesDialogOpen ? (calendarDayNotes.get(isDayNotesDialogOpen) || '') : ''}
-              day={isDayNotesDialogOpen}
-              calendarId={calendarId!!}
-              onUpdateCalendarProperty={onUpdateCalendarProperty}
-            />
-          )}
+        {/* Day Notes Dialog */}
+        {isDayNotesDialogOpen && (
+          <DayNotesDialog
+            open={!!isDayNotesDialogOpen}
+            onClose={() => {
+              setIsDayNotesDialogOpen(null);
+            }}
+            notes={calendarDayNotes && isDayNotesDialogOpen ? (calendarDayNotes.get(isDayNotesDialogOpen) || '') : ''}
+            day={isDayNotesDialogOpen}
+            calendarId={calendarId!!}
+            onUpdateCalendarProperty={onUpdateCalendarProperty}
+          />
+        )}
 
 
         {/* Image Zoom Dialog */}
@@ -1139,6 +1174,21 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               accountBalance={accountBalance}
               maxDailyDrawdown={maxDailyDrawdown}
               monthlyTarget={monthlyTarget}
+              onEditTrade={(trade) => {
+              
+                // Use the same edit handler as in DayDialog
+                if (props.onUpdateTradeProperty) {
+                  // Set up the trade for editing
+                  setNewTrade(() => (createEditTradeData(trade)));
+                  setShowAddForm({ open: true, date: new Date(trade.date), editTrade: trade, showDayDialogWhenDone: false });
+                }
+              }}
+              onDeleteTrade={(tradeId) => {
+                // Use the same delete handler as in DayDialog
+                if (props.onUpdateTradeProperty) {
+                  props.onUpdateTradeProperty(tradeId, (trade) => ({ ...trade, isDeleted: true }));
+                }
+              }}
             />
           </DialogContentStyled>
         </Dialog>
