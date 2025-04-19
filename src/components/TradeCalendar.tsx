@@ -57,7 +57,7 @@ import {
 import { formatCurrency } from '../utils/formatters';
 import CalendarNote from './CalendarNote';
 import { Trade } from '../types/trade';
-import DayDialog from './trades/DayDialog'; 
+import DayDialog from './trades/DayDialog';
 import SelectDateDialog from './SelectDateDialog';
 import PerformanceCharts from './PerformanceCharts';
 import TagFilterDialog from './TagFilterDialog';
@@ -86,6 +86,7 @@ import MonthlyStats from './MonthlyStats';
 import AccountStats from './AccountStats';
 import DayNoteCard from './DayNoteCard';
 import TradeFormDialog, { createEditTradeData } from './trades/TradeFormDialog';
+import ConfirmationDialog from './common/ConfirmationDialog';
 
 interface TradeCalendarProps {
   trades: Trade[];
@@ -438,9 +439,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [isMonthSelectorOpen, setIsMonthSelectorOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
-  const [showAddForm, setShowAddForm] = useState<{ open: boolean,date: Date, editTrade?: Trade | null, createTempTrade?: boolean, showDayDialogWhenDone : boolean } | null>(null);
+  const [showAddForm, setShowAddForm] = useState<{ open: boolean, date: Date, editTrade?: Trade | null, createTempTrade?: boolean, showDayDialogWhenDone: boolean } | null>(null);
   const [zoomedImages, setZoomedImagesState] = useState<ImageZoomProp | null>(null);
-
+  const [tradeToDelete, setTradeToDelete] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
 
 
@@ -535,6 +538,38 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setCurrentDate(new Date());
   };
 
+
+  const handleDeleteClick = (tradeId: string) => {
+
+    setTradeToDelete(tradeId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (tradeToDelete) {
+      setIsDeleting(true);
+      try {
+        if (onUpdateTradeProperty) {
+          await onUpdateTradeProperty(tradeToDelete, (trade) => ({ ...trade, isDeleted: true }));
+        }
+      } catch (error) {
+        console.error('Error deleting trade:', error);
+        setSnackbarMessage('Failed to delete trade. Please try again.');
+        setSnackbarOpen(true);
+      } finally {
+        setIsDeleting(false);
+        setIsDeleteDialogOpen(false);
+        setTradeToDelete(null);
+      }
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteDialogOpen(false);
+    setTradeToDelete(null);
+  };
+
+
   const handleDayClick = (date: Date) => {
     // Prevent adding new trades when app is loading all trades
     if (isLoadingTrades) {
@@ -555,7 +590,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     const trades = filteredTrades.filter(trade => isSameDay(new Date(trade.date), date));
     if (trades.length == 0) {
       setNewTrade(createNewTradeData);
-      setShowAddForm({ open: true, date: date,showDayDialogWhenDone: true });
+      setShowAddForm({ open: true, date: date, showDayDialogWhenDone: true });
     }
     else {
       setSelectedDate(date);
@@ -1051,11 +1086,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             if (trade !== null) {
               setNewTrade(() => (createEditTradeData(trade!!)));
             }
-            setShowAddForm({ open: true,date: selectedDate!!, editTrade: trade, createTempTrade: trade === null, showDayDialogWhenDone: true});
+            setShowAddForm({ open: true, date: selectedDate!!, editTrade: trade, createTempTrade: trade === null, showDayDialogWhenDone: true });
           }}
           date={selectedDate || new Date()}
           trades={selectedDate ? tradesForSelectedDay : []}
           onUpdateTradeProperty={onUpdateTradeProperty}
+          onDeleteTrade={handleDeleteClick}
           calendarId={calendarId!!}
           onDateChange={handleDayChange}
           setZoomedImage={setZoomedImage}
@@ -1079,7 +1115,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             }
           }}
           onCancel={() => {
-            if(showAddForm?.showDayDialogWhenDone){
+            if (showAddForm?.showDayDialogWhenDone) {
               setSelectedDate(null);
               setSelectedDate(showAddForm?.date!!); // show the day dialog
             }
@@ -1175,7 +1211,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               maxDailyDrawdown={maxDailyDrawdown}
               monthlyTarget={monthlyTarget}
               onEditTrade={(trade) => {
-              
+
                 // Use the same edit handler as in DayDialog
                 if (props.onUpdateTradeProperty) {
                   // Set up the trade for editing
@@ -1185,13 +1221,24 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               }}
               onDeleteTrade={(tradeId) => {
                 // Use the same delete handler as in DayDialog
-                if (props.onUpdateTradeProperty) {
-                  props.onUpdateTradeProperty(tradeId, (trade) => ({ ...trade, isDeleted: true }));
-                }
+                handleDeleteClick(tradeId);
+                
               }}
             />
           </DialogContentStyled>
         </Dialog>
+        {/* Confirmation Delete Dialog */}
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          title="Delete Trade"
+          message="Are you sure you want to delete this trade? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+          isSubmitting={isDeleting}
+          confirmColor="error"
+        />
 
         {/* Snackbar for notifications */}
         <Snackbar

@@ -37,6 +37,8 @@ interface TradeListProps {
   sx?: SxProps<Theme>; // Allow styling from parent component
 }
 
+
+
 const TradeList: React.FC<TradeListProps> = ({
   trades,
   expandedTradeId,
