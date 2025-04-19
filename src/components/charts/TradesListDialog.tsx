@@ -38,26 +38,6 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
 }) => {
    
 
-  const dateObj = React.useMemo(() => {
-    try {
-      // Try to parse the date string
-      if (typeof date === 'string') {
-        if (date.includes('/')) {
-          // Handle MM/DD or MM/DD/YYYY format
-          return new Date(date);
-        } else {
-          // For other formats, just create a new date
-          return new Date();
-        }
-      } else {
-        // If it's not a string, return a new date
-        return new Date();
-      }
-    } catch (e) {
-      console.error('Error parsing date:', e);
-      return new Date();
-    }
-  }, [date]);
 
   // Calculate total PnL from trades
   const totalPnL = React.useMemo(() => {

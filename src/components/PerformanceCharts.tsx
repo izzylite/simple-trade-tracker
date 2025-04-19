@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth, parseISO } from 'date-fns';
 import { Box, Typography, useTheme, Tabs, Tab, Paper } from '@mui/material';
 import { alpha } from '@mui/material/styles';
@@ -61,6 +61,27 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     date: '',
     expandedTradeId: null
   });
+
+  // Keep multipleTradesDialog.trades in sync with the main trades array
+  useEffect(() => {
+    if (multipleTradesDialog.open && multipleTradesDialog.trades.length > 0) {
+      // Update the trades in the dialog with the latest data from the main trades array
+      const updatedDialogTrades = multipleTradesDialog.trades.map(dialogTrade => {
+        // Find the corresponding trade in the main trades array
+        const updatedTrade = trades.find(t => t.id === dialogTrade.id);
+        // Return the updated trade if found, otherwise return the original dialog trade
+        return updatedTrade || dialogTrade;
+      });
+
+      // Only update if there are actual changes
+      if (JSON.stringify(updatedDialogTrades) !== JSON.stringify(multipleTradesDialog.trades)) {
+        setMultipleTradesDialog(prev => ({
+          ...prev,
+          trades: updatedDialogTrades
+        }));
+      }
+    }
+  }, [trades, multipleTradesDialog.open, multipleTradesDialog.trades]);
 
   const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
 
