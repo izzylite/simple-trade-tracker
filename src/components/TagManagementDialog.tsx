@@ -275,20 +275,15 @@ const TagManagementDialog: React.FC<TagManagementDialogProps> = ({
                       <ListItem
                         key={tag}
                         secondaryAction={
-                          <IconButton
-                            edge="end"
-                            aria-label="edit"
+                          <Button
+                            color="primary"
+                            sx={{ minWidth: 'auto', p: 0.5 }}
                             onClick={() => setTagToEdit(tag)}
-                            size="small"
                           >
-                            <Button
-                              color="primary"
-                              sx={{ minWidth: 'auto', p: 0.5 }}
-                              onClick={() => setTagToEdit(tag)}
-                            >
-                              Edit
-                            </Button>
-                          </IconButton>
+                            Edit
+                          </Button>
+                      
+                            
                         }
                         sx={{
                           '&:hover': {
@@ -300,15 +295,11 @@ const TagManagementDialog: React.FC<TagManagementDialogProps> = ({
                           primary={
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <Chip
-                                label={formatTagForDisplay(tag)}
+                                label={formatTagForDisplay(tag,true)}
                                 size="small"
                                 sx={getTagChipStyles(tag, theme)}
                               />
-                              {isGroupedTag(tag) && (
-                                <Typography variant="caption" color="text.secondary">
-                                  {tag}
-                                </Typography>
-                              )}
+                               
                             </Box>
                           }
                         />

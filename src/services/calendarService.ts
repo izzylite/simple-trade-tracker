@@ -243,6 +243,7 @@ const convertFirestoreDataToCalendar = (doc: DocumentData): Calendar => {
     monthlyTarget: data.monthlyTarget,
     yearlyTarget: data.yearlyTarget,
     riskPerTrade: data.riskPerTrade,
+    requiredTagGroups: data.requiredTagGroups || [],
     dynamicRiskEnabled: data.dynamicRiskEnabled,
     increasedRiskPercentage: data.increasedRiskPercentage,
     profitThresholdPercentage: data.profitThresholdPercentage,
@@ -291,6 +292,7 @@ const convertCalendarToFirestoreData = (calendar: Omit<Calendar, 'id' | 'cachedT
     lastModified: Timestamp.fromDate(calendar.lastModified),
     accountBalance: calendar.accountBalance,
     maxDailyDrawdown: calendar.maxDailyDrawdown,
+    requiredTagGroups: calendar.requiredTagGroups ? calendar.requiredTagGroups : [] 
   };
 
   // Convert daysNotes Map to a plain object for Firestore
