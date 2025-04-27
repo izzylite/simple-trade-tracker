@@ -13,7 +13,9 @@ import {
   useTheme,
   alpha,
   Tooltip,
-  Button
+  Button,
+  FormControlLabel,
+  Switch
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -234,15 +236,33 @@ const TagManagementDialog: React.FC<TagManagementDialogProps> = ({
                       <Typography variant="subtitle2" fontWeight={600}>
                         {group}
                       </Typography>
-                      {localRequiredGroups.includes(group) && (
-                        <Tooltip title="This tag group is required for all new trades">
-                          <Chip
-                            label="Required"
-                            size="small"
-                            color="primary"
-                            sx={{ height: 20, fontSize: '0.7rem' }}
+                      {group !== 'Ungrouped' && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={localRequiredGroups.includes(group)}
+                                onChange={(e) => {
+                                  const isChecked = e.target.checked;
+                                  const updatedGroups = isChecked
+                                    ? [...localRequiredGroups, group]
+                                    : localRequiredGroups.filter(g => g !== group);
+                                  handleRequiredTagGroupsChange(updatedGroups);
+                                }}
+                                color="primary"
+                                size="small"
+                              />
+                            }
+                            label={
+                              <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                                Required
+                              </Typography>
+                            }
                           />
-                        </Tooltip>
+                          <Tooltip title="When a tag group is set as required, every new trade must include at least one tag from this group">
+                            <InfoIcon sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.875rem' }} />
+                          </Tooltip>
+                        </Box>
                       )}
                     </Box>
                     <Typography variant="caption" color="text.secondary">
@@ -315,8 +335,6 @@ const TagManagementDialog: React.FC<TagManagementDialogProps> = ({
           tag={tagToEdit}
           calendarId={calendarId}
           onSuccess={handleTagEditSuccess}
-          requiredTagGroups={localRequiredGroups}
-          onRequiredTagGroupsChange={handleRequiredTagGroupsChange}
         />
       )}
     </BaseDialog>

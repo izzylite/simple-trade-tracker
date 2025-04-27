@@ -5,12 +5,8 @@ import {
   Box,
   Chip,
   alpha,
-  useTheme,
-  FormControlLabel,
-  Switch,
-  Tooltip
+  useTheme
 } from '@mui/material';
-import { InfoOutlined } from '@mui/icons-material';
 import * as calendarService from '../services/calendarService';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../utils/tagColors';
 import { BaseDialog } from './common';
@@ -21,8 +17,6 @@ interface TagEditDialogProps {
   tag: string;
   calendarId: string;
   onSuccess?: (oldTag: string, newTag: string, tradesUpdated: number) => void;
-  requiredTagGroups?: string[];
-  onRequiredTagGroupsChange?: (groups: string[]) => void;
 }
 
 const TagEditDialog: React.FC<TagEditDialogProps> = ({
@@ -30,15 +24,12 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
   onClose,
   tag,
   calendarId,
-  onSuccess,
-  requiredTagGroups = [],
-  onRequiredTagGroupsChange
+  onSuccess
 }) => {
   const theme = useTheme();
   const [newTag, setNewTag] = useState(tag);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isRequired, setIsRequired] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,14 +73,7 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
   const getTagNamePart = (fullTag: string) => isGroupedTag(fullTag) ? fullTag.split(':')[1] : fullTag;
   const [tagName, setTagName] = useState(getTagNamePart(tag));
 
-  // Check if this tag group is in the required list
-  useEffect(() => {
-    if (isGrouped && tagGroup) {
-      setIsRequired(requiredTagGroups.includes(tagGroup));
-    } else {
-      setIsRequired(false);
-    }
-  }, [isGrouped, tagGroup, requiredTagGroups]);
+
 
   // Update state when tag prop changes
   useEffect(() => {
@@ -103,17 +87,7 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
     handleSubmit(e as React.FormEvent);
   };
 
-  const handleRequiredChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newIsRequired = e.target.checked;
-    setIsRequired(newIsRequired);
 
-    if (onRequiredTagGroupsChange && isGrouped && tagGroup) {
-      const updatedGroups = newIsRequired
-        ? [...requiredTagGroups, tagGroup]
-        : requiredTagGroups.filter(g => g !== tagGroup);
-      onRequiredTagGroupsChange(updatedGroups);
-    }
-  };
 
   // Create a safe onClose function that checks if submission is in progress
   const safeOnClose = () => {
@@ -173,34 +147,7 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
           </Box>
         </Box>
 
-        {isGrouped && (
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            p: 1.5,
-            mt: 1,
-            borderRadius: 1,
-            bgcolor: alpha(theme.palette.background.default, 0.5),
-            border: `1px solid ${theme.palette.divider}`
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={isRequired}
-                    onChange={handleRequiredChange}
-                    color="primary"
-                  />
-                }
-                label="Required Group"
-              />
-              <Tooltip title="When a tag group is set as required, every new trade must include at least one tag from this group">
-                <InfoOutlined sx={{  color: 'text.secondary', fontSize: '1rem' }} />
-              </Tooltip>
-            </Box>
-          </Box>
-        )}
+
 
         {isGrouped ? (
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
