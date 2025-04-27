@@ -1,0 +1,326 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Box,
+  Typography,
+  List,
+  ListItem,
+  ListItemText,
+  IconButton,
+  Divider,
+  TextField,
+  InputAdornment,
+  Chip,
+  useTheme,
+  alpha,
+  Tooltip,
+  Button
+} from '@mui/material';
+import {
+  Edit as EditIcon,
+  Search as SearchIcon,
+  FilterList as FilterListIcon,
+  Info as InfoIcon
+} from '@mui/icons-material';
+import { BaseDialog } from './common';
+import TagEditDialog from './TagEditDialog';
+import {
+  getTagChipStyles,
+  formatTagForDisplay,
+  isGroupedTag,
+  getTagGroup,
+  getUniqueTagGroups
+} from '../utils/tagColors';
+import { Calendar } from '../types/calendar';
+
+interface TagManagementDialogProps {
+  open: boolean;
+  onClose: () => void;
+  allTags: string[];
+  calendarId: string;
+  onTagUpdated?: (oldTag: string, newTag: string) => void;
+  requiredTagGroups?: string[];
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
+}
+
+const TagManagementDialog: React.FC<TagManagementDialogProps> = ({
+  open,
+  onClose,
+  allTags,
+  calendarId,
+  onTagUpdated,
+  requiredTagGroups = [],
+  onUpdateCalendarProperty
+}) => {
+  const theme = useTheme();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTagGroup, setSelectedTagGroup] = useState<string>('');
+  const [tagToEdit, setTagToEdit] = useState<string | null>(null);
+  const [localRequiredGroups, setLocalRequiredGroups] = useState<string[]>(requiredTagGroups);
+
+  // Update local state when props change
+  useEffect(() => {
+    setLocalRequiredGroups(requiredTagGroups);
+  }, [requiredTagGroups]);
+
+  // Get all unique tag groups
+  const tagGroups = useMemo(() => {
+    return getUniqueTagGroups(allTags);
+  }, [allTags]);
+
+  // Filter tags based on search term and selected group
+  const filteredTags = useMemo(() => {
+    let filtered = allTags;
+
+    // Filter by group if selected
+    if (selectedTagGroup) {
+      filtered = filtered.filter(tag =>
+        isGroupedTag(tag) && getTagGroup(tag) === selectedTagGroup
+      );
+    }
+
+    // Filter by search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(tag =>
+        tag.toLowerCase().includes(term) ||
+        formatTagForDisplay(tag).toLowerCase().includes(term)
+      );
+    }
+
+    return filtered;
+  }, [allTags, searchTerm, selectedTagGroup]);
+
+  // Group tags by their group
+  const groupedTags = useMemo(() => {
+    const groups: Record<string, string[]> = {};
+
+    filteredTags.forEach(tag => {
+      if (isGroupedTag(tag)) {
+        const group = getTagGroup(tag);
+        if (!groups[group]) {
+          groups[group] = [];
+        }
+        groups[group].push(tag);
+      } else {
+        if (!groups['Ungrouped']) {
+          groups['Ungrouped'] = [];
+        }
+        groups['Ungrouped'].push(tag);
+      }
+    });
+
+    return groups;
+  }, [filteredTags]);
+
+  const handleTagEditSuccess = (oldTag: string, newTag: string) => {
+    if (onTagUpdated) {
+      onTagUpdated(oldTag, newTag);
+    }
+  };
+
+  const handleRequiredTagGroupsChange = (groups: string[]) => {
+    setLocalRequiredGroups(groups);
+
+    if (onUpdateCalendarProperty) {
+      onUpdateCalendarProperty(calendarId, (calendar) => ({
+        ...calendar,
+        requiredTagGroups: groups
+      }));
+    }
+  };
+
+  return (
+    <BaseDialog
+      open={open}
+      onClose={onClose}
+      title="Tag Management"
+      maxWidth="md"
+      fullWidth
+    >
+      <Box sx={{ p: 2 }}>
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="body1" gutterBottom>
+            Manage your tags and set required tag groups for new trades.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            When a tag group is set as required, every new trade must include at least one tag from this group.
+          </Typography>
+        </Box>
+
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+            Required Tag Groups
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+            {localRequiredGroups.length > 0 ? (
+              localRequiredGroups.map(group => (
+                <Chip
+                  key={group}
+                  label={group}
+                  color="primary"
+                  variant="outlined"
+                  sx={{ fontWeight: 600 }}
+                />
+              ))
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No required tag groups set. Edit a tag group to make it required.
+              </Typography>
+            )}
+          </Box>
+        </Box>
+
+        <Box sx={{ mb: 3 }}>
+          <TextField
+            fullWidth
+            placeholder="Search tags..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+              endAdornment: (
+                <InputAdornment position="end">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <FilterListIcon fontSize="small" />
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+                      <select
+                        value={selectedTagGroup}
+                        onChange={(e) => setSelectedTagGroup(e.target.value)}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          fontSize: '0.875rem',
+                          color: theme.palette.text.primary,
+                          padding: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="">All Groups</option>
+                        {tagGroups.map(group => (
+                          <option key={group} value={group}>{group}</option>
+                        ))}
+                      </select>
+                    </Box>
+                  </Box>
+                </InputAdornment>
+              )
+            }}
+            size="small"
+            sx={{ mb: 2 }}
+          />
+
+          <Box sx={{
+            maxHeight: '400px',
+            overflow: 'auto',
+            border: `1px solid ${theme.palette.divider}`,
+            borderRadius: 1,
+            ...theme.typography.body2
+          }}>
+            {Object.entries(groupedTags).length > 0 ? (
+              Object.entries(groupedTags).map(([group, tags]) => (
+                <Box key={group}>
+                  <Box sx={{
+                    p: 1.5,
+                    bgcolor: alpha(theme.palette.primary.main, 0.05),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="subtitle2" fontWeight={600}>
+                        {group}
+                      </Typography>
+                      {localRequiredGroups.includes(group) && (
+                        <Tooltip title="This tag group is required for all new trades">
+                          <Chip
+                            label="Required"
+                            size="small"
+                            color="primary"
+                            sx={{ height: 20, fontSize: '0.7rem' }}
+                          />
+                        </Tooltip>
+                      )}
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">
+                      {tags.length} tag{tags.length !== 1 ? 's' : ''}
+                    </Typography>
+                  </Box>
+                  <Divider />
+                  <List disablePadding>
+                    {tags.map((tag) => (
+                      <ListItem
+                        key={tag}
+                        secondaryAction={
+                          <IconButton
+                            edge="end"
+                            aria-label="edit"
+                            onClick={() => setTagToEdit(tag)}
+                            size="small"
+                          >
+                            <Button
+                              color="primary"
+                              sx={{ minWidth: 'auto', p: 0.5 }}
+                              onClick={() => setTagToEdit(tag)}
+                            >
+                              Edit
+                            </Button>
+                          </IconButton>
+                        }
+                        sx={{
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.primary.main, 0.05)
+                          }
+                        }}
+                      >
+                        <ListItemText
+                          primary={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Chip
+                                label={formatTagForDisplay(tag)}
+                                size="small"
+                                sx={getTagChipStyles(tag, theme)}
+                              />
+                              {isGroupedTag(tag) && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {tag}
+                                </Typography>
+                              )}
+                            </Box>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              ))
+            ) : (
+              <Box sx={{ p: 3, textAlign: 'center' }}>
+                <Typography color="text.secondary">
+                  No tags found matching your search criteria.
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Box>
+      </Box>
+
+      {tagToEdit && (
+        <TagEditDialog
+          open={!!tagToEdit}
+          onClose={() => setTagToEdit(null)}
+          tag={tagToEdit}
+          calendarId={calendarId}
+          onSuccess={handleTagEditSuccess}
+          requiredTagGroups={localRequiredGroups}
+          onRequiredTagGroupsChange={handleRequiredTagGroupsChange}
+        />
+      )}
+    </BaseDialog>
+  );
+};
+
+export default TagManagementDialog;

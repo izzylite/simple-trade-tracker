@@ -552,6 +552,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       dynamicRiskEnabled={calendar.dynamicRiskEnabled}
       increasedRiskPercentage={calendar.increasedRiskPercentage}
       profitThresholdPercentage={calendar.profitThresholdPercentage}
+      requiredTagGroups={calendar.requiredTagGroups}
       calendarName={calendar.name}
       onAddTrade={handleAddTrade}
       calendarDayNotes={calendar.daysNotes}

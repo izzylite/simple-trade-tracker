@@ -61,6 +61,7 @@ import DayDialog from './trades/DayDialog';
 import SelectDateDialog from './SelectDateDialog';
 import PerformanceCharts from './PerformanceCharts';
 import TagFilterDialog from './TagFilterDialog';
+import TagManagementDialog from './TagManagementDialog';
 import TargetBadge from './TargetBadge';
 import { CalendarCell, WeekdayHeader } from './CalendarGrid';
 
@@ -99,6 +100,7 @@ interface TradeCalendarProps {
   dynamicRiskEnabled?: boolean;
   increasedRiskPercentage?: number;
   profitThresholdPercentage?: number;
+  requiredTagGroups?: string[];
   onAddTrade?: (trade: Trade) => Promise<void>;
   onEditTrade?: (trade: Trade) => Promise<void>;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
@@ -414,6 +416,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     dynamicRiskEnabled,
     increasedRiskPercentage,
     profitThresholdPercentage,
+    requiredTagGroups,
     onAddTrade,
     onTagUpdated,
     onUpdateTradeProperty,
@@ -453,6 +456,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   }, []);
   const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
+  const [isTagManagementDialogOpen, setIsTagManagementDialogOpen] = useState(false);
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -843,11 +847,30 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               >
                 Today
               </Button>
-              <TagFilter
-                allTags={allTags}
-                selectedTags={selectedTags}
-                onTagsChange={handleTagsChange}
-              />
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <TagFilter
+                  allTags={allTags}
+                  selectedTags={selectedTags}
+                  onTagsChange={handleTagsChange}
+                />
+                <Tooltip title="Manage tags and required tag groups">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setIsTagManagementDialogOpen(true)}
+                    sx={{
+                      borderColor: 'divider',
+                      color: 'text.secondary',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        bgcolor: alpha(theme.palette.primary.main, 0.08)
+                      }
+                    }}
+                  >
+                    Manage Tags
+                  </Button>
+                </Tooltip>
+              </Box>
             </Stack>
           </Box>
 
@@ -1138,6 +1161,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           dynamicRiskEnabled={dynamicRiskEnabled}
           increasedRiskPercentage={increasedRiskPercentage}
           profitThresholdPercentage={profitThresholdPercentage}
+          requiredTagGroups={requiredTagGroups}
         />
 
         {/* Day Notes Dialog */}
@@ -1222,7 +1246,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               onDeleteTrade={(tradeId) => {
                 // Use the same delete handler as in DayDialog
                 handleDeleteClick(tradeId);
-                
+
               }}
             />
           </DialogContentStyled>
@@ -1241,6 +1265,16 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         />
 
         {/* Snackbar for notifications */}
+        <TagManagementDialog
+          open={isTagManagementDialogOpen}
+          onClose={() => setIsTagManagementDialogOpen(false)}
+          allTags={allTags}
+          calendarId={calendarId!!}
+          onTagUpdated={onTagUpdated}
+          requiredTagGroups={requiredTagGroups}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
+        />
+
         <Snackbar
           open={snackbarOpen}
           autoHideDuration={4000}

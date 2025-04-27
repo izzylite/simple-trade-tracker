@@ -14,6 +14,8 @@ export interface Calendar {
   dynamicRiskEnabled?: boolean;
   increasedRiskPercentage?: number;
   profitThresholdPercentage?: number;
+  // Tag validation
+  requiredTagGroups?: string[];
   // Notes
   note?: string;
   daysNotes?: Map<string, string>;

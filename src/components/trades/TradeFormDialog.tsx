@@ -29,13 +29,14 @@ interface FormDialogProps {
   onAccountBalanceChange?: (balance: number) => void;
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   setNewMainTrade: (prev: (trade: NewTradeForm) => NewTradeForm | null) => void
-  onCancel: () => void; 
+  onCancel: () => void;
   allTrades?: Trade[];
   riskPerTrade?: number;
   dynamicRiskEnabled?: boolean;
   increasedRiskPercentage?: number;
   profitThresholdPercentage?: number;
   calendarId: string;
+  requiredTagGroups?: string[];
 }
 
 interface FormProps {
@@ -129,7 +130,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   dynamicRiskEnabled,
   increasedRiskPercentage,
   profitThresholdPercentage,
-  calendarId
+  calendarId,
+  requiredTagGroups = []
 }) => {
 
   // State
@@ -185,7 +187,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   }, [allTrades]);
 
 
- 
+
 
 
   const createEmptyTrade = async () => {
@@ -250,10 +252,10 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         URL.revokeObjectURL(image.preview);
       });
     }
-    
+
     setEditingTrade(null);
     setNewMainTrade(() => null);
-    
+
 
   };
 
@@ -793,11 +795,35 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     img.uploadProgress !== undefined && img.uploadProgress < 100 && img.uploadProgress >= 0
   );
 
+  // Check if all required tag groups are present in the trade's tags
+  const validateRequiredTagGroups = (tags: string[]): { valid: boolean; missingGroups: string[] } => {
+    if (!requiredTagGroups || requiredTagGroups.length === 0) {
+      return { valid: true, missingGroups: [] };
+    }
+
+    // Get all groups present in the tags
+    const presentGroups = new Set<string>();
+    tags.forEach(tag => {
+      if (tag.includes(':')) {
+        const group = tag.split(':')[0];
+        presentGroups.add(group);
+      }
+    });
+
+    // Find missing required groups
+    const missingGroups = requiredTagGroups.filter(group => !presentGroups.has(group));
+
+    return {
+      valid: missingGroups.length === 0,
+      missingGroups
+    };
+  };
+
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
     if (!onAddTrade) return;
- 
+
 
     try {
       // Validate form
@@ -813,6 +839,14 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         showErrorSnackbar('Risk to reward is required');
         return;
       }
+
+      // Validate required tag groups
+      const { valid, missingGroups } = validateRequiredTagGroups(newTrade!.tags);
+      if (!valid) {
+        showErrorSnackbar(`Missing required tag groups: ${missingGroups.join(', ')}. Each trade must include at least one tag from these groups.`);
+        return;
+      }
+
       // Check if there are any pending image uploads
       // If there are pending uploads, wait for them to complete
       if (hasPendingUploads()) {
@@ -863,6 +897,12 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       // Validate form
       if (!newTrade!.amount) {
         throw new Error('Amount is required');
+      }
+
+      // Validate required tag groups
+      const { valid, missingGroups } = validateRequiredTagGroups(newTrade!.tags);
+      if (!valid) {
+        throw new Error(`Missing required tag groups: ${missingGroups.join(', ')}. Each trade must include at least one tag from these groups.`);
       }
 
       // Check if there are any pending image uploads
