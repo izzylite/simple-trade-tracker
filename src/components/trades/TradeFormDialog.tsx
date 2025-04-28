@@ -990,6 +990,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               entry: newTrade!.entry || "",
               exit: newTrade!.exit || "",
               date: updatedDate,
+              isTemporary: newTrade?.isTemporary && !newTrade.name,
               tags: finalTags || [],
               riskToReward: parseFloat(newTrade!.riskToReward) || 1,
               partialsTaken: newTrade!.partialsTaken,
