@@ -59,7 +59,7 @@ const processTagsForSubmission = (tags: string[]): string[] => {
       }
 
       if (pendingTag) {
-        return [... tags, pendingTag]
+        return [...tags, pendingTag]
       }
       return tags;
 };
@@ -1073,6 +1073,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
                 increasedRiskPercentage={increasedRiskPercentage}
                 profitThresholdPercentage={profitThresholdPercentage}
                 calendarId={calendarId}
+                requiredTagGroups={requiredTagGroups}
                 onTagUpdated={handleTagUpdated}
                 newTrade={newTrade!}
                 editingTrade={editingTrade}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   TextField,
   FormControl,
@@ -12,7 +12,10 @@ import {
   Box,
   FormControlLabel as MuiFormControlLabel,
   Checkbox,
-  Typography
+  Typography,
+  Chip,
+  alpha,
+  useTheme
 } from '@mui/material';
 import { DatePicker} from '@mui/x-date-pickers';
 import { Trade } from '../../types/trade';
@@ -21,6 +24,7 @@ import ImageUploader from './ImageUploader';
 import { GridImage, GridPendingImage } from './ImageGrid';
 import { formatCurrency } from '../../utils/formatters';
 import TagsInput from './TagsInput';
+import { isGroupedTag, getTagGroup } from '../../utils/tagColors';
 
 export interface NewTradeForm {
   id: string;
@@ -78,6 +82,7 @@ interface TradeFormProps {
   calculateCumulativePnl(newTrade?: NewTradeForm): number;
   calculateAmountFromRiskToReward: (rr: number,cumulativePnL: number) => number;
   calendarId: string;
+  requiredTagGroups?: string[];
   onTagUpdated?: (oldTag: string, newTag: string) => void;
   onNameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onAmountChange: (amount: string) => void;
@@ -110,6 +115,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
   calculateAmountFromRiskToReward,
   calculateCumulativePnl,
   calendarId,
+  requiredTagGroups = [],
   onTagUpdated,
   onNameChange,
   onAmountChange,
@@ -128,6 +134,24 @@ const TradeForm: React.FC<TradeFormProps> = ({
   onImagesReordered,
   onSubmit
 }) => {
+  const theme = useTheme();
+
+  // Calculate which required tag groups are still missing
+  const missingRequiredGroups = useMemo(() => {
+    if (!requiredTagGroups || requiredTagGroups.length === 0) return [];
+
+    // Get the groups that are already satisfied by current tags
+    const satisfiedGroups = new Set<string>();
+    newTrade.tags.forEach(tag => {
+      if (isGroupedTag(tag)) {
+        const group = getTagGroup(tag);
+        satisfiedGroups.add(group);
+      }
+    });
+
+    // Return groups that are required but not satisfied
+    return requiredTagGroups.filter(group => !satisfiedGroups.has(group));
+  }, [requiredTagGroups, newTrade.tags]);
 
   const cumulativePnl = calculateCumulativePnl(newTrade);
 
@@ -327,6 +351,41 @@ const TradeForm: React.FC<TradeFormProps> = ({
         </FormControl>
       </FormField>
       <FormField>
+        {/* Required Tag Groups Indicator */}
+        {missingRequiredGroups.length > 0 && (
+          <Box sx={{
+            mb: 2,
+            p: 2,
+            borderRadius: 1,
+            bgcolor: alpha(theme.palette.warning.main, 0.1),
+            border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`
+          }}>
+            <Typography variant="body2" color="warning.main" sx={{ fontWeight: 600, mb: 1 }}>
+              Required Tag Groups
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+              Please add at least one tag from each required group:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {missingRequiredGroups.map(group => (
+                <Chip
+                  key={group}
+                  label={group}
+                  size="small"
+                  color="warning"
+                  variant="outlined"
+                  sx={{
+                    fontWeight: 500,
+                    '& .MuiChip-label': {
+                      fontSize: '0.75rem'
+                    }
+                  }}
+                />
+              ))}
+            </Box>
+          </Box>
+        )}
+
         <TagsInput
           tags={newTrade.tags}
           allTags={allTags}
