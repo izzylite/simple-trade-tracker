@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { format } from 'date-fns';
-import { alpha, Theme, useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
   Box,
   Paper,
@@ -26,10 +26,34 @@ const DayNoteCard: React.FC<DayNoteCardProps> = ({
   setIsDayNotesDialogOpen
 }) => {
   const theme = useTheme();
-  
+  const [isContentOverflowing, setIsContentOverflowing] = useState(false);
+
   // Get current day of week (Sun, Mon, Tue, etc.)
   const currentDayOfWeek = format(new Date(), 'EEE');
   const hasNoteForToday = calendarNotes && calendarNotes.has(currentDayOfWeek) && calendarNotes.get(currentDayOfWeek)?.trim() !== '';
+
+  // Function to check if content overflows
+  const checkOverflow = useCallback((contentElement: HTMLElement, containerElement: HTMLElement) => {
+    // Create a temporary element to measure the actual content height without duplication
+    const tempDiv = document.createElement('div');
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.visibility = 'hidden';
+    tempDiv.style.height = 'auto';
+    tempDiv.style.width = containerElement.clientWidth + 'px';
+    tempDiv.style.fontSize = '0.8rem';
+    tempDiv.style.lineHeight = '1.3';
+    tempDiv.innerHTML = convertRichTextToHtml(calendarNotes?.get(currentDayOfWeek) || '');
+
+    document.body.appendChild(tempDiv);
+    const actualContentHeight = tempDiv.offsetHeight;
+    document.body.removeChild(tempDiv);
+
+    const containerHeight = containerElement.clientHeight;
+    const isOverflowing = actualContentHeight > containerHeight;
+
+    setIsContentOverflowing(isOverflowing);
+    return isOverflowing;
+  }, [calendarNotes, currentDayOfWeek]);
 
   // Common paper styles for both states
   const paperStyles = {
@@ -172,11 +196,27 @@ const DayNoteCard: React.FC<DayNoteCardProps> = ({
                 }}
                 ref={(el: HTMLDivElement | null) => {
                   if (el) {
-                    // Calculate content length and set appropriate duration
-                    const contentLength = el.textContent?.length || 0;
-                    // Base duration on content length - longer content scrolls slower
-                    const duration = Math.max(10, Math.min(30, contentLength / 20));
-                    el.style.setProperty('--scroll-duration', `${duration}s`);
+                    // Check if content overflows the container
+                    const container = el.parentElement;
+                    if (container) {
+                      // Wait for content to render
+                      setTimeout(() => {
+                        const isOverflowing = checkOverflow(el, container);
+
+                        if (isOverflowing) {
+                          // Calculate content length and set appropriate duration
+                          const contentLength = el.textContent?.length || 0;
+                          // Base duration on content length - longer content scrolls slower
+                          const duration = Math.max(10, Math.min(30, contentLength / 20));
+                          el.style.setProperty('--scroll-duration', `${duration}s`);
+                          el.style.animationPlayState = 'running';
+                        } else {
+                          // Disable animation for short content
+                          el.style.animationPlayState = 'paused';
+                          el.style.transform = 'translateY(0)';
+                        }
+                      }, 100);
+                    }
                   }
                 }}
                 dangerouslySetInnerHTML={{
@@ -184,40 +224,55 @@ const DayNoteCard: React.FC<DayNoteCardProps> = ({
                     <div style="font-size: 0.8rem; line-height: 1.3; text-align: left;">
                       ${convertRichTextToHtml(calendarNotes?.get(currentDayOfWeek) || '')}
                     </div>
-                    <div style="height: 30px;"></div>
-                    <div style="font-size: 0.8rem; line-height: 1.3; text-align: left;">
-                      ${convertRichTextToHtml(calendarNotes?.get(currentDayOfWeek) || '')}
-                    </div>
+                    ${isContentOverflowing ? `
+                      <div style="height: 30px;"></div>
+                      <div style="font-size: 0.8rem; line-height: 1.3; text-align: left;">
+                        ${convertRichTextToHtml(calendarNotes?.get(currentDayOfWeek) || '')}
+                      </div>
+                    ` : ''}
                   `
                 }}
               />
             </Box>
           </Box>
-          <Box sx={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: '30px',
-            background: `linear-gradient(to bottom, transparent, ${theme.palette.mode === 'dark' ? 'rgba(30,30,30,0.8)' : 'rgba(255,255,255,0.8)'})`,
-            pointerEvents: 'none',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'flex-end',
-            paddingBottom: '4px',
-            '&::after': {
-              content: '""',
-              width: '40px',
-              height: '4px',
-              borderRadius: '2px',
-              backgroundColor: alpha(theme.palette.info.main, 0.3),
-              animation: 'pulseIndicator 2s ease-in-out infinite'
-            },
-            '@keyframes pulseIndicator': {
-              '0%, 100%': { opacity: 0.3 },
-              '50%': { opacity: 0.7 }
-            }
-          }} />
+          <Box
+            className="scroll-indicator"
+            sx={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: '30px',
+              background: `linear-gradient(to bottom, transparent, ${theme.palette.mode === 'dark' ? 'rgba(30,30,30,0.8)' : 'rgba(255,255,255,0.8)'})`,
+              pointerEvents: 'none',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'flex-end',
+              paddingBottom: '4px',
+              opacity: 0,
+              transition: 'opacity 0.3s ease',
+              '&::after': {
+                content: '""',
+                width: '40px',
+                height: '4px',
+                borderRadius: '2px',
+                backgroundColor: alpha(theme.palette.info.main, 0.3),
+                animation: 'pulseIndicator 2s ease-in-out infinite'
+              },
+              '@keyframes pulseIndicator': {
+                '0%, 100%': { opacity: 0.3 },
+                '50%': { opacity: 0.7 }
+              }
+            }}
+            ref={(el: HTMLDivElement | null) => {
+              if (el) {
+                // Show indicator only when content is overflowing
+                setTimeout(() => {
+                  el.style.opacity = isContentOverflowing ? '1' : '0';
+                }, 150);
+              }
+            }}
+          />
         </Box>
       ) : (
         // Empty state content

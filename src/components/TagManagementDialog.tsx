@@ -17,6 +17,7 @@ import {
   FormControlLabel,
   Switch
 } from '@mui/material';
+import { scrollbarStyles } from '../styles/scrollbarStyles';
 import {
   Edit as EditIcon,
   Search as SearchIcon,
@@ -220,7 +221,8 @@ const TagManagementDialog: React.FC<TagManagementDialogProps> = ({
             overflow: 'auto',
             border: `1px solid ${theme.palette.divider}`,
             borderRadius: 1,
-            ...theme.typography.body2
+            ...theme.typography.body2,
+            ...scrollbarStyles(theme)
           }}>
             {Object.entries(groupedTags).length > 0 ? (
               Object.entries(groupedTags).map(([group, tags]) => (

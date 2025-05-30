@@ -17,6 +17,7 @@ import {
   filterTagsByGroup
 } from '../utils/tagColors';
 import { BaseDialog, SelectInput } from './common';
+import { scrollbarStyles } from '../styles/scrollbarStyles';
 
 interface TagFilterDialogProps {
   open: boolean;
@@ -104,6 +105,13 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
           options={filteredTags}
           value={selectedTags}
           onChange={(_, newValue) => onTagsChange(newValue)}
+          slotProps={{
+            listbox: {
+              sx: {
+                ...scrollbarStyles(theme)
+              }
+            }
+          }}
           renderInput={(params) => (
             <TextField
               {...params}

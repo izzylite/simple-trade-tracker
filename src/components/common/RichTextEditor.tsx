@@ -15,6 +15,7 @@ import {
   Paper as MuiPaper // Use MuiPaper consistently
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
+import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import {
   FormatBold,
   FormatItalic,
@@ -76,32 +77,7 @@ export interface RichTextEditorProps {
   disabled?: boolean;
 }
 
-// Helper function for scrollbar styling
-const scrollbarStyles = (theme: any) => ({
-  '&::-webkit-scrollbar': {
-    width: '10px',
-    height: '10px',
-  },
-  '&::-webkit-scrollbar-track': {
-    background: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-    borderRadius: '6px',
-    margin: '4px 0',
-  },
-  '&::-webkit-scrollbar-thumb': {
-    background: theme.palette.mode === 'dark'
-      ? alpha(theme.palette.primary.main, 0.3)
-      : alpha(theme.palette.primary.main, 0.2),
-    borderRadius: '6px',
-    border: theme.palette.mode === 'dark'
-      ? '2px solid rgba(0, 0, 0, 0.2)'
-      : '2px solid rgba(255, 255, 255, 0.2)',
-    '&:hover': {
-      background: theme.palette.mode === 'dark'
-        ? alpha(theme.palette.primary.main, 0.5)
-        : alpha(theme.palette.primary.main, 0.4),
-    },
-  },
-});
+
 
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({

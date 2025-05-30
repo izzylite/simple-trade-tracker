@@ -88,6 +88,7 @@ import AccountStats from './AccountStats';
 import DayNoteCard from './DayNoteCard';
 import TradeFormDialog, { createEditTradeData } from './trades/TradeFormDialog';
 import ConfirmationDialog from './common/ConfirmationDialog';
+import WeeklyStatsSection from './WeeklyStatsSection';
 
 interface TradeCalendarProps {
   trades: Trade[];
@@ -1099,6 +1100,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             </Box>
           </Box>
         </Box>
+
+        {/* Weekly Statistics Section */}
+        <WeeklyStatsSection
+          trades={filteredTrades}
+          currentDate={currentDate}
+          accountBalance={accountBalance}
+          maxDailyDrawdown={maxDailyDrawdown}
+        />
 
         <DayDialog
           open={!!selectedDate && !showAddForm?.open}

@@ -17,6 +17,7 @@ import {
   getTagGroup
 } from '../../utils/tagColors';
 import TagEditDialog from '../TagEditDialog';
+import { scrollbarStyles } from '../../styles/scrollbarStyles';
 
 interface TagsInputProps {
   tags: string[];
@@ -50,6 +51,13 @@ const TagsInput: React.FC<TagsInputProps> = ({
         options={allTags}
         value={tags}
         onChange={onTagsChange}
+        slotProps={{
+          listbox: {
+            sx: {
+              ...scrollbarStyles(theme)
+            }
+          }
+        }}
         renderTags={(value, getTagProps) =>
           value.map((option, index) => (
             <Chip
