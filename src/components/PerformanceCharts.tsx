@@ -4,6 +4,7 @@ import { Box, Typography, useTheme, Tabs, Tab, Paper } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { Trade } from '../types/trade';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
+import ScoreSection from './ScoreSection';
 import {
   CumulativePnLChart,
   DailyPnLChart,
@@ -876,6 +877,12 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             selectedDate={selectedDate}
             timePeriod={timePeriod}
             setMultipleTradesDialog={setMultipleTradesDialog}
+          />
+
+          {/* Trading Score Section */}
+          <ScoreSection
+            trades={trades}
+            selectedDate={selectedDate}
           />
         </>
       ) : (
