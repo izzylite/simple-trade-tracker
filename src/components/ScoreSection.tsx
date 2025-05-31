@@ -18,6 +18,7 @@ import ScoreCard from './scoring/ScoreCard';
 import ScoreBreakdown from './scoring/ScoreBreakdown';
 import ScoreHistory from './scoring/ScoreHistory';
 import ScoreSettingsComponent from './scoring/ScoreSettings';
+import TagSelector from './scoring/TagSelector';
 
 interface ScoreSectionProps {
   trades: Trade[];
@@ -51,6 +52,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({ trades, selectedDate }) => 
   const [historyPeriod, setHistoryPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [settings, setSettings] = useState<ScoreSettings>(scoreService.getSettings());
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // Update score service settings when local settings change
   useEffect(() => {
@@ -86,6 +88,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({ trades, selectedDate }) => 
   }, [trades, historyPeriod]);
 
   // Calculate multi-period scores for overview
+  console.log(`total trades: ${trades.length}`);
   const multiPeriodScores = useMemo(() => {
     if (trades.length === 0) return null;
 
@@ -96,6 +99,8 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({ trades, selectedDate }) => 
       return null;
     }
   }, [trades, selectedDate]);
+
+  console.log(`multiPeriodScores: ${multiPeriodScores}`);
 
 
 
@@ -114,6 +119,11 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({ trades, selectedDate }) => 
   const handleSettingsSave = () => {
     // In a real app, you might want to save settings to localStorage or backend
     localStorage.setItem('scoreSettings', JSON.stringify(settings));
+    localStorage.setItem('selectedTags', JSON.stringify(selectedTags));
+  };
+
+  const handleTagsChange = (tags: string[]) => {
+    setSelectedTags(tags);
   };
 
   // Load settings from localStorage on mount
@@ -125,6 +135,16 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({ trades, selectedDate }) => 
         setSettings(parsedSettings);
       } catch (error) {
         console.error('Error loading saved settings:', error);
+      }
+    }
+
+    const savedTags = localStorage.getItem('selectedTags');
+    if (savedTags) {
+      try {
+        const parsedTags = JSON.parse(savedTags);
+        setSelectedTags(parsedTags);
+      } catch (error) {
+        console.error('Error loading saved tags:', error);
       }
     }
   }, []);
@@ -450,11 +470,19 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({ trades, selectedDate }) => 
 
         {/* Settings Tab */}
         <TabPanel value={activeTab} index={3}>
-          <ScoreSettingsComponent
-            settings={settings}
-            onSettingsChange={handleSettingsChange}
-            onSave={handleSettingsSave}
-          />
+          <Stack spacing={3}>
+            <ScoreSettingsComponent
+              settings={settings}
+              onSettingsChange={handleSettingsChange}
+              onSave={handleSettingsSave}
+            />
+
+            <TagSelector
+              trades={trades}
+              selectedTags={selectedTags}
+              onTagsChange={handleTagsChange}
+            />
+          </Stack>
         </TabPanel>
       </Box>
     </Paper>

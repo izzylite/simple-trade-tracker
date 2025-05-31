@@ -153,19 +153,39 @@ Higher scores indicate better emotional control and systematic trading.`;
     }
   };
 
+  const getFactorTooltip = (categoryName: string, factorKey: string): string => {
+    if (categoryName.toLowerCase() === 'discipline') {
+      switch (factorKey.toLowerCase()) {
+        case 'overtrading':
+          return 'Measures if you are taking too many trades relative to your historical average. Lower scores indicate overtrading, which can lead to poor decision making and increased losses.';
+        case 'emotionalcontrol':
+          return 'Evaluates your ability to stick to your trading plan without letting emotions drive decisions. Based on consistency in trade sizing, timing, and strategy selection.';
+        case 'planadhrence':
+        case 'plan_adherence':
+          return 'Measures how well you follow your predetermined trading rules and strategies. Higher scores indicate better discipline in executing your trading plan.';
+        case 'exitdiscipline':
+        case 'exit_discipline':
+          return 'Evaluates your ability to take profits and cut losses according to your plan. Good exit discipline prevents small losses from becoming large ones.';
+        default:
+          return 'This factor measures a specific aspect of your trading discipline and emotional control.';
+      }
+    }
+    return 'This factor contributes to your overall score in this category.';
+  };
+
   return (
     <Card
-      sx={{
-        backgroundColor: theme.palette.mode === 'dark'
-          ? alpha(theme.palette.background.paper, 0.8)
-          : theme.palette.background.paper,
-        borderRadius: 2,
-        boxShadow: theme.shadows[2],
-        border: `1px solid ${theme.palette.mode === 'dark'
-          ? alpha(theme.palette.common.white, 0.1)
-          : alpha(theme.palette.common.black, 0.1)}`
-      }}
-    >
+        sx={{
+          backgroundColor: theme.palette.mode === 'dark'
+            ? alpha(theme.palette.background.paper, 0.8)
+            : theme.palette.background.paper,
+          borderRadius: 2,
+          boxShadow: theme.shadows[2],
+          border: `1px solid ${theme.palette.mode === 'dark'
+            ? alpha(theme.palette.common.white, 0.1)
+            : alpha(theme.palette.common.black, 0.1)}`
+        }}
+      >
       <CardContent sx={{ p: 3 }}>
         <Typography
           variant="h6"
@@ -348,9 +368,35 @@ Higher scores indicate better emotional control and systematic trading.`;
                   {Object.entries(category.factors).map(([factorKey, factorValue]) => (
                     <Box key={factorKey}>
                       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
-                        <Typography variant="body2">
-                          {formatFactorName(factorKey)}
-                        </Typography>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Typography variant="body2">
+                            {formatFactorName(factorKey)}
+                          </Typography>
+                          {category.name.toLowerCase() === 'discipline' && (
+                            <Tooltip
+                              title={
+                                <Box sx={{ p: 1, maxWidth: 300 }}>
+                                  <Typography variant="body2">
+                                    {getFactorTooltip(category.name, factorKey)}
+                                  </Typography>
+                                </Box>
+                              }
+                              placement="top"
+                              arrow
+                            >
+                              <HelpOutline
+                                sx={{
+                                  fontSize: 14,
+                                  color: theme.palette.text.secondary,
+                                  cursor: 'help',
+                                  '&:hover': {
+                                    color: theme.palette.primary.main
+                                  }
+                                }}
+                              />
+                            </Tooltip>
+                          )}
+                        </Stack>
                         <Typography
                           variant="body2"
                           fontWeight="medium"
