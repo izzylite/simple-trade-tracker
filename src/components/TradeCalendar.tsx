@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { FC } from 'react';
 import {
@@ -6,7 +6,7 @@ import {
   Typography,
   IconButton,
   Button,
-  Dialog,
+
   Stack,
   useTheme,
   alpha,
@@ -31,13 +31,8 @@ import {
   Logout as LogoutIcon,
   FilterAlt,
   Clear,
-  Close as CloseIcon,
-  Security as SecurityIcon,
+
   Info as InfoIcon,
-  Edit as EditIcon,
-  EventNote as EventNoteIcon,
-  NoteAdd as NoteAddIcon,
-  Add as AddIcon
 } from '@mui/icons-material';
 import {
   format,
@@ -59,7 +54,7 @@ import CalendarNote from './CalendarNote';
 import { Trade } from '../types/trade';
 import DayDialog from './trades/DayDialog';
 import SelectDateDialog from './SelectDateDialog';
-import PerformanceCharts from './PerformanceCharts';
+
 import TagFilterDialog from './TagFilterDialog';
 import TagManagementDialog from './TagManagementDialog';
 import TargetBadge from './TargetBadge';
@@ -72,12 +67,10 @@ import {
   DayNumber,
   TradeAmount,
   TradeCount,
-  DialogTitleStyled,
-  DialogContentStyled,
+
 } from './StyledComponents';
 import { useNavigate, useParams } from 'react-router-dom';
-import { dialogProps } from '../styles/dialogStyles';
-import { scrollbarStyles } from '../styles/scrollbarStyles';
+
 import { useAuth } from '../contexts/AuthContext';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
 import { NewTradeForm, TradeImage } from './trades/TradeForm';
@@ -88,7 +81,9 @@ import AccountStats from './AccountStats';
 import DayNoteCard from './DayNoteCard';
 import TradeFormDialog, { createEditTradeData } from './trades/TradeFormDialog';
 import ConfirmationDialog from './common/ConfirmationDialog';
-import WeeklyStatsSection from './WeeklyStatsSection';
+import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
+
+import MonthlyStatisticsSection from './MonthlyStatisticsSection';
 
 interface TradeCalendarProps {
   trades: Trade[];
@@ -97,10 +92,7 @@ interface TradeCalendarProps {
   weeklyTarget?: number;
   monthlyTarget?: number;
   yearlyTarget?: number;
-  riskPerTrade?: number;
-  dynamicRiskEnabled?: boolean;
-  increasedRiskPercentage?: number;
-  profitThresholdPercentage?: number;
+  dynamicRiskSettings?: DynamicRiskSettings;
   requiredTagGroups?: string[];
   onAddTrade?: (trade: Trade) => Promise<void>;
   onEditTrade?: (trade: Trade) => Promise<void>;
@@ -115,6 +107,8 @@ interface TradeCalendarProps {
   calendarName?: string,
   calendarNote?: string;
   calendarDayNotes?: Map<string, string>;
+  // Score settings
+  scoreSettings?: import('../types/score').ScoreSettings;
   onClearMonthTrades: (month: number, year: number) => void;
   onToggleTheme: () => void;
   mode: 'light' | 'dark';
@@ -262,9 +256,7 @@ const calculateDayStats = (
   trades: Trade[],
   accountBalance: number,
   maxDailyDrawdown: number,
-  dynamicRiskEnabled?: boolean,
-  increasedRiskPercentage?: number,
-  profitThresholdPercentage?: number,
+  dynamicRiskSettings?: DynamicRiskSettings,
   totalPnL?: number
 ): DayStats => {
   // Calculate net amount for the day
@@ -281,18 +273,18 @@ const calculateDayStats = (
   // Calculate effective max daily drawdown based on dynamic risk settings
   let effectiveMaxDailyDrawdown = maxDailyDrawdown;
 
-  if (dynamicRiskEnabled &&
-    increasedRiskPercentage &&
-    profitThresholdPercentage &&
+  if (dynamicRiskSettings?.dynamicRiskEnabled &&
+    dynamicRiskSettings.increasedRiskPercentage &&
+    dynamicRiskSettings.profitThresholdPercentage &&
     totalPnL !== undefined &&
     accountBalance > 0) {
     // Calculate profit percentage based on account balance + totalPnL
     const profitPercentage = (totalPnL / accountBalance) * 100;
 
     // If profit threshold is met, adjust the max daily drawdown proportionally
-    if (profitPercentage >= profitThresholdPercentage) {
+    if (profitPercentage >= dynamicRiskSettings.profitThresholdPercentage) {
       // Adjust drawdown limit proportionally to the risk increase
-      const riskRatio = increasedRiskPercentage / (maxDailyDrawdown / 2); // Assuming riskPerTrade is half of maxDailyDrawdown
+      const riskRatio = dynamicRiskSettings.increasedRiskPercentage / (maxDailyDrawdown / 2); // Assuming riskPerTrade is half of maxDailyDrawdown
       effectiveMaxDailyDrawdown = maxDailyDrawdown * riskRatio;
     }
   }
@@ -413,10 +405,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     weeklyTarget,
     monthlyTarget,
     yearlyTarget,
-    riskPerTrade,
-    dynamicRiskEnabled,
-    increasedRiskPercentage,
-    profitThresholdPercentage,
+    dynamicRiskSettings,
     requiredTagGroups,
     onAddTrade,
     onTagUpdated,
@@ -427,6 +416,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     calendarName,
     calendarNote,
     calendarDayNotes,
+    // Score settings
+    scoreSettings,
     onClearMonthTrades,
     onToggleTheme,
     mode,
@@ -456,7 +447,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setZoomedImagesState({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
 
   }, []);
-  const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
+
   const [isTagManagementDialogOpen, setIsTagManagementDialogOpen] = useState(false);
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -770,11 +761,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 totalProfit={totalProfit}
                 onChange={onAccountBalanceChange}
                 trades={filteredTrades}
-                onPerformanceClick={() => setIsPerformanceDialogOpen(true)}
-                riskPerTrade={riskPerTrade}
-                dynamicRiskEnabled={dynamicRiskEnabled}
-                increasedRiskPercentage={increasedRiskPercentage}
-                profitThresholdPercentage={profitThresholdPercentage}
+
+                riskPerTrade={dynamicRiskSettings?.riskPerTrade}
+                dynamicRiskSettings={dynamicRiskSettings}
                 onToggleDynamicRisk={(useActualAmounts) => {
                   // Update local state first
                   setIsDynamicRiskToggled(useActualAmounts);
@@ -956,9 +945,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                         dayTrades,
                         accountBalance,
                         maxDailyDrawdown,
-                        dynamicRiskEnabled,
-                        increasedRiskPercentage,
-                        profitThresholdPercentage,
+                        dynamicRiskSettings,
                         totalProfit
                       );
                       const isCurrentMonth = isSameMonth(day, currentDate);
@@ -1101,12 +1088,31 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           </Box>
         </Box>
 
-        {/* Weekly Statistics Section */}
-        <WeeklyStatsSection
+        {/*Current Monthly Statistics Section */}
+        <MonthlyStatisticsSection
           trades={filteredTrades}
-          currentDate={currentDate}
+          selectedDate={currentDate}
           accountBalance={accountBalance}
           maxDailyDrawdown={maxDailyDrawdown}
+          monthlyTarget={monthlyTarget}
+          calendarId={calendarId!!}
+          scoreSettings={scoreSettings}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
+          dynamicRiskSettings={dynamicRiskSettings}
+          onEditTrade={(trade) => {
+            // Use the same edit handler as in DayDialog
+            if (props.onUpdateTradeProperty) {
+              setNewTrade(() => (createEditTradeData(trade)));
+              setShowAddForm({ open: true, date: new Date(trade.date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
+            }
+          }}
+          onDeleteTrade={(tradeId) => {
+            // Use the same delete handler as in DayDialog
+            handleDeleteClick(tradeId);
+          }}
+          onZoomImage={(imageUrl, allImages, initialIndex) => {
+            setZoomedImage(imageUrl, allImages, initialIndex);
+          }}
         />
 
         <DayDialog
@@ -1166,10 +1172,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           accountBalance={accountBalance}
           onAccountBalanceChange={onAccountBalanceChange}
           allTrades={trades} /* Pass all trades for tag suggestions */
-          riskPerTrade={riskPerTrade}
-          dynamicRiskEnabled={dynamicRiskEnabled}
-          increasedRiskPercentage={increasedRiskPercentage}
-          profitThresholdPercentage={profitThresholdPercentage}
+          riskPerTrade={dynamicRiskSettings?.riskPerTrade}
+          dynamicRiskSettings={dynamicRiskSettings}
           requiredTagGroups={requiredTagGroups}
         />
 
@@ -1206,60 +1210,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           yearlyTarget={yearlyTarget}
         />
 
-        {/* Performance Dialog */}
-        <Dialog
-          open={isPerformanceDialogOpen}
-          onClose={() => setIsPerformanceDialogOpen(false)}
-          maxWidth="lg"
-          fullWidth
-          {...dialogProps}
-          PaperProps={{
-            sx: {
-              borderRadius: 2,
-              boxShadow: 'none',
-              border: `1px solid ${theme.palette.divider}`,
-              maxHeight: '90vh',
-              overflow: 'hidden',
-              '& .MuiDialogContent-root': {
-                ...scrollbarStyles(theme)
-              }
-            }
-          }}
-        >
-          <DialogTitleStyled>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              <Typography variant="h6">
-                Performance Analytics
-              </Typography>
-            </Box>
-            <IconButton onClick={() => setIsPerformanceDialogOpen(false)} size="small">
-              <CloseIcon />
-            </IconButton>
-          </DialogTitleStyled>
-          <DialogContentStyled>
-            <PerformanceCharts
-              trades={filteredTrades}
-              selectedDate={currentDate}
-              accountBalance={accountBalance}
-              maxDailyDrawdown={maxDailyDrawdown}
-              monthlyTarget={monthlyTarget}
-              onEditTrade={(trade) => {
 
-                // Use the same edit handler as in DayDialog
-                if (props.onUpdateTradeProperty) {
-                  // Set up the trade for editing
-                  setNewTrade(() => (createEditTradeData(trade)));
-                  setShowAddForm({ open: true, date: new Date(trade.date), editTrade: trade, showDayDialogWhenDone: false });
-                }
-              }}
-              onDeleteTrade={(tradeId) => {
-                // Use the same delete handler as in DayDialog
-                handleDeleteClick(tradeId);
-
-              }}
-            />
-          </DialogContentStyled>
-        </Dialog>
         {/* Confirmation Delete Dialog */}
         <ConfirmationDialog
           open={isDeleteDialogOpen}

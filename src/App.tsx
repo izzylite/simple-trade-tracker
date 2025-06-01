@@ -13,6 +13,11 @@ import { createAppTheme } from './theme';
 import TradeLoadingIndicator from './components/TradeLoadingIndicator';
 import { setAnalyticsCollectionEnabled } from 'firebase/analytics';
 import AppLoadingProgress from './components/AppLoadingProgress';
+import {
+  calculateEffectiveRiskPercentage,
+  calculateRiskAmount,
+  DynamicRiskSettings
+} from './utils/dynamicRiskUtils';
 
 // Lazy load components
 const CalendarHome = lazy(() => import('./components/CalendarHome'));
@@ -220,7 +225,7 @@ function AppContent() {
       );
 
       let cumulativePnL = 0;
-      const updatedTrades = sortedTrades.map(trade => {
+      const updatedTrades = sortedTrades.map((trade, index) => {
         // Skip trades with partials taken
         if (trade.partialsTaken) {
           cumulativePnL += trade.amount;
@@ -233,21 +238,17 @@ function AppContent() {
           return trade;
         }
 
-        // Calculate effective risk percentage
-        let effectiveRisk = calendar.riskPerTrade;
-        if (calendar.dynamicRiskEnabled &&
-            calendar.increasedRiskPercentage &&
-            calendar.profitThresholdPercentage &&
-            calendar.accountBalance > 0) {
-          const profitPercent = (cumulativePnL / calendar.accountBalance * 100);
-          if (profitPercent >= calendar.profitThresholdPercentage) {
-            effectiveRisk = calendar.increasedRiskPercentage;
-          }
-        }
+        // Calculate effective risk percentage using centralized utility
+        const dynamicRiskSettings: DynamicRiskSettings = {
+          accountBalance: calendar.accountBalance,
+          riskPerTrade: calendar.riskPerTrade,
+          dynamicRiskEnabled: calendar.dynamicRiskEnabled,
+          increasedRiskPercentage: calendar.increasedRiskPercentage,
+          profitThresholdPercentage: calendar.profitThresholdPercentage
+        };
 
-        // Calculate risk amount based on account balance + cumulative P&L
-        const totalAccountValue = calendar.accountBalance + cumulativePnL;
-        const riskAmount = (totalAccountValue * (effectiveRisk ?? 0)) / 100;
+        const effectiveRisk = calculateEffectiveRiskPercentage(new Date(trade.date), sortedTrades.slice(0, index), dynamicRiskSettings);
+        const riskAmount = calculateRiskAmount(effectiveRisk, calendar.accountBalance, cumulativePnL);
 
         // Calculate new amount based on trade type and risk to reward
         let newAmount = 0;
@@ -548,15 +549,20 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       monthlyTarget={calendar.monthlyTarget}
       onTagUpdated={onTagUpdated}
       yearlyTarget={calendar.yearlyTarget}
-      riskPerTrade={calendar.riskPerTrade}
-      dynamicRiskEnabled={calendar.dynamicRiskEnabled}
-      increasedRiskPercentage={calendar.increasedRiskPercentage}
-      profitThresholdPercentage={calendar.profitThresholdPercentage}
+      dynamicRiskSettings={{
+        accountBalance: calendar.accountBalance,
+        riskPerTrade: calendar.riskPerTrade,
+        dynamicRiskEnabled: calendar.dynamicRiskEnabled,
+        increasedRiskPercentage: calendar.increasedRiskPercentage,
+        profitThresholdPercentage: calendar.profitThresholdPercentage
+      }}
       requiredTagGroups={calendar.requiredTagGroups}
       calendarName={calendar.name}
       onAddTrade={handleAddTrade}
       calendarDayNotes={calendar.daysNotes}
       calendarNote={calendar.note}
+      // Score settings
+      scoreSettings={calendar.scoreSettings}
       onUpdateCalendarProperty={onUpdateCalendarProperty}
       onUpdateTradeProperty={handleUpdateTradeProperty}
       onAccountBalanceChange={handleChangeAccountBalance}

@@ -10,7 +10,7 @@ import {
   ReferenceLine,
   Cell
 } from 'recharts';
-import { Paper, Typography, useTheme } from '@mui/material';
+import { Box, Paper, Typography, useTheme } from '@mui/material';
 import { format } from 'date-fns'; 
  import { formatValue } from '../../utils/formatters';
 
@@ -88,7 +88,7 @@ const DailyPnLChart: React.FC<DailyPnLChartProps> = ({
   };
 
   return (
-    <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+    <Box>
       <Typography variant="h6" sx={{ mb: 2 }}>
         Daily P&L
       </Typography>
@@ -155,7 +155,7 @@ const DailyPnLChart: React.FC<DailyPnLChartProps> = ({
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-    </Paper>
+    </Box>
   );
 };
 

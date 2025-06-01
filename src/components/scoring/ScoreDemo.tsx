@@ -1,10 +1,13 @@
 import React from 'react';
-import { Box, Typography, Paper } from '@mui/material';
+import { Box, Typography, Paper, Chip, useTheme } from '@mui/material';
 import { Trade } from '../../types/trade';
 import { scoreService } from '../../services/scoreService';
+import { getTagChipStyles } from '../../utils/tagColors';
 
 // Demo component to test scoring functionality
 const ScoreDemo: React.FC = () => {
+  const theme = useTheme();
+
   // Sample trades for testing
   const sampleTrades: Trade[] = [
     {
@@ -59,91 +62,136 @@ const ScoreDemo: React.FC = () => {
     }
   ];
 
-  try {
-    const scoreAnalysis = scoreService.calculateScore(sampleTrades, 'weekly');
-    const scoreSummary = scoreService.getScoreSummary(sampleTrades);
+  const [scoreAnalysis, setScoreAnalysis] = React.useState<any>(null);
+  const [scoreSummary, setScoreSummary] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
 
+  React.useEffect(() => {
+    const calculateScores = async () => {
+      try {
+        const [analysis, summary] = await Promise.all([
+          scoreService.calculateScore(sampleTrades, 'weekly'),
+          scoreService.getScoreSummary(sampleTrades)
+        ]);
+        setScoreAnalysis(analysis);
+        setScoreSummary(summary);
+      } catch (error) {
+        console.error('Error calculating demo scores:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    calculateScores();
+  }, []);
+
+  if (loading) {
     return (
       <Paper sx={{ p: 3, m: 2 }}>
         <Typography variant="h6" gutterBottom>
-          🧪 Score Demo - Testing Functionality
+          🧪 Score Demo - Loading...
         </Typography>
-        
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle1" gutterBottom>
-            Sample Data: {sampleTrades.length} trades
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Win Rate: {((sampleTrades.filter(t => t.type === 'win').length / sampleTrades.length) * 100).toFixed(1)}%
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Total P&L: ${sampleTrades.reduce((sum, t) => sum + t.amount, 0)}
-          </Typography>
-        </Box>
-
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle1" gutterBottom>
-            Score Analysis Results:
-          </Typography>
-          <Typography variant="body2">
-            Overall Score: {scoreAnalysis.currentScore.overall.toFixed(1)}%
-          </Typography>
-          <Typography variant="body2">
-            Consistency: {scoreAnalysis.currentScore.consistency.toFixed(1)}%
-          </Typography>
-          <Typography variant="body2">
-            Risk Management: {scoreAnalysis.currentScore.riskManagement.toFixed(1)}%
-          </Typography>
-          <Typography variant="body2">
-            Performance: {scoreAnalysis.currentScore.performance.toFixed(1)}%
-          </Typography>
-          <Typography variant="body2">
-            Discipline: {scoreAnalysis.currentScore.discipline.toFixed(1)}%
-          </Typography>
-          <Typography variant="body2">
-            Trend: {scoreAnalysis.trend}
-          </Typography>
-        </Box>
-
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle1" gutterBottom>
-            Trading Pattern:
-          </Typography>
-          <Typography variant="body2">
-            Preferred Sessions: {scoreAnalysis.pattern.preferredSessions.join(', ')}
-          </Typography>
-          <Typography variant="body2">
-            Common Tags: {scoreAnalysis.pattern.commonTags.join(', ')}
-          </Typography>
-          <Typography variant="body2">
-            Avg Trades/Week: {scoreAnalysis.pattern.avgTradesPerWeek.toFixed(1)}
-          </Typography>
-        </Box>
-
-        <Box>
-          <Typography variant="subtitle1" gutterBottom>
-            Recommendations:
-          </Typography>
-          {scoreAnalysis.recommendations.map((rec, index) => (
-            <Typography key={index} variant="body2" sx={{ mb: 0.5 }}>
-              • {rec}
-            </Typography>
-          ))}
-        </Box>
+        <Typography variant="body2" color="text.secondary">
+          Calculating scores for sample data...
+        </Typography>
       </Paper>
     );
-  } catch (error) {
+  }
+
+  if (!scoreAnalysis || !scoreSummary) {
     return (
       <Paper sx={{ p: 3, m: 2 }}>
         <Typography variant="h6" color="error" gutterBottom>
           ❌ Score Demo - Error
         </Typography>
         <Typography variant="body2">
-          Error testing score functionality: {error instanceof Error ? error.message : 'Unknown error'}
+          Failed to calculate scores for demo data.
         </Typography>
       </Paper>
     );
   }
+
+  return (
+    <Paper sx={{ p: 3, m: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        🧪 Score Demo - Testing Functionality
+      </Typography>
+
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Sample Data: {sampleTrades.length} trades
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Win Rate: {((sampleTrades.filter(t => t.type === 'win').length / sampleTrades.length) * 100).toFixed(1)}%
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Total P&L: ${sampleTrades.reduce((sum, t) => sum + t.amount, 0)}
+        </Typography>
+      </Box>
+
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Score Analysis Results:
+        </Typography>
+        <Typography variant="body2">
+          Overall Score: {scoreAnalysis.currentScore.overall.toFixed(1)}%
+        </Typography>
+        <Typography variant="body2">
+          Consistency: {scoreAnalysis.currentScore.consistency.toFixed(1)}%
+        </Typography>
+        <Typography variant="body2">
+          Risk Management: {scoreAnalysis.currentScore.riskManagement.toFixed(1)}%
+        </Typography>
+        <Typography variant="body2">
+          Performance: {scoreAnalysis.currentScore.performance.toFixed(1)}%
+        </Typography>
+        <Typography variant="body2">
+          Discipline: {scoreAnalysis.currentScore.discipline.toFixed(1)}%
+        </Typography>
+        <Typography variant="body2">
+          Trend: {scoreAnalysis.trend}
+        </Typography>
+      </Box>
+
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Trading Pattern:
+        </Typography>
+        <Typography variant="body2">
+          Preferred Sessions: {scoreAnalysis.pattern.preferredSessions.join(', ')}
+        </Typography>
+        <Box>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Common Tags:
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {scoreAnalysis.pattern.commonTags.map((tag: string, index: number) => (
+              <Chip
+                key={index}
+                label={tag}
+                size="small"
+                sx={getTagChipStyles(tag, theme)}
+              />
+            ))}
+          </Box>
+        </Box>
+        <Typography variant="body2">
+          Avg Trades/Week: {scoreAnalysis.pattern.avgTradesPerWeek.toFixed(1)}
+        </Typography>
+      </Box>
+
+      <Box>
+        <Typography variant="subtitle1" gutterBottom>
+          Recommendations:
+        </Typography>
+        {scoreAnalysis.recommendations.map((rec: string, index: number) => (
+          <Typography key={index} variant="body2" sx={{ mb: 0.5 }}>
+            • {rec}
+          </Typography>
+        ))}
+      </Box>
+    </Paper>
+  );
 };
 
 export default ScoreDemo;

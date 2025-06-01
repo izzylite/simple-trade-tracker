@@ -27,8 +27,8 @@ import { ScoreHistory as ScoreHistoryType } from '../../types/score';
 
 interface ScoreHistoryProps {
   history: ScoreHistoryType[];
-  period: 'daily' | 'weekly' | 'monthly';
-  onPeriodChange: (period: 'daily' | 'weekly' | 'monthly') => void;
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  onPeriodChange: (period: 'daily' | 'weekly' | 'monthly' | 'yearly') => void;
 }
 
 const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
@@ -41,7 +41,12 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
   const chartData = useMemo(() => {
     return history.map(entry => ({
       date: entry.date,
-      dateLabel: format(entry.date, period === 'daily' ? 'MMM dd' : period === 'weekly' ? 'MMM dd' : 'MMM yyyy'),
+      dateLabel: format(entry.date,
+        period === 'daily' ? 'MMM dd' :
+        period === 'weekly' ? 'MMM dd' :
+        period === 'monthly' ? 'MMM yyyy' :
+        'yyyy'
+      ),
       overall: entry.metrics.overall,
       consistency: entry.metrics.consistency,
       riskManagement: entry.metrics.riskManagement,
@@ -52,8 +57,8 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
   }, [history, period]);
 
   const getScoreColor = (value: number) => {
-    if (value >= 80) return theme.palette.success.main;
-    if (value >= 60) return theme.palette.warning.main;
+    if (value >= 50) return theme.palette.success.main;
+    if (value >= 30) return theme.palette.warning.main;
     return theme.palette.error.main;
   };
 
@@ -204,6 +209,29 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
             <Tab
               label="Monthly"
               value="monthly"
+              sx={{
+                minHeight: 28,
+                textTransform: 'none',
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                color: 'text.secondary',
+                borderRadius: '12px',
+                padding: '4px 12px',
+                minWidth: 'auto',
+                '&.Mui-selected': {
+                  color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
+                  backgroundColor: 'primary.main',
+                  boxShadow: theme.shadows[1]
+                },
+                '&:hover:not(.Mui-selected)': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                  color: 'primary.main'
+                }
+              }}
+            />
+            <Tab
+              label="Yearly"
+              value="yearly"
               sx={{
                 minHeight: 28,
                 textTransform: 'none',

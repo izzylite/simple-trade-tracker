@@ -47,7 +47,7 @@ export interface ScoreBreakdown {
 
 export interface ScoreHistory {
   date: Date;
-  period: 'daily' | 'weekly' | 'monthly';
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
   metrics: ScoreMetrics;
   breakdown: ScoreBreakdown;
   tradeCount: number;
@@ -72,6 +72,8 @@ export interface ScoreSettings {
     maxDrawdown: number;
     avgRiskReward: number;
   };
+  selectedTags?: string[];
+  excludedTagsFromPatterns?: string[]; // Tags to exclude from pattern analysis
 }
 
 export interface TradingPattern {
@@ -87,6 +89,37 @@ export interface TradingPattern {
   tradingDays: number[]; // 0-6 (Sunday-Saturday)
 }
 
+export interface TagCombination {
+  tags: string[];
+  winRate: number;
+  totalTrades: number;
+  wins: number;
+  losses: number;
+  totalPnL: number;
+  avgPnL: number;
+  trend: 'improving' | 'declining' | 'stable';
+  recentWinRate: number; // Win rate in recent period
+  historicalWinRate: number; // Win rate in historical period
+}
+
+export interface TagPatternInsight {
+  type: 'high_performance' | 'declining_pattern' | 'market_condition';
+  title: string;
+  description: string;
+  tagCombination: string[];
+  winRate: number;
+  confidence: number; // 0-100
+  recommendation: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface TagPatternAnalysis {
+  insights: TagPatternInsight[];
+  topCombinations: TagCombination[];
+  decliningCombinations: TagCombination[];
+  marketConditionAlerts: TagPatternInsight[];
+}
+
 export interface ScoreAnalysis {
   currentScore: ScoreMetrics;
   breakdown: ScoreBreakdown;
@@ -95,4 +128,5 @@ export interface ScoreAnalysis {
   strengths: string[];
   weaknesses: string[];
   trend: 'improving' | 'declining' | 'stable';
+  tagPatternAnalysis?: TagPatternAnalysis;
 }

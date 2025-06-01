@@ -5,19 +5,18 @@ import {
   IconButton,
   Paper,
   alpha,
-  Tooltip,
   useTheme,
   TextField,
   Switch,
   FormControlLabel
 } from '@mui/material';
 import {
-  TrendingUp,
   Security as SecurityIcon,
   Info as InfoIcon,
   InfoOutlined
 } from '@mui/icons-material';
 import { Trade } from '../types/trade';
+import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 
 
 
@@ -28,9 +27,7 @@ interface AccountBalanceProps {
   trades: Trade[];
   onPerformanceClick?: () => void;
   riskPerTrade?: number;
-  dynamicRiskEnabled?: boolean;
-  increasedRiskPercentage?: number;
-  profitThresholdPercentage?: number;
+  dynamicRiskSettings?: DynamicRiskSettings;
   onToggleDynamicRisk?: (useActualAmounts: boolean) => void;
   isDynamicRiskToggled?: boolean;
 }
@@ -43,9 +40,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
   totalProfit,
   onPerformanceClick,
   riskPerTrade,
-  dynamicRiskEnabled,
-  increasedRiskPercentage,
-  profitThresholdPercentage,
+  dynamicRiskSettings,
   onToggleDynamicRisk,
   isDynamicRiskToggled = true // Default to true (using actual amounts)
 }) => {
@@ -61,15 +56,15 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
   const effectiveRiskPercentage = useMemo(() => {
     if (!riskPerTrade) return undefined;
 
-    if (dynamicRiskEnabled &&
-      increasedRiskPercentage &&
-      profitThresholdPercentage &&
-      parseFloat(profitPercentage) >= profitThresholdPercentage) {
-      return increasedRiskPercentage;
+    if (dynamicRiskSettings?.dynamicRiskEnabled &&
+      dynamicRiskSettings.increasedRiskPercentage &&
+      dynamicRiskSettings.profitThresholdPercentage &&
+      parseFloat(profitPercentage) >= dynamicRiskSettings.profitThresholdPercentage) {
+      return dynamicRiskSettings.increasedRiskPercentage;
     }
 
     return riskPerTrade;
-  }, [riskPerTrade, dynamicRiskEnabled, increasedRiskPercentage, profitThresholdPercentage, profitPercentage]);
+  }, [riskPerTrade, dynamicRiskSettings, profitPercentage]);
 
   // Calculate total account value
   const totalAccountValue = balance + totalProfit;
@@ -115,21 +110,6 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
           <Typography variant="h6" sx={{ color: 'text.primary', fontWeight: 600, pl: 1 }}>
             Account Balance
           </Typography>
-          <Tooltip title="View Performance Analytics">
-            <IconButton
-              size="small"
-              onClick={onPerformanceClick}
-              sx={{
-                color: 'primary.main',
-                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                '&:hover': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.15),
-                }
-              }}
-            >
-              <TrendingUp fontSize="small" />
-            </IconButton>
-          </Tooltip>
         </Box>
         {isEditing ? (
           <TextField
@@ -279,7 +259,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
                 }}
               >
                 Risk Per Trade ({effectiveRiskPercentage}%)
-                {dynamicRiskEnabled && effectiveRiskPercentage !== riskPerTrade && (
+                {dynamicRiskSettings?.dynamicRiskEnabled && effectiveRiskPercentage !== riskPerTrade && (
                   <Box component="span" sx={{ ml: 1, color: 'success.main', fontSize: '0.75rem', fontWeight: 700 }}>
                     INCREASED
                   </Box>
@@ -297,7 +277,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
             </Typography>
           </Box>
 
-          {dynamicRiskEnabled && profitThresholdPercentage && increasedRiskPercentage && (
+          {dynamicRiskSettings?.dynamicRiskEnabled && dynamicRiskSettings.profitThresholdPercentage && dynamicRiskSettings.increasedRiskPercentage && (
             <Box sx={{
               display: 'flex',
               flexDirection: 'column',
@@ -309,12 +289,12 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  Dynamic Risk: {parseFloat(profitPercentage) >= profitThresholdPercentage ?
+                  Dynamic Risk: {parseFloat(profitPercentage) >= dynamicRiskSettings.profitThresholdPercentage ?
                     <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>Active</Box> :
                     <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Inactive</Box>}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  Threshold: {profitThresholdPercentage}% profit
+                  Threshold: {dynamicRiskSettings.profitThresholdPercentage}% profit
                 </Typography>
               </Box>
 
@@ -339,28 +319,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
                   }
                   sx={{ m: 0 }}
                 />
-                <Tooltip
-                  title={
-                    <Typography variant="body2">
-                      Toggle between actual trade amounts from your history and calculated amounts based on risk management rules.
-                      When using calculated amounts, trades will be recalculated based on your risk per trade setting and risk-to-reward ratios,
-                      showing how your account would have performed with strict risk management.
-                    </Typography>
-                  }
-                  arrow
-                  placement="top"
-                >
-                  <Box
-                    sx={{
-                      display: 'inline-flex', 
-                      cursor: 'help',
-                      ml: 0.5, mb: 0.5,
-                      '&:hover': { color: 'primary.main' }
-                    }}
-                  >
-                    <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7,   display: 'inline-flex' }} />
-                  </Box>
-                </Tooltip>
+                
               </Box>
             </Box>
           )}

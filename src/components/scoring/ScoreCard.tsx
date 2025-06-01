@@ -26,7 +26,7 @@ import { ScoreMetrics } from '../../types/score';
 interface ScoreCardProps {
   score: ScoreMetrics;
   trend: 'improving' | 'declining' | 'stable';
-  period: 'daily' | 'weekly' | 'monthly';
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
   compact?: boolean;
 }
 
@@ -39,8 +39,8 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
   const theme = useTheme();
 
   const getScoreColor = (value: number) => {
-    if (value >= 80) return theme.palette.success.main;
-    if (value >= 60) return theme.palette.warning.main;
+    if (value >= 50) return theme.palette.success.main;
+    if (value >= 30) return theme.palette.warning.main;
     return theme.palette.error.main;
   };
 
@@ -178,15 +178,29 @@ Higher scores indicate better emotional control and systematic trading.`;
             sx={{
               color: getScoreColor(score.overall),
               fontWeight: 'bold',
-              mb: 1
+              mb: 0.5
             }}
           >
-            {score.overall.toFixed(0)}%
+            {isNaN(score.overall) ? '0' : score.overall.toFixed(0)}%
+          </Typography>
+
+          <Typography
+            variant="caption"
+            sx={{
+              color: getTrendColor(),
+              fontWeight: 500,
+              mb: 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5
+            }}
+          >
+            {trend.charAt(0).toUpperCase() + trend.slice(1)}
           </Typography>
 
           <LinearProgress
             variant="determinate"
-            value={score.overall}
+            value={isNaN(score.overall) ? 0 : score.overall}
             sx={{
               height: 6,
               borderRadius: 3,
@@ -259,14 +273,14 @@ Higher scores indicate better emotional control and systematic trading.`;
               mb: 1
             }}
           >
-            {score.overall.toFixed(0)}%
+            {isNaN(score.overall) ? '0' : score.overall.toFixed(0)}%
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Overall Trading Score
           </Typography>
           <LinearProgress
             variant="determinate"
-            value={score.overall}
+            value={isNaN(score.overall) ? 0 : score.overall}
             sx={{
               height: 8,
               borderRadius: 4,
@@ -324,12 +338,12 @@ Higher scores indicate better emotional control and systematic trading.`;
                   fontWeight="bold"
                   sx={{ color: getScoreColor(component.value) }}
                 >
-                  {component.value.toFixed(0)}%
+                  {isNaN(component.value) ? '0' : component.value.toFixed(0)}%
                 </Typography>
               </Stack>
                 <LinearProgress
                   variant="determinate"
-                  value={component.value}
+                  value={isNaN(component.value) ? 0 : component.value}
                   sx={{
                     height: 4,
                     borderRadius: 2,

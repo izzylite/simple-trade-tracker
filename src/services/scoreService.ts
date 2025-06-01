@@ -15,13 +15,17 @@ import {
   calculateDisciplineScore,
   generateRecommendations
 } from '../utils/scoreUtils';
+import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
+import { tagPatternService } from './tagPatternService';
 import {
   subDays,
   subWeeks,
   subMonths,
+  subYears,
   isSameDay,
   isSameWeek,
-  isSameMonth
+  isSameMonth,
+  isSameYear
 } from 'date-fns';
 
 /**
@@ -29,31 +33,46 @@ import {
  */
 export class ScoreService {
   private settings: ScoreSettings;
+  private dynamicRiskSettings?: DynamicRiskSettings;
 
   constructor(settings: ScoreSettings = DEFAULT_SCORE_SETTINGS) {
     this.settings = settings;
   }
 
   /**
+   * Update dynamic risk settings for score calculations
+   */
+  updateDynamicRiskSettings(dynamicRiskSettings?: DynamicRiskSettings): void {
+    this.dynamicRiskSettings = dynamicRiskSettings;
+  }
+
+  /**
    * Calculate comprehensive score analysis for a given period
    */
-  calculateScore(
-    allTrades: Trade[], 
-    period: 'daily' | 'weekly' | 'monthly' = 'weekly',
-    targetDate: Date = new Date()
-  ): ScoreAnalysis {
+  async calculateScore(
+    allTrades: Trade[],
+    period: 'daily' | 'weekly' | 'monthly' | 'yearly' = 'weekly',
+    targetDate: Date = new Date(),
+    scoreSettings: ScoreSettings = DEFAULT_SCORE_SETTINGS
+  ): Promise<ScoreAnalysis> {
     // Filter trades for the target period
     const periodTrades = this.getTradesForPeriod(allTrades, period, targetDate);
-    
+
+    // Yield control to prevent UI blocking
+    await new Promise(resolve => setTimeout(resolve, 0));
+
     // Calculate historical pattern from longer lookback period
     const historicalTrades = this.getHistoricalTrades(allTrades, targetDate);
-    const pattern = calculateTradingPattern(historicalTrades, this.settings.thresholds.lookbackPeriod);
+    const pattern = calculateTradingPattern(targetDate, historicalTrades, this.settings.thresholds.lookbackPeriod, this.settings.selectedTags, this.dynamicRiskSettings);
+
+    // Yield control again
+    await new Promise(resolve => setTimeout(resolve, 0));
 
     // Calculate individual score components
-    const consistency = calculateConsistencyScore(periodTrades, pattern, this.settings);
-    const riskManagement = calculateRiskManagementScore(periodTrades, pattern, this.settings);
-    const performance = calculatePerformanceScore(periodTrades, pattern, this.settings);
-    const discipline = calculateDisciplineScore(periodTrades, pattern, this.settings);
+    const consistency = calculateConsistencyScore(periodTrades, pattern, this.settings, allTrades, this.dynamicRiskSettings);
+    const riskManagement = calculateRiskManagementScore(periodTrades, pattern, this.settings, allTrades, this.dynamicRiskSettings);
+    const performance = calculatePerformanceScore(periodTrades, pattern, this.settings, allTrades, this.dynamicRiskSettings);
+    const discipline = calculateDisciplineScore(periodTrades, pattern, this.settings, allTrades, this.dynamicRiskSettings);
 
     // Calculate overall score using weights
     const overall = (
@@ -63,12 +82,15 @@ export class ScoreService {
       (discipline.score * this.settings.weights.discipline)
     ) / 100;
 
+    // Ensure overall score is not NaN
+    const finalOverall = isNaN(overall) ? 0 : overall;
+
     const currentScore: ScoreMetrics = {
-      consistency: consistency.score,
-      riskManagement: riskManagement.score,
-      performance: performance.score,
-      discipline: discipline.score,
-      overall
+      consistency: isNaN(consistency.score) ? 0 : consistency.score,
+      riskManagement: isNaN(riskManagement.score) ? 0 : riskManagement.score,
+      performance: isNaN(performance.score) ? 0 : performance.score,
+      discipline: isNaN(discipline.score) ? 0 : discipline.score,
+      overall: finalOverall
     };
 
     const breakdown: ScoreBreakdown = {
@@ -78,11 +100,16 @@ export class ScoreService {
       discipline
     };
 
-    // Generate recommendations
-    const { recommendations, strengths, weaknesses } = generateRecommendations(breakdown, pattern);
-
     // Determine trend
     const trend = this.calculateTrend(allTrades, period, targetDate);
+
+    // Calculate tag pattern analysis (only for sufficient data)
+    const tagPatternAnalysis = allTrades.length >= 10
+      ? tagPatternService.analyzeTagPatterns(allTrades, targetDate, scoreSettings)
+      : undefined;
+
+    // Generate recommendations (including tag pattern insights)
+    const { recommendations, strengths, weaknesses } = generateRecommendations(breakdown, pattern, tagPatternAnalysis);
 
     return {
       currentScore,
@@ -91,24 +118,25 @@ export class ScoreService {
       recommendations,
       strengths,
       weaknesses,
-      trend
+      trend,
+      tagPatternAnalysis
     };
   }
 
   /**
    * Get score history for a range of periods
    */
-  getScoreHistory(
-    allTrades: Trade[], 
-    period: 'daily' | 'weekly' | 'monthly',
+  async getScoreHistory(
+    allTrades: Trade[],
+    period: 'daily' | 'weekly' | 'monthly' | 'yearly',
     periodsBack: number = 12
-  ): ScoreHistory[] {
+  ): Promise<ScoreHistory[]> {
     const history: ScoreHistory[] = [];
     const today = new Date();
 
     for (let i = 0; i < periodsBack; i++) {
       let targetDate: Date;
-      
+
       switch (period) {
         case 'daily':
           targetDate = subDays(today, i);
@@ -119,13 +147,16 @@ export class ScoreService {
         case 'monthly':
           targetDate = subMonths(today, i);
           break;
+        case 'yearly':
+          targetDate = subYears(today, i);
+          break;
       }
 
       const periodTrades = this.getTradesForPeriod(allTrades, period, targetDate);
-      
+
       if (periodTrades.length >= this.settings.thresholds.minTradesForScore) {
-        const analysis = this.calculateScore(allTrades, period, targetDate);
-        
+        const analysis = await this.calculateScore(allTrades, period, targetDate);
+
         history.push({
           date: targetDate,
           period,
@@ -133,6 +164,11 @@ export class ScoreService {
           breakdown: analysis.breakdown,
           tradeCount: periodTrades.length
         });
+      }
+
+      // Yield control periodically to prevent UI blocking
+      if (i % 3 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
     }
 
@@ -144,7 +180,7 @@ export class ScoreService {
    */
   private getTradesForPeriod(
     trades: Trade[],
-    period: 'daily' | 'weekly' | 'monthly',
+    period: 'daily' | 'weekly' | 'monthly' | 'yearly',
     targetDate: Date
   ): Trade[] {
     return trades.filter(trade => {
@@ -157,6 +193,8 @@ export class ScoreService {
           return isSameWeek(tradeDate, targetDate, { weekStartsOn: 0 });
         case 'monthly':
           return isSameMonth(tradeDate, targetDate);
+        case 'yearly':
+          return isSameYear(tradeDate, targetDate);
         default:
           return false;
       }
@@ -179,12 +217,76 @@ export class ScoreService {
    */
   private calculateTrend(
     allTrades: Trade[],
-    period: 'daily' | 'weekly' | 'monthly',
+    period: 'daily' | 'weekly' | 'monthly' | 'yearly',
     targetDate: Date
   ): 'improving' | 'declining' | 'stable' {
-    // Simple trend calculation without recursion
-    // Just return stable for now to break the infinite loop
-    return 'stable';
+    try {
+      // Get current period trades
+      const currentTrades = this.getTradesForPeriod(allTrades, period, targetDate);
+
+      // Get previous period date
+      const previousDate = new Date(targetDate);
+      switch (period) {
+        case 'daily':
+          previousDate.setDate(previousDate.getDate() - 1);
+          break;
+        case 'weekly':
+          previousDate.setDate(previousDate.getDate() - 7);
+          break;
+        case 'monthly':
+          previousDate.setMonth(previousDate.getMonth() - 1);
+          break;
+        case 'yearly':
+          previousDate.setFullYear(previousDate.getFullYear() - 1);
+          break;
+      }
+
+      // Get previous period trades
+      const previousTrades = this.getTradesForPeriod(allTrades, period, previousDate);
+
+      // Need at least some trades in both periods to calculate trend
+      if (currentTrades.length < 2 || previousTrades.length < 2) {
+        return 'stable';
+      }
+
+      // Calculate scores for both periods (without recursion by using a simple calculation)
+      const currentScore = this.calculateSimpleScore(currentTrades);
+      const previousScore = this.calculateSimpleScore(previousTrades);
+
+      // Compare scores to determine trend
+      const scoreDifference = currentScore - previousScore;
+      const threshold = 5; // 5% threshold for trend detection
+
+      if (scoreDifference > threshold) {
+        return 'improving';
+      } else if (scoreDifference < -threshold) {
+        return 'declining';
+      } else {
+        return 'stable';
+      }
+    } catch (error) {
+      console.error('Error calculating trend:', error);
+      return 'stable';
+    }
+  }
+
+  /**
+   * Calculate a simple overall score without trend calculation (to avoid recursion)
+   */
+  private calculateSimpleScore(trades: Trade[]): number {
+    if (trades.length === 0) return 0;
+
+    // Simple calculation based on win rate and average return
+    const wins = trades.filter(t => t.type === 'win').length;
+    const winRate = (wins / trades.length) * 100;
+
+    const totalPnL = trades.reduce((sum, t) => sum + t.amount, 0);
+    const avgReturn = totalPnL / trades.length;
+
+    // Combine win rate and average return for a simple score
+    const returnScore = avgReturn > 0 ? Math.min(100, avgReturn * 10) : Math.max(0, 50 + avgReturn * 10);
+
+    return (winRate + returnScore) / 2;
   }
 
   /**
@@ -204,29 +306,38 @@ export class ScoreService {
   /**
    * Calculate score for multiple periods at once
    */
-  calculateMultiPeriodScore(allTrades: Trade[], targetDate: Date = new Date()): {
+  async calculateMultiPeriodScore(allTrades: Trade[], targetDate: Date = new Date(), scoreSettings: ScoreSettings = DEFAULT_SCORE_SETTINGS): Promise<{
     daily: ScoreAnalysis;
     weekly: ScoreAnalysis;
     monthly: ScoreAnalysis;
-  } {
+    yearly: ScoreAnalysis;
+  }> {
+    const [daily, weekly, monthly, yearly] = await Promise.all([
+      this.calculateScore(allTrades, 'daily', targetDate, scoreSettings),
+      this.calculateScore(allTrades, 'weekly', targetDate, scoreSettings),
+      this.calculateScore(allTrades, 'monthly', targetDate, scoreSettings),
+      this.calculateScore(allTrades, 'yearly', targetDate, scoreSettings)
+    ]);
+
     return {
-      daily: this.calculateScore(allTrades, 'daily', targetDate),
-      weekly: this.calculateScore(allTrades, 'weekly', targetDate),
-      monthly: this.calculateScore(allTrades, 'monthly', targetDate)
+      daily,
+      weekly,
+      monthly,
+      yearly
     };
   }
 
   /**
    * Get score summary for dashboard
    */
-  getScoreSummary(allTrades: Trade[]): {
+  async getScoreSummary(allTrades: Trade[]): Promise<{
     currentWeekly: ScoreMetrics;
     trend: 'improving' | 'declining' | 'stable';
     keyMetric: string;
     recommendation: string;
-  } {
-    const weeklyAnalysis = this.calculateScore(allTrades, 'weekly');
-    
+  }> {
+    const weeklyAnalysis = await this.calculateScore(allTrades, 'weekly');
+
     // Find the lowest scoring component
     const scores = [
       { name: 'Consistency', value: weeklyAnalysis.currentScore.consistency },
@@ -234,8 +345,8 @@ export class ScoreService {
       { name: 'Performance', value: weeklyAnalysis.currentScore.performance },
       { name: 'Discipline', value: weeklyAnalysis.currentScore.discipline }
     ];
-    
-    const lowestScore = scores.reduce((min, score) => 
+
+    const lowestScore = scores.reduce((min, score) =>
       score.value < min.value ? score : min
     );
 

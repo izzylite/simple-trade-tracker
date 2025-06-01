@@ -91,14 +91,32 @@ import ScoreSection from './ScoreSection';
 ```tsx
 import { scoreService } from '../services/scoreService';
 
-// Calculate score for current week
-const analysis = scoreService.calculateScore(trades, 'weekly');
+// Calculate score for current week (async)
+const analysis = await scoreService.calculateScore(trades, 'weekly');
 
-// Get score history
-const history = scoreService.getScoreHistory(trades, 'weekly', 12);
+// Get score history (async)
+const history = await scoreService.getScoreHistory(trades, 'weekly', 12);
 
-// Get quick summary
-const summary = scoreService.getScoreSummary(trades);
+// Get quick summary (async)
+const summary = await scoreService.getScoreSummary(trades);
+
+// Example with React hooks
+const [scoreAnalysis, setScoreAnalysis] = useState(null);
+
+useEffect(() => {
+  const calculateScore = async () => {
+    try {
+      const analysis = await scoreService.calculateScore(trades, 'weekly');
+      setScoreAnalysis(analysis);
+    } catch (error) {
+      console.error('Error calculating score:', error);
+    }
+  };
+
+  if (trades.length > 0) {
+    calculateScore();
+  }
+}, [trades]);
 ```
 
 ## Configuration

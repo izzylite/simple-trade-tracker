@@ -91,7 +91,7 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
   };
 
   return (
-    <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+    <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6">Cumulative P&L</Typography>
         {monthlyTarget && targetValue !== null && (
@@ -202,7 +202,7 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
           />
         </AreaChart>
       </ResponsiveContainer>
-    </Paper>
+    </Box>
   );
 };
 

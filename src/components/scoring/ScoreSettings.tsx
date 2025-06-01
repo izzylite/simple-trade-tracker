@@ -23,18 +23,29 @@ import {
   InfoOutlined
 } from '@mui/icons-material';
 import { ScoreSettings } from '../../types/score';
+import { Trade } from '../../types/trade';
 import { DEFAULT_SCORE_SETTINGS } from '../../utils/scoreUtils';
+import ExcludedTagsSelector from './ExcludedTagsSelector';
+import TagSelector from './TagSelector';
 
 interface ScoreSettingsProps {
   settings: ScoreSettings;
   onSettingsChange: (settings: ScoreSettings) => void;
   onSave?: () => void;
+  isSaving?: boolean;
+  trades: Trade[];
+  selectedTags: string[];
+  onTagsChange: (tags: string[]) => void;
 }
 
 const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
   settings,
   onSettingsChange,
-  onSave
+  onSave,
+  isSaving = false,
+  trades,
+  selectedTags,
+  onTagsChange
 }) => {
   const theme = useTheme();
   const [localSettings, setLocalSettings] = useState<ScoreSettings>(settings);
@@ -89,6 +100,13 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
       ...localSettings,
       targets: { ...localSettings.targets, [target]: value }
     };
+    setLocalSettings(newSettings);
+    setHasChanges(true);
+    onSettingsChange(newSettings);
+  };
+
+  const handleExcludedTagsChange = (excludedTags: string[]) => {
+    const newSettings = { ...localSettings, excludedTagsFromPatterns: excludedTags };
     setLocalSettings(newSettings);
     setHasChanges(true);
     onSettingsChange(newSettings);
@@ -165,7 +183,7 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
                 onClick={handleSave}
                 size="small"
                 variant="contained"
-                disabled={!hasChanges}
+                disabled={!hasChanges || isSaving}
                 sx={{
                   backgroundColor: theme.palette.primary.main,
                   '&:hover': {
@@ -178,7 +196,7 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
                   }
                 }}
               >
-                Save
+                {isSaving ? 'Saving...' : 'Save'}
               </Button>
             )}
           </Stack>
@@ -434,6 +452,38 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
                   helperText="Your target risk/reward ratio"
                 />
               </Box>
+            </AccordionDetails>
+          </Accordion>
+
+          {/* Common Strategies Tracking */}
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Typography variant="subtitle1" fontWeight="medium">
+                Common Strategies Tracking
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <TagSelector
+                trades={trades}
+                selectedTags={selectedTags}
+                onTagsChange={onTagsChange}
+              />
+            </AccordionDetails>
+          </Accordion>
+
+          {/* Pattern Analysis Settings */}
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Typography variant="subtitle1" fontWeight="medium">
+                Pattern Analysis Settings
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <ExcludedTagsSelector
+                trades={trades}
+                excludedTags={localSettings.excludedTagsFromPatterns || []}
+                onExcludedTagsChange={handleExcludedTagsChange}
+              />
             </AccordionDetails>
           </Accordion>
         </Stack>
