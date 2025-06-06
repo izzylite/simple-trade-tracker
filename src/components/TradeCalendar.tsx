@@ -654,32 +654,82 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       {showFloatingMonthNav && (
         <Box
           sx={{
-            position: 'fixed',
-            top: 80,
-            right: 20,
-            zIndex: 1200,
-            backgroundColor: alpha(theme.palette.background.paper, 0.95),
-            backdropFilter: 'blur(8px)',
-            borderRadius: 3,
-            boxShadow: theme.shadows[8],
-            border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-            p: 1,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            transition: 'all 0.3s ease-in-out',
-            transform: showFloatingMonthNav ? 'translateY(0)' : 'translateY(-20px)',
-            opacity: showFloatingMonthNav ? 1 : 0
-          }}
-        >
+          position: 'fixed',
+          top: 80,
+          right: 20,
+          zIndex: 1200,
+          backgroundColor: alpha(theme.palette.background.paper, 0.95),
+          backdropFilter: 'blur(8px)',
+          borderRadius: 3,
+          boxShadow: theme.shadows[8],
+          border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+          p: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+          transform: showFloatingMonthNav
+            ? 'translateY(0) translateX(0) scale(1)'
+            : 'translateY(-30px) translateX(20px) scale(0.8)',
+          opacity: showFloatingMonthNav ? 1 : 0,
+          visibility: showFloatingMonthNav ? 'visible' : 'hidden',
+          pointerEvents: showFloatingMonthNav ? 'auto' : 'none',
+          // Add subtle entrance animation
+          animation: showFloatingMonthNav
+            ? 'slideInFromTopRight 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+            : 'slideOutToTopRight 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards',
+          '@keyframes slideInFromTopRight': {
+            '0%': {
+              transform: 'translateY(-40px) translateX(30px) scale(0.7)',
+              opacity: 0,
+              filter: 'blur(4px)'
+            },
+            '60%': {
+              transform: 'translateY(-5px) translateX(-2px) scale(1.05)',
+              opacity: 0.8,
+              filter: 'blur(1px)'
+            },
+            '100%': {
+              transform: 'translateY(0) translateX(0) scale(1)',
+              opacity: 1,
+              filter: 'blur(0px)'
+            }
+          },
+          '@keyframes slideOutToTopRight': {
+            '0%': {
+              transform: 'translateY(0) translateX(0) scale(1)',
+              opacity: 1,
+              filter: 'blur(0px)'
+            },
+            '100%': {
+              transform: 'translateY(-30px) translateX(20px) scale(0.8)',
+              opacity: 0,
+              filter: 'blur(2px)'
+            }
+          },
+          // Add hover animation
+          '&:hover': {
+            transform: showFloatingMonthNav
+              ? 'translateY(-2px) translateX(0) scale(1.02)'
+              : 'translateY(-30px) translateX(20px) scale(0.8)',
+            boxShadow: showFloatingMonthNav ? theme.shadows[12] : theme.shadows[8],
+            transition: 'all 0.2s ease-out'
+          }
+        }}
+      >
           <IconButton
             onClick={handlePrevMonth}
             size="small"
             sx={{
               color: 'text.secondary',
+              transition: 'all 0.2s ease-in-out',
               '&:hover': {
                 color: 'primary.main',
-                bgcolor: alpha(theme.palette.primary.main, 0.08)
+                bgcolor: alpha(theme.palette.primary.main, 0.08),
+                transform: 'scale(1.1)'
+              },
+              '&:active': {
+                transform: 'scale(0.95)'
               }
             }}
           >
@@ -694,8 +744,17 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               textAlign: 'center',
               fontSize: '0.95rem',
               color: 'text.primary',
+              transition: 'all 0.2s ease-in-out',
+              borderRadius: 1,
+              px: 1,
+              py: 0.5,
               '&:hover': {
-                color: 'primary.main'
+                color: 'primary.main',
+                bgcolor: alpha(theme.palette.primary.main, 0.05),
+                transform: 'scale(1.02)'
+              },
+              '&:active': {
+                transform: 'scale(0.98)'
               }
             }}
             onClick={handleMonthClick}
@@ -707,9 +766,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             size="small"
             sx={{
               color: 'text.secondary',
+              transition: 'all 0.2s ease-in-out',
               '&:hover': {
                 color: 'primary.main',
-                bgcolor: alpha(theme.palette.primary.main, 0.08)
+                bgcolor: alpha(theme.palette.primary.main, 0.08),
+                transform: 'scale(1.1)'
+              },
+              '&:active': {
+                transform: 'scale(0.95)'
               }
             }}
           >
