@@ -572,7 +572,7 @@ export const createCalendar = async (userId: string, calendar: Omit<Calendar, 'i
 };
 
 // Duplicate an existing calendar
-export const duplicateCalendar = async (userId: string, sourceCalendarId: string, newName: string): Promise<string> => {
+export const duplicateCalendar = async (userId: string, sourceCalendarId: string, newName: string, includeContent: boolean = false): Promise<string> => {
   try {
     // Get the source calendar
     const sourceCalendar = await getCalendar(sourceCalendarId);
@@ -628,6 +628,21 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
 
     // Create the new calendar
     const newCalendarId = await createCalendar(userId, duplicatedCalendar);
+
+    // If includeContent is true, copy all trades from the source calendar
+    if (includeContent) {
+      try {
+        const sourceTrades = await getAllTrades(sourceCalendarId);
+        if (sourceTrades.length > 0) {
+          // Import all trades to the new calendar
+          await importTrades(newCalendarId, sourceTrades);
+        }
+      } catch (error) {
+        console.error('Error copying trades to duplicated calendar:', error);
+        // Don't throw here - the calendar was created successfully, just the trades failed to copy
+      }
+    }
+
     return newCalendarId;
   } catch (error) {
     console.error('Error duplicating calendar:', error);

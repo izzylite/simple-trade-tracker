@@ -23,7 +23,10 @@ import {
   AppBar,
   Toolbar,
   Avatar,
-  CircularProgress
+  CircularProgress,
+  Menu,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import CalendarFormDialog, { CalendarFormData } from './CalendarFormDialog';
 import {
@@ -42,7 +45,8 @@ import {
   Brightness7 as LightModeIcon,
   ExpandMore,
   ExpandLess,
-  ContentCopy as CopyIcon
+  ContentCopy as CopyIcon,
+  MoreVert as MoreVertIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -60,7 +64,7 @@ import Shimmer from './Shimmer';
 interface CalendarHomeProps {
   calendars: Calendar[];
   onCreateCalendar: (name: string, accountBalance: number, maxDailyDrawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamicRiskEnabled?: boolean, increasedRiskPercentage?: number, profitThresholdPercentage?: number) => void;
-  onDuplicateCalendar: (sourceCalendarId: string, newName: string) => void;
+  onDuplicateCalendar: (sourceCalendarId: string, newName: string, includeContent?: boolean) => void;
   onDeleteCalendar: (id: string) => void;
   onUpdateCalendar: (id: string, updates: Partial<Calendar>) => void;
   onToggleTheme: () => void;
@@ -276,13 +280,16 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
+  const [isDuplicateOptionsDialogOpen, setIsDuplicateOptionsDialogOpen] = useState(false);
   const [calendarToDelete, setCalendarToDelete] = useState<string | null>(null);
   const [calendarToEdit, setCalendarToEdit] = useState<Calendar | null>(null);
   const [calendarToDuplicate, setCalendarToDuplicate] = useState<Calendar | null>(null);
+  const [duplicateWithContent, setDuplicateWithContent] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [expandedCalendars, setExpandedCalendars] = useState<{[key: string]: boolean}>({});
+  const [menuAnchorEl, setMenuAnchorEl] = useState<{[key: string]: HTMLElement | null}>({});
   const theme = useTheme();
   const navigate = useNavigate();
   const [selectedCalendarForCharts, setSelectedCalendarForCharts] = useState<Calendar | null>(null);
@@ -372,21 +379,27 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     navigate(`/calendar/${calendarId}`);
   };
 
-  const handleDeleteClick = (e: React.MouseEvent, calendarId: string) => {
-    e.stopPropagation();
-    setCalendarToDelete(calendarId);
-    setIsDeleteDialogOpen(true);
-  };
 
-  const handleEditClick = (e: React.MouseEvent, calendar: Calendar) => {
-    e.stopPropagation();
+
+  // Menu item handlers that don't need event parameter
+  const handleEditCalendar = (calendar: Calendar) => {
     setCalendarToEdit(calendar);
     setIsEditDialogOpen(true);
   };
 
-  const handleDuplicateClick = (e: React.MouseEvent, calendar: Calendar) => {
-    e.stopPropagation();
+  const handleDuplicateCalendar = (calendar: Calendar) => {
     setCalendarToDuplicate(calendar);
+    setIsDuplicateOptionsDialogOpen(true);
+  };
+
+  const handleDeleteCalendar = (calendarId: string) => {
+    setCalendarToDelete(calendarId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDuplicateOptionSelect = (withContent: boolean) => {
+    setDuplicateWithContent(withContent);
+    setIsDuplicateOptionsDialogOpen(false);
     setIsDuplicateDialogOpen(true);
   };
 
@@ -395,9 +408,10 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
 
     setIsDuplicating(true);
     try {
-      await onDuplicateCalendar(calendarToDuplicate.id, data.name);
+      await onDuplicateCalendar(calendarToDuplicate.id, data.name, duplicateWithContent);
       setIsDuplicateDialogOpen(false);
       setCalendarToDuplicate(null);
+      setDuplicateWithContent(false);
     } catch (error) {
       console.error('Error duplicating calendar:', error);
     } finally {
@@ -419,6 +433,26 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
       ...prev,
       [calendarId]: !prev[calendarId]
     }));
+  };
+
+  const handleMenuClick = (e: React.MouseEvent, calendarId: string) => {
+    e.stopPropagation();
+    setMenuAnchorEl(prev => ({
+      ...prev,
+      [calendarId]: e.currentTarget as HTMLElement
+    }));
+  };
+
+  const handleMenuClose = (calendarId: string) => {
+    setMenuAnchorEl(prev => ({
+      ...prev,
+      [calendarId]: null
+    }));
+  };
+
+  const handleMenuItemClick = (calendarId: string, action: () => void) => {
+    handleMenuClose(calendarId);
+    action();
   };
 
   const handleViewCharts = async (e: React.MouseEvent, calendar: Calendar) => {
@@ -1122,7 +1156,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
 
                         </CardContent>
                         <CardActions sx={{
-                          justifyContent: 'flex-end',
+                          justifyContent: 'space-between',
                           p: 2,
                           pt: 1,
                           mt: 'auto',
@@ -1144,44 +1178,58 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                           >
                             View Charts
                           </Button>
-                          <Button
-                            size="small"
-                            onClick={(e) => handleEditClick(e, calendar)}
-                            sx={{
-                              color: 'primary.main',
-                              '&:hover': {
-                                bgcolor: alpha(theme.palette.primary.main, 0.1)
-                              }
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Tooltip title="Duplicate calendar with same settings">
-                            <Button
+
+                          <Box>
+                            <IconButton
                               size="small"
-                              onClick={(e) => handleDuplicateClick(e, calendar)}
+                              onClick={(e) => handleMenuClick(e, calendar.id)}
                               sx={{
-                                color: 'info.main',
+                                color: 'text.secondary',
                                 '&:hover': {
-                                  bgcolor: alpha(theme.palette.info.main, 0.1)
+                                  bgcolor: alpha(theme.palette.text.secondary, 0.1)
                                 }
                               }}
                             >
-                              <CopyIcon fontSize="small" />
-                            </Button>
-                          </Tooltip>
-                          <Button
-                            size="small"
-                            onClick={(e) => handleDeleteClick(e, calendar.id)}
-                            sx={{
-                              color: 'error.main',
-                              '&:hover': {
-                                bgcolor: alpha(theme.palette.error.main, 0.1)
-                              }
-                            }}
-                          >
-                            Delete
-                          </Button>
+                              <MoreVertIcon fontSize="small" />
+                            </IconButton>
+
+                            <Menu
+                              anchorEl={menuAnchorEl[calendar.id]}
+                              open={Boolean(menuAnchorEl[calendar.id])}
+                              onClose={() => handleMenuClose(calendar.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                            >
+                              <MenuItem
+                                onClick={() => handleMenuItemClick(calendar.id, () => handleEditCalendar(calendar))}
+                              >
+                                <ListItemIcon>
+                                  <EditIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Edit</ListItemText>
+                              </MenuItem>
+
+                              <MenuItem
+                                onClick={() => handleMenuItemClick(calendar.id, () => handleDuplicateCalendar(calendar))}
+                              >
+                                <ListItemIcon>
+                                  <CopyIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Duplicate</ListItemText>
+                              </MenuItem>
+
+                              <MenuItem
+                                onClick={() => handleMenuItemClick(calendar.id, () => handleDeleteCalendar(calendar.id))}
+                                sx={{ color: 'error.main' }}
+                              >
+                                <ListItemIcon>
+                                  <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+                                </ListItemIcon>
+                                <ListItemText>Delete</ListItemText>
+                              </MenuItem>
+                            </Menu>
+                          </Box>
                         </CardActions>
                       </Card>
                     );
@@ -1211,11 +1259,98 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
               submitButtonText="Save Changes"
             />
 
+            <Dialog
+              open={isDuplicateOptionsDialogOpen}
+              onClose={() => {
+                setIsDuplicateOptionsDialogOpen(false);
+                setCalendarToDuplicate(null);
+              }}
+              maxWidth="sm"
+              fullWidth
+              {...dialogProps}
+            >
+              <DialogTitle sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                color: 'primary.main'
+              }}>
+                <CopyIcon fontSize="small" />
+                Duplicate Calendar Options
+              </DialogTitle>
+              <DialogContent>
+                <Typography variant="body1" sx={{ mb: 3 }}>
+                  How would you like to duplicate "{calendarToDuplicate?.name}"?
+                </Typography>
+
+                <Stack spacing={2}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => handleDuplicateOptionSelect(false)}
+                    sx={{
+                      p: 2,
+                      textAlign: 'left',
+                      justifyContent: 'flex-start',
+                      borderColor: 'primary.main',
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.primary.main, 0.1)
+                      }
+                    }}
+                  >
+                    <Box>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                        Settings Only
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Copy calendar settings, targets, and configuration without any trades
+                      </Typography>
+                    </Box>
+                  </Button>
+
+                  <Button
+                    variant="outlined"
+                    onClick={() => handleDuplicateOptionSelect(true)}
+                    sx={{
+                      p: 2,
+                      textAlign: 'left',
+                      justifyContent: 'flex-start',
+                      borderColor: 'info.main',
+                      color: 'info.main',
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.info.main, 0.1)
+                      }
+                    }}
+                  >
+                    <Box>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                        Settings + All Trades
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Copy everything including all trades and performance data
+                      </Typography>
+                    </Box>
+                  </Button>
+                </Stack>
+              </DialogContent>
+              <DialogActions>
+                <Button
+                  onClick={() => {
+                    setIsDuplicateOptionsDialogOpen(false);
+                    setCalendarToDuplicate(null);
+                  }}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  Cancel
+                </Button>
+              </DialogActions>
+            </Dialog>
+
             <CalendarFormDialog
               open={isDuplicateDialogOpen}
               onClose={() => {
                 setIsDuplicateDialogOpen(false);
                 setCalendarToDuplicate(null);
+                setDuplicateWithContent(false);
               }}
               onSubmit={handleDuplicateCalendarSubmit}
               initialData={calendarToDuplicate ? {
@@ -1224,7 +1359,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
               } : undefined}
               isSubmitting={isDuplicating}
               mode="create"
-              title="Duplicate Calendar"
+              title={`Duplicate Calendar ${duplicateWithContent ? '(with trades)' : '(settings only)'}`}
               submitButtonText="Duplicate"
             />
 

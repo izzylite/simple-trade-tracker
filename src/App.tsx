@@ -157,11 +157,11 @@ function AppContent() {
     }
   };
 
-  const handleDuplicateCalendar = async (sourceCalendarId: string, newName: string) => {
+  const handleDuplicateCalendar = async (sourceCalendarId: string, newName: string, includeContent: boolean = false) => {
     if (!user) return;
 
     try {
-      const newCalendarId = await calendarService.duplicateCalendar(user.uid, sourceCalendarId, newName);
+      const newCalendarId = await calendarService.duplicateCalendar(user.uid, sourceCalendarId, newName, includeContent);
 
       // Get the source calendar to copy its properties
       const sourceCalendar = calendars.find(cal => cal.id === sourceCalendarId);
