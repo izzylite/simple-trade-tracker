@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { FC } from 'react';
 import {
@@ -454,12 +454,31 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [showFloatingMonthNav, setShowFloatingMonthNav] = useState(false);
 
   const theme = useTheme();
   const navigate = useNavigate();
   const { calendarId } = useParams();
 
   const { user, signInWithGoogle, signOut } = useAuth();
+
+  // Scroll detection for floating month navigation
+  useEffect(() => {
+    const handleScroll = () => {
+      // Find the score section element
+      const scoreSection = document.querySelector('[data-testid="score-section"]');
+      if (scoreSection) {
+        const rect = scoreSection.getBoundingClientRect();
+        // Show floating nav when score section is visible (top of element is in viewport)
+        setShowFloatingMonthNav(rect.top <= window.innerHeight && rect.bottom >= 0);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Check initial state
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
 
 
@@ -631,6 +650,74 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   return (
     <Box>
+      {/* Floating Month Navigation */}
+      {showFloatingMonthNav && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 80,
+            right: 20,
+            zIndex: 1200,
+            backgroundColor: alpha(theme.palette.background.paper, 0.95),
+            backdropFilter: 'blur(8px)',
+            borderRadius: 3,
+            boxShadow: theme.shadows[8],
+            border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+            p: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            transition: 'all 0.3s ease-in-out',
+            transform: showFloatingMonthNav ? 'translateY(0)' : 'translateY(-20px)',
+            opacity: showFloatingMonthNav ? 1 : 0
+          }}
+        >
+          <IconButton
+            onClick={handlePrevMonth}
+            size="small"
+            sx={{
+              color: 'text.secondary',
+              '&:hover': {
+                color: 'primary.main',
+                bgcolor: alpha(theme.palette.primary.main, 0.08)
+              }
+            }}
+          >
+            <ChevronLeft />
+          </IconButton>
+          <Typography
+            variant="body1"
+            sx={{
+              fontWeight: 600,
+              cursor: 'pointer',
+              minWidth: '140px',
+              textAlign: 'center',
+              fontSize: '0.95rem',
+              color: 'text.primary',
+              '&:hover': {
+                color: 'primary.main'
+              }
+            }}
+            onClick={handleMonthClick}
+          >
+            {format(currentDate, 'MMM yyyy')}
+          </Typography>
+          <IconButton
+            onClick={handleNextMonth}
+            size="small"
+            sx={{
+              color: 'text.secondary',
+              '&:hover': {
+                color: 'primary.main',
+                bgcolor: alpha(theme.palette.primary.main, 0.08)
+              }
+            }}
+          >
+            <ChevronRight />
+          </IconButton>
+        </Box>
+      )}
+
       <AppBar
         position="fixed"
         color="transparent"

@@ -298,6 +298,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
 
   return (
     <Paper
+      data-testid="score-section"
       sx={{
         p: 0,
         backgroundColor: theme.palette.mode === 'dark'
