@@ -247,6 +247,11 @@ const convertFirestoreDataToCalendar = (doc: DocumentData): Calendar => {
     dynamicRiskEnabled: data.dynamicRiskEnabled,
     increasedRiskPercentage: data.increasedRiskPercentage,
     profitThresholdPercentage: data.profitThresholdPercentage,
+    // Duplication tracking
+    duplicatedCalendar: data.duplicatedCalendar,
+    sourceCalendarId: data.sourceCalendarId,
+    // Tags
+    tags: data.tags || [],
     // Notes
     note: data.note,
     daysNotes: daysNotesMap,
@@ -312,10 +317,18 @@ const convertCalendarToFirestoreData = (calendar: Omit<Calendar, 'id' | 'cachedT
     ...(calendar.riskPerTrade !== undefined && { riskPerTrade: calendar.riskPerTrade }),
     ...(calendar.dynamicRiskEnabled !== undefined && { dynamicRiskEnabled: calendar.dynamicRiskEnabled }),
     ...(calendar.increasedRiskPercentage !== undefined && { increasedRiskPercentage: calendar.increasedRiskPercentage }),
+    ...(calendar.profitThresholdPercentage !== undefined && { profitThresholdPercentage: calendar.profitThresholdPercentage }),
+
+    // Duplication tracking
+    ...(calendar.duplicatedCalendar !== undefined && { duplicatedCalendar: calendar.duplicatedCalendar }),
+    ...(calendar.sourceCalendarId !== undefined && { sourceCalendarId: calendar.sourceCalendarId }),
+
+    // Tags
+    ...(calendar.tags !== undefined && { tags: calendar.tags }),
+
     // Notes fields
     ...(calendar.note !== undefined && { note: calendar.note }),
     ...(daysNotesObj && { daysNotes: daysNotesObj }),
-    ...(calendar.profitThresholdPercentage !== undefined && { profitThresholdPercentage: calendar.profitThresholdPercentage }),
 
     // Score settings
     ...(calendar.scoreSettings !== undefined && { scoreSettings: calendar.scoreSettings }),
