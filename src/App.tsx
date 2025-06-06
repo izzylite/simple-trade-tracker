@@ -11,6 +11,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
 import TradeLoadingIndicator from './components/TradeLoadingIndicator';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from './firebase/config';
 
 import AppLoadingProgress from './components/AppLoadingProgress';
 import {
@@ -175,6 +177,8 @@ function AppContent() {
           // Mark as duplicated calendar and track source
           duplicatedCalendar: true,
           sourceCalendarId: sourceCalendarId,
+          // Copy tags from source calendar
+          tags: sourceCalendar.tags || [],
           // Reset statistics for the new calendar
           winRate: 0,
           profitFactor: 0,
@@ -452,6 +456,32 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     }
   }, [calendar, loadAllTrades, loadAttempted]);
 
+  // Subscribe to calendar changes to automatically update tags and other fields
+  useEffect(() => {
+    if (!calendar) return;
+
+    const calendarRef = doc(db, 'calendars', calendar.id);
+    const unsubscribe = onSnapshot(calendarRef, (doc) => {
+      if (doc.exists()) {
+        const updatedCalendarData = doc.data();
+
+        // Only update specific fields that might change from cloud functions
+        // Preserve cached trades and loaded years from local state
+        onUpdateStateCalendar(calendar.id, {
+          tags: updatedCalendarData.tags || [],
+          lastModified: updatedCalendarData.lastModified?.toDate() || new Date(),
+          // Update any other fields that cloud functions might modify
+          // but preserve local state for trades and UI-specific data
+        });
+      }
+    }, (error) => {
+      console.error('Error listening to calendar changes:', error);
+    });
+
+    // Cleanup subscription on unmount or calendar change
+    return () => unsubscribe();
+  }, [calendar?.id, onUpdateStateCalendar]);
+
   if (!calendar) {
     return <Navigate to="/" replace />;
   }
@@ -475,11 +505,14 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
 
 
   const onTagUpdated = async (oldTag: string, newTag: string) => {
+    // Update cached trades locally for immediate UI feedback
     calendar.cachedTrades.forEach((trade: Trade) => {
       if (trade.tags && trade.tags.includes(oldTag)) {
         trade.tags = trade.tags.map(tag => tag === oldTag ? newTag : tag);
       }
     });
+
+    // Update local state immediately
     onUpdateStateCalendar(calendar.id, {
       cachedTrades: [...calendar.cachedTrades]
     });

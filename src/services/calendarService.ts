@@ -548,6 +548,8 @@ export const createCalendar = async (userId: string, calendar: Omit<Calendar, 'i
     // Initialize notes
     note: calendar.note || '',
     daysNotes: calendar.daysNotes ? Object.fromEntries(calendar.daysNotes) : {},
+    // Initialize tags
+    tags: calendar.tags || [],
     // Initialize statistics
     winRate: 0,
     profitFactor: 0,
@@ -598,9 +600,10 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
       // Mark as duplicated calendar and track source
       duplicatedCalendar: true,
       sourceCalendarId: sourceCalendarId,
-      // Copy notes and score settings
+      // Copy notes, tags, and score settings
       note: sourceCalendar.note,
       daysNotes: sourceCalendar.daysNotes,
+      tags: sourceCalendar.tags || [],
       scoreSettings: sourceCalendar.scoreSettings,
       // Reset statistics for the new calendar
       winRate: 0,

@@ -20,6 +20,8 @@ export interface Calendar {
   sourceCalendarId?: string;
   // Tag validation
   requiredTagGroups?: string[];
+  // All tags used in this calendar
+  tags?: string[];
   // Notes
   note?: string;
   daysNotes?: Map<string, string>;
