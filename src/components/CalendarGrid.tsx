@@ -1,6 +1,5 @@
 import { Box } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import { Typography } from '@mui/material';
 
 export const CalendarGrid = styled(Box)(({ theme }) => ({
   display: 'grid',

@@ -48,8 +48,8 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
   const [secondaryTagsDialogOpen, setSecondaryTagsDialogOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
 
-  // Define colors
-  const COLORS = {
+  // Define colors - memoized to prevent unnecessary re-renders
+  const COLORS = React.useMemo(() => ({
     win: theme.palette.success.main,
     loss: theme.palette.error.main,
     neutral: theme.palette.grey[500],
@@ -60,7 +60,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
     thursday: '#9966FF',
     friday: '#FF9F40',
     saturday: '#C9CBCF'
-  };
+  }), [theme]);
 
   // Calculate tag performance by day of week
   const tagDayOfWeekData = React.useMemo(() => {

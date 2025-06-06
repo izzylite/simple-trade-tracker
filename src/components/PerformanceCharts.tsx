@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth, parseISO } from 'date-fns';
+import React, { useMemo, useState, useEffect } from 'react';
+import { format, parseISO } from 'date-fns';
 import { Box, Typography, useTheme, Tabs, Tab, Paper } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { Trade } from '../types/trade';
@@ -18,6 +18,13 @@ import {
   TradesListDialog,
   RiskRewardChart
 } from './charts';
+import {
+  calculateChartData,
+  calculateSessionStats,
+  calculateTargetValue,
+  calculateDrawdownViolationValue,
+  getFilteredTrades as utilGetFilteredTrades
+} from '../utils/chartDataUtils';
 
 interface PerformanceChartsProps {
   trades: Trade[];
@@ -113,26 +120,35 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   
 
   const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [isCalculatingChartData, setIsCalculatingChartData] = useState(false);
 
+
+  // Calculate chart data using the async utility function
+  useEffect(() => {
+    const calculateChartDataAsync = async () => {
+      setIsCalculatingChartData(true);
+      try {
+        const data = await calculateChartData(trades, selectedDate, timePeriod);
+        setChartData(data);
+      } catch (error) {
+        console.error('Error calculating chart data:', error);
+        setChartData([]);
+      } finally {
+        setIsCalculatingChartData(false);
+      }
+    };
+
+    calculateChartDataAsync();
+  }, [trades, selectedDate, timePeriod]);
 
   const handleTimePeriodChange = (newValue: TimePeriod) => {
     setTimePeriod(newValue);
     onTimePeriodChange?.(newValue);
   };
 
-  // Function to filter trades based on selected time period
-  const getFilteredTrades = useCallback((trades: Trade[], selectedDate: Date, period: TimePeriod) => {
-    switch (period) {
-      case 'month':
-        return trades.filter(trade => isSameMonth(new Date(trade.date), selectedDate));
-      case 'year':
-        return trades.filter(trade => new Date(trade.date).getFullYear() === selectedDate.getFullYear());
-      case 'all':
-        return trades;
-      default:
-        return trades;
-    }
-  }, []);
+  // Use the utility function for filtering trades
+  const getFilteredTrades = utilGetFilteredTrades;
 
   // Calculate Risk to Reward statistics
   const riskRewardStats = useMemo(() => {
@@ -155,67 +171,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     return { average, max, data };
   }, [trades, selectedDate, timePeriod, getFilteredTrades]);
 
-  // Calculate chart data for cumulative P&L
-  const chartData = useMemo(() => {
-    const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod);
-
-    // Get the date range for the selected period
-    let startDate, endDate;
-    if (timePeriod === 'month') {
-      startDate = startOfMonth(selectedDate);
-      endDate = endOfMonth(selectedDate);
-    } else if (timePeriod === 'year') {
-      startDate = new Date(selectedDate.getFullYear(), 0, 1);
-      endDate = new Date(selectedDate.getFullYear(), 11, 31);
-    } else {
-      // For 'all', use the first and last trade dates
-      if (filteredTrades.length === 0) {
-        startDate = new Date();
-        endDate = new Date();
-      } else {
-        const sortedTrades = [...filteredTrades].sort((a, b) =>
-          new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-        startDate = new Date(sortedTrades[0].date);
-        endDate = new Date(sortedTrades[sortedTrades.length - 1].date);
-      }
-    }
-
-    // Generate an array of all days in the period
-    const days = eachDayOfInterval({ start: startDate, end: endDate });
-
-    // Calculate cumulative P&L for each day
-    let cumulative = 0;
-    let prevCumulative = 0;
-
-    return days.map(day => {
-      // Find trades for this day
-      const dayTrades = filteredTrades.filter(trade =>
-        format(new Date(trade.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
-      );
-
-      // Calculate daily P&L
-      const dailyPnL = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
-
-      // Update cumulative P&L
-      prevCumulative = cumulative;
-      cumulative += dailyPnL;
-
-      return {
-        date: format(day, timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
-        pnl: dailyPnL,
-        cumulativePnL: cumulative,
-        isIncreasing: cumulative > prevCumulative,
-        isDecreasing: cumulative < prevCumulative,
-        dailyChange: cumulative - prevCumulative,
-        isWin: dailyPnL > 0,
-        isLoss: dailyPnL < 0,
-        isBreakEven: dailyPnL === 0,
-        trades: dayTrades,
-        fullDate: new Date(day)
-      };
-    });
-  }, [trades, selectedDate, timePeriod, getFilteredTrades]);
+  // Chart data is now calculated asynchronously in useEffect above
 
   // Calculate win/loss statistics
   const winLossStats = useMemo(() => {

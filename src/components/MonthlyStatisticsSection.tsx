@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -72,12 +72,27 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   });
   const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
   const [comparisonTags, setComparisonTags] = useState<string[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [isCalculatingChartData, setIsCalculatingChartData] = useState(false);
 
   const timePeriod: TimePeriod = 'month';
 
-  // Calculate chart data using the utility function
-  const chartData = useMemo(() => {
-    return calculateChartData(trades, selectedDate, timePeriod);
+  // Calculate chart data using the async utility function
+  useEffect(() => {
+    const calculateChartDataAsync = async () => {
+      setIsCalculatingChartData(true);
+      try {
+        const data = await calculateChartData(trades, selectedDate, timePeriod);
+        setChartData(data);
+      } catch (error) {
+        console.error('Error calculating chart data:', error);
+        setChartData([]);
+      } finally {
+        setIsCalculatingChartData(false);
+      }
+    };
+
+    calculateChartDataAsync();
   }, [trades, selectedDate, timePeriod]);
 
   // Calculate session statistics using the utility function

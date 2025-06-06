@@ -43,13 +43,16 @@ export const getFilteredTrades = (trades: Trade[], selectedDate: Date, period: T
   }
 };
 
-// Calculate chart data for cumulative P&L
-export const calculateChartData = (
-  trades: Trade[], 
-  selectedDate: Date, 
+// Calculate chart data for cumulative P&L - async to prevent UI blocking
+export const calculateChartData = async (
+  trades: Trade[],
+  selectedDate: Date,
   timePeriod: TimePeriod
-): ChartDataPoint[] => {
+): Promise<ChartDataPoint[]> => {
   const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod);
+
+  // Yield control to prevent UI blocking
+  await new Promise(resolve => setTimeout(resolve, 0));
 
   // Get the date range for the selected period
   let startDate, endDate;
@@ -80,33 +83,50 @@ export const calculateChartData = (
   let cumulative = 0;
   let prevCumulative = 0;
 
-  return days.map(day => {
-    // Find trades for this day
-    const dayTrades = filteredTrades.filter(trade =>
-      format(new Date(trade.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
-    );
+  // Process in chunks to prevent blocking for large datasets
+  const chunkSize = 100;
+  const result: ChartDataPoint[] = [];
 
-    // Calculate daily P&L
-    const dailyPnL = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
+  for (let i = 0; i < days.length; i += chunkSize) {
+    const chunk = days.slice(i, i + chunkSize);
 
-    // Update cumulative P&L
-    prevCumulative = cumulative;
-    cumulative += dailyPnL;
+    const chunkResult = chunk.map(day => {
+      // Find trades for this day
+      const dayTrades = filteredTrades.filter(trade =>
+        format(new Date(trade.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
+      );
 
-    return {
-      date: format(day, timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
-      pnl: dailyPnL,
-      cumulativePnL: cumulative,
-      isIncreasing: cumulative > prevCumulative,
-      isDecreasing: cumulative < prevCumulative,
-      dailyChange: cumulative - prevCumulative,
-      isWin: dailyPnL > 0,
-      isLoss: dailyPnL < 0,
-      isBreakEven: dailyPnL === 0,
-      trades: dayTrades,
-      fullDate: new Date(day)
-    };
-  });
+      // Calculate daily P&L
+      const dailyPnL = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
+
+      // Update cumulative P&L
+      prevCumulative = cumulative;
+      cumulative += dailyPnL;
+
+      return {
+        date: format(day, timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
+        pnl: dailyPnL,
+        cumulativePnL: cumulative,
+        isIncreasing: cumulative > prevCumulative,
+        isDecreasing: cumulative < prevCumulative,
+        dailyChange: cumulative - prevCumulative,
+        isWin: dailyPnL > 0,
+        isLoss: dailyPnL < 0,
+        isBreakEven: dailyPnL === 0,
+        trades: dayTrades,
+        fullDate: new Date(day)
+      };
+    });
+
+    result.push(...chunkResult);
+
+    // Yield control after each chunk
+    if (i + chunkSize < days.length) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+  }
+
+  return result;
 };
 
 // Calculate session performance statistics

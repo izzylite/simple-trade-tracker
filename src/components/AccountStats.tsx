@@ -2,18 +2,14 @@ import React, { useState, useMemo } from 'react';
 import {
   Box,
   Typography,
-  IconButton,
   Paper,
   alpha,
-  useTheme,
   TextField,
   Switch,
   FormControlLabel
 } from '@mui/material';
 import {
-  Security as SecurityIcon,
-  Info as InfoIcon,
-  InfoOutlined
+  Security as SecurityIcon
 } from '@mui/icons-material';
 import { Trade } from '../types/trade';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
@@ -46,8 +42,6 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempBalance, setTempBalance] = useState(balance.toString());
-
-  const theme = useTheme();
 
   // Profit percentage calculation
   const profitPercentage = trades.length > 0 && balance > 0 ? (totalProfit / balance * 100).toFixed(2) : '0';
