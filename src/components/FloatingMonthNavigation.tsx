@@ -47,54 +47,10 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: 1,
-            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-            transform: isVisible
-              ? 'translateY(0) translateX(0) scale(1)'
-              : 'translateY(-30px) translateX(20px) scale(0.8)',
+            transition: 'opacity 0.3s ease-in-out',
             opacity: isVisible ? 1 : 0,
             visibility: isVisible ? 'visible' : 'hidden',
-            pointerEvents: isVisible ? 'auto' : 'none',
-            // Add subtle entrance animation
-            animation: isVisible
-              ? 'slideInFromTopRight 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards'
-              : 'slideOutToTopRight 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards',
-            '@keyframes slideInFromTopRight': {
-              '0%': {
-                transform: 'translateY(-40px) translateX(30px) scale(0.7)',
-                opacity: 0,
-                filter: 'blur(4px)'
-              },
-              '60%': {
-                transform: 'translateY(-5px) translateX(-2px) scale(1.05)',
-                opacity: 0.8,
-                filter: 'blur(1px)'
-              },
-              '100%': {
-                transform: 'translateY(0) translateX(0) scale(1)',
-                opacity: 1,
-                filter: 'blur(0px)'
-              }
-            },
-            '@keyframes slideOutToTopRight': {
-              '0%': {
-                transform: 'translateY(0) translateX(0) scale(1)',
-                opacity: 1,
-                filter: 'blur(0px)'
-              },
-              '100%': {
-                transform: 'translateY(-30px) translateX(20px) scale(0.8)',
-                opacity: 0,
-                filter: 'blur(2px)'
-              }
-            },
-            // Add hover animation
-            '&:hover': {
-              transform: isVisible
-                ? 'translateY(-2px) translateX(0) scale(1.02)'
-                : 'translateY(-30px) translateX(20px) scale(0.8)',
-              boxShadow: isVisible ? theme.shadows[12] : theme.shadows[8],
-              transition: 'all 0.2s ease-out'
-            }
+            pointerEvents: isVisible ? 'auto' : 'none'
           }}
         >
           <IconButton
@@ -102,14 +58,9 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
             size="small"
             sx={{
               color: 'text.secondary',
-              transition: 'all 0.2s ease-in-out',
               '&:hover': {
                 color: 'primary.main',
-                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                transform: 'scale(1.1)'
-              },
-              '&:active': {
-                transform: 'scale(0.95)'
+                bgcolor: alpha(theme.palette.primary.main, 0.08)
               }
             }}
           >
@@ -124,17 +75,12 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
               textAlign: 'center',
               fontSize: '0.95rem',
               color: 'text.primary',
-              transition: 'all 0.2s ease-in-out',
               borderRadius: 1,
               px: 1,
               py: 0.5,
               '&:hover': {
                 color: 'primary.main',
-                bgcolor: alpha(theme.palette.primary.main, 0.05),
-                transform: 'scale(1.02)'
-              },
-              '&:active': {
-                transform: 'scale(0.98)'
+                bgcolor: alpha(theme.palette.primary.main, 0.05)
               }
             }}
             onClick={onMonthClick}
@@ -146,14 +92,9 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
             size="small"
             sx={{
               color: 'text.secondary',
-              transition: 'all 0.2s ease-in-out',
               '&:hover': {
                 color: 'primary.main',
-                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                transform: 'scale(1.1)'
-              },
-              '&:active': {
-                transform: 'scale(0.95)'
+                bgcolor: alpha(theme.palette.primary.main, 0.08)
               }
             }}
           >
