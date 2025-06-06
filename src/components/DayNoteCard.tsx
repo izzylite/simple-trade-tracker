@@ -70,7 +70,6 @@ const DayNoteCard: React.FC<DayNoteCardProps> = ({
       : `0 0 8px ${alpha(theme.palette.primary.main, 0.1)}`,
     position: 'relative',
     overflow: 'hidden',
-    flex: { xs: 1, md: 0.5 },
     cursor: 'pointer',
     transition: 'all 0.2s ease-in-out',
     height: '100%',

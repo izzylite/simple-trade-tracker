@@ -752,7 +752,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             gap: 2,
             flexDirection: { xs: 'column', md: 'row' },
             justifyContent: 'center',
-            alignItems: 'center',
+            alignItems: 'stretch',
             width: '100%'
           }}>
             <Box sx={{ flex: 1, maxWidth: '600px' }}>
@@ -776,10 +776,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             </Box>
 
             {/* Day Note Card - Shows notes or empty state */}
-            <DayNoteCard
-              calendarNotes={calendarDayNotes || new Map()}
-              setIsDayNotesDialogOpen={setIsDayNotesDialogOpen}
-            />
+            <Box sx={{ flex: 1, maxWidth: '600px' }}>
+              <DayNoteCard
+                calendarNotes={calendarDayNotes || new Map()}
+                setIsDayNotesDialogOpen={setIsDayNotesDialogOpen}
+              />
+            </Box>
 
           </Box>
           <MonthlyStats
