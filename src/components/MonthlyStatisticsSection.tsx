@@ -13,7 +13,10 @@ import { Close as CloseIcon, Analytics as AnalyticsIcon } from '@mui/icons-mater
 import { Trade } from '../types/trade';
 import { Calendar } from '../types/calendar';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
+<<<<<<< HEAD
 import { scrollbarStyles } from '../styles/scrollbarStyles';
+=======
+>>>>>>> f0ca26473dd3804a84e4c8dd64c48d19e8bb4594
 import { PnLChartsWrapper, SessionPerformanceAnalysis, TradesListDialog, WinLossDistribution } from './charts';
 import ScoreSection from './ScoreSection';
 import PerformanceCharts from './PerformanceCharts';
@@ -265,9 +268,12 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
             border: `1px solid ${theme.palette.divider}`,
             maxHeight: '90vh',
             overflow: 'hidden'
+<<<<<<< HEAD
           },
           '& .MuiDialogContent-root': {
             ...scrollbarStyles(theme)
+=======
+>>>>>>> f0ca26473dd3804a84e4c8dd64c48d19e8bb4594
           }
         }}
       >
