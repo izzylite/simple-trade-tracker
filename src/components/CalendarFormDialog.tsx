@@ -58,10 +58,10 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
   const [increasedRiskPercentage, setIncreasedRiskPercentage] = useState('');
   const [profitThresholdPercentage, setProfitThresholdPercentage] = useState('');
 
-  // Initialize form with initial data when in edit mode or reset when dialog opens/closes
+  // Initialize form with initial data when in edit mode or when initial data is provided, or reset when dialog opens/closes
   useEffect(() => {
     if (open) {
-      if (initialData && mode === 'edit') {
+      if (initialData) {
         setName(initialData.name || '');
         setAccountBalance(initialData.accountBalance?.toString() || '');
         setMaxDailyDrawdown(initialData.maxDailyDrawdown?.toString() || '');
@@ -73,7 +73,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
         setIncreasedRiskPercentage(initialData.increasedRiskPercentage?.toString() || '');
         setProfitThresholdPercentage(initialData.profitThresholdPercentage?.toString() || '');
       } else {
-        // Reset form for create mode
+        // Reset form for create mode without initial data
         resetForm();
       }
     }
