@@ -222,6 +222,15 @@ export class ScoreService {
     targetDate: Date
   ): 'improving' | 'declining' | 'stable' {
     try {
+      // Check if the target period is current or past
+      const now = new Date();
+      const isCurrentPeriod = this.isCurrentPeriod(targetDate, period, now);
+
+      // For past periods, always return 'stable' since they can't change
+      if (!isCurrentPeriod) {
+        return 'stable';
+      }
+
       // Get current period trades
       const currentTrades = this.getTradesForPeriod(allTrades, period, targetDate);
 
@@ -268,6 +277,28 @@ export class ScoreService {
     } catch (error) {
       console.error('Error calculating trend:', error);
       return 'stable';
+    }
+  }
+
+  /**
+   * Check if a target date represents the current period
+   */
+  private isCurrentPeriod(
+    targetDate: Date,
+    period: 'daily' | 'weekly' | 'monthly' | 'yearly',
+    now: Date = new Date()
+  ): boolean {
+    switch (period) {
+      case 'daily':
+        return isSameDay(targetDate, now);
+      case 'weekly':
+        return isSameWeek(targetDate, now, { weekStartsOn: 0 });
+      case 'monthly':
+        return isSameMonth(targetDate, now);
+      case 'yearly':
+        return isSameYear(targetDate, now);
+      default:
+        return false;
     }
   }
 
