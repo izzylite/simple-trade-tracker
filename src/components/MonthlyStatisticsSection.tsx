@@ -185,6 +185,16 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         </Button>
       </Box>
 
+ {/* Score Section */}
+      <ScoreSection
+        trades={trades}
+        selectedDate={selectedDate}
+        calendarId={calendarId}
+        scoreSettings={scoreSettings}
+        onUpdateCalendarProperty={onUpdateCalendarProperty}
+        accountBalance={accountBalance}
+        dynamicRiskSettings={dynamicRiskSettings}
+      />
       {/* P&L Charts Section */}
       <PnLChartsWrapper
         chartData={chartData}
@@ -219,16 +229,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         </Box>
       </Box>
 
-      {/* Score Section */}
-      <ScoreSection
-        trades={trades}
-        selectedDate={selectedDate}
-        calendarId={calendarId}
-        scoreSettings={scoreSettings}
-        onUpdateCalendarProperty={onUpdateCalendarProperty}
-        accountBalance={accountBalance}
-        dynamicRiskSettings={dynamicRiskSettings}
-      />
+     
 
       {/* Trades List Dialog */}
       <TradesListDialog

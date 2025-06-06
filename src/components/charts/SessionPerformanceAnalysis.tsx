@@ -38,12 +38,21 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
   };
 
   return (
-    <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+    <Paper
+      elevation={theme.palette.mode === 'dark' ? 2 : 1}
+      sx={{
+        p: 3,
+        borderRadius: 2,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: theme.palette.background.paper,
+      }}>
       <Typography variant="h6" sx={{ mb: 2 }}>
         Session Performance
       </Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minHeight: 300 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
           {sessionStats.map(session => (
             <Paper
               key={session.session}

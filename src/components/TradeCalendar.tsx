@@ -1086,34 +1086,34 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               ))}
             </Box>
           </Box>
-        </Box>
 
-        {/*Current Monthly Statistics Section */}
-        <MonthlyStatisticsSection
-          trades={filteredTrades}
-          selectedDate={currentDate}
-          accountBalance={accountBalance}
-          maxDailyDrawdown={maxDailyDrawdown}
-          monthlyTarget={monthlyTarget}
-          calendarId={calendarId!!}
-          scoreSettings={scoreSettings}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
-          dynamicRiskSettings={dynamicRiskSettings}
-          onEditTrade={(trade) => {
-            // Use the same edit handler as in DayDialog
-            if (props.onUpdateTradeProperty) {
-              setNewTrade(() => (createEditTradeData(trade)));
-              setShowAddForm({ open: true, date: new Date(trade.date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
-            }
-          }}
-          onDeleteTrade={(tradeId) => {
-            // Use the same delete handler as in DayDialog
-            handleDeleteClick(tradeId);
-          }}
-          onZoomImage={(imageUrl, allImages, initialIndex) => {
-            setZoomedImage(imageUrl, allImages, initialIndex);
-          }}
-        />
+          {/*Current Monthly Statistics Section */}
+          <MonthlyStatisticsSection
+            trades={filteredTrades}
+            selectedDate={currentDate}
+            accountBalance={accountBalance}
+            maxDailyDrawdown={maxDailyDrawdown}
+            monthlyTarget={monthlyTarget}
+            calendarId={calendarId!!}
+            scoreSettings={scoreSettings}
+            onUpdateCalendarProperty={onUpdateCalendarProperty}
+            dynamicRiskSettings={dynamicRiskSettings}
+            onEditTrade={(trade) => {
+              // Use the same edit handler as in DayDialog
+              if (props.onUpdateTradeProperty) {
+                setNewTrade(() => (createEditTradeData(trade)));
+                setShowAddForm({ open: true, date: new Date(trade.date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
+              }
+            }}
+            onDeleteTrade={(tradeId) => {
+              // Use the same delete handler as in DayDialog
+              handleDeleteClick(tradeId);
+            }}
+            onZoomImage={(imageUrl, allImages, initialIndex) => {
+              setZoomedImage(imageUrl, allImages, initialIndex);
+            }}
+          />
+        </Box>
 
         <DayDialog
           open={!!selectedDate && !showAddForm?.open}
