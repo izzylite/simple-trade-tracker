@@ -13,6 +13,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { PendingImage } from './TradeForm';
 import { GridImage, GridPendingImage } from './ImageGrid';
 import { createNewTradeData } from '../TradeCalendar';
+import {
+  calculateEffectiveRiskPercentage,
+  calculateCumulativePnLToDate,
+  calculateRiskAmount,
+  DynamicRiskSettings
+} from '../../utils/dynamicRiskUtils';
 
 interface FormDialogProps {
   open: boolean;
@@ -32,9 +38,7 @@ interface FormDialogProps {
   onCancel: () => void;
   allTrades?: Trade[];
   riskPerTrade?: number;
-  dynamicRiskEnabled?: boolean;
-  increasedRiskPercentage?: number;
-  profitThresholdPercentage?: number;
+  dynamicRiskSettings?: DynamicRiskSettings;
   calendarId: string;
   requiredTagGroups?: string[];
 }
@@ -64,19 +68,9 @@ const processTagsForSubmission = (tags: string[]): string[] => {
       return tags;
 };
 
-// Calculate cumulative PnL up to a given date
-export const calculateCumulativePnL = (date: Date, allTrades : Trade[]) => {
-
-  // Calculate total profit from all trades before the current date
-  const total = allTrades.reduce((acc, trade) => {
-
-    const tradeDate = new Date(trade.date);
-    if (tradeDate < date) {
-      acc += trade.amount;
-    }
-    return acc;
-  }, 0);
-  return total;
+// Calculate cumulative PnL up to a given date (using centralized utility)
+export const calculateCumulativePnL = (date: Date, allTrades: Trade[]) => {
+  return calculateCumulativePnLToDate(date, allTrades);
 };
 
 export const startOfNextDay = (date : Date | string): Date => {
@@ -127,9 +121,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   onUpdateTradeProperty,
   allTrades = [],
   riskPerTrade,
-  dynamicRiskEnabled,
-  increasedRiskPercentage,
-  profitThresholdPercentage,
+  dynamicRiskSettings,
   calendarId,
   requiredTagGroups = []
 }) => {
@@ -363,13 +355,17 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   const calculateAmountFromRiskToReward = (riskToReward: number, cumulativePnL: number): number => {
     if (!newTrade || !riskPerTrade || !riskToReward || !accountBalance || newTrade.type === 'breakeven') return 0;
 
-    // Get the effective risk percentage (which may be increased due to dynamic risk)
+    const effectiveDynamicRiskSettings: DynamicRiskSettings = {
+      accountBalance,
+      riskPerTrade,
+      dynamicRiskEnabled: dynamicRiskSettings?.dynamicRiskEnabled,
+      increasedRiskPercentage: dynamicRiskSettings?.increasedRiskPercentage,
+      profitThresholdPercentage: dynamicRiskSettings?.profitThresholdPercentage
+    };
 
-    const effectiveRiskPercentage = getEffectiveRiskPercentage(cumulativePnL);
-
-    // Calculate the risk amount based on the effective percentage of account balance
-    const totalAccountValue = accountBalance + cumulativePnL;
-    const riskAmount = (totalAccountValue * effectiveRiskPercentage) / 100;
+    const tradeDate = newTrade.date || date;
+    const effectiveRiskPercentage = calculateEffectiveRiskPercentage(tradeDate, allTrades, effectiveDynamicRiskSettings);
+    const riskAmount = calculateRiskAmount(effectiveRiskPercentage, accountBalance, cumulativePnL);
 
     // For win trades: risk amount * R:R
     // For loss trades: risk amount
@@ -379,24 +375,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   };
 
 
-  // Calculate the effective risk percentage based on dynamic risk settings
-  const getEffectiveRiskPercentage = (cumulativePnL: number): number => {
-    if (!riskPerTrade) return 0;
 
-    // Apply dynamic risk if enabled and profit threshold is met
-
-    if (dynamicRiskEnabled &&
-      increasedRiskPercentage &&
-      profitThresholdPercentage &&
-      accountBalance > 0) {
-      const profitPercentage = (cumulativePnL / accountBalance * 100);
-      if (profitPercentage >= profitThresholdPercentage) {
-        return increasedRiskPercentage;
-      }
-    }
-
-    return riskPerTrade;
-  };
 
   const handlePartialsTakenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const partialsTaken = e.target.checked;
@@ -1069,9 +1048,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               <TradeForm
                 accountBalance={accountBalance}
                 calculateCumulativePnl={(newTrade) => calculateCumulativePnL(newTrade?.date || new Date(),allTrades)}
-                dynamicRiskEnabled={dynamicRiskEnabled}
-                increasedRiskPercentage={increasedRiskPercentage}
-                profitThresholdPercentage={profitThresholdPercentage}
+                dynamicRiskSettings={dynamicRiskSettings}
                 calendarId={calendarId}
                 requiredTagGroups={requiredTagGroups}
                 onTagUpdated={handleTagUpdated}

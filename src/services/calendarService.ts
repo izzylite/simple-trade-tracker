@@ -229,7 +229,7 @@ const convertFirestoreDataToCalendar = (doc: DocumentData): Calendar => {
   // Convert daysNotes from Firestore object to Map
   let daysNotesMap: Map<string, string> | undefined;
   if (data.daysNotes) {
-    daysNotesMap = new Map(Object.entries(data.daysNotes)); 
+    daysNotesMap = new Map(Object.entries(data.daysNotes));
   }
 
   return {
@@ -250,6 +250,8 @@ const convertFirestoreDataToCalendar = (doc: DocumentData): Calendar => {
     // Notes
     note: data.note,
     daysNotes: daysNotesMap,
+    // Score settings
+    scoreSettings: data.scoreSettings,
     // Statistics
     winRate: data.winRate || 0,
     profitFactor: data.profitFactor || 0,
@@ -292,7 +294,7 @@ const convertCalendarToFirestoreData = (calendar: Omit<Calendar, 'id' | 'cachedT
     lastModified: Timestamp.fromDate(calendar.lastModified),
     accountBalance: calendar.accountBalance,
     maxDailyDrawdown: calendar.maxDailyDrawdown,
-    requiredTagGroups: calendar.requiredTagGroups ? calendar.requiredTagGroups : [] 
+    requiredTagGroups: calendar.requiredTagGroups ? calendar.requiredTagGroups : []
   };
 
   // Convert daysNotes Map to a plain object for Firestore
@@ -314,6 +316,9 @@ const convertCalendarToFirestoreData = (calendar: Omit<Calendar, 'id' | 'cachedT
     ...(calendar.note !== undefined && { note: calendar.note }),
     ...(daysNotesObj && { daysNotes: daysNotesObj }),
     ...(calendar.profitThresholdPercentage !== undefined && { profitThresholdPercentage: calendar.profitThresholdPercentage }),
+
+    // Score settings
+    ...(calendar.scoreSettings !== undefined && { scoreSettings: calendar.scoreSettings }),
 
     // Statistics fields
     ...(calendar.winRate !== undefined && { winRate: calendar.winRate }),

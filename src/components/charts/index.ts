@@ -1,5 +1,6 @@
 export { default as CumulativePnLChart } from './CumulativePnLChart';
 export { default as DailyPnLChart } from './DailyPnLChart';
+export { default as PnLChartsWrapper } from './PnLChartsWrapper';
 export { default as WinLossDistribution } from './WinLossDistribution';
 export { default as WinLossStats } from './WinLossStats';
 export { default as TagPerformanceAnalysis } from './TagPerformanceAnalysis';

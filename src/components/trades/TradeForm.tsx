@@ -25,6 +25,7 @@ import { GridImage, GridPendingImage } from './ImageGrid';
 import { formatCurrency } from '../../utils/formatters';
 import TagsInput from './TagsInput';
 import { isGroupedTag, getTagGroup } from '../../utils/tagColors';
+import { DynamicRiskSettings } from '../../utils/dynamicRiskUtils';
 
 export interface NewTradeForm {
   id: string;
@@ -76,9 +77,7 @@ interface TradeFormProps {
   isSubmitting: boolean;
   riskPerTrade?: number;
   accountBalance: number;
-  dynamicRiskEnabled?: boolean;
-  increasedRiskPercentage?: number;
-  profitThresholdPercentage?: number;
+  dynamicRiskSettings?: DynamicRiskSettings;
   calculateCumulativePnl(newTrade?: NewTradeForm): number;
   calculateAmountFromRiskToReward: (rr: number,cumulativePnL: number) => number;
   calendarId: string;
@@ -109,9 +108,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
   isSubmitting,
   riskPerTrade,
   accountBalance,
-  dynamicRiskEnabled,
-  increasedRiskPercentage,
-  profitThresholdPercentage,
+  dynamicRiskSettings,
   calculateAmountFromRiskToReward,
   calculateCumulativePnl,
   calendarId,
@@ -292,12 +289,12 @@ const TradeForm: React.FC<TradeFormProps> = ({
             fullWidth
             disabled
             helperText={
-              dynamicRiskEnabled &&
-                increasedRiskPercentage &&
-                profitThresholdPercentage &&
-                (cumulativePnl / accountBalance * 100) >= profitThresholdPercentage
-                ? `Based on ${increasedRiskPercentage}% of account balance (INCREASED from ${riskPerTrade}%)`
-                : `Based on ${riskPerTrade}% of account balance (${formatCurrency((accountBalance * riskPerTrade) / 100)})`
+              dynamicRiskSettings?.dynamicRiskEnabled &&
+                dynamicRiskSettings.increasedRiskPercentage &&
+                dynamicRiskSettings.profitThresholdPercentage &&
+                (cumulativePnl / accountBalance * 100) >= dynamicRiskSettings.profitThresholdPercentage
+                ? `Based on ${dynamicRiskSettings.increasedRiskPercentage}% of account balance (INCREASED from ${riskPerTrade}%)`
+                : `Based on ${riskPerTrade}% of account balance (${formatCurrency((accountBalance * (riskPerTrade || 0)) / 100)})`
             }
           />
         </FormField>

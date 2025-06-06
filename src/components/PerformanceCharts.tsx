@@ -3,10 +3,12 @@ import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth, parse
 import { Box, Typography, useTheme, Tabs, Tab, Paper } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { Trade } from '../types/trade';
+import { Calendar } from '../types/calendar';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
+import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
+import ScoreSection from './ScoreSection';
 import {
-  CumulativePnLChart,
-  DailyPnLChart,
+  PnLChartsWrapper,
   WinLossDistribution,
   WinLossStats,
   TagPerformanceAnalysis,
@@ -23,11 +25,16 @@ interface PerformanceChartsProps {
   monthlyTarget?: number;
   accountBalance: number;
   maxDailyDrawdown: number;
+  calendarId: string;
+  scoreSettings?: import('../types/score').ScoreSettings;
   onTimePeriodChange?: (period: TimePeriod) => void;
   onPrimaryTagsChange?: (tags: string[]) => void;
   onSecondaryTagsChange?: (tags: string[]) => void;
   onEditTrade?: (trade: Trade) => void;
   onDeleteTrade?: (tradeId: string) => void;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
+  // Dynamic risk settings
+  dynamicRiskSettings?: DynamicRiskSettings;
 }
 
 type TimePeriod = 'month' | 'year' | 'all';
@@ -38,11 +45,15 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   monthlyTarget,
   accountBalance,
   maxDailyDrawdown,
+  calendarId,
+  scoreSettings,
   onTimePeriodChange,
   onPrimaryTagsChange = () => {},
   onSecondaryTagsChange = () => {},
   onEditTrade,
-  onDeleteTrade
+  onDeleteTrade,
+  onUpdateCalendarProperty,
+  dynamicRiskSettings
 }) => {
   const theme = useTheme();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
@@ -717,18 +728,11 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             onTradeClick={handleTradeExpand}
           />
 
-          {/* Cumulative P&L Chart */}
-          <CumulativePnLChart
+          {/* P&L Charts with Tabs */}
+          <PnLChartsWrapper
             chartData={chartData}
             targetValue={targetValue}
             monthlyTarget={monthlyTarget}
-            setMultipleTradesDialog={setMultipleTradesDialog}
-            timePeriod={timePeriod}
-          />
-
-          {/* Daily P&L Chart */}
-          <DailyPnLChart
-            chartData={chartData}
             drawdownViolationValue={drawdownViolationValue}
             setMultipleTradesDialog={setMultipleTradesDialog}
             timePeriod={timePeriod}
@@ -876,6 +880,17 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             selectedDate={selectedDate}
             timePeriod={timePeriod}
             setMultipleTradesDialog={setMultipleTradesDialog}
+          />
+
+          {/* Trading Score Section */}
+          <ScoreSection
+            trades={trades}
+            selectedDate={selectedDate}
+            calendarId={calendarId}
+            scoreSettings={scoreSettings}
+            onUpdateCalendarProperty={onUpdateCalendarProperty}
+            accountBalance={accountBalance} 
+            dynamicRiskSettings={dynamicRiskSettings}
           />
         </>
       ) : (

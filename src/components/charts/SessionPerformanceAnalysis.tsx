@@ -1,16 +1,6 @@
 import React from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell
-} from 'recharts';
 import { Box, Paper, Typography, useTheme, Stack, alpha } from '@mui/material';
-import { format, isSameMonth } from 'date-fns';
+import { isSameMonth } from 'date-fns';
 import { Trade } from '../../types/trade';
 import { formatValue } from '../../utils/formatters';
 
@@ -48,12 +38,21 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
   };
 
   return (
-    <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+    <Paper
+      elevation={theme.palette.mode === 'dark' ? 2 : 1}
+      sx={{
+        p: 3,
+        borderRadius: 2,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: theme.palette.background.paper,
+      }}>
       <Typography variant="h6" sx={{ mb: 2 }}>
         Session Performance
       </Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minHeight: 300 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
           {sessionStats.map(session => (
             <Paper
               key={session.session}
@@ -197,102 +196,69 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
           ))}
         </Box>
 
-        {/* Session Performance Chart */}
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart
-            data={sessionStats}
-            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-            maxBarSize={50}
+        {/* Pro Tip Section */}
+        {sessionStats.some(session => session.totalTrades > 0) && (
+          <Box
+            sx={{
+              p: 2,
+              bgcolor: theme.palette.mode === 'dark' ? 'rgba(33, 150, 243, 0.1)' : 'rgba(33, 150, 243, 0.05)',
+              border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+              borderRadius: 2,
+              mt: 1
+            }}
           >
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="session"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
-              tickFormatter={(value) => `${value}%`}
-            />
-            <Tooltip
-              content={({ active, payload, label }) => {
-                if (active && payload && payload.length) {
-                  const data = payload[0].payload;
-                  return (
-                    <Paper sx={{ p: 1.5, bgcolor: 'background.paper' }}>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: 'bold',
-                          color: SESSION_COLORS[label as keyof typeof SESSION_COLORS]
-                        }}
-                      >
-                        {label}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: COLORS.win }}>
-                        Wins: {data.winners}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: COLORS.loss }}>
-                        Losses: {data.losers}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Win Rate: {data.winRate.toFixed(1)}%
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: data.totalPnL > 0 ? COLORS.win : COLORS.loss,
-                          fontWeight: 'bold',
-                          mt: 0.5
-                        }}
-                      >
-                        P&L: {formatValue(data.totalPnL)}
-                      </Typography>
-                    </Paper>
-                  );
-                }
-                return null;
+            <Typography
+              variant="subtitle2"
+              sx={{
+                color: theme.palette.info.main,
+                fontWeight: 600,
+                mb: 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
               }}
-            />
-            <Bar
-              dataKey="winRate"
-              name="Win Rate"
-              fill={theme.palette.primary.main}
-              radius={[4, 4, 0, 0]}
-              onClick={(data) => {
-                if (data && data.payload) {
-                  const sessionName = data.payload.session;
-                  const sessionTrades = trades.filter(trade =>
-                    trade.session === sessionName &&
-                    (timePeriod === 'month' ? isSameMonth(new Date(trade.date), selectedDate) :
-                     timePeriod === 'year' ? new Date(trade.date).getFullYear() === selectedDate.getFullYear() :
-                     true)
-                  );
-                  if (sessionTrades.length > 0) {
-                    setMultipleTradesDialog({
-                      open: true,
-                      trades: sessionTrades,
-                      date: `${sessionName} Session Trades`,
-                      expandedTradeId: sessionTrades.length === 1 ? sessionTrades[0].id : null
-                    });
-                  }
-                }
-              }}
-              style={{ cursor: 'pointer' }}
             >
-              {sessionStats.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={SESSION_COLORS[entry.session as keyof typeof SESSION_COLORS]}
-                  fillOpacity={0.8}
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+              💡 Pro Tip
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {(() => {
+                const sessionsWithTrades = sessionStats.filter(session => session.totalTrades > 0);
+                if (sessionsWithTrades.length === 0) return "No trading data available for analysis.";
+
+                // Find most profitable session by total P&L
+                const mostProfitable = sessionsWithTrades.reduce((prev, current) =>
+                  current.totalPnL > prev.totalPnL ? current : prev
+                );
+
+                // Find session with highest win rate
+                const highestWinRate = sessionsWithTrades.reduce((prev, current) =>
+                  current.winRate > prev.winRate ? current : prev
+                );
+
+                // Find session with best average P&L per trade
+                const bestAverage = sessionsWithTrades.reduce((prev, current) =>
+                  current.averagePnL > prev.averagePnL ? current : prev
+                );
+
+                if (mostProfitable.totalPnL > 0) {
+                  if (mostProfitable.session === highestWinRate.session && mostProfitable.session === bestAverage.session) {
+                    return `${mostProfitable.session} session is your strongest performer with the highest total P&L (${formatValue(mostProfitable.totalPnL)}), best win rate (${mostProfitable.winRate.toFixed(1)}%), and highest average per trade (${formatValue(mostProfitable.averagePnL)}). Consider focusing more trades during this session.`;
+                  } else if (mostProfitable.session === highestWinRate.session) {
+                    return `${mostProfitable.session} session has both the highest total P&L (${formatValue(mostProfitable.totalPnL)}) and best win rate (${mostProfitable.winRate.toFixed(1)}%). ${bestAverage.session} session has the best average per trade (${formatValue(bestAverage.averagePnL)}).`;
+                  } else {
+                    return `${mostProfitable.session} session is most profitable overall (${formatValue(mostProfitable.totalPnL)}), while ${highestWinRate.session} session has the highest win rate (${highestWinRate.winRate.toFixed(1)}%). Consider analyzing what makes each session successful.`;
+                  }
+                } else {
+                  const leastLosing = sessionsWithTrades.reduce((prev, current) =>
+                    current.totalPnL > prev.totalPnL ? current : prev
+                  );
+                  return `All sessions are currently showing losses. ${leastLosing.session} session has the smallest loss (${formatValue(leastLosing.totalPnL)}). Consider reviewing your strategy and risk management.`;
+                }
+              })()}
+            </Typography>
+          </Box>
+        )}
+
       </Box>
     </Paper>
   );

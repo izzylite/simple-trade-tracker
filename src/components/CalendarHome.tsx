@@ -432,6 +432,19 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     setSelectedMonth(newDate);
   };
 
+  // Create a wrapper function for calendar updates that matches the expected signature
+  const handleUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<void> => {
+    const calendar = calendars.find(c => c.id === calendarId);
+    if (!calendar) return;
+
+    const updatedCalendar = updateCallback(calendar);
+    const updates: Partial<Calendar> = {
+      scoreSettings: updatedCalendar.scoreSettings
+    };
+
+    await onUpdateCalendar(calendarId, updates);
+  };
+
   // Get available months for the selected calendar
   const availableMonths = useMemo(() => {
     if (!selectedCalendarForCharts) return [];
@@ -1293,6 +1306,16 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                       accountBalance={selectedCalendarForCharts.accountBalance}
                       monthlyTarget={selectedCalendarForCharts.monthlyTarget ?? undefined}
                       maxDailyDrawdown={selectedCalendarForCharts.maxDailyDrawdown}
+                      calendarId={selectedCalendarForCharts.id}
+                      dynamicRiskSettings={{
+                        accountBalance: selectedCalendarForCharts.accountBalance,
+                        riskPerTrade: selectedCalendarForCharts.riskPerTrade,
+                        dynamicRiskEnabled: selectedCalendarForCharts.dynamicRiskEnabled,
+                        increasedRiskPercentage: selectedCalendarForCharts.increasedRiskPercentage,
+                        profitThresholdPercentage: selectedCalendarForCharts.profitThresholdPercentage
+                      }}
+                      scoreSettings={selectedCalendarForCharts.scoreSettings}
+                      onUpdateCalendarProperty={handleUpdateCalendarProperty}
                       onTimePeriodChange={handleTimePeriodChange}
                     />
                   )

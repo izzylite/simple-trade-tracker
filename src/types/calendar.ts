@@ -1,4 +1,5 @@
 import { Trade } from './trade';
+import { ScoreSettings } from './score';
 
 export interface Calendar {
   id: string;
@@ -19,6 +20,8 @@ export interface Calendar {
   // Notes
   note?: string;
   daysNotes?: Map<string, string>;
+  // Score settings
+  scoreSettings?: ScoreSettings;
   // Statistics
   winRate?: number;
   profitFactor?: number;
