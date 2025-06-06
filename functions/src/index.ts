@@ -591,10 +591,8 @@ export const updateTag = functions.https.onRequest((req, res) => {
       // Wait for all batch operations to complete
       await Promise.all(batchPromises);
 
-      // Update the calendar's lastModified timestamp
-      await calendarRef.update({
-        lastModified: admin.firestore.FieldValue.serverTimestamp()
-      });
+      // Update the calendar's lastModified timestamp and tags
+      await updateCalendarTags(calendarId);
 
       res.status(200).json({
         success: true,
@@ -610,5 +608,71 @@ export const updateTag = functions.https.onRequest((req, res) => {
     }
   });
 });
+
+// Helper function to extract all unique tags from trades
+function extractTagsFromTrades(trades: any[]): string[] {
+  const tagSet = new Set<string>();
+
+  trades.forEach((trade: any) => {
+    if (trade.tags && Array.isArray(trade.tags)) {
+      trade.tags.forEach((tag: string) => {
+        if (tag && tag.trim()) {
+          tagSet.add(tag.trim());
+        }
+      });
+    }
+  });
+
+  return Array.from(tagSet).sort();
+}
+
+// Helper function to update calendar tags
+async function updateCalendarTags(calendarId: string): Promise<void> {
+  try {
+    // Get all year documents for this calendar
+    const yearsSnapshot = await admin.firestore().collection(`calendars/${calendarId}/years`).get();
+
+    const allTrades: any[] = [];
+
+    // Collect all trades from all years
+    for (const yearDoc of yearsSnapshot.docs) {
+      const yearData = yearDoc.data();
+      const trades = yearData.trades || [];
+      allTrades.push(...trades);
+    }
+
+    // Extract unique tags
+    const uniqueTags = extractTagsFromTrades(allTrades);
+
+    // Update the calendar document with the tags
+    await admin.firestore().collection('calendars').doc(calendarId).update({
+      tags: uniqueTags,
+      lastModified: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    console.log(`Updated calendar ${calendarId} with ${uniqueTags.length} unique tags`);
+  } catch (error) {
+    console.error(`Error updating calendar tags for ${calendarId}:`, error);
+    throw error;
+  }
+}
+
+// Cloud function to maintain calendar tags when trades change
+export const maintainCalendarTags = functions.firestore
+  .document('calendars/{calendarId}/years/{yearId}')
+  .onWrite(async (change, context) => {
+    try {
+      const calendarId = context.params.calendarId;
+
+      // Update the calendar's tags array
+      await updateCalendarTags(calendarId);
+
+      console.log(`Successfully maintained tags for calendar ${calendarId}`);
+      return null;
+    } catch (error) {
+      console.error('Error in maintainCalendarTags function:', error);
+      return null;
+    }
+  });
 
 
