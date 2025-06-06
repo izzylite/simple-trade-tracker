@@ -19,8 +19,6 @@ import {
   TrendingUp,
   FileDownload,
   FileUpload,
-  Clear,
-  Security as SecurityIcon,
   EmojiEvents,
   CalendarMonth
 } from '@mui/icons-material';

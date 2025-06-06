@@ -11,7 +11,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
 import TradeLoadingIndicator from './components/TradeLoadingIndicator';
-import { setAnalyticsCollectionEnabled } from 'firebase/analytics';
+
 import AppLoadingProgress from './components/AppLoadingProgress';
 import {
   calculateEffectiveRiskPercentage,

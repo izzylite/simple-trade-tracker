@@ -12,6 +12,7 @@ import {
   ArrowBackIos as ArrowBackIcon,
   ArrowForwardIos as ArrowForwardIcon
 } from '@mui/icons-material';
+import { scrollbarStyles } from '../styles/scrollbarStyles';
 
 interface ImageZoomDialogProps {
   open: boolean;
@@ -184,24 +185,7 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
           overflow: 'hidden',
           maxWidth: '80%',
           '& .MuiDialogContent-root': {
-            '&::-webkit-scrollbar': {
-              width: '8px',
-              height: '8px'
-            },
-            '&::-webkit-scrollbar-track': {
-              background: 'transparent'
-            },
-            '&::-webkit-scrollbar-thumb': {
-              background: theme.palette.mode === 'dark'
-                ? 'rgba(255, 255, 255, 0.2)'
-                : 'rgba(0, 0, 0, 0.2)',
-              borderRadius: '4px',
-              '&:hover': {
-                background: theme.palette.mode === 'dark'
-                  ? 'rgba(255, 255, 255, 0.3)'
-                  : 'rgba(0, 0, 0, 0.3)'
-              }
-            }
+            ...scrollbarStyles(theme)
           }
         }
       }}

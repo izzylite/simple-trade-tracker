@@ -48,6 +48,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar } from '../types/calendar';
 import { formatCurrency } from '../utils/formatters';
 import { dialogProps } from '../styles/dialogStyles';
+import { scrollbarStyles } from '../styles/scrollbarStyles';
 import PerformanceCharts from './PerformanceCharts';
 import SelectDateDialog from './SelectDateDialog';
 import { useAuth } from '../contexts/AuthContext';
@@ -1270,20 +1271,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
               <DialogContent sx={{
                 p: 3,
                 backgroundColor: theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.6) : '#f0f0f0',
-                '&::-webkit-scrollbar': {
-                  width: '8px',
-                },
-                '&::-webkit-scrollbar-track': {
-                  background: alpha(theme.palette.background.default, 0.5),
-                  borderRadius: '4px',
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  background: alpha(theme.palette.primary.main, 0.2),
-                  borderRadius: '4px',
-                  '&:hover': {
-                    background: alpha(theme.palette.primary.main, 0.3),
-                  },
-                },
+                ...scrollbarStyles(theme)
               }}>
                 {selectedCalendarForCharts && (
                   isLoading || (loadAllTrades && selectedCalendarForCharts.cachedTrades.length === 0) ? (

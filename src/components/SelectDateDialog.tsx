@@ -20,6 +20,7 @@ import { addYears, subYears } from 'date-fns';
 import { Trade } from '../types/trade';
 import TargetBadge from '../components/TargetBadge';
 import { BaseDialog } from './common';
+import { scrollbarStyles } from '../styles/scrollbarStyles';
 
 interface SelectDateDialogProps {
   open: boolean;
@@ -209,20 +210,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
       <Box sx={{
         pt: '24px',
         pb: '24px',
-        '&::-webkit-scrollbar': {
-          width: '8px',
-          height: '8px',
-        },
-        '&::-webkit-scrollbar-track': {
-          background: 'transparent'
-        },
-        '&::-webkit-scrollbar-thumb': {
-          background: alpha(theme.palette.primary.main, 0.2),
-          borderRadius: '4px',
-        },
-        '&::-webkit-scrollbar-thumb:hover': {
-          background: alpha(theme.palette.primary.main, 0.3),
-        }
+        ...scrollbarStyles(theme)
       }}>
          <Paper elevation={0} sx={{
         px: 3,
