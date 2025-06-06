@@ -15,6 +15,9 @@ export interface Calendar {
   dynamicRiskEnabled?: boolean;
   increasedRiskPercentage?: number;
   profitThresholdPercentage?: number;
+  // Duplication tracking
+  duplicatedCalendar?: boolean;
+  sourceCalendarId?: string;
   // Tag validation
   requiredTagGroups?: string[];
   // Notes

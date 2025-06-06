@@ -172,6 +172,9 @@ function AppContent() {
           name: newName,
           createdAt: new Date(),
           lastModified: new Date(),
+          // Mark as duplicated calendar and track source
+          duplicatedCalendar: true,
+          sourceCalendarId: sourceCalendarId,
           // Reset statistics for the new calendar
           winRate: 0,
           profitFactor: 0,

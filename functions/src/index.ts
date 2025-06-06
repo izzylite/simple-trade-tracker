@@ -141,6 +141,35 @@ async function handleTradeYearChanges(change: functions.Change<functions.firesto
   }
 }
 
+// Helper function to check if an image exists in the source calendar
+async function imageExistsInSourceCalendar(imageId: string, sourceCalendarId: string): Promise<boolean> {
+  try {
+    // Get all year documents from the source calendar
+    const yearsSnapshot = await admin.firestore().collection(`calendars/${sourceCalendarId}/years`).get();
+
+    for (const yearDoc of yearsSnapshot.docs) {
+      const yearData = yearDoc.data();
+      const trades = yearData.trades || [];
+
+      // Check if any trade in this year has the image
+      for (const trade of trades) {
+        if (trade.images && Array.isArray(trade.images)) {
+          for (const image of trade.images) {
+            if (image && image.id === imageId) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.error(`Error checking if image ${imageId} exists in source calendar ${sourceCalendarId}:`, error);
+    return false; // Assume it doesn't exist if we can't check
+  }
+}
+
 // Helper function to clean up removed images
 async function cleanupRemovedImagesHelper(change: functions.Change<functions.firestore.DocumentSnapshot>) {
   try {
@@ -177,7 +206,7 @@ async function cleanupRemovedImagesHelper(change: functions.Change<functions.fir
             if(!image.calendarId || !trade.calendarId || image.calendarId === trade.calendarId){
               imagesToDelete.push(image.id);
             }
-           
+
           }
         });
       }
@@ -196,7 +225,7 @@ async function cleanupRemovedImagesHelper(change: functions.Change<functions.fir
       return;
     }
 
-    // Get the calendar document to find the owner
+    // Get the calendar document to find the owner and check if it's duplicated
     const calendarDoc = await admin.firestore().collection('calendars').doc(calendarId).get();
     if (!calendarDoc.exists) {
       console.error('Calendar document not found');
@@ -210,9 +239,37 @@ async function cleanupRemovedImagesHelper(change: functions.Change<functions.fir
     }
 
     const userId = calendarData.userId;
+    const isDuplicatedCalendar = calendarData.duplicatedCalendar === true;
+    const sourceCalendarId = calendarData.sourceCalendarId;
+
+    // Filter images to delete based on duplication status
+    const finalImagesToDelete: string[] = [];
+
+    if (isDuplicatedCalendar && sourceCalendarId) {
+      console.log(`Calendar ${calendarId} is duplicated from ${sourceCalendarId}, checking source calendar for images`);
+
+      // For duplicated calendars, only delete images that don't exist in the source calendar
+      for (const imageId of imagesToDelete) {
+        const existsInSource = await imageExistsInSourceCalendar(imageId, sourceCalendarId);
+        if (!existsInSource) {
+          finalImagesToDelete.push(imageId);
+          console.log(`Image ${imageId} not found in source calendar, will delete`);
+        } else {
+          console.log(`Image ${imageId} exists in source calendar ${sourceCalendarId}, skipping deletion`);
+        }
+      }
+    } else {
+      // For non-duplicated calendars, delete all images as before
+      finalImagesToDelete.push(...imagesToDelete);
+    }
+
+    if (finalImagesToDelete.length === 0) {
+      console.log('No images to delete after checking source calendar');
+      return;
+    }
 
     // Delete each image from storage
-    const deletePromises = imagesToDelete.map(async (imageId) => {
+    const deletePromises = finalImagesToDelete.map(async (imageId) => {
       try {
         const imageRef = admin.storage().bucket().file(`users/${userId}/trade-images/${imageId}`);
         await imageRef.delete();
@@ -224,7 +281,7 @@ async function cleanupRemovedImagesHelper(change: functions.Change<functions.fir
     });
 
     await Promise.all(deletePromises);
-    console.log(`Successfully deleted ${imagesToDelete.length} images`);
+    console.log(`Successfully deleted ${finalImagesToDelete.length} images`);
   } catch (error) {
     console.error('Error in cleanupRemovedImagesHelper function:', error);
   }
@@ -262,6 +319,8 @@ export const cleanupDeletedCalendar = functions.firestore
 
       const calendarId = snapshot.id;
       const userId = calendarData.userId;
+      const isDuplicatedCalendar = calendarData.duplicatedCalendar === true;
+      const sourceCalendarId = calendarData.sourceCalendarId;
 
       if (!userId) {
         console.error('Calendar document does not have a userId field');
@@ -269,12 +328,15 @@ export const cleanupDeletedCalendar = functions.firestore
       }
 
       console.log(`Processing deletion of calendar ${calendarId} for user ${userId}`);
+      if (isDuplicatedCalendar && sourceCalendarId) {
+        console.log(`Calendar is duplicated from ${sourceCalendarId}`);
+      }
 
       // 1. Get all year documents
       const yearsSnapshot = await admin.firestore().collection(`calendars/${calendarId}/years`).get();
 
-      // Track all image IDs to delete
-      const imageIdsToDelete = new Set();
+      // Track all image IDs to potentially delete
+      const imageIdsToCheck = new Set();
 
       // 2. Process each year document to find trades with images
       for (const yearDoc of yearsSnapshot.docs) {
@@ -286,16 +348,37 @@ export const cleanupDeletedCalendar = functions.firestore
           if (trade.images && Array.isArray(trade.images)) {
             trade.images.forEach((image: any) => {
               if (image && image.id) {
-                imageIdsToDelete.add(image.id);
+                imageIdsToCheck.add(image.id);
               }
             });
           }
         });
       }
 
-      console.log(`Found ${imageIdsToDelete.size} images to delete`);
+      console.log(`Found ${imageIdsToCheck.size} images to check for deletion`);
 
-      // 3. Delete all images from storage
+      // 3. Filter images based on duplication status
+      const imageIdsToDelete = new Set();
+
+      if (isDuplicatedCalendar && sourceCalendarId) {
+        // For duplicated calendars, only delete images that don't exist in the source calendar
+        for (const imageId of imageIdsToCheck) {
+          const existsInSource = await imageExistsInSourceCalendar(imageId as string, sourceCalendarId);
+          if (!existsInSource) {
+            imageIdsToDelete.add(imageId);
+            console.log(`Image ${imageId} not found in source calendar, will delete`);
+          } else {
+            console.log(`Image ${imageId} exists in source calendar ${sourceCalendarId}, skipping deletion`);
+          }
+        }
+      } else {
+        // For non-duplicated calendars, delete all images
+        imageIdsToCheck.forEach(imageId => imageIdsToDelete.add(imageId));
+      }
+
+      console.log(`Will delete ${imageIdsToDelete.size} images`);
+
+      // 4. Delete filtered images from storage
       const deletePromises = Array.from(imageIdsToDelete).map(async (imageId) => {
         try {
           const imageRef = admin.storage().bucket().file(`users/${userId}/trade-images/${imageId}`);
@@ -309,7 +392,7 @@ export const cleanupDeletedCalendar = functions.firestore
 
       await Promise.all(deletePromises);
 
-      // 4. Delete all year documents
+      // 5. Delete all year documents
       const yearDeletePromises = yearsSnapshot.docs.map(async (yearDoc) => {
         await yearDoc.ref.delete();
         console.log(`Deleted year document: ${yearDoc.id}`);

@@ -595,6 +595,9 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
       dynamicRiskEnabled: sourceCalendar.dynamicRiskEnabled,
       increasedRiskPercentage: sourceCalendar.increasedRiskPercentage,
       profitThresholdPercentage: sourceCalendar.profitThresholdPercentage,
+      // Mark as duplicated calendar and track source
+      duplicatedCalendar: true,
+      sourceCalendarId: sourceCalendarId,
       // Copy notes and score settings
       note: sourceCalendar.note,
       daysNotes: sourceCalendar.daysNotes,
