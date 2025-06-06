@@ -132,7 +132,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
         // Ensure score service has the latest settings before calculation
         const updatedSettings = { ...settings, selectedTags };
         scoreService.updateSettings(updatedSettings);
-        const analysis = await scoreService.calculateScore(trades, scorePeriod, selectedDate);
+        const analysis = await scoreService.calculateScore(trades, scorePeriod, selectedDate, updatedSettings);
         setScoreAnalysis(analysis);
       } catch (error) {
         console.error('Error calculating score:', error);
@@ -157,7 +157,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
         // Ensure score service has the latest settings before calculation
         const updatedSettings = { ...settings, selectedTags };
         scoreService.updateSettings(updatedSettings);
-        const history = await scoreService.getScoreHistory(trades, historyPeriod, 12);
+        const history = await scoreService.getScoreHistory(trades, historyPeriod, 12, updatedSettings);
         setScoreHistory(history);
       } catch (error) {
         console.error('Error calculating score history:', error);
@@ -180,7 +180,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
         // Ensure score service has the latest settings before calculation
         const updatedSettings = { ...settings, selectedTags };
         scoreService.updateSettings(updatedSettings);
-        const scores = await scoreService.calculateMultiPeriodScore(trades, selectedDate);
+        const scores = await scoreService.calculateMultiPeriodScore(trades, selectedDate, updatedSettings);
         setMultiPeriodScores(scores);
       } catch (error) {
         console.error('Error calculating multi-period scores:', error);

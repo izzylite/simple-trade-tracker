@@ -129,7 +129,8 @@ export class ScoreService {
   async getScoreHistory(
     allTrades: Trade[],
     period: 'daily' | 'weekly' | 'monthly' | 'yearly',
-    periodsBack: number = 12
+    periodsBack: number = 12,
+    scoreSettings: ScoreSettings = DEFAULT_SCORE_SETTINGS
   ): Promise<ScoreHistory[]> {
     const history: ScoreHistory[] = [];
     const today = new Date();
@@ -155,7 +156,7 @@ export class ScoreService {
       const periodTrades = this.getTradesForPeriod(allTrades, period, targetDate);
 
       if (periodTrades.length >= this.settings.thresholds.minTradesForScore) {
-        const analysis = await this.calculateScore(allTrades, period, targetDate);
+        const analysis = await this.calculateScore(allTrades, period, targetDate, scoreSettings);
 
         history.push({
           date: targetDate,
@@ -330,13 +331,13 @@ export class ScoreService {
   /**
    * Get score summary for dashboard
    */
-  async getScoreSummary(allTrades: Trade[]): Promise<{
+  async getScoreSummary(allTrades: Trade[], scoreSettings: ScoreSettings = DEFAULT_SCORE_SETTINGS): Promise<{
     currentWeekly: ScoreMetrics;
     trend: 'improving' | 'declining' | 'stable';
     keyMetric: string;
     recommendation: string;
   }> {
-    const weeklyAnalysis = await this.calculateScore(allTrades, 'weekly');
+    const weeklyAnalysis = await this.calculateScore(allTrades, 'weekly', new Date(), scoreSettings);
 
     // Find the lowest scoring component
     const scores = [
