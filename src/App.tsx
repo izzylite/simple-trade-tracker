@@ -157,6 +157,58 @@ function AppContent() {
     }
   };
 
+  const handleDuplicateCalendar = async (sourceCalendarId: string, newName: string) => {
+    if (!user) return;
+
+    try {
+      const newCalendarId = await calendarService.duplicateCalendar(user.uid, sourceCalendarId, newName);
+
+      // Get the source calendar to copy its properties
+      const sourceCalendar = calendars.find(cal => cal.id === sourceCalendarId);
+      if (sourceCalendar) {
+        const duplicatedCalendar: Calendar = {
+          ...sourceCalendar,
+          id: newCalendarId,
+          name: newName,
+          createdAt: new Date(),
+          lastModified: new Date(),
+          // Reset statistics for the new calendar
+          winRate: 0,
+          profitFactor: 0,
+          maxDrawdown: 0,
+          targetProgress: 0,
+          pnlPerformance: 0,
+          totalTrades: 0,
+          winCount: 0,
+          lossCount: 0,
+          totalPnL: 0,
+          drawdownStartDate: null,
+          drawdownEndDate: null,
+          drawdownRecoveryNeeded: 0,
+          drawdownDuration: 0,
+          avgWin: 0,
+          avgLoss: 0,
+          currentBalance: sourceCalendar.accountBalance,
+          weeklyPnL: 0,
+          monthlyPnL: 0,
+          yearlyPnL: 0,
+          weeklyPnLPercentage: 0,
+          monthlyPnLPercentage: 0,
+          yearlyPnLPercentage: 0,
+          weeklyProgress: 0,
+          monthlyProgress: 0,
+          // Reset trades
+          cachedTrades: [],
+          loadedYears: []
+        };
+
+        setCalendars(prev => [...prev, duplicatedCalendar]);
+      }
+    } catch (error) {
+      console.error('Error duplicating calendar:', error);
+    }
+  };
+
   const handleDeleteCalendar = async (id: string) => {
     try {
       await calendarService.deleteCalendar(id);
@@ -306,6 +358,7 @@ function AppContent() {
               <CalendarHome
                 calendars={calendars}
                 onCreateCalendar={handleCreateCalendar}
+                onDuplicateCalendar={handleDuplicateCalendar}
                 onDeleteCalendar={handleDeleteCalendar}
                 onUpdateCalendar={handleUpdateCalendar}
                 onToggleTheme={toggleColorMode}

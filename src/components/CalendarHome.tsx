@@ -41,7 +41,8 @@ import {
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
   ExpandMore,
-  ExpandLess
+  ExpandLess,
+  ContentCopy as CopyIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -59,6 +60,7 @@ import Shimmer from './Shimmer';
 interface CalendarHomeProps {
   calendars: Calendar[];
   onCreateCalendar: (name: string, accountBalance: number, maxDailyDrawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamicRiskEnabled?: boolean, increasedRiskPercentage?: number, profitThresholdPercentage?: number) => void;
+  onDuplicateCalendar: (sourceCalendarId: string, newName: string) => void;
   onDeleteCalendar: (id: string) => void;
   onUpdateCalendar: (id: string, updates: Partial<Calendar>) => void;
   onToggleTheme: () => void;
@@ -261,6 +263,7 @@ const CalendarSkeleton = () => {
 export const CalendarHome: React.FC<CalendarHomeProps> = ({
   calendars,
   onCreateCalendar,
+  onDuplicateCalendar,
   onDeleteCalendar,
   onUpdateCalendar,
   onToggleTheme,
@@ -272,10 +275,13 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [calendarToDelete, setCalendarToDelete] = useState<string | null>(null);
   const [calendarToEdit, setCalendarToEdit] = useState<Calendar | null>(null);
+  const [calendarToDuplicate, setCalendarToDuplicate] = useState<Calendar | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [expandedCalendars, setExpandedCalendars] = useState<{[key: string]: boolean}>({});
   const theme = useTheme();
   const navigate = useNavigate();
@@ -376,6 +382,27 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     e.stopPropagation();
     setCalendarToEdit(calendar);
     setIsEditDialogOpen(true);
+  };
+
+  const handleDuplicateClick = (e: React.MouseEvent, calendar: Calendar) => {
+    e.stopPropagation();
+    setCalendarToDuplicate(calendar);
+    setIsDuplicateDialogOpen(true);
+  };
+
+  const handleDuplicateCalendarSubmit = async (data: CalendarFormData) => {
+    if (!calendarToDuplicate) return;
+
+    setIsDuplicating(true);
+    try {
+      await onDuplicateCalendar(calendarToDuplicate.id, data.name);
+      setIsDuplicateDialogOpen(false);
+      setCalendarToDuplicate(null);
+    } catch (error) {
+      console.error('Error duplicating calendar:', error);
+    } finally {
+      setIsDuplicating(false);
+    }
   };
 
   const handleDeleteConfirm = () => {
@@ -1129,6 +1156,20 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                           >
                             Edit
                           </Button>
+                          <Tooltip title="Duplicate calendar with same settings">
+                            <Button
+                              size="small"
+                              onClick={(e) => handleDuplicateClick(e, calendar)}
+                              sx={{
+                                color: 'info.main',
+                                '&:hover': {
+                                  bgcolor: alpha(theme.palette.info.main, 0.1)
+                                }
+                              }}
+                            >
+                              <CopyIcon fontSize="small" />
+                            </Button>
+                          </Tooltip>
                           <Button
                             size="small"
                             onClick={(e) => handleDeleteClick(e, calendar.id)}
@@ -1168,6 +1209,23 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
               mode="edit"
               title="Edit Calendar"
               submitButtonText="Save Changes"
+            />
+
+            <CalendarFormDialog
+              open={isDuplicateDialogOpen}
+              onClose={() => {
+                setIsDuplicateDialogOpen(false);
+                setCalendarToDuplicate(null);
+              }}
+              onSubmit={handleDuplicateCalendarSubmit}
+              initialData={calendarToDuplicate ? {
+                ...calendarToDuplicate,
+                name: `${calendarToDuplicate.name} (Copy)`
+              } : undefined}
+              isSubmitting={isDuplicating}
+              mode="create"
+              title="Duplicate Calendar"
+              submitButtonText="Duplicate"
             />
 
             <Dialog

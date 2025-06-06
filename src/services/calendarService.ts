@@ -571,6 +571,70 @@ export const createCalendar = async (userId: string, calendar: Omit<Calendar, 'i
   return docRef.id;
 };
 
+// Duplicate an existing calendar
+export const duplicateCalendar = async (userId: string, sourceCalendarId: string, newName: string): Promise<string> => {
+  try {
+    // Get the source calendar
+    const sourceCalendar = await getCalendar(sourceCalendarId);
+    if (!sourceCalendar) {
+      throw new Error('Source calendar not found');
+    }
+
+    // Create a new calendar based on the source calendar
+    const duplicatedCalendar: Omit<Calendar, 'id' | 'cachedTrades' | 'loadedYears'> = {
+      name: newName,
+      createdAt: new Date(),
+      lastModified: new Date(),
+      accountBalance: sourceCalendar.accountBalance,
+      maxDailyDrawdown: sourceCalendar.maxDailyDrawdown,
+      weeklyTarget: sourceCalendar.weeklyTarget,
+      monthlyTarget: sourceCalendar.monthlyTarget,
+      yearlyTarget: sourceCalendar.yearlyTarget,
+      riskPerTrade: sourceCalendar.riskPerTrade,
+      requiredTagGroups: sourceCalendar.requiredTagGroups || [],
+      dynamicRiskEnabled: sourceCalendar.dynamicRiskEnabled,
+      increasedRiskPercentage: sourceCalendar.increasedRiskPercentage,
+      profitThresholdPercentage: sourceCalendar.profitThresholdPercentage,
+      // Copy notes and score settings
+      note: sourceCalendar.note,
+      daysNotes: sourceCalendar.daysNotes,
+      scoreSettings: sourceCalendar.scoreSettings,
+      // Reset statistics for the new calendar
+      winRate: 0,
+      profitFactor: 0,
+      maxDrawdown: 0,
+      targetProgress: 0,
+      pnlPerformance: 0,
+      totalTrades: 0,
+      winCount: 0,
+      lossCount: 0,
+      totalPnL: 0,
+      drawdownStartDate: null,
+      drawdownEndDate: null,
+      drawdownRecoveryNeeded: 0,
+      drawdownDuration: 0,
+      avgWin: 0,
+      avgLoss: 0,
+      currentBalance: sourceCalendar.accountBalance,
+      weeklyPnL: 0,
+      monthlyPnL: 0,
+      yearlyPnL: 0,
+      weeklyPnLPercentage: 0,
+      monthlyPnLPercentage: 0,
+      yearlyPnLPercentage: 0,
+      weeklyProgress: 0,
+      monthlyProgress: 0
+    };
+
+    // Create the new calendar
+    const newCalendarId = await createCalendar(userId, duplicatedCalendar);
+    return newCalendarId;
+  } catch (error) {
+    console.error('Error duplicating calendar:', error);
+    throw error;
+  }
+};
+
 // Update an existing calendar
 export const updateCalendar = async (calendarId: string, updates: Partial<Omit<Calendar, 'cachedTrades' | 'loadedYears'>>): Promise<void> => {
   const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
