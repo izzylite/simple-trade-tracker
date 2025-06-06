@@ -90,7 +90,9 @@ export const calculateChartData = async (
   for (let i = 0; i < days.length; i += chunkSize) {
     const chunk = days.slice(i, i + chunkSize);
 
-    const chunkResult = chunk.map(day => {
+    // Process each day in the chunk sequentially to avoid unsafe references
+    const chunkResult: ChartDataPoint[] = [];
+    for (const day of chunk) {
       // Find trades for this day
       const dayTrades = filteredTrades.filter(trade =>
         format(new Date(trade.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
@@ -103,7 +105,7 @@ export const calculateChartData = async (
       prevCumulative = cumulative;
       cumulative += dailyPnL;
 
-      return {
+      chunkResult.push({
         date: format(day, timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
         pnl: dailyPnL,
         cumulativePnL: cumulative,
@@ -115,8 +117,8 @@ export const calculateChartData = async (
         isBreakEven: dailyPnL === 0,
         trades: dayTrades,
         fullDate: new Date(day)
-      };
-    });
+      });
+    }
 
     result.push(...chunkResult);
 
