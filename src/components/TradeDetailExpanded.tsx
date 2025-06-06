@@ -12,6 +12,7 @@ import { alpha, useTheme, keyframes } from '@mui/material/styles';
 import { format } from 'date-fns';
 import { Trade } from '../types/trade';
 import {
+  ZoomIn as ZoomInIcon,
   AttachMoney as MoneyIcon,
   CalendarToday as CalendarIcon,
   Balance as RiskIcon,

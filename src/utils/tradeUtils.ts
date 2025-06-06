@@ -1,6 +1,5 @@
 import { Trade } from '../types/trade';
 import { isSameDay } from 'date-fns';
-import { formatCurrency } from './formatters';
 
 export const getDayTrades = (date: Date, trades: Trade[]): Trade[] => {
   return trades.filter(trade => isSameDay(trade.date, date));

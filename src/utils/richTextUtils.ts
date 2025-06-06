@@ -1,4 +1,4 @@
-import { convertFromRaw, ContentState } from 'draft-js';
+import { convertFromRaw } from 'draft-js';
 import { stateToHTML } from 'draft-js-export-html';
 
 /**
