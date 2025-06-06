@@ -36,6 +36,7 @@ interface MonthlyStatisticsSectionProps {
   scoreSettings?: import('../types/score').ScoreSettings;
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
   dynamicRiskSettings?: DynamicRiskSettings;
+  allTags?: string[]; // Add allTags prop to receive calendar.tags
   // Optional handlers for trade interactions
   onEditTrade?: (trade: Trade) => void;
   onDeleteTrade?: (tradeId: string) => void;
@@ -59,6 +60,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   scoreSettings,
   onUpdateCalendarProperty,
   dynamicRiskSettings,
+  allTags: propAllTags,
   onEditTrade,
   onDeleteTrade,
   onZoomImage
@@ -124,8 +126,13 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
     ].filter(item => item.value > 0);
   }, [trades, selectedDate, timePeriod]);
 
-  // Get all unique tags for comparison
+  // Use calendar.tags from props, fallback to extracting from trades if not available
   const allTags = useMemo(() => {
+    if (propAllTags && propAllTags.length > 0) {
+      return propAllTags;
+    }
+
+    // Fallback: extract from trades (for backwards compatibility)
     const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod);
     const tagSet = new Set<string>();
     filteredTrades.forEach(trade => {
@@ -134,7 +141,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
       }
     });
     return Array.from(tagSet).sort();
-  }, [trades, selectedDate, timePeriod]);
+  }, [propAllTags, trades, selectedDate, timePeriod]);
 
   // Calculate tag stats for distribution
   const tagStats = useMemo(() => {
@@ -210,6 +217,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         onUpdateCalendarProperty={onUpdateCalendarProperty}
         accountBalance={accountBalance}
         dynamicRiskSettings={dynamicRiskSettings}
+        allTags={allTags}
       />
       {/* P&L Charts Section */}
       <PnLChartsWrapper

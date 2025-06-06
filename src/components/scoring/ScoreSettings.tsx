@@ -36,6 +36,7 @@ interface ScoreSettingsProps {
   trades: Trade[];
   selectedTags: string[];
   onTagsChange: (tags: string[]) => void;
+  allTags?: string[]; // Add allTags prop to receive calendar.tags
 }
 
 const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
@@ -45,7 +46,8 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
   isSaving = false,
   trades,
   selectedTags,
-  onTagsChange
+  onTagsChange,
+  allTags
 }) => {
   const theme = useTheme();
   const [localSettings, setLocalSettings] = useState<ScoreSettings>(settings);
@@ -467,6 +469,7 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
                 trades={trades}
                 selectedTags={selectedTags}
                 onTagsChange={onTagsChange}
+                allTags={allTags}
               />
             </AccordionDetails>
           </Accordion>
@@ -483,6 +486,7 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
                 trades={trades}
                 excludedTags={localSettings.excludedTagsFromPatterns || []}
                 onExcludedTagsChange={handleExcludedTagsChange}
+                allTags={allTags}
               />
             </AccordionDetails>
           </Accordion>

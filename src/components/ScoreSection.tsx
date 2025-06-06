@@ -37,6 +37,7 @@ interface ScoreSectionProps {
   // Dynamic risk settings
   accountBalance?: number;
   dynamicRiskSettings?: DynamicRiskSettings;
+  allTags?: string[]; // Add allTags prop to receive calendar.tags
 }
 
 interface TabPanelProps {
@@ -65,8 +66,9 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
   calendarId,
   scoreSettings,
   onUpdateCalendarProperty,
-  accountBalance, 
-  dynamicRiskSettings
+  accountBalance,
+  dynamicRiskSettings,
+  allTags
 }) => {
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState(0);
@@ -616,6 +618,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
               trades={trades}
               selectedTags={selectedTags}
               onTagsChange={handleTagsChange}
+              allTags={allTags}
             />
           </Stack>
         </TabPanel>

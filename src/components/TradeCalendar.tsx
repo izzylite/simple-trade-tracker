@@ -94,6 +94,7 @@ interface TradeCalendarProps {
   yearlyTarget?: number;
   dynamicRiskSettings?: DynamicRiskSettings;
   requiredTagGroups?: string[];
+  allTags?: string[]; // Add allTags prop to receive calendar.tags
   onAddTrade?: (trade: Trade) => Promise<void>;
   onEditTrade?: (trade: Trade) => Promise<void>;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
@@ -407,6 +408,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     yearlyTarget,
     dynamicRiskSettings,
     requiredTagGroups,
+    allTags: propAllTags, // Receive calendar.tags from parent
     onAddTrade,
     onTagUpdated,
     onUpdateTradeProperty,
@@ -461,8 +463,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
-  // Get all unique tags from trades
+  // Use calendar.tags from props, fallback to extracting from trades if not available
   const allTags = useMemo(() => {
+    if (propAllTags && propAllTags.length > 0) {
+      return propAllTags;
+    }
+
+    // Fallback: extract from trades (for backwards compatibility)
     const tagSet = new Set<string>();
     trades.forEach(trade => {
       if (trade.tags) {
@@ -470,7 +477,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       }
     });
     return Array.from(tagSet).sort();
-  }, [trades]);
+  }, [propAllTags, trades]);
 
   // Filter trades based on selected tags
   const filteredTrades = useMemo(() => {
@@ -1100,6 +1107,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             scoreSettings={scoreSettings}
             onUpdateCalendarProperty={onUpdateCalendarProperty}
             dynamicRiskSettings={dynamicRiskSettings}
+            allTags={allTags}
             onEditTrade={(trade) => {
               // Use the same edit handler as in DayDialog
               if (props.onUpdateTradeProperty) {

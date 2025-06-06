@@ -646,6 +646,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
         profitThresholdPercentage: calendar.profitThresholdPercentage
       }}
       requiredTagGroups={calendar.requiredTagGroups}
+      allTags={calendar.tags} // Pass calendar.tags for efficient tag access
       calendarName={calendar.name}
       onAddTrade={handleAddTrade}
       calendarDayNotes={calendar.daysNotes}

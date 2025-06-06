@@ -21,18 +21,26 @@ interface ExcludedTagsSelectorProps {
   trades: Trade[];
   excludedTags: string[];
   onExcludedTagsChange: (tags: string[]) => void;
+  allTags?: string[]; // Add allTags prop to receive calendar.tags
 }
 
 const ExcludedTagsSelector: React.FC<ExcludedTagsSelectorProps> = ({
   trades,
   excludedTags,
-  onExcludedTagsChange
+  onExcludedTagsChange,
+  allTags: propAllTags
 }) => {
   const theme = useTheme();
   const [inputValue, setInputValue] = useState('');
 
-  // Get all unique tags from trades
+  // Use calendar.tags from props, fallback to extracting from trades if not available
   const allTags = useMemo(() => {
+    if (propAllTags && propAllTags.length > 0) {
+      // Filter out system tags like Partials from calendar.tags
+      return propAllTags.filter(tag => !tag.startsWith('Partials:')).sort();
+    }
+
+    // Fallback: extract from trades (for backwards compatibility)
     const tagSet = new Set<string>();
     trades.forEach(trade => {
       if (trade.tags) {
@@ -45,7 +53,7 @@ const ExcludedTagsSelector: React.FC<ExcludedTagsSelectorProps> = ({
       }
     });
     return Array.from(tagSet).sort();
-  }, [trades]);
+  }, [propAllTags, trades]);
 
   // Available tags (not already excluded)
   const availableTags = useMemo(() => {
