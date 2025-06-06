@@ -279,12 +279,10 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [isDuplicateOptionsDialogOpen, setIsDuplicateOptionsDialogOpen] = useState(false);
   const [calendarToDelete, setCalendarToDelete] = useState<string | null>(null);
   const [calendarToEdit, setCalendarToEdit] = useState<Calendar | null>(null);
   const [calendarToDuplicate, setCalendarToDuplicate] = useState<Calendar | null>(null);
-  const [duplicateWithContent, setDuplicateWithContent] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
@@ -397,27 +395,23 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     setIsDeleteDialogOpen(true);
   };
 
-  const handleDuplicateOptionSelect = (withContent: boolean) => {
-    setDuplicateWithContent(withContent);
-    setIsDuplicateOptionsDialogOpen(false);
-    setIsDuplicateDialogOpen(true);
-  };
-
-  const handleDuplicateCalendarSubmit = async (data: CalendarFormData) => {
+  const handleDuplicateOptionSelect = async (withContent: boolean) => {
     if (!calendarToDuplicate) return;
 
     setIsDuplicating(true);
     try {
-      await onDuplicateCalendar(calendarToDuplicate.id, data.name, duplicateWithContent);
-      setIsDuplicateDialogOpen(false);
+      const newName = `${calendarToDuplicate.name} (Copy)`;
+      await onDuplicateCalendar(calendarToDuplicate.id, newName, withContent);
+      setIsDuplicateOptionsDialogOpen(false);
       setCalendarToDuplicate(null);
-      setDuplicateWithContent(false);
     } catch (error) {
       console.error('Error duplicating calendar:', error);
     } finally {
       setIsDuplicating(false);
     }
   };
+
+
 
   const handleDeleteConfirm = () => {
     if (calendarToDelete) {
@@ -1279,14 +1273,29 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                 Duplicate Calendar Options
               </DialogTitle>
               <DialogContent>
-                <Typography variant="body1" sx={{ mb: 3 }}>
-                  How would you like to duplicate "{calendarToDuplicate?.name}"?
-                </Typography>
+                {isDuplicating ? (
+                  <Box sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    py: 4
+                  }}>
+                    <CircularProgress size={40} sx={{ mb: 2 }} />
+                    <Typography variant="body1" color="text.secondary">
+                      Duplicating calendar...
+                    </Typography>
+                  </Box>
+                ) : (
+                  <>
+                    <Typography variant="body1" sx={{ mb: 3 }}>
+                      How would you like to duplicate "{calendarToDuplicate?.name}"?
+                    </Typography>
 
-                <Stack spacing={2}>
+                    <Stack spacing={2}>
                   <Button
                     variant="outlined"
                     onClick={() => handleDuplicateOptionSelect(false)}
+                    disabled={isDuplicating}
                     sx={{
                       p: 2,
                       textAlign: 'left',
@@ -1310,6 +1319,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                   <Button
                     variant="outlined"
                     onClick={() => handleDuplicateOptionSelect(true)}
+                    disabled={isDuplicating}
                     sx={{
                       p: 2,
                       textAlign: 'left',
@@ -1330,7 +1340,9 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                       </Typography>
                     </Box>
                   </Button>
-                </Stack>
+                    </Stack>
+                  </>
+                )}
               </DialogContent>
               <DialogActions>
                 <Button
@@ -1345,23 +1357,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
               </DialogActions>
             </Dialog>
 
-            <CalendarFormDialog
-              open={isDuplicateDialogOpen}
-              onClose={() => {
-                setIsDuplicateDialogOpen(false);
-                setCalendarToDuplicate(null);
-                setDuplicateWithContent(false);
-              }}
-              onSubmit={handleDuplicateCalendarSubmit}
-              initialData={calendarToDuplicate ? {
-                ...calendarToDuplicate,
-                name: `${calendarToDuplicate.name} (Copy)`
-              } : undefined}
-              isSubmitting={isDuplicating}
-              mode="create"
-              title={`Duplicate Calendar ${duplicateWithContent ? '(with trades)' : '(settings only)'}`}
-              submitButtonText="Duplicate"
-            />
+
 
             <Dialog
               open={isDeleteDialogOpen}
