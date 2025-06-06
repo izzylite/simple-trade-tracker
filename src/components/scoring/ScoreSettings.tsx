@@ -114,6 +114,13 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
     onSettingsChange(newSettings);
   };
 
+  const handleTagsChangeWithSaveState = (tags: string[]) => {
+    // Enable save button when tags change within the settings interface
+    setHasChanges(true);
+    // Call the original onTagsChange callback
+    onTagsChange(tags);
+  };
+
   const handleReset = () => {
     setLocalSettings(DEFAULT_SCORE_SETTINGS);
     setHasChanges(true);
@@ -468,7 +475,7 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
               <TagSelector
                 trades={trades}
                 selectedTags={selectedTags}
-                onTagsChange={onTagsChange}
+                onTagsChange={handleTagsChangeWithSaveState}
                 allTags={allTags}
               />
             </AccordionDetails>

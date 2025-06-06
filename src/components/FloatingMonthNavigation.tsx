@@ -41,7 +41,7 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
             backgroundColor: alpha(theme.palette.background.paper, 0.95),
             backdropFilter: 'blur(8px)',
             borderRadius: 3,
-            boxShadow: theme.shadows[8],
+            boxShadow: theme.shadows[4],
             border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
             p: 1,
             display: 'flex',

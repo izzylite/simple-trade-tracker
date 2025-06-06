@@ -10,12 +10,26 @@ import {
   CardContent,
   IconButton,
   Tooltip,
-  Alert
+  Alert,
+  List,
+  ListItem,
+  ListItemText,
+  Button,
+  Divider,
+  InputAdornment
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
-import { HelpOutline, Close } from '@mui/icons-material';
+import { useTheme, alpha } from '@mui/material/styles';
+import { HelpOutline, Close, Search as SearchIcon } from '@mui/icons-material';
 import { Trade } from '../../types/trade';
-import { getTagChipStyles, formatTagForDisplay } from '../../utils/tagColors';
+import {
+  getTagChipStyles,
+  formatTagForDisplay,
+  isGroupedTag,
+  getTagGroup,
+  getUniqueTagGroups,
+  filterTagsByGroup
+} from '../../utils/tagColors';
+import { scrollbarStyles } from '../../styles/scrollbarStyles';
 
 interface ExcludedTagsSelectorProps {
   trades: Trade[];
@@ -31,7 +45,7 @@ const ExcludedTagsSelector: React.FC<ExcludedTagsSelectorProps> = ({
   allTags: propAllTags
 }) => {
   const theme = useTheme();
-  const [inputValue, setInputValue] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Use calendar.tags from props, fallback to extracting from trades if not available
   const allTags = useMemo(() => {
@@ -55,26 +69,58 @@ const ExcludedTagsSelector: React.FC<ExcludedTagsSelectorProps> = ({
     return Array.from(tagSet).sort();
   }, [propAllTags, trades]);
 
-  // Available tags (not already excluded)
+  // Filter tags based on search term
+  const filteredTags = useMemo(() => {
+    if (!searchTerm) return allTags;
+
+    const term = searchTerm.toLowerCase();
+    return allTags.filter(tag =>
+      tag.toLowerCase().includes(term) ||
+      formatTagForDisplay(tag).toLowerCase().includes(term)
+    );
+  }, [allTags, searchTerm]);
+
+  // Available tags (not already excluded) from filtered tags
   const availableTags = useMemo(() => {
-    return allTags.filter(tag => !excludedTags.includes(tag));
-  }, [allTags, excludedTags]);
+    return filteredTags.filter(tag => !excludedTags.includes(tag));
+  }, [filteredTags, excludedTags]);
+
+  // Group available tags by their group
+  const groupedAvailableTags = useMemo(() => {
+    const groups: Record<string, string[]> = {};
+
+    availableTags.forEach(tag => {
+      if (isGroupedTag(tag)) {
+        const group = getTagGroup(tag);
+        if (!groups[group]) {
+          groups[group] = [];
+        }
+        groups[group].push(tag);
+      } else {
+        if (!groups['Ungrouped']) {
+          groups['Ungrouped'] = [];
+        }
+        groups['Ungrouped'].push(tag);
+      }
+    });
+
+    return groups;
+  }, [availableTags]);
 
   const handleAddTag = (tag: string) => {
     if (tag && !excludedTags.includes(tag)) {
       onExcludedTagsChange([...excludedTags, tag]);
-      setInputValue('');
     }
+  };
+
+  const handleAddAllInCategory = (category: string) => {
+    const categoryTags = groupedAvailableTags[category] || [];
+    const newExcludedTags = [...excludedTags, ...categoryTags];
+    onExcludedTagsChange(newExcludedTags);
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
     onExcludedTagsChange(excludedTags.filter(tag => tag !== tagToRemove));
-  };
-
-  const handleAutocompleteChange = (_: any, value: string | null) => {
-    if (value) {
-      handleAddTag(value);
-    }
   };
 
   return (
@@ -110,45 +156,122 @@ const ExcludedTagsSelector: React.FC<ExcludedTagsSelectorProps> = ({
           <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
             Add Tag to Exclude
           </Typography>
-          <Autocomplete
-            value={null}
-            inputValue={inputValue}
-            onInputChange={(_, newInputValue) => setInputValue(newInputValue)}
-            onChange={handleAutocompleteChange}
-            options={availableTags}
-            getOptionLabel={(option) => formatTagForDisplay(option)}
-            renderOption={(props, option) => (
-              <Box component="li" {...props}>
-                <Chip
-                  label={formatTagForDisplay(option)}
-                  size="small"
-                  sx={getTagChipStyles(option, theme)}
-                />
-              </Box>
-            )}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                placeholder="Search for tags to exclude..."
-                variant="outlined"
-                size="small"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: theme.palette.mode === 'dark'
-                      ? 'rgba(255, 255, 255, 0.05)'
-                      : 'rgba(0, 0, 0, 0.02)',
-                  }
-                }}
-              />
-            )}
-            noOptionsText={
-              availableTags.length === 0 
-                ? "No tags available to exclude"
-                : "No matching tags found"
-            }
-            disabled={availableTags.length === 0}
+          <TextField
+            placeholder="Search for tags to exclude..."
+            variant="outlined"
+            size="small"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }
+            }}
+            sx={{
+              width: '100%',
+              '& .MuiOutlinedInput-root': {
+                backgroundColor: theme.palette.mode === 'dark'
+                  ? 'rgba(255, 255, 255, 0.05)'
+                  : 'rgba(0, 0, 0, 0.02)',
+              }
+            }}
           />
         </Box>
+
+        {/* Available Tags by Category */}
+        {Object.keys(groupedAvailableTags).length > 0 && (
+          <Box sx={{
+            maxHeight: '250px',
+            overflow: 'auto',
+            border: `1px solid ${theme.palette.divider}`,
+            borderRadius: 1,
+            mb: 3,
+            ...scrollbarStyles(theme)
+          }}>
+            {Object.entries(groupedAvailableTags).map(([group, tags]) => (
+              <Box key={group}>
+                <Box sx={{
+                  p: 1.5,
+                  bgcolor: alpha(theme.palette.primary.main, 0.05),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="subtitle2" fontWeight={600}>
+                      {group}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {tags.length} tag{tags.length !== 1 ? 's' : ''}
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleAddAllInCategory(group)}
+                    sx={{ minWidth: 'auto', px: 1 }}
+                  >
+                    Add All
+                  </Button>
+                </Box>
+                <Divider />
+                <List disablePadding>
+                  {tags.map((tag) => (
+                    <ListItem
+                      key={tag}
+                      secondaryAction={
+                        <Button
+                          size="small"
+                          variant="text"
+                          onClick={() => handleAddTag(tag)}
+                          sx={{ minWidth: 'auto', p: 0.5 }}
+                        >
+                          Add
+                        </Button>
+                      }
+                      sx={{
+                        '&:hover': {
+                          bgcolor: alpha(theme.palette.primary.main, 0.05)
+                        }
+                      }}
+                    >
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Chip
+                              label={formatTagForDisplay(tag, true)}
+                              size="small"
+                              sx={getTagChipStyles(tag, theme)}
+                            />
+                          </Box>
+                        }
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {Object.keys(groupedAvailableTags).length === 0 && (
+          <Box sx={{
+            p: 2,
+            textAlign: 'center',
+            color: 'text.secondary',
+            border: `1px solid ${theme.palette.divider}`,
+            borderRadius: 1,
+            mb: 3
+          }}>
+            <Typography variant="body2">
+              {searchTerm ? 'No matching tags found' : 'No tags available to exclude'}
+            </Typography>
+          </Box>
+        )}
 
         {/* Currently excluded tags */}
         <Box>

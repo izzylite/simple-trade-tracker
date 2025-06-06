@@ -8,12 +8,27 @@ import {
   Chip,
   useTheme,
   Autocomplete,
-  Stack
+  Stack,
+  List,
+  ListItem,
+  ListItemText,
+  Button,
+  Divider,
+  InputAdornment
 } from '@mui/material';
+import { Search as SearchIcon } from '@mui/icons-material';
 
 import { alpha } from '@mui/material/styles';
 import { Trade } from '../../types/trade';
-import { getTagChipStyles, formatTagForDisplay } from '../../utils/tagColors';
+import {
+  getTagChipStyles,
+  formatTagForDisplay,
+  isGroupedTag,
+  getTagGroup,
+  getUniqueTagGroups,
+  filterTagsByGroup
+} from '../../utils/tagColors';
+import { scrollbarStyles } from '../../styles/scrollbarStyles';
 
 interface TagSelectorProps {
   trades: Trade[];
@@ -29,7 +44,7 @@ const TagSelector: React.FC<TagSelectorProps> = ({
   allTags: propAllTags
 }) => {
   const theme = useTheme();
-  const [inputValue, setInputValue] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Use calendar.tags from props, fallback to extracting from trades if not available
   const allTags = useMemo(() => {
@@ -53,16 +68,11 @@ const TagSelector: React.FC<TagSelectorProps> = ({
     return Array.from(tagSet).sort();
   }, [propAllTags, trades]);
 
-  // Available tags (not already selected)
-  const availableTags = useMemo(() => {
-    return allTags.filter(tag => !selectedTags.includes(tag));
-  }, [allTags, selectedTags]);
-
   // Calculate tag usage statistics
   const tagStats = useMemo(() => {
     const stats: Record<string, { count: number; percentage: number }> = {};
     allTags.forEach(tag => {
-      const count = trades.filter(trade => 
+      const count = trades.filter(trade =>
         trade.tags && trade.tags.includes(tag)
       ).length;
       const percentage = trades.length > 0 ? Math.round((count / trades.length) * 100) : 0;
@@ -71,24 +81,58 @@ const TagSelector: React.FC<TagSelectorProps> = ({
     return stats;
   }, [allTags, trades]);
 
-  const handleTagToggle = (tag: string) => {
-    const newSelectedTags = selectedTags.includes(tag)
-      ? selectedTags.filter(t => t !== tag)
-      : [...selectedTags, tag];
-    onTagsChange(newSelectedTags);
-  };
+  // Filter tags based on search term
+  const filteredTags = useMemo(() => {
+    if (!searchTerm) return allTags;
+
+    const term = searchTerm.toLowerCase();
+    return allTags.filter(tag =>
+      tag.toLowerCase().includes(term) ||
+      formatTagForDisplay(tag).toLowerCase().includes(term)
+    );
+  }, [allTags, searchTerm]);
+
+  // Available tags (not already selected) from filtered tags
+  const availableTags = useMemo(() => {
+    return filteredTags.filter(tag => !selectedTags.includes(tag));
+  }, [filteredTags, selectedTags]);
+
+  // Group available tags by their group
+  const groupedAvailableTags = useMemo(() => {
+    const groups: Record<string, string[]> = {};
+
+    availableTags.forEach(tag => {
+      if (isGroupedTag(tag)) {
+        const group = getTagGroup(tag);
+        if (!groups[group]) {
+          groups[group] = [];
+        }
+        groups[group].push(tag);
+      } else {
+        if (!groups['Ungrouped']) {
+          groups['Ungrouped'] = [];
+        }
+        groups['Ungrouped'].push(tag);
+      }
+    });
+
+    return groups;
+  }, [availableTags]);
 
   const handleAddTag = (tag: string) => {
     if (tag && !selectedTags.includes(tag)) {
       onTagsChange([...selectedTags, tag]);
-      setInputValue('');
     }
   };
 
-  const handleAutocompleteChange = (_: any, value: string | null) => {
-    if (value) {
-      handleAddTag(value);
-    }
+  const handleRemoveTag = (tag: string) => {
+    onTagsChange(selectedTags.filter(t => t !== tag));
+  };
+
+  const handleAddAllInCategory = (category: string) => {
+    const categoryTags = groupedAvailableTags[category] || [];
+    const newSelectedTags = [...selectedTags, ...categoryTags];
+    onTagsChange(newSelectedTags);
   };
 
   const handleClearAll = () => {
@@ -101,58 +145,133 @@ const TagSelector: React.FC<TagSelectorProps> = ({
         Select specific tags to track their usage frequency across your trades. This will show how often you use each selected strategy in the Analysis tab.
       </Typography>
 
-      {/* Add Tag Dropdown */}
+      {/* Search Field */}
       <Box mb={2}>
         <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
           Add Tags to Track
         </Typography>
-        <Autocomplete
-          value={null}
-          inputValue={inputValue}
-          onInputChange={(_, newInputValue) => setInputValue(newInputValue)}
-          onChange={handleAutocompleteChange}
-          options={availableTags}
-          getOptionLabel={(option) => formatTagForDisplay(option)}
-          renderOption={(props, option) => {
-            const stats = tagStats[option];
-            return (
-              <Box component="li" {...props}>
-                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                  <Chip
-                    label={formatTagForDisplay(option)}
-                    size="small"
-                    sx={getTagChipStyles(option, theme)}
-                  />
-                  <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                    {stats.count} trades ({stats.percentage}%)
-                  </Typography>
-                </Box>
-              </Box>
-            );
+        <TextField
+          placeholder="Search for tags to track..."
+          variant="outlined"
+          size="small"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }
           }}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              placeholder="Search for tags to track..."
-              variant="outlined"
-              size="small"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  backgroundColor: theme.palette.mode === 'dark'
-                    ? 'rgba(255, 255, 255, 0.05)'
-                    : 'rgba(0, 0, 0, 0.02)',
-                }
-              }}
-            />
-          )}
-          noOptionsText={
-            availableTags.length === 0
-              ? "All tags are already selected"
-              : "No matching tags found"
-          }
-          disabled={availableTags.length === 0}
+          sx={{
+            width: '100%',
+            '& .MuiOutlinedInput-root': {
+              backgroundColor: theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.05)'
+                : 'rgba(0, 0, 0, 0.02)',
+            }
+          }}
         />
       </Box>
+
+      {/* Available Tags by Category */}
+      {Object.keys(groupedAvailableTags).length > 0 && (
+        <Box sx={{
+          maxHeight: '300px',
+          overflow: 'auto',
+          border: `1px solid ${theme.palette.divider}`,
+          borderRadius: 1,
+          mb: 2,
+          ...scrollbarStyles(theme)
+        }}>
+          {Object.entries(groupedAvailableTags).map(([group, tags]) => (
+            <Box key={group}>
+              <Box sx={{
+                p: 1.5,
+                bgcolor: alpha(theme.palette.primary.main, 0.05),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    {group}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {tags.length} tag{tags.length !== 1 ? 's' : ''}
+                  </Typography>
+                </Box>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => handleAddAllInCategory(group)}
+                  sx={{ minWidth: 'auto', px: 1 }}
+                >
+                  Add All
+                </Button>
+              </Box>
+              <Divider />
+              <List disablePadding>
+                {tags.map((tag) => {
+                  const stats = tagStats[tag];
+                  return (
+                    <ListItem
+                      key={tag}
+                      secondaryAction={
+                        <Button
+                          size="small"
+                          variant="text"
+                          onClick={() => handleAddTag(tag)}
+                          sx={{ minWidth: 'auto', p: 0.5 }}
+                        >
+                          Add
+                        </Button>
+                      }
+                      sx={{
+                        '&:hover': {
+                          bgcolor: alpha(theme.palette.primary.main, 0.05)
+                        }
+                      }}
+                    >
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Chip
+                              label={formatTagForDisplay(tag, true)}
+                              size="small"
+                              sx={getTagChipStyles(tag, theme)}
+                            />
+                            <Typography variant="caption" color="text.secondary">
+                              {stats.count} trades ({stats.percentage}%)
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </ListItem>
+                  );
+                })}
+              </List>
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      {Object.keys(groupedAvailableTags).length === 0 && (
+        <Box sx={{
+          p: 2,
+          textAlign: 'center',
+          color: 'text.secondary',
+          border: `1px solid ${theme.palette.divider}`,
+          borderRadius: 1,
+          mb: 2
+        }}>
+          <Typography variant="body2">
+            {searchTerm ? 'No matching tags found' : 'All tags are already selected'}
+          </Typography>
+        </Box>
+      )}
 
      
 
@@ -188,7 +307,7 @@ const TagSelector: React.FC<TagSelectorProps> = ({
                       }
                     }
                   }}
-                  onDelete={() => handleTagToggle(tag)}
+                  onDelete={() => handleRemoveTag(tag)}
                 />
               );
             })}

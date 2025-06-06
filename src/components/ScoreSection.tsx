@@ -21,6 +21,7 @@ import { ScoreSettings, ScoreAnalysis } from '../types/score';
 import { Calendar } from '../types/calendar';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import { scoreService } from '../services/scoreService';
+import { calculateRecommendedScore } from '../utils/scoreUtils';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import ScoreCard from './scoring/ScoreCard';
 import ScoreBreakdown from './scoring/ScoreBreakdown';
@@ -78,6 +79,9 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
   const [selectedTags, setSelectedTags] = useState<string[]>(scoreSettings?.selectedTags || []);
   const [isSaving, setIsSaving] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
+
+  // Calculate recommended score based on user's targets
+  const recommendedScore = calculateRecommendedScore(settings);
   const [scoreAnalysis, setScoreAnalysis] = useState<ScoreAnalysis | null>(null);
   const [scoreHistory, setScoreHistory] = useState<any[]>([]);
   const [multiPeriodScores, setMultiPeriodScores] = useState<any>(null);
@@ -481,6 +485,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
                       trend={multiPeriodScores.daily.trend}
                       period="daily"
                       compact
+                      recommendedScore={recommendedScore}
                     />
                   </Box>
                   <Box
@@ -497,6 +502,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
                       trend={multiPeriodScores.weekly.trend}
                       period="weekly"
                       compact
+                      recommendedScore={recommendedScore}
                     />
                   </Box>
                   <Box
@@ -513,6 +519,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
                       trend={multiPeriodScores.monthly.trend}
                       period="monthly"
                       compact
+                      recommendedScore={recommendedScore}
                     />
                   </Box>
                   <Box
@@ -529,6 +536,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
                       trend={multiPeriodScores.yearly.trend}
                       period="yearly"
                       compact
+                      recommendedScore={recommendedScore}
                     />
                   </Box>
                 </Stack>

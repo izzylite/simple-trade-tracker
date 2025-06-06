@@ -38,6 +38,48 @@ export const DEFAULT_SCORE_SETTINGS: ScoreSettings = {
   excludedTagsFromPatterns: []
 };
 
+/**
+ * Calculate recommended score based on user's targets and settings
+ * This provides a target score that represents good trading performance
+ */
+export const calculateRecommendedScore = (settings: ScoreSettings): number => {
+  // Base score calculation based on targets
+  // These are reasonable benchmarks for each component
+
+  // Consistency: 75% is a good target for following patterns
+  const consistencyTarget = 75;
+
+  // Risk Management: Based on targets, calculate expected score
+  const riskMgmtTarget = Math.min(85,
+    // Win rate factor (60% target = 75 points, 70% = 85 points)
+    (settings.targets.winRate / 60) * 75 +
+    // Risk/reward factor (2.0 target = 10 points)
+    Math.min(10, (settings.targets.avgRiskReward / 2.0) * 10)
+  );
+
+  // Performance: Based on profit factor and win rate targets
+  const performanceTarget = Math.min(80,
+    // Profit factor contribution (1.5 target = 60 points, 2.0 = 80 points)
+    Math.min(60, (settings.targets.profitFactor / 1.5) * 60) +
+    // Win rate contribution (60% = 20 points)
+    Math.min(20, (settings.targets.winRate / 60) * 20)
+  );
+
+  // Discipline: 70% is a reasonable target for discipline metrics
+  const disciplineTarget = 70;
+
+  // Calculate weighted recommended score
+  const recommendedScore = (
+    (consistencyTarget * settings.weights.consistency) +
+    (riskMgmtTarget * settings.weights.riskManagement) +
+    (performanceTarget * settings.weights.performance) +
+    (disciplineTarget * settings.weights.discipline)
+  ) / 100;
+
+  // Ensure the score is between 50-90 (reasonable range)
+  return Math.max(50, Math.min(90, recommendedScore));
+};
+
 
 
 /**

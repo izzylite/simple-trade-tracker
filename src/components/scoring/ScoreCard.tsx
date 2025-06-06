@@ -19,7 +19,8 @@ import {
   Shield,
   Timeline,
   Rule,
-  HelpOutline
+  HelpOutline,
+  Flag
 } from '@mui/icons-material';
 import { ScoreMetrics } from '../../types/score';
 
@@ -28,13 +29,15 @@ interface ScoreCardProps {
   trend: 'improving' | 'declining' | 'stable';
   period: 'daily' | 'weekly' | 'monthly' | 'yearly';
   compact?: boolean;
+  recommendedScore?: number; // Target score to achieve (0-100)
 }
 
-const ScoreCard: React.FC<ScoreCardProps> = ({ 
-  score, 
-  trend, 
-  period, 
-  compact = false 
+const ScoreCard: React.FC<ScoreCardProps> = ({
+  score,
+  trend,
+  period,
+  compact = false,
+  recommendedScore = 75 // Default recommended score of 75%
 }) => {
   const theme = useTheme();
 
@@ -65,6 +68,74 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
         return theme.palette.text.secondary;
     }
   };
+
+  const isScoreMeetingTarget = (currentScore: number) => {
+    return currentScore >= recommendedScore;
+  };
+
+  const getTargetStatus = (currentScore: number) => {
+    const difference = currentScore - recommendedScore;
+    if (difference >= 0) {
+      return {
+        status: 'achieved',
+        message: `${difference.toFixed(0)}% above target`,
+        color: theme.palette.success.main
+      };
+    } else {
+      return {
+        status: 'below',
+        message: `${Math.abs(difference).toFixed(0)}% below target`,
+        color: theme.palette.warning.main
+      };
+    }
+  };
+
+  const ProgressWithTarget: React.FC<{
+    value: number;
+    height: number;
+    showTarget?: boolean;
+  }> = ({ value, height, showTarget = true }) => (
+    <Box sx={{ position: 'relative', width: '100%' }}>
+      <LinearProgress
+        variant="determinate"
+        value={isNaN(value) ? 0 : value}
+        sx={{
+          height,
+          borderRadius: height / 2,
+          backgroundColor: theme.palette.mode === 'dark'
+            ? alpha(theme.palette.common.white, 0.1)
+            : theme.palette.grey[200],
+          '& .MuiLinearProgress-bar': {
+            backgroundColor: getScoreColor(value),
+            borderRadius: height / 2
+          }
+        }}
+      />
+      {showTarget && (
+        <Box
+          sx={{
+            position: 'absolute',
+            left: `${recommendedScore}%`,
+            top: 0,
+            height: '100%',
+            width: 2,
+            backgroundColor: theme.palette.info.main,
+            borderRadius: 1,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: -2,
+              left: -2,
+              width: 6,
+              height: 6,
+              backgroundColor: theme.palette.info.main,
+              borderRadius: '50%'
+            }
+          }}
+        />
+      )}
+    </Box>
+  );
 
   const getDetailedTooltip = (componentName: string): string => {
     switch (componentName.toLowerCase()) {
@@ -184,34 +255,34 @@ Higher scores indicate better emotional control and systematic trading.`;
             {isNaN(score.overall) ? '0' : score.overall.toFixed(0)}%
           </Typography>
 
-          <Typography
-            variant="caption"
-            sx={{
-              color: getTrendColor(),
-              fontWeight: 500,
-              mb: 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.5
-            }}
-          >
-            {trend.charAt(0).toUpperCase() + trend.slice(1)}
-          </Typography>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
+            <Typography
+              variant="caption"
+              sx={{
+                color: getTrendColor(),
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5
+              }}
+            >
+              {trend.charAt(0).toUpperCase() + trend.slice(1)}
+            </Typography>
+            <Tooltip title={`Target: ${recommendedScore}%`}>
+              <Flag
+                sx={{
+                  fontSize: 14,
+                  color: isScoreMeetingTarget(score.overall)
+                    ? theme.palette.success.main
+                    : theme.palette.info.main
+                }}
+              />
+            </Tooltip>
+          </Stack>
 
-          <LinearProgress
-            variant="determinate"
-            value={isNaN(score.overall) ? 0 : score.overall}
-            sx={{
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: theme.palette.mode === 'dark'
-                ? alpha(theme.palette.common.white, 0.1)
-                : theme.palette.grey[200],
-              '& .MuiLinearProgress-bar': {
-                backgroundColor: getScoreColor(score.overall),
-                borderRadius: 3
-              }
-            }}
+          <ProgressWithTarget
+            value={score.overall}
+            height={6}
           />
         </CardContent>
       </Card>
@@ -265,9 +336,9 @@ Higher scores indicate better emotional control and systematic trading.`;
 
         {/* Overall Score */}
         <Box sx={{ textAlign: 'center', mb: 3 }}>
-          <Typography 
-            variant="h2" 
-            sx={{ 
+          <Typography
+            variant="h2"
+            sx={{
               color: getScoreColor(score.overall),
               fontWeight: 'bold',
               mb: 1
@@ -275,24 +346,31 @@ Higher scores indicate better emotional control and systematic trading.`;
           >
             {isNaN(score.overall) ? '0' : score.overall.toFixed(0)}%
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             Overall Trading Score
           </Typography>
-          <LinearProgress
-            variant="determinate"
-            value={isNaN(score.overall) ? 0 : score.overall}
-            sx={{
-              height: 8,
-              borderRadius: 4,
-              mt: 1,
-              backgroundColor: theme.palette.mode === 'dark'
-                ? alpha(theme.palette.common.white, 0.1)
-                : theme.palette.grey[200],
-              '& .MuiLinearProgress-bar': {
-                backgroundColor: getScoreColor(score.overall),
-                borderRadius: 4
-              }
-            }}
+
+          {/* Target Status */}
+          <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} mb={1}>
+            <Flag sx={{ fontSize: 16, color: theme.palette.info.main }} />
+            <Typography variant="caption" color="text.secondary">
+              Target: {recommendedScore}%
+            </Typography>
+            <Chip
+              label={getTargetStatus(score.overall).message}
+              size="small"
+              sx={{
+                backgroundColor: alpha(getTargetStatus(score.overall).color, 0.1),
+                color: getTargetStatus(score.overall).color,
+                fontWeight: 500,
+                fontSize: '0.7rem'
+              }}
+            />
+          </Stack>
+
+          <ProgressWithTarget
+            value={score.overall}
+            height={8}
           />
         </Box>
 
@@ -333,29 +411,25 @@ Higher scores indicate better emotional control and systematic trading.`;
                     </Tooltip>
                   )}
                 </Stack>
-                <Typography
-                  variant="body2"
-                  fontWeight="bold"
-                  sx={{ color: getScoreColor(component.value) }}
-                >
-                  {isNaN(component.value) ? '0' : component.value.toFixed(0)}%
-                </Typography>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography
+                    variant="body2"
+                    fontWeight="bold"
+                    sx={{ color: getScoreColor(component.value) }}
+                  >
+                    {isNaN(component.value) ? '0' : component.value.toFixed(0)}%
+                  </Typography>
+                  {isScoreMeetingTarget(component.value) && (
+                    <Tooltip title="Meeting target">
+                      <Flag sx={{ fontSize: 12, color: theme.palette.success.main }} />
+                    </Tooltip>
+                  )}
+                </Stack>
               </Stack>
-                <LinearProgress
-                  variant="determinate"
-                  value={isNaN(component.value) ? 0 : component.value}
-                  sx={{
-                    height: 4,
-                    borderRadius: 2,
-                    backgroundColor: theme.palette.mode === 'dark'
-                      ? alpha(theme.palette.common.white, 0.1)
-                      : theme.palette.grey[200],
-                    '& .MuiLinearProgress-bar': {
-                      backgroundColor: getScoreColor(component.value),
-                      borderRadius: 2
-                    }
-                  }}
-                />
+              <ProgressWithTarget
+                value={component.value}
+                height={4}
+              />
             </Box>
           ))}
         </Stack>
