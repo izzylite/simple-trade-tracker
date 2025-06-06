@@ -19,9 +19,9 @@ import { auth, db } from '../firebase/config';
 import { Calendar } from '../types/calendar';
 import { Trade } from '../types/trade';
 import { YearlyTrades } from '../types/yearlyTrades';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase/config';
-import { PendingImage, TradeImage } from '../components/trades/TradeForm';
+import { TradeImage } from '../components/trades/TradeForm';
 
 const CALENDARS_COLLECTION = 'calendars';
 const YEARS_SUBCOLLECTION = 'years';
@@ -729,7 +729,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
     }
     // If still not found, try to fetch it from Firestore
     else if (trade === undefined) {
-      throw new Error('Attempting to fetch trade with ID ${tradeId} from Firestore');
+      throw new Error(`Attempting to fetch trade with ID ${tradeId} from Firestore`);
 
     }
 

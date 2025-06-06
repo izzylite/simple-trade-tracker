@@ -4,11 +4,9 @@ import {
   TextField,
   Chip,
   Box,
-  IconButton,
   Tooltip,
   Button
 } from '@mui/material';
-import { Edit as EditIcon } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import {
   getTagChipStyles,

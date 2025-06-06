@@ -1,4 +1,3 @@
-import { GlobalStyles as MuiGlobalStyles } from '@mui/material';
 import { Theme } from '@mui/material/styles';
 
 export const globalStyles = (theme: Theme) => ({

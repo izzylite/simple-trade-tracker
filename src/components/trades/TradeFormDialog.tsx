@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Snackbar,
@@ -140,49 +140,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   // Track previous showForm state to avoid unnecessary handleAddClick calls
   const prevShowFormRef = useRef<FormProps | null>(null);
 
-  useEffect(() => {
-    // Only call handleAddClick when showForm changes from not meeting conditions to meeting them
-    const shouldCreateTempTrade = showForm.open && showForm.createTempTrade;
-    const prevShouldCreateTempTrade = prevShowFormRef.current?.open && prevShowFormRef.current?.createTempTrade;
-
-    if (shouldCreateTempTrade && (!prevShowFormRef.current || !prevShouldCreateTempTrade)) {
-      createEmptyTrade();
-    }
-    else if(showForm.editTrade){
-      setEditingTrade(showForm.editTrade);
-    }
-
-    // Update previous showForm ref
-    prevShowFormRef.current = showForm;
-  }, [showForm]);
-
-  useEffect(() => {
-    if (newMainTrade) {
-      setNewTrade(newMainTrade!);
-    }
-  }, [newMainTrade]);
-
-
-  // Derived state
-  const allTags = useMemo(() => {
-    const tagsSet = new Set<string>();
-    allTrades.forEach(trade => {
-      if (trade.tags) {
-        trade.tags.forEach(tag => {
-          if (!tag.startsWith('Partials:')) {
-            tagsSet.add(tag);
-          }
-        });
-      }
-    });
-    return Array.from(tagsSet);
-  }, [allTrades]);
-
-
-
-
-
-  const createEmptyTrade = async () => {
+  // Function to create empty trade - defined before useEffect that uses it
+  const createEmptyTrade = useCallback(async () => {
     setEditingTrade(null);
     // Set creating empty trade state to true to disable cancel/close buttons
     setIsCreatingEmptyTrade(true);
@@ -221,7 +180,51 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       // Re-enable cancel/close buttons regardless of success or failure
       setIsCreatingEmptyTrade(false);
     }
-  };
+  }, [calendarId, onAddTrade, date]);
+
+  useEffect(() => {
+    // Only call handleAddClick when showForm changes from not meeting conditions to meeting them
+    const shouldCreateTempTrade = showForm.open && showForm.createTempTrade;
+    const prevShouldCreateTempTrade = prevShowFormRef.current?.open && prevShowFormRef.current?.createTempTrade;
+
+    if (shouldCreateTempTrade && (!prevShowFormRef.current || !prevShouldCreateTempTrade)) {
+      createEmptyTrade();
+    }
+    else if(showForm.editTrade){
+      setEditingTrade(showForm.editTrade);
+    }
+
+    // Update previous showForm ref
+    prevShowFormRef.current = showForm;
+  }, [showForm, createEmptyTrade]);
+
+  useEffect(() => {
+    if (newMainTrade) {
+      setNewTrade(newMainTrade!);
+    }
+  }, [newMainTrade]);
+
+
+  // Derived state
+  const allTags = useMemo(() => {
+    const tagsSet = new Set<string>();
+    allTrades.forEach(trade => {
+      if (trade.tags) {
+        trade.tags.forEach(tag => {
+          if (!tag.startsWith('Partials:')) {
+            tagsSet.add(tag);
+          }
+        });
+      }
+    });
+    return Array.from(tagsSet);
+  }, [allTrades]);
+
+
+
+
+
+
 
 
 
