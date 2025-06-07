@@ -848,7 +848,11 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
     }
     // If still not found, try to fetch it from Firestore
     else if (trade === undefined) {
-      throw new Error(`Attempting to fetch trade with ID ${tradeId} from Firestore`);
+      const fetchedTrade = await getTrade(calendarId,tradeId);
+      if (fetchedTrade === null || fetchedTrade === undefined) {
+        throw new Error(`Attempting to fetch trade with ID ${tradeId} from Firestore`);
+      }
+      trade = fetchedTrade;
 
     }
 
@@ -1064,7 +1068,7 @@ export const importTrades = async (calendarId: string, trades: Trade[]): Promise
 
 
 // Get a specific trade by ID
-export const getTrade = async (calendarId: string, tradeId: string): Promise<Trade | null> => {
+export const getTrade = async (calendarId: string, tradeId: string): Promise<Trade | null | undefined> => {
   // Find which year the trade belongs to
   const yearsRef = collection(db, CALENDARS_COLLECTION, calendarId, YEARS_SUBCOLLECTION);
   const yearsSnapshot = await getDocs(yearsRef);

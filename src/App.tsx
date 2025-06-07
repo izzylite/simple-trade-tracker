@@ -507,9 +507,16 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
         trade.tags = trade.tags.map(tag => tag === oldTag ? newTag : tag);
       }
     });
+    const tags = [...calendar.tags || []];
+      (calendar.tags || []).forEach((tag: string, index : number) => {
+      if (tag == oldTag) {
+        tags[index] = newTag; 
+      }
+    });
 
     // Update local state immediately
     onUpdateStateCalendar(calendar.id, {
+      tags: tags,
       cachedTrades: [...calendar.cachedTrades]
     });
   }

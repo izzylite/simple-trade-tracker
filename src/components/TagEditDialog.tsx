@@ -67,12 +67,11 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
     }
   };
 
-  const isGrouped = isGroupedTag(tag);
-  const tagGroup = isGrouped ? getTagGroup(tag) : '';
+  const isGrouped = isGroupedTag(tag); 
   // For grouped tags, extract the tag name part for the input field
   const getTagNamePart = (fullTag: string) => isGroupedTag(fullTag) ? fullTag.split(':')[1] : fullTag;
   const [tagName, setTagName] = useState(getTagNamePart(tag));
-
+  const [tagGroup, setTagGroup] = useState(isGrouped ? getTagGroup(tag) : '');  
 
 
   // Update state when tag prop changes
@@ -150,19 +149,30 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
 
 
         {isGrouped ? (
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-            <TextField
-              label="Group"
-              value={tagGroup}
-              disabled
-              size="small"
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}> 
+              <TextField
+                label="Group"
+             value={tagGroup}
+              onChange={(e) => {
+                const newGroupName = e.target.value;
+                setTagGroup(newGroupName);
+                setNewTag(`${newGroupName}:${tagName}`);
+              }}
+              fullWidth
+              autoFocus
+              error={!!error}
+              helperText={error}
+              disabled={isSubmitting}
+              size="medium"
               sx={{
-                width: '30%',
-                '& .MuiInputBase-root': {
-                  bgcolor: alpha(theme.palette.text.disabled, 0.05)
+                '& .MuiFormHelperText-root': {
+                  color: theme.palette.error.main,
+                  fontWeight: 500,
+                  marginTop: 1
                 }
               }}
             />
+
             <TextField
               label="Tag Name"
               value={tagName}
