@@ -40,6 +40,7 @@ interface MonthlyStatisticsSectionProps {
   // Optional handlers for trade interactions
   onEditTrade?: (trade: Trade) => void;
   onDeleteTrade?: (tradeId: string) => void;
+  onDeleteMultipleTrades?: (tradeIds: string[]) => void;
   onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
 }
 
@@ -63,6 +64,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   allTags: propAllTags,
   onEditTrade,
   onDeleteTrade,
+  onDeleteMultipleTrades,
   onZoomImage
 }) => {
   const theme = useTheme();
@@ -273,6 +275,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         allTrades={trades}
         onEditClick={onEditTrade}
         onDeleteClick={onDeleteTrade}
+        onDeleteMultiple={onDeleteMultipleTrades}
       />
 
       {/* Performance Details Dialog */}

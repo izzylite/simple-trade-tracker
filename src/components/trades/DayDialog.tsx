@@ -18,10 +18,12 @@ interface DayDialogProps {
   onDateChange: (date: Date) => void;
   showAddForm: (ediTrade?: Trade | null) => void;
   onDeleteTrade: (tradeId: string) => void;
+  onDeleteMultipleTrades?: (tradeIds: string[]) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   allTrades?: Trade[];
   calendarId: string;
+  deletingTradeIds?: string[];
 }
 
 
@@ -35,11 +37,14 @@ const DayDialog: React.FC<DayDialogProps> = ({
   trades,
   accountBalance,
   onDeleteTrade,
+  onDeleteMultipleTrades,
   showAddForm,
   onDateChange,
   onUpdateTradeProperty,
   setZoomedImage,
   allTrades = [],
+  calendarId,
+  deletingTradeIds
 }) => {
 
   // State
@@ -117,8 +122,11 @@ const DayDialog: React.FC<DayDialogProps> = ({
             onTradeClick={handleTradeClick}
             onEditClick={handleEditClick}
             onDeleteClick={onDeleteTrade}
+            onDeleteMultiple={onDeleteMultipleTrades}
             onZoomedImage={setZoomedImage}
             onUpdateTradeProperty={onUpdateTradeProperty}
+            enableBulkSelection={trades.length > 1} // Enable bulk selection when there are multiple trades
+            deletingTradeIds={deletingTradeIds}
           />
         </Box>
       </BaseDialog>

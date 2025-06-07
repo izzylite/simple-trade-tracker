@@ -21,6 +21,7 @@ interface TradesDialogProps {
   allTrades: Trade[];
   onEditClick?: (trade: Trade) => void;
   onDeleteClick?: (tradeId: string) => void;
+  onDeleteMultiple?: (tradeIds: string[]) => void;
 }
 
 const TradesListDialog: React.FC<TradesDialogProps> = ({
@@ -34,7 +35,8 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   accountBalance,
   allTrades,
   onEditClick,
-  onDeleteClick
+  onDeleteClick,
+  onDeleteMultiple
 }) => {
    
 
@@ -77,8 +79,10 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
           onTradeClick={onTradeExpand}
           onEditClick={onEditClick || (() => {})} // Use provided handler or no-op
           onDeleteClick={onDeleteClick || (() => {})} // Use provided handler or no-op
+          onDeleteMultiple={onDeleteMultiple}
           onZoomedImage={onZoomImage}
           hideActions={!onEditClick && !onDeleteClick} // Hide actions only if both handlers are not provided
+          enableBulkSelection={trades.length > 1 && !!onDeleteMultiple} // Enable bulk selection when there are multiple trades and handler is provided
         />
       </Box>
     </BaseDialog>

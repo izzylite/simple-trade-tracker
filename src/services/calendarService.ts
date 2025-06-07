@@ -11,8 +11,7 @@ import {
   setDoc,
   getDoc,
   writeBatch,
-  runTransaction,
-  deleteDoc
+  runTransaction
 } from 'firebase/firestore';
 import { isSameWeek, isSameMonth } from 'date-fns';
 import { auth, db } from '../firebase/config';
@@ -223,7 +222,7 @@ export const calculateCalendarStats = (trades: Trade[], calendar: Calendar): Cal
 };
 
 // Convert Firestore data to Calendar object
-const convertFirestoreDataToCalendar = (doc: DocumentData): Calendar => {
+export const convertFirestoreDataToCalendar = (doc: DocumentData): Calendar => {
   const data = doc.data();
 
   // Convert daysNotes from Firestore object to Map
@@ -250,6 +249,11 @@ const convertFirestoreDataToCalendar = (doc: DocumentData): Calendar => {
     // Duplication tracking
     duplicatedCalendar: data.duplicatedCalendar,
     sourceCalendarId: data.sourceCalendarId,
+    // Trash/deletion tracking
+    isDeleted: data.isDeleted,
+    deletedAt: data.deletedAt ? data.deletedAt.toDate() : undefined,
+    deletedBy: data.deletedBy,
+    autoDeleteAt: data.autoDeleteAt ? data.autoDeleteAt.toDate() : undefined,
     // Tags
     tags: data.tags || [],
     // Notes
@@ -307,7 +311,7 @@ const convertCalendarToFirestoreData = (calendar: Omit<Calendar, 'id' | 'cachedT
   if (calendar.daysNotes && calendar.daysNotes.size > 0) {
     daysNotesObj = Object.fromEntries(calendar.daysNotes);
   }
-  
+
   // Add optional fields only if they are not undefined
   const optionalFields = {
     // Configuration fields
@@ -322,6 +326,16 @@ const convertCalendarToFirestoreData = (calendar: Omit<Calendar, 'id' | 'cachedT
     // Duplication tracking
     ...(calendar.duplicatedCalendar !== undefined && { duplicatedCalendar: calendar.duplicatedCalendar }),
     ...(calendar.sourceCalendarId !== undefined && { sourceCalendarId: calendar.sourceCalendarId }),
+
+    // Trash/deletion tracking
+    ...(calendar.isDeleted !== undefined && { isDeleted: calendar.isDeleted }),
+    ...(calendar.deletedAt !== undefined && {
+      deletedAt: calendar.deletedAt ? Timestamp.fromDate(calendar.deletedAt) : null
+    }),
+    ...(calendar.deletedBy !== undefined && { deletedBy: calendar.deletedBy }),
+    ...(calendar.autoDeleteAt !== undefined && {
+      autoDeleteAt: calendar.autoDeleteAt ? Timestamp.fromDate(calendar.autoDeleteAt) : null
+    }),
 
     // Tags
     ...(calendar.tags !== undefined && { tags: calendar.tags }),
@@ -375,7 +389,7 @@ const convertCalendarToFirestoreData = (calendar: Omit<Calendar, 'id' | 'cachedT
 };
 
 // Convert Trade object to Firestore data
-const convertTradeToFirestoreData = (trade: Trade,calendarId : string) => {
+const convertTradeToFirestoreData = (trade: Trade, calendarId: string) => {
   // Create base object with required fields
   const baseData = {
     id: trade.id,
@@ -520,11 +534,11 @@ const convertFirestoreDataToYearlyTrades = (doc: DocumentData): YearlyTrades => 
 };
 
 // Convert YearlyTrades object to Firestore data
-const convertYearlyTradesToFirestoreData = (yearlyTrades: YearlyTrades,calendarId : string) => {
+const convertYearlyTradesToFirestoreData = (yearlyTrades: YearlyTrades, calendarId: string) => {
   return {
     year: yearlyTrades.year,
     lastModified: Timestamp.fromDate(yearlyTrades.lastModified),
-    trades: yearlyTrades.trades.map(trade => convertTradeToFirestoreData(trade,calendarId))
+    trades: yearlyTrades.trades.map(trade => convertTradeToFirestoreData(trade, calendarId))
   };
 };
 
@@ -546,9 +560,13 @@ export const getCalendar = async (calendarId: string): Promise<Calendar | null> 
 };
 
 
-// Get all calendars for a user
+// Get all calendars for a user (excluding deleted ones)
 export const getUserCalendars = async (userId: string): Promise<Calendar[]> => {
-  const q = query(collection(db, CALENDARS_COLLECTION), where("userId", "==", userId));
+  const q = query(
+    collection(db, CALENDARS_COLLECTION),
+    where("userId", "==", userId),
+    where("isDeleted", "!=", true)
+  );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(convertFirestoreDataToCalendar);
 };
@@ -587,7 +605,7 @@ export const createCalendar = async (userId: string, calendar: Omit<Calendar, 'i
 };
 
 // Duplicate an existing calendar
-export const duplicateCalendar = async (userId: string, sourceCalendarId: string, newName: string, includeContent: boolean = false): Promise<string> => {
+export const duplicateCalendar = async (userId: string, sourceCalendarId: string, newName: string, includeContent: boolean = false): Promise<Omit<Calendar, 'cachedTrades' | 'loadedYears'>> => {
   try {
     // Get the source calendar
     const sourceCalendar = await getCalendar(sourceCalendarId);
@@ -613,6 +631,7 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
       // Mark as duplicated calendar and track source
       duplicatedCalendar: true,
       sourceCalendarId: sourceCalendarId,
+      isDeleted: false,
       // Copy notes, tags, and score settings
       note: sourceCalendar.note,
       daysNotes: sourceCalendar.daysNotes,
@@ -662,7 +681,10 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
       }
     }
 
-    return newCalendarId;
+    return {
+      id:newCalendarId,
+      ...duplicatedCalendar
+    };
   } catch (error) {
     console.error('Error duplicating calendar:', error);
     throw error;
@@ -687,12 +709,11 @@ export const updateCalendar = async (calendarId: string, updates: Partial<Omit<C
   await updateDoc(calendarRef, updateData);
 };
 
-// Delete a calendar
-export const deleteCalendar = async (calendarId: string): Promise<void> => {
-  // Delete the calendar document
-  const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
-  // Commit the batch
-  await deleteDoc(calendarRef);
+// Delete a calendar (soft delete - move to trash)
+export const deleteCalendar = async (calendarId: string, userId: string): Promise<void> => {
+  // Import moveCalendarToTrash to avoid circular dependency
+  const { moveCalendarToTrash } = await import('./trashService');
+  await moveCalendarToTrash(calendarId, userId);
 };
 
 // Get trades for a specific year
@@ -757,7 +778,7 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
         yearlyTrades.trades.push(trade);
         yearlyTrades.lastModified = new Date();
 
-        transaction.update(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades,calendarId));
+        transaction.update(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades, calendarId));
       } else {
         // Year document doesn't exist, create it
         const yearlyTrades: YearlyTrades = {
@@ -766,7 +787,7 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
           trades: [trade]
         };
 
-        transaction.set(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades,calendarId));
+        transaction.set(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades, calendarId));
       }
 
       // Update the calendar with stats
@@ -781,7 +802,7 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
   }
 };
 
-export const onUpdateCalendar = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar ) : Promise<Calendar> => {
+export const onUpdateCalendar = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<Calendar> => {
   try {
     const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
 
@@ -798,7 +819,7 @@ export const onUpdateCalendar = async (calendarId: string, updateCallback: (cale
       const updatedCalendar = updateCallback(calendar);
       updatedCalendar.lastModified = new Date();
       // Convert daysNotes Map to a plain object for Firestore
-       
+
       // Update the calendar document
       transaction.update(calendarRef, convertCalendarToFirestoreData(updatedCalendar));
       return updatedCalendar;
@@ -811,7 +832,7 @@ export const onUpdateCalendar = async (calendarId: string, updateCallback: (cale
 
 // Update a trade in a calendar using a transaction to prevent race conditions
 export const updateTrade = async (calendarId: string, tradeId: string, cachedTrades: Trade[] = [],
-   updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade): Promise<[CalendarStats, Trade[]] | undefined> => {
+  updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade): Promise<[CalendarStats, Trade[]] | undefined> => {
   try {
     // First try to find the trade in cached trades
     let trade = cachedTrades.find(t => t.id === tradeId);
@@ -831,7 +852,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
 
     }
 
-      const year = new Date(trade.date).getFullYear();
+    const year = new Date(trade.date).getFullYear();
     // If the trade is moved to a different year, we need to handle it differently
 
     // Same year, use a transaction to update the trade
@@ -853,7 +874,9 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       if (!yearDoc.exists() && !isNewTrade) {
         throw new Error(`Year document for ${year} not found`);
       }
-      let allTrades: Trade[] = await getTrades(calendarId, cachedTrades);
+      let tradeIndex = cachedTrades.findIndex(t => t.id === trade!!.id);
+      // get updated all trade if this is a delete process
+      let allTrades: Trade[] = await getTrades(calendarId,tradeIndex >=0 && updateCallback(cachedTrades[tradeIndex]).isDeleted? [] :   cachedTrades);
       let yearTrades: Trade[] = [];
       let newTrade: Trade;
 
@@ -865,7 +888,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       }
 
       // Find the trade to update or add the new trade
-      let tradeIndex = yearTrades.findIndex(t => t.id === trade!!.id);
+        tradeIndex = yearTrades.findIndex(t => t.id === trade!!.id);
 
       if (tradeIndex === -1) {
         // If this is a new trade, add it to the arrays
@@ -876,7 +899,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
           allTrades.push(newTrade);
           tradeIndex = yearTrades.length - 1;
         } else {
-          throw new Error(`Trade with ID ${trade!!.id} not found in year ${year}`);
+          console.log(`Trade with ID ${trade!!.id} not found in year ${year}`)
         }
       }
 
@@ -902,7 +925,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       if (yearDoc.exists()) {
         // Update existing year document
         transaction.update(yearDocRef, {
-          trades: yearTrades.map(trade => convertTradeToFirestoreData(trade,calendarId)),
+          trades: yearTrades.map(trade => convertTradeToFirestoreData(trade, calendarId)),
           lastModified: Timestamp.fromDate(new Date())
         });
       } else {
@@ -910,7 +933,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
         console.log(`Creating new year document for year ${year}`);
         transaction.set(yearDocRef, {
           year,
-          trades: yearTrades.map(trade => convertTradeToFirestoreData(trade,calendarId)),
+          trades: yearTrades.map(trade => convertTradeToFirestoreData(trade, calendarId)),
           lastModified: Timestamp.fromDate(new Date())
         });
       }
@@ -969,7 +992,7 @@ export const clearMonthTrades = async (calendarId: string, month: number, year: 
     // Calculate stats
     const stats = calculateCalendarStats(allTrades, calendar);
 
-    await updateDoc(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades,calendarId));
+    await updateDoc(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades, calendarId));
 
     // Update the calendar with stats and lastModified timestamp
     await updateCalendarStats(calendarRef, stats);
@@ -1025,7 +1048,7 @@ export const importTrades = async (calendarId: string, trades: Trade[]): Promise
     };
 
     const yearDocRef = doc(db, CALENDARS_COLLECTION, calendarId, YEARS_SUBCOLLECTION, year);
-    await setDoc(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades,calendarId));
+    await setDoc(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades, calendarId));
   }
 
   // Update the calendar with stats and lastModified timestamp

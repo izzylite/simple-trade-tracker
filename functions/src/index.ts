@@ -4,6 +4,11 @@ import * as cors from 'cors';
 
 admin.initializeApp();
 
+// Export the cleanup function
+export { cleanupExpiredCalendars } from './cleanupExpiredCalendars';
+
+ 
+
 // Helper function to handle trade date changes that result in year changes
 async function handleTradeYearChanges(change: functions.Change<functions.firestore.DocumentSnapshot>, context: functions.EventContext) {
   try {

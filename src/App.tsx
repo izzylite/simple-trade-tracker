@@ -24,6 +24,7 @@ import {
 // Lazy load components
 const CalendarHome = lazy(() => import('./components/CalendarHome'));
 const TradeCalendar = lazy(() => import('./components/TradeCalendar'));
+const CalendarTrash = lazy(() => import('./components/trash/CalendarTrash'));
 
 // Loading component for Suspense
 const LoadingFallback = () => <AppLoadingProgress />;
@@ -70,20 +71,18 @@ function AppContent() {
   const theme = useMemo(() => createTheme(createAppTheme(mode)), [mode]);
 
   // Function to load all trades for a calendar
-  const loadAllTrades = async (calendarId: string,fetchCalendar?:boolean) => {
+  const loadAllTrades = async (calendarId: string, fetchCalendar?: boolean) => {
     // Find the calendar to get its name
     const calendar = calendars.find(cal => cal.id === calendarId);
     const calendarName = calendar?.name || '';
 
     // Set loading state
-    setIsLoadingTrades(true);
-    setLoadingCalendarName(calendarName);
-    setLoadingAction('loading');
+    setLoading(true, 'loading', calendarName)
     try {
       const allTrades = await calendarService.getAllTrades(calendarId);
-      if(fetchCalendar){
+      if (fetchCalendar) {
         const calendar = await calendarService.getCalendar(calendarId);
-        if(calendar){
+        if (calendar) {
           const stats = calendarService.calculateCalendarStats(allTrades, calendar);
           updateCalendarState(calendarId, {
             ...calendar,
@@ -126,12 +125,12 @@ function AppContent() {
     } finally {
       // Reset loading state after a short delay to ensure the UI updates smoothly
       setTimeout(() => {
-        setIsLoadingTrades(false);
-        setLoadingCalendarName(undefined);
-        setLoadingAction('loading'); // Reset to default action
+        setLoading(false, 'loading', undefined)
       }, 500);
     }
   };
+
+
 
   const handleCreateCalendar = async (name: string, accountBalance: number, maxDailyDrawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamicRiskEnabled?: boolean, increasedRiskPercentage?: number, profitThresholdPercentage?: number) => {
     if (!user) return;
@@ -163,47 +162,14 @@ function AppContent() {
     if (!user) return;
 
     try {
-      const newCalendarId = await calendarService.duplicateCalendar(user.uid, sourceCalendarId, newName, includeContent);
+      const newCalendar = await calendarService.duplicateCalendar(user.uid, sourceCalendarId, newName, includeContent);
 
       // Get the source calendar to copy its properties
       const sourceCalendar = calendars.find(cal => cal.id === sourceCalendarId);
       if (sourceCalendar) {
         const duplicatedCalendar: Calendar = {
           ...sourceCalendar,
-          id: newCalendarId,
-          name: newName,
-          createdAt: new Date(),
-          lastModified: new Date(),
-          // Mark as duplicated calendar and track source
-          duplicatedCalendar: true,
-          sourceCalendarId: sourceCalendarId,
-          // Copy tags from source calendar
-          tags: sourceCalendar.tags || [],
-          // Copy statistics if including content, otherwise reset
-          winRate: includeContent ? sourceCalendar.winRate : 0,
-          profitFactor: includeContent ? sourceCalendar.profitFactor : 0,
-          maxDrawdown: includeContent ? sourceCalendar.maxDrawdown : 0,
-          targetProgress: includeContent ? sourceCalendar.targetProgress : 0,
-          pnlPerformance: includeContent ? sourceCalendar.pnlPerformance : 0,
-          totalTrades: includeContent ? sourceCalendar.totalTrades : 0,
-          winCount: includeContent ? sourceCalendar.winCount : 0,
-          lossCount: includeContent ? sourceCalendar.lossCount : 0,
-          totalPnL: includeContent ? sourceCalendar.totalPnL : 0,
-          drawdownStartDate: includeContent ? sourceCalendar.drawdownStartDate : null,
-          drawdownEndDate: includeContent ? sourceCalendar.drawdownEndDate : null,
-          drawdownRecoveryNeeded: includeContent ? sourceCalendar.drawdownRecoveryNeeded : 0,
-          drawdownDuration: includeContent ? sourceCalendar.drawdownDuration : 0,
-          avgWin: includeContent ? sourceCalendar.avgWin : 0,
-          avgLoss: includeContent ? sourceCalendar.avgLoss : 0,
-          currentBalance: includeContent ? sourceCalendar.currentBalance : sourceCalendar.accountBalance,
-          weeklyPnL: includeContent ? sourceCalendar.weeklyPnL : 0,
-          monthlyPnL: includeContent ? sourceCalendar.monthlyPnL : 0,
-          yearlyPnL: includeContent ? sourceCalendar.yearlyPnL : 0,
-          weeklyPnLPercentage: includeContent ? sourceCalendar.weeklyPnLPercentage : 0,
-          monthlyPnLPercentage: includeContent ? sourceCalendar.monthlyPnLPercentage : 0,
-          yearlyPnLPercentage: includeContent ? sourceCalendar.yearlyPnLPercentage : 0,
-          weeklyProgress: includeContent ? sourceCalendar.weeklyProgress : 0,
-          monthlyProgress: includeContent ? sourceCalendar.monthlyProgress : 0,
+          ...newCalendar,
           // Reset trades
           cachedTrades: [],
           loadedYears: []
@@ -218,7 +184,8 @@ function AppContent() {
 
   const handleDeleteCalendar = async (id: string) => {
     try {
-      await calendarService.deleteCalendar(id);
+      if (!user) return;
+      await calendarService.deleteCalendar(id, user.uid);
       setCalendars(prev => prev.filter(cal => cal.id !== id));
     } catch (error) {
       console.error('Error deleting calendar:', error);
@@ -235,8 +202,24 @@ function AppContent() {
     }
   };
 
+   const setLoading = (
+      loading: boolean,
+      loadingAction: 'loading' | 'importing' | 'exporting' ="loading",
+      calendarName: string | undefined = undefined
+    ) => {
+      if (!loading) {
+        setIsLoadingTrades(false);
+        setLoadingCalendarName(undefined);
+        setLoadingAction('loading'); // Reset to default action
+      } else {
+        setIsLoadingTrades(true);
+        setLoadingCalendarName(calendarName);
+        setLoadingAction(loadingAction);
+      }
+    }
 
-  const updateCalendarState =  (id: string, updates: Partial<Calendar>) => {
+
+  const updateCalendarState = (id: string, updates: Partial<Calendar>) => {
     setCalendars(prev => prev.map(cal =>
       cal.id === id
         ? { ...cal, ...updates, lastModified: new Date() }
@@ -263,7 +246,7 @@ function AppContent() {
     if (useActualAmounts) {
       console.log('Resetting to actual trade amounts...');
       // Reload all trades for the calendar to get the original values
-      loadAllTrades(calendarId,true);
+      loadAllTrades(calendarId, true);
       return;
     }
 
@@ -338,8 +321,10 @@ function AppContent() {
 
     };
 
+   
+
     // Execute the recalculation and get the results
-     recalculateTrades();
+    recalculateTrades();
   };
 
   return (
@@ -382,17 +367,26 @@ function AppContent() {
                 calendars={calendars}
                 onUpdateStateCalendar={updateCalendarState}
                 onToggleTheme={toggleColorMode}
-                mode={mode}
+                mode={mode} 
                 loadAllTrades={loadAllTrades}
                 setIsImportingTrades={setIsImportingTrades}
                 setLoadingCalendarName={setLoadingCalendarName}
                 setLoadingAction={setLoadingAction}
                 onToggleDynamicRisk={handleToggleDynamicRisk}
                 isLoadingTrades={isLoadingTrades}
+                setLoadingTrades={(loading)=> setLoading(loading)}
               />
             }
           />
-
+          <Route
+            path="/trash"
+            element={
+              <CalendarTrash
+                onToggleTheme={toggleColorMode}
+                mode={mode}
+              />
+            }
+          />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -425,7 +419,8 @@ interface CalendarRouteProps {
   setLoadingCalendarName: React.Dispatch<React.SetStateAction<string | undefined>>;
   setLoadingAction: React.Dispatch<React.SetStateAction<'loading' | 'importing' | 'exporting'>>;
   onToggleDynamicRisk: (calendarId: string, useActualAmounts: boolean) => void;
-  isLoadingTrades: boolean;
+  isLoadingTrades: boolean; 
+  setLoadingTrades: (loading: boolean) => void
 }
 
 
@@ -439,13 +434,14 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
   setLoadingCalendarName,
   setLoadingAction,
   onToggleDynamicRisk,
-  isLoadingTrades
+  isLoadingTrades,
+  setLoadingTrades,
 }) => {
   const { calendarId } = useParams<{ calendarId: string }>();
   const calendar = calendars.find((c: Calendar) => c.id === calendarId);
 
   // Track whether we've attempted to load trades for this calendar
-  const [loadAttempted, setLoadAttempted] = useState<{[key: string]: boolean}>({});
+  const [loadAttempted, setLoadAttempted] = useState<{ [key: string]: boolean }>({});
 
   // Load all trades for the calendar if they haven't been loaded yet
   useEffect(() => {
@@ -518,10 +514,10 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     });
   }
 
-  const handleUpdateTradeProperty = async (tradeId: string, updateCallback: (trade: Trade) => Trade,createIfNotExists?: (tradeId: string) => Trade) : Promise<Trade | undefined> => {
+  const handleUpdateTradeProperty = async (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade): Promise<Trade | undefined> => {
 
     try {
-      const result = await calendarService.updateTrade(calendar.id, tradeId, calendar.cachedTrades,updateCallback,createIfNotExists);
+      const result = await calendarService.updateTrade(calendar.id, tradeId, calendar.cachedTrades, updateCallback, createIfNotExists);
       // Update the cached trades and stats in the calendar
       if (result) {
         const [updatedStats, updatedTrades] = result;
@@ -534,10 +530,11 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       }
     } catch (error) {
       console.error('Error updating trade:', error);
+      throw error;
     }
   };
 
-  const onUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar ) : Promise<void> => {
+  const onUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<void> => {
     try {
       const updatedCalendar = await calendarService.onUpdateCalendar(calendarId, updateCallback);
       // Update the cached trades and stats in the calendar
@@ -621,7 +618,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       if (updatedStats) {
         // Update the calendar with the updated stats
         onUpdateStateCalendar(calendar.id, {
-         ...updatedStats
+          ...updatedStats
         });
       }
     } catch (error) {
@@ -651,6 +648,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       onAddTrade={handleAddTrade}
       calendarDayNotes={calendar.daysNotes}
       calendarNote={calendar.note}
+      // setLoading={(loading) => setLoadingTrades(loading)}
       // Score settings
       scoreSettings={calendar.scoreSettings}
       onUpdateCalendarProperty={onUpdateCalendarProperty}

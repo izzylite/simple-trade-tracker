@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { FC } from 'react';
 import {
@@ -73,6 +73,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { useAuth } from '../contexts/AuthContext';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
+import AppHeader from './common/AppHeader';
 import { NewTradeForm, TradeImage } from './trades/TradeForm';
 import DayNotesDialog from './DayNotesDialog';
 import { Calendar } from '../types/calendar';
@@ -81,6 +82,7 @@ import AccountStats from './AccountStats';
 import DayNoteCard from './DayNoteCard';
 import TradeFormDialog, { createEditTradeData } from './trades/TradeFormDialog';
 import ConfirmationDialog from './common/ConfirmationDialog';
+
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 
 import MonthlyStatisticsSection from './MonthlyStatisticsSection';
@@ -439,10 +441,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
   const [showAddForm, setShowAddForm] = useState<{ open: boolean, date: Date, editTrade?: Trade | null, createTempTrade?: boolean, showDayDialogWhenDone: boolean } | null>(null);
   const [zoomedImages, setZoomedImagesState] = useState<ImageZoomProp | null>(null);
-  const [tradeToDelete, setTradeToDelete] = useState<string | null>(null);
+  const [tradesToDelete, setTradesToDelete] = useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
+  const [deletingTradeIds, setDeletingTradeIds] = useState<string[]>([]);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
 
   // Custom function to handle setting zoomed image and related state
@@ -455,6 +457,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'warning' | 'error'>('warning');
   const [showFloatingMonthNav, setShowFloatingMonthNav] = useState(false);
 
   const theme = useTheme();
@@ -562,34 +565,65 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   };
 
 
+  // Handle single trade deletion
   const handleDeleteClick = (tradeId: string) => {
-
-    setTradeToDelete(tradeId);
+    setTradesToDelete([tradeId]);
     setIsDeleteDialogOpen(true);
+    setDeleteError(null);
+  };
+
+  // Handle multiple trade deletion
+  const handleDeleteMultipleTrades = (tradeIds: string[]) => {
+    setTradesToDelete(tradeIds);
+    setIsDeleteDialogOpen(true);
+    setDeleteError(null);
   };
 
   const handleConfirmDelete = async () => {
-    if (tradeToDelete) {
-      setIsDeleting(true);
-      try {
+    if (tradesToDelete.length === 0) return;
+
+    setIsDeleteDialogOpen(false);
+    setDeleteError(null);
+
+    // Add all trades to deleting list immediately for UI feedback
+    setDeletingTradeIds(prev => [...prev, ...tradesToDelete]);
+
+    try {
+      // Delete trades in parallel for better performance
+      const deletePromises = tradesToDelete.map(async (tradeId) => {
         if (onUpdateTradeProperty) {
-          await onUpdateTradeProperty(tradeToDelete, (trade) => ({ ...trade, isDeleted: true }));
+          return await onUpdateTradeProperty(tradeId, (trade) => ({ ...trade, isDeleted: true }));
         }
-      } catch (error) {
-        console.error('Error deleting trade:', error);
-        setSnackbarMessage('Failed to delete trade. Please try again.');
-        setSnackbarOpen(true);
-      } finally {
-        setIsDeleting(false);
-        setIsDeleteDialogOpen(false);
-        setTradeToDelete(null);
-      }
+        return Promise.resolve();
+      });
+
+      await Promise.all(deletePromises);
+
+      // Show success message
+      const successMessage = tradesToDelete.length === 1
+        ? 'Trade deleted successfully.'
+        : `Successfully deleted ${tradesToDelete.length} trades.`;
+
+      showSnackbar(successMessage, 'success');
+    } catch (error) {
+      console.error('Error deleting trades:', error);
+      const errorMessage = tradesToDelete.length === 1
+        ? 'Failed to delete trade. Please try again.'
+        : `Failed to delete some trades. Please try again.`;
+
+      setDeleteError(errorMessage);
+      showSnackbar(errorMessage, 'error');
+    } finally {
+      // Remove all trades from deleting list
+      setDeletingTradeIds(prev => prev.filter(id => !tradesToDelete.includes(id)));
+      setTradesToDelete([]);
     }
   };
 
   const handleCancelDelete = () => {
     setIsDeleteDialogOpen(false);
-    setTradeToDelete(null);
+    setTradesToDelete([]);
+    setDeleteError(null);
   };
 
 
@@ -597,8 +631,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     // Prevent adding new trades when app is loading all trades
     if (isLoadingTrades) {
       console.log('Cannot add trade while trades are loading');
-      setSnackbarMessage('Cannot add trade while trades are loading. Please wait...');
-      setSnackbarOpen(true);
+      showSnackbar('Cannot add trade while trades are loading. Please wait...', 'warning');
       return;
     }
 
@@ -649,6 +682,21 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setSnackbarOpen(false);
   };
 
+  // Utility function to show snackbar messages
+  const showSnackbar = (message: string, severity: 'success' | 'warning' | 'error' = 'warning') => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+
+  // Retry failed deletion
+  const retryDeletion = async () => {
+    if (deleteError && tradesToDelete.length > 0) {
+      setDeleteError(null);
+      await handleConfirmDelete();
+    }
+  };
+
   return (
     <Box>
       {/* Floating Month Navigation */}
@@ -660,107 +708,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         onMonthClick={handleMonthClick}
       />
 
-      <AppBar
-        position="fixed"
-        color="transparent"
-        elevation={0.7}
-        sx={{
-          backdropFilter: 'blur(8px)',
-          backgroundColor: alpha(mode === 'light' ? '#ffffff' : theme.palette.background.default, 0.9),
-          borderBottom: `1px solid ${theme.palette.divider}`
-        }}
-      >
-        <Toolbar>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1 }}>
-            <IconButton
-              onClick={() => navigate('/')}
-              size="small"
-              sx={{
-                color: 'text.secondary',
-                '&:hover': {
-                  color: 'primary.main',
-                  bgcolor: alpha(theme.palette.primary.main, 0.08)
-                }
-              }}
-            >
-              <ArrowBack />
-            </IconButton>
-            <Typography variant="h5" component="h1">
-              {calendarName || 'Calendar'}
-            </Typography>
-          </Box>
-          {user ? (
-            <Stack direction="row" spacing={2} alignItems="center">
-              <IconButton
-                onClick={onToggleTheme}
-                color="inherit"
-                size="small"
-                sx={{
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  }
-                }}
-              >
-                {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
-              </IconButton>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="body2" color="text.secondary">
-                  {user.email}
-                </Typography>
-                <Avatar
-                  src={user.photoURL || undefined}
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    bgcolor: theme.palette.primary.main,
-                    fontSize: '0.875rem'
-                  }}
-                >
-                  {user.email ? user.email[0].toUpperCase() : 'U'}
-                </Avatar>
-              </Stack>
-              <Button
-                variant="outlined"
-                color="inherit"
-                startIcon={<LogoutIcon />}
-                onClick={signOut}
-                size="small"
-              >
-                Sign Out
-              </Button>
-            </Stack>
-          ) : (
-            <Stack direction="row" spacing={2} alignItems="center">
-              <IconButton
-                onClick={onToggleTheme}
-                color="inherit"
-                size="small"
-                sx={{
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  }
-                }}
-              >
-                {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
-              </IconButton>
-              <Button
-                variant="contained"
-                startIcon={<GoogleIcon />}
-                onClick={signInWithGoogle}
-                sx={{
-                  bgcolor: '#4285F4',
-                  '&:hover': {
-                    bgcolor: '#3367D6'
-                  }
-                }}
-              >
-                Sign in with Google
-              </Button>
-            </Stack>
-          )}
-        </Toolbar>
-      </AppBar>
-      <Toolbar /> {/* This empty Toolbar acts as a spacer */}
+      <AppHeader
+        onToggleTheme={onToggleTheme}
+        mode={mode}
+        title={calendarName || 'Calendar'}
+        showBackButton={true}
+        backButtonPath="/"
+      />
+      <Toolbar />
 
       <Box sx={{
         display: 'flex',
@@ -1148,6 +1103,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               // Use the same delete handler as in DayDialog
               handleDeleteClick(tradeId);
             }}
+            onDeleteMultipleTrades={handleDeleteMultipleTrades}
             onZoomImage={(imageUrl, allImages, initialIndex) => {
               setZoomedImage(imageUrl, allImages, initialIndex);
             }}
@@ -1169,11 +1125,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           trades={selectedDate ? tradesForSelectedDay : []}
           onUpdateTradeProperty={onUpdateTradeProperty}
           onDeleteTrade={handleDeleteClick}
+          onDeleteMultipleTrades={handleDeleteMultipleTrades}
           calendarId={calendarId!!}
           onDateChange={handleDayChange}
           setZoomedImage={setZoomedImage}
           accountBalance={accountBalance}
           allTrades={trades} /* Pass all trades for tag suggestions */
+          deletingTradeIds={deletingTradeIds}
 
         />
 
@@ -1210,7 +1168,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           setZoomedImage={setZoomedImage}
           accountBalance={accountBalance}
           onAccountBalanceChange={onAccountBalanceChange}
-          allTrades={trades} /* Pass all trades for tag suggestions */
+          allTrades={trades}
+          tags={allTags}
           riskPerTrade={dynamicRiskSettings?.riskPerTrade}
           dynamicRiskSettings={dynamicRiskSettings}
           requiredTagGroups={requiredTagGroups}
@@ -1250,18 +1209,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         />
 
 
-        {/* Confirmation Delete Dialog */}
-        <ConfirmationDialog
-          open={isDeleteDialogOpen}
-          title="Delete Trade"
-          message="Are you sure you want to delete this trade? This action cannot be undone."
-          confirmText="Delete"
-          cancelText="Cancel"
-          onConfirm={handleConfirmDelete}
-          onCancel={handleCancelDelete}
-          isSubmitting={isDeleting}
-          confirmColor="error"
-        />
+
 
         {/* Snackbar for notifications */}
         <TagManagementDialog
@@ -1274,17 +1222,49 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onUpdateCalendarProperty={onUpdateCalendarProperty}
         />
 
+        {/* Confirmation Delete Dialog */}
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          title={tradesToDelete.length === 1 ? "Delete Trade" : `Delete ${tradesToDelete.length} Trades`}
+          message={
+            tradesToDelete.length === 1
+              ? "Are you sure you want to delete this trade? This action cannot be undone."
+              : `Are you sure you want to delete ${tradesToDelete.length} trades? This action cannot be undone.`
+          }
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+          confirmColor="error"
+          isSubmitting={deletingTradeIds.some(id => tradesToDelete.includes(id))}
+        />
+
         <Snackbar
           open={snackbarOpen}
-          autoHideDuration={4000}
+          autoHideDuration={snackbarSeverity === 'success' ? 3000 : deleteError ? 6000 : 4000}
           onClose={handleSnackbarClose}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         >
           <Alert
             onClose={handleSnackbarClose}
-            severity="warning"
+            severity={snackbarSeverity}
             variant="filled"
             sx={{ width: '100%' }}
+            action={
+              deleteError && tradesToDelete.length > 0 ? (
+                <Button
+                  color="inherit"
+                  size="small"
+                  onClick={() => {
+                    handleSnackbarClose();
+                    retryDeletion();
+                  }}
+                  sx={{ color: 'inherit' }}
+                >
+                  Retry
+                </Button>
+              ) : undefined
+            }
           >
             {snackbarMessage}
           </Alert>

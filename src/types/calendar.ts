@@ -18,6 +18,11 @@ export interface Calendar {
   // Duplication tracking
   duplicatedCalendar?: boolean;
   sourceCalendarId?: string;
+  // Trash/deletion tracking
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: string;
+  autoDeleteAt?: Date;
   // Tag validation
   requiredTagGroups?: string[];
   // All tags used in this calendar

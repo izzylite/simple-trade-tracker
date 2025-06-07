@@ -40,6 +40,7 @@ interface FormDialogProps {
   riskPerTrade?: number;
   dynamicRiskSettings?: DynamicRiskSettings;
   calendarId: string;
+  tags: string[];
   requiredTagGroups?: string[];
 }
 
@@ -55,17 +56,17 @@ interface FormProps {
 // Helper function to process tags
 const processTagsForSubmission = (tags: string[]): string[] => {
 
-      // Get any pending tag from the input field (if it exists)
-      const tagInput = document.querySelector('.MuiAutocomplete-input') as HTMLInputElement;
-      let pendingTag = '';
-      if (tagInput && tagInput.value.trim()) {
-        pendingTag = tagInput.value.trim();
-      }
+  // Get any pending tag from the input field (if it exists)
+  const tagInput = document.querySelector('.MuiAutocomplete-input') as HTMLInputElement;
+  let pendingTag = '';
+  if (tagInput && tagInput.value.trim()) {
+    pendingTag = tagInput.value.trim();
+  }
 
-      if (pendingTag) {
-        return [...tags, pendingTag]
-      }
-      return tags;
+  if (pendingTag) {
+    return [...tags, pendingTag]
+  }
+  return tags;
 };
 
 // Calculate cumulative PnL up to a given date (using centralized utility)
@@ -73,13 +74,13 @@ export const calculateCumulativePnL = (date: Date, allTrades: Trade[]) => {
   return calculateCumulativePnLToDate(date, allTrades);
 };
 
-export const startOfNextDay = (date : Date | string): Date => {
-    const nextDay = new Date(date);
-    nextDay.setDate(nextDay.getDate() + 1);
-    return nextDay;
-  }
+export const startOfNextDay = (date: Date | string): Date => {
+  const nextDay = new Date(date);
+  nextDay.setDate(nextDay.getDate() + 1);
+  return nextDay;
+}
 
-export const createEditTradeData = (trade: Trade) : NewTradeForm => {
+export const createEditTradeData = (trade: Trade): NewTradeForm => {
   return {
     id: trade.id,
     name: trade.name ? trade.name.replace(/^📈 /, '') : '',
@@ -123,6 +124,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   riskPerTrade,
   dynamicRiskSettings,
   calendarId,
+  tags = [],
   requiredTagGroups = []
 }) => {
 
@@ -190,7 +192,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     if (shouldCreateTempTrade && (!prevShowFormRef.current || !prevShouldCreateTempTrade)) {
       createEmptyTrade();
     }
-    else if(showForm.editTrade){
+    else if (showForm.editTrade) {
       setEditingTrade(showForm.editTrade);
     }
 
@@ -205,20 +207,10 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   }, [newMainTrade]);
 
 
-  // Derived state
+  // Derived state 
   const allTags = useMemo(() => {
-    const tagsSet = new Set<string>();
-    allTrades.forEach(trade => {
-      if (trade.tags) {
-        trade.tags.forEach(tag => {
-          if (!tag.startsWith('Partials:')) {
-            tagsSet.add(tag);
-          }
-        });
-      }
-    });
-    return Array.from(tagsSet);
-  }, [allTrades]);
+    return tags.filter((tag) => !tag.startsWith('Partials:'))
+  }, [tags]);
 
 
 
@@ -304,7 +296,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     if (riskPerTrade && trade.riskToReward && !trade.partialsTaken) {
       const rr = parseFloat(trade.riskToReward);
       if (!isNaN(rr)) {
-        const calculatedAmount = calculateAmountFromRiskToReward(rr, calculateCumulativePnL(trade.date || date,allTrades));
+        const calculatedAmount = calculateAmountFromRiskToReward(rr, calculateCumulativePnL(trade.date || date, allTrades));
         // Apply sign based on trade type
         return trade.type === 'loss' ? -Math.abs(calculatedAmount) : Math.abs(calculatedAmount);
       }
@@ -487,7 +479,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           return {
             url: img.preview,
             pending: true,
-            calendarId : calendarId,
+            calendarId: calendarId,
             id: img.id,
             width: img.width,
             height: img.height,
@@ -504,7 +496,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         };
       },
         (tradeid: string) => {
-          setIsCreatingEmptyTrade(true);
+          // setIsCreatingEmptyTrade(true);
           // Create a temporary trade object if it doesnt exist
           return {
             ...createFinalTradeData(newTrade!, date), id: tradeid, name: newTrade!.name || 'New Trade', isTemporary: true
@@ -518,8 +510,11 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             isTemporary: true
           };
         })
-        setIsCreatingEmptyTrade(false);
       }
+      // if (isCreatingEmptyTrade){
+      //    setIsCreatingEmptyTrade(false);
+      // }
+       
 
 
       for (const image of newPendingImages) {
@@ -766,8 +761,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     }
 
     // Update the cached trades list
-    if(onTagUpdated){
-      onTagUpdated(oldTag,newTag);
+    if (onTagUpdated) {
+      onTagUpdated(oldTag, newTag);
 
     }
 
@@ -854,7 +849,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
     } catch (error) {
       showErrorSnackbar(error instanceof Error ? error.message : 'Failed to add trade. Please try again.');
-      if(newTrade!.isTemporary){
+      if (newTrade!.isTemporary) {
         console.error('Error updating temporary trade:', error);
         throw new Error(`Failed to update temporary trade: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -1023,9 +1018,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         hideCloseButton={isCreatingEmptyTrade} // Disable close button when creating empty trade
         primaryButtonText={(editingTrade ? 'Update Trade' : 'Add Trade')}
         primaryButtonAction={(editingTrade ?
-            (e?: React.FormEvent) => handleEditSubmit(e) :
-            (e?: React.FormEvent) => handleSubmit(e)
-          )}
+          (e?: React.FormEvent) => handleEditSubmit(e) :
+          (e?: React.FormEvent) => handleSubmit(e)
+        )}
         isSubmitting={isSubmitting || isCreatingEmptyTrade} // Show loading state when creating empty trade
         cancelButtonAction={() => {
           // Only allow canceling if we're not in the process of creating an empty trade
@@ -1040,47 +1035,47 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
           <DayHeader
             title={format(date, 'EEEE, MMMM d, yyyy')}
-            accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(date),allTrades)}
+            accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(date), allTrades)}
             formInputVisible={true}
             totalPnL={trades.reduce((sum, trade) => sum + trade.amount, 0)}
-            onPrevDay={()=> {}}
-            onNextDay={()=> {}}
+            onPrevDay={() => { }}
+            onNextDay={() => { }}
           />
 
-<Box>
-              <TradeForm
-                accountBalance={accountBalance}
-                calculateCumulativePnl={(newTrade) => calculateCumulativePnL(newTrade?.date || new Date(),allTrades)}
-                dynamicRiskSettings={dynamicRiskSettings}
-                calendarId={calendarId}
-                requiredTagGroups={requiredTagGroups}
-                onTagUpdated={handleTagUpdated}
-                newTrade={newTrade!}
-                editingTrade={editingTrade}
-                allTags={allTags}
-                isSubmitting={isSubmitting}
-                riskPerTrade={riskPerTrade}
-                calculateAmountFromRiskToReward={calculateAmountFromRiskToReward}
-                onNameChange={handleNameChange}
-                onAmountChange={handleAmountChange}
-                onTypeChange={handleTypeChange}
-                onEntryChange={handleEntryChange}
-                onExitChange={handleExitChange}
-                onRiskToRewardChange={handleRiskToRewardChange}
-                onPartialsTakenChange={handlePartialsTakenChange}
-                onSessionChange={handleSessionChange}
-                onNotesChange={handleNotesChange}
-                onTagsChange={handleTagsChange}
-                onDateChange={handleDateChange}
-                onImageUpload={handleImageUpload}
-                onImageCaptionChange={handleImageCaptionChange}
-                onImageRemove={handleImageRemove}
-                onImagesReordered={handleImagesReordered}
-                onSubmit={editingTrade ? handleEditSubmit : handleSubmit}
-              />
+          <Box>
+            <TradeForm
+              accountBalance={accountBalance}
+              calculateCumulativePnl={(newTrade) => calculateCumulativePnL(newTrade?.date || new Date(), allTrades)}
+              dynamicRiskSettings={dynamicRiskSettings}
+              calendarId={calendarId}
+              requiredTagGroups={requiredTagGroups}
+              onTagUpdated={handleTagUpdated}
+              newTrade={newTrade!}
+              editingTrade={editingTrade}
+              allTags={allTags}
+              isSubmitting={isSubmitting}
+              riskPerTrade={riskPerTrade}
+              calculateAmountFromRiskToReward={calculateAmountFromRiskToReward}
+              onNameChange={handleNameChange}
+              onAmountChange={handleAmountChange}
+              onTypeChange={handleTypeChange}
+              onEntryChange={handleEntryChange}
+              onExitChange={handleExitChange}
+              onRiskToRewardChange={handleRiskToRewardChange}
+              onPartialsTakenChange={handlePartialsTakenChange}
+              onSessionChange={handleSessionChange}
+              onNotesChange={handleNotesChange}
+              onTagsChange={handleTagsChange}
+              onDateChange={handleDateChange}
+              onImageUpload={handleImageUpload}
+              onImageCaptionChange={handleImageCaptionChange}
+              onImageRemove={handleImageRemove}
+              onImagesReordered={handleImagesReordered}
+              onSubmit={editingTrade ? handleEditSubmit : handleSubmit}
+            />
 
 
-            </Box>
+          </Box>
         </Box>
       </BaseDialog>
 
