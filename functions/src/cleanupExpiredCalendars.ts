@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 
 const db = admin.firestore();
 const CALENDARS_COLLECTION = 'calendars';
@@ -8,10 +9,7 @@ const CALENDARS_COLLECTION = 'calendars';
  * Cloud function that runs daily to clean up expired calendars from trash
  * Calendars that have been in trash for more than 30 days are permanently deleted
  */
-export const cleanupExpiredCalendars = functions.pubsub
-  .schedule('every day 02:00')
-  .timeZone('UTC')
-  .onRun(async (context) => {
+export const cleanupExpiredCalendarsV2 = onSchedule('0 2 * * *', async (event) => {
     try {
       functions.logger.info('Starting cleanup of expired calendars');
 
@@ -52,13 +50,6 @@ export const cleanupExpiredCalendars = functions.pubsub
       if (errors.length > 0) {
         functions.logger.warn(`Cleanup completed with ${errors.length} errors:`, errors);
       }
-
-      return {
-        success: true,
-        deletedCount,
-        errors: errors.length,
-        message: `Cleanup completed: ${deletedCount} calendars deleted, ${errors.length} errors`
-      };
 
     } catch (error) {
       functions.logger.error('Error during calendar cleanup:', error);

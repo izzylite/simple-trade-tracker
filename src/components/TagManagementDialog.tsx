@@ -70,6 +70,13 @@ const TagManagementDialog: React.FC<TagManagementDialogProps> = ({
     return getUniqueTagGroups(allTags);
   }, [allTags]);
 
+  // Reset selected tag group if it no longer exists in the available tag groups
+  useEffect(() => {
+    if (selectedTagGroup && !tagGroups.includes(selectedTagGroup)) {
+      setSelectedTagGroup('');
+    }
+  }, [tagGroups, selectedTagGroup]);
+
   // Filter tags based on search term and selected group
   const filteredTags = useMemo(() => {
     let filtered = allTags;
@@ -115,7 +122,35 @@ const TagManagementDialog: React.FC<TagManagementDialogProps> = ({
     return groups;
   }, [filteredTags]);
 
-  const handleTagEditSuccess = (oldTag: string, newTag: string) => {
+  const handleTagEditSuccess = (oldTag: string, newTag: string, tradesUpdated: number) => {
+    console.log(`Tag update completed: ${oldTag} -> ${newTag}, ${tradesUpdated} trades updated`);
+
+    // Check if this was a tag group name change
+    const oldGroup = isGroupedTag(oldTag) ? getTagGroup(oldTag) : null;
+    const newGroup = isGroupedTag(newTag) ? getTagGroup(newTag) : null;
+
+    // If the selected tag group was the old group name, update it to the new group name
+    if (oldGroup && newGroup && oldGroup !== newGroup && selectedTagGroup === oldGroup) {
+      setSelectedTagGroup(newGroup);
+    }
+
+    // Update local required groups if a group name changed
+    if (oldGroup && newGroup && oldGroup !== newGroup) {
+      const updatedRequiredGroups = localRequiredGroups.map(group =>
+        group === oldGroup ? newGroup : group
+      );
+      setLocalRequiredGroups(updatedRequiredGroups);
+    }
+
+    // If the tag was deleted (newTag is empty) and we were filtering by its group,
+    // check if the group still has other tags, if not, reset the filter
+    if (!newTag.trim() && oldGroup && selectedTagGroup === oldGroup) {
+      // We'll let the memoized tagGroups handle this - if the group no longer exists,
+      // the filter will show no results, which is correct behavior
+      // Alternatively, we could reset to show all groups:
+      // setSelectedTagGroup('');
+    }
+
     if (onTagUpdated) {
       onTagUpdated(oldTag, newTag);
     }

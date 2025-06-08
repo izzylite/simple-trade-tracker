@@ -39,6 +39,13 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
       return;
     }
 
+    // Validate that the tag doesn't contain multiple colons
+    const colonCount = (newTag.match(/:/g) || []).length;
+    if (colonCount > 1) {
+      setError('Tags can only contain one colon (:) for category formatting');
+      return;
+    }
+
     if (newTag === tag) {
       onClose();
       return;
@@ -155,6 +162,10 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
              value={tagGroup}
               onChange={(e) => {
                 const newGroupName = e.target.value;
+                // Prevent multiple colons in group name
+                if ((newGroupName.match(/:/g) || []).length > 0) {
+                  return;
+                }
                 setTagGroup(newGroupName);
                 setNewTag(`${newGroupName}:${tagName}`);
               }}
@@ -178,6 +189,10 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
               value={tagName}
               onChange={(e) => {
                 const newTagName = e.target.value;
+                // Prevent multiple colons in tag name
+                if ((newTagName.match(/:/g) || []).length > 0) {
+                  return;
+                }
                 setTagName(newTagName);
                 setNewTag(`${tagGroup}:${newTagName}`);
               }}
@@ -202,6 +217,10 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
             value={newTag}
             onChange={(e) => {
               const value = e.target.value;
+              // Prevent multiple colons in tag
+              if ((value.match(/:/g) || []).length > 1) {
+                return;
+              }
               setNewTag(value);
               setTagName(value);
             }}

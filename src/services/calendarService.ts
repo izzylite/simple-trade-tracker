@@ -13,6 +13,7 @@ import {
   writeBatch,
   runTransaction
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { isSameWeek, isSameMonth } from 'date-fns';
 import { auth, db } from '../firebase/config';
 import { Calendar } from '../types/calendar';
@@ -682,7 +683,7 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
     }
 
     return {
-      id:newCalendarId,
+      id: newCalendarId,
       ...duplicatedCalendar
     };
   } catch (error) {
@@ -795,6 +796,18 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
 
       // Return the updated stats
       return stats;
+    }).then(async (stats) => {
+      await onUpdateCalendar(calendarId, (calendar) => {
+        const calendarTags = calendar.tags || []
+        trade.tags?.forEach((tag) => {
+          if (!calendarTags.includes(tag)) {
+            calendarTags.push(tag)
+          }
+        })
+        calendar.tags = calendarTags;
+        return calendar;
+      });
+      return stats;
     });
   } catch (error) {
     console.error('Error adding trade:', error);
@@ -848,7 +861,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
     }
     // If still not found, try to fetch it from Firestore
     else if (trade === undefined) {
-      const fetchedTrade = await getTrade(calendarId,tradeId);
+      const fetchedTrade = await getTrade(calendarId, tradeId);
       if (fetchedTrade === null || fetchedTrade === undefined) {
         throw new Error(`Attempting to fetch trade with ID ${tradeId} from Firestore`);
       }
@@ -880,7 +893,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       }
       let tradeIndex = cachedTrades.findIndex(t => t.id === trade!!.id);
       // get updated all trade if this is a delete process
-      let allTrades: Trade[] = await getTrades(calendarId,tradeIndex >=0 && updateCallback(cachedTrades[tradeIndex]).isDeleted? [] :   cachedTrades);
+      let allTrades: Trade[] = await getTrades(calendarId, tradeIndex >= 0 && updateCallback(cachedTrades[tradeIndex]).isDeleted ? [] : cachedTrades);
       let yearTrades: Trade[] = [];
       let newTrade: Trade;
 
@@ -892,7 +905,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       }
 
       // Find the trade to update or add the new trade
-        tradeIndex = yearTrades.findIndex(t => t.id === trade!!.id);
+      tradeIndex = yearTrades.findIndex(t => t.id === trade!!.id);
 
       if (tradeIndex === -1) {
         // If this is a new trade, add it to the arrays
@@ -1151,35 +1164,26 @@ export const uploadImage = async (
 // Update a tag across all trades in a calendar
 export const updateTag = async (calendarId: string, oldTag: string, newTag: string): Promise<{ success: boolean; tradesUpdated: number }> => {
   try {
-    // Get the current user's ID token for authentication
+    // Ensure user is authenticated
     const user = auth.currentUser;
     if (!user) {
       throw new Error('User not authenticated');
     }
 
-    const idToken = await user.getIdToken();
+    // Get Firebase Functions instance
+    const functions = getFunctions();
 
-    // Call the cloud function using fetch instead of httpsCallable
-    const response = await fetch('https://us-central1-tradetracker-30ec1.cloudfunctions.net/updateTag', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${idToken}`
-      },
-      body: JSON.stringify({ calendarId, oldTag, newTag })
-    });
+    // Get the cloud function
+    const updateTagFunction = httpsCallable(functions, 'updateTagV2');
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to update tag');
-    }
+    // Call the cloud function
+    const result = await updateTagFunction({ calendarId, oldTag, newTag });
 
-    // Parse and return the result
-    const result = await response.json();
-    return result as { success: boolean; tradesUpdated: number };
+    return result.data as { success: boolean; tradesUpdated: number };
   } catch (error) {
     console.error('Error updating tag:', error);
     throw error;
   }
 };
+
 

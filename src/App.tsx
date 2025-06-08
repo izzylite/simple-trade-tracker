@@ -452,7 +452,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     }
   }, [calendar, loadAllTrades, loadAttempted]);
 
-  // Subscribe to calendar changes to automatically update tags and other fields
+ // Subscribe to calendar changes to automatically update tags and other fields
   useEffect(() => {
     if (!calendar) return;
 
@@ -463,12 +463,16 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
 
         // Only update specific fields that might change from cloud functions
         // Preserve cached trades and loaded years from local state
-        onUpdateStateCalendar(calendar.id, {
-          tags: updatedCalendarData.tags || [],
-          lastModified: updatedCalendarData.lastModified?.toDate() || new Date(),
-          // Update any other fields that cloud functions might modify
+          onUpdateStateCalendar(calendar.id, {
+            tags: updatedCalendarData.tags || [],
+            lastModified: updatedCalendarData.lastModified?.toDate() || new Date(),
+            requiredTagGroups: updatedCalendarData.requiredTagGroups || calendar.requiredTagGroups,
+            scoreSettings: updatedCalendarData.scoreSettings || calendar.scoreSettings,
+             // Update any other fields that cloud functions might modify
           // but preserve local state for trades and UI-specific data
-        });
+          });
+
+        
       }
     }, (error) => {
       console.error('Error listening to calendar changes:', error);
@@ -476,7 +480,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
 
     // Cleanup subscription on unmount or calendar change
     return () => unsubscribe();
-  }, [calendar?.id, onUpdateStateCalendar]);
+  }, [calendar?.id]);
 
   if (!calendar) {
     return <Navigate to="/" replace />;
@@ -501,23 +505,108 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
 
 
   const onTagUpdated = async (oldTag: string, newTag: string) => {
-    // Update cached trades locally for immediate UI feedback
-    calendar.cachedTrades.forEach((trade: Trade) => {
-      if (trade.tags && trade.tags.includes(oldTag)) {
-        trade.tags = trade.tags.map(tag => tag === oldTag ? newTag : tag);
+    // Helper function to update tags in an array, handling group name changes
+    const updateTagsWithGroupNameChange = (tags: string[]) => {
+      // Check if this is a group name change
+      const oldGroup = oldTag.includes(':') ? oldTag.split(':')[0] : null;
+      const newGroup = newTag && newTag.includes(':') ? newTag.split(':')[0] : null;
+      const isGroupNameChange = oldGroup && newGroup && oldGroup !== newGroup;
+
+      if (isGroupNameChange) {
+        // Group name changed - update all tags in the old group
+        return tags.map((tag: string) => {
+          if (tag === oldTag) {
+            // Direct match - replace with new tag
+            return newTag;
+          } else if (tag.includes(':') && tag.split(':')[0] === oldGroup) {
+            // Same group - update group name but keep tag name
+            const tagName = tag.split(':')[1];
+            return `${newGroup}:${tagName}`;
+          } else {
+            // Different group or ungrouped - keep as is
+            return tag;
+          }
+        }).filter(tag => tag !== ''); // Remove empty tags
+      } else {
+        // Not a group name change - just replace the specific tag
+        return tags.map(tag => tag === oldTag ? newTag : tag).filter((tag: string) => tag !== '');
       }
-    });
-    const tags = [...calendar.tags || []];
-      (calendar.tags || []).forEach((tag: string, index : number) => {
-      if (tag == oldTag) {
-        tags[index] = newTag; 
+    };
+
+    // Helper function to update required tag groups
+    const updateRequiredTagGroups = (requiredGroups: string[]) => {
+      const oldGroup = oldTag.includes(':') ? oldTag.split(':')[0] : null;
+      const newGroup = newTag && newTag.includes(':') ? newTag.split(':')[0] : null;
+      console.log(`Updated required tag groups ${requiredGroups}`);
+      if (oldGroup && newGroup && oldGroup !== newGroup) {
+        // Group name changed, update it in requiredTagGroups
+        return requiredGroups.map(group => group === oldGroup ? newGroup : group);
+      } else {
+        // No group change needed
+        return requiredGroups;
       }
+    };
+
+    // Helper function to update tags in a trade, handling group name changes
+    const updateTradeTagsWithGroupNameChange = (trade: Trade) => {
+      if (!trade.tags || !Array.isArray(trade.tags)) {
+        return trade;
+      }
+
+      // Check if this is a group name change
+      const oldGroup = oldTag.includes(':') ? oldTag.split(':')[0] : null;
+      const newGroup = newTag && newTag.includes(':') ? newTag.split(':')[0] : null;
+      const isGroupNameChange = oldGroup && newGroup && oldGroup !== newGroup;
+
+      let updated = false;
+      const updatedTags = [...trade.tags];
+
+      if (isGroupNameChange) {
+        // Group name change - update all tags in the old group
+        for (let j = 0; j < updatedTags.length; j++) {
+          const tag = updatedTags[j];
+          if (tag === oldTag) {
+            // Direct match - replace with new tag
+            if (newTag.trim() === '') {
+              updatedTags.splice(j, 1);
+              j--; // Adjust index after removal
+            } else {
+              updatedTags[j] = newTag.trim();
+            }
+            updated = true;
+          } else if (tag.includes(':') && tag.split(':')[0] === oldGroup) {
+            // Same group - update group name but keep tag name
+            const tagName = tag.split(':')[1];
+            updatedTags[j] = `${newGroup}:${tagName}`;
+            updated = true;
+          }
+        }
+      } else {
+        // Not a group name change - just replace the specific tag
+        if (trade.tags.includes(oldTag)) {
+          const tagIndex = updatedTags.indexOf(oldTag);
+          if (newTag.trim() === '') {
+            updatedTags.splice(tagIndex, 1);
+          } else {
+            updatedTags[tagIndex] = newTag.trim();
+          }
+          updated = true;
+        }
+      }
+
+      return updated ? { ...trade, tags: updatedTags } : trade;
+    };
+
+    // Update cached trades locally for immediate UI feedback (create new array to avoid mutation)
+    const updatedCachedTrades = calendar.cachedTrades.map((trade: Trade) => {
+      return updateTradeTagsWithGroupNameChange(trade);
     });
 
     // Update local state immediately
     onUpdateStateCalendar(calendar.id, {
-      tags: tags,
-      cachedTrades: [...calendar.cachedTrades]
+      tags: updateTagsWithGroupNameChange(calendar.tags || []),
+      requiredTagGroups: updateRequiredTagGroups(calendar.requiredTagGroups || []),
+      cachedTrades: updatedCachedTrades
     });
   }
 

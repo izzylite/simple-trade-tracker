@@ -1,62 +1,55 @@
 import * as admin from 'firebase-admin';
-import * as functions from 'firebase-functions';
-import * as cors from 'cors';
-import { handleTradeYearChanges, canDeleteImage, cleanupRemovedImagesHelper, updateCalendarTags, haveTagsChanged } from './utils';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onDocumentUpdated, onDocumentDeleted } from 'firebase-functions/v2/firestore';
+import { handleTradeYearChanges, canDeleteImage, cleanupRemovedImagesHelper, haveTagsChanged, updateTagsWithGroupNameChange, updateTradeTagsWithGroupNameChange, updateCalendarTagsFromTradeChanges } from './utils';
 
 admin.initializeApp();
 
 // Export the cleanup function
-export { cleanupExpiredCalendars } from './cleanupExpiredCalendars';
+export { cleanupExpiredCalendarsV2 } from './cleanupExpiredCalendars';
 
  
 
 // Cloud function to handle year document updates - cleans up removed images and handles trade date changes
-export const onTradeChanged = functions.firestore
-  .document('calendars/{calendarId}/years/{yearId}')
-  .onUpdate(async (change, context) => {
-    try {
-      // First, handle any removed images
-      await cleanupRemovedImagesHelper(change);
+export const onTradeChangedV2 = onDocumentUpdated('calendars/{calendarId}/years/{yearId}', async (event) => {
+  try {
+    // First, handle any removed images
+    await cleanupRemovedImagesHelper(event);
 
-      // Then, handle any trade date changes
-      await handleTradeYearChanges(change, context);
+    // Then, handle any trade date changes
+    await handleTradeYearChanges(event);
 
-      // Check if tags have changed before updating calendar tags
-      const beforeData = change.before.data();
-      const afterData = change.after.data();
+    // Check if tags have changed before updating calendar tags
+    const beforeData = event.data?.before.data();
+    const afterData = event.data?.after.data();
 
-      if (haveTagsChanged(beforeData, afterData)) {
-        console.log(`Tags changed in calendar ${context.params.calendarId}, updating calendar tags`);
-        await updateCalendarTags(context.params.calendarId);
-      } else {
-        console.log(`No tag changes detected in calendar ${context.params.calendarId}, skipping calendar tags update`);
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Error in onTradeChanged function:', error);
-      return null;
+    if (haveTagsChanged(beforeData, afterData)) {
+      console.log(`Tags changed in calendar ${event.params.calendarId}, updating calendar tags`);
+      await updateCalendarTagsFromTradeChanges(event.params.calendarId, beforeData, afterData, event.params.yearId);
+    } else {
+      console.log(`No tag changes detected in calendar ${event.params.calendarId}, skipping calendar tags update`);
     }
-  });
+  } catch (error) {
+    console.error('Error in onTradeChanged function:', error);
+  }
+});
 
 
 // Cloud function to delete all trades and images when a calendar is deleted
-export const cleanupDeletedCalendar = functions.firestore
-  .document('calendars/{calendarId}')
-  .onDelete(async (snapshot) => {
-    try {
-      const calendarData = snapshot.data();
-      if (!calendarData) {
-        console.log('No data in deleted calendar document');
-        return null;
-      }
+export const cleanupDeletedCalendarV2 = onDocumentDeleted('calendars/{calendarId}', async (event) => {
+  try {
+    const calendarData = event.data?.data();
+    if (!calendarData) {
+      console.log('No data in deleted calendar document');
+      return;
+    }
 
-      const calendarId = snapshot.id;
-      const userId = calendarData.userId;
+    const calendarId = event.params.calendarId;
+    const userId = calendarData.userId;
 
       if (!userId) {
         console.error('Calendar document does not have a userId field');
-        return null;
+        return;
       }
 
       console.log(`Processing deletion of calendar ${calendarId} for user ${userId}`);
@@ -124,84 +117,62 @@ export const cleanupDeletedCalendar = functions.firestore
       await Promise.all(yearDeletePromises);
 
       console.log(`Successfully cleaned up calendar ${calendarId}`);
-      return null;
     } catch (error) {
       console.error('Error in cleanupDeletedCalendar function:', error);
-      return null;
     }
   });
 
-// Configure CORS middleware
-const corsHandler = cors({ origin: true });
+// Cloud function to update a tag across all trades in a calendar (v2)
+export const updateTagV2 = onCall(async (request) => {
+  try {
+    console.log('updateTag called with data:', JSON.stringify(request.data));
+    console.log('updateTag called with auth:', request.auth ? 'authenticated' : 'not authenticated');
 
-// Cloud function to update a tag across all trades in a calendar
-export const updateTag = functions.https.onRequest((req, res) => {
-  corsHandler(req, res, async () => {
-    try {
-      // Only allow POST requests
-      if (req.method !== 'POST') {
-        res.status(405).send('Method Not Allowed');
-        return;
-      }
+    // Ensure user is authenticated
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'User must be authenticated');
+    }
 
-      // Get data from request body
-      const data = req.body;
+    const uid = request.auth.uid;
 
-      // Get authorization token from header
-      const authHeader = req.headers.authorization;
-      const idToken = authHeader && authHeader.startsWith('Bearer ')
-        ? authHeader.split('Bearer ')[1]
-        : null;
+    // Validate input data
+    const { calendarId, oldTag, newTag } = request.data;
+    console.log('Extracted parameters:', { calendarId, oldTag, newTag });
 
-      // Validate input data
-      const { calendarId, oldTag, newTag } = data;
+    if (!calendarId || !oldTag || newTag === undefined || newTag === null) {
+      console.log('Validation failed:', { calendarId: !!calendarId, oldTag: !!oldTag, newTag: newTag !== undefined && newTag !== null });
+      throw new HttpsError('invalid-argument', 'Missing required parameters: calendarId, oldTag, or newTag');
+    }
 
-      if (!calendarId || !oldTag || newTag === undefined || newTag === null) {
-        res.status(400).json({ error: 'Missing required parameters: calendarId, oldTag, or newTag' });
-        return;
-      }
+    // If oldTag and newTag are the same, no update needed
+    if (oldTag === newTag) {
+      console.log('oldTag and newTag are identical, no update needed');
+      return { success: true, tradesUpdated: 0 };
+    }
 
-      // Ensure user is authenticated
-      if (!idToken) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
-      }
+    // Get the calendar document to verify ownership
+    const calendarRef = admin.firestore().collection('calendars').doc(calendarId);
+    const calendarDoc = await calendarRef.get();
 
-      // Verify the ID token
-      let decodedToken;
-      try {
-        decodedToken = await admin.auth().verifyIdToken(idToken);
-      } catch (error) {
-        res.status(401).json({ error: 'Invalid authentication token' });
-        return;
-      }
+    if (!calendarDoc.exists) {
+      throw new HttpsError('not-found', 'Calendar not found');
+    }
 
-      const uid = decodedToken.uid;
-
-      // Get the calendar document to verify ownership
-      const calendarRef = admin.firestore().collection('calendars').doc(calendarId);
-      const calendarDoc = await calendarRef.get();
-
-      if (!calendarDoc.exists) {
-        res.status(404).json({ error: 'Calendar not found' });
-        return;
-      }
-
-      const calendarData = calendarDoc.data();
-      if (!calendarData || calendarData.userId !== uid) {
-        res.status(403).json({ error: 'Unauthorized access to calendar' });
-        return;
-      }
+    const calendarData = calendarDoc.data();
+    if (!calendarData || calendarData.userId !== uid) {
+      throw new HttpsError('permission-denied', 'Unauthorized access to calendar');
+    }
 
         const updateData: any = {
         lastModified: admin.firestore.FieldValue.serverTimestamp()
       };
-
+      console.log(`Updating tag ${oldTag} to ${newTag} in calendar ${calendarId} requiredTagGroups ${calendarData.requiredTagGroups}`);
       if (calendarData.requiredTagGroups) {
         // Update required tag groups when a group name changes
         // If oldTag is "Strategy:Long" and newTag is "NewStrategy:Long", update "Strategy" to "NewStrategy"
         // If oldTag is "Strategy:Long" and newTag is "Strategy:Short", no change needed
         // If newTag is empty (tag deletion), remove the group if no other tags use it
+        console.log(`Updating tag ${oldTag} to ${newTag} in calendar ${calendarId} second`);
         const oldGroup = oldTag.includes(':') ? oldTag.split(':')[0] : null;
         const newGroup = newTag && newTag.includes(':') ? newTag.split(':')[0] : null;
 
@@ -220,13 +191,13 @@ export const updateTag = functions.https.onRequest((req, res) => {
         }
       }
       if (calendarData.tags) {
-        updateData.tags = calendarData.tags.map((tag: string) => tag === oldTag ? newTag : tag);
+        updateData.tags = updateTagsWithGroupNameChange(calendarData.tags, oldTag, newTag);
       }
       if (calendarData.scoreSettings?.excludedTagsFromPatterns) {
-        updateData['scoreSettings.excludedTagsFromPatterns'] = calendarData.scoreSettings.excludedTagsFromPatterns.map((tag: string) => tag === oldTag ? newTag : tag).filter((tag : string)=> tag !== '');
+        updateData['scoreSettings.excludedTagsFromPatterns'] = updateTagsWithGroupNameChange(calendarData.scoreSettings.excludedTagsFromPatterns, oldTag, newTag);
       }
       if (calendarData.scoreSettings?.selectedTags) {
-        updateData['scoreSettings.selectedTags'] = calendarData.scoreSettings.selectedTags.map((tag: string) => tag === oldTag ? newTag : tag).filter((tag : string)=> tag !== '');
+        updateData['scoreSettings.selectedTags'] = updateTagsWithGroupNameChange(calendarData.scoreSettings.selectedTags, oldTag, newTag);
       }
 
       await calendarDoc.ref.update(updateData);
@@ -238,10 +209,9 @@ export const updateTag = functions.https.onRequest((req, res) => {
       const yearsRef = admin.firestore().collection(`calendars/${calendarId}/years`);
       const yearsSnapshot = await yearsRef.get();
 
-      if (yearsSnapshot.empty) {
-        res.status(200).json({ success: true, tradesUpdated: 0 });
-        return;
-      }
+    if (yearsSnapshot.empty) {
+      return { success: true, tradesUpdated: 0 };
+    }
       console.log(`updating old tag : ${oldTag} to new tag: ${newTag}`)
       let totalTradesUpdated = 0;
       let batch = admin.firestore().batch();
@@ -255,19 +225,14 @@ export const updateTag = functions.https.onRequest((req, res) => {
         const trades = yearData.trades || [];
         let yearUpdated = false;
 
-        // Check each trade for the tag
+        // Check each trade for tags that need updating
         for (let i = 0; i < trades.length; i++) {
           const trade = trades[i];
-          if (trade.tags && Array.isArray(trade.tags) && trade.tags.includes(oldTag)) {
-            // Replace the old tag with the new tag
-            const tagIndex = trade.tags.indexOf(oldTag);
-            if (newTag.trim() === '') {
-              trade.tags.splice(tagIndex, 1);
-            } else {
-              trade.tags[tagIndex] = newTag.trim();
-            }
+          const result = updateTradeTagsWithGroupNameChange(trade, oldTag, newTag);
+
+          if (result.updated) {
             yearUpdated = true;
-            totalTradesUpdated++;
+            totalTradesUpdated += result.updatedCount;
           }
         }
 
@@ -296,21 +261,20 @@ export const updateTag = functions.https.onRequest((req, res) => {
       // Wait for all batch operations to complete
       await Promise.all(batchPromises);
 
-       
-
-      res.status(200).json({
-        success: true,
-        tradesUpdated: totalTradesUpdated
-      });
-    } catch (error) {
-      console.error('Error in updateTag function:', error);
-      if (error instanceof Error) {
-        res.status(500).json({ error: error.message });
-      } else {
-        res.status(500).json({ error: 'An unknown error occurred' });
-      }
+    return {
+      success: true,
+      tradesUpdated: totalTradesUpdated
+    };
+  } catch (error) {
+    console.error('Error in updateTag function:', error);
+    if (error instanceof HttpsError) {
+      throw error;
+    } else if (error instanceof Error) {
+      throw new HttpsError('internal', error.message);
+    } else {
+      throw new HttpsError('internal', 'An unknown error occurred');
     }
-  });
+  }
 });
 
 

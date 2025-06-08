@@ -1,14 +1,13 @@
 
 import * as admin from 'firebase-admin';
-import * as functions from 'firebase-functions'; 
 
 // Helper function to handle trade date changes that result in year changes
-export async function handleTradeYearChanges(change: functions.Change<functions.firestore.DocumentSnapshot>, context: functions.EventContext) {
+export async function handleTradeYearChanges(event: any) {
   try {
-    const beforeData = change.before.data();
-    const afterData = change.after.data();
-    const calendarId = context.params.calendarId;
-    const yearId = context.params.yearId;
+    const beforeData = event.data?.before.data();
+    const afterData = event.data?.after.data();
+    const calendarId = event.params.calendarId;
+    const yearId = event.params.yearId;
 
     if (!beforeData || !afterData) {
       console.log('No data in document');
@@ -88,8 +87,8 @@ export async function handleTradeYearChanges(change: functions.Change<functions.
       // Start a transaction to ensure data consistency
       await admin.firestore().runTransaction(async (transaction) => {
         // Get the current year document to remove the trade
-        const currentYearRef = change.after.ref;
-        const currentYearDoc = await transaction.get(currentYearRef);
+        const currentYearRef = event.data?.after.ref;
+        const currentYearDoc = await transaction.get(currentYearRef) as any;
 
         if (!currentYearDoc.exists) {
           console.error(`Current year document ${yearId} not found in transaction`);
@@ -250,10 +249,10 @@ export async function canDeleteImage(imageId: string, currentCalendarId: string,
 }
 
 // Helper function to clean up removed images
-export async function cleanupRemovedImagesHelper(change: functions.Change<functions.firestore.DocumentSnapshot>) {
+export async function cleanupRemovedImagesHelper(event: any) {
   try {
-    const beforeData = change.before.data();
-    const afterData = change.after.data();
+    const beforeData = event.data?.before.data();
+    const afterData = event.data?.after.data();
 
     if (!beforeData || !afterData) {
       console.log('No data in document');
@@ -298,7 +297,7 @@ export async function cleanupRemovedImagesHelper(change: functions.Change<functi
     }
 
     // Get the user ID from the document path
-    const calendarId = change.after.ref.parent.parent?.id;
+    const calendarId = event.data?.after.ref.parent.parent?.id;
     if (!calendarId) {
       console.error('Could not determine calendar ID');
       return;
@@ -412,9 +411,228 @@ export function haveTagsChanged(beforeData: any, afterData: any): boolean {
   return false;
 }
 
-// Helper function to update calendar tags
+/**
+ * Utility function to update tags in an array, handling group name changes
+ * @param tags - Array of tags to update
+ * @param oldTag - The old tag being replaced
+ * @param newTag - The new tag to replace with
+ * @returns Updated array of tags
+ */
+export function updateTagsWithGroupNameChange(tags: string[], oldTag: string, newTag: string): string[] {
+  // Check if this is a group name change
+  const oldGroup = oldTag.includes(':') ? oldTag.split(':')[0] : null;
+  const newGroup = newTag && newTag.includes(':') ? newTag.split(':')[0] : null;
+  const isGroupNameChange = oldGroup && newGroup && oldGroup !== newGroup;
+
+  if (isGroupNameChange) {
+    // Group name changed - update all tags in the old group
+    return tags.map((tag: string) => {
+      if (tag === oldTag) {
+        // Direct match - replace with new tag
+        return newTag;
+      } else if (tag.includes(':') && tag.split(':')[0] === oldGroup) {
+        // Same group - update group name but keep tag name
+        const tagName = tag.split(':')[1];
+        return `${newGroup}:${tagName}`;
+      } else {
+        // Different group or ungrouped - keep as is
+        return tag;
+      }
+    }).filter(tag => tag !== ''); // Remove empty tags
+  } else {
+    // Not a group name change - just replace the specific tag
+    return tags.map((tag: string) => tag === oldTag ? newTag : tag).filter(tag => tag !== '');
+  }
+}
+
+/**
+ * Utility function to update tags in a trade object, handling group name changes
+ * @param trade - Trade object with tags array
+ * @param oldTag - The old tag being replaced
+ * @param newTag - The new tag to replace with
+ * @returns Object with updated: boolean and updatedCount: number
+ */
+export function updateTradeTagsWithGroupNameChange(trade: any, oldTag: string, newTag: string): { updated: boolean; updatedCount: number } {
+  if (!trade.tags || !Array.isArray(trade.tags)) {
+    return { updated: false, updatedCount: 0 };
+  }
+
+  // Check if this is a group name change
+  const oldGroup = oldTag.includes(':') ? oldTag.split(':')[0] : null;
+  const newGroup = newTag && newTag.includes(':') ? newTag.split(':')[0] : null;
+  const isGroupNameChange = oldGroup && newGroup && oldGroup !== newGroup;
+
+  let updatedCount = 0;
+  let updated = false;
+
+  if (isGroupNameChange) {
+    // Group name change - update all tags in the old group
+    for (let j = 0; j < trade.tags.length; j++) {
+      const tag = trade.tags[j];
+      if (tag === oldTag) {
+        // Direct match - replace with new tag
+        if (newTag.trim() === '') {
+          trade.tags.splice(j, 1);
+          j--; // Adjust index after removal
+        } else {
+          trade.tags[j] = newTag.trim();
+        }
+        updated = true;
+        updatedCount++;
+      } else if (tag.includes(':') && tag.split(':')[0] === oldGroup) {
+        // Same group - update group name but keep tag name
+        const tagName = tag.split(':')[1];
+        trade.tags[j] = `${newGroup}:${tagName}`;
+        updated = true;
+        updatedCount++;
+      }
+    }
+  } else {
+    // Not a group name change - just replace the specific tag
+    if (trade.tags.includes(oldTag)) {
+      const tagIndex = trade.tags.indexOf(oldTag);
+      if (newTag.trim() === '') {
+        trade.tags.splice(tagIndex, 1);
+      } else {
+        trade.tags[tagIndex] = newTag.trim();
+      }
+      updated = true;
+      updatedCount++;
+    }
+  }
+
+  return { updated, updatedCount };
+}
+
+/**
+ * Updates calendar tags when trades change - maintains proper tag consistency
+ * @param calendarId - The calendar ID to update
+ * @param beforeData - The year document data before changes
+ * @param afterData - The year document data after changes
+ * @param yearId - The year document ID (optional, for optimization)
+ */
+export async function updateCalendarTagsFromTradeChanges(calendarId: string, beforeData: any, afterData: any, yearId?: string): Promise<void> {
+  try {
+    // Get the calendar document
+    const calendarDoc = await admin.firestore().collection('calendars').doc(calendarId).get();
+    if (!calendarDoc.exists) {
+      console.log(`Calendar ${calendarId} not found, skipping tag update`);
+      return;
+    }
+
+    const calendarData = calendarDoc.data();
+    if (!calendarData?.tags || !Array.isArray(calendarData.tags) || calendarData.tags.length === 0) {
+      console.log(`Calendar ${calendarId} has empty tags, using updateCalendarTags to rebuild`);
+      await updateCalendarTags(calendarId);
+      return;
+    }
+
+    // Extract tags from before and after data
+    const beforeTrades = beforeData?.trades || [];
+    const afterTrades = afterData?.trades || [];
+
+    const beforeTags = new Set<string>();
+    const afterTags = new Set<string>();
+
+    // Collect tags from before trades
+    beforeTrades.forEach((trade: any) => {
+      if (trade.tags && Array.isArray(trade.tags)) {
+        trade.tags.forEach((tag: string) => beforeTags.add(tag));
+      }
+    });
+
+    // Collect tags from after trades
+    afterTrades.forEach((trade: any) => {
+      if (trade.tags && Array.isArray(trade.tags)) {
+        trade.tags.forEach((tag: string) => afterTags.add(tag));
+      }
+    });
+
+    // Find new tags that were added
+    const newTags = Array.from(afterTags).filter(tag => !beforeTags.has(tag));
+
+    // Find tags that were removed
+    const removedTags = Array.from(beforeTags).filter(tag => !afterTags.has(tag));
+
+    if (newTags.length === 0 && removedTags.length === 0) {
+      console.log(`No tag changes detected in calendar ${calendarId}`);
+      return;
+    }
+
+    console.log(`Calendar ${calendarId} tag changes - Added: ${newTags.length}, Removed: ${removedTags.length}`);
+
+    // Update calendar tags by adding new ones and keeping existing ones
+    // We don't remove tags here because they might exist in other years
+    let updatedTags = [...calendarData.tags];
+    let hasChanges = false;
+
+    // Add new tags
+    newTags.forEach(tag => {
+      if (!updatedTags.includes(tag)) {
+        updatedTags.push(tag);
+        hasChanges = true;
+      }
+    });
+
+    // For removed tags, we need to check if they exist in other years before removing
+    if (removedTags.length > 0) {
+      // Get all year documents to check if removed tags exist elsewhere
+      const yearsSnapshot = await admin.firestore().collection(`calendars/${calendarId}/years`).get();
+      const allOtherTags = new Set<string>();
+
+      for (const yearDoc of yearsSnapshot.docs) {
+        if (yearId && yearDoc.id === yearId) continue; // Skip the current year document
+
+        const yearData = yearDoc.data();
+        const trades = yearData.trades || [];
+
+        trades.forEach((trade: any) => {
+          if (trade.tags && Array.isArray(trade.tags)) {
+            trade.tags.forEach((tag: string) => allOtherTags.add(tag));
+          }
+        });
+      }
+
+      // Remove tags that don't exist in any other year
+      removedTags.forEach(tag => {
+        if (!allOtherTags.has(tag) && updatedTags.includes(tag)) {
+          updatedTags = updatedTags.filter(t => t !== tag);
+          hasChanges = true;
+        }
+      });
+    }
+
+    if (hasChanges) {
+      await admin.firestore().collection('calendars').doc(calendarId).update({
+        tags: updatedTags.sort(),
+        lastModified: admin.firestore.FieldValue.serverTimestamp()
+      });
+      console.log(`Updated calendar ${calendarId} tags: ${updatedTags.length} total tags`);
+    }
+  } catch (error) {
+    console.error(`Error updating calendar tags for ${calendarId}:`, error);
+    throw error;
+  }
+}
+
+// Helper function to update calendar tags - only runs when calendar.tags is empty or missing
 export async function updateCalendarTags(calendarId: string): Promise<void> {
   try {
+    // First check if calendar.tags is already populated
+    const calendarDoc = await admin.firestore().collection('calendars').doc(calendarId).get();
+    if (!calendarDoc.exists) {
+      console.log(`Calendar ${calendarId} not found, skipping tag update`);
+      return;
+    }
+
+    const calendarData = calendarDoc.data();
+    if (calendarData?.tags && Array.isArray(calendarData.tags) && calendarData.tags.length > 0) {
+      console.log(`Calendar ${calendarId} already has ${calendarData.tags.length} tags, skipping automatic update`);
+      return;
+    }
+
+    console.log(`Calendar ${calendarId} has empty or missing tags, rebuilding from trades...`);
+
     // Get all year documents for this calendar
     const yearsSnapshot = await admin.firestore().collection(`calendars/${calendarId}/years`).get();
 

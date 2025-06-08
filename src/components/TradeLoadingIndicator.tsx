@@ -5,7 +5,7 @@ import { CloudDownload, FileUpload, FileDownload } from '@mui/icons-material';
 interface TradeLoadingIndicatorProps {
   isLoading: boolean;
   calendarName?: string;
-  action?: 'loading' | 'importing' | 'exporting';
+  action?: 'loading' | 'importing' | 'exporting' | 'updating_tags';
 }
 
 const TradeLoadingIndicator: React.FC<TradeLoadingIndicatorProps> = ({ isLoading, calendarName, action = 'loading' }) => {
@@ -38,6 +38,11 @@ const TradeLoadingIndicator: React.FC<TradeLoadingIndicatorProps> = ({ isLoading
         baseText = calendarName
           ? `Exporting trades from "${calendarName}"`
           : 'Exporting trades';
+        break;
+      case 'updating_tags':
+        baseText = calendarName
+          ? `Updating tags for "${calendarName}"`
+          : 'Updating tags';
         break;
       default: // 'loading'
         baseText = calendarName

@@ -755,7 +755,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         if (!prev) return prev;
         return {
           ...prev,
-          tags: prev.tags.map(tag => tag === oldTag ? newTag : tag)
+          tags: prev.tags.map(tag => tag === oldTag ? newTag : tag).filter((tag: string) => tag !== '')
         };
       });
     }
@@ -763,9 +763,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     // Update the cached trades list
     if (onTagUpdated) {
       onTagUpdated(oldTag, newTag);
-
     }
-
   };
 
   const hasPendingUploads = (): boolean => newTrade!.pendingImages.some(img =>

@@ -393,7 +393,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
         <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
           Pro tip: Categorize tags using the format "Category:Tag" (e.g., "Strategy:Breakout", "Setup:Double Top").
           Categorized tags are grouped together in charts, making it easier to filter and analyze your trading patterns
-          and identify which strategies and setups are most profitable.
+          and identify which strategies and setups are most profitable. Note: Only one colon (:) is allowed per tag.
         </Typography>
       </FormField>
 
