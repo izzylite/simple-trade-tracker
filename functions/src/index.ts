@@ -1,7 +1,7 @@
 import * as admin from 'firebase-admin';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onDocumentUpdated, onDocumentDeleted } from 'firebase-functions/v2/firestore';
-import { handleTradeYearChanges, canDeleteImage, cleanupRemovedImagesHelper, haveTagsChanged, updateTagsWithGroupNameChange, updateTradeTagsWithGroupNameChange, updateCalendarTagsFromTradeChanges } from './utils';
+import { handleTradeYearChanges, canDeleteImage, cleanupRemovedImagesHelper, haveTagsChanged, updateTagsWithGroupNameChange, updateTradeTagsWithGroupNameChange, updateCalendarTagsFromTradeChanges, findDuplicatedCalendarsQuery } from './utils';
 
 admin.initializeApp();
 
@@ -56,6 +56,8 @@ export const cleanupDeletedCalendarV2 = onDocumentDeleted('calendars/{calendarId
 
       // 1. Get all year documents
       const yearsSnapshot = await admin.firestore().collection(`calendars/${calendarId}/years`).get();
+      // 2. Get duplicated calendar snapshots here to reduce reads
+      const findDuplicatedCalendarsSnapshot = await findDuplicatedCalendarsQuery(calendarId,userId)
 
       // Track all image IDs to potentially delete
       const imageIdsToCheck = new Set();
@@ -83,7 +85,7 @@ export const cleanupDeletedCalendarV2 = onDocumentDeleted('calendars/{calendarId
       const imageIdsToDelete = new Set();
 
       for (const imageId of imageIdsToCheck) {
-        const canDelete = await canDeleteImage(imageId as string, calendarId, userId);
+        const canDelete = await canDeleteImage(imageId as string, calendarId, userId, calendarData,yearsSnapshot,findDuplicatedCalendarsSnapshot);
         if (canDelete) {
           imageIdsToDelete.add(imageId);
           console.log(`Image ${imageId} can be safely deleted`);
@@ -125,9 +127,7 @@ export const cleanupDeletedCalendarV2 = onDocumentDeleted('calendars/{calendarId
 // Cloud function to update a tag across all trades in a calendar (v2)
 export const updateTagV2 = onCall(async (request) => {
   try {
-    console.log('updateTag called with data:', JSON.stringify(request.data));
-    console.log('updateTag called with auth:', request.auth ? 'authenticated' : 'not authenticated');
-
+    
     // Ensure user is authenticated
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'User must be authenticated');
@@ -166,13 +166,12 @@ export const updateTagV2 = onCall(async (request) => {
         const updateData: any = {
         lastModified: admin.firestore.FieldValue.serverTimestamp()
       };
-      console.log(`Updating tag ${oldTag} to ${newTag} in calendar ${calendarId} requiredTagGroups ${calendarData.requiredTagGroups}`);
+      
       if (calendarData.requiredTagGroups) {
         // Update required tag groups when a group name changes
         // If oldTag is "Strategy:Long" and newTag is "NewStrategy:Long", update "Strategy" to "NewStrategy"
         // If oldTag is "Strategy:Long" and newTag is "Strategy:Short", no change needed
-        // If newTag is empty (tag deletion), remove the group if no other tags use it
-        console.log(`Updating tag ${oldTag} to ${newTag} in calendar ${calendarId} second`);
+        // If newTag is empty (tag deletion), remove the group if no other tags use it 
         const oldGroup = oldTag.includes(':') ? oldTag.split(':')[0] : null;
         const newGroup = newTag && newTag.includes(':') ? newTag.split(':')[0] : null;
 
