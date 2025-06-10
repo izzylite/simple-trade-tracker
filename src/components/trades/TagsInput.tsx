@@ -136,6 +136,12 @@ const TagsInput: React.FC<TagsInputProps> = ({
             {...params}
             label="Tags"
             placeholder="Add tags"
+            slotProps={{
+              htmlInput: {
+                ...params.inputProps,
+                'data-testid': 'tags-input'
+              }
+            }}
           />
         )}
       />
