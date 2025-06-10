@@ -38,7 +38,8 @@ export const onTradeChangedV2 = onDocumentUpdated('calendars/{calendarId}/years/
 // Cloud function to delete all trades and images when a calendar is deleted
 export const cleanupDeletedCalendarV2 = onDocumentDeleted('calendars/{calendarId}', async (event) => {
   try {
-    const calendarData = event.data?.data();
+    
+    const calendarData = {...event.data?.data()};
     if (!calendarData) {
       console.log('No data in deleted calendar document');
       return;
@@ -56,8 +57,6 @@ export const cleanupDeletedCalendarV2 = onDocumentDeleted('calendars/{calendarId
 
       // 1. Get all year documents
       const yearsSnapshot = await admin.firestore().collection(`calendars/${calendarId}/years`).get();
-      // 2. Get duplicated calendar snapshots here to reduce reads
-      const findDuplicatedCalendarsSnapshot = await findDuplicatedCalendarsQuery(calendarId,userId)
 
       // Track all image IDs to potentially delete
       const imageIdsToCheck = new Set();
@@ -81,11 +80,35 @@ export const cleanupDeletedCalendarV2 = onDocumentDeleted('calendars/{calendarId
 
       console.log(`Found ${imageIdsToCheck.size} images to check for deletion`);
 
-      // 3. Filter images using comprehensive logic
+      // 3. Filter images using comprehensive logic with caching
       const imageIdsToDelete = new Set();
 
+      // Create cache for years snapshots to avoid duplicate queries
+      const yearsSnapshotCache = new Map<string, admin.firestore.QuerySnapshot<admin.firestore.DocumentData>>();
+      let duplicatedCalendarsSnapshot: admin.firestore.QuerySnapshot<admin.firestore.DocumentData> | null = null;
+
+      // Callback function to get years snapshot with caching
+      const getYearsSnapshot = async (calendarId: string) => {
+        if (!yearsSnapshotCache.has(calendarId)) {
+          const snapshot = await admin.firestore().collection(`calendars/${calendarId}/years`).get();
+          yearsSnapshotCache.set(calendarId, snapshot);
+        }
+        return yearsSnapshotCache.get(calendarId)!;
+      };
+
+      // Callback function to get duplicated calendars snapshot with caching
+      const getDuplicatedCalendarsSnapshot = async () => {
+        if (!duplicatedCalendarsSnapshot) {
+          duplicatedCalendarsSnapshot = await findDuplicatedCalendarsQuery(calendarId, userId);
+        }
+        return duplicatedCalendarsSnapshot;
+      };
+
       for (const imageId of imageIdsToCheck) {
-        const canDelete = await canDeleteImage(imageId as string, calendarId, userId, calendarData,yearsSnapshot,findDuplicatedCalendarsSnapshot);
+        const canDelete = await canDeleteImage(
+          imageId as string, calendarId, calendarData,
+          getYearsSnapshot, getDuplicatedCalendarsSnapshot
+        );
         if (canDelete) {
           imageIdsToDelete.add(imageId);
           console.log(`Image ${imageId} can be safely deleted`);

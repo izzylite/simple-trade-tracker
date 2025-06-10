@@ -138,13 +138,9 @@ export async function handleTradeYearChanges(event: any) {
   }
 }
 
-// Helper function to check if an image exists in a specific calendar
-export async function imageExistsInCalendar(imageId: string, calendarId: string,
-  yearsSnapshot: admin.firestore.QuerySnapshot<admin.firestore.DocumentData> | undefined = undefined): Promise<boolean> {
+// Helper function to check if an image exists in a specific calendar using provided years data
+export function imageExistsInYears(imageId: string, yearsSnapshot: admin.firestore.QuerySnapshot<admin.firestore.DocumentData>): boolean {
   try {
-    // Get all year documents from the calendar
-    yearsSnapshot = !yearsSnapshot ? await admin.firestore().collection(`calendars/${calendarId}/years`).get() : yearsSnapshot;
-
     for (const yearDoc of yearsSnapshot.docs) {
       const yearData = yearDoc.data();
       const trades = yearData.trades || [];
@@ -163,6 +159,20 @@ export async function imageExistsInCalendar(imageId: string, calendarId: string,
 
     return false;
   } catch (error) {
+    console.error(`Error checking if image ${imageId} exists in years:`, error);
+    return false; // Assume it doesn't exist if we can't check
+  }
+}
+
+// Type for the query cache callback
+type QueryCacheCallback = (calendarId: string) => Promise<admin.firestore.QuerySnapshot<admin.firestore.DocumentData>>;
+
+// Helper function to check if an image exists in a specific calendar
+export async function imageExistsInCalendar(imageId: string, calendarId: string, getYearsSnapshot: QueryCacheCallback): Promise<boolean> {
+  try {
+    const yearsSnapshot = await getYearsSnapshot(calendarId);
+    return imageExistsInYears(imageId, yearsSnapshot);
+  } catch (error) {
     console.error(`Error checking if image ${imageId} exists in calendar ${calendarId}:`, error);
     return false; // Assume it doesn't exist if we can't check
   }
@@ -177,11 +187,10 @@ export async function findDuplicatedCalendarsQuery(sourceCalendarId: string, use
     .get();
 }
 // Helper function to find all calendars that are duplicated from a source calendar
-export async function findDuplicatedCalendars(sourceCalendarId: string, userId: string,
-  calendarsSnapshot: admin.firestore.QuerySnapshot<admin.firestore.DocumentData> | undefined = undefined
+export async function findDuplicatedCalendars(sourceCalendarId: string,
+  calendarsSnapshot: admin.firestore.QuerySnapshot<admin.firestore.DocumentData>
 ): Promise<string[]> {
   try {
-    calendarsSnapshot = !calendarsSnapshot ? await findDuplicatedCalendarsQuery(sourceCalendarId,userId) : calendarsSnapshot;
     return calendarsSnapshot.docs.map(doc => doc.id);
   } catch (error) {
     console.error(`Error finding duplicated calendars for source ${sourceCalendarId}:`, error);
@@ -190,20 +199,17 @@ export async function findDuplicatedCalendars(sourceCalendarId: string, userId: 
 }
 
 // Helper function to check if an image can be safely deleted
-export async function canDeleteImage(imageId: string, currentCalendarId: string, userId: string,
-  currentCalendarData: admin.firestore.DocumentData | undefined = undefined,
-  yearsSnapshot: admin.firestore.QuerySnapshot<admin.firestore.DocumentData> | undefined = undefined,
-  findDuplicatedCalendarsSnapshot: admin.firestore.QuerySnapshot<admin.firestore.DocumentData> | undefined = undefined): Promise<boolean> {
+export async function canDeleteImage(
+  imageId: string,
+  currentCalendarId: string,
+  currentCalendarData: admin.firestore.DocumentData,
+  getYearsSnapshot: QueryCacheCallback,
+  getDuplicatedCalendarsSnapshot: () => Promise<admin.firestore.QuerySnapshot<admin.firestore.DocumentData>>
+): Promise<boolean> {
   try {
     if (!currentCalendarData) {
-      // Get the current calendar data
-      const currentCalendarDoc = await admin.firestore().collection('calendars').doc(currentCalendarId).get();
-      if (!currentCalendarDoc.exists) {
-        console.error(`Calendar ${currentCalendarId} not found`);
-        return false;
-      }
-
-      currentCalendarData = currentCalendarDoc.data();
+      console.error(`Calendar data for ${currentCalendarId} not found`);
+      return false;
     }
 
     const isDuplicatedCalendar = currentCalendarData?.duplicatedCalendar === true;
@@ -214,17 +220,19 @@ export async function canDeleteImage(imageId: string, currentCalendarId: string,
       console.log(`Checking deletion from duplicated calendar ${currentCalendarId}, source: ${sourceCalendarId}`);
 
       // Check if image exists in source calendar
-      const existsInSource = await imageExistsInCalendar(imageId, sourceCalendarId, yearsSnapshot);
+      const existsInSource = await imageExistsInCalendar(imageId, sourceCalendarId, getYearsSnapshot);
       if (existsInSource) {
         console.log(`Image ${imageId} exists in source calendar ${sourceCalendarId}, cannot delete`);
         return false;
       }
 
       // Check if image exists in other duplicated calendars from the same source
-      const otherDuplicatedCalendars = await findDuplicatedCalendars(sourceCalendarId, userId, findDuplicatedCalendarsSnapshot);
+      const duplicatedCalendarsSnapshot = await getDuplicatedCalendarsSnapshot();
+      const otherDuplicatedCalendars = await findDuplicatedCalendars(sourceCalendarId, duplicatedCalendarsSnapshot);
+
       for (const duplicatedCalendarId of otherDuplicatedCalendars) {
         if (duplicatedCalendarId !== currentCalendarId) {
-          const existsInOtherDuplicate = await imageExistsInCalendar(imageId, duplicatedCalendarId,yearsSnapshot);
+          const existsInOtherDuplicate = await imageExistsInCalendar(imageId, duplicatedCalendarId, getYearsSnapshot);
           if (existsInOtherDuplicate) {
             console.log(`Image ${imageId} exists in other duplicated calendar ${duplicatedCalendarId}, cannot delete`);
             return false;
@@ -239,11 +247,12 @@ export async function canDeleteImage(imageId: string, currentCalendarId: string,
       console.log(`Checking deletion from original calendar ${currentCalendarId}`);
 
       // Find all calendars duplicated from this one
-      const duplicatedCalendars = await findDuplicatedCalendars(currentCalendarId, userId,findDuplicatedCalendarsSnapshot);
+      const duplicatedCalendarsSnapshot = await getDuplicatedCalendarsSnapshot();
+      const duplicatedCalendars = await findDuplicatedCalendars(currentCalendarId, duplicatedCalendarsSnapshot);
 
       // Check if image exists in any duplicated calendar
       for (const duplicatedCalendarId of duplicatedCalendars) {
-        const existsInDuplicate = await imageExistsInCalendar(imageId, duplicatedCalendarId,yearsSnapshot);
+        const existsInDuplicate = await imageExistsInCalendar(imageId, duplicatedCalendarId, getYearsSnapshot);
         if (existsInDuplicate) {
           console.log(`Image ${imageId} exists in duplicated calendar ${duplicatedCalendarId}, cannot delete`);
           return false;
@@ -329,16 +338,38 @@ export async function cleanupRemovedImagesHelper(event: any) {
 
     const userId = calendarData.userId;
 
-    // 1. Get all year documents
-    const yearsSnapshot = await admin.firestore().collection(`calendars/${calendarId}/years`).get();
-    // 2. Get duplicated calendar snapshots here to reduce reads
-    const findDuplicatedCalendarsSnapshot = await findDuplicatedCalendarsQuery(calendarId, userId);
-
-    // Filter images to delete using comprehensive logic
+    // Filter images to delete using comprehensive logic with caching
     const finalImagesToDelete: string[] = [];
 
+    // Create cache for years snapshots to avoid duplicate queries
+    const yearsSnapshotCache = new Map<string, admin.firestore.QuerySnapshot<admin.firestore.DocumentData>>();
+    let duplicatedCalendarsSnapshot: admin.firestore.QuerySnapshot<admin.firestore.DocumentData> | null = null;
+
+    // Callback function to get years snapshot with caching
+    const getYearsSnapshot = async (calendarId: string) => {
+      if (!yearsSnapshotCache.has(calendarId)) {
+        const snapshot = await admin.firestore().collection(`calendars/${calendarId}/years`).get();
+        yearsSnapshotCache.set(calendarId, snapshot);
+      }
+      return yearsSnapshotCache.get(calendarId)!;
+    };
+
+    // Callback function to get duplicated calendars snapshot with caching
+    const getDuplicatedCalendarsSnapshot = async () => {
+      if (!duplicatedCalendarsSnapshot) {
+        duplicatedCalendarsSnapshot = await findDuplicatedCalendarsQuery(calendarId, userId);
+      }
+      return duplicatedCalendarsSnapshot;
+    };
+
     for (const imageId of imagesToDelete) {
-      const canDelete = await canDeleteImage(imageId, calendarId, userId, calendarData, yearsSnapshot, findDuplicatedCalendarsSnapshot);
+      const canDelete = await canDeleteImage(
+        imageId,
+        calendarId,
+        calendarData,
+        getYearsSnapshot,
+        getDuplicatedCalendarsSnapshot
+      );
       if (canDelete) {
         finalImagesToDelete.push(imageId);
         console.log(`Image ${imageId} can be safely deleted`);
