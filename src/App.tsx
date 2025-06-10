@@ -488,18 +488,34 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
 
   const handleAddTrade = async (trade: Trade) => {
     const newTrade = trade.id ? trade : { ...trade, id: uuidv4() };
+
+    // Optimistically update the UI first for better user experience
+    const optimisticCachedTrades = [...calendar.cachedTrades, newTrade];
+    onUpdateStateCalendar(calendar.id, {
+      cachedTrades: optimisticCachedTrades
+    });
+
     try {
       // Add the trade and get the updated stats
       // Pass the cached trades to avoid fetching all trades from Firestore
       const updatedStats = await calendarService.addTrade(calendar.id, newTrade, calendar.cachedTrades);
-      // First update the cached trades. Then update the calendar with the statistics
+
+      // Update with the final stats from the database
       onUpdateStateCalendar(calendar.id, {
-        cachedTrades: [...calendar.cachedTrades, newTrade],
+        cachedTrades: optimisticCachedTrades,
         ...updatedStats
       });
 
     } catch (error) {
       console.error('Error adding trade:', error);
+
+      // Revert the optimistic update on error
+      onUpdateStateCalendar(calendar.id, {
+        cachedTrades: calendar.cachedTrades // Revert to original state
+      });
+
+      // Re-throw the error so the calling component can handle it
+      throw error;
     }
   };
 

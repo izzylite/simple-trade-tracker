@@ -15,9 +15,10 @@ import {
   Typography,
   Chip,
   alpha,
-  useTheme
+  useTheme,
+  Autocomplete
 } from '@mui/material';
-import { DatePicker} from '@mui/x-date-pickers';
+import { DatePicker } from '@mui/x-date-pickers';
 import { Trade } from '../../types/trade';
 import { FormField } from '../StyledComponents';
 import ImageUploader from './ImageUploader';
@@ -26,7 +27,11 @@ import { formatCurrency } from '../../utils/formatters';
 import TagsInput from './TagsInput';
 import { isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { DynamicRiskSettings } from '../../utils/dynamicRiskUtils';
-
+import {
+  generateContextualTradeNameSuggestions,
+  generateCommonTradeNamePatterns
+}
+  from '../../utils/tradeNameSuggestions';
 export interface NewTradeForm {
   id: string;
   name: string;
@@ -59,26 +64,27 @@ export interface PendingImage {
 }
 
 export interface TradeImage {
-    url: string;
-    id: string;
-    calendarId: string;
-    pending?: boolean;
-    caption?: string;
-    width?: number;
-    height?: number;
-    row?: number;
-    column?: number;
-    columnWidth?: number; // Width as percentage (0-100)
+  url: string;
+  id: string;
+  calendarId: string;
+  pending?: boolean;
+  caption?: string;
+  width?: number;
+  height?: number;
+  row?: number;
+  column?: number;
+  columnWidth?: number; // Width as percentage (0-100)
 }
 interface TradeFormProps {
   newTrade: NewTradeForm;
   editingTrade: Trade | null;
   allTags: string[];
-  isSubmitting: boolean; 
+  allTrades?: Trade[];
+  isSubmitting: boolean;
   accountBalance: number;
   dynamicRiskSettings: DynamicRiskSettings;
   calculateCumulativePnl(newTrade?: NewTradeForm): number;
-  calculateAmountFromRiskToReward: (rr: number,cumulativePnL: number) => number;
+  calculateAmountFromRiskToReward: (rr: number, cumulativePnL: number) => number;
   calendarId: string;
   requiredTagGroups?: string[];
   onTagUpdated?: (oldTag: string, newTag: string) => void;
@@ -104,7 +110,8 @@ const TradeForm: React.FC<TradeFormProps> = ({
   newTrade,
   editingTrade,
   allTags,
-  isSubmitting, 
+  allTrades = [],
+  isSubmitting,
   accountBalance,
   dynamicRiskSettings,
   calculateAmountFromRiskToReward,
@@ -148,7 +155,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
     return requiredTagGroups.filter(group => !satisfiedGroups.has(group));
   }, [requiredTagGroups, newTrade.tags]);
 
-  const cumulativePnl = calculateCumulativePnl(newTrade); 
+  const cumulativePnl = calculateCumulativePnl(newTrade);
 
   // Calculate and update the amount based on risk
   const calculateAmountFromRisk = (): string => {
@@ -169,6 +176,32 @@ const TradeForm: React.FC<TradeFormProps> = ({
     return amount.toString();
   };
 
+  // Add trade name suggestions logic
+  const tradeNameSuggestions = useMemo(() => {
+    if (!allTrades || allTrades.length === 0) {
+      return generateCommonTradeNamePatterns(newTrade.name);
+    }
+
+    const contextualSuggestions = generateContextualTradeNameSuggestions(
+      allTrades,
+      newTrade.tags,
+      newTrade.session || undefined,
+      newTrade.name,
+      8
+    );
+
+    // If no contextual suggestions, add some common patterns
+    if (contextualSuggestions.length < 5) {
+      const commonPatterns = generateCommonTradeNamePatterns(newTrade.name);
+      const uniquePatterns = commonPatterns.filter(pattern =>
+        !contextualSuggestions.includes(pattern)
+      );
+      return [...contextualSuggestions, ...uniquePatterns].slice(0, 8);
+    }
+
+    return contextualSuggestions;
+  }, [allTrades, newTrade.name, newTrade.tags, newTrade.session]);
+
 
 
 
@@ -181,7 +214,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
       if (dynamicRiskSettings.riskPerTrade && value && !newTrade.partialsTaken) {
         const rr = parseFloat(value);
         if (!isNaN(rr)) {
-          const calculatedAmount = calculateAmountFromRiskToReward(rr,cumulativePnl);
+          const calculatedAmount = calculateAmountFromRiskToReward(rr, cumulativePnl);
           onAmountChange(calculatedAmount.toString())
         }
       }
@@ -192,12 +225,35 @@ const TradeForm: React.FC<TradeFormProps> = ({
   return (
     <form onSubmit={onSubmit}>
       <FormField>
-        <TextField
-          label="Trade Name"
+        <Autocomplete
+          freeSolo
+          options={tradeNameSuggestions}
           value={newTrade.name}
-          onChange={onNameChange}
-          fullWidth
-          placeholder="Enter a name for this trade"
+          onInputChange={(event, newValue) => {
+            // Create a synthetic event for compatibility with existing handler
+            const syntheticEvent = {
+              target: { value: newValue || '' }
+            } as React.ChangeEvent<HTMLInputElement>;
+            onNameChange(syntheticEvent);
+          }}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Trade Name"
+              placeholder="Enter a name for this trade"
+              fullWidth
+            />
+          )}
+          renderOption={(props, option) => (
+            <Box component="li" {...props}>
+              <Typography variant="body2">{option}</Typography>
+            </Box>
+          )}
+          sx={{
+            '& .MuiAutocomplete-option': {
+              fontSize: '0.875rem',
+            }
+          }}
         />
       </FormField>
       <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>

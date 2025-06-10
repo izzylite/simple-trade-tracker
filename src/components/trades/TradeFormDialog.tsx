@@ -823,28 +823,44 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       setIsSubmitting(true);
       // Prepare data
       let tradeData = createFinalTradeData(newTrade!, date);
-      // Update the temporary trade with the final data
-      if (newTrade!.isTemporary && newTrade!.id) {
-        await handleUpdateTradeProperty(newTrade!.id, () => ({ ...tradeData, isTemporary: false })); // Mark as a permanent trade
 
-      }
-      else {
-        await onAddTrade(tradeData);
-      }
+      try {
+        // Update the temporary trade with the final data
+        if (newTrade!.isTemporary && newTrade!.id) {
+          await handleUpdateTradeProperty(newTrade!.id, () => ({ ...tradeData, isTemporary: false })); // Mark as a permanent trade
+        }
+        else {
+          await onAddTrade(tradeData);
+        }
 
-      resetForm();
-      onCancel();
+        // Only reset and close if the operation was successful
+        resetForm();
+        onCancel();
+
+      } catch (dbError) {
+        // If it's a temporary trade that failed to update, we should clean it up
+        if (newTrade!.isTemporary && newTrade!.id) {
+          try {
+            // Delete the temporary trade that failed to be made permanent
+            await handleUpdateTradeProperty(newTrade!.id, (trade) => ({
+              ...trade,
+              isDeleted: true
+            }));
+            console.log('Cleaned up temporary trade after failed update');
+          } catch (cleanupError) {
+            console.error('Failed to cleanup temporary trade:', cleanupError);
+          }
+        }
+
+        // Re-throw the original error
+        throw dbError;
+      }
 
     } catch (error) {
+      console.error('Error in trade submission:', error);
       showErrorSnackbar(error instanceof Error ? error.message : 'Failed to add trade. Please try again.');
-      if (newTrade!.isTemporary) {
-        console.error('Error updating temporary trade:', error);
-        throw new Error(`Failed to update temporary trade: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-      else {
-        console.error('Error adding new trade:', error);
-        throw new Error(`Failed to add new trade: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
+
+      // Don't close the dialog on error - let the user try again or cancel manually
 
     } finally {
       setIsSubmitting(false);
@@ -1041,6 +1057,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               newTrade={newTrade!}
               editingTrade={editingTrade}
               allTags={allTags}
+               allTrades={allTrades}
               isSubmitting={isSubmitting} 
               calculateAmountFromRiskToReward={calculateAmountFromRiskToReward}
               onNameChange={handleNameChange}
