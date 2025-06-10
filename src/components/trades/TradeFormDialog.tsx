@@ -55,7 +55,7 @@ interface FormProps {
 // Helper function to process tags
 const processTagsForSubmission = (tags: string[]): string[] => {
   // Get any pending tag from the tags input field specifically (not the trade name input)
-  const tagInput = document.querySelector('[data-testid="tags-input"]') as HTMLInputElement;
+  const tagInput = document.getElementById('trade-tags-input') as HTMLInputElement;
   let pendingTag = '';
   if (tagInput && tagInput.value.trim()) {
     pendingTag = tagInput.value.trim();

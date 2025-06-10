@@ -49,7 +49,7 @@ const ScoreBreakdown: React.FC<ScoreBreakdownProps> = ({
   weaknesses
 }) => {
   const theme = useTheme();
-  const [expanded, setExpanded] = useState<string | false>('consistency');
+  const [expanded, setExpanded] = useState<string | false>('');
 
   const handleChange = (panel: string) => (_: React.SyntheticEvent, isExpanded: boolean) => {
     setExpanded(isExpanded ? panel : false);
@@ -513,16 +513,57 @@ Higher scores indicate better emotional control and systematic trading.`;
               : alpha(theme.palette.common.black, 0.1)}`
           }}
         >
-          <Typography
-            variant="subtitle2"
-            gutterBottom
-            sx={{
-              color: theme.palette.text.primary,
-              fontWeight: 600
-            }}
-          >
-            📈 Your Trading Pattern
-          </Typography>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{
+                color: theme.palette.text.primary,
+                fontWeight: 600
+              }}
+            >
+              📈 Your Trading Pattern
+            </Typography>
+            <Tooltip
+              title={
+                <Box sx={{ p: 1, maxWidth: 380 }}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+                    How Your Trading Pattern is Established:
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    • <strong>Preferred Sessions:</strong> Your top 2 most frequently traded sessions based on historical data
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    • <strong>Common Strategies:</strong> Your top 5 most-used tags/strategies from past trades
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    • <strong>Trading Frequency:</strong> Average trades per week calculated from your trading history
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    • <strong>Win Rate & Profit Factor:</strong> Historical averages used as benchmarks for consistency scoring
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1, color: 'warning.main' }}>
+                    • <strong>Lookback Period:</strong> Pattern is based on trades from the last 30 days to reflect your current trading style
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 1 }}>
+                    Patterns are automatically updated as you add more trades. Requires minimum 3 trades for reliable pattern detection.
+                  </Typography>
+                </Box>
+              }
+              placement="top"
+              arrow
+            >
+              <HelpOutline
+                sx={{
+                  fontSize: 18,
+                  color: theme.palette.text.secondary,
+                  cursor: 'help',
+                  '&:hover': {
+                    color: theme.palette.primary.main
+                  }
+                }}
+              />
+            </Tooltip>
+          </Stack>
           <Stack spacing={1}>
             <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
               <strong style={{ color: theme.palette.text.primary }}>Preferred Sessions:</strong> {pattern.preferredSessions.join(', ') || 'Not established'}

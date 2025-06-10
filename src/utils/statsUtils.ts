@@ -33,10 +33,12 @@ export const calculateProfitFactor = (trades: Trade[]): number => {
     .reduce((sum, trade) => sum + trade.amount, 0);
 
   const grossLoss = Math.abs(trades
-    .filter(trade => trade.amount < 0)
+    .filter(trade => trade.amount < 0 || trade.type === 'loss')
     .reduce((sum, trade) => sum + trade.amount, 0));
-
-  if (grossLoss === 0) return grossProfit > 0 ? 999 : 0;
+     
+  // If no losses, return a high but reasonable number instead of 999
+  // This represents an excellent profit factor without looking like an error
+  if (grossLoss === 0) return grossProfit > 0 ? 50.0 : 0;
   return grossProfit / grossLoss;
 };
 

@@ -139,7 +139,7 @@ const TagsInput: React.FC<TagsInputProps> = ({
             slotProps={{
               htmlInput: {
                 ...params.inputProps,
-                'data-testid': 'tags-input'
+                id: 'trade-tags-input'
               }
             }}
           />

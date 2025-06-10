@@ -219,7 +219,7 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
 
         <Stack>
           {/* Score Component Weights */}
-          <Accordion defaultExpanded>
+          <Accordion>
             <AccordionSummary expandIcon={<ExpandMore />}>
               <Typography variant="subtitle1" fontWeight="medium">
                 Score Component Weights
