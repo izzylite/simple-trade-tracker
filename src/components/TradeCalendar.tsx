@@ -83,7 +83,7 @@ import DayNoteCard from './DayNoteCard';
 import TradeFormDialog, { createEditTradeData } from './trades/TradeFormDialog';
 import ConfirmationDialog from './common/ConfirmationDialog';
 
-import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
+import { DynamicRiskSettings, calculateEffectiveMaxDailyDrawdown, calculatePercentageOfCurrentValue } from '../utils/dynamicRiskUtils';
 
 import MonthlyStatisticsSection from './MonthlyStatisticsSection';
 import FloatingMonthNavigation from './FloatingMonthNavigation';
@@ -95,7 +95,7 @@ interface TradeCalendarProps {
   weeklyTarget?: number;
   monthlyTarget?: number;
   yearlyTarget?: number;
-  dynamicRiskSettings?: DynamicRiskSettings;
+  dynamicRiskSettings: DynamicRiskSettings;
   requiredTagGroups?: string[];
   allTags?: string[]; // Add allTags prop to receive calendar.tags
   onAddTrade?: (trade: Trade) => Promise<void>;
@@ -168,6 +168,7 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ date, trades, monthStart, weekInd
   );
 
   const totalPnL = weekTrades.reduce((sum, trade) => sum + trade.amount, 0);
+  // For weekly target progress, use original account balance (targets are based on original balance)
   const percentage = accountBalance > 0 ? (totalPnL / accountBalance * 100).toFixed(1) : '0';
   const targetProgress = weeklyTarget && weeklyTarget > 0 ? (parseFloat(percentage) / weeklyTarget * 100).toFixed(0) : '0';
   const isTargetMet = weeklyTarget ? parseFloat(percentage) >= weeklyTarget : false;
@@ -257,40 +258,34 @@ export const createNewTradeData = (): NewTradeForm => ({
 });
 
 const calculateDayStats = (
-  trades: Trade[],
+  dayTrades: Trade[],
   accountBalance: number,
   maxDailyDrawdown: number,
   dynamicRiskSettings?: DynamicRiskSettings,
-  totalPnL?: number
+  allTrades?: Trade[]
 ): DayStats => {
   // Calculate net amount for the day
-  const netAmount = trades.reduce((sum, trade) => sum + trade.amount, 0);
+  const netAmount = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
 
-  // Calculate percentage loss/gain relative to account balance
-  const percentage = accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0';
+  // Calculate percentage loss/gain relative to current total value (account balance + cumulative profit)
+  const percentage = allTrades
+    ? calculatePercentageOfCurrentValue(netAmount, accountBalance, allTrades).toFixed(1)
+    : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0';
 
   let status: DayStatus = 'neutral';
-  if (trades.length > 0) {
-    status = netAmount > 0 ? 'win' : netAmount < 0 ? 'loss' : trades.find(trade => trade.type === 'breakeven') ? 'breakeven' : 'neutral';
+  if (dayTrades.length > 0) {
+    status = netAmount > 0 ? 'win' : netAmount < 0 ? 'loss' : dayTrades.find(trade => trade.type === 'breakeven') ? 'breakeven' : 'neutral';
   }
 
   // Calculate effective max daily drawdown based on dynamic risk settings
   let effectiveMaxDailyDrawdown = maxDailyDrawdown;
 
-  if (dynamicRiskSettings?.dynamicRiskEnabled &&
-    dynamicRiskSettings.increasedRiskPercentage &&
-    dynamicRiskSettings.profitThresholdPercentage &&
-    totalPnL !== undefined &&
-    accountBalance > 0) {
-    // Calculate profit percentage based on account balance + totalPnL
-    const profitPercentage = (totalPnL / accountBalance) * 100;
-
-    // If profit threshold is met, adjust the max daily drawdown proportionally
-    if (profitPercentage >= dynamicRiskSettings.profitThresholdPercentage) {
-      // Adjust drawdown limit proportionally to the risk increase
-      const riskRatio = dynamicRiskSettings.increasedRiskPercentage / (maxDailyDrawdown / 2); // Assuming riskPerTrade is half of maxDailyDrawdown
-      effectiveMaxDailyDrawdown = maxDailyDrawdown * riskRatio;
-    }
+  if (dynamicRiskSettings && allTrades) {
+    effectiveMaxDailyDrawdown = calculateEffectiveMaxDailyDrawdown(
+      maxDailyDrawdown,
+      allTrades,
+      dynamicRiskSettings
+    );
   }
 
   // Check for drawdown violation - if the loss percentage exceeds effectiveMaxDailyDrawdown
@@ -939,7 +934,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                         accountBalance,
                         maxDailyDrawdown,
                         dynamicRiskSettings,
-                        totalProfit
+                        filteredTrades
                       );
                       const isCurrentMonth = isSameMonth(day, currentDate);
                       const isCurrentDay = isToday(day);
@@ -1170,7 +1165,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onAccountBalanceChange={onAccountBalanceChange}
           allTrades={trades}
           tags={allTags}
-          riskPerTrade={dynamicRiskSettings?.riskPerTrade}
           dynamicRiskSettings={dynamicRiskSettings}
           requiredTagGroups={requiredTagGroups}
         />

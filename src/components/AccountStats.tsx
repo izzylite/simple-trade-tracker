@@ -43,7 +43,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [tempBalance, setTempBalance] = useState(balance.toString());
 
-  // Profit percentage calculation
+  // Profit percentage calculation - should be based on original account balance for threshold comparison
   const profitPercentage = trades.length > 0 && balance > 0 ? (totalProfit / balance * 100).toFixed(2) : '0';
 
   // Calculate the effective risk percentage based on dynamic risk settings

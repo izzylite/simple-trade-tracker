@@ -74,10 +74,9 @@ interface TradeFormProps {
   newTrade: NewTradeForm;
   editingTrade: Trade | null;
   allTags: string[];
-  isSubmitting: boolean;
-  riskPerTrade?: number;
+  isSubmitting: boolean; 
   accountBalance: number;
-  dynamicRiskSettings?: DynamicRiskSettings;
+  dynamicRiskSettings: DynamicRiskSettings;
   calculateCumulativePnl(newTrade?: NewTradeForm): number;
   calculateAmountFromRiskToReward: (rr: number,cumulativePnL: number) => number;
   calendarId: string;
@@ -105,8 +104,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
   newTrade,
   editingTrade,
   allTags,
-  isSubmitting,
-  riskPerTrade,
+  isSubmitting, 
   accountBalance,
   dynamicRiskSettings,
   calculateAmountFromRiskToReward,
@@ -150,12 +148,11 @@ const TradeForm: React.FC<TradeFormProps> = ({
     return requiredTagGroups.filter(group => !satisfiedGroups.has(group));
   }, [requiredTagGroups, newTrade.tags]);
 
-  const cumulativePnl = calculateCumulativePnl(newTrade);
-
+  const cumulativePnl = calculateCumulativePnl(newTrade); 
 
   // Calculate and update the amount based on risk
   const calculateAmountFromRisk = (): string => {
-    if (!riskPerTrade || !newTrade.riskToReward) return '';
+    if (!dynamicRiskSettings.riskPerTrade || !newTrade.riskToReward) return '';
 
     const rr = parseFloat(newTrade.riskToReward);
     if (isNaN(rr)) return '';
@@ -181,7 +178,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
       onRiskToRewardChange(value)
 
       // If risk per trade is set and partials are not taken, automatically calculate and update the amount
-      if (riskPerTrade && value && !newTrade.partialsTaken) {
+      if (dynamicRiskSettings.riskPerTrade && value && !newTrade.partialsTaken) {
         const rr = parseFloat(value);
         if (!isNaN(rr)) {
           const calculatedAmount = calculateAmountFromRiskToReward(rr,cumulativePnl);
@@ -265,7 +262,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
           />
         </RadioGroup>
       </FormControl>
-      {(!riskPerTrade || (riskPerTrade && newTrade.partialsTaken)) ? (
+      {(!dynamicRiskSettings.riskPerTrade || (dynamicRiskSettings.riskPerTrade && newTrade.partialsTaken)) ? (
         <FormField>
           <TextField
             label="Amount"
@@ -274,7 +271,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
             onChange={(e) => onAmountChange(e.target.value)}
             fullWidth
             required
-            helperText={riskPerTrade && newTrade.partialsTaken ? "Manual entry for partial profits" : undefined}
+            helperText={dynamicRiskSettings.riskPerTrade && newTrade.partialsTaken ? "Manual entry for partial profits" : undefined}
           />
         </FormField>
       ) : (
@@ -293,15 +290,15 @@ const TradeForm: React.FC<TradeFormProps> = ({
                 dynamicRiskSettings.increasedRiskPercentage &&
                 dynamicRiskSettings.profitThresholdPercentage &&
                 (cumulativePnl / accountBalance * 100) >= dynamicRiskSettings.profitThresholdPercentage
-                ? `Based on ${dynamicRiskSettings.increasedRiskPercentage}% of account balance (INCREASED from ${riskPerTrade}%)`
-                : `Based on ${riskPerTrade}% of account balance (${formatCurrency((accountBalance * (riskPerTrade || 0)) / 100)})`
+                ? `Based on ${dynamicRiskSettings.increasedRiskPercentage}% of account balance (INCREASED from ${dynamicRiskSettings.riskPerTrade}%)`
+                : `Based on ${dynamicRiskSettings.riskPerTrade}% of account balance (${formatCurrency((accountBalance * (dynamicRiskSettings.riskPerTrade || 0)) / 100)})`
             }
           />
         </FormField>
       )}
 
 
-      {riskPerTrade !== undefined && (
+      {dynamicRiskSettings.riskPerTrade !== undefined && (
         <FormField>
           <MuiFormControlLabel
             control={

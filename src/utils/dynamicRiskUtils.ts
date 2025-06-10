@@ -1,4 +1,5 @@
 import { Trade } from '../types/trade';
+import { endOfDay } from 'date-fns';
 
 /**
  * Dynamic risk settings interface
@@ -18,8 +19,9 @@ export const calculateCumulativePnLToDate = (
   targetDate: Date,
   allTrades: Trade[]
 ): number => {
+  const endOfTargetDate = endOfDay(targetDate);
   return allTrades
-    .filter(trade => new Date(trade.date) < targetDate)
+    .filter(trade => new Date(trade.date) <= endOfTargetDate)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .reduce((cumulative, trade) => cumulative + trade.amount, 0);
 };
@@ -70,6 +72,29 @@ export const calculateCurrentEffectiveRiskPercentage = (
   const currentDate = new Date(latestDate.getTime() + 24 * 60 * 60 * 1000);
 
   return calculateEffectiveRiskPercentage(currentDate, allTrades, dynamicRiskSettings);
+};
+
+/**
+ * Calculate current total account value (account balance + cumulative profit)
+ */
+export const calculateCurrentTotalValue = (
+  accountBalance: number,
+  allTrades: Trade[]
+): number => {
+  const totalPnL = allTrades.reduce((sum, trade) => sum + trade.amount, 0);
+  return accountBalance + totalPnL;
+};
+
+/**
+ * Calculate percentage based on current total value instead of just account balance
+ */
+export const calculatePercentageOfCurrentValue = (
+  amount: number,
+  accountBalance: number,
+  allTrades: Trade[]
+): number => {
+  const currentTotalValue = calculateCurrentTotalValue(accountBalance, allTrades);
+  return currentTotalValue > 0 ? (amount / currentTotalValue) * 100 : 0;
 };
 
 /**
@@ -199,3 +224,4 @@ export const getDynamicRiskStatus = (
     thresholdMet
   };
 };
+
