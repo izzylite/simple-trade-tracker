@@ -6,7 +6,8 @@ import {
   CircularProgress,
   Divider,
   Paper,
-  Button
+  Button,
+  IconButton
 } from '@mui/material';
 import { alpha, useTheme, keyframes } from '@mui/material/styles';
 import { format } from 'date-fns';
@@ -18,7 +19,9 @@ import {
   Balance as RiskIcon,
   Schedule as SessionIcon,
   Note as NoteIcon,
-  Image as ImageIcon
+  Image as ImageIcon,
+  PushPin as PinIcon,
+  PushPinOutlined as UnpinIcon
 } from '@mui/icons-material';
 import { AnimatedDropdown } from './Animations';
 import { TagsDisplay } from './common';
@@ -59,6 +62,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 }) => {
   const theme = useTheme();
   const [isToggling, setIsToggling] = useState(false);
+  const [isPinning, setIsPinning] = useState(false);
   const [loadingImages, setLoadingImages] = useState<{[key: string]: boolean}>({});
 
   // Initialize loading state for all images
@@ -95,6 +99,23 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     }
   };
 
+  // Function to toggle pin status
+  const handleTogglePin = async () => {
+    if (!onUpdateTradeProperty || isPinning) return;
+
+    try {
+      setIsPinning(true);
+      await onUpdateTradeProperty(trade.id, (currentTrade) => ({
+        ...currentTrade,
+        isPinned: !currentTrade.isPinned
+      }));
+    } catch (error) {
+      console.error('Error toggling pin status:', error);
+    } finally {
+      setIsPinning(false);
+    }
+  };
+
   if (!isExpanded) return null;
 
   return (
@@ -115,13 +136,44 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
         width: '100%'
       }}>
         <Stack spacing={3}>
+          {/* Header Section */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+            {/* Trade Name */}
+            <Box sx={{ flex: 1 }}>
+              {trade.name && (
+                <Typography variant="h6" color="text.primary" sx={{ display: 'block', fontWeight: 700 }}>
+                  📈 {trade.name}
+                </Typography>
+              )}
+            </Box>
+
+            {/* Pin Button */}
+            {onUpdateTradeProperty && (
+              <IconButton
+                onClick={handleTogglePin}
+                disabled={isPinning}
+                sx={{
+                  color: trade.isPinned ? 'primary.main' : 'text.secondary',
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    color: 'primary.main'
+                  },
+                  '&:disabled': {
+                    color: 'text.disabled'
+                  }
+                }}
+              >
+                {isPinning ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  trade.isPinned ? <UnpinIcon sx={{ fontSize: 20 }} /> : <PinIcon sx={{ fontSize: 20 }} />
+                )}
+              </IconButton>
+            )}
+          </Box>
+
           {/* Properties Section */}
           <Box sx={{ width: '100%' }}>
-            {trade.name && (
-              <Typography variant="h6" color="text.primary" sx={{ mb: 2, display: 'block', fontWeight: 700 }}>
-                📈 {trade.name}
-              </Typography>
-            )}
             <Typography variant="subtitle2" color="text.primary" sx={{ mb: 1.5, display: 'block', fontWeight: 700, fontSize: '0.9rem' }}>
               Properties
             </Typography>
@@ -211,36 +263,39 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       {trade.amount > 0 ? '+' : ''}{trade.amount.toFixed(2)}
                     </Typography>
 
-                    {onUpdateTradeProperty && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color={trade.type === 'win' ? 'success' : 'error'}
-                        onClick={handleToggleTradeType}
-                        disabled={isToggling}
-                        sx={{
-                          minWidth: '80px',
-                          fontSize: '0.7rem',
-                          position: 'relative'
-                        }}
-                      >
-                        {isToggling ? (
-                          <>
-                            <CircularProgress
-                              size={16}
-                              color="inherit"
-                              sx={{
-                                position: 'absolute',
-                                left: '8px'
-                              }}
-                            />
-                            Processing...
-                          </>
-                        ) : (
-                          <>Toggle {trade.type === 'win' ? 'Win' : 'Loss'}</>
-                        )}
-                      </Button>
-                    )}
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      {/* Toggle Button */}
+                      {onUpdateTradeProperty && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color={trade.type === 'win' ? 'success' : 'error'}
+                          onClick={handleToggleTradeType}
+                          disabled={isToggling}
+                          sx={{
+                            minWidth: '80px',
+                            fontSize: '0.7rem',
+                            position: 'relative'
+                          }}
+                        >
+                          {isToggling ? (
+                            <>
+                              <CircularProgress
+                                size={16}
+                                color="inherit"
+                                sx={{
+                                  position: 'absolute',
+                                  left: '8px'
+                                }}
+                              />
+                              Processing...
+                            </>
+                          ) : (
+                            <>Toggle {trade.type === 'win' ? 'Win' : 'Loss'}</>
+                          )}
+                        </Button>
+                      )}
+                    </Box>
                   </Box>
                 </Paper>
 

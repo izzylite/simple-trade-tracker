@@ -17,4 +17,5 @@ export interface Trade {
   notes?: string;
   isTemporary?: boolean;
   images?: Array<TradeImage>;
+  isPinned?: boolean;
 }

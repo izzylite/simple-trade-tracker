@@ -18,6 +18,7 @@ import {
   Avatar,
   Snackbar,
   Alert,
+  Badge,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -31,7 +32,7 @@ import {
   Logout as LogoutIcon,
   FilterAlt,
   Clear,
-
+  PushPin as PinIcon,
   Info as InfoIcon,
 } from '@mui/icons-material';
 import {
@@ -82,6 +83,7 @@ import AccountStats from './AccountStats';
 import DayNoteCard from './DayNoteCard';
 import TradeFormDialog, { createEditTradeData } from './trades/TradeFormDialog';
 import ConfirmationDialog from './common/ConfirmationDialog';
+import PinnedTradesDrawer from './PinnedTradesDrawer';
 
 import { DynamicRiskSettings, calculateEffectiveMaxDailyDrawdown, calculatePercentageOfCurrentValue } from '../utils/dynamicRiskUtils';
 
@@ -454,12 +456,15 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'warning' | 'error'>('warning');
   const [showFloatingMonthNav, setShowFloatingMonthNav] = useState(false);
+  const [pinnedTradesDrawerOpen, setPinnedTradesDrawerOpen] = useState(false);
 
   const theme = useTheme();
   const navigate = useNavigate();
   const { calendarId } = useParams();
 
   const { user, signInWithGoogle, signOut } = useAuth();
+
+
 
   // Scroll detection for floating month navigation
   useEffect(() => {
@@ -692,6 +697,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     }
   };
 
+
+
   return (
     <Box>
       {/* Floating Month Navigation */}
@@ -824,6 +831,26 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 }}
               >
                 Today
+              </Button>
+              <Button
+                startIcon={
+                  <Badge
+                    badgeContent={trades.filter(trade => trade.isPinned).length}
+                    color="secondary"
+                    max={99}
+                    showZero={false}
+                  >
+                    <PinIcon />
+                  </Badge>
+                }
+                onClick={() => setPinnedTradesDrawerOpen(true)}
+                variant="outlined"
+                size="small"
+                sx={{
+                  minWidth: { xs: '100%', sm: 'auto' }
+                }}
+              >
+                Pinned Trades
               </Button>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <TagFilter
@@ -1263,6 +1290,20 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             {snackbarMessage}
           </Alert>
         </Snackbar>
+
+
+
+        {/* Pinned Trades Drawer */}
+        <PinnedTradesDrawer
+          open={pinnedTradesDrawerOpen}
+          onClose={() => setPinnedTradesDrawerOpen(false)}
+          trades={trades}
+          onTradeClick={(trade) => {
+            // Close drawer and open the trade in expanded view
+            setPinnedTradesDrawerOpen(false);
+            setSelectedDate(new Date(trade.date));
+          }}
+        />
       </Box>
     </Box>
   );

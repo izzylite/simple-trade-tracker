@@ -427,6 +427,7 @@ const convertTradeToFirestoreData = (trade: Trade, calendarId: string) => {
     ...(trade.session !== undefined && { session: trade.session }),
     ...(trade.notes !== undefined && { notes: trade.notes }),
     ...(trade.isTemporary !== undefined && { isTemporary: trade.isTemporary }),
+    ...(trade.isPinned !== undefined && { isPinned: trade.isPinned }),
     ...(processedImages && { images: processedImages })
   };
 
@@ -529,7 +530,8 @@ const convertFirestoreDataToYearlyTrades = (doc: DocumentData): YearlyTrades => 
     lastModified: data.lastModified.toDate(),
     trades: data.trades.map((trade: any) => ({
       ...trade,
-      date: trade.date.toDate()
+      date: trade.date.toDate(),
+      isPinned: trade.isPinned || false // Ensure isPinned field is included
     }))
   };
 };
