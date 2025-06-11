@@ -89,37 +89,44 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
     >
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
-        <Box
-          sx={{
-            p: 2,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            backgroundColor: alpha(theme.palette.primary.main, 0.05)
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <PinIcon sx={{ fontSize: 24, color: 'primary.main' }} />
-              <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                Pinned Trades
-              </Typography>
-              <Chip
-                label={sortedPinnedTrades.length}
-                size="small"
-                sx={{
-                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                  color: 'primary.main',
-                  fontWeight: 600
-                }}
-              />
-            </Box>
-            <IconButton onClick={onClose} size="small">
-              <CloseIcon />
-            </IconButton>
+        <Box sx={{
+          p: 2,
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2
+        }}>
+          <Box sx={{
+            p: 1,
+            borderRadius: 1,
+            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <PinIcon sx={{ color: 'primary.main', fontSize: 20 }} />
           </Box>
+          <Typography variant="h6" sx={{ flex: 1, fontWeight: 600 }}>
+            Pinned Trades
+          </Typography>
+          {sortedPinnedTrades.length > 0 && (
+            <Chip
+              label={sortedPinnedTrades.length}
+              size="small"
+              sx={{
+                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                color: 'primary.main',
+                fontWeight: 600
+              }}
+            />
+          )}
+          <IconButton onClick={onClose} size="small">
+            <CloseIcon />
+          </IconButton>
         </Box>
 
         {/* Content */}
-        <Box sx={{ flex: 1, overflow: 'hidden' }}>
+        <Box sx={{ flex: 1, overflow: 'auto' }}>
           {sortedPinnedTrades.length === 0 ? (
             <Box
               sx={{

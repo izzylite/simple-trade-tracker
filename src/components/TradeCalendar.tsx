@@ -34,6 +34,7 @@ import {
   Clear,
   PushPin as PinIcon,
   Info as InfoIcon,
+  LocalOffer as TagIcon,
 } from '@mui/icons-material';
 import {
   format,
@@ -57,7 +58,9 @@ import DayDialog from './trades/DayDialog';
 import SelectDateDialog from './SelectDateDialog';
 
 import TagFilterDialog from './TagFilterDialog';
+import TagFilterDrawer from './TagFilterDrawer';
 import TagManagementDialog from './TagManagementDialog';
+import TagManagementDrawer from './TagManagementDrawer';
 import TargetBadge from './TargetBadge';
 import { CalendarCell, WeekdayHeader } from './CalendarGrid';
 
@@ -337,11 +340,11 @@ interface TagFilterProps {
   allTags: string[];
   selectedTags: string[];
   onTagsChange: (tags: string[]) => void;
+  onOpenDrawer: () => void;
 }
 
-const TagFilter: React.FC<TagFilterProps> = ({ allTags, selectedTags, onTagsChange }) => {
+const TagFilter: React.FC<TagFilterProps> = ({ allTags, selectedTags, onTagsChange, onOpenDrawer }) => {
   const theme = useTheme();
-  const [open, setOpen] = useState(false);
 
   const handleClearTags = () => {
     onTagsChange([]);
@@ -354,10 +357,12 @@ const TagFilter: React.FC<TagFilterProps> = ({ allTags, selectedTags, onTagsChan
           variant="outlined"
           size="small"
           startIcon={<FilterAlt />}
-          onClick={() => setOpen(true)}
+          onClick={onOpenDrawer}
           sx={{
             borderColor: selectedTags.length > 0 ? 'primary.main' : 'divider',
             color: selectedTags.length > 0 ? 'primary.main' : 'text.secondary',
+            display: 'flex',
+            alignItems: 'center',
             '&:hover': {
               borderColor: 'primary.main',
               bgcolor: alpha(theme.palette.primary.main, 0.08)
@@ -385,15 +390,6 @@ const TagFilter: React.FC<TagFilterProps> = ({ allTags, selectedTags, onTagsChan
           </IconButton>
         </Tooltip>
       )}
-
-      <TagFilterDialog
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Filter Trades by Tags"
-        allTags={allTags}
-        selectedTags={selectedTags}
-        onTagsChange={onTagsChange}
-      />
     </Box>
   );
 };
@@ -451,6 +447,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   }, []);
 
   const [isTagManagementDialogOpen, setIsTagManagementDialogOpen] = useState(false);
+  const [isTagFilterDrawerOpen, setIsTagFilterDrawerOpen] = useState(false);
+  const [isTagManagementDrawerOpen, setIsTagManagementDrawerOpen] = useState(false);
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -563,7 +561,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const handleTodayClick = () => {
     setCurrentDate(new Date());
   };
-
+  const hasPinnedTrades = useMemo(() => {
+    const pinnedTrades = trades.filter(trade => trade.isPinned);
+    return pinnedTrades.length;
+  }, [trades]);
 
   // Handle single trade deletion
   const handleDeleteClick = (tradeId: string) => {
@@ -827,27 +828,39 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 variant="outlined"
                 size="small"
                 sx={{
-                  minWidth: { xs: '100%', sm: 'auto' }
+                  minWidth: { xs: '100%', sm: 'auto' },
+                  display: 'flex',
+                  alignItems: 'center'
                 }}
               >
                 Today
               </Button>
               <Button
-                startIcon={
-                  <Badge
-                    badgeContent={trades.filter(trade => trade.isPinned).length}
-                    color="secondary"
-                    max={99}
-                    showZero={false}
-                  >
-                    <PinIcon />
-                  </Badge>
-                }
+                startIcon={<PinIcon />}
                 onClick={() => setPinnedTradesDrawerOpen(true)}
                 variant="outlined"
                 size="small"
                 sx={{
-                  minWidth: { xs: '100%', sm: 'auto' }
+                  minWidth: { xs: '100%', sm: 'auto' },
+                  display: 'flex',
+                  alignItems: 'center',
+                  ...(hasPinnedTrades > 0 ? {
+                    // Active state - like Today button when active
+                    borderColor: 'primary.main',
+                    color: 'primary.main',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      bgcolor: alpha(theme.palette.primary.main, 0.08)
+                    }
+                  } : {
+                    // Inactive state - like other buttons
+                    borderColor: 'divider',
+                    color: 'text.secondary',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      bgcolor: alpha(theme.palette.primary.main, 0.08)
+                    }
+                  })
                 }}
               >
                 Pinned Trades
@@ -857,15 +870,19 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   allTags={allTags}
                   selectedTags={selectedTags}
                   onTagsChange={handleTagsChange}
+                  onOpenDrawer={() => setIsTagFilterDrawerOpen(true)}
                 />
                 <Tooltip title="Manage tags and required tag groups">
                   <Button
                     variant="outlined"
                     size="small"
-                    onClick={() => setIsTagManagementDialogOpen(true)}
+                    startIcon={<TagIcon />}
+                    onClick={() => setIsTagManagementDrawerOpen(true)}
                     sx={{
                       borderColor: 'divider',
                       color: 'text.secondary',
+                      display: 'flex',
+                      alignItems: 'center',
                       '&:hover': {
                         borderColor: 'primary.main',
                         bgcolor: alpha(theme.palette.primary.main, 0.08)
@@ -1231,6 +1248,25 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
+
+        {/* Drawers */}
+        <TagFilterDrawer
+          open={isTagFilterDrawerOpen}
+          onClose={() => setIsTagFilterDrawerOpen(false)}
+          allTags={allTags}
+          selectedTags={selectedTags}
+          onTagsChange={handleTagsChange}
+        />
+
+        <TagManagementDrawer
+          open={isTagManagementDrawerOpen}
+          onClose={() => setIsTagManagementDrawerOpen(false)}
+          allTags={allTags}
+          calendarId={calendarId!!}
+          onTagUpdated={onTagUpdated}
+          requiredTagGroups={requiredTagGroups}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
+        />
 
         {/* Snackbar for notifications */}
         <TagManagementDialog
