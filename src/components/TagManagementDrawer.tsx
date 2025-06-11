@@ -25,7 +25,7 @@ import {
   FilterList as FilterListIcon,
   Info as InfoIcon,
   Close as CloseIcon,
-  Settings as SettingsIcon
+  Tag as TagIcon,
 } from '@mui/icons-material';
 import TagEditDialog from './TagEditDialog';
 import {
@@ -191,7 +191,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <SettingsIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+            <TagIcon sx={{ color: 'primary.main', fontSize: 20 }} />
           </Box>
           <Typography variant="h6" sx={{ flex: 1, fontWeight: 600 }}>
             Tag Management

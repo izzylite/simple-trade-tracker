@@ -19,6 +19,7 @@ import {
   Snackbar,
   Alert,
   Badge,
+  Fab,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -35,6 +36,7 @@ import {
   PushPin as PinIcon,
   Info as InfoIcon,
   LocalOffer as TagIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import {
   format,
@@ -61,6 +63,7 @@ import TagFilterDialog from './TagFilterDialog';
 import TagFilterDrawer from './TagFilterDrawer';
 import TagManagementDialog from './TagManagementDialog';
 import TagManagementDrawer from './TagManagementDrawer';
+import SearchDrawer from './SearchDrawer';
 import TargetBadge from './TargetBadge';
 import { CalendarCell, WeekdayHeader } from './CalendarGrid';
 
@@ -449,6 +452,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [isTagManagementDialogOpen, setIsTagManagementDialogOpen] = useState(false);
   const [isTagFilterDrawerOpen, setIsTagFilterDrawerOpen] = useState(false);
   const [isTagManagementDrawerOpen, setIsTagManagementDrawerOpen] = useState(false);
+  const [isSearchDrawerOpen, setIsSearchDrawerOpen] = useState(false);
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -1328,6 +1332,34 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         </Snackbar>
 
 
+
+        {/* Search FAB */}
+        <Fab
+          color="primary"
+          aria-label="search trades"
+          onClick={() => setIsSearchDrawerOpen(true)}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 1200
+          }}
+        >
+          <SearchIcon />
+        </Fab>
+
+        {/* Search Drawer */}
+        <SearchDrawer
+          open={isSearchDrawerOpen}
+          onClose={() => setIsSearchDrawerOpen(false)}
+          trades={trades}
+          allTags={allTags}
+          onTradeClick={(trade) => {
+            // Close search drawer and open the trade in expanded view
+            setIsSearchDrawerOpen(false);
+            setSelectedDate(new Date(trade.date));
+          }}
+        />
 
         {/* Pinned Trades Drawer */}
         <PinnedTradesDrawer
