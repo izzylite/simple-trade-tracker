@@ -116,7 +116,7 @@ const TagsDisplay: React.FC<TagsDisplayProps> = ({
       )}
 
       {!showGroups && (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1}}>
           {filteredTags.map(tag => (
             <Chip
               key={tag}

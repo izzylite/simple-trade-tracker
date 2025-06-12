@@ -6,7 +6,7 @@ import {
 import { Trade } from '../../types/trade';
 import TradeList from '../trades/TradeList';
 import { BaseDialog } from '../common';
-import DayHeader from '../trades/DayHeader'; 
+import DayHeader from '../trades/DayHeader';
 import { calculateCumulativePnL, startOfNextDay } from '../trades/TradeFormDialog';
 
 interface TradesDialogProps {
@@ -16,6 +16,7 @@ interface TradesDialogProps {
   expandedTradeId: string | null;
   onClose: () => void;
   onTradeExpand: (tradeId: string) => void;
+ onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   onZoomImage: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
   accountBalance: number;
   allTrades: Trade[];
@@ -34,11 +35,12 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   onZoomImage,
   accountBalance,
   allTrades,
+  onUpdateTradeProperty,
   onEditClick,
   onDeleteClick,
   onDeleteMultiple
 }) => {
-   
+
 
 
   // Calculate total PnL from trades
@@ -65,11 +67,11 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
         {/* DayHeader with navigation buttons hidden */}
         <DayHeader
           title={''}
-          accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(date),allTrades)}
+          accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(date), allTrades)}
           formInputVisible={true} // Set to true to hide navigation buttons
           totalPnL={totalPnL}
-          onPrevDay={() => {}} // Empty function since we're hiding the buttons
-          onNextDay={() => {}} // Empty function since we're hiding the buttons
+          onPrevDay={() => { }} // Empty function since we're hiding the buttons
+          onNextDay={() => { }} // Empty function since we're hiding the buttons
         />
 
         <TradeList
@@ -77,10 +79,11 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
           trades={trades}
           expandedTradeId={expandedTradeId}
           onTradeClick={onTradeExpand}
-          onEditClick={onEditClick || (() => {})} // Use provided handler or no-op
-          onDeleteClick={onDeleteClick || (() => {})} // Use provided handler or no-op
+          onEditClick={onEditClick || (() => { })} // Use provided handler or no-op
+          onDeleteClick={onDeleteClick || (() => { })} // Use provided handler or no-op
           onDeleteMultiple={onDeleteMultiple}
           onZoomedImage={onZoomImage}
+          onUpdateTradeProperty={onUpdateTradeProperty}
           hideActions={!onEditClick && !onDeleteClick} // Hide actions only if both handlers are not provided
           enableBulkSelection={trades.length > 1 && !!onDeleteMultiple} // Enable bulk selection when there are multiple trades and handler is provided
         />

@@ -447,7 +447,7 @@ const TradeList: React.FC<TradeListProps> = ({
 
               {expandedTradeId === trade.id && (
                 <TradeDetailExpanded
-                  trade={trade}
+                  tradeData={trade}
                   isExpanded={true}
                   setZoomedImage={onZoomedImage}
                   onUpdateTradeProperty={onUpdateTradeProperty}

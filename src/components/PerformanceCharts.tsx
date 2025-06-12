@@ -39,6 +39,7 @@ interface PerformanceChartsProps {
   onSecondaryTagsChange?: (tags: string[]) => void;
   onEditTrade?: (trade: Trade) => void;
   onDeleteTrade?: (tradeId: string) => void;
+ onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
   // Dynamic risk settings
   dynamicRiskSettings?: DynamicRiskSettings;
@@ -55,10 +56,11 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   calendarId,
   scoreSettings,
   onTimePeriodChange,
-  onPrimaryTagsChange = () => {},
-  onSecondaryTagsChange = () => {},
+  onPrimaryTagsChange = () => { },
+  onSecondaryTagsChange = () => { },
   onEditTrade,
   onDeleteTrade,
+  onUpdateTradeProperty,
   onUpdateCalendarProperty,
   dynamicRiskSettings
 }) => {
@@ -117,7 +119,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     }
   }, [trades, multipleTradesDialog.open, multipleTradesDialog.trades]);
 
-  
+
 
   const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
   const [chartData, setChartData] = useState<any[]>([]);
@@ -312,13 +314,13 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
     // Group trades by date
     const tradesByDate = filteredTrades.reduce((acc, trade) => {
-        const dateKey = format(new Date(trade.date), 'yyyy-MM-dd');
-        if (!acc[dateKey]) {
-          acc[dateKey] = [];
-        }
-        acc[dateKey].push(trade);
-        return acc;
-      }, {} as { [key: string]: Trade[] });
+      const dateKey = format(new Date(trade.date), 'yyyy-MM-dd');
+      if (!acc[dateKey]) {
+        acc[dateKey] = [];
+      }
+      acc[dateKey].push(trade);
+      return acc;
+    }, {} as { [key: string]: Trade[] });
 
     // Calculate daily statistics
     return Object.entries(tradesByDate)
@@ -565,6 +567,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         trades={multipleTradesDialog.trades}
         date={multipleTradesDialog.date}
         expandedTradeId={multipleTradesDialog.expandedTradeId}
+        onUpdateTradeProperty={onUpdateTradeProperty}
         onClose={() => setMultipleTradesDialog(prev => ({ ...prev, open: false }))}
         onTradeExpand={handleTradeExpand}
         onZoomImage={handleZoomImage}
@@ -579,8 +582,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
           Performance Charts for {timePeriod === 'month'
             ? format(selectedDate, 'MMMM yyyy')
             : timePeriod === 'year'
-            ? format(selectedDate, 'yyyy')
-            : 'All Time'
+              ? format(selectedDate, 'yyyy')
+              : 'All Time'
           }
         </Typography>
         <Tabs
@@ -612,7 +615,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               borderRadius: '16px',
               padding: '6px 18px',
               '&.Mui-selected': {
-                color:theme.palette.mode === 'dark' ? 'white' : 'background.paper',
+                color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
                 backgroundColor: 'primary.main',
                 boxShadow: theme.shadows[1]
               },
@@ -635,7 +638,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               borderRadius: '16px',
               padding: '6px 18px',
               '&.Mui-selected': {
-                color:theme.palette.mode === 'dark' ? 'white' : 'background.paper',
+                color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
                 backgroundColor: 'primary.main',
                 boxShadow: theme.shadows[1]
               },
@@ -658,7 +661,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               borderRadius: '16px',
               padding: '6px 18px',
               '&.Mui-selected': {
-                color:theme.palette.mode === 'dark' ? 'white' : 'background.paper',
+                color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
                 backgroundColor: 'primary.main',
                 boxShadow: theme.shadows[1]
               },
@@ -750,7 +753,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
                     borderRadius: '16px',
                     padding: '6px 18px',
                     '&.Mui-selected': {
-                      color:theme.palette.mode === 'dark' ? 'white' : 'background.paper',
+                      color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
                       backgroundColor: 'primary.main',
                       boxShadow: theme.shadows[1]
                     },
@@ -772,7 +775,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
                     borderRadius: '16px',
                     padding: '6px 18px',
                     '&.Mui-selected': {
-                      color:theme.palette.mode === 'dark' ? 'white' : 'background.paper',
+                      color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
                       backgroundColor: 'primary.main',
                       boxShadow: theme.shadows[1]
                     },
@@ -845,7 +848,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             calendarId={calendarId}
             scoreSettings={scoreSettings}
             onUpdateCalendarProperty={onUpdateCalendarProperty}
-            accountBalance={accountBalance} 
+            accountBalance={accountBalance}
             dynamicRiskSettings={dynamicRiskSettings}
           />
         </>
@@ -865,8 +868,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             No trading data available for {timePeriod === 'month'
               ? format(selectedDate, 'MMMM yyyy')
               : timePeriod === 'year'
-              ? format(selectedDate, 'yyyy')
-              : 'All Time'
+                ? format(selectedDate, 'yyyy')
+                : 'All Time'
             }
           </Typography>
         </Box>

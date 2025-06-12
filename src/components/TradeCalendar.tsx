@@ -1132,6 +1132,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             monthlyTarget={monthlyTarget}
             calendarId={calendarId!!}
             scoreSettings={scoreSettings}
+            onUpdateTradeProperty={onUpdateTradeProperty}
             onUpdateCalendarProperty={onUpdateCalendarProperty}
             dynamicRiskSettings={dynamicRiskSettings}
             allTags={allTags}

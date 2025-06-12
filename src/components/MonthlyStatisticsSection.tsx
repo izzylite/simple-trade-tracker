@@ -34,6 +34,7 @@ interface MonthlyStatisticsSectionProps {
   monthlyTarget?: number;
   calendarId: string;
   scoreSettings?: import('../types/score').ScoreSettings;
+  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
   dynamicRiskSettings?: DynamicRiskSettings;
   allTags?: string[]; // Add allTags prop to receive calendar.tags
@@ -59,6 +60,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   monthlyTarget,
   calendarId,
   scoreSettings,
+  onUpdateTradeProperty,
   onUpdateCalendarProperty,
   dynamicRiskSettings,
   allTags: propAllTags,
@@ -210,7 +212,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         </Button>
       </Box>
 
- {/* Score Section */}
+      {/* Score Section */}
       <ScoreSection
         trades={trades}
         selectedDate={selectedDate}
@@ -255,7 +257,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         </Box>
       </Box>
 
-     
+
 
       {/* Trades List Dialog */}
       <TradesListDialog
@@ -263,6 +265,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         onClose={() => setMultipleTradesDialog(prev => ({ ...prev, open: false }))}
         trades={multipleTradesDialog.trades}
         date={multipleTradesDialog.date}
+
         expandedTradeId={multipleTradesDialog.expandedTradeId}
         onTradeExpand={(tradeId) =>
           setMultipleTradesDialog(prev => ({
@@ -270,7 +273,8 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
             expandedTradeId: prev.expandedTradeId === tradeId ? null : tradeId
           }))
         }
-        onZoomImage={onZoomImage || (() => {})}
+        onUpdateTradeProperty={onUpdateTradeProperty}
+        onZoomImage={onZoomImage || (() => { })}
         accountBalance={accountBalance}
         allTrades={trades}
         onEditClick={onEditTrade}
@@ -316,6 +320,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
             monthlyTarget={monthlyTarget}
             calendarId={calendarId}
             scoreSettings={scoreSettings}
+            onUpdateTradeProperty={onUpdateTradeProperty}
             onUpdateCalendarProperty={onUpdateCalendarProperty}
             dynamicRiskSettings={dynamicRiskSettings}
             onEditTrade={onEditTrade}
