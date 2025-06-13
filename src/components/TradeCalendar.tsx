@@ -96,7 +96,7 @@ import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/
 
 import MonthlyStatisticsSection from './MonthlyStatisticsSection';
 import FloatingMonthNavigation from './FloatingMonthNavigation';
-import { calculateDayStats } from '../utils/statsUtils';
+import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
 
 interface TradeCalendarProps {
   trades: Trade[];
@@ -170,7 +170,11 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ date, trades, monthStart, weekInd
       : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0';
 
  
-  const targetProgress = weeklyTarget && weeklyTarget > 0 ? Math.min((parseFloat(percentage) / weeklyTarget * 100),100).toFixed(0) : '0'; 
+  // Calculate target progress using centralized function
+  const targetProgressValue = weeklyTarget && weeklyTarget > 0
+    ? calculateTargetProgress(weekTrades, accountBalance, weeklyTarget, weekStart, trades)
+    : 0;
+  const targetProgress = targetProgressValue.toFixed(0);
   const isTargetMet = weeklyTarget ? parseFloat(percentage) >= weeklyTarget : false;
 
   return (

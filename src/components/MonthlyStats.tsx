@@ -27,6 +27,7 @@ import { Trade } from '../types/trade';
 import { exportTrades, importTrades } from '../utils/tradeExportImport';
 import { formatCurrency } from '../utils/formatters';
 import { calculatePercentageOfValueAtDate } from '../utils/dynamicRiskUtils';
+import { calculateTargetProgress } from '../utils/statsUtils';
 
 
 
@@ -71,10 +72,13 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   // Calculate account value at start of month for display
   const tradesBeforeMonth = trades.filter(trade => new Date(trade.date) < startOfCurrentMonth);
   const accountValueAtStartOfMonth = accountBalance + tradesBeforeMonth.reduce((sum, trade) => sum + trade.amount, 0);
-  
 
-  // Calculate monthly target progress
-  const targetProgress = monthlyTarget && monthlyTarget > 0 ? Math.min((parseFloat(growthPercentage) / monthlyTarget * 100),100).toFixed(0) : '0';
+
+  // Calculate monthly target progress using centralized function
+  const targetProgressValue = monthlyTarget && monthlyTarget > 0
+    ? calculateTargetProgress(monthTrades, accountBalance, monthlyTarget, startOfCurrentMonth, trades)
+    : 0;
+  const targetProgress = targetProgressValue.toFixed(0);
   const isTargetMet = monthlyTarget ? parseFloat(growthPercentage) >= monthlyTarget : false;
 
   const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv'>('xlsx');
@@ -159,9 +163,18 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, pl: 0.5 }}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, pl: 0.5,  }}>
             Monthly Performance
+            <Typography variant="body2" sx={{
+                  fontWeight: 500,
+                  mt : 1,
+                  color: 'text.secondary',  
+                  fontSize: '0.875rem'
+                }}>
+                  Started with {formatCurrency(accountValueAtStartOfMonth)}
+                </Typography>
           </Typography>
+            
 
           <Box sx={{
             position: { xs: 'absolute', sm: 'static' },
@@ -313,6 +326,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               <TrendingUp sx={{ fontSize: '1.2rem', color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.secondary' }} />
               <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary' }}>
                 Monthly P&L
+              
               </Typography>
             </Box>
             <Typography
@@ -343,14 +357,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
                 </Typography>
               </Tooltip>
             </Typography>
-            <Typography variant="body2" sx={{
-              fontWeight: 500,
-              color: 'text.secondary',
-              mt: 0.5,
-              fontSize: '0.875rem'
-            }}>
-              Started with {formatCurrency(accountValueAtStartOfMonth)}
-            </Typography>
+
             {monthlyTarget && (
               <Box sx={{ width: '100%', mt: 1.5 }}>
                 <Box sx={{
@@ -464,7 +471,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
       </Paper>
 
-      
+
       <Dialog
         open={showClearConfirm}
         onClose={() => setShowClearConfirm(false)}

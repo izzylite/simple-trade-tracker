@@ -128,23 +128,39 @@ export const calculateMaxDrawdown = (trades: Trade[]): {
   };
 };
 
+
 /**
  * Calculate target progress for a set of trades
  * @param trades Array of trades
  * @param accountBalance Initial account balance
  * @param target Target percentage
- * @returns Target progress percentage
+ * @param startDate Optional start date to calculate account value at start of period
+ * @param allTrades Optional all trades array for calculating account value at start date
+ * @returns Target progress percentage (capped at 100%)
  */
 export const calculateTargetProgress = (
   trades: Trade[],
   accountBalance: number,
-  target: number
+  target: number,
+  startDate?: Date,
+  allTrades?: Trade[]
 ): number => {
   if (!target || target <= 0 || !accountBalance) return 0;
 
   const totalPnL = calculateTotalPnL(trades);
-  const targetAmount = (target / 100) * accountBalance;
 
+  // Calculate account value at start of period if startDate and allTrades are provided
+  let baselineAccountValue = accountBalance;
+  if (startDate && allTrades) {
+    const tradesBeforePeriod = allTrades.filter(trade => new Date(trade.date) < startDate);
+    baselineAccountValue = accountBalance + tradesBeforePeriod.reduce((sum, trade) => sum + trade.amount, 0);
+  }
+
+  if (baselineAccountValue <= 0) return 0;
+
+  const targetAmount = (target / 100) * baselineAccountValue;
+
+  // Cap progress at 100% to prevent overflow in UI components
   return Math.min(Math.max((totalPnL / targetAmount) * 100, 0), 100);
 };
 
@@ -321,47 +337,4 @@ export const calculateDayStats = (
   return { netAmount, status, percentage, isDrawdownViolation };
 };
 
-
-interface MonthlyStats {
-  totalPnL: number;
-  winRate: number;
-  profitFactor: number;
-  avgWin: number;
-  avgLoss: number;
-  netChange: number;
-}
-
-export const calculateMonthlyStats = (trades: Trade[], currentDate: Date, accountBalance: number): MonthlyStats => {
-  const monthTrades = trades.filter(trade => isSameMonth(new Date(trade.date), currentDate));
-  const totalPnL = monthTrades.reduce((sum, trade) => sum + trade.amount, 0);
-  const winCount = monthTrades.filter(trade => trade.type === 'win').length;
-  const lossCount = monthTrades.filter(trade => trade.type === 'loss').length;
-  const winRate = monthTrades.length > 0 ? (winCount / monthTrades.length * 100) : 0;
-
-  const winningTrades = monthTrades.filter(t => t.type === 'win');
-  const losingTrades = monthTrades.filter(t => t.type === 'loss');
-
-  // Calculate profit factor (gross profit / gross loss)
-  const grossProfit = winningTrades.reduce((sum, t) => sum + t.amount, 0);
-  const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.amount, 0));
-  const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : winCount > 0 ? Infinity : 0;
-
-  const avgWin = winCount > 0
-    ? winningTrades.reduce((sum, t) => sum + t.amount, 0) / winCount
-    : 0;
-
-  const avgLoss = lossCount > 0
-    ? losingTrades.reduce((sum, t) => sum + t.amount, 0) / lossCount
-    : 0;
-
-  const netChange = accountBalance > 0 ? (totalPnL / accountBalance * 100) : 0;
-
-  return {
-    totalPnL,
-    winRate,
-    profitFactor,
-    avgWin,
-    avgLoss,
-    netChange
-  };
-};
+ 

@@ -22,6 +22,7 @@ import { Trade } from '../types/trade';
 import TargetBadge from '../components/TargetBadge';
 import { BaseDialog } from './common';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
+import { calculateTargetProgress } from '../utils/statsUtils';
 
 interface SelectDateDialogProps {
   open: boolean;
@@ -86,7 +87,11 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   const yearlyWinCount = yearTrades.filter(trade => trade.type === 'win').length;
   const yearlyLossCount = yearTrades.filter(trade => trade.type === 'loss').length;
   const yearlyWinRate = yearTrades.length > 0 ? (yearlyWinCount / yearTrades.length * 100).toFixed(1) : '0';
-  const yearlyGrowthPercentage = accountBalance > 0 ? (yearlyPnL / accountBalance * 100).toFixed(2) : '0';
+  // Calculate yearly growth percentage using account value at start of year
+  const startOfYear = new Date(currentYear, 0, 1);
+  const tradesBeforeYear = trades.filter(trade => new Date(trade.date) < startOfYear);
+  const accountValueAtStartOfYear = accountBalance + tradesBeforeYear.reduce((sum, trade) => sum + trade.amount, 0);
+  const yearlyGrowthPercentage = accountValueAtStartOfYear > 0 ? (yearlyPnL / accountValueAtStartOfYear * 100).toFixed(2) : '0';
 
   // Calculate monthly PnL for each month
   const getMonthPnL = (monthIndex: number) => {
@@ -118,35 +123,60 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
 
   const bestMonth = getBestMonth();
 
-  // Calculate monthly target progress
+  // Calculate monthly target progress using centralized function
   const getMonthTargetProgress = (monthIndex: number) => {
     if (!monthlyTarget || monthlyTarget <= 0) return null;
+
+    const monthTrades = trades.filter(trade =>
+      new Date(trade.date).getFullYear() === currentYear &&
+      new Date(trade.date).getMonth() === monthIndex
+    );
+
+    const startOfMonth = new Date(currentYear, monthIndex, 1);
+    const progress = calculateTargetProgress(monthTrades, accountBalance, monthlyTarget, startOfMonth, trades);
     const monthPnL = getMonthPnL(monthIndex);
-    const targetAmount = (monthlyTarget / 100) * accountBalance;
-    const progress = (monthPnL / targetAmount) * 100;
+
+    // Calculate account value at start of month for target amount comparison
+    const tradesBeforeMonth = trades.filter(trade => new Date(trade.date) < startOfMonth);
+    const accountValueAtStartOfMonth = accountBalance + tradesBeforeMonth.reduce((sum, trade) => sum + trade.amount, 0);
+    const targetAmount = (monthlyTarget / 100) * accountValueAtStartOfMonth;
+
     return {
-      progress: Math.min(Math.max(progress, 0), 100),
+      progress,
       isMet: monthPnL >= targetAmount,
-      rawProgress: progress
+      rawProgress: (monthPnL / targetAmount) * 100
     };
   };
 
   // Calculate monthly growth percentage
   const getMonthGrowthPercentage = (monthIndex: number) => {
-    if (accountBalance <= 0) return '0';
     const monthPnL = getMonthPnL(monthIndex);
-    return (monthPnL / accountBalance * 100).toFixed(2);
+
+    // Calculate account value at start of month (excluding that month's trades)
+    const startOfMonth = new Date(currentYear, monthIndex, 1);
+    const tradesBeforeMonth = trades.filter(trade => new Date(trade.date) < startOfMonth);
+    const accountValueAtStartOfMonth = accountBalance + tradesBeforeMonth.reduce((sum, trade) => sum + trade.amount, 0);
+
+    if (accountValueAtStartOfMonth <= 0) return '0';
+    return (monthPnL / accountValueAtStartOfMonth * 100).toFixed(2);
   };
 
-  // Calculate yearly target progress
+  // Calculate yearly target progress using centralized function
   const getYearlyTargetProgress = () => {
     if (!yearlyTarget || yearlyTarget <= 0) return null;
-    const targetAmount = (yearlyTarget / 100) * accountBalance;
-    const progress = (yearlyPnL / targetAmount) * 100;
+
+    const startOfYear = new Date(currentYear, 0, 1);
+    const progress = calculateTargetProgress(yearTrades, accountBalance, yearlyTarget, startOfYear, trades);
+
+    // Calculate account value at start of year for target amount comparison
+    const tradesBeforeYear = trades.filter(trade => new Date(trade.date) < startOfYear);
+    const accountValueAtStartOfYear = accountBalance + tradesBeforeYear.reduce((sum, trade) => sum + trade.amount, 0);
+    const targetAmount = (yearlyTarget / 100) * accountValueAtStartOfYear;
+
     return {
-      progress: Math.min(Math.max(progress, 0), 100),
+      progress,
       isMet: yearlyPnL >= targetAmount,
-      rawProgress: progress
+      rawProgress: (yearlyPnL / targetAmount) * 100
     };
   };
 
@@ -194,7 +224,20 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
 
   const dialogActions = (
     <Box sx={{ display: 'flex', gap: 2 }}>
-      {onOpenGalleryMode && yearTrades.length > 0 && (
+      
+      <Button
+        onClick={onClose}
+        variant="outlined"
+        size="large"
+        sx={{
+          textTransform: 'none',
+          fontWeight: 600,
+          borderRadius: 1.5,
+          px: 3
+        }}
+      >
+        Cancel
+      </Button>{onOpenGalleryMode && yearTrades.length > 0 && (
         <Button
           onClick={handleYearlyGalleryMode}
           variant="contained"
@@ -210,19 +253,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
           Gallery View
         </Button>
       )}
-      <Button
-        onClick={onClose}
-        variant="outlined"
-        size="large"
-        sx={{
-          textTransform: 'none',
-          fontWeight: 600,
-          borderRadius: 1.5,
-          px: 3
-        }}
-      >
-        Cancel
-      </Button>
+
     </Box>
   );
 
