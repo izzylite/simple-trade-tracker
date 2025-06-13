@@ -43,6 +43,7 @@ interface PerformanceChartsProps {
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
   // Dynamic risk settings
   dynamicRiskSettings?: DynamicRiskSettings;
+  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
 }
 
 type TimePeriod = 'month' | 'year' | 'all';
@@ -62,7 +63,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   onDeleteTrade,
   onUpdateTradeProperty,
   onUpdateCalendarProperty,
-  dynamicRiskSettings
+  dynamicRiskSettings,
+  onOpenGalleryMode
 }) => {
   const theme = useTheme();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
@@ -575,6 +577,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         allTrades={trades}
         onEditClick={onEditTrade}
         onDeleteClick={onDeleteTrade}
+        onOpenGalleryMode={onOpenGalleryMode}
       />
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>

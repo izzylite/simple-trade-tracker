@@ -30,6 +30,9 @@ import { AnimatedDropdown } from './Animations';
 import { TagsDisplay } from './common';
 import { TradeImage } from './trades/TradeForm';
 
+// Global cache to track loaded images across the entire application
+const imageLoadCache = new Set<string>();
+
 interface TradeDetailExpandedProps {
   tradeData: Trade;
   isExpanded: boolean;
@@ -83,11 +86,33 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   useEffect(() => {
     if (trade.images && trade.images.length > 0) {
       const initialLoadingState: { [key: string]: boolean } = {};
+
       trade.images.forEach(image => {
         if (!isPendingImage(image)) {
-          initialLoadingState[image.id] = true;
+          // Check if image is already in our global cache
+          if (imageLoadCache.has(image.url)) {
+            // Image was previously loaded, don't show loading state
+            initialLoadingState[image.id] = false;
+          } else {
+            // Image not in cache, check if it's already loaded in browser
+            const img = new Image();
+            img.onload = () => {
+              // Add to cache and update loading state
+              imageLoadCache.add(image.url);
+              setLoadingImages(prev => ({ ...prev, [image.id]: false }));
+            };
+            img.onerror = () => {
+              // Even on error, don't show loading state anymore
+              setLoadingImages(prev => ({ ...prev, [image.id]: false }));
+            };
+
+            // Set initial loading state and start loading
+            initialLoadingState[image.id] = true;
+            img.src = image.url;
+          }
         }
       });
+
       setLoadingImages(initialLoadingState);
     }
   }, [trade.images]);

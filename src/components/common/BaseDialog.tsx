@@ -100,7 +100,7 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
 
       {(actions || !hideFooterCancelButton || primaryButtonAction) && (
         <DialogActionsStyled>
-          {actions}
+          
           <Box sx={{ display: 'flex', gap: 1 }}>
 
             {(!hideFooterCancelButton || cancelButtonAction) && (
@@ -112,6 +112,8 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
                 {cancelButtonText}
               </Button>
             )}
+
+            {actions}
 
             {primaryButtonAction && (
               <Button

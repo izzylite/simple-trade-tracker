@@ -1,8 +1,13 @@
 import React from 'react';
 import {
   Typography,
-  Box
+  Box,
+  Button,
+  Tooltip
 } from '@mui/material';
+import {
+  ViewCarousel as GalleryIcon
+} from '@mui/icons-material';
 import { Trade } from '../../types/trade';
 import TradeList from '../trades/TradeList';
 import { BaseDialog } from '../common';
@@ -23,6 +28,7 @@ interface TradesDialogProps {
   onEditClick?: (trade: Trade) => void;
   onDeleteClick?: (tradeId: string) => void;
   onDeleteMultiple?: (tradeIds: string[]) => void;
+  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
 }
 
 const TradesListDialog: React.FC<TradesDialogProps> = ({
@@ -38,22 +44,48 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   onUpdateTradeProperty,
   onEditClick,
   onDeleteClick,
-  onDeleteMultiple
+  onDeleteMultiple,
+  onOpenGalleryMode
 }) => {
 
-
+  // Gallery mode handler
+  const handleGalleryModeClick = () => {
+    if (onOpenGalleryMode && trades.length > 0) {
+      const title = `${date} - ${trades.length} Trade${trades.length > 1 ? 's' : ''}`;
+      onOpenGalleryMode(trades, expandedTradeId || trades[0].id, title);
+      onClose(); // Close the dialog when opening gallery mode
+    }
+  };
 
   // Calculate total PnL from trades
   const totalPnL = React.useMemo(() => {
     return trades.reduce((sum, trade) => sum + trade.amount, 0);
   }, [trades]);
   const dialogTitle = (
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-      <Typography variant="h6">
-        {trades.length} {trades.length === 1 ? 'Trade' : 'Trades'} for {date}
-      </Typography>
-    </Box>
+    <Typography variant="h6">
+      {trades.length} {trades.length === 1 ? 'Trade' : 'Trades'} for {date}
+    </Typography>
   );
+
+  // Custom actions for the dialog
+  const dialogActions = onOpenGalleryMode && trades.length > 0 ? (
+    <Tooltip title="View trades in gallery mode">
+      <Button
+        variant="contained"
+        size="large"
+        startIcon={<GalleryIcon />}
+        onClick={handleGalleryModeClick}
+        sx={{
+          textTransform: 'none',
+          fontWeight: 600,
+          borderRadius: 1.5,
+          px: 3
+        }}
+      >
+        Gallery View
+      </Button>
+    </Tooltip>
+  ) : undefined;
 
   return (
     <BaseDialog
@@ -62,6 +94,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
       maxWidth="sm"
       fullWidth
       title={dialogTitle}
+      actions={dialogActions}
     >
       <Box sx={{ p: 2 }}>
         {/* DayHeader with navigation buttons hidden */}

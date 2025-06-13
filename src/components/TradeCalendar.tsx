@@ -1147,6 +1147,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             onZoomImage={(imageUrl, allImages, initialIndex) => {
               setZoomedImage(imageUrl, allImages, initialIndex);
             }}
+            onOpenGalleryMode={openGalleryMode}
           />
         </Box>
 

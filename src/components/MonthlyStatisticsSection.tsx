@@ -43,6 +43,7 @@ interface MonthlyStatisticsSectionProps {
   onDeleteTrade?: (tradeId: string) => void;
   onDeleteMultipleTrades?: (tradeIds: string[]) => void;
   onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
+  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
 }
 
 interface MultipleTradesDialog {
@@ -67,7 +68,8 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   onEditTrade,
   onDeleteTrade,
   onDeleteMultipleTrades,
-  onZoomImage
+  onZoomImage,
+  onOpenGalleryMode
 }) => {
   const theme = useTheme();
   const [multipleTradesDialog, setMultipleTradesDialog] = useState<MultipleTradesDialog>({
@@ -280,6 +282,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         onEditClick={onEditTrade}
         onDeleteClick={onDeleteTrade}
         onDeleteMultiple={onDeleteMultipleTrades}
+        onOpenGalleryMode={onOpenGalleryMode}
       />
 
       {/* Performance Details Dialog */}
@@ -325,6 +328,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
             dynamicRiskSettings={dynamicRiskSettings}
             onEditTrade={onEditTrade}
             onDeleteTrade={onDeleteTrade}
+            onOpenGalleryMode={onOpenGalleryMode}
           />
         </DialogContent>
       </Dialog>
