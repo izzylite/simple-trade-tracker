@@ -4,7 +4,7 @@ import {
   Snackbar,
   Alert
 } from '@mui/material';
-import { format } from 'date-fns';
+import { endOfDay, format } from 'date-fns';
 import { Trade } from '../../types/trade';
 import { BaseDialog } from '../common';
 import * as calendarService from '../../services/calendarService';
@@ -293,7 +293,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     if (trade.riskToReward && !trade.partialsTaken) {
       const rr = parseFloat(trade.riskToReward);
       if (!isNaN(rr)) {
-        const calculatedAmount = calculateAmountFromRiskToReward(rr, calculateCumulativePnL(trade.date || date, allTrades));
+        const calculatedAmount = calculateAmountFromRiskToReward(rr, calculateCumulativePnL(trade.date || endOfDay(date), allTrades));
         // Apply sign based on trade type
         return trade.type === 'loss' ? -Math.abs(calculatedAmount) : Math.abs(calculatedAmount);
       }
@@ -1048,7 +1048,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           <Box>
             <TradeForm
               accountBalance={accountBalance}
-              calculateCumulativePnl={(newTrade) => calculateCumulativePnL(newTrade?.date || date, allTrades)}
+              calculateCumulativePnl={(newTrade) => calculateCumulativePnL(newTrade?.date || endOfDay(date), allTrades)}
               dynamicRiskSettings={dynamicRiskSettings}
               calendarId={calendarId}
               requiredTagGroups={requiredTagGroups}

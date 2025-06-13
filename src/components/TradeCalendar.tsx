@@ -472,11 +472,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   useEffect(() => {
     const handleScroll = () => {
       // Find the score section element
-      const scoreSection = document.querySelector('[data-testid="score-section"]');
-      if (scoreSection) {
-        const rect = scoreSection.getBoundingClientRect();
+      const section = document.querySelector('[data-testid="month-nav-section"]');
+      if (section) {
+        const rect = section.getBoundingClientRect();
         // Show floating nav when score section is visible (top of element is in viewport)
-        setShowFloatingMonthNav(rect.top <= window.innerHeight && rect.bottom >= 0);
+        setShowFloatingMonthNav((rect.top <= window.innerHeight && rect.bottom >= 0)==false? true : false);
       }
     };
 
@@ -799,11 +799,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             flexDirection: { xs: 'column', sm: 'row' },
             gap: { xs: 1, sm: 0 }
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box
+             data-testid="month-nav-section"
+            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <IconButton onClick={handlePrevMonth}>
                 <ChevronLeft />
               </IconButton>
               <Typography
+               
                 variant="h5"
                 sx={{
                   fontWeight: 800,
@@ -821,6 +824,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               >
                 {format(currentDate, 'MMMM yyyy')}
               </Typography>
+
               <IconButton onClick={handleNextMonth}>
                 <ChevronRight />
               </IconButton>

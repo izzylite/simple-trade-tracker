@@ -67,6 +67,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   const [loadingImages, setLoadingImages] = useState<{ [key: string]: boolean }>({});
 
   // Initialize loading state for all images
+
+
   useEffect(() => {
     if (trade.images && trade.images.length > 0) {
       const initialLoadingState: { [key: string]: boolean } = {};
@@ -340,9 +342,23 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                         Risk to Reward
                       </Typography>
                     </Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
-                      {trade.riskToReward}
-                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+                        {trade.riskToReward}
+                      </Typography>
+                      {trade.type === 'win' && trade.riskToReward && (
+                        <Typography variant="caption" sx={{
+                          color: 'text.secondary',
+                          fontSize: '0.75rem',
+                          fontWeight: 500
+                        }}>
+                          Amount Risked: ${(() => {
+                            const amountRisked = Math.abs(trade.amount) / trade.riskToReward;
+                            return amountRisked.toFixed(2);
+                          })()}
+                        </Typography>
+                      )}
+                    </Box>
                   </Paper>
                 )}
 
@@ -620,7 +636,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   </Typography>
                 </Box>
 
-                <Box sx={{ pl: 2 }}>
+                <Box sx={{ pl: 1 }}>
                   <TagsDisplay
                     tags={trade.tags || []}
                     showGroups={false}

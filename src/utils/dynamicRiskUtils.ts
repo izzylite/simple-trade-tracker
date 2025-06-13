@@ -19,9 +19,9 @@ export const calculateCumulativePnLToDate = (
   targetDate: Date,
   allTrades: Trade[]
 ): number => {
-  const endOfTargetDate = endOfDay(targetDate);
+   
   return allTrades
-    .filter(trade => new Date(trade.date) <= endOfTargetDate)
+    .filter(trade => new Date(trade.date) <= targetDate)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .reduce((cumulative, trade) => cumulative + trade.amount, 0);
 };
