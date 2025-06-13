@@ -79,7 +79,6 @@ import {
 } from './StyledComponents';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { useAuth } from '../contexts/AuthContext';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
 import AppHeader from './common/AppHeader';
 import { NewTradeForm, TradeImage } from './trades/TradeForm';
@@ -93,10 +92,11 @@ import ConfirmationDialog from './common/ConfirmationDialog';
 import PinnedTradesDrawer from './PinnedTradesDrawer';
 import TradeGalleryDialog from './TradeGalleryDialog';
 
-import { DynamicRiskSettings, calculateEffectiveMaxDailyDrawdown, calculatePercentageOfCurrentValue } from '../utils/dynamicRiskUtils';
+import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 
 import MonthlyStatisticsSection from './MonthlyStatisticsSection';
 import FloatingMonthNavigation from './FloatingMonthNavigation';
+import { calculateDayStats, calculateMonthlyStats } from '../utils/statsUtils';
 
 interface TradeCalendarProps {
   trades: Trade[];
@@ -132,26 +132,9 @@ interface TradeCalendarProps {
   onToggleDynamicRisk?: (useActualAmounts: boolean) => void;
   // Loading state
   isLoadingTrades?: boolean;
-}
+} 
 
 
-
-
-interface DayStats {
-  netAmount: number;
-  status: DayStatus;
-  percentage: string;
-  isDrawdownViolation: boolean;
-}
-
-interface MonthlyStats {
-  totalPnL: number;
-  winRate: number;
-  profitFactor: number;
-  avgWin: number;
-  avgLoss: number;
-  netChange: number;
-}
 
 interface WeeklyPnLProps {
   date: Date;
@@ -267,79 +250,9 @@ export const createNewTradeData = (): NewTradeForm => ({
   uploadedImages: [],
 });
 
-const calculateDayStats = (
-  dayTrades: Trade[],
-  accountBalance: number,
-  maxDailyDrawdown: number,
-  dynamicRiskSettings?: DynamicRiskSettings,
-  allTrades?: Trade[]
-): DayStats => {
-  // Calculate net amount for the day
-  const netAmount = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
 
-  // Calculate percentage loss/gain relative to current total value (account balance + cumulative profit)
-  const percentage = allTrades
-    ? calculatePercentageOfCurrentValue(netAmount, accountBalance, allTrades).toFixed(1)
-    : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0';
 
-  let status: DayStatus = 'neutral';
-  if (dayTrades.length > 0) {
-    status = netAmount > 0 ? 'win' : netAmount < 0 ? 'loss' : dayTrades.find(trade => trade.type === 'breakeven') ? 'breakeven' : 'neutral';
-  }
-
-  // Calculate effective max daily drawdown based on dynamic risk settings
-  let effectiveMaxDailyDrawdown = maxDailyDrawdown;
-
-  if (dynamicRiskSettings && allTrades) {
-    effectiveMaxDailyDrawdown = calculateEffectiveMaxDailyDrawdown(
-      maxDailyDrawdown,
-      allTrades,
-      dynamicRiskSettings
-    );
-  }
-
-  // Check for drawdown violation - if the loss percentage exceeds effectiveMaxDailyDrawdown
-  const percentageValue = parseFloat(percentage);
-  const isDrawdownViolation = status === 'loss' && Math.abs(percentageValue) > effectiveMaxDailyDrawdown;
-
-  return { netAmount, status, percentage, isDrawdownViolation };
-};
-
-const calculateMonthlyStats = (trades: Trade[], currentDate: Date, accountBalance: number): MonthlyStats => {
-  const monthTrades = trades.filter(trade => isSameMonth(new Date(trade.date), currentDate));
-  const totalPnL = monthTrades.reduce((sum, trade) => sum + trade.amount, 0);
-  const winCount = monthTrades.filter(trade => trade.type === 'win').length;
-  const lossCount = monthTrades.filter(trade => trade.type === 'loss').length;
-  const winRate = monthTrades.length > 0 ? (winCount / monthTrades.length * 100) : 0;
-
-  const winningTrades = monthTrades.filter(t => t.type === 'win');
-  const losingTrades = monthTrades.filter(t => t.type === 'loss');
-
-  // Calculate profit factor (gross profit / gross loss)
-  const grossProfit = winningTrades.reduce((sum, t) => sum + t.amount, 0);
-  const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.amount, 0));
-  const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : winCount > 0 ? Infinity : 0;
-
-  const avgWin = winCount > 0
-    ? winningTrades.reduce((sum, t) => sum + t.amount, 0) / winCount
-    : 0;
-
-  const avgLoss = lossCount > 0
-    ? losingTrades.reduce((sum, t) => sum + t.amount, 0) / lossCount
-    : 0;
-
-  const netChange = accountBalance > 0 ? (totalPnL / accountBalance * 100) : 0;
-
-  return {
-    totalPnL,
-    winRate,
-    profitFactor,
-    avgWin,
-    avgLoss,
-    netChange
-  };
-};
-
+ 
 // TagFilter component for filtering trades by tags
 interface TagFilterProps {
   allTags: string[];
@@ -473,13 +386,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     title: undefined
   });
 
-  const theme = useTheme();
-  const navigate = useNavigate();
+  const theme = useTheme(); 
   const { calendarId } = useParams();
 
-  const { user, signInWithGoogle, signOut } = useAuth();
-
-
+  
 
   // Scroll detection for floating month navigation
   useEffect(() => {
