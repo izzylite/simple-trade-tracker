@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { format } from 'date-fns';
 import {
   Box,
   Typography,
@@ -25,6 +26,7 @@ import {
 import { Trade } from '../types/trade';
 import { exportTrades, importTrades } from '../utils/tradeExportImport';
 import { formatCurrency } from '../utils/formatters';
+import { calculatePercentageOfValueAtDate } from '../utils/dynamicRiskUtils';
 
 
 
@@ -55,14 +57,24 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   );
 
   // Calculate monthly values from the filtered trades
-  const totalPnL = monthTrades.reduce((sum, trade) => sum + trade.amount, 0);
+  const netAmountForThisMonth = monthTrades.reduce((sum, trade) => sum + trade.amount, 0);
   const winCount = monthTrades.filter(trade => trade.type === 'win').length;
   const lossCount = monthTrades.filter(trade => trade.type === 'loss').length;
   const winRate = monthTrades.length > 0 ? (winCount / monthTrades.length * 100).toFixed(1) : '0';
-  const growthPercentage = accountBalance > 0 ? (totalPnL / accountBalance * 100).toFixed(2) : '0';
+
+  // Calculate growth percentage using account value at start of month (excluding current month trades)
+  const startOfCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const growthPercentage = trades
+    ? calculatePercentageOfValueAtDate(netAmountForThisMonth, accountBalance, trades, startOfCurrentMonth).toFixed(1)
+    : accountBalance > 0 ? ((netAmountForThisMonth / accountBalance) * 100).toFixed(2) : '0';
+
+  // Calculate account value at start of month for display
+  const tradesBeforeMonth = trades.filter(trade => new Date(trade.date) < startOfCurrentMonth);
+  const accountValueAtStartOfMonth = accountBalance + tradesBeforeMonth.reduce((sum, trade) => sum + trade.amount, 0);
+  
 
   // Calculate monthly target progress
-  const targetProgress = monthlyTarget && monthlyTarget > 0 ? (parseFloat(growthPercentage) / monthlyTarget * 100).toFixed(0) : '0';
+  const targetProgress = monthlyTarget && monthlyTarget > 0 ? Math.min((parseFloat(growthPercentage) / monthlyTarget * 100),100).toFixed(0) : '0';
   const isTargetMet = monthlyTarget ? parseFloat(growthPercentage) >= monthlyTarget : false;
 
   const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv'>('xlsx');
@@ -298,7 +310,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               gap: 1,
               mb: 0.5
             }}>
-              <TrendingUp sx={{ fontSize: '1.2rem', color: totalPnL > 0 ? 'success.main' : totalPnL < 0 ? 'error.main' : 'text.secondary' }} />
+              <TrendingUp sx={{ fontSize: '1.2rem', color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.secondary' }} />
               <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary' }}>
                 Monthly P&L
               </Typography>
@@ -307,23 +319,37 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               variant="h5"
               sx={{
                 fontWeight: 700,
-                color: totalPnL > 0 ? 'success.main' : totalPnL < 0 ? 'error.main' : 'text.primary',
+                color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.primary',
                 display: 'flex',
                 alignItems: 'baseline',
                 gap: 0.5
               }}
             >
-              {formatCurrency(totalPnL)}
-              <Typography
-                component="span"
-                sx={{
-                  fontSize: '1rem',
-                  color: totalPnL > 0 ? 'success.main' : totalPnL < 0 ? 'error.main' : 'text.primary',
-                  fontWeight: 600
-                }}
+              {formatCurrency(netAmountForThisMonth)}
+              <Tooltip
+                title={`Percentage calculated based on account value at start of ${format(currentDate, 'MMMM')}: ${formatCurrency(accountValueAtStartOfMonth)} (excluding this month's trades for consistent comparison)`}
+                placement="top"
               >
-                ({growthPercentage}%)
-              </Typography>
+                <Typography
+                  component="span"
+                  sx={{
+                    fontSize: '1rem',
+                    color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.primary',
+                    fontWeight: 600,
+                    cursor: 'help'
+                  }}
+                >
+                  ({growthPercentage}%)
+                </Typography>
+              </Tooltip>
+            </Typography>
+            <Typography variant="body2" sx={{
+              fontWeight: 500,
+              color: 'text.secondary',
+              mt: 0.5,
+              fontSize: '0.875rem'
+            }}>
+              Started with {formatCurrency(accountValueAtStartOfMonth)}
             </Typography>
             {monthlyTarget && (
               <Box sx={{ width: '100%', mt: 1.5 }}>

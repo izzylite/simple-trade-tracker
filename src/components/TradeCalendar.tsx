@@ -92,11 +92,11 @@ import ConfirmationDialog from './common/ConfirmationDialog';
 import PinnedTradesDrawer from './PinnedTradesDrawer';
 import TradeGalleryDialog from './TradeGalleryDialog';
 
-import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
+import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 
 import MonthlyStatisticsSection from './MonthlyStatisticsSection';
 import FloatingMonthNavigation from './FloatingMonthNavigation';
-import { calculateDayStats, calculateMonthlyStats } from '../utils/statsUtils';
+import { calculateDayStats } from '../utils/statsUtils';
 
 interface TradeCalendarProps {
   trades: Trade[];
@@ -159,11 +159,18 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ date, trades, monthStart, weekInd
     isSameWeek(new Date(trade.date), weekStart, { weekStartsOn: 0 }) &&
     new Date(trade.date).getMonth() === currentMonth
   );
+  
+  
+    // Calculate net amount for the week
+    const netAmount = weekTrades.reduce((sum, trade) => sum + trade.amount, 0);
+  
+    // Calculate percentage loss/gain relative to account value at start of week (excluding current week trades)
+    const percentage = trades
+      ? calculatePercentageOfValueAtDate(netAmount, accountBalance, trades, weekStart).toFixed(1)
+      : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0';
 
-  const totalPnL = weekTrades.reduce((sum, trade) => sum + trade.amount, 0);
-  // For weekly target progress, use original account balance (targets are based on original balance)
-  const percentage = accountBalance > 0 ? (totalPnL / accountBalance * 100).toFixed(1) : '0';
-  const targetProgress = weeklyTarget && weeklyTarget > 0 ? (parseFloat(percentage) / weeklyTarget * 100).toFixed(0) : '0';
+ 
+  const targetProgress = weeklyTarget && weeklyTarget > 0 ? Math.min((parseFloat(percentage) / weeklyTarget * 100),100).toFixed(0) : '0'; 
   const isTargetMet = weeklyTarget ? parseFloat(percentage) >= weeklyTarget : false;
 
   return (
@@ -191,17 +198,17 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ date, trades, monthStart, weekInd
           variant="subtitle1"
           sx={{
             fontWeight: 600,
-            color: totalPnL > 0 ? 'success.main' : totalPnL < 0 ? 'error.main' : 'text.primary',
+            color: netAmount > 0 ? 'success.main' : netAmount < 0 ? 'error.main' : 'text.primary',
             fontSize: '0.875rem',
             textAlign: 'center'
           }}
         >
-          {formatCurrency(totalPnL)}
+          {formatCurrency(netAmount)}
         </Typography>
         <Typography
           variant="caption"
           sx={{
-            color: totalPnL > 0 ? 'success.main' : totalPnL < 0 ? 'error.main' : 'text.secondary',
+            color: netAmount > 0 ? 'success.main' : netAmount < 0 ? 'error.main' : 'text.secondary',
             fontSize: '0.75rem',
             fontWeight: 500,
             textAlign: 'center'
@@ -471,11 +478,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
     return days;
   }, [currentDate]);
-
-  const monthlyStats = useMemo(() =>
-    calculateMonthlyStats(filteredTrades, currentDate, accountBalance),
-    [filteredTrades, currentDate, accountBalance]
-  );
+ 
 
   const handlePrevMonth = () => {
     setCurrentDate(prev => subMonths(prev, 1));
@@ -970,7 +973,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                         accountBalance,
                         maxDailyDrawdown,
                         dynamicRiskSettings,
-                        filteredTrades
+                        filteredTrades,
+                        day
                       );
                       const isCurrentMonth = isSameMonth(day, currentDate);
                       const isCurrentDay = isToday(day);

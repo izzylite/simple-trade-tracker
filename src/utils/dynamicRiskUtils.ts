@@ -98,6 +98,21 @@ export const calculatePercentageOfCurrentValue = (
 };
 
 /**
+ * Calculate percentage based on account value at a specific point in time
+ * Excludes trades after the specified date to provide consistent baseline calculations
+ */
+export const calculatePercentageOfValueAtDate = (
+  amount: number,
+  accountBalance: number,
+  allTrades: Trade[],
+  excludeAfterDate: Date
+): number => {
+  const relevantTrades = allTrades.filter(trade => new Date(trade.date) < excludeAfterDate);
+  const baselineValue = calculateCurrentTotalValue(accountBalance, relevantTrades);
+  return baselineValue > 0 ? (amount / baselineValue) * 100 : 0;
+};
+
+/**
  * Calculate risk amount based on effective risk percentage and account value
  */
 export const calculateRiskAmount = (

@@ -1,6 +1,6 @@
 import { Trade } from '../types/trade';
 import { isAfter, isBefore, isSameDay, isSameMonth, isSameWeek, isSameYear, startOfDay } from 'date-fns';
-import { calculateEffectiveMaxDailyDrawdown, calculatePercentageOfCurrentValue,DynamicRiskSettings } from './dynamicRiskUtils';
+import { calculateEffectiveMaxDailyDrawdown, calculatePercentageOfValueAtDate, DynamicRiskSettings } from './dynamicRiskUtils';
 import { 
   DayStatus
 } from '../components/StyledComponents'; 
@@ -287,14 +287,15 @@ export const calculateDayStats = (
   accountBalance: number,
   maxDailyDrawdown: number,
   dynamicRiskSettings?: DynamicRiskSettings,
-  allTrades?: Trade[]
+  allTrades?: Trade[],
+  dayDate?: Date
 ): DayStats => {
   // Calculate net amount for the day
   const netAmount = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
 
-  // Calculate percentage loss/gain relative to current total value (account balance + cumulative profit)
-  const percentage = allTrades
-    ? calculatePercentageOfCurrentValue(netAmount, accountBalance, allTrades).toFixed(1)
+  // Calculate percentage loss/gain relative to account value at start of day (excluding current day trades)
+  const percentage = allTrades && dayDate
+    ? calculatePercentageOfValueAtDate(netAmount, accountBalance, allTrades, startOfDay(dayDate)).toFixed(1)
     : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0';
 
   let status: DayStatus = 'neutral';
