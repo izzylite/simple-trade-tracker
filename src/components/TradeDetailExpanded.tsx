@@ -7,7 +7,8 @@ import {
   Divider,
   Paper,
   Button,
-  IconButton
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import { alpha, useTheme, keyframes } from '@mui/material/styles';
 import { format } from 'date-fns';
@@ -21,7 +22,9 @@ import {
   Note as NoteIcon,
   Image as ImageIcon,
   PushPin as PinIcon,
-  PushPinOutlined as UnpinIcon
+  PushPinOutlined as UnpinIcon,
+  ViewList as ViewListIcon,
+  Category as CategoryIcon
 } from '@mui/icons-material';
 import { AnimatedDropdown } from './Animations';
 import { TagsDisplay } from './common';
@@ -65,10 +68,18 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   const [isToggling, setIsToggling] = useState(false);
   const [isPinning, setIsPinning] = useState(false);
   const [loadingImages, setLoadingImages] = useState<{ [key: string]: boolean }>({});
+  const [showTagGroups, setShowTagGroups] = useState(() => {
+    // Load from localStorage, default to false if not found
+    const saved = localStorage.getItem('tradeDetail_showTagGroups');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+
+  // Update local trade state when tradeData prop changes
+  useEffect(() => {
+    setTrade(tradeData);
+  }, [tradeData]);
 
   // Initialize loading state for all images
-
-
   useEffect(() => {
     if (trade.images && trade.images.length > 0) {
       const initialLoadingState: { [key: string]: boolean } = {};
@@ -79,7 +90,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
       });
       setLoadingImages(initialLoadingState);
     }
-  }, []);
+  }, [trade.images]);
 
   // No need to organize tags here as TagsDisplay will handle it
 
@@ -119,6 +130,13 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     } finally {
       setIsPinning(false);
     }
+  };
+
+  // Function to toggle tag groups display and save to localStorage
+  const handleToggleTagGroups = () => {
+    const newValue = !showTagGroups;
+    setShowTagGroups(newValue);
+    localStorage.setItem('tradeDetail_showTagGroups', JSON.stringify(newValue));
   };
 
   if (!isExpanded) return null;
@@ -630,16 +648,31 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
               {/* Tags Section */}
               <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="subtitle2" color="text.primary" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
                     Tags
                   </Typography>
+                  <Tooltip title={showTagGroups ? "Show flat tag list" : "Group tags by category"}>
+                    <IconButton
+                      size="small"
+                      onClick={handleToggleTagGroups}
+                      sx={{
+                        color: 'text.secondary',
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                          color: 'primary.main'
+                        }
+                      }}
+                    >
+                      {showTagGroups ? <ViewListIcon sx={{ fontSize: 18 }} /> : <CategoryIcon sx={{ fontSize: 18 }} />}
+                    </IconButton>
+                  </Tooltip>
                 </Box>
 
                 <Box sx={{ pl: 1 }}>
                   <TagsDisplay
                     tags={trade.tags || []}
-                    showGroups={false}
+                    showGroups={showTagGroups}
                     chipSize="medium"
                   />
                 </Box>

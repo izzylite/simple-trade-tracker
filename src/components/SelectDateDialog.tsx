@@ -14,7 +14,8 @@ import {
   TrendingUp,
   EmojiEvents,
   CalendarMonth,
-  CalendarToday
+  CalendarToday,
+  ViewCarousel as GalleryIcon
 } from '@mui/icons-material';
 import { addYears, subYears } from 'date-fns';
 import { Trade } from '../types/trade';
@@ -31,6 +32,7 @@ interface SelectDateDialogProps {
   accountBalance: number;
   monthlyTarget?: number;
   yearlyTarget?: number;
+  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
 }
 
 const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
@@ -41,7 +43,8 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   trades,
   accountBalance,
   monthlyTarget,
-  yearlyTarget
+  yearlyTarget,
+  onOpenGalleryMode
 }) => {
   const theme = useTheme();
   const [currentDate, setCurrentDate] = React.useState(initialDate || new Date());
@@ -65,6 +68,14 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
     const newDate = new Date(currentYear, monthIndex, 1);
     onDateSelect(newDate);
     onClose();
+  };
+
+  const handleYearlyGalleryMode = () => {
+    if (onOpenGalleryMode && yearTrades.length > 0) {
+      const title = `${currentYear} - All Trades (${yearTrades.length} trades)`;
+      onOpenGalleryMode(yearTrades, yearTrades[0].id, title);
+      onClose();
+    }
   };
 
   const currentMonth = currentDate.getMonth();
@@ -182,19 +193,37 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   );
 
   const dialogActions = (
-    <Button
-      onClick={onClose}
-      variant="outlined"
-      size="large"
-      sx={{
-        textTransform: 'none',
-        fontWeight: 600,
-        borderRadius: 1.5,
-        px: 3
-      }}
-    >
-      Cancel
-    </Button>
+    <Box sx={{ display: 'flex', gap: 2 }}>
+      {onOpenGalleryMode && yearTrades.length > 0 && (
+        <Button
+          onClick={handleYearlyGalleryMode}
+          variant="contained"
+          size="large"
+          startIcon={<GalleryIcon />}
+          sx={{
+            textTransform: 'none',
+            fontWeight: 600,
+            borderRadius: 1.5,
+            px: 3
+          }}
+        >
+          Gallery View
+        </Button>
+      )}
+      <Button
+        onClick={onClose}
+        variant="outlined"
+        size="large"
+        sx={{
+          textTransform: 'none',
+          fontWeight: 600,
+          borderRadius: 1.5,
+          px: 3
+        }}
+      >
+        Cancel
+      </Button>
+    </Box>
   );
 
   return (

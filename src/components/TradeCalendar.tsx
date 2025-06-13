@@ -37,6 +37,7 @@ import {
   Info as InfoIcon,
   LocalOffer as TagIcon,
   Search as SearchIcon,
+  ViewCarousel as GalleryIcon,
 } from '@mui/icons-material';
 import {
   format,
@@ -90,6 +91,7 @@ import DayNoteCard from './DayNoteCard';
 import TradeFormDialog, { createEditTradeData } from './trades/TradeFormDialog';
 import ConfirmationDialog from './common/ConfirmationDialog';
 import PinnedTradesDrawer from './PinnedTradesDrawer';
+import TradeGalleryDialog from './TradeGalleryDialog';
 
 import { DynamicRiskSettings, calculateEffectiveMaxDailyDrawdown, calculatePercentageOfCurrentValue } from '../utils/dynamicRiskUtils';
 
@@ -459,6 +461,17 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'warning' | 'error'>('warning');
   const [showFloatingMonthNav, setShowFloatingMonthNav] = useState(false);
   const [pinnedTradesDrawerOpen, setPinnedTradesDrawerOpen] = useState(false);
+  const [galleryMode, setGalleryMode] = useState<{
+    open: boolean;
+    trades: Trade[];
+    initialTradeId?: string;
+    title?: string;
+  }>({
+    open: false,
+    trades: [],
+    initialTradeId: undefined,
+    title: undefined
+  });
 
   const theme = useTheme();
   const navigate = useNavigate();
@@ -475,7 +488,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       const section = document.querySelector('[data-testid="month-nav-section"]');
       if (section) {
         const rect = section.getBoundingClientRect();
-        // Show floating nav when score section is visible (top of element is in viewport)
+        // Show floating nav when section is NOT visible (top of element is NOT viewport)
         setShowFloatingMonthNav((rect.top <= window.innerHeight && rect.bottom >= 0)==false? true : false);
       }
     };
@@ -702,6 +715,38 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     }
   };
 
+  // Gallery mode handlers
+  const openGalleryMode = (trades: Trade[], initialTradeId?: string, title?: string) => {
+    setGalleryMode({
+      open: true,
+      trades,
+      initialTradeId,
+      title
+    });
+  };
+
+  const closeGalleryMode = () => {
+    setGalleryMode({
+      open: false,
+      trades: [],
+      initialTradeId: undefined,
+      title: undefined
+    });
+  };
+
+  const handleMonthlyGalleryMode = () => {
+    // Filter trades to only include those from the current month
+    const monthTrades = filteredTrades.filter(trade =>
+      isSameMonth(new Date(trade.date), currentDate)
+    );
+
+    if (monthTrades.length > 0) {
+      const monthName = format(currentDate, 'MMMM yyyy');
+      const title = `${monthName} - Monthly Trades (${monthTrades.length} trades)`;
+      openGalleryMode(monthTrades, monthTrades[0].id, title);
+    }
+  };
+
 
 
   return (
@@ -843,6 +888,35 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               >
                 Today
               </Button>
+              {(() => {
+                // Check if there are trades for the current month
+                const monthTrades = filteredTrades.filter(trade =>
+                  isSameMonth(new Date(trade.date), currentDate)
+                );
+                return monthTrades.length > 0;
+              })() && (
+                <Tooltip title="View all trades for this month in gallery mode">
+                  <Button
+                    startIcon={<GalleryIcon />}
+                    onClick={handleMonthlyGalleryMode}
+                    variant="outlined"
+                    size="small"
+                    sx={{
+                      minWidth: { xs: '100%', sm: 'auto' },
+                      display: 'flex',
+                      alignItems: 'center',
+                      borderColor: 'divider',
+                      color: 'text.secondary',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        bgcolor: alpha(theme.palette.primary.main, 0.08)
+                      }
+                    }}
+                  >
+                    Gallery View
+                  </Button>
+                </Tooltip>
+              )}
               <Button
                 startIcon={<PinIcon />}
                 onClick={() => setPinnedTradesDrawerOpen(true)}
@@ -1180,7 +1254,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           accountBalance={accountBalance}
           allTrades={trades} /* Pass all trades for tag suggestions */
           deletingTradeIds={deletingTradeIds}
-
+          onOpenGalleryMode={openGalleryMode}
         />
 
 
@@ -1253,6 +1327,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           accountBalance={accountBalance}
           monthlyTarget={monthlyTarget}
           yearlyTarget={yearlyTarget}
+          onOpenGalleryMode={openGalleryMode}
         />
 
 
@@ -1360,9 +1435,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           trades={trades}
           allTags={allTags}
           onTradeClick={(trade) => {
-            // Close search drawer and open the trade in expanded view
+            // Close search drawer and open the trade in gallery mode
             setIsSearchDrawerOpen(false);
-            setSelectedDate(new Date(trade.date));
+            openGalleryMode(trades, trade.id, "Search Results");
           }}
         />
 
@@ -1372,10 +1447,22 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onClose={() => setPinnedTradesDrawerOpen(false)}
           trades={trades}
           onTradeClick={(trade) => {
-            // Close drawer and open the trade in expanded view
+            // Close drawer and open the trade in gallery mode
             setPinnedTradesDrawerOpen(false);
-            setSelectedDate(new Date(trade.date));
+            const pinnedTrades = trades.filter(t => t.isPinned);
+            openGalleryMode(pinnedTrades, trade.id, "Pinned Trades");
           }}
+        />
+
+        {/* Trade Gallery Dialog */}
+        <TradeGalleryDialog
+          open={galleryMode.open}
+          onClose={closeGalleryMode}
+          trades={galleryMode.trades}
+          initialTradeId={galleryMode.initialTradeId}
+          onUpdateTradeProperty={onUpdateTradeProperty}
+          setZoomedImage={setZoomedImage}
+          title={galleryMode.title}
         />
       </Box>
     </Box>

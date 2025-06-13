@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import {
   Box,
-  Snackbar,
-  Alert
+  Button,
+  Tooltip
 } from '@mui/material';
+import { ViewCarousel as GalleryIcon } from '@mui/icons-material';
 import { format, isAfter, startOfDay } from 'date-fns';
 import { Trade } from '../../types/trade';
-import { BaseDialog, ConfirmationDialog } from '../common';
+import { BaseDialog } from '../common';
 import { DayHeader, TradeList } from './';
 import { calculateCumulativePnL, startOfNextDay } from './TradeFormDialog';
 interface DayDialogProps {
@@ -24,6 +25,7 @@ interface DayDialogProps {
   allTrades?: Trade[];
   calendarId: string;
   deletingTradeIds?: string[];
+  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
 }
 
 
@@ -44,7 +46,8 @@ const DayDialog: React.FC<DayDialogProps> = ({
   setZoomedImage,
   allTrades = [],
   calendarId,
-  deletingTradeIds
+  deletingTradeIds,
+  onOpenGalleryMode
 }) => {
 
   // State
@@ -81,7 +84,14 @@ const DayDialog: React.FC<DayDialogProps> = ({
 
   const handleEditClick = (trade: Trade) => {
     showAddForm(trade);
+  };
 
+  const handleGalleryModeClick = () => {
+    if (onOpenGalleryMode && trades.length > 0) {
+      const title = `${format(date, 'EEEE, MMMM d, yyyy')} - ${trades.length} Trade${trades.length > 1 ? 's' : ''}`;
+      onOpenGalleryMode(trades, expandedTradeId || trades[0].id, title);
+      onClose(); // Close the day dialog when opening gallery mode
+    }
   };
 
 
@@ -99,11 +109,25 @@ const DayDialog: React.FC<DayDialogProps> = ({
         title="Daily Trades"
         maxWidth="md"
         fullWidth
-        hideCloseButton={false}  
+        hideCloseButton={false}
         primaryButtonText={'Add Trade'}
         primaryButtonAction={() => handleAddClick()
-        } 
+        }
         hideFooterCancelButton={false}
+        actions={
+          onOpenGalleryMode && trades.length > 0 ? (
+            <Tooltip title="View trades in gallery mode">
+              <Button
+                variant="outlined"
+                startIcon={<GalleryIcon />}
+                onClick={handleGalleryModeClick}
+                sx={{ mr: 1 }}
+              >
+                Gallery View
+              </Button>
+            </Tooltip>
+          ) : undefined
+        }
       >
         <Box sx={{ p: 3 }}>
 
