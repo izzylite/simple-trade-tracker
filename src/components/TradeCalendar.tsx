@@ -1382,6 +1382,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onUpdateTradeProperty={onUpdateTradeProperty}
           setZoomedImage={setZoomedImage}
           title={galleryMode.title}
+          calendarId={calendarId}
         />
       </Box>
     </Box>

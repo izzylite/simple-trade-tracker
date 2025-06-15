@@ -13,19 +13,19 @@ const globalStyles = (theme: Theme) => ({
       height: '8px',
     },
     '&::-webkit-scrollbar-track': {
-      background: theme.palette.mode === 'dark' 
-        ? 'rgba(255, 255, 255, 0.05)' 
+      background: theme.palette.mode === 'dark'
+        ? 'rgba(255, 255, 255, 0.05)'
         : 'rgba(0, 0, 0, 0.05)',
       borderRadius: '4px',
     },
     '&::-webkit-scrollbar-thumb': {
-      background: theme.palette.mode === 'dark' 
-        ? 'rgba(255, 255, 255, 0.2)' 
+      background: theme.palette.mode === 'dark'
+        ? 'rgba(255, 255, 255, 0.2)'
         : 'rgba(0, 0, 0, 0.2)',
       borderRadius: '4px',
       '&:hover': {
-        background: theme.palette.mode === 'dark' 
-          ? 'rgba(255, 255, 255, 0.3)' 
+        background: theme.palette.mode === 'dark'
+          ? 'rgba(255, 255, 255, 0.3)'
           : 'rgba(0, 0, 0, 0.3)',
       },
     },
@@ -64,19 +64,19 @@ const globalStyles = (theme: Theme) => ({
       height: '8px',
     },
     '&::-webkit-scrollbar-track': {
-      background: theme.palette.mode === 'dark' 
-        ? 'rgba(255, 255, 255, 0.05)' 
+      background: theme.palette.mode === 'dark'
+        ? 'rgba(255, 255, 255, 0.05)'
         : 'rgba(0, 0, 0, 0.05)',
       borderRadius: '4px',
     },
     '&::-webkit-scrollbar-thumb': {
-      background: theme.palette.mode === 'dark' 
-        ? 'rgba(255, 255, 255, 0.2)' 
+      background: theme.palette.mode === 'dark'
+        ? 'rgba(255, 255, 255, 0.2)'
         : 'rgba(0, 0, 0, 0.2)',
       borderRadius: '4px',
       '&:hover': {
-        background: theme.palette.mode === 'dark' 
-          ? 'rgba(255, 255, 255, 0.3)' 
+        background: theme.palette.mode === 'dark'
+          ? 'rgba(255, 255, 255, 0.3)'
           : 'rgba(0, 0, 0, 0.3)',
       },
     },
@@ -96,8 +96,8 @@ const globalStyles = (theme: Theme) => ({
   },
   '.MuiOutlinedInput-root': {
     '&:hover .MuiOutlinedInput-notchedOutline': {
-      borderColor: theme.palette.mode === 'dark' 
-        ? 'rgba(255, 255, 255, 0.3)' 
+      borderColor: theme.palette.mode === 'dark'
+        ? 'rgba(255, 255, 255, 0.3)'
         : 'rgba(0, 0, 0, 0.3)',
     },
     '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
@@ -134,8 +134,8 @@ const globalStyles = (theme: Theme) => ({
   },
   '.MuiBackdrop-root': {
     backdropFilter: 'blur(4px)',
-    backgroundColor: theme.palette.mode === 'dark' 
-      ? 'rgba(0, 0, 0, 0.8)' 
+    backgroundColor: theme.palette.mode === 'dark'
+      ? 'rgba(0, 0, 0, 0.8)'
       : 'rgba(255, 255, 255, 0.8)',
   },
   '.MuiPopover-paper, .MuiMenu-paper': {

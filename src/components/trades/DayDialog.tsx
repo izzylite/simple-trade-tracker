@@ -151,6 +151,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
             onUpdateTradeProperty={onUpdateTradeProperty}
             enableBulkSelection={trades.length > 1} // Enable bulk selection when there are multiple trades
             deletingTradeIds={deletingTradeIds}
+            calendarId={calendarId}
           />
         </Box>
       </BaseDialog>

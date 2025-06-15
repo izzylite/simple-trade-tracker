@@ -18,4 +18,10 @@ export interface Trade {
   isTemporary?: boolean;
   images?: Array<TradeImage>;
   isPinned?: boolean;
+
+  // Sharing fields
+  shareLink?: string;
+  isShared?: boolean;
+  sharedAt?: Date;
+  shareId?: string;
 }

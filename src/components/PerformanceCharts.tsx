@@ -578,6 +578,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         onEditClick={onEditTrade}
         onDeleteClick={onDeleteTrade}
         onOpenGalleryMode={onOpenGalleryMode}
+        calendarId={calendarId}
       />
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>

@@ -428,7 +428,12 @@ const convertTradeToFirestoreData = (trade: Trade, calendarId: string) => {
     ...(trade.notes !== undefined && { notes: trade.notes }),
     ...(trade.isTemporary !== undefined && { isTemporary: trade.isTemporary }),
     ...(trade.isPinned !== undefined && { isPinned: trade.isPinned }),
-    ...(processedImages && { images: processedImages })
+    ...(processedImages && { images: processedImages }),
+    // Sharing fields
+    ...(trade.shareLink !== undefined && { shareLink: trade.shareLink }),
+    ...(trade.isShared !== undefined && { isShared: trade.isShared }),
+    ...(trade.sharedAt !== undefined && { sharedAt: Timestamp.fromDate(trade.sharedAt) }),
+    ...(trade.shareId !== undefined && { shareId: trade.shareId })
   };
 
   return {
@@ -531,7 +536,12 @@ const convertFirestoreDataToYearlyTrades = (doc: DocumentData): YearlyTrades => 
     trades: data.trades.map((trade: any) => ({
       ...trade,
       date: trade.date.toDate(),
-      isPinned: trade.isPinned || false // Ensure isPinned field is included
+      isPinned: trade.isPinned || false, // Ensure isPinned field is included
+      // Sharing fields
+      ...(trade.shareLink && { shareLink: trade.shareLink }),
+      ...(trade.isShared !== undefined && { isShared: trade.isShared }),
+      ...(trade.sharedAt && { sharedAt: trade.sharedAt.toDate() }),
+      ...(trade.shareId && { shareId: trade.shareId })
     }))
   };
 };

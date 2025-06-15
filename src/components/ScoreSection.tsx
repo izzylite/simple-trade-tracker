@@ -311,7 +311,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
         borderRadius: 2,
         boxShadow: theme.shadows[2],
         border: `1px solid ${theme.palette.mode === 'dark'
-          ? alpha(theme.palette.common.white, 0.1)
+          ? 'rgba(204, 204, 204, 0.1)'
           : alpha(theme.palette.common.black, 0.1)}`
       }}
     >

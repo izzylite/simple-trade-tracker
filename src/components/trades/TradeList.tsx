@@ -43,6 +43,7 @@ interface TradeListProps {
   enableBulkSelection?: boolean; // New prop to enable bulk selection
   sx?: SxProps<Theme>; // Allow styling from parent component
   deletingTradeIds?: string[]; // IDs of trades currently being deleted
+  calendarId?: string; // Calendar ID for sharing functionality
 }
 
 
@@ -59,7 +60,8 @@ const TradeList: React.FC<TradeListProps> = ({
   hideActions = false, // Default to showing actions
   enableBulkSelection = false, // Default to disabled
   sx,
-  deletingTradeIds = []
+  deletingTradeIds = [],
+  calendarId
 }) => {
   const theme = useTheme();
   const [selectedTradeIds, setSelectedTradeIds] = useState<string[]>([]);
@@ -451,6 +453,7 @@ const TradeList: React.FC<TradeListProps> = ({
                   isExpanded={true}
                   setZoomedImage={onZoomedImage}
                   onUpdateTradeProperty={onUpdateTradeProperty}
+                  calendarId={calendarId}
                 />
               )}
             </React.Fragment>

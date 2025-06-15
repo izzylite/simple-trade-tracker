@@ -68,8 +68,14 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         zIndex: (theme) => theme.zIndex.drawer + 1
       }}
     >
-      <Toolbar>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1 }}>
+      <Toolbar sx={{ px: { xs: 1, sm: 3 } }}> {/* Responsive padding */}
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: { xs: 1, sm: 2 }, // Smaller gap on mobile
+          flexGrow: 1,
+          minWidth: 0 // Allow text truncation
+        }}>
           {showBackButton && (
             <IconButton
               onClick={() => navigate(backButtonPath)}
@@ -85,13 +91,29 @@ const AppHeader: React.FC<AppHeaderProps> = ({
               <ArrowBackIcon />
             </IconButton>
           )}
-          <Typography variant="h5" component="h1" sx={{ flexGrow: 1 }}>
+          <Typography
+            variant="h5"
+            component="h1"
+            sx={{
+              flexGrow: 1,
+              fontSize: { xs: '1.1rem', sm: '1.5rem' }, // Responsive font size
+              fontWeight: 600,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0
+            }}
+          >
             {title}
           </Typography>
         </Box>
         
         {user ? (
-          <Stack direction="row" spacing={2} alignItems="center">
+          <Stack
+            direction="row"
+            spacing={{ xs: 0.5, sm: 2 }} // Tighter spacing on mobile
+            alignItems="center"
+          >
             <IconButton
               onClick={onToggleTheme}
               color="inherit"
@@ -104,34 +126,64 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             >
               {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
             </IconButton>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="body2" color="text.secondary">
-                {user.email}
-              </Typography>
-              <Avatar
-                src={user.photoURL || undefined}
+            <Stack
+              direction="row"
+              spacing={{ xs: 0.5, sm: 1 }} // Tighter spacing on mobile
+              alignItems="center"
+              sx={{
+                display: { xs: 'none', sm: 'flex' } // Hide email on mobile
+              }}
+            >
+              <Typography
+                variant="body2"
+                color="text.secondary"
                 sx={{
-                  width: 32,
-                  height: 32,
-                  bgcolor: theme.palette.primary.main,
-                  fontSize: '0.875rem'
+                  maxWidth: { xs: '80px', sm: 'none' }, // Limit width on small screens
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
                 }}
               >
-                {user.email ? user.email[0].toUpperCase() : 'U'}
-              </Avatar>
+                {user.email}
+              </Typography>
             </Stack>
+            <Avatar
+              src={user.photoURL || undefined}
+              sx={{
+                width: { xs: 28, sm: 32 }, // Smaller avatar on mobile
+                height: { xs: 28, sm: 32 },
+                bgcolor: theme.palette.primary.main,
+                fontSize: '0.875rem'
+              }}
+            >
+              {user.email ? user.email[0].toUpperCase() : 'U'}
+            </Avatar>
             <Button
               variant="outlined"
               color="inherit"
-              startIcon={<LogoutIcon />}
               onClick={handleSignOut}
               size="small"
+              sx={{
+                minWidth: { xs: 'auto', sm: 'auto' },
+                px: { xs: 1, sm: 2 }, // Less padding on mobile
+                fontSize: { xs: '0.75rem', sm: '0.875rem' } // Smaller text on mobile
+              }}
             >
-              Sign Out
+              <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 0.5 }}>
+                <LogoutIcon sx={{ fontSize: 16 }} />
+                Sign Out
+              </Box>
+              <Box sx={{ display: { xs: 'block', sm: 'none' } }}>
+                <LogoutIcon sx={{ fontSize: 16 }} />
+              </Box>
             </Button>
           </Stack>
         ) : (
-          <Stack direction="row" spacing={2} alignItems="center">
+          <Stack
+            direction="row"
+            spacing={{ xs: 0.5, sm: 2 }} // Tighter spacing on mobile
+            alignItems="center"
+          >
             <IconButton
               onClick={onToggleTheme}
               color="inherit"
@@ -146,16 +198,23 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             </IconButton>
             <Button
               variant="contained"
-              startIcon={<GoogleIcon />}
               onClick={handleSignIn}
+              size="small"
               sx={{
                 bgcolor: '#4285F4',
                 '&:hover': {
                   bgcolor: '#3367D6'
-                }
+                },
+                px: { xs: 1.5, sm: 2 }, // Less padding on mobile
+                fontSize: { xs: '0.75rem', sm: '0.875rem' }, // Smaller text on mobile
+                minWidth: { xs: 'auto', sm: 'auto' }
               }}
             >
-              Sign in with Google
+              <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 0.5 }}>
+                <GoogleIcon sx={{ fontSize: 16 }} />
+                Sign in with Google
+              </Box>
+              <Box sx={{ display: { xs: 'block', sm: 'none' } }}>Sign In</Box>
             </Button>
           </Stack>
         )}

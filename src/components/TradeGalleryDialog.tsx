@@ -28,6 +28,7 @@ interface TradeGalleryDialogProps {
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   title?: string;
+  calendarId?: string;
 }
 
 const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
@@ -37,7 +38,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   initialTradeId,
   onUpdateTradeProperty,
   setZoomedImage,
-  title = "Trade Gallery"
+  title = "Trade Gallery",
+  calendarId
 }) => {
   const theme = useTheme();
   
@@ -210,6 +212,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           isExpanded={true}
           setZoomedImage={setZoomedImage}
           onUpdateTradeProperty={onUpdateTradeProperty}
+          calendarId={calendarId}
         />
       </Box>
     </Dialog>

@@ -1,3 +1,4 @@
+export { default as AppHeader } from './AppHeader';
 export { default as BaseDialog } from './BaseDialog';
 export { default as TagsDisplay } from './TagsDisplay';
 export { default as CalendarCell } from './CalendarCell';

@@ -8,6 +8,9 @@ admin.initializeApp();
 // Export the cleanup function
 export { cleanupExpiredCalendarsV2 } from './cleanupExpiredCalendars';
 
+// Export the sharing functions
+export { generateTradeShareLinkV2, getSharedTradeV2, deactivateSharedTradeV2 } from './sharing';
+
  
 
 // Cloud function to handle year document updates - cleans up removed images and handles trade date changes
@@ -148,7 +151,9 @@ export const cleanupDeletedCalendarV2 = onDocumentDeleted('calendars/{calendarId
   });
 
 // Cloud function to update a tag across all trades in a calendar (v2)
-export const updateTagV2 = onCall(async (request) => {
+export const updateTagV2 = onCall({
+  cors: true, // Enable CORS for web requests
+}, async (request) => {
   try {
     
     // Ensure user is authenticated

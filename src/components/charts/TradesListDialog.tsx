@@ -29,6 +29,7 @@ interface TradesDialogProps {
   onDeleteClick?: (tradeId: string) => void;
   onDeleteMultiple?: (tradeIds: string[]) => void;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
+  calendarId?: string;
 }
 
 const TradesListDialog: React.FC<TradesDialogProps> = ({
@@ -45,7 +46,8 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   onEditClick,
   onDeleteClick,
   onDeleteMultiple,
-  onOpenGalleryMode
+  onOpenGalleryMode,
+  calendarId
 }) => {
 
   // Gallery mode handler
@@ -119,6 +121,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
           onUpdateTradeProperty={onUpdateTradeProperty}
           hideActions={!onEditClick && !onDeleteClick} // Hide actions only if both handlers are not provided
           enableBulkSelection={trades.length > 1 && !!onDeleteMultiple} // Enable bulk selection when there are multiple trades and handler is provided
+          calendarId={calendarId}
         />
       </Box>
     </BaseDialog>

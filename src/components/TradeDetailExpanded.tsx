@@ -29,6 +29,7 @@ import {
 import { AnimatedDropdown } from './Animations';
 import { TagsDisplay } from './common';
 import { TradeImage } from './trades/TradeForm';
+import ShareTradeButton from './sharing/ShareTradeButton';
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -38,6 +39,7 @@ interface TradeDetailExpandedProps {
   isExpanded: boolean;
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
+  calendarId?: string;
 }
 
 // Define shimmer animation
@@ -64,7 +66,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   tradeData,
   isExpanded,
   setZoomedImage,
-  onUpdateTradeProperty
+  onUpdateTradeProperty,
+  calendarId
 }) => {
   const theme = useTheme();
   const [trade, setTrade] = useState<Trade>(tradeData);
@@ -195,29 +198,44 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               )}
             </Box>
 
-            {/* Pin Button */}
-            {onUpdateTradeProperty && (
-              <IconButton
-                onClick={handleTogglePin}
-                disabled={isPinning}
-                sx={{
-                  color: trade.isPinned ? 'primary.main' : 'text.secondary',
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                    color: 'primary.main'
-                  },
-                  '&:disabled': {
-                    color: 'text.disabled'
-                  }
-                }}
-              >
-                {isPinning ? (
-                  <CircularProgress size={20} color="inherit" />
-                ) : (
-                  trade.isPinned ? <UnpinIcon sx={{ fontSize: 20 }} /> : <PinIcon sx={{ fontSize: 20 }} />
-                )}
-              </IconButton>
-            )}
+            {/* Action Buttons */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              {/* Share Button */}
+              {calendarId && (
+                <ShareTradeButton
+                  trade={trade}
+                  calendarId={calendarId}
+                  onTradeUpdated={(updatedTrade) => setTrade(updatedTrade)}
+                  onUpdateTradeProperty={onUpdateTradeProperty}
+                  size="small"
+                  color="inherit"
+                />
+              )}
+
+              {/* Pin Button */}
+              {onUpdateTradeProperty && (
+                <IconButton
+                  onClick={handleTogglePin}
+                  disabled={isPinning}
+                  sx={{
+                    color: trade.isPinned ? 'primary.main' : 'text.secondary',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                      color: 'primary.main'
+                    },
+                    '&:disabled': {
+                      color: 'text.disabled'
+                    }
+                  }}
+                >
+                  {isPinning ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    trade.isPinned ? <UnpinIcon sx={{ fontSize: 20 }} /> : <PinIcon sx={{ fontSize: 20 }} />
+                  )}
+                </IconButton>
+              )}
+            </Box>
           </Box>
 
           {/* Properties Section */}
@@ -246,7 +264,13 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                     gap: 0.5,
                     gridColumn: { xs: '1', sm: 'span 2' }
                   }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <Box sx={{
+                      display: 'flex',
+                      flexDirection: { xs: 'column', sm: 'row' }, // Stack vertically on mobile
+                      justifyContent: 'space-between',
+                      gap: { xs: 1, sm: 0 }, // Add gap on mobile
+                      width: '100%'
+                    }}>
                       {trade.entry && (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                           <Typography variant="caption" sx={{ fontWeight: 600, color: 'info.main' }}>
@@ -302,7 +326,13 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       PnL
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box sx={{
+                    display: 'flex',
+                    flexDirection: { xs: 'column', sm: 'row' }, // Stack vertically on mobile
+                    justifyContent: 'space-between',
+                    alignItems: { xs: 'flex-start', sm: 'center' }, // Align left on mobile
+                    gap: { xs: 1, sm: 0 } // Add gap on mobile
+                  }}>
                     <Typography variant="h6" sx={{
                       fontWeight: 700,
                       color: trade.amount > 0 ? 'success.main' : trade.amount < 0 ? 'error.main' : 'text.primary',
@@ -466,6 +496,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                           key={`row-${rowIndex}`}
                           sx={{
                             display: 'flex',
+                            flexDirection: { xs: rowImages.length > 1 ? 'column' : 'row', sm: 'row' }, // Stack images vertically on mobile if multiple
                             width: '100%',
                             mb: 2,
                             gap: 1 // Add small gap between columns
@@ -478,7 +509,10 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                               <Box
                                 key={`image-${image.id}-${rowIndex}-${colIndex}`}
                                 sx={{
-                                  width: `${image.columnWidth || 100}%`,
+                                  width: {
+                                    xs: rowImages.length > 1 ? '100%' : `${image.columnWidth || 100}%`, // Full width on mobile if multiple images
+                                    sm: `${image.columnWidth || 100}%`
+                                  },
                                   borderRadius: 1,
                                   overflow: 'hidden',
                                   position: 'relative'

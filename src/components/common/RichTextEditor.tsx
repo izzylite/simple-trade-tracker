@@ -508,7 +508,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   // Add text colors to the style map
   TEXT_COLORS.forEach(color => {
     if (color.color !== 'default') {
-      styleMap[`TEXT_COLOR_${color.color.replace('#', '')}`] = { color: color.color };
+      // Use softer white (#CCCCCC) for dark mode, pure white for light mode
+      const finalColor = color.color === '#FFFFFF' && theme.palette.mode === 'dark'
+        ? '#CCCCCC'
+        : color.color;
+      styleMap[`TEXT_COLOR_${color.color.replace('#', '')}`] = { color: finalColor };
     }
   });
   // Add background colors to the style map
