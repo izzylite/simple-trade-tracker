@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Toolbar,
@@ -11,8 +11,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   useTheme,
-  Fade,
-  Paper as MuiPaper // Use MuiPaper consistently
+  Paper as MuiPaper
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
@@ -26,45 +25,15 @@ import {
   ArrowDropDown,
   Palette
 } from '@mui/icons-material';
-import { Editor, EditorState, RichUtils, ContentState, convertToRaw, convertFromRaw } from 'draft-js';
+import { Editor, EditorState, RichUtils, convertToRaw } from 'draft-js';
 import 'draft-js/dist/Draft.css';
 
-// Define color options
-const TEXT_COLORS = [
-{ label: 'Default', color: 'default' }, // Handled specially in rendering
-{ label: 'Black', color: '#000000' },
-{ label: 'White', color: '#FFFFFF' },
-{ label: 'Brown', color: '#BA856F' },
-{ label: 'Orange', color: '#C07A47' },
-{ label: 'Yellow', color: '#B58A48' },
-{ label: 'Green', color: '#427256' },
-{ label: 'Blue', color: '#379AD3' },
-{ label: 'Purple', color: '#9664C9' },
-{ label: 'Pink', color: '#9B4342' },
-{ label: 'Red', color: '#BC4B4A' },
-];
-
-const BACKGROUND_COLORS = [
-{ label: 'Default', color: 'default' }, // Handled specially
-{ label: 'Black', color: '#000000' },
-{ label: 'Dark Gray', color: '#2F2F2F' },
-{ label: 'Brown', color: '#4A3228' },
-{ label: 'Orange', color: '#5C3B23' },
-{ label: 'Yellow', color: '#564328' },
-{ label: 'Green', color: '#243D30' },
-{ label: 'Blue', color: '#143A4E' },
-{ label: 'Purple', color: '#3C2D49' },
-{ label: 'Pink', color: '#4E2C3C' },
-{ label: 'Red', color: '#522E2A' },
-];
-
-// Define heading options
-const HEADING_OPTIONS = [
-  { label: 'Normal', style: 'unstyled' },
-  { label: 'Heading 1', style: 'header-one' },
-  { label: 'Heading 2', style: 'header-two' },
-  { label: 'Heading 3', style: 'header-three' },
-];
+// Import utilities, constants, and hooks
+import { createEditorStateFromValue } from './RichTextEditor/utils/draftUtils';
+import { TEXT_COLORS, BACKGROUND_COLORS } from './RichTextEditor/constants/colors';
+import { HEADING_OPTIONS } from './RichTextEditor/constants/headings';
+import { useRecentColors } from './RichTextEditor/hooks/useRecentColors';
+import { useFloatingToolbar } from './RichTextEditor/hooks/useFloatingToolbar';
 
 export interface RichTextEditorProps {
   value?: string;
@@ -91,64 +60,51 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   disabled = false
 }) => {
   const theme = useTheme();
-  const [editorState, setEditorState] = useState(() => {
-    if (value) {
-      try {
-        // Try to parse the value as raw content
-        const rawContent = JSON.parse(value);
-        // Basic check if it looks like Draft.js raw content
-        if (rawContent && Array.isArray(rawContent.blocks) && typeof rawContent.entityMap === 'object') {
-          const contentState = convertFromRaw(rawContent);
-          return EditorState.createWithContent(contentState);
-        } else {
-            // If not valid raw JSON, treat as plain text
-             return EditorState.createWithContent(ContentState.createFromText(value));
+  const [editorState, setEditorState] = useState(() => createEditorStateFromValue(value));
+
+  // Update editor state when value prop changes (for controlled component behavior)
+  useEffect(() => {
+    if (value !== previousValueRef.current) {
+      previousValueRef.current = value;
+
+      if (value !== undefined) {
+        const newEditorState = createEditorStateFromValue(value);
+        // Only update if the content is actually different to avoid infinite loops
+        const currentContent = convertToRaw(editorState.getCurrentContent());
+        const newContent = convertToRaw(newEditorState.getCurrentContent());
+
+        if (JSON.stringify(currentContent) !== JSON.stringify(newContent)) {
+          setEditorState(newEditorState);
         }
-      } catch (e) {
-        // If parsing fails or it's not raw content, create with plain text
-        console.warn("RichTextEditor: Failed to parse initial value as Draft.js raw content. Treating as plain text.", e);
-        return EditorState.createWithContent(ContentState.createFromText(value));
       }
     }
-    return EditorState.createEmpty();
-  });
+  }, [value]);
 
   const editorRef = useRef<Editor>(null);
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const previousValueRef = useRef<string | undefined>(value);
   const [headingMenuAnchor, setHeadingMenuAnchor] = useState<null | HTMLElement>(null);
   const [colorMenuAnchor, setColorMenuAnchor] = useState<null | HTMLElement>(null);
 
-  // State for tracking recently used colors
-  const [recentlyUsedTextColors, setRecentlyUsedTextColors] = useState<Array<{ label: string; color: string }>>([]);
-  const [recentlyUsedBgColors, setRecentlyUsedBgColors] = useState<Array<{ label: string; color: string }>>([]);
+  // Use custom hooks for better organization
+  const {
+    recentTextColors,
+    recentBgColors,
+    addRecentTextColor,
+    addRecentBgColor
+  } = useRecentColors();
 
-  // Load recently used colors from localStorage on component mount
-  useEffect(() => {
-    try {
-      const savedTextColors = localStorage.getItem('richTextEditor_recentTextColors');
-      const savedBgColors = localStorage.getItem('richTextEditor_recentBgColors');
-
-      if (savedTextColors) {
-        setRecentlyUsedTextColors(JSON.parse(savedTextColors));
-      } else {
-         setRecentlyUsedTextColors([]); // Initialize if nothing in storage
-      }
-
-      if (savedBgColors) {
-        setRecentlyUsedBgColors(JSON.parse(savedBgColors));
-      } else {
-         setRecentlyUsedBgColors([]); // Initialize if nothing in storage
-      }
-    } catch (error) {
-      console.error('Error loading recently used colors from localStorage:', error);
-       setRecentlyUsedTextColors([]);
-       setRecentlyUsedBgColors([]);
-    }
-  }, []);
-
-  const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
-  const [floatingToolbarPosition, setFloatingToolbarPosition] = useState<{ top: number; left: number } | null>(null);
+  const {
+    showFloatingToolbar,
+    floatingToolbarPosition
+  } = useFloatingToolbar({
+    disabled,
+    editorWrapperRef,
+    toolbarRef,
+    colorMenuAnchor,
+    headingMenuAnchor,
+  });
 
   // Focus the editor when clicked
   const focusEditor = () => {
@@ -157,190 +113,28 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   };
 
-  // Function to get selection rectangle
-  const getSelectionRect = (): DOMRect | null => {
-    try { // Add try-catch for robustness
-        const selection = window.getSelection();
-        if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-            return null;
-        }
-        const range = selection.getRangeAt(0);
-        return range.getBoundingClientRect();
-    } catch (e) {
-        console.error("Error getting selection rect:", e);
-        return null;
-    }
-  };
 
- // Function to update and show/hide floating toolbar
-  const checkSelectionAndPositionToolbar = useCallback(() => {
-    if (disabled || !editorWrapperRef.current) return;
-
-    const selection = window.getSelection();
-    const hasText = selection && !selection.isCollapsed && selection.rangeCount > 0;
-
-    if (hasText) {
-      try {
-        const selectionRect = getSelectionRect();
-
-        if (selectionRect && selectionRect.width > 0 && editorWrapperRef.current) { // Ensure wrapperRef exists
-          const editorRect = editorWrapperRef.current.getBoundingClientRect();
-          const editorScrollTop = editorWrapperRef.current.scrollTop;
-          const editorScrollLeft = editorWrapperRef.current.scrollLeft;
-
-          // Use actual toolbar dimensions if available, otherwise estimate
-          // Note: Dimensions might be slightly off if read during animation/transition
-          const toolbarHeight = toolbarRef.current?.offsetHeight ?? 48;
-          const toolbarWidth = toolbarRef.current?.offsetWidth ?? 320;
-          const spacing = 8; // Space between selection and toolbar
-
-          // Calculate base position relative to the editor's viewport entry
-          let top = selectionRect.top - editorRect.top - toolbarHeight - spacing;
-          let left = selectionRect.left - editorRect.left + (selectionRect.width / 2) - (toolbarWidth / 2);
-
-          // Add scroll position to get position relative to the scrollable content
-          top += editorScrollTop;
-          left += editorScrollLeft;
-
-          // --- FIXED: Boundary checks accounting for scroll ---
-          const safeTopBoundary = editorScrollTop + spacing;
-          const safeBottomBoundaryForTopPositioning = selectionRect.bottom - editorRect.top + spacing + editorScrollTop;
-
-          // If not enough space above (or it goes above the scrolled viewport), position below
-          if (top < safeTopBoundary) {
-            top = safeBottomBoundaryForTopPositioning;
-          }
-
-          // Prevent going off left edge (relative to scrolled content)
-          const safeLeftBoundary = editorScrollLeft + spacing;
-          left = Math.max(safeLeftBoundary, left);
-
-          // Prevent going off right edge (relative to scrolled content)
-          // editorRect.width is viewport width, consider scrollbar width
-          const scrollbarWidthAllowance = 15; // Adjust as needed
-          const safeRightBoundary = editorRect.width - toolbarWidth - spacing + editorScrollLeft - scrollbarWidthAllowance;
-          left = Math.min(safeRightBoundary, left);
-          // --- End Fixed Boundary Checks ---
-
-          setFloatingToolbarPosition({ top, left });
-          if (!showFloatingToolbar) { // Only set true if it was previously false to potentially reduce re-renders
-             setShowFloatingToolbar(true);
-          }
-          return;
-        }
-      } catch (error) {
-        console.error('Error positioning toolbar:', error);
-        // Fall through to hide toolbar on error
-      }
-    }
-
-    // Hide toolbar if no valid selection OR an error occurred positioning it
-    // Only hide if no menus anchored to the toolbar are open
-    if (!colorMenuAnchor && !headingMenuAnchor) {
-      // Check if it's currently shown before setting state
-      if (showFloatingToolbar) {
-          setShowFloatingToolbar(false);
-          // Optionally reset position: setFloatingToolbarPosition(null); // Can cause jumpiness if reset immediately
-      }
-    }
-  }, [disabled, colorMenuAnchor, headingMenuAnchor, showFloatingToolbar]); // Added showFloatingToolbar dependency
 
   // Handle editor state changes
   const handleEditorChange = (state: EditorState) => {
+    const prevContentState = editorState.getCurrentContent();
+    const newContentState = state.getCurrentContent();
+
     setEditorState(state);
-    // Update toolbar position based on cursor movement within the selection
-    // checkSelectionAndPositionToolbar(); // Debounce or throttle this if performance is an issue
 
     if (onChange) {
-      // Convert the content to a JSON string
-      const contentState = state.getCurrentContent();
       // Only save if content has actually changed (prevents unnecessary updates)
-      if (contentState !== editorState.getCurrentContent()) {
-          const rawContent = convertToRaw(contentState);
-          onChange(JSON.stringify(rawContent));
+      // Compare the raw content to detect actual changes
+      const prevRaw = convertToRaw(prevContentState);
+      const newRaw = convertToRaw(newContentState);
+
+      if (JSON.stringify(prevRaw) !== JSON.stringify(newRaw)) {
+        onChange(JSON.stringify(newRaw));
       }
     }
   };
 
-  // Effect to add/remove event listeners for selection
-  useEffect(() => {
-    const editorElement = editorWrapperRef.current;
-    if (!editorElement || disabled) return;
 
-    // Use a slight delay on mouseup to allow selection to finalize
-    const handleMouseUp = () => setTimeout(checkSelectionAndPositionToolbar, 0);
-    const handleTouchEnd = () => setTimeout(checkSelectionAndPositionToolbar, 0);
-    // Check on key up for keyboard selections & cursor movement
-    const handleKeyUp = (event: KeyboardEvent) => {
-        // Check for arrow keys, selection keys (Shift+Arrows), Home, End etc.
-        if (
-            event.key.includes('Arrow') ||
-            ['Home', 'End', 'PageUp', 'PageDown'].includes(event.key) ||
-            (event.shiftKey && ['Delete', 'Backspace'].includes(event.key)) // Selection changes
-        ) {
-             setTimeout(checkSelectionAndPositionToolbar, 0);
-        }
-    };
-
-    editorElement.addEventListener('mouseup', handleMouseUp);
-    editorElement.addEventListener('touchend', handleTouchEnd);
-    editorElement.addEventListener('keyup', handleKeyUp); // Listen on editor for keys
-    // Check on focus as well
-    editorElement.addEventListener('focus', checkSelectionAndPositionToolbar);
-
-
-    return () => {
-      editorElement.removeEventListener('mouseup', handleMouseUp);
-      editorElement.removeEventListener('touchend', handleTouchEnd);
-      editorElement.removeEventListener('keyup', handleKeyUp);
-      editorElement.removeEventListener('focus', checkSelectionAndPositionToolbar);
-
-    };
-  }, [checkSelectionAndPositionToolbar, disabled]); // Re-run if disabled state changes or function reference changes
-
-
-  // Effect to hide toolbar on outside click
-   useEffect(() => {
-      const handleClickOutside = (event: MouseEvent) => {
-          const target = event.target as Node;
-
-          // Check if click is outside the editor and the toolbar
-          const isOutsideEditor = editorWrapperRef.current && !editorWrapperRef.current.contains(target);
-          const isOutsideToolbar = toolbarRef.current && !toolbarRef.current.contains(target);
-          // A basic check if click is outside menu anchors (more robust would involve menu refs)
-          const isOutsideMenus = !colorMenuAnchor && !headingMenuAnchor;
-
-          if (showFloatingToolbar && isOutsideEditor && isOutsideToolbar && isOutsideMenus) {
-              setShowFloatingToolbar(false);
-              // setFloatingToolbarPosition(null); // Avoid resetting position immediately
-              return; // Hide and exit
-          }
-
-          // Check if click is *inside* editor but possibly clears selection
-          if (
-              editorWrapperRef.current &&
-              editorWrapperRef.current.contains(target) &&
-              isOutsideToolbar // Ensure click isn't on toolbar itself
-          ) {
-              // Use RAF or timeout to check selection state *after* the click's effects
-              requestAnimationFrame(() => {
-                  const selection = window.getSelection();
-                  if (selection && selection.isCollapsed) {
-                      // Only hide if no menus are open
-                      if (!colorMenuAnchor && !headingMenuAnchor) {
-                          setShowFloatingToolbar(false);
-                           // setFloatingToolbarPosition(null);
-                      }
-                  }
-              });
-          }
-      };
-
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-          document.removeEventListener('mousedown', handleClickOutside);
-      };
-  }, [showFloatingToolbar, colorMenuAnchor, headingMenuAnchor]); // Dependencies ensure checks use current menu state
 
    // Function to prevent editor blur/selection clear when interacting with toolbar
    const handleToolbarInteraction = (event: React.MouseEvent | React.TouchEvent) => {
@@ -381,8 +175,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
    // Apply text color
    const applyTextColor = (color: string) => {
+    // Store current scroll position before applying color
+    const editorElement = editorRef.current?.editor;
+    const scrollTop = editorElement?.scrollTop || 0;
+
     const currentStyle = editorState.getCurrentInlineStyle();
     let nextEditorState = editorState;
+
     // Remove any existing text color styles in the selection
     const textColorStyles = currentStyle.filter((style): style is string =>
         style !== undefined && style.startsWith('TEXT_COLOR_')
@@ -399,26 +198,31 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         // Update recently used text colors
         const colorObj = TEXT_COLORS.find(c => c.color === color);
         if (colorObj) {
-            setRecentlyUsedTextColors(prev => {
-                const filtered = prev.filter(c => c.color !== color);
-                const newList = [colorObj, ...filtered].slice(0, 5); // Keep 5 most recent
-                try { localStorage.setItem('richTextEditor_recentTextColors', JSON.stringify(newList)); }
-                catch (error) { console.error('Error saving recent text colors:', error); }
-                return newList;
-            });
+            addRecentTextColor(colorObj);
         }
     }
-    // If default, we just remove all text colors (already done above)
 
     handleEditorChange(nextEditorState);
-    setColorMenuAnchor(null); // Close menu
-    setTimeout(() => editorRef.current?.focus(), 0); // Refocus editor
+    setColorMenuAnchor(null);
+
+    // Restore scroll position and focus
+    setTimeout(() => {
+      if (editorElement) {
+        editorElement.scrollTop = scrollTop;
+      }
+      editorRef.current?.focus();
+    }, 0);
    };
 
     // Apply background color
     const applyBackgroundColor = (color: string) => {
+        // Store current scroll position before applying color
+        const editorElement = editorRef.current?.editor;
+        const scrollTop = editorElement?.scrollTop || 0;
+
         const currentStyle = editorState.getCurrentInlineStyle();
         let nextEditorState = editorState;
+
         // Remove any existing background color styles in the selection
         const bgColorStyles = currentStyle.filter((style): style is string =>
             style !== undefined && style.startsWith('BG_COLOR_')
@@ -432,53 +236,78 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             const newStyle = `BG_COLOR_${color.replace('#', '')}`;
             nextEditorState = RichUtils.toggleInlineStyle(nextEditorState, newStyle);
 
-             // Update recently used background colors
+            // Update recently used background colors
             const colorObj = BACKGROUND_COLORS.find(c => c.color === color);
             if (colorObj) {
-                setRecentlyUsedBgColors(prev => {
-                    const filtered = prev.filter(c => c.color !== color);
-                    const newList = [colorObj, ...filtered].slice(0, 5); // Keep 5 most recent
-                    try { localStorage.setItem('richTextEditor_recentBgColors', JSON.stringify(newList)); }
-                    catch (error) { console.error('Error saving recent bg colors:', error); }
-                    return newList;
-                });
+                addRecentBgColor(colorObj);
             }
         }
-        // If default, we just remove all background colors (already done above)
 
         handleEditorChange(nextEditorState);
-        setColorMenuAnchor(null); // Close menu
-        setTimeout(() => editorRef.current?.focus(), 0); // Refocus editor
+        setColorMenuAnchor(null);
+
+        // Restore scroll position and focus
+        setTimeout(() => {
+          if (editorElement) {
+            editorElement.scrollTop = scrollTop;
+          }
+          editorRef.current?.focus();
+        }, 0);
     };
 
   // Handle menu anchor button clicks (toggle open/close)
   const handleHeadingButtonClick = (event: React.MouseEvent<HTMLElement>) => {
     event.preventDefault();
     event.stopPropagation();
+
+    // Store current scroll position before opening menu
+    const editorElement = editorRef.current?.editor;
+    const scrollTop = editorElement?.scrollTop || 0;
+
     if (headingMenuAnchor) {
       setHeadingMenuAnchor(null); // Close if already open
        setTimeout(() => editorRef.current?.focus(), 0); // Refocus
     } else {
       setHeadingMenuAnchor(event.currentTarget); // Open if closed
+
+      // Restore scroll position after menu opens
+      setTimeout(() => {
+        if (editorElement) {
+          editorElement.scrollTop = scrollTop;
+        }
+      }, 0);
     }
   };
 
   const handleColorButtonClick = (event: React.MouseEvent<HTMLElement>) => {
     event.preventDefault();
     event.stopPropagation();
+
+    // Store current scroll position before opening menu
+    const editorElement = editorRef.current?.editor;
+    const scrollTop = editorElement?.scrollTop || 0;
+
     if (colorMenuAnchor) {
       setColorMenuAnchor(null); // Close if already open
        setTimeout(() => editorRef.current?.focus(), 0); // Refocus
     } else {
       setColorMenuAnchor(event.currentTarget); // Open if closed
+
+      // Restore scroll position after menu opens
+      setTimeout(() => {
+        if (editorElement) {
+          editorElement.scrollTop = scrollTop;
+        }
+      }, 0);
     }
   };
 
   // Apply heading style
   const applyHeading = (headingStyle: string) => {
-    // Get the current selection and content
-    const selection = editorState.getSelection();
-    const contentState = editorState.getCurrentContent();
+    // Store current scroll position before applying heading
+    const editorElement = editorRef.current?.editor;
+    const scrollTop = editorElement?.scrollTop || 0;
+
     const currentStyles = editorState.getCurrentInlineStyle();
 
     // Apply the block type change
@@ -498,9 +327,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     // Update the editor state
     handleEditorChange(nextEditorState);
 
-    // Close menu and refocus
+    // Close menu and restore scroll position
     setHeadingMenuAnchor(null);
-    setTimeout(() => editorRef.current?.focus(), 0);
+    setTimeout(() => {
+      if (editorElement) {
+        editorElement.scrollTop = scrollTop;
+      }
+      editorRef.current?.focus();
+    }, 0);
   };
 
   // Custom style map for colors
@@ -579,16 +413,19 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         open={Boolean(colorMenuAnchor)}
         onClose={() => {
           setColorMenuAnchor(null);
-          // Check selection immediately after closing menu (might be slightly delayed by animations)
-          setTimeout(checkSelectionAndPositionToolbar, 50);
+          // Don't check selection when menu closes to prevent unwanted scrolling
+          // The toolbar will be repositioned naturally when user interacts with editor again
           // Refocus editor after closing menu only if editor still has focus logically
           if (editorState.getSelection().getHasFocus()) {
              setTimeout(() => editorRef.current?.focus(), 0);
           }
         }}
-        disablePortal={false} // Keep within editor flow for positioning
+        disablePortal={false} // Keep portal for proper positioning
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+        disableScrollLock={true} // Prevent scroll lock that might cause jumps
+        disableAutoFocus={true} // Prevent auto focus that might cause scroll
+        disableEnforceFocus={true} // Prevent focus enforcement
         slotProps={{
           paper: {
             onMouseDown: handleToolbarInteraction, // Use interaction handler
@@ -609,14 +446,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         }}
       >
         {/* Recently Used Colors Section */}
-        {(recentlyUsedTextColors.length > 0 || recentlyUsedBgColors.length > 0) && (
+        {(recentTextColors.length > 0 || recentBgColors.length > 0) && (
             <Box sx={{ mb: 2 }}>
                 <Typography variant="caption" sx={{ mb: 1, color: theme.palette.text.secondary, display: 'block' }}>
                     Recently Used
                 </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                     {/* Text Colors with 'A' */}
-                    {recentlyUsedTextColors.map((color) => (
+                    {recentTextColors.map((color) => (
                     <Tooltip key={`recent-text-${color.color}`} title={`Text: ${color.label}`}>
                         <IconButton
                         size="small"
@@ -638,7 +475,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                     </Tooltip>
                     ))}
                     {/* Background Colors */}
-                    {recentlyUsedBgColors.map((color) => (
+                    {recentBgColors.map((color) => (
                     <Tooltip key={`recent-bg-${color.color}`} title={`Background: ${color.label}`}>
                         <IconButton
                         size="small"
@@ -745,14 +582,18 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         open={Boolean(headingMenuAnchor)}
         onClose={() => {
           setHeadingMenuAnchor(null);
-          setTimeout(checkSelectionAndPositionToolbar, 50);
+          // Don't check selection when menu closes to prevent unwanted scrolling
+          // The toolbar will be repositioned naturally when user interacts with editor again
           if (editorState.getSelection().getHasFocus()) {
              setTimeout(() => editorRef.current?.focus(), 0);
           }
         }}
-        disablePortal={false}
+        disablePortal={false} // Keep portal for proper positioning
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+        disableScrollLock={true} // Prevent scroll lock that might cause jumps
+        disableAutoFocus={true} // Prevent auto focus that might cause scroll
+        disableEnforceFocus={true} // Prevent focus enforcement
         slotProps={{
           paper: {
             onMouseDown: handleToolbarInteraction,

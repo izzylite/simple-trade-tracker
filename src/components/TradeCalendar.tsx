@@ -61,7 +61,6 @@ import DayDialog from './trades/DayDialog';
 import SelectDateDialog from './SelectDateDialog';
 
 import TagFilterDialog from './TagFilterDialog';
-import TagFilterDrawer from './TagFilterDrawer';
 import TagManagementDialog from './TagManagementDialog';
 import TagManagementDrawer from './TagManagementDrawer';
 import SearchDrawer from './SearchDrawer';
@@ -376,7 +375,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   }, []);
 
   const [isTagManagementDialogOpen, setIsTagManagementDialogOpen] = useState(false);
-  const [isTagFilterDrawerOpen, setIsTagFilterDrawerOpen] = useState(false);
   const [isTagManagementDrawerOpen, setIsTagManagementDrawerOpen] = useState(false);
   const [isSearchDrawerOpen, setIsSearchDrawerOpen] = useState(false);
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
@@ -869,7 +867,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   allTags={allTags}
                   selectedTags={selectedTags}
                   onTagsChange={handleTagsChange}
-                  onOpenDrawer={() => setIsTagFilterDrawerOpen(true)}
+                  onOpenDrawer={() => setIsSearchDrawerOpen(true)}
                 />
                 <Tooltip title="Manage tags and required tag groups">
                   <Button
@@ -1253,13 +1251,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
         {/* Drawers */}
-        <TagFilterDrawer
-          open={isTagFilterDrawerOpen}
-          onClose={() => setIsTagFilterDrawerOpen(false)}
-          allTags={allTags}
-          selectedTags={selectedTags}
-          onTagsChange={handleTagsChange}
-        />
 
         <TagManagementDrawer
           open={isTagManagementDrawerOpen}
@@ -1332,10 +1323,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
-        {/* Search FAB */}
+        {/* Search & Filter FAB */}
         <Fab
           color="primary"
-          aria-label="search trades"
+          aria-label="search and filter trades"
           onClick={() => setIsSearchDrawerOpen(true)}
           sx={{
             position: 'fixed',
@@ -1347,12 +1338,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           <SearchIcon />
         </Fab>
 
-        {/* Search Drawer */}
+        {/* Search & Filter Drawer */}
         <SearchDrawer
           open={isSearchDrawerOpen}
           onClose={() => setIsSearchDrawerOpen(false)}
           trades={trades}
           allTags={allTags}
+          selectedTags={selectedTags}
+          onTagsChange={handleTagsChange}
           onTradeClick={(trade) => {
             // Close search drawer and open the trade in gallery mode
             setIsSearchDrawerOpen(false);

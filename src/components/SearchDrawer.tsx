@@ -14,7 +14,15 @@ import {
   Chip,
   Divider,
   InputAdornment,
-  CircularProgress
+  CircularProgress,
+  Autocomplete,
+  Button,
+  Collapse,
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -22,16 +30,24 @@ import {
   TrendingUp as WinIcon,
   TrendingDown as LossIcon,
   Remove as BreakevenIcon,
-  CalendarToday as DateIcon
+  CalendarToday as DateIcon,
+  FilterAlt as FilterIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  DateRange as DateRangeIcon
 } from '@mui/icons-material';
+import { DatePicker } from '@mui/x-date-pickers';
 import { Trade } from '../types/trade';
-import { format } from 'date-fns';
+import { format, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns';
 import {
   getTagChipStyles,
   formatTagForDisplay,
   isGroupedTag,
-  getTagGroup
+  getTagGroup,
+  getUniqueTagGroups,
+  filterTagsByGroup
 } from '../utils/tagColors';
+import { SelectInput } from './common';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 
 interface SearchDrawerProps {
@@ -40,6 +56,18 @@ interface SearchDrawerProps {
   trades: Trade[];
   allTags: string[];
   onTradeClick?: (trade: Trade) => void;
+  // Tag filtering props
+  selectedTags?: string[];
+  onTagsChange?: (tags: string[]) => void;
+}
+
+// Date filter types
+type DateFilterType = 'all' | 'single' | 'range';
+
+interface DateFilter {
+  type: DateFilterType;
+  startDate: Date | null;
+  endDate: Date | null;
 }
 
 // Debounce hook for search optimization
@@ -60,8 +88,40 @@ const useDebounce = (value: string, delay: number) => {
 };
 
 // Background search worker function
-const performSearch = (trades: Trade[], query: string): Trade[] => {
-  if (!query.trim()) return [];
+const performSearch = (trades: Trade[], query: string, selectedTags: string[] = [], dateFilter: DateFilter): Trade[] => {
+  // First apply tag filtering if any tags are selected
+  let filteredTrades = trades;
+  if (selectedTags.length > 0) {
+    filteredTrades = trades.filter(trade =>
+      trade.tags?.some(tag => selectedTags.includes(tag))
+    );
+  }
+
+  // Apply date filtering
+  if (dateFilter.type !== 'all') {
+    filteredTrades = filteredTrades.filter(trade => {
+      const tradeDate = new Date(trade.date);
+
+      if (dateFilter.type === 'single' && dateFilter.startDate) {
+        const filterDate = startOfDay(dateFilter.startDate);
+        const endOfFilterDate = endOfDay(dateFilter.startDate);
+        return !isBefore(tradeDate, filterDate) && !isAfter(tradeDate, endOfFilterDate);
+      }
+
+      if (dateFilter.type === 'range' && dateFilter.startDate && dateFilter.endDate) {
+        const startFilterDate = startOfDay(dateFilter.startDate);
+        const endFilterDate = endOfDay(dateFilter.endDate);
+        return !isBefore(tradeDate, startFilterDate) && !isAfter(tradeDate, endFilterDate);
+      }
+
+      return true;
+    });
+  }
+
+  // If no search query, return filtered results
+  if (!query.trim()) {
+    return filteredTrades.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
 
   const lowerQuery = query.toLowerCase();
 
@@ -71,7 +131,7 @@ const performSearch = (trades: Trade[], query: string): Trade[] => {
     .map(term => term.trim())
     .filter(term => term.length > 0);
 
-  return trades.filter(trade => {
+  return filteredTrades.filter(trade => {
     // For multiple search terms, check if ALL terms match (AND logic)
     // For single term, use the original OR logic across different fields
 
@@ -153,7 +213,9 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
   onClose,
   trades,
   allTags,
-  onTradeClick
+  onTradeClick,
+  selectedTags = [],
+  onTagsChange
 }) => {
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
@@ -161,10 +223,33 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
   const [filteredTrades, setFilteredTrades] = useState<Trade[]>([]);
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
 
+  // Tag filtering state
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const [selectedTagGroup, setSelectedTagGroup] = useState<string>('');
+
+  // Date filtering state
+  const [isDateFilterExpanded, setIsDateFilterExpanded] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateFilter>({
+    type: 'all',
+    startDate: null,
+    endDate: null
+  });
+
+  // Get all unique tag groups
+  const tagGroups = useMemo(() => {
+    return getUniqueTagGroups(allTags);
+  }, [allTags]);
+
+  // Filter tags by selected group
+  const filteredTagOptions = useMemo(() => {
+    if (!selectedTagGroup) return allTags;
+    return filterTagsByGroup(allTags, selectedTagGroup);
+  }, [allTags, selectedTagGroup]);
+
   // Debounce search query to avoid excessive calculations
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  // Perform search in background when debounced query changes
+  // Perform search in background when debounced query or selected tags change
   useEffect(() => {
     if (!open) return; // Don't search if drawer is closed
 
@@ -174,7 +259,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
       // Use setTimeout to move computation to next tick (background)
       setTimeout(() => {
         try {
-          const results = performSearch(trades, debouncedSearchQuery);
+          const results = performSearch(trades, debouncedSearchQuery, selectedTags, dateFilter);
           const suggestions = getSuggestedTags(allTags, debouncedSearchQuery);
 
           setFilteredTrades(results);
@@ -190,7 +275,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
     };
 
     performBackgroundSearch();
-  }, [debouncedSearchQuery, trades, allTags, open]);
+  }, [debouncedSearchQuery, selectedTags, dateFilter, trades, allTags, open]);
 
   // Reset search when drawer closes
   useEffect(() => {
@@ -199,8 +284,57 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
       setFilteredTrades([]);
       setSuggestedTags([]);
       setIsSearching(false);
+      setSelectedTagGroup('');
+      setIsDateFilterExpanded(false);
+      setDateFilter({
+        type: 'all',
+        startDate: null,
+        endDate: null
+      });
     }
   }, [open]);
+
+  // Tag filtering handlers
+  const handleTagsChange = useCallback((tags: string[]) => {
+    onTagsChange?.(tags);
+  }, [onTagsChange]);
+
+  const handleClearTags = useCallback(() => {
+    onTagsChange?.([]);
+  }, [onTagsChange]);
+
+  // Date filtering handlers
+  const handleDateFilterChange = useCallback((type: DateFilterType) => {
+    setDateFilter(prev => ({
+      ...prev,
+      type,
+      // Clear dates when switching to 'all'
+      startDate: type === 'all' ? null : prev.startDate,
+      endDate: type === 'all' ? null : prev.endDate
+    }));
+  }, []);
+
+  const handleStartDateChange = useCallback((date: Date | null) => {
+    setDateFilter(prev => ({
+      ...prev,
+      startDate: date
+    }));
+  }, []);
+
+  const handleEndDateChange = useCallback((date: Date | null) => {
+    setDateFilter(prev => ({
+      ...prev,
+      endDate: date
+    }));
+  }, []);
+
+  const handleClearDateFilter = useCallback(() => {
+    setDateFilter({
+      type: 'all',
+      startDate: null,
+      endDate: null
+    });
+  }, []);
 
   const getTradeTypeIcon = (type: Trade['type']) => {
     switch (type) {
@@ -277,7 +411,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
             <SearchIcon sx={{ color: 'primary.main', fontSize: 20 }} />
           </Box>
           <Typography variant="h6" sx={{ flex: 1, fontWeight: 600 }}>
-            Search Trades
+            Search & Filter Trades
           </Typography>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
@@ -310,6 +444,283 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
             💡 Use multiple tags separated by spaces, commas, or semicolons to find trades with ALL specified tags
           </Typography>
+        </Box>
+
+        {/* Tag Filter Section */}
+        {onTagsChange && (
+          <Box sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+            <Box sx={{ p: 2, pb: 1 }}>
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                color: selectedTags.length > 0 ? 'primary.main' : 'text.secondary',
+                fontWeight: selectedTags.length > 0 ? 600 : 400
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
+                  <FilterIcon sx={{ fontSize: 20 }} />
+                  <Typography variant="body2">
+                    Filter by Tags
+                  </Typography>
+                  {selectedTags.length > 0 && (
+                    <Chip
+                      label={`${selectedTags.length} selected`}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: '0.7rem' }}
+                    />
+                  )}
+                </Box>
+                <IconButton
+                  onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                  size="small"
+                  sx={{
+                    color: 'inherit',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1)
+                    }
+                  }}
+                >
+                  {isFilterExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+              </Box>
+            </Box>
+
+            <Collapse in={isFilterExpanded}>
+              <Box sx={{ px: 2, pb: 2 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {tagGroups.length > 0 && (
+                    <SelectInput
+                      label="Filter by Tag Group"
+                      value={selectedTagGroup}
+                      onChange={(e) => setSelectedTagGroup(e.target.value as string)}
+                      options={[
+                        { value: "", label: "All Tags" },
+                        ...tagGroups.map(group => ({ value: group, label: group }))
+                      ]}
+                      size="small"
+                    />
+                  )}
+
+                  <Autocomplete
+                    multiple
+                    options={filteredTagOptions}
+                    value={selectedTags}
+                    onChange={(_, newValue) => handleTagsChange(newValue)}
+                    slotProps={{
+                      listbox: {
+                        sx: {
+                          ...scrollbarStyles(theme)
+                        }
+                      }
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        variant="outlined"
+                        label="Select Tags"
+                        placeholder="Choose tags to filter"
+                        fullWidth
+                        size="small"
+                      />
+                    )}
+                    renderTags={(value, getTagProps) =>
+                      value.map((option, index) => (
+                        <Chip
+                          label={formatTagForDisplay(option, true)}
+                          {...getTagProps({ index })}
+                          sx={getTagChipStyles(option, theme)}
+                          title={isGroupedTag(option) ? `Group: ${getTagGroup(option)}` : undefined}
+                        />
+                      ))
+                    }
+                    renderOption={(props, option) => (
+                      <li {...props}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {isGroupedTag(option) && (
+                            <Chip
+                              label={getTagGroup(option)}
+                              size="small"
+                              sx={{
+                                ...getTagChipStyles(option, theme),
+                                height: '18px',
+                                fontSize: '0.7rem'
+                              }}
+                            />
+                          )}
+                          {formatTagForDisplay(option, true)}
+                        </Box>
+                      </li>
+                    )}
+                  />
+
+                  {selectedTags.length > 0 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {selectedTags.length} tag{selectedTags.length > 1 ? 's' : ''} selected
+                      </Typography>
+                      <Button onClick={handleClearTags} size="small" color="inherit">
+                        Clear All
+                      </Button>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            </Collapse>
+          </Box>
+        )}
+
+        {/* Date Filter Section */}
+        <Box sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+          <Box sx={{ p: 2, pb: 1 }}>
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              color: dateFilter.type !== 'all' ? 'primary.main' : 'text.secondary',
+              fontWeight: dateFilter.type !== 'all' ? 600 : 400
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
+                <DateRangeIcon sx={{ fontSize: 20 }} />
+                <Typography variant="body2">
+                  Filter by Date
+                </Typography>
+                {dateFilter.type !== 'all' && (
+                  <Chip
+                    label={
+                      dateFilter.type === 'single'
+                        ? 'Single Date'
+                        : dateFilter.type === 'range'
+                        ? 'Date Range'
+                        : ''
+                    }
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                    sx={{ height: 20, fontSize: '0.7rem' }}
+                  />
+                )}
+              </Box>
+              <IconButton
+                onClick={() => setIsDateFilterExpanded(!isDateFilterExpanded)}
+                size="small"
+                sx={{
+                  color: 'inherit',
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1)
+                  }
+                }}
+              >
+                {isDateFilterExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </IconButton>
+            </Box>
+          </Box>
+
+          <Collapse in={isDateFilterExpanded}>
+            <Box sx={{ px: 2, pb: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <FormControl component="fieldset" sx={{ width: '100%' }}>
+                  <RadioGroup
+                    value={dateFilter.type}
+                    onChange={(e) => handleDateFilterChange(e.target.value as DateFilterType)}
+                    sx={{ gap: 1 }}
+                  >
+                    <FormControlLabel
+                      value="all"
+                      control={<Radio size="small" />}
+                      label="All dates"
+                      sx={{ margin: 0 }}
+                    />
+                    <FormControlLabel
+                      value="single"
+                      control={<Radio size="small" />}
+                      label="Specific date"
+                      sx={{ margin: 0 }}
+                    />
+                    <FormControlLabel
+                      value="range"
+                      control={<Radio size="small" />}
+                      label="Date range"
+                      sx={{ margin: 0 }}
+                    />
+                  </RadioGroup>
+                </FormControl>
+
+                {/* Date Pickers */}
+                {dateFilter.type === 'single' && (
+                  <DatePicker
+                    label="Select Date"
+                    value={dateFilter.startDate}
+                    onChange={handleStartDateChange}
+                    slotProps={{
+                      textField: {
+                        fullWidth: true,
+                        size: 'small'
+                      }
+                    }}
+                  />
+                )}
+
+                {dateFilter.type === 'range' && (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <DatePicker
+                      label="Start Date"
+                      value={dateFilter.startDate}
+                      onChange={handleStartDateChange}
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          size: 'small'
+                        }
+                      }}
+                    />
+                    <DatePicker
+                      label="End Date"
+                      value={dateFilter.endDate}
+                      onChange={handleEndDateChange}
+                      minDate={dateFilter.startDate || undefined}
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          size: 'small'
+                        }
+                      }}
+                    />
+                  </Box>
+                )}
+
+                {/* Date Filter Summary and Clear Button */}
+                {dateFilter.type !== 'all' && (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {/* Summary */}
+                    <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {dateFilter.type === 'single' && dateFilter.startDate && (
+                          <>Showing trades from: <strong>{format(dateFilter.startDate, 'MMM dd, yyyy')}</strong></>
+                        )}
+                        {dateFilter.type === 'range' && dateFilter.startDate && dateFilter.endDate && (
+                          <>
+                            Showing trades from: <strong>{format(dateFilter.startDate, 'MMM dd, yyyy')}</strong> to <strong>{format(dateFilter.endDate, 'MMM dd, yyyy')}</strong>
+                          </>
+                        )}
+                        {dateFilter.type === 'range' && dateFilter.startDate && !dateFilter.endDate && (
+                          <>Showing trades from: <strong>{format(dateFilter.startDate, 'MMM dd, yyyy')}</strong> onwards</>
+                        )}
+                      </Typography>
+                    </Box>
+
+                    {/* Clear Button */}
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <Button onClick={handleClearDateFilter} size="small" color="inherit">
+                        Clear Date Filter
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          </Collapse>
         </Box>
 
         {/* Content */}
@@ -345,18 +756,18 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
           )}
 
           {/* Search Results */}
-          {searchQuery.trim() && (
+          {(searchQuery.trim() || selectedTags.length > 0 || dateFilter.type !== 'all') && (
             <Box sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Search Results {!isSearching && `(${filteredTrades.length})`}
+                  {searchQuery.trim() ? 'Search Results' : 'Filtered Results'} {!isSearching && `(${filteredTrades.length})`}
                 </Typography>
                 {(() => {
                   const terms = searchQuery.split(/[,;\s]+/).map(term => term.trim()).filter(term => term.length > 0);
                   if (terms.length > 1) {
                     return (
                       <Chip
-                        label={`${terms.length} tags (AND)`}
+                        label={`${terms.length} search terms (AND)`}
                         size="small"
                         color="primary"
                         variant="outlined"
@@ -366,6 +777,24 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                   }
                   return null;
                 })()}
+                {selectedTags.length > 0 && (
+                  <Chip
+                    label={`${selectedTags.length} tag filter${selectedTags.length > 1 ? 's' : ''}`}
+                    size="small"
+                    color="secondary"
+                    variant="outlined"
+                    sx={{ fontSize: '0.7rem', height: 20 }}
+                  />
+                )}
+                {dateFilter.type !== 'all' && (
+                  <Chip
+                    label={`${dateFilter.type === 'single' ? 'Single date' : 'Date range'} filter`}
+                    size="small"
+                    color="info"
+                    variant="outlined"
+                    sx={{ fontSize: '0.7rem', height: 20 }}
+                  />
+                )}
               </Box>
 
               {isSearching ? (
@@ -509,16 +938,16 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
           )}
 
           {/* Empty State */}
-          {!searchQuery.trim() && (
+          {!searchQuery.trim() && selectedTags.length === 0 && dateFilter.type === 'all' && (
             <Box sx={{ textAlign: 'center', py: 6, px: 3 }}>
               <SearchIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
               <Typography variant="h6" sx={{ mb: 1, fontWeight: 600, color: 'text.secondary' }}>
                 Search Your Trades
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 350, mx: 'auto', mb: 2 }}>
-                Search by trade name, tags, notes, or session to quickly find specific trades.
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 400, mx: 'auto', mb: 2 }}>
+                Search by trade name, tags, notes, or session. Use tag and date filters to narrow down results.
               </Typography>
-              <Box sx={{ textAlign: 'left', maxWidth: 350, mx: 'auto' }}>
+              <Box sx={{ textAlign: 'left', maxWidth: 400, mx: 'auto' }}>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
                   Examples:
                 </Typography>
@@ -528,8 +957,14 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                   • <code>scalping, morning</code> - Find trades with BOTH tags
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                   • <code>EURUSD breakout</code> - Find trades with both terms
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  • Use tag filters to show trades with specific tags
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  • Use date filters to show trades from specific dates or ranges
                 </Typography>
               </Box>
             </Box>
