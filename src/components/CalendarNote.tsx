@@ -27,6 +27,9 @@ interface CalendarNoteDataProps {
   isEditable?: boolean;
   title?: string;
   emptyStateText?: string;
+  // Optional props for trade link navigation
+  trades?: Array<{ id: string; [key: string]: any }>;
+  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
 }
 
 const CalendarNote: React.FC<CalendarNoteDataProps> = ({
@@ -35,7 +38,9 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   calendarId,
   isEditable = true,
   title = "Description",
-  emptyStateText = "No description available. Click the edit button to description to calendar."
+  emptyStateText = "No description available. Click the edit button to description to calendar.",
+  trades,
+  onOpenGalleryMode
 }) => {
   const [expanded, setExpanded] = useState(false); 
   const [editedData, setEditedData] = useState(calendarNote);
@@ -44,6 +49,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
 
   // Auto-save when editedData changes
   useEffect(() => {
+   
     if (editedData !== calendarNote) {
       const saveTimeout = setTimeout(() => {
         handleSave();
@@ -64,6 +70,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
       if (!onUpdateCalendarProperty) {
         throw new Error('onUpdateCalendarProperty is undefined');
       }
+       
       setIsSaving(true);
       await onUpdateCalendarProperty(calendarId!!, (calendar) => {
         return {
@@ -178,6 +185,9 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
               onChange={setEditedData}
               placeholder="Enter a description about your calendar, trading strategy, plans, or mindset..."
               minHeight={300}
+              calendarId={calendarId}
+              trades={trades}
+              onOpenGalleryMode={onOpenGalleryMode}
             />
             
           </Box>

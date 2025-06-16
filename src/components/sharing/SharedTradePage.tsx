@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -15,6 +15,11 @@ import AppHeader from '../common/AppHeader';
 
 const SharedTradePage: React.FC = () => {
   const { shareId } = useParams<{ shareId: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Check if we came from a referrer (link click)
+  const referrerState = location.state as { referrer?: string; referrerCalendarId?: string } | null;
 
   // Local theme mode state for shared trade page
   const [mode, setMode] = useState<'light' | 'dark'>(() => {
@@ -32,6 +37,15 @@ const SharedTradePage: React.FC = () => {
     setMode(prevMode => prevMode === 'light' ? 'dark' : 'light');
   };
 
+  // Handle back navigation
+  const handleBackClick = () => {
+    if (referrerState?.referrer) {
+      navigate(referrerState.referrer);
+    } else {
+      navigate('/');
+    }
+  };
+
   // Create theme based on current mode
   const theme = useMemo(() => createTheme(createAppTheme(mode)), [mode]);
 
@@ -44,6 +58,8 @@ const SharedTradePage: React.FC = () => {
             onToggleTheme={handleToggleTheme}
             mode={mode}
             title="📈 Trade Tracker - Shared Trade"
+            showBackButton={!!referrerState?.referrer}
+            onBackClick={handleBackClick}
           />
           <Toolbar />
 
@@ -72,6 +88,8 @@ const SharedTradePage: React.FC = () => {
           onToggleTheme={handleToggleTheme}
           mode={mode}
           title="📈 Trade Tracker - Shared Trade"
+          showBackButton={!!referrerState?.referrer}
+          onBackClick={handleBackClick}
         />
         <Toolbar />
 

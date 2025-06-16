@@ -15,6 +15,7 @@ interface UseFloatingToolbarProps {
   toolbarRef: React.RefObject<HTMLDivElement | null>;
   colorMenuAnchor: HTMLElement | null;
   headingMenuAnchor: HTMLElement | null;
+  linkDialogOpen?: boolean;
 }
 
 /**
@@ -26,6 +27,7 @@ export function useFloatingToolbar({
   toolbarRef,
   colorMenuAnchor,
   headingMenuAnchor,
+  linkDialogOpen = false,
 }: UseFloatingToolbarProps) {
   const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
   const [floatingToolbarPosition, setFloatingToolbarPosition] = useState<Position | null>(null);
@@ -65,11 +67,11 @@ export function useFloatingToolbar({
     }
 
     // Hide toolbar if no valid selection OR an error occurred positioning it
-    // Only hide if no menus anchored to the toolbar are open
-    if (!colorMenuAnchor && !headingMenuAnchor && showFloatingToolbar) {
+    // Only hide if no menus or dialogs are open
+    if (!colorMenuAnchor && !headingMenuAnchor && !linkDialogOpen && showFloatingToolbar) {
       setShowFloatingToolbar(false);
     }
-  }, [disabled, colorMenuAnchor, headingMenuAnchor, showFloatingToolbar, editorWrapperRef, toolbarRef]);
+  }, [disabled, colorMenuAnchor, headingMenuAnchor, linkDialogOpen, showFloatingToolbar, editorWrapperRef, toolbarRef]);
 
   // Debounced version for performance
   const debouncedCheckSelection = useMemo(
@@ -117,7 +119,7 @@ export function useFloatingToolbar({
         const target = event.target as Node;
         const elementsToCheck = [editorWrapperRef.current, toolbarRef.current];
         const isOutsideElements = isClickOutside(target, elementsToCheck);
-        const isOutsideMenus = !colorMenuAnchor && !headingMenuAnchor;
+        const isOutsideMenus = !colorMenuAnchor && !headingMenuAnchor && !linkDialogOpen;
 
         if (showFloatingToolbar && isOutsideElements && isOutsideMenus) {
             setShowFloatingToolbar(false);
@@ -132,7 +134,7 @@ export function useFloatingToolbar({
         ) {
             // Use RAF to check selection state after the click's effects
             requestAnimationFrame(() => {
-                if (!hasValidSelection() && !colorMenuAnchor && !headingMenuAnchor) {
+                if (!hasValidSelection() && !colorMenuAnchor && !headingMenuAnchor && !linkDialogOpen) {
                     setShowFloatingToolbar(false);
                 }
             });
@@ -143,7 +145,7 @@ export function useFloatingToolbar({
     return () => {
         document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showFloatingToolbar, colorMenuAnchor, headingMenuAnchor, editorWrapperRef, toolbarRef]);
+  }, [showFloatingToolbar, colorMenuAnchor, headingMenuAnchor, linkDialogOpen, editorWrapperRef, toolbarRef]);
 
   return {
     showFloatingToolbar,

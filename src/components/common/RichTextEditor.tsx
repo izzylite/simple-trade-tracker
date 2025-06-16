@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Box,
   Toolbar,
@@ -11,7 +11,13 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   useTheme,
-  Paper as MuiPaper
+  Paper as MuiPaper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
@@ -23,9 +29,11 @@ import {
   FormatListNumbered,
   Title,
   ArrowDropDown,
-  Palette
+  Palette,
+  Link,
+  FormatClear
 } from '@mui/icons-material';
-import { Editor, EditorState, RichUtils, convertToRaw } from 'draft-js';
+import { Editor, EditorState, convertToRaw } from 'draft-js';
 import 'draft-js/dist/Draft.css';
 
 // Import utilities, constants, and hooks
@@ -34,6 +42,36 @@ import { TEXT_COLORS, BACKGROUND_COLORS } from './RichTextEditor/constants/color
 import { HEADING_OPTIONS } from './RichTextEditor/constants/headings';
 import { useRecentColors } from './RichTextEditor/hooks/useRecentColors';
 import { useFloatingToolbar } from './RichTextEditor/hooks/useFloatingToolbar';
+
+// Import new utility functions
+import {
+  getCurrentLink,
+  createLinkEntity,
+  removeLinkEntity
+} from './RichTextEditor/utils/linkUtils';
+import {
+  toggleInlineStyle,
+  toggleBlockType,
+  applyTextColor,
+  applyBackgroundColor,
+  applyHeading,
+  clearFormatting,
+  getCurrentBlockType,
+  blockStyleFn,
+  restoreScrollAndFocus
+} from './RichTextEditor/utils/editorActions';
+import { keyBindingFn, handleKeyCommand } from './RichTextEditor/utils/keyboardUtils';
+import { createStyleMap, handleToolbarInteraction } from './RichTextEditor/utils/styleUtils';
+import {
+  createHeadingButtonClickHandler,
+  createColorButtonClickHandler,
+  createMenuCloseHandler
+} from './RichTextEditor/utils/menuUtils';
+import {
+  handleLinkDialogOpen,
+  handleLinkDialogClose
+} from './RichTextEditor/utils/linkDialogUtils';
+import { createDecorator } from './RichTextEditor/utils/decoratorUtils';
 
 export interface RichTextEditorProps {
   value?: string;
@@ -44,7 +82,13 @@ export interface RichTextEditorProps {
   minHeight?: number | string;
   maxHeight?: number | string;
   disabled?: boolean;
+  // Optional props for trade link navigation
+  calendarId?: string;
+  trades?: Array<{ id: string; [key: string]: any }>;
+  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
 }
+
+
 
 
 
@@ -57,10 +101,32 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   helperText,
   minHeight = 150,
   maxHeight = 'none',
-  disabled = false
+  disabled = false,
+  calendarId,
+  trades,
+  onOpenGalleryMode
 }) => {
   const theme = useTheme();
-  const [editorState, setEditorState] = useState(() => createEditorStateFromValue(value));
+
+  // Refs must be declared before any useEffect that uses them
+  const editorRef = useRef<Editor>(null);
+  const editorWrapperRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const previousValueRef = useRef<string | undefined>(value);
+  const savedScrollPositionRef = useRef<number>(0);
+
+  // Create decorator with props
+  const decorator = useMemo(() => createDecorator(calendarId, trades, onOpenGalleryMode), [calendarId, trades, onOpenGalleryMode]);
+
+  const [editorState, setEditorState] = useState(() => {
+    const initialState = createEditorStateFromValue(value);
+    return EditorState.set(initialState, { decorator });
+  });
+  const [headingMenuAnchor, setHeadingMenuAnchor] = useState<null | HTMLElement>(null);
+  const [colorMenuAnchor, setColorMenuAnchor] = useState<null | HTMLElement>(null);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkText, setLinkText] = useState('');
 
   // Update editor state when value prop changes (for controlled component behavior)
   useEffect(() => {
@@ -69,23 +135,38 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
       if (value !== undefined) {
         const newEditorState = createEditorStateFromValue(value);
+        const newEditorStateWithDecorator = EditorState.set(newEditorState, { decorator });
         // Only update if the content is actually different to avoid infinite loops
         const currentContent = convertToRaw(editorState.getCurrentContent());
-        const newContent = convertToRaw(newEditorState.getCurrentContent());
+        const newContent = convertToRaw(newEditorStateWithDecorator.getCurrentContent());
 
         if (JSON.stringify(currentContent) !== JSON.stringify(newContent)) {
-          setEditorState(newEditorState);
+          setEditorState(newEditorStateWithDecorator);
         }
       }
     }
-  }, [value]);
+  }, [value, editorState, decorator]);
 
-  const editorRef = useRef<Editor>(null);
-  const editorWrapperRef = useRef<HTMLDivElement>(null);
-  const toolbarRef = useRef<HTMLDivElement>(null);
-  const previousValueRef = useRef<string | undefined>(value);
-  const [headingMenuAnchor, setHeadingMenuAnchor] = useState<null | HTMLElement>(null);
-  const [colorMenuAnchor, setColorMenuAnchor] = useState<null | HTMLElement>(null);
+  // Effect to restore scroll position when link dialog closes
+  useEffect(() => {
+    if (!linkDialogOpen && savedScrollPositionRef.current > 0) {
+      const editorElement = editorWrapperRef.current;
+      if (editorElement) {
+        // Use requestAnimationFrame to ensure DOM has updated
+        requestAnimationFrame(() => {
+          editorElement.scrollTop = savedScrollPositionRef.current;
+          // Reset the saved position
+          savedScrollPositionRef.current = 0;
+          // Restore focus to editor
+          setTimeout(() => {
+            if (editorRef.current) {
+              editorRef.current.focus();
+            }
+          }, 50);
+        });
+      }
+    }
+  }, [linkDialogOpen]);
 
   // Use custom hooks for better organization
   const {
@@ -104,6 +185,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     toolbarRef,
     colorMenuAnchor,
     headingMenuAnchor,
+    linkDialogOpen,
   });
 
   // Focus the editor when clicked
@@ -134,270 +216,132 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   };
 
-
-
-   // Function to prevent editor blur/selection clear when interacting with toolbar
-   const handleToolbarInteraction = (event: React.MouseEvent | React.TouchEvent) => {
-      event.preventDefault(); // Prevent editor losing focus
-      // event.stopPropagation(); // Usually not needed unless nested click handlers conflict
-   };
-
-
-  // Toggle inline styles (bold, italic, underline)
-  const toggleInlineStyle = (style: string) => {
-    handleEditorChange(RichUtils.toggleInlineStyle(editorState, style));
-     // Keep focus on editor after applying style
-     setTimeout(() => editorRef.current?.focus(), 0);
+  // Create action handlers using utilities
+  const handleToggleInlineStyle = (style: string) => {
+    const newState = toggleInlineStyle(editorState, style, editorRef);
+    handleEditorChange(newState);
   };
 
-  // Toggle block types (headings, lists)
-  const toggleBlockType = (blockType: string) => {
-    // Get current styles to preserve them
-    const currentStyles = editorState.getCurrentInlineStyle();
-
-    // Apply the block type change
-    let nextEditorState = RichUtils.toggleBlockType(editorState, blockType);
-
-    // Preserve text color styles by re-applying them
-    const textColorStyles = currentStyles.filter((style): style is string =>
-      style !== undefined && style.startsWith('TEXT_COLOR_')
-    ).toArray();
-
-    // Re-apply each text color style
-    textColorStyles.forEach(style => {
-      nextEditorState = RichUtils.toggleInlineStyle(nextEditorState, style);
-    });
-
-    // Update the editor state
-    handleEditorChange(nextEditorState);
-    setTimeout(() => editorRef.current?.focus(), 0);
+  const handleToggleBlockType = (blockType: string) => {
+    const newState = toggleBlockType(editorState, blockType, editorRef);
+    handleEditorChange(newState);
   };
 
-   // Apply text color
-   const applyTextColor = (color: string) => {
-    // Store current scroll position before applying color
-    const editorElement = editorRef.current?.editor;
-    const scrollTop = editorElement?.scrollTop || 0;
+  // Apply text color using utility
+  const handleApplyTextColor = (color: string) => {
+    const { newState, scrollTop } = applyTextColor(
+      editorState,
+      color,
+      editorRef,
+      addRecentTextColor,
+      TEXT_COLORS
+    );
 
-    const currentStyle = editorState.getCurrentInlineStyle();
-    let nextEditorState = editorState;
-
-    // Remove any existing text color styles in the selection
-    const textColorStyles = currentStyle.filter((style): style is string =>
-        style !== undefined && style.startsWith('TEXT_COLOR_')
-    ).toArray();
-    textColorStyles.forEach(style => {
-        nextEditorState = RichUtils.toggleInlineStyle(nextEditorState, style);
-    });
-
-    // Apply the new text color if it's not default
-    if (color !== 'default') {
-        const newStyle = `TEXT_COLOR_${color.replace('#', '')}`;
-        nextEditorState = RichUtils.toggleInlineStyle(nextEditorState, newStyle);
-
-        // Update recently used text colors
-        const colorObj = TEXT_COLORS.find(c => c.color === color);
-        if (colorObj) {
-            addRecentTextColor(colorObj);
-        }
-    }
-
-    handleEditorChange(nextEditorState);
+    handleEditorChange(newState);
     setColorMenuAnchor(null);
-
-    // Restore scroll position and focus
-    setTimeout(() => {
-      if (editorElement) {
-        editorElement.scrollTop = scrollTop;
-      }
-      editorRef.current?.focus();
-    }, 0);
-   };
-
-    // Apply background color
-    const applyBackgroundColor = (color: string) => {
-        // Store current scroll position before applying color
-        const editorElement = editorRef.current?.editor;
-        const scrollTop = editorElement?.scrollTop || 0;
-
-        const currentStyle = editorState.getCurrentInlineStyle();
-        let nextEditorState = editorState;
-
-        // Remove any existing background color styles in the selection
-        const bgColorStyles = currentStyle.filter((style): style is string =>
-            style !== undefined && style.startsWith('BG_COLOR_')
-        ).toArray();
-        bgColorStyles.forEach(style => {
-            nextEditorState = RichUtils.toggleInlineStyle(nextEditorState, style);
-        });
-
-        // Apply the new background color if it's not default
-        if (color !== 'default') {
-            const newStyle = `BG_COLOR_${color.replace('#', '')}`;
-            nextEditorState = RichUtils.toggleInlineStyle(nextEditorState, newStyle);
-
-            // Update recently used background colors
-            const colorObj = BACKGROUND_COLORS.find(c => c.color === color);
-            if (colorObj) {
-                addRecentBgColor(colorObj);
-            }
-        }
-
-        handleEditorChange(nextEditorState);
-        setColorMenuAnchor(null);
-
-        // Restore scroll position and focus
-        setTimeout(() => {
-          if (editorElement) {
-            editorElement.scrollTop = scrollTop;
-          }
-          editorRef.current?.focus();
-        }, 0);
-    };
-
-  // Handle menu anchor button clicks (toggle open/close)
-  const handleHeadingButtonClick = (event: React.MouseEvent<HTMLElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    // Store current scroll position before opening menu
-    const editorElement = editorRef.current?.editor;
-    const scrollTop = editorElement?.scrollTop || 0;
-
-    if (headingMenuAnchor) {
-      setHeadingMenuAnchor(null); // Close if already open
-       setTimeout(() => editorRef.current?.focus(), 0); // Refocus
-    } else {
-      setHeadingMenuAnchor(event.currentTarget); // Open if closed
-
-      // Restore scroll position after menu opens
-      setTimeout(() => {
-        if (editorElement) {
-          editorElement.scrollTop = scrollTop;
-        }
-      }, 0);
-    }
+    restoreScrollAndFocus(editorRef, scrollTop, 0);
   };
 
-  const handleColorButtonClick = (event: React.MouseEvent<HTMLElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
+  // Apply background color using utility
+  const handleApplyBackgroundColor = (color: string) => {
+    const { newState, scrollTop } = applyBackgroundColor(
+      editorState,
+      color,
+      editorRef,
+      addRecentBgColor,
+      BACKGROUND_COLORS
+    );
 
-    // Store current scroll position before opening menu
-    const editorElement = editorRef.current?.editor;
-    const scrollTop = editorElement?.scrollTop || 0;
-
-    if (colorMenuAnchor) {
-      setColorMenuAnchor(null); // Close if already open
-       setTimeout(() => editorRef.current?.focus(), 0); // Refocus
-    } else {
-      setColorMenuAnchor(event.currentTarget); // Open if closed
-
-      // Restore scroll position after menu opens
-      setTimeout(() => {
-        if (editorElement) {
-          editorElement.scrollTop = scrollTop;
-        }
-      }, 0);
-    }
+    handleEditorChange(newState);
+    setColorMenuAnchor(null);
+    restoreScrollAndFocus(editorRef, scrollTop, 0);
   };
 
-  // Apply heading style
-  const applyHeading = (headingStyle: string) => {
-    // Store current scroll position before applying heading
-    const editorElement = editorRef.current?.editor;
-    const scrollTop = editorElement?.scrollTop || 0;
+  // Create menu handlers using utilities
+  const handleHeadingButtonClick = createHeadingButtonClickHandler(
+    headingMenuAnchor,
+    setHeadingMenuAnchor,
+    editorRef
+  );
 
-    const currentStyles = editorState.getCurrentInlineStyle();
+  const handleColorButtonClick = createColorButtonClickHandler(
+    colorMenuAnchor,
+    setColorMenuAnchor,
+    editorRef
+  );
 
-    // Apply the block type change
-    let nextEditorState = RichUtils.toggleBlockType(editorState, headingStyle);
 
-    // Preserve text color styles by re-applying them
-    // This is necessary because sometimes toggling block types can affect inline styles
-    const textColorStyles = currentStyles.filter((style): style is string =>
-      style !== undefined && style.startsWith('TEXT_COLOR_')
-    ).toArray();
 
-    // Re-apply each text color style
-    textColorStyles.forEach(style => {
-      nextEditorState = RichUtils.toggleInlineStyle(nextEditorState, style);
-    });
-
-    // Update the editor state
-    handleEditorChange(nextEditorState);
-
-    // Close menu and restore scroll position
+  // Apply heading using utility
+  const handleApplyHeading = (headingStyle: string) => {
+    const { newState, scrollTop } = applyHeading(editorState, headingStyle, editorRef);
+    handleEditorChange(newState);
     setHeadingMenuAnchor(null);
-    setTimeout(() => {
-      if (editorElement) {
-        editorElement.scrollTop = scrollTop;
-      }
-      editorRef.current?.focus();
-    }, 0);
+    restoreScrollAndFocus(editorRef, scrollTop, 0);
   };
 
-  // Custom style map for colors
-  const styleMap: Record<string, React.CSSProperties> = {};
-  // Add text colors to the style map
-  TEXT_COLORS.forEach(color => {
-    if (color.color !== 'default') {
-      // Use softer white (#CCCCCC) for dark mode, pure white for light mode
-      const finalColor = color.color === '#FFFFFF' && theme.palette.mode === 'dark'
-        ? '#CCCCCC'
-        : color.color;
-      styleMap[`TEXT_COLOR_${color.color.replace('#', '')}`] = { color: finalColor };
-    }
-  });
-  // Add background colors to the style map
-  BACKGROUND_COLORS.forEach(color => {
-    if (color.color !== 'default') {
-      styleMap[`BG_COLOR_${color.color.replace('#', '')}`] = { backgroundColor: color.color };
-    }
-  });
-
-  // Get the current block type
-  const getCurrentBlockType = (): string => {
-    const selection = editorState.getSelection();
-    if (!selection.getHasFocus()) return 'unstyled'; // Return default if no focus
-    try {
-        const contentState = editorState.getCurrentContent();
-        const startKey = selection.getStartKey();
-        const currentBlock = contentState.getBlockForKey(startKey);
-        return currentBlock.getType();
-    } catch (e) {
-        console.error("Error getting block type:", e);
-        return 'unstyled';
-    }
-  };
-
-  // Custom block renderer CSS classes
-  const blockStyleFn = (contentBlock: any): string => {
-    const type = contentBlock.getType();
-    switch (type) {
-      case 'header-one':
-        return 'RichEditor-h1';
-      case 'header-two':
-        return 'RichEditor-h2';
-      case 'header-three':
-        return 'RichEditor-h3';
-      case 'unordered-list-item':
-        return 'RichEditor-ul';
-      case 'ordered-list-item':
-        return 'RichEditor-ol';
-      default:
-        return ''; // Let Draft handle default block styling
-    }
-  };
-
-  // Handle keyboard shortcuts
-  const handleKeyCommand = (command: string, state: EditorState): 'handled' | 'not-handled' => {
-    const newState = RichUtils.handleKeyCommand(state, command);
+  // Clear formatting using utility
+  const handleClearFormatting = () => {
+    const newState = clearFormatting(editorState, editorRef);
     if (newState) {
       handleEditorChange(newState);
-      return 'handled';
     }
-    return 'not-handled';
+  };
+
+  // Link handlers using utilities
+  const handleLinkClick = () => {
+    handleLinkDialogOpen(
+      editorState,
+      editorWrapperRef,
+      savedScrollPositionRef,
+      setLinkText,
+      setLinkUrl,
+      setLinkDialogOpen
+    );
+  };
+
+  const insertLink = () => {
+    if (!linkUrl.trim()) return;
+
+    const newState = createLinkEntity(editorState, linkUrl, linkText);
+    handleEditorChange(newState);
+
+    handleLinkDialogClose(setLinkDialogOpen, setLinkText, setLinkUrl);
+
+    // Restore focus
+    // setTimeout(() => {
+    //   if (editorRef.current) {
+    //     editorRef.current.focus();
+    //   }
+    // }, 100);
+  };
+
+  const removeLink = () => {
+    const newState = removeLinkEntity(editorState);
+    handleEditorChange(newState);
+
+    // Restore focus
+    setTimeout(() => {
+      if (editorRef.current) {
+        editorRef.current.focus();
+      }
+    }, 0);
+  };
+
+
+
+  // Create style map using utility
+  const styleMap = createStyleMap(theme, TEXT_COLORS, BACKGROUND_COLORS);
+
+  // Create keyboard command handler using utility
+  const handleKeyCommandWrapper = (command: string, state: EditorState): 'handled' | 'not-handled' => {
+    return handleKeyCommand(command, state, {
+      clearFormatting: handleClearFormatting,
+      handleLinkClick,
+      removeLink,
+      getCurrentLink: () => getCurrentLink(editorState),
+      handleEditorChange
+    });
   };
 
 
@@ -457,7 +401,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                     <Tooltip key={`recent-text-${color.color}`} title={`Text: ${color.label}`}>
                         <IconButton
                         size="small"
-                        onClick={() => applyTextColor(color.color)}
+                        onClick={() => handleApplyTextColor(color.color)}
                         sx={{
                             width: 24, height: 24,
                             backgroundColor: color.color === 'default' ? 'transparent' : color.label === 'White' ? "gray" : alpha(color.color, 0.1),
@@ -479,7 +423,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                     <Tooltip key={`recent-bg-${color.color}`} title={`Background: ${color.label}`}>
                         <IconButton
                         size="small"
-                        onClick={() => applyBackgroundColor(color.color)}
+                        onClick={() => handleApplyBackgroundColor(color.color)}
                         sx={{
                             width: 24, height: 24,
                             backgroundColor: color.color,
@@ -506,7 +450,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               <Tooltip key={`text-${color.color}`} title={color.label}>
                 <IconButton
                   size="small"
-                  onClick={() => applyTextColor(color.color)}
+                  onClick={() => handleApplyTextColor(color.color)}
                   sx={{
                     width: 24, height: 24,
                     backgroundColor: color.color === 'default' ? 'transparent' : color.label === 'White' ? "gray" : alpha(color.color, 0.1),
@@ -545,7 +489,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               <Tooltip key={`bg-${color.color}`} title={color.label}>
                 <IconButton
                   size="small"
-                  onClick={() => applyBackgroundColor(color.color)}
+                  onClick={() => handleApplyBackgroundColor(color.color)}
                   sx={{
                     width: 24, height: 24,
 
@@ -568,12 +512,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     );
   };
 
+
+
   // Render heading menu
   const renderHeadingMenu = () => {
     // Use a fragment or null to avoid rendering issues when closed
     if (!headingMenuAnchor) return null;
 
-    const currentBlock = getCurrentBlockType();
+    const currentBlock = getCurrentBlockType(editorState);
 
     return (
       <Menu
@@ -614,7 +560,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         {HEADING_OPTIONS.map((option) => (
           <MenuItem
             key={option.style}
-            onClick={() => applyHeading(option.style)}
+            onClick={() => handleApplyHeading(option.style)}
             selected={currentBlock === option.style}
             sx={{
                 fontWeight: option.style.includes('header') ? 'bold' : 500, // Use bold for headers, medium for normal text
@@ -635,7 +581,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     if (!showFloatingToolbar || !floatingToolbarPosition) return null;
 
     const currentStyles = editorState.getCurrentInlineStyle();
-    const currentBlockType = getCurrentBlockType();
+    const currentBlockType = getCurrentBlockType(editorState);
+    const currentLink = getCurrentLink(editorState);
 
     return (
       // Using div for positioning
@@ -706,7 +653,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                     <ToggleButton
                         value="bold"
                         selected={currentStyles.has('BOLD')}
-                        onClick={() => toggleInlineStyle('BOLD')}
+                        onClick={() => handleToggleInlineStyle('BOLD')}
                         disabled={disabled}
                         aria-pressed={currentStyles.has('BOLD')}
                         aria-label="Bold"
@@ -719,7 +666,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                     <ToggleButton
                         value="italic"
                         selected={currentStyles.has('ITALIC')}
-                        onClick={() => toggleInlineStyle('ITALIC')}
+                        onClick={() => handleToggleInlineStyle('ITALIC')}
                         disabled={disabled}
                         aria-pressed={currentStyles.has('ITALIC')}
                         aria-label="Italic"
@@ -732,7 +679,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                     <ToggleButton
                         value="underline"
                         selected={currentStyles.has('UNDERLINE')}
-                        onClick={() => toggleInlineStyle('UNDERLINE')}
+                        onClick={() => handleToggleInlineStyle('UNDERLINE')}
                         disabled={disabled}
                         aria-pressed={currentStyles.has('UNDERLINE')}
                         aria-label="Underline"
@@ -771,7 +718,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                     <ToggleButton
                         value="bullet-list"
                         selected={currentBlockType === 'unordered-list-item'}
-                        onClick={() => toggleBlockType('unordered-list-item')}
+                        onClick={() => handleToggleBlockType('unordered-list-item')}
                         disabled={disabled}
                         aria-pressed={currentBlockType === 'unordered-list-item'}
                         aria-label="Bullet List"
@@ -784,7 +731,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                     <ToggleButton
                         value="number-list"
                         selected={currentBlockType === 'ordered-list-item'}
-                        onClick={() => toggleBlockType('ordered-list-item')}
+                        onClick={() => handleToggleBlockType('ordered-list-item')}
                         disabled={disabled}
                         aria-pressed={currentBlockType === 'ordered-list-item'}
                         aria-label="Numbered List"
@@ -814,6 +761,52 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                     </IconButton>
                  </Tooltip>
                </Box>
+
+               <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.5 }} />
+
+               {/* Link and Clear Formatting */}
+               <ToggleButtonGroup size="small" sx={{ mr: 0.5 }}>
+                 <Tooltip title={currentLink ? `Edit Link: ${currentLink.url}` : "Insert Link (Ctrl+L)"}>
+                    <ToggleButton
+                        value="link"
+                        selected={Boolean(currentLink)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleLinkClick();
+                        }}
+                        onMouseDown={handleToolbarInteraction}
+                        onTouchStart={handleToolbarInteraction}
+                        disabled={disabled}
+                        aria-pressed={Boolean(currentLink)}
+                        aria-label={currentLink ? "Edit Link" : "Insert Link"}
+                        sx={{
+                          padding: '4px 6px',
+                          ...(currentLink && {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.15),
+                            '&:hover': {
+                              backgroundColor: alpha(theme.palette.primary.main, 0.25),
+                            }
+                          })
+                        }}
+                    >
+                        <Link fontSize="small" />
+                    </ToggleButton>
+                 </Tooltip>
+                 <Tooltip title="Clear Formatting (Ctrl+Shift+X)">
+                    <IconButton
+                        size="small"
+                        onClick={handleClearFormatting}
+                        disabled={disabled}
+                        aria-label="Clear Formatting"
+                        sx={{ padding: '4px 6px' }}
+                    >
+                        <FormatClear fontSize="small" />
+                    </IconButton>
+                 </Tooltip>
+               </ToggleButtonGroup>
+
+
             </Toolbar>
         </MuiPaper>
       </div>
@@ -912,6 +905,32 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
              },
              '& .RichEditor-ol': { // Ensure ol counters work
                  // listStyleType: 'decimal';
+             },
+             // Link styles - enhanced visual feedback
+             '& .rich-editor-link': {
+               color: `${theme.palette.primary.main} !important`,
+               textDecoration: 'underline !important',
+               cursor: 'pointer !important',
+               backgroundColor: `${alpha(theme.palette.primary.main, 0.08)} !important`,
+               padding: '2px 4px !important',
+               borderRadius: '4px !important',
+               border: `1px solid ${alpha(theme.palette.primary.main, 0.2)} !important`,
+               display: 'inline-block !important',
+               transition: 'all 0.2s ease-in-out !important',
+               margin: '0 1px !important',
+               fontWeight: '500 !important',
+               '&:hover': {
+                 color: `${theme.palette.primary.dark} !important`,
+                 backgroundColor: `${alpha(theme.palette.primary.main, 0.15)} !important`,
+                 borderColor: `${alpha(theme.palette.primary.main, 0.4)} !important`,
+                 transform: 'translateY(-1px) !important',
+                 boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.25)} !important`,
+               },
+               '&:active': {
+                 transform: 'translateY(0px) !important',
+                 backgroundColor: `${alpha(theme.palette.primary.main, 0.2)} !important`,
+                 boxShadow: `0 1px 4px ${alpha(theme.palette.primary.main, 0.3)} !important`,
+               }
              }
           }}
         >
@@ -922,7 +941,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             placeholder={placeholder}
             customStyleMap={styleMap}
             blockStyleFn={blockStyleFn}
-            handleKeyCommand={handleKeyCommand}
+            handleKeyCommand={handleKeyCommandWrapper}
+            keyBindingFn={keyBindingFn}
             readOnly={disabled}
             spellCheck={true}
           />
@@ -937,12 +957,90 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       {renderHeadingMenu()}
       {renderColorMenu()}
 
+      {/* Link Dialog */}
+      <Dialog
+        open={linkDialogOpen}
+        onClose={() => setLinkDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        disableScrollLock={true}
+        disableEnforceFocus={false}
+        disableRestoreFocus={true}
+      >
+        <DialogTitle>{getCurrentLink(editorState) ? 'Edit Link' : 'Insert Link'}</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Link Text"
+            fullWidth
+            variant="outlined"
+            value={linkText}
+            onChange={(e) => setLinkText(e.target.value)}
+            sx={{ mb: 2 }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && linkUrl.trim()) {
+                e.preventDefault();
+                insertLink();
+              }
+            }}
+          />
+          <TextField
+            margin="dense"
+            label="URL"
+            fullWidth
+            variant="outlined"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            placeholder="https://example.com"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && linkUrl.trim()) {
+                e.preventDefault();
+                insertLink();
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLinkDialogOpen(false)}>
+            Cancel
+          </Button>
+          {getCurrentLink(editorState) && (
+            <Button
+              onClick={() => {
+                removeLink();
+                setLinkDialogOpen(false);
+                setLinkText('');
+                setLinkUrl('');
+              }}
+              color="error"
+              variant="outlined"
+            >
+              Remove Link
+            </Button>
+          )}
+          <Button
+            onClick={insertLink}
+            variant="contained"
+            disabled={!linkUrl.trim()}
+          >
+            {getCurrentLink(editorState) ? 'Update Link' : 'Insert Link'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-      {helperText && (
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-          {helperText}
+
+      {/* Helper text and character count */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
+        {helperText && (
+          <Typography variant="caption" color="text.secondary">
+            {helperText}
+          </Typography>
+        )}
+        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+          {editorState.getCurrentContent().getPlainText().length} characters
         </Typography>
-      )}
+      </Box>
     </Box>
   );
 };

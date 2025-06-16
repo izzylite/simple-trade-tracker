@@ -17,6 +17,9 @@ interface DayNotesDialogProps {
   notes: string;
   calendarId: string;
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
+  // Optional props for trade link navigation
+  trades?: Array<{ id: string; [key: string]: any }>;
+  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
 }
 
 const DayNotesDialog: React.FC<DayNotesDialogProps> = ({
@@ -25,7 +28,9 @@ const DayNotesDialog: React.FC<DayNotesDialogProps> = ({
   day,
   notes,
   calendarId,
-  onUpdateCalendarProperty
+  onUpdateCalendarProperty,
+  trades,
+  onOpenGalleryMode
 }) => {
   const [currentNotes, setCurrentNotes] = useState(notes);
   const [isSaving, setIsSaving] = useState(false);
@@ -141,6 +146,9 @@ const DayNotesDialog: React.FC<DayNotesDialogProps> = ({
           onChange={handleNotesChange}
           placeholder="Add notes for this day..."
           minHeight={300}
+          calendarId={calendarId}
+          trades={trades}
+          onOpenGalleryMode={onOpenGalleryMode}
         />
       </Box>
     </BaseDialog>

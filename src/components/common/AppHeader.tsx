@@ -26,6 +26,7 @@ interface AppHeaderProps {
   title?: string;
   showBackButton?: boolean;
   backButtonPath?: string;
+  onBackClick?: () => void;
 }
 
 const AppHeader: React.FC<AppHeaderProps> = ({
@@ -33,7 +34,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   mode,
   title = 'Trade Tracker',
   showBackButton = false,
-  backButtonPath = '/'
+  backButtonPath = '/',
+  onBackClick
 }) => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -53,6 +55,14 @@ const AppHeader: React.FC<AppHeaderProps> = ({
       await signInWithGoogle();
     } catch (error) {
       console.error('Failed to sign in:', error);
+    }
+  };
+
+  const handleBackButtonClick = () => {
+    if (onBackClick) {
+      onBackClick();
+    } else {
+      navigate(backButtonPath);
     }
   };
 
@@ -78,7 +88,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         }}>
           {showBackButton && (
             <IconButton
-              onClick={() => navigate(backButtonPath)}
+              onClick={handleBackButtonClick}
               size="small"
               sx={{
                 color: 'text.secondary',

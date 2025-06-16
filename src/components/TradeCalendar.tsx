@@ -703,6 +703,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             calendarNote={calendarNote || ''}
             calendarId={calendarId!!}
             onUpdateCalendarProperty={onUpdateCalendarProperty}
+            trades={trades}
+            onOpenGalleryMode={openGalleryMode}
           />
 
           <Box sx={{
@@ -1224,6 +1226,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             day={isDayNotesDialogOpen}
             calendarId={calendarId!!}
             onUpdateCalendarProperty={onUpdateCalendarProperty}
+            trades={trades}
+            onOpenGalleryMode={openGalleryMode}
           />
         )}
 
