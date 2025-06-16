@@ -66,6 +66,8 @@ function MyComponent() {
 | `minHeight` | `number \| string` | `150` | Minimum height of the editor |
 | `maxHeight` | `number \| string` | `'none'` | Maximum height of the editor |
 | `disabled` | `boolean` | `false` | Whether the editor is disabled |
+| `hideCharacterCount` | `boolean` | `false` | Whether to hide the character count display |
+| `maxLength` | `number` | `undefined` | Maximum number of characters allowed |
 
 ## File Structure
 

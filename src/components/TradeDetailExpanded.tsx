@@ -30,6 +30,7 @@ import { AnimatedDropdown } from './Animations';
 import { TagsDisplay } from './common';
 import { TradeImage } from './trades/TradeForm';
 import ShareTradeButton from './sharing/ShareTradeButton';
+import RichTextEditor from './common/RichTextEditor';
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -40,6 +41,9 @@ interface TradeDetailExpandedProps {
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   calendarId?: string;
+  // Optional props for trade link navigation in notes
+  trades?: Array<{ id: string; [key: string]: any }>;
+  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
 }
 
 // Define shimmer animation
@@ -67,7 +71,9 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   isExpanded,
   setZoomedImage,
   onUpdateTradeProperty,
-  calendarId
+  calendarId,
+  trades,
+  onOpenGalleryMode
 }) => {
   const theme = useTheme();
   const [trade, setTrade] = useState<Trade>(tradeData);
@@ -687,20 +693,21 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                     </Typography>
                   </Box>
                   <Box sx={{
-                    p: 1.5,
                     borderRadius: 1,
                     backgroundColor: alpha(theme.palette.background.paper, 0.7),
-
-                    maxHeight: 'none', // Ensure no max height constraint
-                    overflow: 'visible' // Prevent scrollbars
+                    overflow: 'visible',
+                    p: 1
                   }}>
-                    <Typography variant="body2" sx={{
-                      whiteSpace: 'pre-line',
-                      overflow: 'visible', // Prevent scrollbars
-                      lineHeight: 1.5 // Slightly increased line height for better readability
-                    }}>
-                      {trade.notes}
-                    </Typography>
+                    <RichTextEditor
+                      value={trade.notes}
+                      disabled={true}
+                      hideCharacterCount={true}
+                      minHeight={50}
+                      maxHeight={400}
+                      calendarId={calendarId}
+                      trades={trades}
+                      onOpenGalleryMode={onOpenGalleryMode}
+                    />
                   </Box>
                 </Box>
               )}

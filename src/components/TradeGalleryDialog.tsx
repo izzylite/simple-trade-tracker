@@ -29,6 +29,8 @@ interface TradeGalleryDialogProps {
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   title?: string;
   calendarId?: string;
+  // Optional props for trade link navigation in notes
+  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
 }
 
 const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
@@ -39,7 +41,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   onUpdateTradeProperty,
   setZoomedImage,
   title = "Trade Gallery",
-  calendarId
+  calendarId,
+  onOpenGalleryMode
 }) => {
   const theme = useTheme();
   
@@ -213,6 +216,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           setZoomedImage={setZoomedImage}
           onUpdateTradeProperty={onUpdateTradeProperty}
           calendarId={calendarId}
+          trades={trades}
+          onOpenGalleryMode={onOpenGalleryMode}
         />
       </Box>
     </Dialog>

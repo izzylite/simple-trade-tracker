@@ -82,6 +82,8 @@ export interface RichTextEditorProps {
   minHeight?: number | string;
   maxHeight?: number | string;
   disabled?: boolean;
+  hideCharacterCount?: boolean;
+  maxLength?: number;
   // Optional props for trade link navigation
   calendarId?: string;
   trades?: Array<{ id: string; [key: string]: any }>;
@@ -102,6 +104,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   minHeight = 150,
   maxHeight = 'none',
   disabled = false,
+  hideCharacterCount = false,
+  maxLength,
   calendarId,
   trades,
   onOpenGalleryMode
@@ -201,6 +205,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleEditorChange = (state: EditorState) => {
     const prevContentState = editorState.getCurrentContent();
     const newContentState = state.getCurrentContent();
+
+    // Check character limit if maxLength is specified
+    if (maxLength && newContentState.getPlainText().length > maxLength) {
+      // If the new content exceeds the limit, don't update the state
+      return;
+    }
 
     setEditorState(state);
 
@@ -830,7 +840,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
           overflow: 'hidden', // Clip potential overflows (like toolbar if not positioned carefully)
           transition: 'border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-          backgroundColor: theme.palette.background.paper
+          
         }}
       >
         {/* Editor Scrollable Area */}
@@ -1031,16 +1041,32 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
 
       {/* Helper text and character count */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
-        {helperText && (
-          <Typography variant="caption" color="text.secondary">
-            {helperText}
-          </Typography>
-        )}
-        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-          {editorState.getCurrentContent().getPlainText().length} characters
-        </Typography>
-      </Box>
+      {(helperText || !hideCharacterCount) && (
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
+          {helperText && (
+            <Typography variant="caption" color="text.secondary">
+              {helperText}
+            </Typography>
+          )}
+          {!hideCharacterCount && (() => {
+            const currentLength = editorState.getCurrentContent().getPlainText().length;
+            const isNearLimit = maxLength && currentLength > maxLength * 0.8;
+            const isAtLimit = maxLength && currentLength >= maxLength;
+
+            return (
+              <Typography
+                variant="caption"
+                sx={{
+                  ml: 'auto',
+                  color: isAtLimit ? 'error.main' : isNearLimit ? 'warning.main' : 'text.secondary'
+                }}
+              >
+                {currentLength}{maxLength ? ` / ${maxLength}` : ''} characters
+              </Typography>
+            );
+          })()}
+        </Box>
+      )}
     </Box>
   );
 };

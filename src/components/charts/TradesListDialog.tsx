@@ -122,6 +122,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
           hideActions={!onEditClick && !onDeleteClick} // Hide actions only if both handlers are not provided
           enableBulkSelection={trades.length > 1 && !!onDeleteMultiple} // Enable bulk selection when there are multiple trades and handler is provided
           calendarId={calendarId}
+          onOpenGalleryMode={onOpenGalleryMode}
         />
       </Box>
     </BaseDialog>

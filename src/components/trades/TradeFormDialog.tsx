@@ -41,6 +41,8 @@ interface FormDialogProps {
   calendarId: string;
   tags: string[];
   requiredTagGroups?: string[];
+  // Optional props for trade link navigation in notes
+  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
 }
 
 interface FormProps {
@@ -122,7 +124,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   dynamicRiskSettings,
   calendarId,
   tags = [],
-  requiredTagGroups = []
+  requiredTagGroups = [],
+  onOpenGalleryMode
 }) => {
 
   // State
@@ -372,8 +375,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     setNewTrade(prev => ({ ...prev!, session: e.target.value }));
   };
 
-  const handleNotesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewTrade(prev => ({ ...prev!, notes: e.target.value }));
+  const handleNotesChange = (value: string) => {
+    setNewTrade(prev => ({ ...prev!, notes: value }));
   };
 
   const handleTagsChange = (_event: React.SyntheticEvent, newValue: string[]) => {
@@ -1075,6 +1078,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               onImageRemove={handleImageRemove}
               onImagesReordered={handleImagesReordered}
               onSubmit={editingTrade ? handleEditSubmit : handleSubmit}
+              trades={allTrades}
+              onOpenGalleryMode={onOpenGalleryMode}
             />
 
 

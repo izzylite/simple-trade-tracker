@@ -44,6 +44,8 @@ interface TradeListProps {
   sx?: SxProps<Theme>; // Allow styling from parent component
   deletingTradeIds?: string[]; // IDs of trades currently being deleted
   calendarId?: string; // Calendar ID for sharing functionality
+  // Optional props for trade link navigation in notes
+  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
 }
 
 
@@ -61,7 +63,8 @@ const TradeList: React.FC<TradeListProps> = ({
   enableBulkSelection = false, // Default to disabled
   sx,
   deletingTradeIds = [],
-  calendarId
+  calendarId,
+  onOpenGalleryMode
 }) => {
   const theme = useTheme();
   const [selectedTradeIds, setSelectedTradeIds] = useState<string[]>([]);
@@ -454,6 +457,8 @@ const TradeList: React.FC<TradeListProps> = ({
                   setZoomedImage={onZoomedImage}
                   onUpdateTradeProperty={onUpdateTradeProperty}
                   calendarId={calendarId}
+                  trades={trades}
+                  onOpenGalleryMode={onOpenGalleryMode}
                 />
               )}
             </React.Fragment>

@@ -193,6 +193,7 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
           });
         }}
         // No onUpdateTradeProperty or calendarId - this makes it read-only
+        // No trades or onOpenGalleryMode for shared view - external links only
       />
 
       {/* Footer */}

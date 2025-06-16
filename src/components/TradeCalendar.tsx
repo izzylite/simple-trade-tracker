@@ -1213,6 +1213,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           tags={allTags}
           dynamicRiskSettings={dynamicRiskSettings}
           requiredTagGroups={requiredTagGroups}
+          onOpenGalleryMode={openGalleryMode}
         />
 
         {/* Day Notes Dialog */}
@@ -1380,6 +1381,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           setZoomedImage={setZoomedImage}
           title={galleryMode.title}
           calendarId={calendarId}
+          onOpenGalleryMode={openGalleryMode}
         />
       </Box>
     </Box>

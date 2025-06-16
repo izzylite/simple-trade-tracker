@@ -27,6 +27,7 @@ import { formatCurrency } from '../../utils/formatters';
 import TagsInput from './TagsInput';
 import { isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { DynamicRiskSettings } from '../../utils/dynamicRiskUtils';
+import RichTextEditor from '../common/RichTextEditor';
 import {
   generateContextualTradeNameSuggestions,
   generateCommonTradeNamePatterns
@@ -96,7 +97,7 @@ interface TradeFormProps {
   onRiskToRewardChange: (riskToReward: string) => void;
   onPartialsTakenChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSessionChange: (e: any) => void;
-  onNotesChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onNotesChange: (value: string) => void;
   onTagsChange: (event: React.SyntheticEvent, newValue: string[]) => void;
   onDateChange?: (date: Date | null) => void;
   onImageUpload: (files: FileList) => void;
@@ -104,6 +105,9 @@ interface TradeFormProps {
   onImageRemove: (index: number, isPending: boolean) => void;
   onImagesReordered?: (images: Array<GridImage | GridPendingImage>) => void;
   onSubmit: (e: React.FormEvent) => void;
+  // Optional props for trade link navigation in notes
+  trades?: Array<{ id: string; [key: string]: any }>;
+  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
 }
 
 const TradeForm: React.FC<TradeFormProps> = ({
@@ -134,7 +138,9 @@ const TradeForm: React.FC<TradeFormProps> = ({
   onImageCaptionChange,
   onImageRemove,
   onImagesReordered,
-  onSubmit
+  onSubmit,
+  trades,
+  onOpenGalleryMode
 }) => {
   const theme = useTheme();
 
@@ -470,18 +476,17 @@ const TradeForm: React.FC<TradeFormProps> = ({
       />
 
       <FormField>
-        <TextField
+        <RichTextEditor
           label="Notes"
           value={newTrade.notes}
           onChange={onNotesChange}
-          fullWidth
-          multiline
-          minRows={4}
-          maxRows={20} // Large number to effectively disable scrolling
-          sx={{
-            '& .MuiInputBase-root': { overflow: 'visible' }, // Prevent scrollbars
-            '& .MuiOutlinedInput-root': { overflow: 'visible' } // Ensure outline doesn't clip
-          }}
+          placeholder="Add notes for this trade..."
+          minHeight={150}
+          maxHeight={400}
+          maxLength={1024}
+          calendarId={calendarId}
+          trades={trades}
+          onOpenGalleryMode={onOpenGalleryMode}
         />
       </FormField>
 
