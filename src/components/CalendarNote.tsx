@@ -15,7 +15,10 @@ import {
   ExpandLess as ExpandLessIcon,
   Description as DescriptionIcon,
   Edit as EditIcon,
-  CalendarMonth
+  CalendarMonth,
+  Check as CheckIcon,
+  Error as ErrorIcon,
+  Save as SaveIcon
 } from '@mui/icons-material';
 import RichTextEditor from './common/RichTextEditor';
 import { Calendar } from '../types/calendar';
@@ -42,15 +45,20 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   trades,
   onOpenGalleryMode
 }) => {
-  const [expanded, setExpanded] = useState(false); 
+  const [expanded, setExpanded] = useState(false);
   const [editedData, setEditedData] = useState(calendarNote);
-  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const theme = useTheme();
+
+  // Update editedData when calendarNote prop changes
+  useEffect(() => {
+    setEditedData(calendarNote);
+  }, [calendarNote]);
 
   // Auto-save when editedData changes
   useEffect(() => {
-   
     if (editedData !== calendarNote) {
+      setSaveStatus('saving');
       const saveTimeout = setTimeout(() => {
         handleSave();
       }, 1000); // Debounce save for 1 second
@@ -63,6 +71,14 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
     setExpanded(!expanded);
   };
 
+  // Handle keyboard shortcuts
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+      event.preventDefault();
+      handleSave();
+    }
+  };
+
    
 
   const handleSave = async () => {
@@ -70,20 +86,25 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
       if (!onUpdateCalendarProperty) {
         throw new Error('onUpdateCalendarProperty is undefined');
       }
-       
-      setIsSaving(true);
+
+      setSaveStatus('saving');
+
       await onUpdateCalendarProperty(calendarId!!, (calendar) => {
         return {
           ...calendar,
           note: editedData
         };
       });
+
+      setSaveStatus('saved');
+      // Reset to idle after showing saved status for 2 seconds
+      setTimeout(() => setSaveStatus('idle'), 2000);
     }
     catch (error) {
       console.error('Error saving notes:', error);
-    }
-    finally {
-      setIsSaving(false); 
+      setSaveStatus('error');
+      // Reset to idle after showing error status for 3 seconds
+      setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };
 
@@ -152,11 +173,35 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
             {title}
           </Typography>
 
-          {isSaving && (
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <CircularProgress size={10} sx={{ color: theme.palette.warning.main }} />
-              </Box>
-            )}
+          {/* Save Status Indicator */}
+          {saveStatus !== 'idle' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              {saveStatus === 'saving' && (
+                <>
+                  <CircularProgress size={12} sx={{ color: theme.palette.warning.main }} />
+                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem' }}>
+                    Saving...
+                  </Typography>
+                </>
+              )}
+              {saveStatus === 'saved' && (
+                <>
+                  <CheckIcon sx={{ color: theme.palette.success.main, fontSize: '1rem' }} />
+                  <Typography variant="caption" sx={{ color: theme.palette.success.main, fontSize: '0.7rem' }}>
+                    Saved
+                  </Typography>
+                </>
+              )}
+              {saveStatus === 'error' && (
+                <>
+                  <ErrorIcon sx={{ color: theme.palette.error.main, fontSize: '1rem' }} />
+                  <Typography variant="caption" sx={{ color: theme.palette.error.main, fontSize: '0.7rem' }}>
+                    Error saving
+                  </Typography>
+                </>
+              )}
+            </Box>
+          )}
         </Box>
         <Box>
           
@@ -179,18 +224,17 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
       </Box>
 
       <Collapse in={expanded}>
-      <Box sx={{ p: 2 }}>
-            <RichTextEditor
-              value={editedData}
-              onChange={setEditedData}
-              placeholder="Enter a description about your calendar, trading strategy, plans, or mindset..."
-              minHeight={300}
-              calendarId={calendarId}
-              trades={trades}
-              onOpenGalleryMode={onOpenGalleryMode}
-            />
-            
-          </Box>
+        <Box sx={{ p: 2 }} onKeyDown={handleKeyDown}>
+          <RichTextEditor
+            value={editedData}
+            onChange={setEditedData}
+            placeholder="Enter a description about your calendar, trading strategy, plans, or mindset..."
+            minHeight={300}
+            calendarId={calendarId}
+            trades={trades}
+            onOpenGalleryMode={onOpenGalleryMode}
+          />
+        </Box>
       </Collapse>
     </Paper>
   );
