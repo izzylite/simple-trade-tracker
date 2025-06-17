@@ -259,6 +259,7 @@ export const convertFirestoreDataToCalendar = (doc: DocumentData): Calendar => {
     tags: data.tags || [],
     // Notes
     note: data.note,
+    heroImageUrl: data.heroImageUrl,
     daysNotes: daysNotesMap,
     // Score settings
     scoreSettings: data.scoreSettings,
@@ -343,6 +344,7 @@ const convertCalendarToFirestoreData = (calendar: Omit<Calendar, 'id' | 'cachedT
 
     // Notes fields
     ...(calendar.note !== undefined && { note: calendar.note }),
+    ...(calendar.heroImageUrl !== undefined && { heroImageUrl: calendar.heroImageUrl }),
     ...(daysNotesObj && { daysNotes: daysNotesObj }),
 
     // Score settings
@@ -647,6 +649,7 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
       isDeleted: false,
       // Copy notes, tags, and score settings
       note: sourceCalendar.note,
+      heroImageUrl: sourceCalendar.heroImageUrl,
       daysNotes: sourceCalendar.daysNotes,
       tags: sourceCalendar.tags || [],
       scoreSettings: sourceCalendar.scoreSettings,

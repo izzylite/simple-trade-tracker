@@ -284,10 +284,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   // Apply heading using utility
   const handleApplyHeading = (headingStyle: string) => {
-    const { newState, scrollTop } = applyHeading(editorState, headingStyle, editorRef);
+    const { newState } = applyHeading(editorState, headingStyle, editorRef);
     handleEditorChange(newState);
     setHeadingMenuAnchor(null);
-    restoreScrollAndFocus(editorRef, scrollTop, 0);
   };
 
   // Clear formatting using utility
@@ -382,19 +381,22 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         disableEnforceFocus={true} // Prevent focus enforcement
         slotProps={{
           paper: {
-            onMouseDown: handleToolbarInteraction, // Use interaction handler
-            onTouchStart: handleToolbarInteraction, // Use interaction handler
+            onMouseDown: handleToolbarInteraction,
+            onTouchStart: handleToolbarInteraction,
             sx: {
-              width: 200, // Slightly wider
+              width: 180,
               padding: 1.5,
               backgroundColor: theme.palette.mode === 'dark'
-                ? alpha(theme.palette.background.paper, 0.98)
+                ? alpha(theme.palette.background.paper, 0.95)
                 : alpha(theme.palette.background.paper, 0.98),
-              backdropFilter: 'blur(8px)',
-              borderRadius: 1,
-              boxShadow: theme.shadows[6], // Slightly more shadow for menus
-              zIndex: 1400, // Higher than the toolbar
-              mt: 0.5, // Small margin top
+              backdropFilter: 'blur(20px)',
+              borderRadius: '12px',
+              border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+              boxShadow: theme.palette.mode === 'dark'
+                ? `0 8px 32px ${alpha('#000000', 0.4)}, 0 2px 8px ${alpha('#000000', 0.2)}`
+                : `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}, 0 2px 8px ${alpha('#000000', 0.1)}`,
+              zIndex: 1400,
+              mt: 0.5,
             }
           }
         }}
@@ -402,25 +404,63 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         {/* Recently Used Colors Section */}
         {(recentTextColors.length > 0 || recentBgColors.length > 0) && (
             <Box sx={{ mb: 2 }}>
-                <Typography variant="caption" sx={{ mb: 1, color: theme.palette.text.secondary, display: 'block' }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    mb: 1,
+                    color: theme.palette.text.primary,
+                    display: 'block',
+                    fontWeight: 600,
+                    fontSize: '0.7rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.3px'
+                  }}
+                >
                     Recently Used
                 </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                     {/* Text Colors with 'A' */}
                     {recentTextColors.map((color) => (
-                    <Tooltip key={`recent-text-${color.color}`} title={`Text: ${color.label}`}>
+                    <Tooltip key={`recent-text-${color.color}`} title={`Text: ${color.label}`} placement="top">
                         <IconButton
                         size="small"
                         onClick={() => handleApplyTextColor(color.color)}
                         sx={{
-                            width: 24, height: 24,
-                            backgroundColor: color.color === 'default' ? 'transparent' : color.label === 'White' ? "gray" : alpha(color.color, 0.1),
-                            color: color.color,
-                            border: `1px solid ${color.color}`,
-                            borderRadius: 1, p: 0, minWidth: 0,
-                            '&:hover': { opacity: 0.8 },
-                            fontSize: '0.75rem', fontWeight: 'bold',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            width: 24,
+                            height: 24,
+                            backgroundColor: color.color === 'default' ? 'transparent' : color.label === 'White' ? alpha(theme.palette.grey[400], 0.3) : alpha(color.color, 0.15),
+                            color: color.color === 'default' ? theme.palette.text.primary : color.color,
+                            border: `1px solid ${color.color === 'default' ? theme.palette.divider : color.color}`,
+                            borderRadius: '6px',
+                            p: 0,
+                            minWidth: 0,
+                            fontSize: '0.65rem',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            '&::before': {
+                              content: '""',
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              background: 'transparent',
+                              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                              zIndex: -1,
+                            },
+                            '&:hover': {
+                              transform: 'translateY(-1px) scale(1.05)',
+                              boxShadow: `0 4px 12px ${alpha(color.color === 'default' ? theme.palette.text.primary : color.color, 0.3)}`,
+                              borderColor: color.color === 'default' ? theme.palette.text.primary : color.color,
+                              '&::before': {
+                                background: `linear-gradient(135deg, ${alpha(color.color === 'default' ? theme.palette.text.primary : color.color, 0.1)}, ${alpha(color.color === 'default' ? theme.palette.text.primary : color.color, 0.05)})`,
+                              }
+                            }
                         }}
                         aria-label={`Apply ${color.label} text color`}
                         >
@@ -430,59 +470,107 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                     ))}
                     {/* Background Colors */}
                     {recentBgColors.map((color) => (
-                    <Tooltip key={`recent-bg-${color.color}`} title={`Background: ${color.label}`}>
+                    <Tooltip key={`recent-bg-${color.color}`} title={`Background: ${color.label}`} placement="top">
                         <IconButton
                         size="small"
                         onClick={() => handleApplyBackgroundColor(color.color)}
                         sx={{
-                            width: 24, height: 24,
-                            backgroundColor: color.color,
-                            border: `1px solid ${theme.palette.divider}`,
-                            borderRadius: 1, p: 0, minWidth: 0,
-                            '&:hover': { opacity: 0.8 }
+                            width: 24,
+                            height: 24,
+                            backgroundColor: color.color === 'default' ? 'transparent' : color.color,
+                            border: `1px solid ${color.color === 'default' ? theme.palette.divider : alpha(color.color, 0.8)}`,
+                            borderRadius: '6px',
+                            p: 0,
+                            minWidth: 0,
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            // Use slash for default background
+                            ...(color.color === 'default' && {
+                                backgroundImage: `linear-gradient(to top right, transparent calc(50% - 0.5px), ${alpha(theme.palette.text.primary, 0.4)} calc(50% - 0.5px), ${alpha(theme.palette.text.primary, 0.4)} calc(50% + 0.5px), transparent calc(50% + 0.5px))`
+                            }),
+                            '&:hover': {
+                              transform: 'translateY(-1px) scale(1.05)',
+                              boxShadow: `0 4px 12px ${alpha(color.color === 'default' ? theme.palette.text.primary : color.color, 0.4)}`,
+                              borderColor: color.color === 'default' ? theme.palette.text.primary : color.color,
+                            }
                         }}
                          aria-label={`Apply ${color.label} background color`}
                         />
                     </Tooltip>
                     ))}
                 </Box>
-                 <Divider sx={{ my: 1.5 }} />
+                 <Divider sx={{
+                   my: 1.5,
+                   backgroundColor: alpha(theme.palette.divider, 0.3),
+                   height: '1px'
+                 }} />
             </Box>
         )}
 
         {/* Text Colors Section */}
         <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" sx={{ mb: 1, color: theme.palette.text.secondary, display: 'block' }}>
+          <Typography
+            variant="caption"
+            sx={{
+              mb: 1,
+              color: theme.palette.text.primary,
+              display: 'block',
+              fontWeight: 600,
+              fontSize: '0.7rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.3px'
+            }}
+          >
             Text Color
           </Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(24px, 1fr))', gap: 0.5 }}>
             {TEXT_COLORS.map((color) => (
-              <Tooltip key={`text-${color.color}`} title={color.label}>
+              <Tooltip key={`text-${color.color}`} title={color.label} placement="top">
                 <IconButton
                   size="small"
                   onClick={() => handleApplyTextColor(color.color)}
                   sx={{
-                    width: 24, height: 24,
-                    backgroundColor: color.color === 'default' ? 'transparent' : color.label === 'White' ? "gray" : alpha(color.color, 0.1),
+                    width: 24,
+                    height: 24,
+                    backgroundColor: color.color === 'default' ? 'transparent' : color.label === 'White' ? alpha(theme.palette.grey[400], 0.3) : alpha(color.color, 0.15),
                     color: color.color === 'default' ? theme.palette.text.primary : color.color,
-                    border: color.color === 'default'
-                      ? `1px solid ${theme.palette.divider}`
-                      : `1px solid ${color.color}`,
-                    borderRadius: 1, p: 0, minWidth: 0,
-                    '&:hover': {
-                      opacity: 0.8,
-                      backgroundColor: color.color === 'default' ? 'transparent' : color.label === 'White' ? "gray" : color.color
-                    },
-                    fontSize: '0.75rem',
+                    border: `1px solid ${color.color === 'default' ? theme.palette.divider : color.color}`,
+                    borderRadius: '6px',
+                    p: 0,
+                    minWidth: 0,
+                    fontSize: '0.65rem',
                     fontWeight: 'bold',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'transparent',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      zIndex: -1,
+                    },
+                    '&:hover': {
+                      transform: 'translateY(-1px) scale(1.05)',
+                      boxShadow: `0 4px 12px ${alpha(color.color === 'default' ? theme.palette.text.primary : color.color, 0.3)}`,
+                      borderColor: color.color === 'default' ? theme.palette.text.primary : color.color,
+                      '&::before': {
+                        background: `linear-gradient(135deg, ${alpha(color.color === 'default' ? theme.palette.text.primary : color.color, 0.1)}, ${alpha(color.color === 'default' ? theme.palette.text.primary : color.color, 0.05)})`,
+                      }
+                    }
                   }}
                   aria-label={`Apply ${color.label} text color`}
                 >
                   {/* Use 'A' for text color indication */}
-                  {color.color === 'default' ? <Typography variant="caption" sx={{lineHeight: 1}}>Aa</Typography> : 'A'}
+                  {color.color === 'default' ? <Typography variant="caption" sx={{lineHeight: 1, fontSize: '0.7rem'}}>Aa</Typography> : 'A'}
                 </IconButton>
               </Tooltip>
             ))}
@@ -491,26 +579,62 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
         {/* Background Colors Section */}
         <Box>
-          <Typography variant="caption" sx={{ mb: 1, color: theme.palette.text.secondary, display: 'block' }}>
+          <Typography
+            variant="caption"
+            sx={{
+              mb: 1,
+              color: theme.palette.text.primary,
+              display: 'block',
+              fontWeight: 600,
+              fontSize: '0.7rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.3px'
+            }}
+          >
             Background Color
           </Typography>
            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(24px, 1fr))', gap: 0.5 }}>
             {BACKGROUND_COLORS.map((color) => (
-              <Tooltip key={`bg-${color.color}`} title={color.label}>
+              <Tooltip key={`bg-${color.color}`} title={color.label} placement="top">
                 <IconButton
                   size="small"
                   onClick={() => handleApplyBackgroundColor(color.color)}
                   sx={{
-                    width: 24, height: 24,
-
-                    backgroundColor: color.color === 'default' ? 'transparent' : alpha(color.color,0.8),
-                    border: `1px solid ${color.color === 'default' ? theme.palette.divider :color.color}`,
-                    borderRadius: 1, p: 0, minWidth: 0,
-                    '&:hover': { opacity: 0.8, backgroundColor: color.color === 'default' ? 'transparent' : color.color },
+                    width: 24,
+                    height: 24,
+                    backgroundColor: color.color === 'default' ? 'transparent' : color.color,
+                    border: `1px solid ${color.color === 'default' ? theme.palette.divider : alpha(color.color, 0.8)}`,
+                    borderRadius: '6px',
+                    p: 0,
+                    minWidth: 0,
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    position: 'relative',
+                    overflow: 'hidden',
                     // Use slash for default background
                     ...(color.color === 'default' && {
-                        backgroundImage: `linear-gradient(to top right, transparent calc(50% - 0.5px), ${alpha(theme.palette.text.primary, 0.3)} calc(50% - 0.5px), ${alpha(theme.palette.text.primary, 0.3)} calc(50% + 0.5px), transparent calc(50% + 0.5px))`
-                    })
+                        backgroundImage: `linear-gradient(to top right, transparent calc(50% - 0.5px), ${alpha(theme.palette.text.primary, 0.4)} calc(50% - 0.5px), ${alpha(theme.palette.text.primary, 0.4)} calc(50% + 0.5px), transparent calc(50% + 0.5px))`
+                    }),
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'transparent',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      zIndex: -1,
+                    },
+                    '&:hover': {
+                      transform: 'translateY(-1px) scale(1.05)',
+                      boxShadow: `0 4px 12px ${alpha(color.color === 'default' ? theme.palette.text.primary : color.color, 0.4)}`,
+                      borderColor: color.color === 'default' ? theme.palette.text.primary : color.color,
+                      '&::before': {
+                        background: color.color === 'default'
+                          ? `linear-gradient(135deg, ${alpha(theme.palette.text.primary, 0.1)}, ${alpha(theme.palette.text.primary, 0.05)})`
+                          : `linear-gradient(135deg, ${alpha(color.color, 0.2)}, ${alpha(color.color, 0.1)})`,
+                      }
+                    }
                   }}
                    aria-label={`Apply ${color.label} background color`}
                 />
@@ -550,19 +674,26 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         disableScrollLock={true} // Prevent scroll lock that might cause jumps
         disableAutoFocus={true} // Prevent auto focus that might cause scroll
         disableEnforceFocus={true} // Prevent focus enforcement
+        disableRestoreFocus={true} // Prevent focus restoration that might cause scroll
         slotProps={{
           paper: {
             onMouseDown: handleToolbarInteraction,
             onTouchStart: handleToolbarInteraction,
             sx: {
               backgroundColor: theme.palette.mode === 'dark'
-                ? alpha(theme.palette.background.paper, 0.98)
+                ? alpha(theme.palette.background.paper, 0.95)
                 : alpha(theme.palette.background.paper, 0.98),
-              backdropFilter: 'blur(8px)',
-              borderRadius: 1,
-              boxShadow: theme.shadows[6],
-              zIndex: 1400, // Higher than the toolbar
-              mt: 0.5,
+              backdropFilter: 'blur(20px)',
+              borderRadius: '12px',
+              border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+              boxShadow: theme.palette.mode === 'dark'
+                ? `0 8px 32px ${alpha('#000000', 0.4)}, 0 2px 8px ${alpha('#000000', 0.2)}`
+                : `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}, 0 2px 8px ${alpha('#000000', 0.1)}`,
+              zIndex: 1400,
+              mt: 1,
+              // Prevent any layout shifts
+              position: 'fixed',
+              willChange: 'transform',
             }
           }
         }}
@@ -573,9 +704,23 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onClick={() => handleApplyHeading(option.style)}
             selected={currentBlock === option.style}
             sx={{
-                fontWeight: option.style.includes('header') ? 'bold' : 500, // Use bold for headers, medium for normal text
-                fontSize: option.style === 'header-one' ? '1.4rem' : option.style === 'header-two' ? '1.2rem' : option.style === 'header-three' ? '1rem' : '0.85rem',
-                fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
+              fontWeight: option.style.includes('header') ? 'bold' : 500,
+              fontSize: option.style === 'header-one' ? '1.4rem' : option.style === 'header-two' ? '1.2rem' : option.style === 'header-three' ? '1rem' : '0.85rem',
+              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
+              borderRadius: '8px',
+              margin: '2px 4px',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                transform: 'translateX(4px)',
+              },
+              '&.Mui-selected': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                color: theme.palette.primary.main,
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.18),
+                }
+              }
             }}
           >
             {option.label}
@@ -609,25 +754,30 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           ref={toolbarRef}
           onMouseDown={handleToolbarInteraction}
           onTouchStart={handleToolbarInteraction}
-          elevation={6}
+          elevation={0}
           sx={{
-            borderRadius: '8px', // Slightly less rounded
+            borderRadius: '12px',
             overflow: 'hidden',
             backgroundColor: theme.palette.mode === 'dark'
-              ? alpha(theme.palette.background.default, 0.9) // Slightly darker background
-              : alpha(theme.palette.background.paper, 0.95),
-            backdropFilter: 'blur(10px)',
-            border: `1px solid ${theme.palette.divider}`, // Use divider color
-            boxShadow: theme.shadows[4], // Standard shadow
-            transition: 'opacity 0.15s ease-out, transform 0.15s ease-out', // Smoother transition
+              ? alpha(theme.palette.background.paper, 0.95)
+              : alpha(theme.palette.background.paper, 0.98),
+            backdropFilter: 'blur(20px)',
+            border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+            boxShadow: theme.palette.mode === 'dark'
+              ? `0 8px 32px ${alpha('#000000', 0.4)}, 0 2px 8px ${alpha('#000000', 0.2)}`
+              : `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}, 0 2px 8px ${alpha('#000000', 0.1)}`,
+            transition: 'opacity 0.15s ease-out, transform 0.15s ease-out',
             animation: 'floatingToolbarFadeIn 0.15s ease-out forwards',
             '@keyframes floatingToolbarFadeIn': {
               '0%': { opacity: 0, transform: 'translateY(8px)' },
               '100%': { opacity: 1, transform: 'translateY(0)' }
             },
-            // Style for hiding (could use display: none or opacity: 0)
-            // opacity: showFloatingToolbar ? 1 : 0,
-            // pointerEvents: showFloatingToolbar ? 'auto' : 'none',
+            '&:hover': {
+              boxShadow: theme.palette.mode === 'dark'
+                ? `0 12px 40px ${alpha('#000000', 0.5)}, 0 4px 12px ${alpha('#000000', 0.3)}`
+                : `0 12px 40px ${alpha(theme.palette.primary.main, 0.2)}, 0 4px 12px ${alpha('#000000', 0.15)}`,
+              transform: 'translateY(-1px)',
+            }
           }}
           role="toolbar"
           aria-label="Text Formatting"
@@ -635,31 +785,76 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             <Toolbar
               variant="dense"
               sx={{
-                p: 0.5,
+                p: 1,
                 minHeight: 'auto',
                 display: 'flex',
                 flexWrap: 'nowrap',
                 justifyContent: 'center',
-                 // Ensure buttons are visible against backdrop
+                gap: 0.5,
+                // Enhanced button styling
                 '& .MuiIconButton-root, & .MuiToggleButton-root': {
-                   color: theme.palette.text.secondary, // Use secondary text color for icons
-                   '&:hover': {
-                     backgroundColor: alpha(theme.palette.action.hover, 0.1),
-                     color: theme.palette.text.primary, // Darken icon on hover
-                   },
-                   '&.Mui-selected': {
-                     backgroundColor: alpha(theme.palette.primary.main, 0.15),
-                     color: theme.palette.primary.main, // Use primary color for selected
-                     '&:hover': {
-                       backgroundColor: alpha(theme.palette.primary.main, 0.25),
-                     }
-                   }
-                 },
+                  color: theme.palette.text.secondary,
+                  borderRadius: '8px',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'transparent',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    zIndex: -1,
+                  },
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                    color: theme.palette.primary.main,
+                    transform: 'translateY(-1px)',
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`,
+                    '&::before': {
+                      background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)}, ${alpha(theme.palette.primary.light, 0.05)})`,
+                    }
+                  },
+                  '&.Mui-selected': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                    color: theme.palette.primary.main,
+                    boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.25)}`,
+                    '&::before': {
+                      background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.15)}, ${alpha(theme.palette.primary.light, 0.08)})`,
+                    },
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.18),
+                      transform: 'translateY(-1px)',
+                      boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
+                    }
+                  }
+                },
+                // Enhanced divider styling
+                '& .MuiDivider-root': {
+                  backgroundColor: alpha(theme.palette.divider, 0.3),
+                  margin: theme.spacing(0, 0.75),
+                  height: '24px',
+                  alignSelf: 'center',
+                }
               }}
             >
               {/* Text Formatting */}
-              <ToggleButtonGroup size="small" sx={{ mr: 0.5 }}>
-                 <Tooltip title="Bold (Ctrl+B)">
+              <ToggleButtonGroup
+                size="small"
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    border: 'none',
+                    margin: '0 2px',
+                    padding: '6px 8px',
+                    minWidth: '36px',
+                    height: '36px',
+                  }
+                }}
+              >
+                 <Tooltip title="Bold (Ctrl+B)" placement="top">
                     <ToggleButton
                         value="bold"
                         selected={currentStyles.has('BOLD')}
@@ -667,12 +862,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                         disabled={disabled}
                         aria-pressed={currentStyles.has('BOLD')}
                         aria-label="Bold"
-                        sx={{ padding: '4px 6px' }}
                     >
                         <FormatBold fontSize="small" />
                     </ToggleButton>
                  </Tooltip>
-                 <Tooltip title="Italic (Ctrl+I)">
+                 <Tooltip title="Italic (Ctrl+I)" placement="top">
                     <ToggleButton
                         value="italic"
                         selected={currentStyles.has('ITALIC')}
@@ -680,12 +874,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                         disabled={disabled}
                         aria-pressed={currentStyles.has('ITALIC')}
                         aria-label="Italic"
-                        sx={{ padding: '4px 6px' }}
                     >
                         <FormatItalic fontSize="small" />
                     </ToggleButton>
                  </Tooltip>
-                 <Tooltip title="Underline (Ctrl+U)">
+                 <Tooltip title="Underline (Ctrl+U)" placement="top">
                     <ToggleButton
                         value="underline"
                         selected={currentStyles.has('UNDERLINE')}
@@ -693,18 +886,17 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                         disabled={disabled}
                         aria-pressed={currentStyles.has('UNDERLINE')}
                         aria-label="Underline"
-                        sx={{ padding: '4px 6px' }}
                     >
                         <FormatUnderlined fontSize="small" />
                     </ToggleButton>
                  </Tooltip>
               </ToggleButtonGroup>
 
-              <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.5 }} />
+              <Divider orientation="vertical" flexItem />
 
               {/* Heading Menu */}
-              <Box sx={{ mr: 0.5 }}>
-                <Tooltip title="Heading Style">
+              <Box>
+                <Tooltip title="Heading Style" placement="top">
                     <IconButton
                         size="small"
                         onClick={handleHeadingButtonClick}
@@ -713,18 +905,35 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                         aria-controls={headingMenuAnchor ? 'heading-menu' : undefined}
                         aria-expanded={Boolean(headingMenuAnchor)}
                         aria-label="Heading Style"
-                        sx={{ padding: '4px 6px' }}
+                        sx={{
+                          padding: '6px 8px',
+                          minWidth: '36px',
+                          height: '36px',
+                          margin: '0 2px',
+                        }}
                     >
-                        <Title fontSize="small" /><ArrowDropDown fontSize="inherit" sx={{ ml: -0.5 }}/>
+                        <Title fontSize="small" />
+                        <ArrowDropDown fontSize="inherit" sx={{ ml: -0.5, fontSize: '16px' }}/>
                     </IconButton>
                  </Tooltip>
               </Box>
 
-              <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.5 }} />
+              <Divider orientation="vertical" flexItem />
 
               {/* List Formatting */}
-               <ToggleButtonGroup size="small" sx={{ mr: 0.5 }}>
-                 <Tooltip title="Bullet List">
+               <ToggleButtonGroup
+                 size="small"
+                 sx={{
+                   '& .MuiToggleButton-root': {
+                     border: 'none',
+                     margin: '0 2px',
+                     padding: '6px 8px',
+                     minWidth: '36px',
+                     height: '36px',
+                   }
+                 }}
+               >
+                 <Tooltip title="Bullet List" placement="top">
                     <ToggleButton
                         value="bullet-list"
                         selected={currentBlockType === 'unordered-list-item'}
@@ -732,12 +941,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                         disabled={disabled}
                         aria-pressed={currentBlockType === 'unordered-list-item'}
                         aria-label="Bullet List"
-                        sx={{ padding: '4px 6px' }}
                     >
                         <FormatListBulleted fontSize="small" />
                     </ToggleButton>
                  </Tooltip>
-                 <Tooltip title="Numbered List">
+                 <Tooltip title="Numbered List" placement="top">
                     <ToggleButton
                         value="number-list"
                         selected={currentBlockType === 'ordered-list-item'}
@@ -745,18 +953,17 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                         disabled={disabled}
                         aria-pressed={currentBlockType === 'ordered-list-item'}
                         aria-label="Numbered List"
-                        sx={{ padding: '4px 6px' }}
                     >
                         <FormatListNumbered fontSize="small" />
                     </ToggleButton>
                  </Tooltip>
                </ToggleButtonGroup>
 
-               <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.5 }} />
+               <Divider orientation="vertical" flexItem />
 
                {/* Color Formatting */}
                <Box>
-                 <Tooltip title="Text & Background Color">
+                 <Tooltip title="Text & Background Color" placement="top">
                     <IconButton
                         size="small"
                         onClick={handleColorButtonClick}
@@ -765,18 +972,34 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                         aria-controls={colorMenuAnchor ? 'color-menu' : undefined}
                         aria-expanded={Boolean(colorMenuAnchor)}
                         aria-label="Text and background color"
-                         sx={{ padding: '4px 6px' }}
+                        sx={{
+                          padding: '6px 8px',
+                          minWidth: '36px',
+                          height: '36px',
+                          margin: '0 2px',
+                        }}
                     >
                         <Palette fontSize="small" />
                     </IconButton>
                  </Tooltip>
                </Box>
 
-               <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.5 }} />
+               <Divider orientation="vertical" flexItem />
 
                {/* Link and Clear Formatting */}
-               <ToggleButtonGroup size="small" sx={{ mr: 0.5 }}>
-                 <Tooltip title={currentLink ? `Edit Link: ${currentLink.url}` : "Insert Link (Ctrl+L)"}>
+               <ToggleButtonGroup
+                 size="small"
+                 sx={{
+                   '& .MuiToggleButton-root, & .MuiIconButton-root': {
+                     border: 'none',
+                     margin: '0 2px',
+                     padding: '6px 8px',
+                     minWidth: '36px',
+                     height: '36px',
+                   }
+                 }}
+               >
+                 <Tooltip title={currentLink ? `Edit Link: ${currentLink.url}` : "Insert Link (Ctrl+L)"} placement="top">
                     <ToggleButton
                         value="link"
                         selected={Boolean(currentLink)}
@@ -790,26 +1013,16 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                         disabled={disabled}
                         aria-pressed={Boolean(currentLink)}
                         aria-label={currentLink ? "Edit Link" : "Insert Link"}
-                        sx={{
-                          padding: '4px 6px',
-                          ...(currentLink && {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.15),
-                            '&:hover': {
-                              backgroundColor: alpha(theme.palette.primary.main, 0.25),
-                            }
-                          })
-                        }}
                     >
                         <Link fontSize="small" />
                     </ToggleButton>
                  </Tooltip>
-                 <Tooltip title="Clear Formatting (Ctrl+Shift+X)">
+                 <Tooltip title="Clear Formatting (Ctrl+Shift+X)" placement="top">
                     <IconButton
                         size="small"
                         onClick={handleClearFormatting}
                         disabled={disabled}
                         aria-label="Clear Formatting"
-                        sx={{ padding: '4px 6px' }}
                     >
                         <FormatClear fontSize="small" />
                     </IconButton>

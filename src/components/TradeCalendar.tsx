@@ -20,17 +20,14 @@ import {
   Alert,
   Badge,
   Fab,
+
 } from '@mui/material';
 import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
   Today,
-  ArrowBack,
-  Brightness4 as DarkModeIcon,
-  Brightness7 as LightModeIcon,
-  Google as GoogleIcon,
-  Logout as LogoutIcon,
+
   FilterAlt,
   Clear,
   PushPin as PinIcon,
@@ -38,6 +35,7 @@ import {
   LocalOffer as TagIcon,
   Search as SearchIcon,
   ViewCarousel as GalleryIcon,
+
 } from '@mui/icons-material';
 import {
   format,
@@ -90,6 +88,7 @@ import TradeFormDialog, { createEditTradeData } from './trades/TradeFormDialog';
 import ConfirmationDialog from './common/ConfirmationDialog';
 import PinnedTradesDrawer from './PinnedTradesDrawer';
 import TradeGalleryDialog from './TradeGalleryDialog';
+import { ImagePickerDialog, ImageAttribution } from './heroImage';
 
 import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 
@@ -119,6 +118,8 @@ interface TradeCalendarProps {
   onImportTrades?: (trades: Trade[]) => void;
   calendarName?: string,
   calendarNote?: string;
+  heroImageUrl?: string;
+  heroImageAttribution?: ImageAttribution;
   calendarDayNotes?: Map<string, string>;
   // Score settings
   scoreSettings?: import('../types/score').ScoreSettings;
@@ -341,6 +342,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     onImportTrades,
     calendarName,
     calendarNote,
+    heroImageUrl,
+    heroImageAttribution,
     calendarDayNotes,
     // Score settings
     scoreSettings,
@@ -395,8 +398,45 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     title: undefined
   });
 
-  const theme = useTheme(); 
+  // Image picker state
+  const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
+
+
+
+  const theme = useTheme();
   const { calendarId } = useParams();
+
+  // Hero image handlers
+  const handleHeroImageChange = async (imageUrl: string | null, attribution?: ImageAttribution) => {
+    try {
+      if (!onUpdateCalendarProperty) {
+        throw new Error('onUpdateCalendarProperty is undefined');
+      }
+
+      await onUpdateCalendarProperty(calendarId!!, (calendar) => {
+        return {
+          ...calendar,
+          heroImageUrl: imageUrl || undefined,
+          heroImageAttribution: imageUrl ? attribution : undefined
+        };
+      });
+    } catch (error) {
+      console.error('Error saving hero image:', error);
+    }
+  };
+
+  const handleOpenImagePicker = () => {
+    setIsImagePickerOpen(true);
+  };
+
+  const handleRemoveHeroImage = () => {
+    handleHeroImageChange(null);
+  };
+
+  const handleImageSelect = async (imageUrl: string, attribution?: ImageAttribution) => {
+    await handleHeroImageChange(imageUrl, attribution);
+    setIsImagePickerOpen(false);
+  };
 
   
 
@@ -702,14 +742,19 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           <CalendarNote
             calendarNote={calendarNote || ''}
             calendarId={calendarId!!}
+            title={calendarName}
             onUpdateCalendarProperty={onUpdateCalendarProperty}
+            heroImageUrl={heroImageUrl}
+            heroImageAttribution={heroImageAttribution}
+            onOpenImagePicker={handleOpenImagePicker}
+            onRemoveHeroImage={handleRemoveHeroImage}
             trades={trades}
             onOpenGalleryMode={openGalleryMode}
           />
 
           <Box sx={{
             display: 'flex',
-            gap: 2,
+            gap: 1,
             flexDirection: { xs: 'column', md: 'row' },
             justifyContent: 'center',
             alignItems: 'stretch',
@@ -744,14 +789,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             </Box>
 
           </Box>
-          <MonthlyStats
-            trades={filteredTrades}
-            accountBalance={accountBalance}
-            onImportTrades={onImportTrades}
-            currentDate={currentDate}
-            monthlyTarget={monthlyTarget}
-            onClearMonthTrades={onClearMonthTrades}
-          />
+        
 
           <Box sx={{
             display: 'flex',
@@ -1119,6 +1157,15 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             </Box>
           </Box>
 
+            <MonthlyStats
+            trades={filteredTrades}
+            accountBalance={accountBalance}
+            onImportTrades={onImportTrades}
+            currentDate={currentDate}
+            monthlyTarget={monthlyTarget}
+            onClearMonthTrades={onClearMonthTrades}
+          />
+
           {/*Current Monthly Statistics Section */}
           <MonthlyStatisticsSection
             trades={filteredTrades}
@@ -1383,6 +1430,15 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           calendarId={calendarId}
           onOpenGalleryMode={openGalleryMode}
         />
+
+        {/* Image Picker Dialog */}
+        <ImagePickerDialog
+          open={isImagePickerOpen}
+          onClose={() => setIsImagePickerOpen(false)}
+          onImageSelect={handleImageSelect}
+          title="Choose a cover image for your calendar"
+        />
+
       </Box>
     </Box>
   );

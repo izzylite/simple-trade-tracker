@@ -1,5 +1,6 @@
 import { Trade } from './trade';
 import { ScoreSettings } from './score';
+import { ImageAttribution } from '../components/heroImage';
 
 export interface Calendar {
   id: string;
@@ -29,6 +30,8 @@ export interface Calendar {
   tags?: string[];
   // Notes
   note?: string;
+  heroImageUrl?: string;
+  heroImageAttribution?: ImageAttribution;
   daysNotes?: Map<string, string>;
   // Score settings
   scoreSettings?: ScoreSettings;

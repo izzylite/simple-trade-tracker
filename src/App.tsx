@@ -765,6 +765,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       onAddTrade={handleAddTrade}
       calendarDayNotes={calendar.daysNotes}
       calendarNote={calendar.note}
+      heroImageUrl={calendar.heroImageUrl}
       // setLoading={(loading) => setLoadingTrades(loading)}
       // Score settings
       scoreSettings={calendar.scoreSettings}

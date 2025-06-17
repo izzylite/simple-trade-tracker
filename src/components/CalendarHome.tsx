@@ -640,7 +640,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                           overflow: 'hidden',
                           display: 'flex',
                           flexDirection: 'column',
-                          height: expandedCalendars[calendar.id] ? 'auto' : '360px',
+                          height: expandedCalendars[calendar.id] ? 'auto' : (calendar.heroImageUrl ? '420px' : '360px'),
                           '&:hover': {
                             transform: 'translateY(-4px)',
                             boxShadow: theme.shadows[8],
@@ -659,11 +659,77 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                         }}
                         onClick={() => handleCalendarClick(calendar.id)}
                       >
+                        {/* Hero Image Section */}
+                        {calendar.heroImageUrl && (
+                          <Box sx={{ position: 'relative' }}>
+                            <Box
+                              sx={{
+                                position: 'relative',
+                                overflow: 'hidden',
+                                height: 160,
+                                backgroundImage: `url(${calendar.heroImageUrl})`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
+                                backgroundRepeat: 'no-repeat',
+                                '&::before': {
+                                  content: '""',
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  background: `linear-gradient(to bottom, ${alpha(theme.palette.common.black, 0.1)}, ${alpha(theme.palette.common.black, 0.3)})`,
+                                  zIndex: 1
+                                }
+                              }}
+                            />
+
+                            {/* Attribution overlay - only show for Unsplash images */}
+                            {calendar.heroImageAttribution && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  bottom: 0,
+                                  right: 0,
+                                  background: 'linear-gradient(45deg, transparent, rgba(0,0,0,0.7))',
+                                  color: 'white',
+                                  p: 0.5,
+                                  borderTopLeftRadius: 1,
+                                  zIndex: 2
+                                }}
+                              >
+                                <Typography variant="caption" sx={{ fontSize: '0.6rem', display: 'block' }}>
+                                  Photo by{' '}
+                                  <a
+                                    href={calendar.heroImageAttribution.photographerUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: 'white', textDecoration: 'underline' }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {calendar.heroImageAttribution.photographer}
+                                  </a>
+                                  {' '}on{' '}
+                                  <a
+                                    href={calendar.heroImageAttribution.unsplashUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: 'white', textDecoration: 'underline' }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Unsplash
+                                  </a>
+                                </Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        )}
+
                         <Box
                           className="calendar-gradient"
                           sx={{
                             position: 'absolute',
-                            top: 0,
+                            top: calendar.heroImageUrl ? 160 : 0,
                             left: 0,
                             right: 0,
                             bottom: 0,

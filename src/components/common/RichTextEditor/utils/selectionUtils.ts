@@ -68,34 +68,39 @@ export function calculateToolbarPosition(
   scrollLeft: number
 ): Position {
   const spacing = 8; // Space between selection and toolbar
-  
+
   // Calculate base position relative to the editor's viewport
   let top = selectionRect.top - editorRect.top - toolbarDimensions.height - spacing;
-  let left = selectionRect.left - editorRect.left + (selectionRect.width / 2) - (toolbarDimensions.width / 2);
-  
+
+  // Calculate left position with more stable centering
+  const selectionCenter = selectionRect.left - editorRect.left + (selectionRect.width / 2);
+  let left = selectionCenter - (toolbarDimensions.width / 2);
+
   // Add scroll position to get position relative to the scrollable content
   top += scrollTop;
   left += scrollLeft;
-  
+
   // Boundary checks accounting for scroll
   const safeTopBoundary = scrollTop + spacing;
   const safeBottomBoundaryForTopPositioning = selectionRect.bottom - editorRect.top + spacing + scrollTop;
-  
+
   // If not enough space above, position below
   if (top < safeTopBoundary) {
     top = safeBottomBoundaryForTopPositioning;
   }
-  
-  // Prevent going off left edge
-  const safeLeftBoundary = scrollLeft + spacing;
-  left = Math.max(safeLeftBoundary, left);
-  
-  // Prevent going off right edge
-  const scrollbarWidthAllowance = 15;
-  const safeRightBoundary = editorRect.width - toolbarDimensions.width - spacing + scrollLeft - scrollbarWidthAllowance;
-  left = Math.min(safeRightBoundary, left);
-  
-  return { top, left };
+
+  // More robust horizontal boundary checks
+  const minLeftBoundary = scrollLeft + spacing;
+  const maxRightBoundary = editorRect.width - toolbarDimensions.width - spacing + scrollLeft - 20; // Account for scrollbar
+
+  // Ensure toolbar stays within bounds
+  left = Math.max(minLeftBoundary, Math.min(maxRightBoundary, left));
+
+  // Round to prevent sub-pixel positioning that can cause shifting
+  return {
+    top: Math.round(top),
+    left: Math.round(left)
+  };
 }
 
 /**
@@ -105,19 +110,23 @@ export function calculateToolbarPosition(
  */
 export function getToolbarDimensions(toolbarElement: HTMLElement | null): ToolbarDimensions {
   if (!toolbarElement) {
-    return { width: 320, height: 48 }; // Default fallback dimensions
+    return { width: 400, height: 48 }; // Updated fallback to match typical toolbar width
   }
-  
+
   try {
     // Use getBoundingClientRect for more accurate dimensions
     const rect = toolbarElement.getBoundingClientRect();
-    return {
-      width: rect.width || toolbarElement.offsetWidth || 320,
-      height: rect.height || toolbarElement.offsetHeight || 48
-    };
+
+    // Only use actual dimensions if they're reasonable (not 0 or very small)
+    const width = (rect.width > 50) ? rect.width :
+                  (toolbarElement.offsetWidth > 50) ? toolbarElement.offsetWidth : 400;
+    const height = (rect.height > 20) ? rect.height :
+                   (toolbarElement.offsetHeight > 20) ? toolbarElement.offsetHeight : 48;
+
+    return { width, height };
   } catch (error) {
     console.error('Error getting toolbar dimensions:', error);
-    return { width: 320, height: 48 };
+    return { width: 400, height: 48 };
   }
 }
 

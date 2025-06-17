@@ -39,24 +39,34 @@ export function useFloatingToolbar({
     if (hasValidSelection()) {
       try {
         const selectionRect = getSelectionRect();
-        
+
         if (selectionRect && selectionRect.width > 0 && editorWrapperRef.current) {
           const editorRect = editorWrapperRef.current.getBoundingClientRect();
           const editorScrollTop = editorWrapperRef.current.scrollTop;
           const editorScrollLeft = editorWrapperRef.current.scrollLeft;
-          
-          const toolbarDimensions = getToolbarDimensions(toolbarRef.current);
-          const position = calculateToolbarPosition(
-            selectionRect,
-            editorRect,
-            toolbarDimensions,
-            editorScrollTop,
-            editorScrollLeft
-          );
 
-          setFloatingToolbarPosition(position);
+          // Get toolbar dimensions with a small delay if toolbar is not yet rendered
+          const getPositionWithDimensions = () => {
+            const toolbarDimensions = getToolbarDimensions(toolbarRef.current);
+            const position = calculateToolbarPosition(
+              selectionRect,
+              editorRect,
+              toolbarDimensions,
+              editorScrollTop,
+              editorScrollLeft
+            );
+            setFloatingToolbarPosition(position);
+          };
+
+          // If toolbar is not visible yet, show it first then position
           if (!showFloatingToolbar) {
             setShowFloatingToolbar(true);
+            // Use requestAnimationFrame to ensure toolbar is rendered before positioning
+            requestAnimationFrame(() => {
+              getPositionWithDimensions();
+            });
+          } else {
+            getPositionWithDimensions();
           }
           return;
         }
