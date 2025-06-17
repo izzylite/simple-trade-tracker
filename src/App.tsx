@@ -133,7 +133,7 @@ function AppContent() {
 
 
 
-  const handleCreateCalendar = async (name: string, accountBalance: number, maxDailyDrawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamicRiskEnabled?: boolean, increasedRiskPercentage?: number, profitThresholdPercentage?: number) => {
+  const handleCreateCalendar = async (name: string, accountBalance: number, maxDailyDrawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamicRiskEnabled?: boolean, increasedRiskPercentage?: number, profitThresholdPercentage?: number, heroImageUrl?: string, heroImageAttribution?: any, heroImagePosition?: string) => {
     if (!user) return;
 
     const newCalendar: Omit<Calendar, 'id' | 'cachedTrades' | 'loadedYears'> = {
@@ -148,7 +148,10 @@ function AppContent() {
       riskPerTrade,
       dynamicRiskEnabled,
       increasedRiskPercentage,
-      profitThresholdPercentage
+      profitThresholdPercentage,
+      heroImageUrl,
+      heroImageAttribution,
+      heroImagePosition: heroImagePosition as any
     };
 
     try {
@@ -766,6 +769,8 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       calendarDayNotes={calendar.daysNotes}
       calendarNote={calendar.note}
       heroImageUrl={calendar.heroImageUrl}
+      heroImageAttribution={calendar.heroImageAttribution}
+      heroImagePosition={calendar.heroImagePosition}
       // setLoading={(loading) => setLoadingTrades(loading)}
       // Score settings
       scoreSettings={calendar.scoreSettings}

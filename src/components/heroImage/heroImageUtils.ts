@@ -36,7 +36,7 @@ export const validateImageUrl = (url: string): Promise<boolean> => {
 /**
  * Gets the display style for hero image background
  */
-export const getHeroImageStyle = (heroImageUrl?: string) => {
+export const getHeroImageStyle = (heroImageUrl?: string, heroImagePosition?: string) => {
   if (!heroImageUrl) {
     return {};
   }
@@ -44,7 +44,7 @@ export const getHeroImageStyle = (heroImageUrl?: string) => {
   return {
     backgroundImage: `url(${heroImageUrl})`,
     backgroundSize: 'cover',
-    backgroundPosition: 'center',
+    backgroundPosition: heroImagePosition || 'center',
     backgroundRepeat: 'no-repeat'
   };
 };

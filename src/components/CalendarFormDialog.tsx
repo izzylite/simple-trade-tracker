@@ -7,10 +7,22 @@ import {
   CircularProgress,
   Typography,
   FormControlLabel,
-  Switch
+  Switch,
+  Card,
+  CardMedia,
+  IconButton,
+  Tooltip,
+  alpha,
+  useTheme
 } from '@mui/material';
+import {
+  Image as ImageIcon,
+  Delete as DeleteIcon,
+  CropFree as PositionIcon
+} from '@mui/icons-material';
 import { Calendar } from '../types/calendar';
 import { BaseDialog } from './common';
+import { ImagePickerDialog, ImageAttribution } from './heroImage';
 
 export interface CalendarFormData {
   name: string;
@@ -23,6 +35,9 @@ export interface CalendarFormData {
   dynamicRiskEnabled?: boolean;
   increasedRiskPercentage?: number;
   profitThresholdPercentage?: number;
+  heroImageUrl?: string;
+  heroImageAttribution?: ImageAttribution;
+  heroImagePosition?: 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top left' | 'top right' | 'bottom left' | 'bottom right';
 }
 
 interface CalendarFormDialogProps {
@@ -46,6 +61,8 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
   title,
   submitButtonText
 }) => {
+  const theme = useTheme();
+
   // Form state
   const [name, setName] = useState('');
   const [accountBalance, setAccountBalance] = useState('');
@@ -57,6 +74,12 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
   const [dynamicRiskEnabled, setDynamicRiskEnabled] = useState(false);
   const [increasedRiskPercentage, setIncreasedRiskPercentage] = useState('');
   const [profitThresholdPercentage, setProfitThresholdPercentage] = useState('');
+
+  // Hero image state
+  const [heroImageUrl, setHeroImageUrl] = useState<string>('');
+  const [heroImageAttribution, setHeroImageAttribution] = useState<ImageAttribution | undefined>(undefined);
+  const [heroImagePosition, setHeroImagePosition] = useState<string>('center');
+  const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
   // Initialize form with initial data when in edit mode or when initial data is provided, or reset when dialog opens/closes
   useEffect(() => {
@@ -72,6 +95,9 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
         setDynamicRiskEnabled(initialData.dynamicRiskEnabled || false);
         setIncreasedRiskPercentage(initialData.increasedRiskPercentage?.toString() || '');
         setProfitThresholdPercentage(initialData.profitThresholdPercentage?.toString() || '');
+        setHeroImageUrl(initialData.heroImageUrl || '');
+        setHeroImageAttribution(initialData.heroImageAttribution);
+        setHeroImagePosition(initialData.heroImagePosition || 'center');
       } else {
         // Reset form for create mode without initial data
         resetForm();
@@ -90,6 +116,9 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
     setDynamicRiskEnabled(false);
     setIncreasedRiskPercentage('');
     setProfitThresholdPercentage('');
+    setHeroImageUrl('');
+    setHeroImageAttribution(undefined);
+    setHeroImagePosition('center');
   };
 
   const handleSubmit = async () => {
@@ -121,10 +150,30 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
           riskPerTrade: riskPerTradeValue,
           dynamicRiskEnabled,
           increasedRiskPercentage: increasedRiskValue,
-          profitThresholdPercentage: profitThresholdValue
+          profitThresholdPercentage: profitThresholdValue,
+          heroImageUrl: heroImageUrl || undefined,
+          heroImageAttribution: heroImageAttribution,
+          heroImagePosition: heroImagePosition as any
         });
       }
     }
+  };
+
+  // Hero image handlers
+  const handleImageSelect = (imageUrl: string, attribution?: ImageAttribution) => {
+    setHeroImageUrl(imageUrl);
+    setHeroImageAttribution(attribution);
+    setIsImagePickerOpen(false);
+  };
+
+  const handleRemoveImage = () => {
+    setHeroImageUrl('');
+    setHeroImageAttribution(undefined);
+    setHeroImagePosition('center');
+  };
+
+  const handlePositionChange = (position: string) => {
+    setHeroImagePosition(position);
   };
 
   const isFormValid = name.trim() && accountBalance.trim() && maxDailyDrawdown.trim();
@@ -179,6 +228,130 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
             onChange={(e) => setName(e.target.value)}
             autoFocus
           />
+
+          {/* Hero Image Section */}
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
+              Cover Image (Optional)
+            </Typography>
+
+            {heroImageUrl ? (
+              <Card sx={{
+                position: 'relative',
+                borderRadius: 2,
+                overflow: 'hidden',
+                border: '1px solid',
+                borderColor: 'divider'
+              }}>
+                <CardMedia
+                  component="div"
+                  sx={{
+                    height: 120,
+                    backgroundImage: `url(${heroImageUrl})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: heroImagePosition,
+                    backgroundRepeat: 'no-repeat',
+                    position: 'relative',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: `linear-gradient(to bottom, ${alpha(theme.palette.common.black, 0.1)}, ${alpha(theme.palette.common.black, 0.3)})`,
+                      zIndex: 1
+                    }
+                  }}
+                />
+
+                {/* Image controls overlay */}
+                <Box sx={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  display: 'flex',
+                  gap: 1,
+                  zIndex: 2
+                }}>
+                  <Tooltip title="Change position">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        const positions = ['center', 'top', 'bottom', 'left', 'right', 'top left', 'top right', 'bottom left', 'bottom right'];
+                        const currentIndex = positions.indexOf(heroImagePosition);
+                        const nextIndex = (currentIndex + 1) % positions.length;
+                        handlePositionChange(positions[nextIndex]);
+                      }}
+                      sx={{
+                        backgroundColor: alpha(theme.palette.background.paper, 0.9),
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.background.paper, 1),
+                        }
+                      }}
+                    >
+                      <PositionIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+
+                  <Tooltip title="Remove image">
+                    <IconButton
+                      size="small"
+                      onClick={handleRemoveImage}
+                      sx={{
+                        backgroundColor: alpha(theme.palette.error.main, 0.9),
+                        color: 'white',
+                        '&:hover': {
+                          backgroundColor: theme.palette.error.main,
+                        }
+                      }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+
+                {/* Attribution */}
+                {heroImageAttribution && (
+                  <Box sx={{
+                    position: 'absolute',
+                    bottom: 4,
+                    right: 4,
+                    backgroundColor: alpha(theme.palette.common.black, 0.7),
+                    color: 'white',
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: 0.5,
+                    zIndex: 2
+                  }}>
+                    <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>
+                      📸 {heroImageAttribution.photographer}
+                    </Typography>
+                  </Box>
+                )}
+              </Card>
+            ) : (
+              <Button
+                variant="outlined"
+                startIcon={<ImageIcon />}
+                onClick={() => setIsImagePickerOpen(true)}
+                sx={{
+                  height: 120,
+                  borderStyle: 'dashed',
+                  borderColor: 'divider',
+                  color: 'text.secondary',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    color: 'primary.main',
+                    backgroundColor: alpha(theme.palette.primary.main, 0.04)
+                  }
+                }}
+                fullWidth
+              >
+                Add Cover Image
+              </Button>
+            )}
+          </Box>
           <TextField
             label={mode === 'create' ? "Initial Account Balance" : "Account Balance"}
             fullWidth
@@ -335,6 +508,14 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
             </Box>
           )}
         </Stack>
+
+        {/* Image Picker Dialog */}
+        <ImagePickerDialog
+          open={isImagePickerOpen}
+          onClose={() => setIsImagePickerOpen(false)}
+          onImageSelect={handleImageSelect}
+          title="Choose a cover image for your calendar"
+        />
     </BaseDialog>
   );
 };

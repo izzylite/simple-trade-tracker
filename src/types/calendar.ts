@@ -32,6 +32,7 @@ export interface Calendar {
   note?: string;
   heroImageUrl?: string;
   heroImageAttribution?: ImageAttribution;
+  heroImagePosition?: 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top left' | 'top right' | 'bottom left' | 'bottom right';
   daysNotes?: Map<string, string>;
   // Score settings
   scoreSettings?: ScoreSettings;

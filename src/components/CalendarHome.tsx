@@ -65,7 +65,7 @@ import AppHeader from './common/AppHeader';
 
 interface CalendarHomeProps {
   calendars: Calendar[];
-  onCreateCalendar: (name: string, accountBalance: number, maxDailyDrawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamicRiskEnabled?: boolean, increasedRiskPercentage?: number, profitThresholdPercentage?: number) => void;
+  onCreateCalendar: (name: string, accountBalance: number, maxDailyDrawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamicRiskEnabled?: boolean, increasedRiskPercentage?: number, profitThresholdPercentage?: number, heroImageUrl?: string, heroImageAttribution?: any, heroImagePosition?: string) => void;
   onDuplicateCalendar: (sourceCalendarId: string, newName: string, includeContent?: boolean) => void;
   onDeleteCalendar: (id: string) => void;
   onUpdateCalendar: (id: string, updates: Partial<Calendar>) => void;
@@ -326,7 +326,10 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
         data.riskPerTrade,
         data.dynamicRiskEnabled,
         data.increasedRiskPercentage,
-        data.profitThresholdPercentage
+        data.profitThresholdPercentage,
+        data.heroImageUrl,
+        data.heroImageAttribution,
+        data.heroImagePosition
       );
       setIsCreateDialogOpen(false);
     } catch (error) {
@@ -351,7 +354,10 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
         riskPerTrade: data.riskPerTrade,
         dynamicRiskEnabled: data.dynamicRiskEnabled,
         increasedRiskPercentage: data.increasedRiskPercentage,
-        profitThresholdPercentage: data.profitThresholdPercentage
+        profitThresholdPercentage: data.profitThresholdPercentage,
+        heroImageUrl: data.heroImageUrl,
+        heroImageAttribution: data.heroImageAttribution,
+        heroImagePosition: data.heroImagePosition
       };
 
       await onUpdateCalendar(calendarToEdit.id, updates);
@@ -635,17 +641,33 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                         key={calendar.id}
                         sx={{
                           cursor: 'pointer',
-                          transition: 'all 0.3s ease',
+                          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                           position: 'relative',
                           overflow: 'hidden',
                           display: 'flex',
                           flexDirection: 'column',
-                          height: expandedCalendars[calendar.id] ? 'auto' : (calendar.heroImageUrl ? '420px' : '360px'),
+                          height: expandedCalendars[calendar.id] ? 'auto' : (calendar.heroImageUrl ? '480px' : '420px'),
+                          borderRadius: 3,
+                          border: '1px solid',
+                          borderColor: alpha(theme.palette.divider, 0.1),
+                          background: theme.palette.mode === 'dark'
+                            ? `linear-gradient(145deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.default, 0.98)} 100%)`
+                            : `linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.98) 100%)`,
+                          backdropFilter: 'blur(10px)',
+                          boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.3 : 0.08)}`,
                           '&:hover': {
-                            transform: 'translateY(-4px)',
-                            boxShadow: theme.shadows[8],
+                            transform: 'translateY(-8px) scale(1.02)',
+                            boxShadow: `0 20px 40px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.4 : 0.15)}`,
+                            borderColor: alpha(theme.palette.primary.main, 0.3),
                             '& .calendar-gradient': {
                               opacity: 1
+                            },
+                            '& .hero-image': {
+                              transform: 'scale(1.05)'
+                            },
+                            '& .stats-card': {
+                              transform: 'translateY(-2px)',
+                              boxShadow: `0 8px 25px ${alpha(theme.palette.primary.main, 0.15)}`
                             }
                           },
                           '&::before': {
@@ -655,22 +677,27 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                             left: 0,
                             right: 0,
                             height: '4px',
+                            background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.primary.light}, ${theme.palette.secondary.main})`,
+                            borderTopLeftRadius: 12,
+                            borderTopRightRadius: 12,
                           }
                         }}
                         onClick={() => handleCalendarClick(calendar.id)}
                       >
                         {/* Hero Image Section */}
                         {calendar.heroImageUrl && (
-                          <Box sx={{ position: 'relative' }}>
+                          <Box sx={{ position: 'relative', overflow: 'hidden' }}>
                             <Box
+                              className="hero-image"
                               sx={{
                                 position: 'relative',
                                 overflow: 'hidden',
-                                height: 160,
+                                height: 200,
                                 backgroundImage: `url(${calendar.heroImageUrl})`,
                                 backgroundSize: 'cover',
-                                backgroundPosition: 'center',
+                                backgroundPosition: calendar.heroImagePosition || 'center',
                                 backgroundRepeat: 'no-repeat',
+                                transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                                 '&::before': {
                                   content: '""',
                                   position: 'absolute',
@@ -678,7 +705,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                                   left: 0,
                                   right: 0,
                                   bottom: 0,
-                                  background: `linear-gradient(to bottom, ${alpha(theme.palette.common.black, 0.1)}, ${alpha(theme.palette.common.black, 0.3)})`,
+                                  background: `linear-gradient(135deg, ${alpha(theme.palette.common.black, 0.2)} 0%, ${alpha(theme.palette.common.black, 0.1)} 50%, ${alpha(theme.palette.common.black, 0.4)} 100%)`,
                                   zIndex: 1
                                 }
                               }}
@@ -689,23 +716,33 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                               <Box
                                 sx={{
                                   position: 'absolute',
-                                  bottom: 0,
-                                  right: 0,
-                                  background: 'linear-gradient(45deg, transparent, rgba(0,0,0,0.7))',
+                                  bottom: 8,
+                                  right: 8,
+                                  background: `linear-gradient(135deg, ${alpha(theme.palette.common.black, 0.8)} 0%, ${alpha(theme.palette.common.black, 0.6)} 100%)`,
+                                  backdropFilter: 'blur(8px)',
                                   color: 'white',
-                                  p: 0.5,
-                                  borderTopLeftRadius: 1,
-                                  zIndex: 2
+                                  px: 1.5,
+                                  py: 0.5,
+                                  borderRadius: 2,
+                                  zIndex: 2,
+                                  border: `1px solid ${alpha(theme.palette.common.white, 0.1)}`
                                 }}
                               >
-                                <Typography variant="caption" sx={{ fontSize: '0.6rem', display: 'block' }}>
-                                  Photo by{' '}
+                                <Typography variant="caption" sx={{ fontSize: '0.65rem', display: 'block', fontWeight: 500 }}>
+                                  📸{' '}
                                   <a
                                     href={calendar.heroImageAttribution.photographerUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    style={{ color: 'white', textDecoration: 'underline' }}
+                                    style={{
+                                      color: 'white',
+                                      textDecoration: 'none',
+                                      borderBottom: '1px solid rgba(255,255,255,0.3)',
+                                      transition: 'border-color 0.2s ease'
+                                    }}
                                     onClick={(e) => e.stopPropagation()}
+                                    onMouseEnter={(e) => e.target.style.borderBottomColor = 'white'}
+                                    onMouseLeave={(e) => e.target.style.borderBottomColor = 'rgba(255,255,255,0.3)'}
                                   >
                                     {calendar.heroImageAttribution.photographer}
                                   </a>
@@ -714,8 +751,15 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                                     href={calendar.heroImageAttribution.unsplashUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    style={{ color: 'white', textDecoration: 'underline' }}
+                                    style={{
+                                      color: 'white',
+                                      textDecoration: 'none',
+                                      borderBottom: '1px solid rgba(255,255,255,0.3)',
+                                      transition: 'border-color 0.2s ease'
+                                    }}
                                     onClick={(e) => e.stopPropagation()}
+                                    onMouseEnter={(e) => e.target.style.borderBottomColor = 'white'}
+                                    onMouseLeave={(e) => e.target.style.borderBottomColor = 'rgba(255,255,255,0.3)'}
                                   >
                                     Unsplash
                                   </a>
@@ -729,24 +773,32 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                           className="calendar-gradient"
                           sx={{
                             position: 'absolute',
-                            top: calendar.heroImageUrl ? 160 : 0,
+                            top: calendar.heroImageUrl ? 200 : 0,
                             left: 0,
                             right: 0,
                             bottom: 0,
-                            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)}, ${alpha(theme.palette.primary.light, 0.02)})`,
+                            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.primary.light, 0.04)} 50%, ${alpha(theme.palette.secondary.main, 0.06)} 100%)`,
                             opacity: 0,
-                            transition: 'opacity 0.3s ease',
+                            transition: 'opacity 0.4s ease',
                             pointerEvents: 'none'
                           }}
                         />
-                        <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', flexGrow: 1, maxHeight: expandedCalendars[calendar.id] ? 'none' : 'calc(100% - 60px)' }}>
-                          <Box sx={{ mb: 1.5 }}>
+                        <CardContent sx={{
+                          p: 3,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          flexGrow: 1,
+                          maxHeight: expandedCalendars[calendar.id] ? 'none' : 'calc(100% - 80px)',
+                          position: 'relative',
+                          zIndex: 1
+                        }}>
+                          <Box sx={{ mb: 2 }}>
                             <Box
                               sx={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
-                                alignItems: 'center',
-                                mb: 1,
+                                alignItems: 'flex-start',
+                                mb: 1.5,
                                 cursor: 'pointer'
                               }}
                               onClick={(e) => {
@@ -754,46 +806,154 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                                 handleToggleExpand(e, calendar.id);
                               }}
                             >
-                              <Typography
-                                variant="h6"
-                                gutterBottom
-                                sx={{
-                                  fontWeight: 600,
-                                  color: 'text.primary',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 1,
-                                  mb: 0
-                                }}
-                              >
-                                {calendar.name}
-                                {stats.totalPnL > 0 && (
-                                  <TrendingUp sx={{ fontSize: '1.2rem', color: 'success.main' }} />
-                                )}
-                                {stats.totalPnL < 0 && (
-                                  <TrendingDown sx={{ fontSize: '1.2rem', color: 'error.main' }} />
-                                )}
-                              </Typography>
+                              <Box sx={{ flex: 1 }}>
+                                <Typography
+                                  variant="h5"
+                                  sx={{
+                                    fontWeight: 700,
+                                    color: 'text.primary',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1.5,
+                                    mb: 0.5,
+                                    fontSize: '1.4rem',
+                                    letterSpacing: '-0.02em',
+                                    lineHeight: 1.2
+                                  }}
+                                >
+                                  {calendar.name}
+                                  {stats.totalPnL > 0 && (
+                                    <Box sx={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: '50%',
+                                      bgcolor: alpha(theme.palette.success.main, 0.1),
+                                      border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`
+                                    }}>
+                                      <TrendingUp sx={{ fontSize: '1rem', color: 'success.main' }} />
+                                    </Box>
+                                  )}
+                                  {stats.totalPnL < 0 && (
+                                    <Box sx={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: '50%',
+                                      bgcolor: alpha(theme.palette.error.main, 0.1),
+                                      border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`
+                                    }}>
+                                      <TrendingDown sx={{ fontSize: '1rem', color: 'error.main' }} />
+                                    </Box>
+                                  )}
+                                </Typography>
+
+                                {/* Performance Badge */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                  <Box
+                                    sx={{
+                                      px: 1.5,
+                                      py: 0.5,
+                                      borderRadius: 2,
+                                      bgcolor: stats.totalPnL > 0
+                                        ? alpha(theme.palette.success.main, 0.1)
+                                        : stats.totalPnL < 0
+                                        ? alpha(theme.palette.error.main, 0.1)
+                                        : alpha(theme.palette.grey[500], 0.1),
+                                      border: `1px solid ${stats.totalPnL > 0
+                                        ? alpha(theme.palette.success.main, 0.2)
+                                        : stats.totalPnL < 0
+                                        ? alpha(theme.palette.error.main, 0.2)
+                                        : alpha(theme.palette.grey[500], 0.2)}`,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 0.5
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        fontWeight: 600,
+                                        fontSize: '0.75rem',
+                                        color: stats.totalPnL > 0
+                                          ? 'success.main'
+                                          : stats.totalPnL < 0
+                                          ? 'error.main'
+                                          : 'text.secondary'
+                                      }}
+                                    >
+                                      {stats.totalPnL > 0 ? '+' : ''}{formatCurrency(stats.totalPnL)}
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        fontSize: '0.7rem',
+                                        color: 'text.secondary',
+                                        opacity: 0.8
+                                      }}
+                                    >
+                                      ({stats.growthPercentage > 0 ? '+' : ''}{stats.growthPercentage.toFixed(1)}%)
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </Box>
+
                               <IconButton
                                 size="small"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleToggleExpand(e, calendar.id);
                                 }}
-                                sx={{ color: 'text.secondary' }}
+                                sx={{
+                                  color: 'text.secondary',
+                                  bgcolor: alpha(theme.palette.background.default, 0.5),
+                                  '&:hover': {
+                                    bgcolor: alpha(theme.palette.background.default, 0.8),
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s ease'
+                                }}
                               >
                                 {expandedCalendars[calendar.id] ? <ExpandLess /> : <ExpandMore />}
                               </IconButton>
                             </Box>
-                            <Stack direction="row" spacing={2} sx={{ mb: 1 }}>
-                              <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <CalendarIcon sx={{ fontSize: '1rem' }} />
-                                {format(calendar.createdAt, 'MMM d, yyyy')}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <EditIcon sx={{ fontSize: '1rem' }} />
-                                {format(calendar.lastModified, 'MMM d, yyyy')}
-                              </Typography>
+                            <Stack direction="row" spacing={3} sx={{ mb: 1.5 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                                <Box sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: '50%',
+                                  bgcolor: alpha(theme.palette.primary.main, 0.1)
+                                }}>
+                                  <CalendarIcon sx={{ fontSize: '0.8rem', color: 'primary.main' }} />
+                                </Box>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                                  Created {format(calendar.createdAt, 'MMM d, yyyy')}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                                <Box sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: '50%',
+                                  bgcolor: alpha(theme.palette.secondary.main, 0.1)
+                                }}>
+                                  <EditIcon sx={{ fontSize: '0.8rem', color: 'secondary.main' }} />
+                                </Box>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                                  Updated {format(calendar.lastModified, 'MMM d, yyyy')}
+                                </Typography>
+                              </Box>
                             </Stack>
                           </Box>
                           <Divider sx={{ my: 1, opacity: 0.6 }} />

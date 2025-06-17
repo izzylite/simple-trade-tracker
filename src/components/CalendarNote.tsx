@@ -23,7 +23,8 @@ import {
   Image as ImageIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Photo
+  Photo,
+  CropFree as PositionIcon
 } from '@mui/icons-material';
 import RichTextEditor from './common/RichTextEditor';
 import { Calendar } from '../types/calendar';
@@ -36,6 +37,7 @@ interface CalendarNoteDataProps {
   title?: string;
   heroImageUrl?: string;
   heroImageAttribution?: ImageAttribution;
+  heroImagePosition?: 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top left' | 'top right' | 'bottom left' | 'bottom right';
   onOpenImagePicker?: () => void;
   onRemoveHeroImage?: () => void;
   // Optional props for trade link navigation
@@ -50,6 +52,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   title = "Description",
   heroImageUrl,
   heroImageAttribution,
+  heroImagePosition = 'center',
   onOpenImagePicker,
   onRemoveHeroImage,
   trades,
@@ -59,6 +62,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   const [editedData, setEditedData] = useState(calendarNote);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [imageMenuAnchor, setImageMenuAnchor] = useState<HTMLElement | null>(null);
+  const [positionMenuAnchor, setPositionMenuAnchor] = useState<HTMLElement | null>(null);
   const theme = useTheme();
 
   // Update editedData when calendarNote prop changes
@@ -160,8 +164,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
 
       <Paper
         elevation={3}
-        sx={{ 
-          borderRadius: 2,
+        sx={{  
           overflow: 'hidden',
           border: '1px solid',
           borderColor: 'divider',
@@ -189,7 +192,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
                 sx={{
                   position: 'relative',
                   overflow: 'hidden',
-                  height: 300,
+                  height: 200,
                   backgroundImage: `url(${heroImageUrl})`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',

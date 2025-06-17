@@ -14,34 +14,18 @@ import {
   CardActionArea,
   useTheme,
   alpha,
-  Link
+  Link,
+  Chip
 } from '@mui/material';
 import {
   Close as CloseIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  Cached as CachedIcon
 } from '@mui/icons-material';
 import Shimmer from '../Shimmer';
+import { unsplashCache, UnsplashImage } from '../../services/unsplashCache';
 
-interface UnsplashImage {
-  id: string;
-  urls: {
-    small: string;
-    regular: string;
-    full: string;
-  };
-  links: {
-    download_location: string;
-    html: string;
-  };
-  alt_description: string;
-  user: {
-    name: string;
-    username: string;
-    links: {
-      html: string;
-    };
-  };
-}
+
 
 export interface ImageAttribution {
   id: string;
@@ -69,6 +53,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [images, setImages] = useState<UnsplashImage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isFromCache, setIsFromCache] = useState(false);
 
   const UNSPLASH_ACCESS_KEY = process.env.REACT_APP_UNSPLASH_ACCESS_KEY;
 
@@ -82,6 +67,22 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
     'investment',
     'profit growth'
   ];
+
+  // Get recently searched queries from cache
+  const getEnhancedPopularSearches = () => {
+    const recentQueries = unsplashCache.getPopularQueries(3);
+    const defaultSearches = popularSearches;
+
+    // Combine recent queries with default ones, avoiding duplicates
+    const combined = [...recentQueries];
+    defaultSearches.forEach(search => {
+      if (!combined.some(query => query.toLowerCase() === search.toLowerCase())) {
+        combined.push(search);
+      }
+    });
+
+    return combined.slice(0, 8); // Limit to 8 total suggestions
+  };
 
   const generatePlaceholderImages = (query: string): UnsplashImage[] => {
     const categories = ['trading', 'finance', 'business', 'charts', 'success', 'growth'];
@@ -113,13 +114,30 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
     if (!query.trim()) return;
 
     setLoading(true);
+    setIsFromCache(false);
+
     try {
-      if (!UNSPLASH_ACCESS_KEY) {
-        console.warn('Unsplash API key not configured, using placeholder images');
-        setImages(generatePlaceholderImages(query));
+      // Check cache first
+      const cachedImages = unsplashCache.getCachedImages(query);
+      if (cachedImages) {
+        console.log(`Loading ${cachedImages.length} images from cache for query: "${query}"`);
+        setImages(cachedImages);
+        setIsFromCache(true);
+        setLoading(false);
         return;
       }
 
+      if (!UNSPLASH_ACCESS_KEY) {
+        console.warn('Unsplash API key not configured, using placeholder images');
+        const placeholderImages = generatePlaceholderImages(query);
+        setImages(placeholderImages);
+        // Cache placeholder images too
+        unsplashCache.cacheImages(query, placeholderImages);
+        setLoading(false);
+        return;
+      }
+
+      console.log(`Fetching images from Unsplash API for query: "${query}"`);
       const response = await fetch(
         `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=24&orientation=landscape`,
         {
@@ -132,13 +150,22 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
       if (response.ok) {
         const data = await response.json();
         setImages(data.results);
+        // Cache the results
+        unsplashCache.cacheImages(query, data.results);
+        console.log(`Cached ${data.results.length} images for query: "${query}"`);
       } else {
         console.error('Failed to fetch images from Unsplash');
-        setImages(generatePlaceholderImages(query));
+        const placeholderImages = generatePlaceholderImages(query);
+        setImages(placeholderImages);
+        // Cache placeholder images as fallback
+        unsplashCache.cacheImages(query, placeholderImages);
       }
     } catch (error) {
       console.error('Error fetching images:', error);
-      setImages(generatePlaceholderImages(query));
+      const placeholderImages = generatePlaceholderImages(query);
+      setImages(placeholderImages);
+      // Cache placeholder images as fallback
+      unsplashCache.cacheImages(query, placeholderImages);
     } finally {
       setLoading(false);
     }
@@ -175,11 +202,20 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
     handleSearchImages(search);
   };
 
-  // Load default images when dialog opens
+  // Load default images when dialog opens and clean up expired cache
   React.useEffect(() => {
-    if (open && images.length === 0) {
-      setSearchQuery('trading charts');
-      handleSearchImages('trading charts');
+    if (open) {
+      // Clean up expired cache entries
+      const removedCount = unsplashCache.removeExpiredEntries();
+      if (removedCount > 0) {
+        console.log(`Removed ${removedCount} expired cache entries`);
+      }
+
+      // Load default images if none are loaded
+      if (images.length === 0) {
+        setSearchQuery('trading charts');
+        handleSearchImages('trading charts');
+      }
     }
   }, [open]);
 
@@ -305,6 +341,26 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
           </Button>
         </Box>
 
+        {/* Cache status indicator */}
+        {isFromCache && (
+          <Box sx={{ mb: 2 }}>
+            <Chip
+              icon={<CachedIcon />}
+              label="Loaded from cache"
+              size="small"
+              color="success"
+              variant="outlined"
+              sx={{
+                fontSize: '0.75rem',
+                height: 24,
+                '& .MuiChip-icon': {
+                  fontSize: '0.9rem'
+                }
+              }}
+            />
+          </Box>
+        )}
+
         {/* Popular searches */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle2" sx={{
@@ -320,37 +376,74 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
             flexWrap: 'wrap',
             gap: 1
           }}>
-            {popularSearches.map((search) => (
-              <Button
-                key={search}
-                size="small"
-                variant="outlined"
-                onClick={() => handlePopularSearchClick(search)}
-                sx={{
-                  fontSize: '0.8rem',
-                  textTransform: 'none',
-                  borderRadius: 1,
-                  minWidth: 'auto',
-                  px: 2,
-                  py: 0.5,
-                  borderColor: 'divider',
-                  color: 'text.primary',
-                  background: (theme) => theme.palette.mode === 'dark'
-                    ? `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.background.default, 0.9)} 100%)`
-                    : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.9) 100%)',
-                  '&:hover': {
-                    borderColor: 'primary.main',
-                    color: 'primary.main',
-                    background: (theme) => `linear-gradient(135deg, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.15 : 0.05)} 0%, ${alpha(theme.palette.primary.light, theme.palette.mode === 'dark' ? 0.15 : 0.05)} 100%)`,
-                    transform: 'translateY(-1px)',
-                    boxShadow: (theme) => `0 2px 8px ${alpha(theme.palette.primary.main, 0.25)}`
-                  }
-                }}
-              >
-                {search}
-              </Button>
-            ))}
+            {getEnhancedPopularSearches().map((search, index) => {
+              const isRecentQuery = unsplashCache.isCached(search);
+              return (
+                <Button
+                  key={`${search}-${index}`}
+                  size="small"
+                  variant="outlined"
+                  onClick={() => handlePopularSearchClick(search)}
+                  startIcon={isRecentQuery ? <CachedIcon sx={{ fontSize: '0.8rem' }} /> : undefined}
+                  sx={{
+                    fontSize: '0.8rem',
+                    textTransform: 'none',
+                    borderRadius: 1,
+                    minWidth: 'auto',
+                    px: 2,
+                    py: 0.5,
+                    borderColor: isRecentQuery ? 'success.main' : 'divider',
+                    color: isRecentQuery ? 'success.main' : 'text.primary',
+                    background: (theme) => isRecentQuery
+                      ? `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.05)} 0%, ${alpha(theme.palette.success.light, 0.05)} 100%)`
+                      : theme.palette.mode === 'dark'
+                        ? `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.background.default, 0.9)} 100%)`
+                        : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.9) 100%)',
+                    '&:hover': {
+                      borderColor: isRecentQuery ? 'success.main' : 'primary.main',
+                      color: isRecentQuery ? 'success.main' : 'primary.main',
+                      background: (theme) => isRecentQuery
+                        ? `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(theme.palette.success.light, 0.1)} 100%)`
+                        : `linear-gradient(135deg, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.15 : 0.05)} 0%, ${alpha(theme.palette.primary.light, theme.palette.mode === 'dark' ? 0.15 : 0.05)} 100%)`,
+                      transform: 'translateY(-1px)',
+                      boxShadow: (theme) => `0 2px 8px ${alpha(isRecentQuery ? theme.palette.success.main : theme.palette.primary.main, 0.25)}`
+                    }
+                  }}
+                >
+                  {search}
+                </Button>
+              );
+            })}
           </Box>
+        </Box>
+
+        {/* Cache Management */}
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            {(() => {
+              const stats = unsplashCache.getCacheStats();
+              return `${stats.totalEntries} cached searches • ${(stats.totalSize / 1024).toFixed(1)}KB`;
+            })()}
+          </Typography>
+          <Button
+            size="small"
+            variant="text"
+            onClick={() => {
+              unsplashCache.clearCache();
+              setImages([]);
+              setIsFromCache(false);
+            }}
+            sx={{
+              fontSize: '0.75rem',
+              textTransform: 'none',
+              color: 'text.secondary',
+              '&:hover': {
+                color: 'error.main'
+              }
+            }}
+          >
+            Clear cache
+          </Button>
         </Box>
 
         {/* Images Grid */}

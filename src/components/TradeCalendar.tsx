@@ -120,6 +120,7 @@ interface TradeCalendarProps {
   calendarNote?: string;
   heroImageUrl?: string;
   heroImageAttribution?: ImageAttribution;
+  heroImagePosition?: 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top left' | 'top right' | 'bottom left' | 'bottom right';
   calendarDayNotes?: Map<string, string>;
   // Score settings
   scoreSettings?: import('../types/score').ScoreSettings;
@@ -132,7 +133,7 @@ interface TradeCalendarProps {
   onToggleDynamicRisk?: (useActualAmounts: boolean) => void;
   // Loading state
   isLoadingTrades?: boolean;
-} 
+}
 
 
 
@@ -159,17 +160,17 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ date, trades, monthStart, weekInd
     isSameWeek(new Date(trade.date), weekStart, { weekStartsOn: 0 }) &&
     new Date(trade.date).getMonth() === currentMonth
   );
-  
-  
-    // Calculate net amount for the week
-    const netAmount = weekTrades.reduce((sum, trade) => sum + trade.amount, 0);
-  
-    // Calculate percentage loss/gain relative to account value at start of week (excluding current week trades)
-    const percentage = trades
-      ? calculatePercentageOfValueAtDate(netAmount, accountBalance, trades, weekStart).toFixed(1)
-      : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0';
 
- 
+
+  // Calculate net amount for the week
+  const netAmount = weekTrades.reduce((sum, trade) => sum + trade.amount, 0);
+
+  // Calculate percentage loss/gain relative to account value at start of week (excluding current week trades)
+  const percentage = trades
+    ? calculatePercentageOfValueAtDate(netAmount, accountBalance, trades, weekStart).toFixed(1)
+    : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0';
+
+
   // Calculate target progress using centralized function
   const targetProgressValue = weeklyTarget && weeklyTarget > 0
     ? calculateTargetProgress(weekTrades, accountBalance, weeklyTarget, weekStart, trades)
@@ -263,7 +264,7 @@ export const createNewTradeData = (): NewTradeForm => ({
 
 
 
- 
+
 // TagFilter component for filtering trades by tags
 interface TagFilterProps {
   allTags: string[];
@@ -344,6 +345,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     calendarNote,
     heroImageUrl,
     heroImageAttribution,
+    heroImagePosition,
     calendarDayNotes,
     // Score settings
     scoreSettings,
@@ -438,7 +440,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setIsImagePickerOpen(false);
   };
 
-  
+
 
   // Scroll detection for floating month navigation
   useEffect(() => {
@@ -448,7 +450,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       if (section) {
         const rect = section.getBoundingClientRect();
         // Show floating nav when section is NOT visible (top of element is NOT viewport)
-        setShowFloatingMonthNav((rect.top <= window.innerHeight && rect.bottom >= 0)==false? true : false);
+        setShowFloatingMonthNav((rect.top <= window.innerHeight && rect.bottom >= 0) == false ? true : false);
       }
     };
 
@@ -520,7 +522,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
     return days;
   }, [currentDate]);
- 
+
 
   const handlePrevMonth = () => {
     setCurrentDate(prev => subMonths(prev, 1));
@@ -724,6 +726,20 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       />
       <Toolbar />
 
+        <CalendarNote
+          calendarNote={calendarNote || ''}
+          calendarId={calendarId!!}
+          title={calendarName}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
+          heroImageUrl={heroImageUrl}
+          heroImageAttribution={heroImageAttribution}
+          heroImagePosition={heroImagePosition}
+          onOpenImagePicker={handleOpenImagePicker}
+          onRemoveHeroImage={handleRemoveHeroImage}
+          trades={trades}
+          onOpenGalleryMode={openGalleryMode}
+        />
+
       <Box sx={{
         display: 'flex',
         flexDirection: 'column',
@@ -731,6 +747,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         p: 2,
         mt: 1
       }}>
+
+      
+
         <Box sx={{
           display: 'flex',
           flexDirection: 'column',
@@ -739,18 +758,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           margin: '0 auto',
           width: '100%'
         }}>
-          <CalendarNote
-            calendarNote={calendarNote || ''}
-            calendarId={calendarId!!}
-            title={calendarName}
-            onUpdateCalendarProperty={onUpdateCalendarProperty}
-            heroImageUrl={heroImageUrl}
-            heroImageAttribution={heroImageAttribution}
-            onOpenImagePicker={handleOpenImagePicker}
-            onRemoveHeroImage={handleRemoveHeroImage}
-            trades={trades}
-            onOpenGalleryMode={openGalleryMode}
-          />
+
 
           <Box sx={{
             display: 'flex',
@@ -789,7 +797,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             </Box>
 
           </Box>
-        
+
 
           <Box sx={{
             display: 'flex',
@@ -800,13 +808,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             gap: { xs: 1, sm: 0 }
           }}>
             <Box
-             data-testid="month-nav-section"
-            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              data-testid="month-nav-section"
+              sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <IconButton onClick={handlePrevMonth}>
                 <ChevronLeft />
               </IconButton>
               <Typography
-               
+
                 variant="h5"
                 sx={{
                   fontWeight: 800,
@@ -850,28 +858,28 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 );
                 return monthTrades.length > 0;
               })() && (
-                <Tooltip title="View all trades for this month in gallery mode">
-                  <Button
-                    startIcon={<GalleryIcon />}
-                    onClick={handleMonthlyGalleryMode}
-                    variant="outlined"
-                    size="small"
-                    sx={{
-                      minWidth: { xs: '100%', sm: 'auto' },
-                      display: 'flex',
-                      alignItems: 'center',
-                      borderColor: 'divider',
-                      color: 'text.secondary',
-                      '&:hover': {
-                        borderColor: 'primary.main',
-                        bgcolor: alpha(theme.palette.primary.main, 0.08)
-                      }
-                    }}
-                  >
-                    Gallery View
-                  </Button>
-                </Tooltip>
-              )}
+                  <Tooltip title="View all trades for this month in gallery mode">
+                    <Button
+                      startIcon={<GalleryIcon />}
+                      onClick={handleMonthlyGalleryMode}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        minWidth: { xs: '100%', sm: 'auto' },
+                        display: 'flex',
+                        alignItems: 'center',
+                        borderColor: 'divider',
+                        color: 'text.secondary',
+                        '&:hover': {
+                          borderColor: 'primary.main',
+                          bgcolor: alpha(theme.palette.primary.main, 0.08)
+                        }
+                      }}
+                    >
+                      Gallery View
+                    </Button>
+                  </Tooltip>
+                )}
               <Button
                 startIcon={<PinIcon />}
                 onClick={() => setPinnedTradesDrawerOpen(true)}
@@ -1157,7 +1165,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             </Box>
           </Box>
 
-            <MonthlyStats
+          <MonthlyStats
             trades={filteredTrades}
             accountBalance={accountBalance}
             onImportTrades={onImportTrades}
