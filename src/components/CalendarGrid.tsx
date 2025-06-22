@@ -20,7 +20,7 @@ export const CalendarCell = styled(Box)(({ theme }) => ({
   minHeight: '30px',
   borderRadius: theme.shape.borderRadius,
   overflow: 'hidden',
-  backgroundColor: theme.palette.background.default,
+  backgroundColor: theme.palette.background.default, 
   // Removed border to prevent double border with StyledCalendarDay
 }));
 

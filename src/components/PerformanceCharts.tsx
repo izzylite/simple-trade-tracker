@@ -448,35 +448,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     return Array.from(tags).sort();
   }, [trades]);
 
-  // Filter tagStats based on both tag selections
-  const filteredTagStats = useMemo(() => {
-    // If no tags are selected for either primary or secondary, return an empty array to show empty chart
-    if (primaryTags.length === 0 && secondaryTags.length === 0) return [];
-
-    return tagStats.filter(stat => {
-      // If primary tags are selected, the tag must be in primaryTags
-      if (primaryTags.length > 0 && !primaryTags.includes(stat.tag)) {
-        return false;
-      }
-
-      // If secondary tags are selected, check if trades with this tag also have the required secondary tags
-      if (secondaryTags.length > 0) {
-        // Get all trades for this tag that have tags
-        const tradesWithTag = trades.filter(trade => trade.tags?.includes(stat.tag) ?? false);
-
-        // Check if any of these trades also have all the secondary tags
-        const hasSecondaryTags = tradesWithTag.some(trade =>
-          secondaryTags.every(secondaryTag => trade.tags?.includes(secondaryTag) ?? false)
-        );
-
-        if (!hasSecondaryTags) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [tagStats, primaryTags, secondaryTags, trades]);
+   
+  
 
   // Calculate target value for monthly target
   const targetValue = useMemo(() => {
@@ -847,13 +820,12 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
                 secondaryTags={secondaryTags}
                 setPrimaryTags={(tags) => {
                   setPrimaryTags(tags);
-                  onPrimaryTagsChange(tags);
+                  onPrimaryTagsChange(tags); 
                 }}
                 setSecondaryTags={(tags) => {
                   setSecondaryTags(tags);
-                  onSecondaryTagsChange(tags);
-                }}
-                filteredTagStats={filteredTagStats}
+                  onSecondaryTagsChange(tags); 
+                }} 
                 setMultipleTradesDialog={setMultipleTradesDialog}
               />
             </Box>

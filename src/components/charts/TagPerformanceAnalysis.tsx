@@ -15,7 +15,8 @@ import { InfoOutlined } from '@mui/icons-material';
 import { format, isSameMonth } from 'date-fns';
 import { Trade } from '../../types/trade';
 import { formatValue } from '../../utils/formatters';
-import TagFilterDialog from '../TagFilterDialog';
+import TagFilterDialog from '../TagFilterDialog'; 
+import { getTradesStats } from '../../utils/chartDataUtils';
 
 interface TagPerformanceAnalysisProps {
   trades: Trade[];
@@ -25,8 +26,7 @@ interface TagPerformanceAnalysisProps {
   primaryTags: string[];
   secondaryTags: string[];
   setPrimaryTags: (tags: string[]) => void;
-  setSecondaryTags: (tags: string[]) => void;
-  filteredTagStats: any[];
+  setSecondaryTags: (tags: string[]) => void; 
   setMultipleTradesDialog: (dialogState: any) => void;
 }
 
@@ -38,14 +38,47 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
   primaryTags,
   secondaryTags,
   setPrimaryTags,
-  setSecondaryTags,
-  filteredTagStats,
+  setSecondaryTags, 
   setMultipleTradesDialog
 }) => {
   const theme = useTheme();
   const [primaryTagsDialogOpen, setPrimaryTagsDialogOpen] = useState(false);
   const [secondaryTagsDialogOpen, setSecondaryTagsDialogOpen] = useState(false);
 
+ 
+    const filteredTagStats : any = React.useMemo(() => {
+      // If no tags selected, return empty array
+      if (primaryTags.length === 0) {
+        return [];
+      }
+  
+      // Filter trades by selected tags 
+     return getTradesStats(trades.filter(trade => {
+        // Check if trade has tags
+        if (!trade.tags || trade.tags.length === 0) {
+          return false;
+        }
+  
+        // Check if trade has any of the primary tags
+        const hasPrimaryTag = primaryTags.some(tag => trade.tags?.includes(tag));
+        if (!hasPrimaryTag) {
+          return false;
+        }
+  
+        // If secondary tags are selected, check if trade has all of them
+        if (secondaryTags.length > 0) {
+          return secondaryTags.every(tag => trade.tags?.includes(tag));
+        }
+  
+        return true;
+      }))
+  
+     
+   
+    }, [trades, primaryTags, secondaryTags]);
+
+  
+  
   // Define colors
   const COLORS = {
     win: '#4caf50',
@@ -143,7 +176,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
       ) : (
         <ResponsiveContainer width="100%" height={300}>
           <BarChart
-            data={filteredTagStats}
+            data={[filteredTagStats]}
             margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
             maxBarSize={50}
           >
@@ -202,9 +235,8 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
               radius={[4, 4, 0, 0]}
               onClick={(data) => {
                if (data && data.payload) {
-                 const tag = data.payload.tag;
-                 const filteredTrades = trades.filter(trade =>
-                   trade.tags?.includes(tag) &&
+                 const trades = data.payload.trades as Trade[]; 
+                 const filteredTrades = trades.filter(trade => 
                    trade.type === 'win' &&
                    (timePeriod === 'month' ? isSameMonth(new Date(trade.date), selectedDate) :
                     timePeriod === 'year' ? new Date(trade.date).getFullYear() === selectedDate.getFullYear() :
@@ -214,7 +246,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
                    setMultipleTradesDialog({
                      open: true,
                      trades: filteredTrades,
-                     date: `Winning trades with tag: ${tag}`,
+                     date: `Winning trades with tag: ${[...primaryTags,...secondaryTags].join(", ")}`,
                      expandedTradeId: filteredTrades.length === 1 ? filteredTrades[0].id : null
                    });
                  }
@@ -231,8 +263,8 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
               onClick={(data) => {
                if (data && data.payload) {
                  const tag = data.payload.tag;
-                 const filteredTrades = trades.filter(trade =>
-                   trade.tags?.includes(tag) &&
+                 const trades = data.payload.trades as Trade[]; 
+                 const filteredTrades = trades.filter(trade => 
                    trade.type === 'loss' &&
                    (timePeriod === 'month' ? isSameMonth(new Date(trade.date), selectedDate) :
                     timePeriod === 'year' ? new Date(trade.date).getFullYear() === selectedDate.getFullYear() :
@@ -242,7 +274,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
                    setMultipleTradesDialog({
                      open: true,
                      trades: filteredTrades,
-                     date: `Losing trades with tag: ${tag}`,
+                     date: `Losing trades with tag: ${[...primaryTags,...secondaryTags].join(", ")}`,
                      expandedTradeId: filteredTrades.length === 1 ? filteredTrades[0].id : null
                    });
                  }

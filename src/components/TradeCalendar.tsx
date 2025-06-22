@@ -180,28 +180,19 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ date, trades, monthStart, weekInd
   const isTargetMet = weeklyTarget ? parseFloat(percentage) >= weeklyTarget : false;
 
   return (
-    <Box sx={{
+    <CalendarCell sx={{
       bgcolor: 'background.paper',
-      borderRadius: 2,
+      borderRadius: 1,
       border: `2px solid ${
         netAmount > 0
           ? alpha(theme.palette.success.main, 0.3)
           : netAmount < 0
             ? alpha(theme.palette.error.main, 0.3)
             : alpha(theme.palette.divider, 0.2)
-      }`,
-      display: 'flex',
-      flexDirection: 'column',
+      }`, 
       justifyContent: 'center',
-      alignItems: 'center',
-      height: '100%',
-      minHeight: { xs: '80px', md: '100px' },
-      position: 'relative',
-      overflow: 'hidden',
-      boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, 0.05)}`,
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-
-
+      alignItems: 'center', 
+      position: 'relative',  
       ...sx
     }}>
       <Stack spacing={0.5} sx={{ alignItems: 'center', p: 1 }}>
@@ -266,7 +257,7 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ date, trades, monthStart, weekInd
           {weekTrades.length} trade{weekTrades.length !== 1 ? 's' : ''}
         </Typography>
       </Stack>
-    </Box>
+    </CalendarCell>
   );
 };
 
@@ -1179,64 +1170,16 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                             onClick={() => handleDayClick(day)}
                             $isCurrentMonth={isCurrentMonth}
                             $dayStatus={dayStats.status}
-                            sx={[
-                              {
-                                minHeight: { xs: '80px', md: '100px' },
-                                borderRadius: 2,
-                                backgroundColor: dayStats.status === 'win'
-                                  ? alpha(theme.palette.success.main, mode === 'dark' ? 0.2 : 0.1)
-                                  : dayStats.status === 'loss'
-                                    ? alpha(theme.palette.error.main, mode === 'dark' ? 0.2 : 0.1)
-                                    : dayStats.status === 'breakeven'
-                                      ? alpha(theme.palette.info.main, mode === 'dark' ? 0.2 : 0.1)
-                                      : theme.palette.background.paper,
-                                border: `2px solid ${
-                                  dayStats.status === 'win'
-                                    ? alpha(theme.palette.success.main, 0.3)
-                                    : dayStats.status === 'loss'
-                                      ? alpha(theme.palette.error.main, 0.3)
-                                      : dayStats.status === 'breakeven'
-                                        ? alpha(theme.palette.info.main, 0.3)
-                                        : alpha(theme.palette.divider, 0.2)
-                                }`,
-                                boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, mode === 'dark' ? 0.3 : 0.05)}`,
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                position: 'relative',
-                                overflow: 'hidden',
-
-                                '&:hover': {
-                                  borderColor: dayStats.status === 'win'
-                                    ? theme.palette.success.main
-                                    : dayStats.status === 'loss'
-                                      ? theme.palette.error.main
-                                      : theme.palette.primary.main
-                                }
-                              },
-                              !isCurrentMonth && {
-                                opacity: 0.4,
-                                backgroundColor: alpha(theme.palette.background.default, 0.5),
-                                '&:hover': {
-                                  opacity: 0.6
-                                }
-                              },
-                              isCurrentDay && {
-                                borderColor: `${theme.palette.primary.main} !important`,
-                                borderWidth: '3px !important',
-                                boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}, 0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
-                              },
-                              selectedDate && isSameDay(day, selectedDate) && {
-                                borderColor: `${theme.palette.secondary.main} !important`,
-                                borderWidth: '3px !important',
-                                backgroundColor: alpha(theme.palette.secondary.main, 0.1)
-                              }
-                            ]}
+                           
                           >
                             <DayNumber $isCurrentMonth={isCurrentMonth}>
                               {format(day, 'd')}
                             </DayNumber>
                             {dayTrades.length > 0 && (
-                              <AnimatedPulse>
-                                <Box sx={{
+                              //  <AnimatedPulse>
+                               
+                              // </AnimatedPulse>
+                               <Box sx={{
                                   display: 'flex',
                                   flexDirection: 'column',
                                   alignItems: 'center',
@@ -1273,7 +1216,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                                     </Typography>
                                   )}
                                 </Box>
-                              </AnimatedPulse>
                             )}
                           </StyledCalendarDay>
                         </CalendarCell>

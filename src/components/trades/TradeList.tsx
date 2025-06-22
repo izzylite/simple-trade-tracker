@@ -361,7 +361,7 @@ const TradeList: React.FC<TradeListProps> = ({
                             arrow
                           >
                             <Chip
-                              label={group}
+                              label={`${group} ${groupTags.length > 1? groupTags.length : ""}`}
                               size="small"
                               sx={{
                                 ...getTagChipStyles(groupTags[0], theme),

@@ -76,8 +76,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   onOpenGalleryMode
 }) => {
   const theme = useTheme();
-  const [trade, setTrade] = useState<Trade>(tradeData);
-  const [isToggling, setIsToggling] = useState(false);
+  const [trade, setTrade] = useState<Trade>(tradeData); 
   const [isPinning, setIsPinning] = useState(false);
   const [loadingImages, setLoadingImages] = useState<{ [key: string]: boolean }>({});
   const [showTagGroups, setShowTagGroups] = useState(() => {
@@ -127,26 +126,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   }, [trade.images]);
 
   // No need to organize tags here as TagsDisplay will handle it
-
-  // Function to toggle trade type between 'win' and 'loss'
-  const handleToggleTradeType = async () => {
-    if (!onUpdateTradeProperty || isToggling) return;
-
-    try {
-      setIsToggling(true);
-      const result = await onUpdateTradeProperty(trade.id, (currentTrade) => ({
-        ...currentTrade,
-        type: currentTrade.type === 'win' ? 'loss' : 'win',
-        // Flip the amount sign
-        amount: currentTrade.type === 'win' ? -Math.abs(currentTrade.amount) : Math.abs(currentTrade.amount)
-      }));
-      setTrade(result!!);
-    } catch (error) {
-      console.error('Error toggling trade type:', error);
-    } finally {
-      setIsToggling(false);
-    }
-  };
+ 
 
   // Function to toggle pin status
   const handleTogglePin = async () => {
@@ -205,20 +185,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
             </Box>
 
             {/* Action Buttons */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              {/* Share Button */}
-              {calendarId && (
-                <ShareTradeButton
-                  trade={trade}
-                  calendarId={calendarId}
-                  onTradeUpdated={(updatedTrade) => setTrade(updatedTrade)}
-                  onUpdateTradeProperty={onUpdateTradeProperty}
-                  size="small"
-                  color="inherit"
-                />
-              )}
-
-              {/* Pin Button */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+               {/* Pin Button */}
               {onUpdateTradeProperty && (
                 <IconButton
                   onClick={handleTogglePin}
@@ -241,6 +209,19 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   )}
                 </IconButton>
               )}
+              {/* Share Button */}
+              {calendarId && (
+                <ShareTradeButton
+                  trade={trade}
+                  calendarId={calendarId}
+                  onTradeUpdated={(updatedTrade) => setTrade(updatedTrade)}
+                  onUpdateTradeProperty={onUpdateTradeProperty}
+                  size="small"
+                  color="inherit"
+                />
+              )}
+
+             
             </Box>
           </Box>
 
@@ -347,39 +328,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       {trade.amount > 0 ? '+' : ''}{trade.amount.toFixed(2)}
                     </Typography>
 
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                      {/* Toggle Button */}
-                      {onUpdateTradeProperty && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color={trade.type === 'win' ? 'success' : 'error'}
-                          onClick={handleToggleTradeType}
-                          disabled={isToggling}
-                          sx={{
-                            minWidth: '80px',
-                            fontSize: '0.7rem',
-                            position: 'relative'
-                          }}
-                        >
-                          {isToggling ? (
-                            <>
-                              <CircularProgress
-                                size={16}
-                                color="inherit"
-                                sx={{
-                                  position: 'absolute',
-                                  left: '8px'
-                                }}
-                              />
-                              Processing...
-                            </>
-                          ) : (
-                            <>Toggle {trade.type === 'win' ? 'Win' : 'Loss'}</>
-                          )}
-                        </Button>
-                      )}
-                    </Box>
+                    
                   </Box>
                 </Paper>
 

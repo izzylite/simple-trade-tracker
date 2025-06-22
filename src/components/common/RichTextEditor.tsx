@@ -1061,51 +1061,49 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           ref={editorWrapperRef}
           onClick={focusEditor}
           sx={{
-            padding: theme.spacing(1.2, 1.8), // Reduced padding to match smaller text
+            padding: theme.spacing(1.2, 1.8),
             minHeight,
             maxHeight,
-            overflow: 'auto', // Keep scrolling internal to this Box
+            overflow: 'auto',
             cursor: disabled ? 'not-allowed' : 'text',
-            position: 'relative', // Needed for placeholder positioning
+            position: 'relative',
             ...scrollbarStyles(theme),
-
-            // --- Draft JS Editor Styles ---
             '& .public-DraftEditorPlaceholder-root': {
                 color: theme.palette.text.disabled,
                 position: 'absolute',
-                top: theme.spacing(1.2), // Match reduced padding
-                left: theme.spacing(1.8), // Match reduced padding
-                zIndex: 0, // Below content
-                pointerEvents: 'none', // Don't interfere with clicks
+                top: theme.spacing(1.2),
+                left: theme.spacing(1.8),
+                zIndex: 0,
+                pointerEvents: 'none',
                 opacity: 0.8,
                 fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
-                fontWeight: 500, // Medium weight for thicker text
+                fontWeight: 500,
+                fontSize: '0.9rem', // Reduced placeholder font size
             },
             '& .public-DraftEditor-content': {
-              minHeight: typeof minHeight === 'number' ? `calc(${minHeight}px - ${theme.spacing(3)})` : `calc(${minHeight} - ${theme.spacing(3)})`, // Adjust minHeight based on padding
+              minHeight: typeof minHeight === 'number' ? `calc(${minHeight}px - ${theme.spacing(3)})` : `calc(${minHeight} - ${theme.spacing(3)})`,
               fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
-              fontSize: '1rem',
-              lineHeight: 1.3, // Reduced line height to match the image
-              fontWeight: 500, // Medium weight for thicker text
+              fontSize: '0.9rem', // Reduced text size
+              lineHeight: 1.3,
+              fontWeight: 500,
               color: theme.palette.text.primary,
               position: 'relative',
-              zIndex: 1, // Above placeholder
-              // Selection color handled globally or via theme usually
+              zIndex: 1,
               '& *::selection': {
                  backgroundColor: alpha(theme.palette.primary.main, 0.3),
               },
             },
             // Custom Block Styles
             '& .RichEditor-h1': {
-              fontSize: '1.4rem', fontWeight: 'bold', margin: '0.8rem 0 0.4rem',
+              fontSize: '1.1rem', fontWeight: 'bold', margin: '0.8rem 0 0.4rem',
               fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
             },
             '& .RichEditor-h2': {
-              fontSize: '1.2rem', fontWeight: 'bold', margin: '0.6rem 0 0.3rem',
+              fontSize: '1rem', fontWeight: 'bold', margin: '0.6rem 0 0.3rem',
               fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
             },
             '& .RichEditor-h3': {
-              fontSize: '1rem', fontWeight: 'bold', margin: '0.5rem 0 0.25rem', fontStyle: 'italic',
+              fontSize: '0.95rem', fontWeight: 'bold', margin: '0.5rem 0 0.25rem', fontStyle: 'italic',
               fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
             },
             '& .RichEditor-ul, & .RichEditor-ol': {

@@ -16,12 +16,43 @@ export const StyledCalendarDay = styled(Box)<{
   cursor: 'pointer',
   borderRadius: theme.shape.borderRadius,
   transition: 'all 0.1s ease-in-out',
-  opacity: $isCurrentMonth ? 1 : 0.5,
-  backgroundColor: $dayStatus === 'win'
-    ? alpha(theme.palette.success.main, 0.1)
-    : $dayStatus === 'loss'
-      ? alpha(theme.palette.error.main, 0.1)
-      : theme.palette.background.paper
+  opacity: $isCurrentMonth ? 1 : 0.4,
+  minHeight: theme.breakpoints.down('md') ? '80px' : '100px',
+  backgroundColor:
+    $dayStatus === 'win'
+      ? alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
+      : $dayStatus === 'loss'
+      ? alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
+      : $dayStatus === 'breakeven'
+      ? alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
+      : theme.palette.background.paper,
+  border: `2px solid ${
+    $dayStatus === 'win'
+      ? alpha(theme.palette.success.main, 0.3)
+      : $dayStatus === 'loss'
+      ? alpha(theme.palette.error.main, 0.3)
+      : $dayStatus === 'breakeven'
+      ? alpha(theme.palette.info.main, 0.3)
+      : alpha(theme.palette.divider, 0.2)
+  }`,
+  boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.3 : 0.05)}`,
+  position: 'relative',
+  overflow: 'hidden',
+  '&:hover': {
+    borderColor:
+      $dayStatus === 'win'
+        ? theme.palette.success.main
+        : $dayStatus === 'loss'
+        ? theme.palette.error.main
+        : theme.palette.primary.main,
+  },
+  ...(!$isCurrentMonth && {
+    opacity: 0.4,
+    backgroundColor: alpha(theme.palette.background.default, 0.5),
+    '&:hover': {
+      opacity: 0.6,
+    },
+  }),
 }));
 
 export const CalendarCell = styled(Box)(({ theme }) => ({

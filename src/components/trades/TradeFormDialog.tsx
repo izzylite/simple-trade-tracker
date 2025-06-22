@@ -418,6 +418,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     );
 
     // Add the new images to the state with grid layout information
+    let pendingImages : PendingImage[] = []
     setNewTrade((prev) => {
       const existingPendingImages = prev!.pendingImages;
       const existingUploadedImages = prev!.uploadedImages;
@@ -441,10 +442,10 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           columnWidth: 100 // Full width for the row
         };
       });
-
+      pendingImages = [...existingPendingImages, ...newImagesWithLayout]
       return {
         ...prev!,
-        pendingImages: [...existingPendingImages, ...newImagesWithLayout],
+        pendingImages: pendingImages,
       };
     });
 
@@ -510,7 +511,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
 
       for (const image of newPendingImages) {
-        await startImageUpload(image, newTrade!.id!!);
+        await startImageUpload(image, newTrade!.id!!,pendingImages);
       }
     }
     catch (error) {
@@ -518,7 +519,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     }
   };
   // Function to start uploading an image
-  const startImageUpload = async (image: PendingImage, tradeId: string): Promise<void> => {
+  const startImageUpload = async (image: PendingImage, tradeId: string,pendingImages: PendingImage[]): Promise<void> => {
     try {
       // Update progress to show upload has started
       setNewTrade(prev => ({
@@ -549,13 +550,12 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
       // Once upload is complete, move from pendingImages to uploadedImages
       // Find the original pending image to get its layout information
-      const originalPendingImage = newTrade!.pendingImages.find(img => img.id === image.id);
-
+      const originalPendingImage =  pendingImages.find(img => img.id === image.id); 
       // Preserve layout information
       const updatedImage = {
         ...uploadedImage,
         caption: image.caption,
-        row: originalPendingImage?.row || newTrade!.pendingImages.indexOf(originalPendingImage!!),
+        row: originalPendingImage?.row || 0,
         column: originalPendingImage?.column || 0,
         columnWidth: originalPendingImage?.columnWidth || 100
       };

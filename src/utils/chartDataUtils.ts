@@ -42,6 +42,37 @@ export const getFilteredTrades = (trades: Trade[], selectedDate: Date, period: T
       return trades;
   }
 };
+export const getTradesStats = (trades: Trade[]) => {
+
+  // Create a map to store stats for each tag
+  const stats = { wins: 0, losses: 0, breakevens: 0, totalPnL: 0 };
+  trades.forEach(trade => {
+    if (trade.type === 'win') {
+      stats.wins++;
+    } else if (trade.type === 'loss') {
+      stats.losses++;
+    } else if (trade.type === 'breakeven') {
+      stats.breakevens++;
+    }
+    stats.totalPnL += trade.amount;
+  });
+
+  // Calculate win rate excluding breakevens from the denominator
+    const totalTradesForWinRate = stats.wins + stats.losses;
+    const winRate = totalTradesForWinRate > 0 ? Math.round((stats.wins / totalTradesForWinRate) * 100) : 0;
+    const totalTrades = stats.wins + stats.losses + stats.breakevens;
+
+    return {
+      trades,
+      wins: stats.wins,
+      losses: stats.losses,
+      breakevens: stats.breakevens,
+      totalTrades,
+      winRate,
+      totalPnL: stats.totalPnL
+    };
+
+}
 
 // Calculate chart data for cumulative P&L - async to prevent UI blocking
 export const calculateChartData = async (
@@ -133,9 +164,9 @@ export const calculateChartData = async (
 
 // Calculate session performance statistics
 export const calculateSessionStats = (
-  trades: Trade[], 
-  selectedDate: Date, 
-  timePeriod: TimePeriod, 
+  trades: Trade[],
+  selectedDate: Date,
+  timePeriod: TimePeriod,
   accountBalance: number
 ): SessionStats[] => {
   const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod).filter(trade => trade.session !== undefined);

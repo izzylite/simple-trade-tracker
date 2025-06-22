@@ -106,7 +106,7 @@ interface TradeFormProps {
   onImagesReordered?: (images: Array<GridImage | GridPendingImage>) => void;
   onSubmit: (e: React.FormEvent) => void;
   // Optional props for trade link navigation in notes
-  trades?: Array<{ id: string; [key: string]: any }>;
+  trades?: Array<{ id: string;[key: string]: any }>;
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
 }
 
@@ -385,7 +385,16 @@ const TradeForm: React.FC<TradeFormProps> = ({
           fullWidth
           type="number"
           sx={{
-            '& input': { min: 0, step: 0.1 }
+            '& input': { min: 0, step: 0.1 },
+            // Hide number input spinners for Chrome, Safari, Edge, Opera
+            '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': {
+              WebkitAppearance: 'none',
+              margin: 0,
+            },
+            // Hide number input spinners for Firefox
+            '& input[type=number]': {
+              MozAppearance: 'textfield',
+            },
           }}
         />
       </FormField>

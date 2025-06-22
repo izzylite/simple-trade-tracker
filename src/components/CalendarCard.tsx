@@ -203,7 +203,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
         )}
 
         {/* Attribution overlay - only show for actual images */}
-        {calendar.heroImageUrl && calendar.heroImageAttribution && (
+        {/* {calendar.heroImageUrl && calendar.heroImageAttribution && (
           <Box
             sx={{
               position: 'absolute',
@@ -253,7 +253,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               </a>
             </Typography>
           </Box>
-        )}
+        )} */}
       </Box>
 
       {/* Content Section */}
