@@ -15,7 +15,8 @@ import {
   ListItemText,
   Stack,
   Divider,
-  Tooltip
+  Tooltip,
+  Theme
 } from '@mui/material';
 import {
   TrendingUp,
@@ -100,6 +101,90 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
     action();
   };
 
+  function renderAccountGrowth(
+    stats: CalendarStats,
+    theme: Theme,
+    formatCurrency: (amount: number) => string
+  ): React.ReactNode {
+    const growth = stats.growthPercentage;
+    if (isNaN(growth)) return null;
+
+    let color: string;
+    let Icon: typeof TrendingUp | typeof TrendingDown | null = null;
+    if (growth > 0) {
+      color = theme.palette.success.main;
+      Icon = TrendingUp;
+    } else if (growth < 0) {
+      color = theme.palette.error.main;
+      Icon = TrendingDown;
+    } else {
+      color = theme.palette.text.secondary;
+      Icon = null;
+    }
+
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          mt: 1,
+          gap: 1.5,
+          p: 1.5,
+          borderRadius: 2,
+          bgcolor: stats.totalPnL > 0
+            ? alpha(theme.palette.success.main, 0.1)
+            : stats.totalPnL < 0
+              ? alpha(theme.palette.error.main, 0.1)
+              : alpha(theme.palette.grey[500], 0.1),
+          border: `1px solid ${stats.totalPnL > 0
+            ? alpha(theme.palette.success.main, 0.2)
+            : stats.totalPnL < 0
+              ? alpha(theme.palette.error.main, 0.2)
+              : alpha(theme.palette.grey[500], 0.2)}`,
+        }}
+      >
+        <Box
+          sx={{
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: stats.totalPnL > 0
+              ? alpha(theme.palette.success.main, 0.1)
+              : stats.totalPnL < 0
+                ? alpha(theme.palette.error.main, 0.1)
+                : alpha(theme.palette.grey[500], 0.1)
+          }}
+        >
+          <TrendingUp sx={{
+            fontSize: '1.2rem',
+            color: stats.totalPnL > 0
+              ? theme.palette.success.main
+              : stats.totalPnL < 0
+                ? theme.palette.error.main
+                : theme.palette.grey[500]
+          }} />
+        </Box>
+        <Box>
+          <Typography variant="h6" sx={{
+            color: stats.totalPnL > 0
+              ? 'success.main'
+              : stats.totalPnL < 0
+                ? 'error.main'
+                : 'text.secondary',
+            fontWeight: 600
+          }}>
+            {formatCurrency(stats.totalPnL)}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Growth: {stats.growthPercentage.toFixed(2)}%
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
   return (
     <Card
       sx={{
@@ -312,57 +397,11 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                 </Box>
               )}
             </Typography>
-
-            {/* Performance Badge */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-              <Box
-                sx={{
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: 2,
-                  bgcolor: stats.totalPnL > 0
-                    ? alpha(theme.palette.success.main, 0.1)
-                    : stats.totalPnL < 0
-                    ? alpha(theme.palette.error.main, 0.1)
-                    : alpha(theme.palette.grey[500], 0.1),
-                  border: `1px solid ${stats.totalPnL > 0
-                    ? alpha(theme.palette.success.main, 0.2)
-                    : stats.totalPnL < 0
-                    ? alpha(theme.palette.error.main, 0.2)
-                    : alpha(theme.palette.grey[500], 0.2)}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.5
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    color: stats.totalPnL > 0
-                      ? 'success.main'
-                      : stats.totalPnL < 0
-                      ? 'error.main'
-                      : 'text.secondary'
-                  }}
-                >
-                  {stats.totalPnL > 0 ? '+' : ''}{formatCurrency(stats.totalPnL)}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontSize: '0.7rem',
-                    color: 'text.secondary',
-                    opacity: 0.8
-                  }}
-                >
-                  ({stats.growthPercentage > 0 ? '+' : ''}{stats.growthPercentage.toFixed(1)}%)
-                </Typography>
-              </Box>
-            </Box>
+            {/* Account Growth */}
+            {!isExpanded && renderAccountGrowth(stats, theme, formatCurrency)}
           </Box>
         </Box>
+
 
 
 
@@ -411,56 +450,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
             flexGrow: 0,
             mb: 2
           }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                p: 1.5,
-                borderRadius: 1,
-                bgcolor: alpha(theme.palette.background.default, 0.6)
-              }}
-            >
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  bgcolor: stats.totalPnL > 0
-                    ? alpha(theme.palette.success.main, 0.1)
-                    : stats.totalPnL < 0
-                    ? alpha(theme.palette.error.main, 0.1)
-                    : alpha(theme.palette.grey[500], 0.1)
-                }}
-              >
-                <TrendingUp sx={{
-                  fontSize: '1.2rem',
-                  color: stats.totalPnL > 0
-                    ? theme.palette.success.main
-                    : stats.totalPnL < 0
-                    ? theme.palette.error.main
-                    : theme.palette.grey[500]
-                }} />
-              </Box>
-              <Box>
-                <Typography variant="h6" sx={{
-                  color: stats.totalPnL > 0
-                    ? 'success.main'
-                    : stats.totalPnL < 0
-                    ? 'error.main'
-                    : 'text.secondary',
-                  fontWeight: 600
-                }}>
-                  {formatCurrency(stats.totalPnL)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Growth: {stats.growthPercentage.toFixed(2)}%
-                </Typography>
-              </Box>
-            </Box>
+            {renderAccountGrowth(stats, theme, formatCurrency)}
 
             <Box sx={{
               display: 'grid',
@@ -672,8 +662,8 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                       color: parseFloat(String(stats.weeklyPnLPercentage)) > 0
                         ? 'success.main'
                         : parseFloat(String(stats.weeklyPnLPercentage)) < 0
-                        ? 'error.main'
-                        : 'text.primary'
+                          ? 'error.main'
+                          : 'text.primary'
                     }}
                   >
                     {parseFloat(String(stats.weeklyPnLPercentage)) > 0 ? '+' : ''}{parseFloat(String(stats.weeklyPnLPercentage)).toFixed(1)}%
@@ -690,8 +680,8 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                       color: parseFloat(String(stats.monthlyPnLPercentage)) > 0
                         ? 'success.main'
                         : parseFloat(String(stats.monthlyPnLPercentage)) < 0
-                        ? 'error.main'
-                        : 'text.primary'
+                          ? 'error.main'
+                          : 'text.primary'
                     }}
                   >
                     {parseFloat(String(stats.monthlyPnLPercentage)) > 0 ? '+' : ''}{parseFloat(String(stats.monthlyPnLPercentage)).toFixed(1)}%
@@ -708,8 +698,8 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                       color: parseFloat(String(stats.yearlyPnLPercentage)) > 0
                         ? 'success.main'
                         : parseFloat(String(stats.yearlyPnLPercentage)) < 0
-                        ? 'error.main'
-                        : 'text.primary'
+                          ? 'error.main'
+                          : 'text.primary'
                     }}
                   >
                     {parseFloat(String(stats.yearlyPnLPercentage)) > 0 ? '+' : ''}{parseFloat(String(stats.yearlyPnLPercentage)).toFixed(1)}%
@@ -797,8 +787,8 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               <ListItemText>Duplicate</ListItemText>
             </MenuItem>
 
-            <MenuItem 
-              onClick={() => handleMenuItemClick(() => onDeleteCalendar(calendar.id))} 
+            <MenuItem
+              onClick={() => handleMenuItemClick(() => onDeleteCalendar(calendar.id))}
               sx={{ color: 'error.main' }}
             >
               <ListItemIcon>

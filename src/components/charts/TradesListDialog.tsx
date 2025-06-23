@@ -60,7 +60,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
   // Format data for the chart based on selected metric
   const [chartData, setChartData] = React.useState<any[] | undefined>(undefined);
- 
+
 
   const tradeStats = React.useMemo(() => {
     let containWins = false;
@@ -84,13 +84,13 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
       const result = await Promise.resolve(
         getTagDayOfWeekChartData(trades, theme, selectedMetric === "winRate" && tradeStats.containBoth)
       );
-     
+
       if (isMounted) {
         // Sum all totalTrades values
         const totalTradesSum = Array.isArray(result)
           ? result.reduce((sum, item) => sum + (item.totalTrades > 0 ? 1 : 0), 0)
           : 0;
-        setChartData(totalTradesSum> 1? result : undefined); 
+        setChartData(totalTradesSum > 1 ? result : undefined);
       }
     };
 
@@ -192,6 +192,14 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
                 </Button>
 
               </Box>}
+            {chartData.some(data => data.totalTrades > 0) ? (
+              <Typography variant="body2" color="primary" sx={{ mt: 1, fontWeight: 500 }}>
+                {tradeStats.containBoth && selectedMetric === 'winRate'
+                  ? `Best day for selected strategies: ${chartData.reduce((best, day) => day.totalTrades > 0 && day.winRate > best.winRate ? day : best, { winRate: 0, fullDay: 'None' }).fullDay}`
+                  : `Most profitable day: ${chartData.reduce((best, day) => day.totalTrades > 0 && day.pnl > best.pnl ? day : best, { pnl: -Infinity, fullDay: 'None' }).fullDay}`
+                }
+              </Typography>
+            ) : null}
 
             <ResponsiveContainer width="100%" height={300}>
               <BarChart
@@ -211,7 +219,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
                   tickLine={false}
                   tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
                   domain={tradeStats.containBoth ? [0, 100] : ['auto', 'auto']}
-                  tickFormatter={tradeStats.containBoth
+                  tickFormatter={tradeStats.containBoth && selectedMetric === "winRate"
                     ? (value) => `${value}%`
                     : (value) => formatCurrency(value).replace('$', '')}
                 />
@@ -267,6 +275,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+
           </>
         }
 
