@@ -135,7 +135,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
             InputProps={{
               startAdornment: (
                 <Typography sx={{ color: 'text.secondary', fontSize: '1.1rem', mr: 0.5, fontWeight: 600 }}>
-                  $
+                  $ee
                 </Typography>
               )
             }}

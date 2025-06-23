@@ -26,7 +26,8 @@ import {
   Photo,
   EventNote as EventNoteIcon,
   Visibility as VisibilityIcon,
-  VisibilityOff as VisibilityOffIcon
+  VisibilityOff as VisibilityOffIcon,
+  Note
 } from '@mui/icons-material';
 import RichTextEditor from './common/RichTextEditor';
 import { Calendar } from '../types/calendar';
@@ -181,302 +182,337 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   return (
 
 
-      <Paper
-        elevation={3}
-        sx={{
-          overflow: 'hidden',
-          borderRadius: 0,
-          backgroundColor: theme.palette.background.paper,
-          minHeight: !expanded ? '60px' : 'auto',
-          transition: 'all 0.3s ease',
-          boxShadow: `0 2px 8px ${alpha(theme.palette.grey[500], 0.1)}`,
-          '&:hover': {
-            boxShadow: `0 4px 12px ${alpha(theme.palette.grey[500], 0.15)}`,
-            transform: 'translateY(-2px)'
-          },
+    <Paper
+      elevation={3}
+      sx={{
+        overflow: 'hidden',
+        borderRadius: 0,
+        backgroundColor: theme.palette.background.paper,
+        minHeight: !expanded ? '60px' : 'auto',
+        transition: 'all 0.3s ease',
+        boxShadow: `0 2px 8px ${alpha(theme.palette.grey[500], 0.1)}`,
+        '&:hover': {
+          boxShadow: `0 4px 12px ${alpha(theme.palette.grey[500], 0.15)}`,
+          transform: 'translateY(-2px)'
+        },
 
-        }}
-      >
-        <Box sx={{
+      }}
+    >
+      <Box sx={{
 
-          backgroundColor: heroImageUrl ? 'transparent' : alpha(theme.palette.primary.main, 0.08),
+        backgroundColor: heroImageUrl ? 'transparent' : alpha(theme.palette.primary.main, 0.08),
 
-          zIndex: 2
-        }}>
-          {/* Hero Image Section */}
-          {heroImageUrl && (
-            <Box sx={{ position: 'relative' }}>
+        zIndex: 2
+      }}>
+        {/* Hero Image Section */}
+        {heroImageUrl && (
+          <Box sx={{ position: 'relative' }}>
+            <Box
+              sx={{
+                position: 'relative',
+                overflow: 'hidden',
+                height: 200,
+                backgroundImage: `url(${heroImageUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                imageRendering: 'high-quality',
+                WebkitBackfaceVisibility: 'hidden',
+                backfaceVisibility: 'hidden',
+                transform: 'translateZ(0)', // Force hardware acceleration
+                willChange: 'transform', // Optimize for changes
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: `linear-gradient(to bottom, ${alpha(theme.palette.common.black, 0.1)}, ${alpha(theme.palette.common.black, 0.3)})`,
+                  zIndex: 1
+                }
+              }}
+            />
+
+            {/* Attribution overlay - only show for Unsplash images */}
+            {heroImageAttribution && (
               <Box
                 sx={{
-                  position: 'relative',
-                  overflow: 'hidden',
-                  height: 200,
-                  backgroundImage: `url(${heroImageUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat',
-                  imageRendering: 'high-quality',
-                  WebkitBackfaceVisibility: 'hidden',
-                  backfaceVisibility: 'hidden',
-                  transform: 'translateZ(0)', // Force hardware acceleration
-                  willChange: 'transform', // Optimize for changes
-                  '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: `linear-gradient(to bottom, ${alpha(theme.palette.common.black, 0.1)}, ${alpha(theme.palette.common.black, 0.3)})`,
-                    zIndex: 1
-                  }
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  background: 'linear-gradient(45deg, transparent, rgba(0,0,0,0.7))',
+                  color: 'white',
+                  p: 1,
+                  borderTopLeftRadius: 1,
+                  zIndex: 2
+                }}
+              >
+                <Typography variant="caption" sx={{ fontSize: '0.7rem', display: 'block' }}>
+                  Photo by{' '}
+                  <a
+                    href={heroImageAttribution.photographerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'white', textDecoration: 'underline' }}
+                  >
+                    {heroImageAttribution.photographer}
+                  </a>
+                  {' '}on{' '}
+                  <a
+                    href={heroImageAttribution.unsplashUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'white', textDecoration: 'underline' }}
+                  >
+                    Unsplash
+                  </a>
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {/* Header */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            p: 1.5,
+            pl: 2,
+            backgroundColor: heroImageUrl ? 'transparent' : alpha(theme.palette.primary.main, 0.08),
+            borderBottom: expanded ? `1px solid ${theme.palette.divider}` : 'none',
+            transition: 'background-color 0.3s ease',
+            position: 'relative',
+            zIndex: 2
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 36,
+                height: 36,
+                borderRadius: '50%',
+                backgroundColor: alpha(theme.palette.warning.main, 0.15),
+                mr: 1.5
+              }}
+            >
+              <CalendarMonth
+                sx={{
+                  color: theme.palette.warning.main,
+                  fontSize: '1.5rem'
                 }}
               />
-
-              {/* Attribution overlay - only show for Unsplash images */}
-              {heroImageAttribution && (
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    bottom: 0,
-                    right: 0,
-                    background: 'linear-gradient(45deg, transparent, rgba(0,0,0,0.7))',
-                    color: 'white',
-                    p: 1,
-                    borderTopLeftRadius: 1,
-                    zIndex: 2
-                  }}
-                >
-                  <Typography variant="caption" sx={{ fontSize: '0.7rem', display: 'block' }}>
-                    Photo by{' '}
-                    <a
-                      href={heroImageAttribution.photographerUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: 'white', textDecoration: 'underline' }}
-                    >
-                      {heroImageAttribution.photographer}
-                    </a>
-                    {' '}on{' '}
-                    <a
-                      href={heroImageAttribution.unsplashUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: 'white', textDecoration: 'underline' }}
-                    >
-                      Unsplash
-                    </a>
-                  </Typography>
-                </Box>
-              )}
             </Box>
-          )}
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 700,
+                fontSize: '1.1rem',
+                letterSpacing: '-0.3px',
+                color: 'inherit',
+              }}
+            >
+              {title}
+            </Typography>
 
-          {/* Header */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              p: 1.5,
-              pl: 2,
-              backgroundColor: heroImageUrl ? 'transparent' : alpha(theme.palette.primary.main, 0.08),
-              borderBottom: expanded ? `1px solid ${theme.palette.divider}` : 'none',
-              transition: 'background-color 0.3s ease',
-              position: 'relative',
-              zIndex: 2
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 36,
-                  height: 36,
-                  borderRadius: '50%',
-                  backgroundColor: alpha(theme.palette.warning.main, 0.15),
-                  mr: 1.5
-                }}
-              >
-                <CalendarMonth
-                  sx={{
-                    color: theme.palette.warning.main,
-                    fontSize: '1.5rem'
-                  }}
-                />
+            {/* Save Status Indicator */}
+            {saveStatus !== 'idle' && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {saveStatus === 'saving' && (
+                  <>
+                    <CircularProgress size={12} sx={{ color: theme.palette.warning.main }} />
+                    <Typography variant="caption" sx={{
+                      color: heroImageUrl ? 'white' : theme.palette.text.secondary,
+                      fontSize: '0.7rem',
+                      textShadow: heroImageUrl ? '0 1px 2px rgba(0,0,0,0.8)' : 'none'
+                    }}>
+                      Saving...
+                    </Typography>
+                  </>
+                )}
+                {saveStatus === 'saved' && (
+                  <>
+                    <CheckIcon sx={{ color: theme.palette.success.main, fontSize: '1rem' }} />
+                    <Typography variant="caption" sx={{
+                      color: heroImageUrl ? 'white' : theme.palette.success.main,
+                      fontSize: '0.7rem',
+                      textShadow: heroImageUrl ? '0 1px 2px rgba(0,0,0,0.8)' : 'none'
+                    }}>
+                      Saved
+                    </Typography>
+                  </>
+                )}
+                {saveStatus === 'error' && (
+                  <>
+                    <ErrorIcon sx={{ color: theme.palette.error.main, fontSize: '1rem' }} />
+                    <Typography variant="caption" sx={{
+                      color: heroImageUrl ? 'white' : theme.palette.error.main,
+                      fontSize: '0.7rem',
+                      textShadow: heroImageUrl ? '0 1px 2px rgba(0,0,0,0.8)' : 'none'
+                    }}>
+                      Error saving
+                    </Typography>
+                  </>
+                )}
               </Box>
-              <Typography
-                variant="h6"
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {onUpdateCalendarProperty && onOpenImagePicker && (
+              <>
+                <Tooltip title={heroImageUrl ? "Manage cover image" : "Add cover image"}>
+                  <IconButton
+                    size="small"
+                    onClick={handleImageButtonClick}
+                    sx={{
+                      color: 'text.secondary',
+                      backgroundColor: alpha(theme.palette.grey[500], 0.08),
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.grey[500], 0.15),
+                      }
+                    }}
+                  >
+                    <ImageIcon />
+                  </IconButton>
+                </Tooltip>
+
+                {/* Only show menu when hero image exists */}
+                {heroImageUrl && (
+                  <Menu
+                    anchorEl={imageMenuAnchor}
+                    open={Boolean(imageMenuAnchor)}
+                    onClose={handleImageMenuClose}
+                    onClick={(e) => e.stopPropagation()}
+                    transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                    anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                  >
+                    <MenuItem onClick={handleChangeImage}>
+                      <ListItemIcon>
+                        <Photo fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText>Change cover</ListItemText>
+                    </MenuItem>
+
+                    <MenuItem onClick={handleRemoveImage} sx={{ color: 'error.main' }}>
+                      <ListItemIcon>
+                        <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+                      </ListItemIcon>
+                      <ListItemText>Remove cover</ListItemText>
+                    </MenuItem>
+                  </Menu>
+                )}
+              </>
+            )}
+
+            <Tooltip title={expanded ? "Hide description" : "Show description"}>
+              <IconButton
+                size="small"
+                onClick={handleToggleExpand}
                 sx={{
-                  fontWeight: 700,
-                  fontSize: '1.1rem',
-                  letterSpacing: '-0.3px',
-                  color: 'inherit',
+                  color: 'text.secondary',
+                  backgroundColor: alpha(theme.palette.grey[500], 0.08),
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.grey[500], 0.15),
+                  }
                 }}
               >
-                {title}
-              </Typography>
-
-              {/* Save Status Indicator */}
-              {saveStatus !== 'idle' && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  {saveStatus === 'saving' && (
-                    <>
-                      <CircularProgress size={12} sx={{ color: theme.palette.warning.main }} />
-                      <Typography variant="caption" sx={{
-                        color: heroImageUrl ? 'white' : theme.palette.text.secondary,
-                        fontSize: '0.7rem',
-                        textShadow: heroImageUrl ? '0 1px 2px rgba(0,0,0,0.8)' : 'none'
-                      }}>
-                        Saving...
-                      </Typography>
-                    </>
-                  )}
-                  {saveStatus === 'saved' && (
-                    <>
-                      <CheckIcon sx={{ color: theme.palette.success.main, fontSize: '1rem' }} />
-                      <Typography variant="caption" sx={{
-                        color: heroImageUrl ? 'white' : theme.palette.success.main,
-                        fontSize: '0.7rem',
-                        textShadow: heroImageUrl ? '0 1px 2px rgba(0,0,0,0.8)' : 'none'
-                      }}>
-                        Saved
-                      </Typography>
-                    </>
-                  )}
-                  {saveStatus === 'error' && (
-                    <>
-                      <ErrorIcon sx={{ color: theme.palette.error.main, fontSize: '1rem' }} />
-                      <Typography variant="caption" sx={{
-                        color: heroImageUrl ? 'white' : theme.palette.error.main,
-                        fontSize: '0.7rem',
-                        textShadow: heroImageUrl ? '0 1px 2px rgba(0,0,0,0.8)' : 'none'
-                      }}>
-                        Error saving
-                      </Typography>
-                    </>
-                  )}
-                </Box>
-              )}
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              {onUpdateCalendarProperty && onOpenImagePicker && (
-                <>
-                  <Tooltip title={heroImageUrl ? "Manage cover image" : "Add cover image"}>
-                    <IconButton
-                      size="small"
-                      onClick={handleImageButtonClick}
-                      sx={{
-                        color: 'text.secondary',
-                        backgroundColor: alpha(theme.palette.grey[500], 0.08),
-                        '&:hover': {
-                          backgroundColor: alpha(theme.palette.grey[500], 0.15),
-                        }
-                      }}
-                    >
-                      <ImageIcon />
-                    </IconButton>
-                  </Tooltip>
-
-                  {/* Only show menu when hero image exists */}
-                  {heroImageUrl && (
-                    <Menu
-                      anchorEl={imageMenuAnchor}
-                      open={Boolean(imageMenuAnchor)}
-                      onClose={handleImageMenuClose}
-                      onClick={(e) => e.stopPropagation()}
-                      transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-                      anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-                    >
-                      <MenuItem onClick={handleChangeImage}>
-                        <ListItemIcon>
-                          <Photo fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText>Change cover</ListItemText>
-                      </MenuItem>
-
-                      <MenuItem onClick={handleRemoveImage} sx={{ color: 'error.main' }}>
-                        <ListItemIcon>
-                          <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
-                        </ListItemIcon>
-                        <ListItemText>Remove cover</ListItemText>
-                      </MenuItem>
-                    </Menu>
-                  )}
-                </>
-              )}
-
-              <Tooltip title={expanded ? "Hide description" : "Show description"}>
-                <IconButton
-                  size="small"
-                  onClick={handleToggleExpand}
-                  sx={{
-                    color: 'text.secondary',
-                    backgroundColor: alpha(theme.palette.grey[500], 0.08),
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.grey[500], 0.15),
-                    }
-                  }}
-                >
-                  {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </IconButton>
-              </Tooltip>
-            </Box>
+                {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </IconButton>
+            </Tooltip>
           </Box>
         </Box>
+      </Box>
 
-        
 
-        <Collapse in={expanded}>
-          <Box sx={{ p: 2 }} onKeyDown={handleKeyDown}>
-            <RichTextEditor
-              value={editedData}
-              onChange={setEditedData}
-              placeholder="Enter a description about your calendar, trading strategy, plans, or mindset..."
-              minHeight={300}
-              calendarId={calendarId}
-              trades={trades}
-              onOpenGalleryMode={onOpenGalleryMode}
-            />
-          </Box>
-        </Collapse>
 
-        {/* Day Notes Display - Below header */}
-        {calendarDayNotes && setIsDayNotesDialogOpen && (() => {
-          const currentDayOfWeek = format(new Date(), 'EEE');
-          const fullDayName = format(new Date(), 'EEEE');
-          const hasNoteForToday = calendarDayNotes.has(currentDayOfWeek) && calendarDayNotes.get(currentDayOfWeek)?.trim() !== '';
+      <Collapse in={expanded}>
+        <Box sx={{ p: 2 }} onKeyDown={handleKeyDown}>
+          <RichTextEditor
+            value={editedData}
+            onChange={setEditedData}
+            placeholder="Enter a description about your calendar, trading strategy, plans, or mindset..."
+            minHeight={300}
+            calendarId={calendarId}
+            trades={trades}
+            onOpenGalleryMode={onOpenGalleryMode}
+          />
+        </Box>
+      </Collapse>
 
-          if (hasNoteForToday) {
-            const noteContent = calendarDayNotes.get(currentDayOfWeek) || '';
-            const richTextHtml = convertRichTextToHtml(noteContent);
+      {/* Day Notes Display - Below header */}
+      {calendarDayNotes && setIsDayNotesDialogOpen && (() => {
+        const currentDayOfWeek = format(new Date(), 'EEE');
+        const fullDayName = format(new Date(), 'EEEE');
+        const hasNoteForToday = calendarDayNotes.has(currentDayOfWeek) && calendarDayNotes.get(currentDayOfWeek)?.trim() !== '';
 
-            return (
-              <Box sx={{
-                 px: 2,
-                 py: 1,
-                borderBottom: `1px solid ${theme.palette.divider}`,
-                backgroundColor: alpha(theme.palette.info.main, 0.05),
-                borderLeft: `4px solid ${theme.palette.info.main}`
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <EventNoteIcon sx={{ fontSize: '1rem', color: 'info.main' }} />
+        if (hasNoteForToday) {
+          const noteContent = calendarDayNotes.get(currentDayOfWeek) || '';
+          // const richTextHtml = convertRichTextToHtml(noteContent);
+
+          return (
+            <Box sx={{
+              px: 2,
+              py: 1,
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              backgroundColor: alpha(theme.palette.info.main, 0.05),
+              borderLeft: `4px solid ${theme.palette.info.main}`
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <EventNoteIcon sx={{ fontSize: '1rem', color: 'info.main' }} />
+                  <Typography
+                    variant="subtitle2"
+                    sx={{
+                      fontSize: '0.875rem',
+                      color: 'info.main',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    {fullDayName} Note
+                  </Typography>
+                </Box>
+
+                <Box
+
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                  }}
+                >
+                  <Box
+                    onClick={handleToggleDayNotesHidden}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      cursor: 'pointer',
+                      color: 'info.main'
+                    }}
+                  >
+                    <Note fontSize="small" />
                     <Typography
-                      variant="subtitle2"
+                      variant="body1"
                       sx={{
-                        fontSize: '0.875rem',
-                        color: 'info.main',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px'
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        color: 'text.main',
+                        textTransform: 'none',
                       }}
+                      onClick={() => setIsDayNotesDialogOpen(currentDayOfWeek)}
                     >
-                      {fullDayName} Note
+                      {'Edit Note'}
                     </Typography>
                   </Box>
+
+
                   <Box
                     onClick={handleToggleDayNotesHidden}
                     sx={{
@@ -500,69 +536,36 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
                     </Typography>
                   </Box>
                 </Box>
-                {!isDayNotesHidden && (
-                  <Box
-                    sx={{
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onClick={() => setIsDayNotesDialogOpen(currentDayOfWeek)}
-                  >
-                    <Box
-                      className="note-content"
-                      sx={{
-                        fontSize: '0.875rem',
-                        color: 'text.primary',
-                        lineHeight: 1.5,
-                        transition: 'color 0.2s ease',
-                        '& p': {
-                          margin: '0 0 8px 0',
-                          '&:last-child': { margin: 0 }
-                        },
-                        '& strong': {
-                          fontWeight: 600,
-                          color: 'text.primary'
-                        },
-                        '& em': {
-                          fontStyle: 'italic',
-                          color: 'text.secondary'
-                        },
-                        '& ul, & ol': {
-                          margin: '4px 0',
-                          paddingLeft: '20px'
-                        },
-                        '& li': {
-                          margin: '2px 0'
-                        }
-                      }}
-                      dangerouslySetInnerHTML={{
-                        __html: richTextHtml.length > MAX_NOTE_LENGTH
-                          ? richTextHtml.substring(0, MAX_NOTE_LENGTH) + '...'
-                          : richTextHtml
-                      }}
-                    />
-                    {richTextHtml.length > MAX_NOTE_LENGTH && (
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: 'primary.main',
-                          fontWeight: 500,
-                          mt: 0.5,
-                          display: 'block'
-                        }}
-                      >
-                        Click to read more
-                      </Typography>
-                    )}
-                  </Box>
-                )}
+
               </Box>
-            );
-          }
-          return null;
-        })()}
-      </Paper>
-     
+              {!isDayNotesHidden && (
+
+               <Box
+                  sx={{ 
+          
+                  }}
+                  
+                >
+                  <RichTextEditor
+                    value={noteContent}
+                    disabled={true}
+                    hideCharacterCount={true}
+                    minHeight={50}
+                    maxHeight={400}
+                    calendarId={calendarId}
+                    trades={trades}
+                    onOpenGalleryMode={onOpenGalleryMode}
+                  />
+ 
+                </Box>
+              )}
+            </Box>
+          );
+        }
+        return null;
+      })()}
+    </Paper>
+
   );
 };
 

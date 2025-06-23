@@ -1065,7 +1065,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             minHeight,
             maxHeight,
             overflow: 'auto',
-            cursor: disabled ? 'not-allowed' : 'text',
+            cursor: 'text',
             position: 'relative',
             ...scrollbarStyles(theme),
             '& .public-DraftEditorPlaceholder-root': {
