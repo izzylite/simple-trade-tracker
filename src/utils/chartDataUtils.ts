@@ -1,5 +1,6 @@
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth } from 'date-fns';
+import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth, getDay } from 'date-fns';
 import { Trade } from '../types/trade';
+import { Theme } from '@mui/material';
 
 export type TimePeriod = 'month' | 'year' | 'all';
 
@@ -58,21 +59,82 @@ export const getTradesStats = (trades: Trade[]) => {
   });
 
   // Calculate win rate excluding breakevens from the denominator
-    const totalTradesForWinRate = stats.wins + stats.losses;
-    const winRate = totalTradesForWinRate > 0 ? Math.round((stats.wins / totalTradesForWinRate) * 100) : 0;
-    const totalTrades = stats.wins + stats.losses + stats.breakevens;
+  const totalTradesForWinRate = stats.wins + stats.losses;
+  const winRate = totalTradesForWinRate > 0 ? Math.round((stats.wins / totalTradesForWinRate) * 100) : 0;
+  const totalTrades = stats.wins + stats.losses + stats.breakevens;
 
-    return {
-      trades,
-      wins: stats.wins,
-      losses: stats.losses,
-      breakevens: stats.breakevens,
-      totalTrades,
-      winRate,
-      totalPnL: stats.totalPnL
-    };
+  return {
+    trades,
+    wins: stats.wins,
+    losses: stats.losses,
+    breakevens: stats.breakevens,
+    totalTrades,
+    winRate,
+    totalPnL: stats.totalPnL
+  };
 
 }
+
+
+export const getTagDayOfWeekChartData = (
+trades: Trade[],  theme: Theme, winRateMetric : boolean = true) => {
+  // Day of week names
+  const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  
+
+  // Group trades by day of week
+  const tradesByDay = DAYS_OF_WEEK.map((day, index) => {
+    // Get trades for this day of week
+    const dayTrades = trades.filter(trade => {
+      const tradeDate = new Date(trade.date);
+      return getDay(tradeDate) === index;
+    });
+
+    // Calculate statistics
+    const totalTrades = dayTrades.length;
+    const winTrades = dayTrades.filter(trade => trade.type === 'win').length;
+    const lossTrades = dayTrades.filter(trade => trade.type === 'loss').length;
+    const winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0;
+    const totalPnL = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
+
+    return {
+      day,
+      dayIndex: index,
+      totalTrades,
+      winTrades,
+      lossTrades,
+      winRate,
+      pnl: totalPnL,
+      trades: dayTrades
+    };
+  });
+   // Define colors - memoized to prevent unnecessary re-renders
+    const COLORS = { 
+      neutral: theme.palette.grey[500],
+      sunday: '#FF6384',
+      monday: '#36A2EB',
+      tuesday: '#FFCE56',
+      wednesday: '#4BC0C0',
+      thursday: '#9966FF',
+      friday: '#FF9F40',
+      saturday: '#C9CBCF'
+    };
+
+  return tradesByDay.map(dayData => ({
+      day: dayData.day.substring(0, 3), // Abbreviate day names
+      fullDay: dayData.day, 
+      totalTrades: dayData.totalTrades,
+      winTrades: dayData.winTrades,
+      lossTrades: dayData.lossTrades,
+      value: winRateMetric? dayData.winRate : dayData.pnl,
+      winRate: dayData.winRate,
+      pnl: dayData.pnl,
+      trades: dayData.trades,
+      color: COLORS[dayData.day.toLowerCase() as keyof typeof COLORS] || COLORS.neutral
+    }));
+ 
+};
+
 
 // Calculate chart data for cumulative P&L - async to prevent UI blocking
 export const calculateChartData = async (

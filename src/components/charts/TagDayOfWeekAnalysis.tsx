@@ -12,10 +12,11 @@ import {
 } from 'recharts';
 import { Box, Paper, Typography, useTheme, Button, alpha, Tooltip as MuiTooltip } from '@mui/material';
 import { InfoOutlined } from '@mui/icons-material';
-import { format, getDay } from 'date-fns';
+
 import { Trade } from '../../types/trade';
 import { formatCurrency } from '../../utils/formatters';
 import TagFilterDialog from '../TagFilterDialog';
+import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
 
 interface TagDayOfWeekAnalysisProps {
   trades: Trade[];
@@ -29,8 +30,7 @@ interface TagDayOfWeekAnalysisProps {
   setMultipleTradesDialog: (dialogState: any) => void;
 }
 
-// Day of week names
-const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 
 const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
   trades,
@@ -48,29 +48,15 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
   const [secondaryTagsDialogOpen, setSecondaryTagsDialogOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
 
-  // Define colors - memoized to prevent unnecessary re-renders
-  const COLORS = React.useMemo(() => ({
-    win: theme.palette.success.main,
-    loss: theme.palette.error.main,
-    neutral: theme.palette.grey[500],
-    sunday: '#FF6384',
-    monday: '#36A2EB',
-    tuesday: '#FFCE56',
-    wednesday: '#4BC0C0',
-    thursday: '#9966FF',
-    friday: '#FF9F40',
-    saturday: '#C9CBCF'
-  }), [theme]);
-
-  // Calculate tag performance by day of week
-  const tagDayOfWeekData = React.useMemo(() => {
+  // Format data for the chart based on selected metric
+  const filteredTrades = React.useMemo(() => {
     // If no tags selected, return empty array
     if (primaryTags.length === 0) {
       return [];
     }
 
     // Filter trades by selected tags
-    const filteredTrades = trades.filter(trade => {
+    return trades.filter(trade => {
       // Check if trade has tags
       if (!trade.tags || trade.tags.length === 0) {
         return false;
@@ -89,52 +75,16 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
 
       return true;
     });
-
-    // Group trades by day of week
-    const tradesByDay = DAYS_OF_WEEK.map((day, index) => {
-      // Get trades for this day of week
-      const dayTrades = filteredTrades.filter(trade => {
-        const tradeDate = new Date(trade.date);
-        return getDay(tradeDate) === index;
-      });
-
-      // Calculate statistics
-      const totalTrades = dayTrades.length;
-      const winTrades = dayTrades.filter(trade => trade.type === 'win').length;
-      const lossTrades = dayTrades.filter(trade => trade.type === 'loss').length;
-      const winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0;
-      const totalPnL = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
-
-      return {
-        day,
-        dayIndex: index,
-        totalTrades,
-        winTrades,
-        lossTrades,
-        winRate,
-        pnl: totalPnL,
-        trades: dayTrades
-      };
-    });
-
-    return tradesByDay;
   }, [trades, primaryTags, secondaryTags]);
 
+
   // Format data for the chart based on selected metric
+  
   const chartData = React.useMemo(() => {
-    return tagDayOfWeekData.map(dayData => ({
-      day: dayData.day.substring(0, 3), // Abbreviate day names
-      fullDay: dayData.day,
-      value: selectedMetric === 'winRate' ? dayData.winRate : dayData.pnl,
-      totalTrades: dayData.totalTrades,
-      winTrades: dayData.winTrades,
-      lossTrades: dayData.lossTrades,
-      winRate: dayData.winRate,
-      pnl: dayData.pnl,
-      trades: dayData.trades,
-      color: COLORS[dayData.day.toLowerCase() as keyof typeof COLORS] || COLORS.neutral
-    }));
-  }, [tagDayOfWeekData, selectedMetric, COLORS]);
+
+    return getTagDayOfWeekChartData(filteredTrades, theme, selectedMetric === 'winRate');
+      
+  }, [selectedMetric,filteredTrades]);
 
   // Custom tooltip for the chart
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -148,10 +98,10 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
           <Typography variant="body2">
             Total Trades: {data.totalTrades}
           </Typography>
-          <Typography variant="body2" sx={{ color: COLORS.win }}>
+          <Typography variant="body2" sx={{ color: theme.palette.success.main }}>
             Wins: {data.winTrades}
           </Typography>
-          <Typography variant="body2" sx={{ color: COLORS.loss }}>
+          <Typography variant="body2" sx={{ color: theme.palette.error.main }}>
             Losses: {data.lossTrades}
           </Typography>
           <Typography variant="body2">
@@ -165,6 +115,8 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
     }
     return null;
   };
+
+
 
   return (
     <Box>
@@ -249,7 +201,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
             showClearButton={true}
           />
         </Box>
-      </Box>
+      </Box> 
       {primaryTags.length === 0 ? (
         <Box sx={{
           display: 'flex',
@@ -287,60 +239,62 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
               </Typography>
             ) : null}
           </Box>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart
-            data={chartData}
-            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-            maxBarSize={50}
-          >
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="day"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
-              domain={selectedMetric === 'winRate' ? [0, 100] : ['auto', 'auto']}
-              tickFormatter={selectedMetric === 'winRate'
-                ? (value) => `${value}%`
-                : (value) => formatCurrency(value).replace('$', '')}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend />
-            <Bar
-              dataKey="value"
-              name={selectedMetric === 'winRate' ? 'Win Rate' : 'P&L'}
-              fill={theme.palette.primary.main}
-              radius={[4, 4, 0, 0]}
-              onClick={(data) => {
-                if (data && data.payload) {
-                  const dayTrades = data.payload.trades;
-                  if (dayTrades.length > 0) {
-                    setMultipleTradesDialog({
-                      open: true,
-                      trades: dayTrades,
-                      date: `${selectedMetric === 'winRate' ? 'Win Rate' : 'P&L'} for ${data.payload.fullDay}`,
-                      expandedTradeId: dayTrades.length === 1 ? dayTrades[0].id : null
-                    });
-                  }
-                }
-              }}
-              style={{ cursor: 'pointer' }}
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={chartData}
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              maxBarSize={50}
             >
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="day"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
+                domain={selectedMetric === 'winRate' ? [0, 100] : ['auto', 'auto']}
+                tickFormatter={selectedMetric === 'winRate'
+                  ? (value) => `${value}%`
+                  : (value) => formatCurrency(value).replace('$', '')}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend />
+              <Bar
+                dataKey="value"
+                name={selectedMetric === 'winRate' ? 'Win Rate' : 'P&L'}
+                fill={theme.palette.primary.main}
+                radius={[4, 4, 0, 0]}
+                onClick={(data) => {
+                  if (data && data.payload && setMultipleTradesDialog) {
+                    const dayTrades = data.payload.trades;
+                    if (dayTrades.length > 0) {
+                      setMultipleTradesDialog({
+                        open: true,
+                        trades: dayTrades,
+                        showChartInfo:false,
+                        date: `${selectedMetric === 'winRate' ? 'Win Rate' : 'P&L'} for ${data.payload.fullDay}`,
+                        expandedTradeId: dayTrades.length === 1 ? dayTrades[0].id : null
+                      });
+                    }
+                  }
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </>
-      )}
+      )} 
     </Box>
   );
 };
+ 
 
 export default TagDayOfWeekAnalysis;

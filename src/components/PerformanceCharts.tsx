@@ -75,11 +75,13 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   const [multipleTradesDialog, setMultipleTradesDialog] = useState<{
     open: boolean;
     trades: Trade[];
+    showChartInfo?: boolean,
     date: string;
     expandedTradeId: string | null;
   }>({
     open: false,
     trades: [],
+    showChartInfo: true,
     date: '',
     expandedTradeId: null
   });
@@ -518,7 +520,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       // Open the dialog with the filtered trades
       setMultipleTradesDialog({
         open: true,
-        trades: categoryTrades,
+        trades: categoryTrades, 
         date: dialogTitle,
         expandedTradeId: categoryTrades.length === 1 ? categoryTrades[0].id : null
       });
@@ -542,6 +544,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         trades={multipleTradesDialog.trades}
         date={multipleTradesDialog.date}
         expandedTradeId={multipleTradesDialog.expandedTradeId}
+        showChartInfo={multipleTradesDialog.showChartInfo || true}
         onUpdateTradeProperty={onUpdateTradeProperty}
         onClose={() => setMultipleTradesDialog(prev => ({ ...prev, open: false }))}
         onTradeExpand={handleTradeExpand}
@@ -719,7 +722,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             <Box sx={{
               flex: 1,
               width: { xs: '100%', md: '50%' },
-              height: { xs: '400px', md: '100%' }
+              height: { xs: '400px', md: '400px' }
             }}>
               {/* Daily Summary Table */}
               <DailySummaryTable
