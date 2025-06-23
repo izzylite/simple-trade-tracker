@@ -445,7 +445,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
       </Collapse>
 
       {/* Day Notes Display - Below header */}
-      {calendarDayNotes && setIsDayNotesDialogOpen && (() => {
+      {calendarDayNotes && !expanded && setIsDayNotesDialogOpen && (() => {
         const currentDayOfWeek = format(new Date(), 'EEE');
         const fullDayName = format(new Date(), 'EEEE');
         const hasNoteForToday = calendarDayNotes.has(currentDayOfWeek) && calendarDayNotes.get(currentDayOfWeek)?.trim() !== '';
@@ -540,12 +540,6 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
               </Box>
               {!isDayNotesHidden && (
 
-               <Box
-                  sx={{ 
-          
-                  }}
-                  
-                >
                   <RichTextEditor
                     value={noteContent}
                     disabled={true}
@@ -556,8 +550,6 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
                     trades={trades}
                     onOpenGalleryMode={onOpenGalleryMode}
                   />
- 
-                </Box>
               )}
             </Box>
           );
