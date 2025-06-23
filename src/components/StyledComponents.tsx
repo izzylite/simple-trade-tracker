@@ -6,8 +6,10 @@ export type DayStatus = 'win' | 'loss' | 'neutral' | 'breakeven';
 // Calendar day styled component
 export const StyledCalendarDay = styled(Box)<{
   $isCurrentMonth: boolean;
+  $isCurrentDay: boolean,
   $dayStatus: DayStatus;
-}>(({ theme, $isCurrentMonth, $dayStatus }) => ({
+
+}>(({ theme, $isCurrentMonth, $isCurrentDay, $dayStatus }) => ({
   padding: theme.spacing(1),
   height: '100%',
   display: 'flex',
@@ -20,21 +22,20 @@ export const StyledCalendarDay = styled(Box)<{
   minHeight: theme.breakpoints.down('md') ? '80px' : '100px',
   backgroundColor:
     $dayStatus === 'win'
-      ? alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
+      ? alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.2 : 0.4)
       : $dayStatus === 'loss'
-      ? alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
-      : $dayStatus === 'breakeven'
-      ? alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
-      : theme.palette.background.paper,
-  border: `2px solid ${
-    $dayStatus === 'win'
-      ? alpha(theme.palette.success.main, 0.3)
-      : $dayStatus === 'loss'
+        ? alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.2 : 0.4)
+        : $dayStatus === 'breakeven'
+          ? alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.2 : 0.4)
+          : theme.palette.background.paper,
+  border: `2px solid ${$dayStatus === 'win'
+    ? alpha(theme.palette.success.main, 0.3)
+    : $dayStatus === 'loss'
       ? alpha(theme.palette.error.main, 0.3)
       : $dayStatus === 'breakeven'
-      ? alpha(theme.palette.info.main, 0.3)
-      : alpha(theme.palette.divider, 0.2)
-  }`,
+        ? alpha(theme.palette.info.main, 0.3)
+        : alpha(theme.palette.divider, 0.2)
+    }`,
   boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.3 : 0.05)}`,
   position: 'relative',
   overflow: 'hidden',
@@ -43,8 +44,8 @@ export const StyledCalendarDay = styled(Box)<{
       $dayStatus === 'win'
         ? theme.palette.success.main
         : $dayStatus === 'loss'
-        ? theme.palette.error.main
-        : theme.palette.primary.main,
+          ? theme.palette.error.main
+          : theme.palette.primary.main,
   },
   ...(!$isCurrentMonth && {
     opacity: 0.4,
@@ -53,6 +54,12 @@ export const StyledCalendarDay = styled(Box)<{
       opacity: 0.6,
     },
   }),
+  ...($isCurrentDay && {
+    borderColor: `${theme.palette.primary.main} !important`,
+    borderWidth: '3px !important',
+    boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}, 0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+  })
+
 }));
 
 export const CalendarCell = styled(Box)(({ theme }) => ({

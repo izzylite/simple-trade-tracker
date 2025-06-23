@@ -1169,6 +1169,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                           <StyledCalendarDay
                             onClick={() => handleDayClick(day)}
                             $isCurrentMonth={isCurrentMonth}
+                             $isCurrentDay={isCurrentDay}
                             $dayStatus={dayStats.status}
                            
                           >

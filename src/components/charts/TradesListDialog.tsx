@@ -196,7 +196,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
               <Typography variant="body2" color="primary" sx={{ mt: 1, fontWeight: 500 }}>
                 {tradeStats.containBoth && selectedMetric === 'winRate'
                   ? `Best day for selected strategies: ${chartData.reduce((best, day) => day.totalTrades > 0 && day.winRate > best.winRate ? day : best, { winRate: 0, fullDay: 'None' }).fullDay}`
-                  : `Most profitable day: ${chartData.reduce((best, day) => day.totalTrades > 0 && day.pnl > best.pnl ? day : best, { pnl: -Infinity, fullDay: 'None' }).fullDay}`
+                  : `Most profitable/un-profitable day: ${chartData.reduce((best, day) => day.totalTrades > 0 && day.pnl > best.pnl ? day : best, { pnl: -Infinity, fullDay: 'None' }).fullDay}`
                 }
               </Typography>
             ) : null}
@@ -263,7 +263,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
                 }} />
                 <Bar
                   dataKey="value"
-                  name={tradeStats.containBoth ? 'Win Rate' : 'P&L'}
+                  name={tradeStats.containBoth && selectedMetric === "winRate" ? 'Win Rate' : 'P&L'}
                   fill={theme.palette.primary.main}
                   radius={[4, 4, 0, 0]}
 
