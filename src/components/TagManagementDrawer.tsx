@@ -202,7 +202,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
         </Box>
 
         {/* Content */}
-        <Box sx={{ flex: 1, p: 2, overflow: 'auto' }}>
+        <Box sx={{ flex: 1, p: 2, overflow: 'auto',...scrollbarStyles(theme) }}>
           <Box sx={{ mb: 3 }}>
             <Typography variant="body1" gutterBottom>
               Manage your tags and set required tag groups for new trades.
@@ -279,7 +279,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
             />
 
             <Box sx={{
-              maxHeight: '400px',
+              maxHeight: '100%',
               overflow: 'auto',
               border: `1px solid ${theme.palette.divider}`,
               borderRadius: 1,
