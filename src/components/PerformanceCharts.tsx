@@ -722,7 +722,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             <Box sx={{
               flex: 1,
               width: { xs: '100%', md: '50%' },
-              height: { xs: '400px', md: '400px' }
+              height: { xs: '400px', md: '100%' }
             }}>
               {/* Daily Summary Table */}
               <DailySummaryTable
