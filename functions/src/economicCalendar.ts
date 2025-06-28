@@ -248,6 +248,54 @@ export const populateDatabaseManually = onCall(
  
 
 /**
+ * Check if a value looks like a numeric economic indicator
+ */
+function isNumericValue(value: string): boolean {
+  if (!value || typeof value !== 'string') return false;
+
+  const trimmed = value.trim();
+
+  // Skip obviously non-numeric values
+  if (trimmed.length === 0 || trimmed.length > 25) return false;
+  if (/^[a-zA-Z\s]+$/.test(trimmed)) return false; // Only letters and spaces
+  if (trimmed.includes(':') && /\d{1,2}:\d{2}/.test(trimmed)) return false; // Time format
+
+  // Remove common formatting and check if it's a number
+  const cleaned = trimmed
+    .replace(/[,%$€£¥]/g, '') // Remove currency symbols and formatting
+    .replace(/[()]/g, '') // Remove parentheses
+    .replace(/^\+/, '') // Remove leading plus sign
+    .replace(/\s+/g, ''); // Remove spaces
+
+  // Check for various numeric patterns
+  const numericPatterns = [
+    /^-?\d+\.?\d*$/, // Basic numbers: 123, 123.45, -123.45
+    /^-?\d+\.?\d*[KMB]$/i, // Numbers with K/M/B suffix: 123K, 1.5M, 2B
+    /^-?\d+\.?\d*%$/, // Percentages: 2.5%, -1.2%
+    /^-?\d{1,3}(,\d{3})*\.?\d*$/, // Numbers with comma separators: 1,234.56
+    /^\d+\.?\d*[KMB]?$/i, // Positive numbers with optional suffix
+    /^-?\d+\.?\d*[bp]$/i, // Basis points: 25bp, -10bp
+  ];
+
+  const isNumeric = numericPatterns.some(pattern => pattern.test(cleaned));
+  const canParse = !isNaN(parseFloat(cleaned.replace(/[KMBbp%]/gi, '')));
+
+  return isNumeric && canParse && cleaned.length > 0;
+}
+
+/**
+ * Clean and normalize numeric values
+ */
+function cleanNumericValue(value: string): string {
+  if (!value) return '';
+
+  return value.trim()
+    .replace(/^\+/, '') // Remove leading plus
+    .replace(/,/g, '') // Remove commas
+    .trim();
+}
+
+/**
  * Enhanced MyFXBook weekly parsing using our tested logic
  */
 async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[]> {
@@ -272,13 +320,48 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
 
       // Only process rows with sufficient cells and date patterns
       const hasEnoughCells = cells.length >= 4;
-      const hasDatePattern = /Jun\s+\d{1,2}|Jul\s+\d{1,2}|\d{1,2}\s+Jun|\d{1,2}\s+Jul/i.test(text);
+      // Updated to match all months, not just Jun/Jul
+      const hasDatePattern = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}|\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2}/i.test(text);
       const hasCurrency = /\b(USD|EUR|GBP|JPY|AUD|CAD|CHF)\b/.test(text);
 
       return hasEnoughCells && hasDatePattern && hasCurrency;
     });
 
     logger.info(`📊 Found ${tableRows.length} potential event rows`);
+
+    // Debug: If no rows found, let's examine the HTML structure
+    if (tableRows.length === 0) {
+      logger.info('🔍 No rows found with current criteria. Analyzing HTML structure...');
+
+      // Check total number of tables and rows
+      const allTables = $('table');
+      const allRows = $('tr');
+      logger.info(`📋 Total tables in HTML: ${allTables.length}`);
+      logger.info(`📋 Total rows in HTML: ${allRows.length}`);
+
+      // Sample some row content for debugging
+      logger.info('📋 Sample of first 10 table rows:');
+      allRows.slice(0, 10).each((i, row) => {
+        const $row = $(row);
+        const cells = $row.find('td');
+        const text = $row.text().trim().substring(0, 100); // First 100 chars
+        logger.info(`  Row ${i}: ${cells.length} cells, text: "${text}"`);
+      });
+
+      // Check for any rows with currency codes
+      const rowsWithCurrency = $('tr').filter((_i, el) => {
+        const text = $(el).text();
+        return /\b(USD|EUR|GBP|JPY|AUD|CAD|CHF)\b/.test(text);
+      });
+      logger.info(`📋 Rows containing currency codes: ${rowsWithCurrency.length}`);
+
+      // Check for any rows with date patterns
+      const rowsWithDates = $('tr').filter((_i, el) => {
+        const text = $(el).text();
+        return /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}|\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2}/i.test(text);
+      });
+      logger.info(`📋 Rows containing date patterns: ${rowsWithDates.length}`);
+    }
 
     // Process each row
     tableRows.each((i, row) => {
@@ -294,6 +377,9 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
         let impact = '';
         let time = '';
         let date = '';
+        let actual = '';
+        let forecast = '';
+        let previous = '';
 
         // Find currency (look for 3-letter currency codes)
         for (const cell of cellTexts) {
@@ -312,9 +398,9 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
           }
         }
 
-        // Extract date from first cell
+        // Extract date from first cell - updated to handle all months
         const dateCell = cellTexts[0] || '';
-        const dateMatch = dateCell.match(/(Jun \d{1,2}|Jul \d{1,2}|\d{1,2} Jun|\d{1,2} Jul)/);
+        const dateMatch = dateCell.match(/((Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}|\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2})/i);
         if (dateMatch) {
           date = dateMatch[1];
         }
@@ -334,27 +420,129 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
               !validCurrencies.includes(potentialEventName) &&
               !validImpacts.includes(potentialEventName) &&
               !potentialEventName.match(/^\d{1,2}:\d{2}$/) &&
-              !potentialEventName.match(/^(Jun|Jul) \d{1,2}$/)) {
+              !potentialEventName.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}$/i) &&
+              !potentialEventName.match(/^\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/i)) {
             eventName = potentialEventName;
           }
         }
 
+        // Extract forecast, previous, and actual values using MyFXBook's specific structure
+        // MyFXBook uses data attributes and CSS classes to identify these values
+
+        // Method 1: Use data attributes (most reliable)
+        const $cells = $row.find('td');
+        $cells.each((_cellIndex, cell) => {
+          const $cell = $(cell);
+
+          // Look for previous value
+          if ($cell.attr('data-previous') || $cell.attr('previous-value')) {
+            const prevValue = $cell.attr('previous-value') || $cell.text().trim();
+            if (prevValue && isNumericValue(prevValue)) {
+              previous = cleanNumericValue(prevValue);
+            }
+          }
+
+          // Look for forecast/consensus value
+          if ($cell.attr('data-concensus') || $cell.attr('concensus')) {
+            const forecastValue = $cell.attr('concensus') || $cell.text().trim();
+            if (forecastValue && isNumericValue(forecastValue)) {
+              forecast = cleanNumericValue(forecastValue);
+            }
+          }
+
+          // Look for actual value
+          if ($cell.attr('data-actual')) {
+            const actualValue = $cell.text().trim();
+            if (actualValue && isNumericValue(actualValue)) {
+              actual = cleanNumericValue(actualValue);
+            }
+          }
+        });
+
+        // Method 2: Use CSS classes as backup
+        if (!previous) {
+          const previousCell = $row.find('.previousCell');
+          if (previousCell.length > 0) {
+            const prevText = previousCell.text().trim();
+            if (isNumericValue(prevText)) {
+              previous = cleanNumericValue(prevText);
+            }
+          }
+        }
+
+        if (!actual) {
+          const actualCell = $row.find('.actualCell');
+          if (actualCell.length > 0) {
+            const actualText = actualCell.text().trim();
+            if (isNumericValue(actualText)) {
+              actual = cleanNumericValue(actualText);
+            }
+          }
+        }
+
+        // Method 3: Fallback to position-based extraction (MyFXBook standard layout)
+        // Order: Date, Status, Flag, Currency, Event, Impact, Previous, Forecast, Actual
+        if ((!previous || !forecast || !actual) && cellTexts.length >= 9) {
+          if (!previous && cellTexts[6] && isNumericValue(cellTexts[6])) {
+            previous = cleanNumericValue(cellTexts[6]);
+          }
+          if (!forecast && cellTexts[7] && isNumericValue(cellTexts[7])) {
+            forecast = cleanNumericValue(cellTexts[7]);
+          }
+          if (!actual && cellTexts[8] && isNumericValue(cellTexts[8])) {
+            actual = cleanNumericValue(cellTexts[8]);
+          }
+        }
+
         // Validate and create event
-        if (currency && eventName && eventName.length > 3) {
+        // Only include events that have actual economic data OR are significant events
+        const hasEconomicData = actual || forecast || previous;
+        const isSignificantEvent = impact && impact !== 'None' && impact !== '';
+
+        if (currency && eventName && eventName.length > 3 && (hasEconomicData || isSignificantEvent)) {
           // Create ISO date string
           let isoDate = '';
           if (date && time) {
             // Convert to proper date format (assuming current year)
             const year = new Date().getFullYear();
             const monthMap: { [key: string]: string } = {
-              'Jun': '06', 'Jul': '07'
+              'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+              'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+              'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
             };
 
-            const dateMatch = date.match(/(Jun|Jul) (\d{1,2})/);
+            // Try different date formats
+            let dateMatch = date.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})/i);
             if (dateMatch) {
               const month = monthMap[dateMatch[1]];
               const day = dateMatch[2].padStart(2, '0');
               isoDate = `${year}-${month}-${day}T${time}:00+00:00`;
+            } else {
+              // Try reverse format: "15 Jan"
+              dateMatch = date.match(/(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
+              if (dateMatch) {
+                const day = dateMatch[1].padStart(2, '0');
+                const month = monthMap[dateMatch[2]];
+                isoDate = `${year}-${month}-${day}T${time}:00+00:00`;
+              } else {
+                // Try MM/DD/YYYY format
+                dateMatch = date.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+                if (dateMatch) {
+                  const month = dateMatch[1].padStart(2, '0');
+                  const day = dateMatch[2].padStart(2, '0');
+                  const yearPart = dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3];
+                  isoDate = `${yearPart}-${month}-${day}T${time}:00+00:00`;
+                } else {
+                  // Try YYYY-MM-DD format
+                  dateMatch = date.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+                  if (dateMatch) {
+                    const yearPart = dateMatch[1];
+                    const month = dateMatch[2].padStart(2, '0');
+                    const day = dateMatch[3].padStart(2, '0');
+                    isoDate = `${yearPart}-${month}-${day}T${time}:00+00:00`;
+                  }
+                }
+              }
             }
           }
 
@@ -366,17 +554,20 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
           const event: EconomicEvent = {
             currency,
             event: cleanEventName(eventName), // Apply proper event name cleaning
-            impact: impact || 'Medium',
+            impact: impact || 'None',
             time_utc: isoDate,
-            actual: '',
-            forecast: '',
-            previous: ''
+            actual: actual || '',
+            forecast: forecast || '',
+            previous: previous || ''
           };
 
           events.push(event);
 
           if (events.length <= 10) { // Log first 10 events for debugging
-            logger.info(`✅ Extracted: ${date || 'Unknown'} | ${time || '00:00'} | ${currency} ${eventName} | ${impact || 'Medium'}`);
+            const actualStr = actual ? ` | A:${actual}` : '';
+            const forecastStr = forecast ? ` | F:${forecast}` : '';
+            const previousStr = previous ? ` | P:${previous}` : '';
+            logger.info(`✅ Extracted: ${date || 'Unknown'} | ${time || '00:00'} | ${currency} ${eventName} | ${impact || 'Medium'}${actualStr}${forecastStr}${previousStr}`);
           }
         }
 
@@ -386,7 +577,26 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
       }
     });
 
+    // Analyze the types of events we extracted
+    const eventsWithData = events.filter(e => e.actual || e.forecast || e.previous);
+    const eventsWithoutData = events.filter(e => !e.actual && !e.forecast && !e.previous);
+
     logger.info(`🎉 Successfully extracted ${events.length} events`);
+    logger.info(`📊 Events with economic data: ${eventsWithData.length}`);
+    logger.info(`📅 Events without data (holidays/announcements): ${eventsWithoutData.length}`);
+
+    if (eventsWithData.length > 0) {
+      logger.info(`💰 Sample events with data:`);
+      eventsWithData.slice(0, 3).forEach((event, i) => {
+        const dataStr = [
+          event.actual ? `A:${event.actual}` : '',
+          event.forecast ? `F:${event.forecast}` : '',
+          event.previous ? `P:${event.previous}` : ''
+        ].filter(s => s).join(', ');
+        logger.info(`  ${i + 1}. ${event.currency} ${event.event} (${dataStr})`);
+      });
+    }
+
     return events;
 
   } catch (error) {

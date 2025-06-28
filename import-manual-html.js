@@ -1,20 +1,511 @@
-const { initializeApp } = require('firebase/app');
-const { getFunctions, httpsCallable } = require('firebase/functions');
 const cheerio = require('cheerio');
 const fs = require('fs');
-const path = require('path');
 
-const firebaseConfig = {
-  apiKey: 'AIzaSyBJqJNvW_WwM2d8kKs8Z8Z8Z8Z8Z8Z8Z8Z',
-  authDomain: 'tradetracker-30ec1.firebaseapp.com',
-  projectId: 'tradetracker-30ec1',
-  storageBucket: 'tradetracker-30ec1.appspot.com',
-  messagingSenderId: '123456789',
-  appId: '1:123456789:web:abcdefghijklmnop'
+// Add logger implementation
+const logger = {
+  info: (message, ...args) => console.log(message, ...args),
+  warn: (message, ...args) => console.warn(message, ...args),
+  error: (message, ...args) => console.error(message, ...args)
 };
 
-const app = initializeApp(firebaseConfig);
-const functions = getFunctions(app);
+/**
+ * Check if a value looks like a numeric economic indicator
+ */
+function isNumericValue(value) {
+  if (!value || typeof value !== 'string') return false;
+
+  const trimmed = value.trim();
+
+  // Skip obviously non-numeric values
+  if (trimmed.length === 0 || trimmed.length > 25) return false;
+  if (/^[a-zA-Z\s]+$/.test(trimmed)) return false; // Only letters and spaces
+  if (trimmed.includes(':') && /\d{1,2}:\d{2}/.test(trimmed)) return false; // Time format
+
+  // Remove common formatting and check if it's a number
+  const cleaned = trimmed
+    .replace(/[,%$€£¥]/g, '') // Remove currency symbols and formatting
+    .replace(/[()]/g, '') // Remove parentheses
+    .replace(/^\+/, '') // Remove leading plus sign
+    .replace(/\s+/g, ''); // Remove spaces
+
+  // Check for various numeric patterns
+  const numericPatterns = [
+    /^-?\d+\.?\d*$/, // Basic numbers: 123, 123.45, -123.45
+    /^-?\d+\.?\d*[KMB]$/i, // Numbers with K/M/B suffix: 123K, 1.5M, 2B
+    /^-?\d+\.?\d*%$/, // Percentages: 2.5%, -1.2%
+    /^-?\d{1,3}(,\d{3})*\.?\d*$/, // Numbers with comma separators: 1,234.56
+    /^\d+\.?\d*[KMB]?$/i, // Positive numbers with optional suffix
+    /^-?\d+\.?\d*[bp]$/i, // Basis points: 25bp, -10bp
+  ];
+
+  const isNumeric = numericPatterns.some(pattern => pattern.test(cleaned));
+  const canParse = !isNaN(parseFloat(cleaned.replace(/[KMBbp%]/gi, '')));
+
+  return isNumeric && canParse && cleaned.length > 0;
+}
+
+/**
+ * Clean and normalize numeric values
+ */
+function cleanNumericValue(value) {
+  if (!value) return '';
+
+  return value.trim()
+    .replace(/^\+/, '') // Remove leading plus
+    .replace(/,/g, '') // Remove commas
+    .trim();
+}
+
+/**
+ * Get flag image URL from country code
+ */
+function getFlagUrl(countryCode, size = 'w160') {
+  if (!countryCode) return '';
+
+  // Use FlagCDN for reliable flag images
+  return `https://flagcdn.com/${size}/${countryCode.toLowerCase()}.png`;
+}
+
+/**
+ * Get country information including flag URL
+ */
+async function getCountryInfo(countryCode) {
+  if (!countryCode) return null;
+
+  try {
+    // Use REST Countries API for comprehensive country data
+    const response = await fetch(`https://restcountries.com/v3.1/alpha/${countryCode}`);
+    const data = await response.json();
+
+    if (data && data[0]) {
+      const country = data[0];
+      return {
+        name: country.name?.common || '',
+        officialName: country.name?.official || '',
+        flagUrl: country.flags?.png || getFlagUrl(countryCode),
+        flagSvg: country.flags?.svg || '',
+        region: country.region || '',
+        capital: country.capital?.[0] || ''
+      };
+    }
+  } catch (error) {
+    console.warn(`Could not fetch country info for ${countryCode}:`, error);
+  }
+
+  // Fallback to just flag URL
+  return {
+    name: '',
+    flagUrl: getFlagUrl(countryCode),
+    flagSvg: '',
+    region: '',
+    capital: ''
+  };
+}
+
+/**
+ * Enhanced MyFXBook weekly parsing using our tested logic
+ */
+async function parseMyFXBookWeeklyEnhanced(html) {
+  logger.info('🔧 Parsing MyFXBook HTML with enhanced weekly logic...');
+
+  try {
+    const $ = cheerio.load(html);
+    const events = [];
+
+    // Valid currencies and impacts for filtering
+    const validCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
+    const validImpacts = ['High', 'Medium', 'Low'];
+
+    logger.info('🔍 Looking for table rows with economic data...');
+
+    // Find all table rows with proper structure (at least 4 cells)
+    const tableRows = $('tr').filter((_i, el) => {
+      const $row = $(el);
+      const cells = $row.find('td');
+      const text = $row.text();
+
+      // Only process rows with sufficient cells and date patterns
+      const hasEnoughCells = cells.length >= 4;
+      // Updated to match all months, not just Jun/Jul
+      const hasDatePattern = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}|\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2}/i.test(text);
+      const hasCurrency = /\b(USD|EUR|GBP|JPY|AUD|CAD|CHF)\b/.test(text);
+
+      return hasEnoughCells && hasDatePattern && hasCurrency;
+    });
+
+    logger.info(`📊 Found ${tableRows.length} potential event rows`);
+
+    // Debug: If no rows found, let's examine the HTML structure
+    if (tableRows.length === 0) {
+      logger.info('🔍 No rows found with current criteria. Analyzing HTML structure...');
+
+      // Check total number of tables and rows
+      const allTables = $('table');
+      const allRows = $('tr');
+      logger.info(`📋 Total tables in HTML: ${allTables.length}`);
+      logger.info(`📋 Total rows in HTML: ${allRows.length}`);
+
+      // Sample some row content for debugging
+      logger.info('📋 Sample of first 10 table rows:');
+      allRows.slice(0, 10).each((i, row) => {
+        const $row = $(row);
+        const cells = $row.find('td');
+        const cellTexts = cells.map((_j, cell) => $(cell).text().trim()).get();
+        const text = $row.text().trim().substring(0, 100); // First 100 chars
+        logger.info(`  Row ${i}: ${cells.length} cells, text: "${text}"`);
+        if (cells.length > 0) {
+          logger.info(`    Cells: [${cellTexts.slice(0, 8).map(c => `"${c}"`).join(', ')}]`);
+        }
+      });
+
+      // Check for any rows with currency codes
+      const rowsWithCurrency = $('tr').filter((_i, el) => {
+        const text = $(el).text();
+        return /\b(USD|EUR|GBP|JPY|AUD|CAD|CHF)\b/.test(text);
+      });
+      logger.info(`📋 Rows containing currency codes: ${rowsWithCurrency.length}`);
+
+      // Check for any rows with date patterns
+      const rowsWithDates = $('tr').filter((_i, el) => {
+        const text = $(el).text();
+        return /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}|\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2}/i.test(text);
+      });
+      logger.info(`📋 Rows containing date patterns: ${rowsWithDates.length}`);
+    }
+
+    // Process each row
+    tableRows.each((i, row) => {
+      try {
+        const $row = $(row);
+        const cellTexts = $row.find('td, th').map((_j, cell) => $(cell).text().trim()).get();
+
+        if (cellTexts.length < 4) return; // Skip rows with insufficient data
+
+        // Debug: Log cell structure for first few rows to understand the format
+        if (i < 5) {
+          logger.info(`🔍 Row ${i} structure: [${cellTexts.map((cell, idx) => `${idx}:"${cell}"`).join(', ')}]`);
+        }
+
+        // Extract data using enhanced logic
+        let currency = '';
+        let eventName = '';
+        let impact = '';
+        let time = '';
+        let date = '';
+        let actual = '';
+        let forecast = '';
+        let previous = '';
+        let country = '';
+        let flagClass = '';
+
+        // Find currency (look for 3-letter currency codes)
+        for (const cell of cellTexts) {
+          const currencyMatch = cell.match(/\b(USD|EUR|GBP|JPY|AUD|CAD|CHF)\b/);
+          if (currencyMatch && validCurrencies.includes(currencyMatch[1])) {
+            currency = currencyMatch[1];
+            break;
+          }
+        }
+
+        // Find impact level
+        for (const cell of cellTexts) {
+          if (validImpacts.includes(cell)) {
+            impact = cell;
+            break;
+          }
+        }
+
+        // Extract country and flag information from the flag column (typically 3rd column)
+        const $flagCells = $row.find('td');
+        $flagCells.each((cellIndex, cell) => {
+          const $cell = $(cell);
+
+          // Debug: Log cell content for first few rows to understand structure
+          if (i < 3 && cellIndex < 5) {
+            const cellHtml = $cell.html();
+            if (cellHtml && cellHtml.includes('flag')) {
+              logger.info(`🔍 Flag cell ${cellIndex} HTML: ${cellHtml.substring(0, 200)}`);
+            }
+          }
+
+          // Look for flag elements - MyFXBook uses specific patterns
+          const $flagIcon = $cell.find('i[title]'); // Icon with title attribute
+          const $flagSpan = $cell.find('span.flag'); // Span with flag class
+          const $allFlags = $cell.find('[class*="flag"]'); // Any element with "flag" in class
+
+          if ($flagIcon.length > 0) {
+            // Extract country from title attribute
+            const titleAttr = $flagIcon.attr('title');
+            if (titleAttr && titleAttr.length > 0) {
+              country = titleAttr.trim();
+              if (i < 3) logger.info(`🏳️ Found country from title: ${country}`);
+            }
+
+            // Extract country from class attribute as backup
+            if (!country) {
+              const classAttr = $flagIcon.attr('class');
+              if (classAttr) {
+                // Look for country name in class (e.g., "United States align-center")
+                const countryMatch = classAttr.match(/^([A-Za-z\s]+)\s+align-center/);
+                if (countryMatch) {
+                  country = countryMatch[1].trim();
+                  if (i < 3) logger.info(`🏳️ Found country from class: ${country}`);
+                }
+              }
+            }
+          }
+
+          if ($flagSpan.length > 0) {
+            // Extract flag class (e.g., "flag-icon-us")
+            const spanClass = $flagSpan.attr('class');
+            if (spanClass) {
+              const flagMatch = spanClass.match(/flag-icon-([a-z]{2})/);
+              if (flagMatch) {
+                flagClass = flagMatch[1]; // Extract country code (e.g., "us")
+                if (i < 3) logger.info(`🚩 Found flag code: ${flagClass}`);
+              }
+            }
+          }
+
+          // Alternative: Look for any flag-related classes
+          if (!flagClass && $allFlags.length > 0) {
+            $allFlags.each((_idx, flagEl) => {
+              const flagElClass = $(flagEl).attr('class');
+              if (flagElClass) {
+                const flagMatch = flagElClass.match(/flag-icon-([a-z]{2})/);
+                if (flagMatch) {
+                  flagClass = flagMatch[1];
+                  if (i < 3) logger.info(`🚩 Found flag code from alternative search: ${flagClass}`);
+                }
+              }
+            });
+          }
+        });
+
+        // Extract date from first cell - updated to handle all months
+        const dateCell = cellTexts[0] || '';
+        const dateMatch = dateCell.match(/((Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}|\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2})/i);
+        if (dateMatch) {
+          date = dateMatch[1];
+        }
+
+        // Extract time
+        const timeMatch = cellTexts.join(' ').match(/(\d{1,2}:\d{2})/);
+        if (timeMatch) {
+          time = timeMatch[1];
+        }
+
+        // Extract event name from specific cell position (Cell 4 typically contains event description)
+        // Only use structured table data, not pattern matching
+        if (cellTexts.length >= 5) {
+          const potentialEventName = cellTexts[4]; // Cell 4 is typically the event description
+          if (potentialEventName &&
+              potentialEventName.length > 3 &&
+              !validCurrencies.includes(potentialEventName) &&
+              !validImpacts.includes(potentialEventName) &&
+              !potentialEventName.match(/^\d{1,2}:\d{2}$/) &&
+              !potentialEventName.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}$/i) &&
+              !potentialEventName.match(/^\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/i)) {
+            eventName = potentialEventName;
+          }
+        }
+
+        // Extract forecast, previous, and actual values using MyFXBook's specific structure
+        // MyFXBook uses data attributes and CSS classes to identify these values
+
+        // Method 1: Use data attributes (most reliable)
+        const $cells = $row.find('td');
+        $cells.each((_cellIndex, cell) => {
+          const $cell = $(cell);
+
+          // Look for previous value
+          if ($cell.attr('data-previous') || $cell.attr('previous-value')) {
+            const prevValue = $cell.attr('previous-value') || $cell.text().trim();
+            if (prevValue && isNumericValue(prevValue)) {
+              previous = cleanNumericValue(prevValue);
+            }
+          }
+
+          // Look for forecast/consensus value
+          if ($cell.attr('data-concensus') || $cell.attr('concensus')) {
+            const forecastValue = $cell.attr('concensus') || $cell.text().trim();
+            if (forecastValue && isNumericValue(forecastValue)) {
+              forecast = cleanNumericValue(forecastValue);
+            }
+          }
+
+          // Look for actual value
+          if ($cell.attr('data-actual')) {
+            const actualValue = $cell.text().trim();
+            if (actualValue && isNumericValue(actualValue)) {
+              actual = cleanNumericValue(actualValue);
+            }
+          }
+        });
+
+        // Method 2: Use CSS classes as backup
+        if (!previous) {
+          const previousCell = $row.find('.previousCell');
+          if (previousCell.length > 0) {
+            const prevText = previousCell.text().trim();
+            if (isNumericValue(prevText)) {
+              previous = cleanNumericValue(prevText);
+            }
+          }
+        }
+
+        if (!actual) {
+          const actualCell = $row.find('.actualCell');
+          if (actualCell.length > 0) {
+            const actualText = actualCell.text().trim();
+            if (isNumericValue(actualText)) {
+              actual = cleanNumericValue(actualText);
+            }
+          }
+        }
+
+        // Method 3: Fallback to position-based extraction (MyFXBook standard layout)
+        // Order: Date, Status, Flag, Currency, Event, Impact, Previous, Forecast, Actual
+        if ((!previous || !forecast || !actual) && cellTexts.length >= 9) {
+          if (!previous && cellTexts[6] && isNumericValue(cellTexts[6])) {
+            previous = cleanNumericValue(cellTexts[6]);
+          }
+          if (!forecast && cellTexts[7] && isNumericValue(cellTexts[7])) {
+            forecast = cleanNumericValue(cellTexts[7]);
+          }
+          if (!actual && cellTexts[8] && isNumericValue(cellTexts[8])) {
+            actual = cleanNumericValue(cellTexts[8]);
+          }
+        }
+
+        // Debug: Log what we extracted for first few rows
+        if (i < 3 && (actual || forecast || previous)) {
+          logger.info(`🔢 Row ${i} extracted - Previous: "${previous}", Forecast: "${forecast}", Actual: "${actual}"`);
+        }
+
+        // Validate and create event
+        // Only include events that have actual economic data OR are significant events
+        const hasEconomicData = actual || forecast || previous;
+        const isSignificantEvent = impact && impact !== 'None' && impact !== '';
+
+        if (currency && eventName && eventName.length > 3 && (hasEconomicData || isSignificantEvent)) {
+          // Create ISO date string
+          let isoDate = '';
+          if (date && time) {
+            // Convert to proper date format (assuming current year)
+            const year = new Date().getFullYear();
+            const monthMap = {
+              'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+              'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+              'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+            };
+
+            // Try different date formats
+            let dateMatch = date.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})/i);
+            if (dateMatch) {
+              const month = monthMap[dateMatch[1]];
+              const day = dateMatch[2].padStart(2, '0');
+              isoDate = `${year}-${month}-${day}T${time}:00+00:00`;
+            } else {
+              // Try reverse format: "15 Jan"
+              dateMatch = date.match(/(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
+              if (dateMatch) {
+                const day = dateMatch[1].padStart(2, '0');
+                const month = monthMap[dateMatch[2]];
+                isoDate = `${year}-${month}-${day}T${time}:00+00:00`;
+              } else {
+                // Try MM/DD/YYYY format
+                dateMatch = date.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+                if (dateMatch) {
+                  const month = dateMatch[1].padStart(2, '0');
+                  const day = dateMatch[2].padStart(2, '0');
+                  const yearPart = dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3];
+                  isoDate = `${yearPart}-${month}-${day}T${time}:00+00:00`;
+                } else {
+                  // Try YYYY-MM-DD format
+                  dateMatch = date.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+                  if (dateMatch) {
+                    const yearPart = dateMatch[1];
+                    const month = dateMatch[2].padStart(2, '0');
+                    const day = dateMatch[3].padStart(2, '0');
+                    isoDate = `${yearPart}-${month}-${day}T${time}:00+00:00`;
+                  }
+                }
+              }
+            }
+          }
+
+          if (!isoDate) {
+            // Fallback to current date if parsing fails
+            isoDate = new Date().toISOString();
+          }
+
+          const event = {
+            currency,
+            event: cleanEventName(eventName), // Apply proper event name cleaning
+            impact: impact || 'None',
+            time_utc: isoDate,
+            actual: actual || '',
+            forecast: forecast || '',
+            previous: previous || '',
+            country: country || '',
+            flagCode: flagClass || '',
+            flagUrl: flagClass ? getFlagUrl(flagClass) : ''
+          };
+
+          events.push(event);
+
+          if (events.length <= 10) { // Log first 10 events for debugging
+            const actualStr = actual ? ` | A:${actual}` : '';
+            const forecastStr = forecast ? ` | F:${forecast}` : '';
+            const previousStr = previous ? ` | P:${previous}` : '';
+            const countryStr = country ? ` | ${country}` : '';
+            const flagStr = flagClass ? ` | ${flagClass}` : '';
+            logger.info(`✅ Extracted: ${date || 'Unknown'} | ${time || '00:00'} | ${currency} ${eventName} | ${impact || 'Medium'}${actualStr}${forecastStr}${previousStr}${countryStr}${flagStr}`);
+          }
+        }
+
+      } catch (rowError) {
+        // Skip individual row errors
+        logger.warn(`⚠️ Error processing row ${i}:`, rowError);
+      }
+    });
+
+    // Analyze the types of events we extracted
+    const eventsWithData = events.filter(e => e.actual || e.forecast || e.previous);
+    const eventsWithoutData = events.filter(e => !e.actual && !e.forecast && !e.previous);
+    const eventsWithCountry = events.filter(e => e.country);
+    const countries = [...new Set(events.map(e => e.country).filter(c => c))];
+    const flagCodes = [...new Set(events.map(e => e.flagCode).filter(f => f))];
+
+    logger.info(`🎉 Successfully extracted ${events.length} events`);
+    logger.info(`📊 Events with economic data: ${eventsWithData.length}`);
+    logger.info(`📅 Events without data (holidays/announcements): ${eventsWithoutData.length}`);
+    logger.info(`🏳️ Events with country info: ${eventsWithCountry.length}`);
+    logger.info(`🌍 Countries found: ${countries.join(', ')}`);
+    logger.info(`🚩 Flag codes found: ${flagCodes.join(', ')}`);
+
+    if (eventsWithData.length > 0) {
+      logger.info(`💰 Sample events with data:`);
+      eventsWithData.slice(0, 3).forEach((event, i) => {
+        const dataStr = [
+          event.actual ? `A:${event.actual}` : '',
+          event.forecast ? `F:${event.forecast}` : '',
+          event.previous ? `P:${event.previous}` : ''
+        ].filter(s => s).join(', ');
+        const locationStr = event.country ? ` [${event.country}]` : '';
+        const flagStr = event.flagUrl ? ` 🏳️ ${event.flagUrl}` : '';
+        logger.info(`  ${i + 1}. ${event.currency} ${event.event}${locationStr} (${dataStr})${flagStr}`);
+      });
+    }
+
+    return events;
+
+  } catch (error) {
+    logger.error('❌ Error in parseMyFXBookWeeklyEnhanced:', error);
+    throw error;
+  }
+}
 
 /**
  * Clean event names by removing currency prefixes, time indicators, and impact levels
@@ -35,13 +526,16 @@ function cleanEventName(eventName) {
     cleaned = cleaned.replace(new RegExp(`\\b${curr}\\b`, 'g'), '').trim();
   });
 
-  // Remove time indicators like "4h 5min", "35 min", etc.
+  // Remove time indicators like "4h 5min", "35 min", "28 min", etc.
   cleaned = cleaned.replace(/\d+h\s*\d*min?/gi, '').trim();
   cleaned = cleaned.replace(/\d+\s*min/gi, '').trim();
   cleaned = cleaned.replace(/\d+h/gi, '').trim();
 
   // Remove "days" prefix that sometimes appears
   cleaned = cleaned.replace(/^days\s+/i, '').trim();
+
+  // Remove common prefixes that include currency
+  cleaned = cleaned.replace(/^(USD|EUR|GBP|JPY|AUD|CAD|CHF|NZD)\s*/gi, '').trim();
 
   // Remove impact level indicators that get mixed into event names
   cleaned = cleaned.replace(/\s+(High|Medium|Low)\s*$/gi, '').trim();
@@ -52,10 +546,6 @@ function cleanEventName(eventName) {
 
   // Remove trailing incomplete parentheses like "(May" or "(Jun"
   cleaned = cleaned.replace(/\s*\([A-Za-z]{3}$/, '').trim();
-
-  // Remove common prefixes/suffixes that might be artifacts
-  cleaned = cleaned.replace(/^[\d\s:]+/, ''); // Remove leading time/numbers
-  cleaned = cleaned.replace(/\s*\([^)]*\)\s*$/, ''); // Remove trailing parentheses
 
   // Remove leading/trailing special characters and extra spaces
   cleaned = cleaned.replace(/^[^\w]+|[^\w]+$/g, '').trim();
@@ -69,180 +559,12 @@ function cleanEventName(eventName) {
   // Final cleanup
   cleaned = cleaned.replace(/^\s+|\s+$/g, '').trim();
 
-  return cleaned;
-}
-
-/**
- * Parse MyFXBook HTML using the same reliable logic as our cloud function
- */
-function parseMyFXBookHTML(html) {
-  console.log('🔧 Parsing MyFXBook HTML with reliable table-based logic...');
-
-  try {
-    const $ = cheerio.load(html);
-    const events = [];
-
-    // Valid currencies for filtering
-    const validCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
-
-    console.log('🔍 Looking for table rows with structured economic data...');
-
-    // Find all table rows and process them systematically
-    const rows = $('tr');
-    console.log(`📊 Found ${rows.length} table rows to analyze`);
-
-    rows.each((index, row) => {
-      try {
-        const $row = $(row);
-        const cells = $row.find('td');
-        
-        // Only process rows with sufficient cells (proper table structure)
-        if (cells.length >= 4) {
-          const rowText = $row.text();
-          
-          // Look for date patterns to identify event rows
-          const datePatterns = [
-            /Jun\s+\d{1,2}/i,
-            /\d{1,2}\s+Jun/i,
-            /June\s+\d{1,2}/i,
-            /\d{1,2}\s+June/i,
-            /Jul\s+\d{1,2}/i,
-            /\d{1,2}\s+Jul/i,
-            /July\s+\d{1,2}/i,
-            /\d{1,2}\s+July/i,
-            /Aug\s+\d{1,2}/i,
-            /\d{1,2}\s+Aug/i,
-            /Sep\s+\d{1,2}/i,
-            /\d{1,2}\s+Sep/i,
-            /Oct\s+\d{1,2}/i,
-            /\d{1,2}\s+Oct/i,
-            /Nov\s+\d{1,2}/i,
-            /\d{1,2}\s+Nov/i,
-            /Dec\s+\d{1,2}/i,
-            /\d{1,2}\s+Dec/i,
-            /Jan\s+\d{1,2}/i,
-            /\d{1,2}\s+Jan/i,
-            /Feb\s+\d{1,2}/i,
-            /\d{1,2}\s+Feb/i,
-            /Mar\s+\d{1,2}/i,
-            /\d{1,2}\s+Mar/i,
-            /Apr\s+\d{1,2}/i,
-            /\d{1,2}\s+Apr/i,
-            /May\s+\d{1,2}/i,
-            /\d{1,2}\s+May/i
-          ];
-          
-          const hasDateMatch = datePatterns.some(pattern => pattern.test(rowText));
-          
-          if (hasDateMatch) {
-            // Extract data from individual cells using reliable cell-based parsing
-            let time = '';
-            let currency = '';
-            let eventName = '';
-            let impact = '';
-            let dateStr = '';
-            
-            cells.each((cellIndex, cell) => {
-              const cellText = $(cell).text().trim();
-              
-              // Cell 0: Usually contains date and time
-              if (cellIndex === 0 && hasDateMatch) {
-                // Extract date
-                for (const pattern of datePatterns) {
-                  const dateMatch = cellText.match(pattern);
-                  if (dateMatch) {
-                    dateStr = dateMatch[0];
-                    break;
-                  }
-                }
-                
-                // Extract time from the same cell
-                const timeMatch = cellText.match(/(\d{1,2}):(\d{2})/);
-                if (timeMatch) {
-                  time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
-                }
-              }
-              
-              // Look for currency (3-letter currency codes)
-              if (/^(USD|EUR|GBP|JPY|AUD|CAD|CHF)$/.test(cellText)) {
-                currency = cellText;
-              }
-              
-              // Look for impact level
-              if (/^(High|Medium|Low)$/i.test(cellText)) {
-                impact = cellText;
-              }
-              
-              // Look for event name (Cell 3 typically contains the main event description)
-              if (cellIndex === 3 && cellText.length > 3 &&
-                  !/^(USD|EUR|GBP|JPY|AUD|CAD|CHF)$/i.test(cellText) &&
-                  !/^(High|Medium|Low)$/i.test(cellText) &&
-                  !/^\d{1,2}:\d{2}$/.test(cellText) &&
-                  !/^[\d.,%-]+$/.test(cellText) &&
-                  !/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{1,2}:\d{2}$/i.test(cellText)) { // Exclude date/time patterns
-                eventName = cellText;
-              }
-            });
-            
-            // Validate and create event only if we have essential data
-            if (time && currency && eventName && validCurrencies.includes(currency)) {
-              // Convert date to ISO format
-              let isoDate = '';
-              if (dateStr) {
-                const year = new Date().getFullYear();
-                let month = '';
-                let day = '';
-                
-                const monthMap = {
-                  'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
-                  'may': '05', 'jun': '06', 'jul': '07', 'aug': '08',
-                  'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
-                };
-                
-                for (const [monthName, monthNum] of Object.entries(monthMap)) {
-                  if (dateStr.toLowerCase().includes(monthName)) {
-                    month = monthNum;
-                    day = dateStr.replace(/[^\d]/g, '').padStart(2, '0');
-                    break;
-                  }
-                }
-                
-                if (month && day) {
-                  isoDate = `${year}-${month}-${day}`;
-                }
-              }
-              
-              // Use current date as fallback
-              if (!isoDate) {
-                isoDate = new Date().toISOString().split('T')[0];
-              }
-              
-              const event = {
-                currency: currency,
-                event: cleanEventName(eventName),
-                impact: impact || 'Medium',
-                time_utc: `${isoDate}T${time}:00+00:00`,
-                actual: '',
-                forecast: '',
-                previous: ''
-              };
-              
-              events.push(event);
-            }
-          }
-        }
-      } catch (error) {
-        console.warn(`Error processing row ${index}:`, error);
-      }
-    });
-
-    console.log(`🎉 Successfully extracted ${events.length} events using reliable parsing`);
-    return events;
-
-  } catch (error) {
-    console.error('❌ Error parsing HTML:', error);
-    throw error;
+  // Capitalize first letter
+  if (cleaned.length > 0) {
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
   }
+
+  return cleaned;
 }
 
 /**
@@ -255,7 +577,7 @@ async function storeEventsInDatabase(events) {
     // Create a cloud function that can accept manual events
     // For now, we'll create a simple JSON output that can be manually imported
     console.log('\n📄 EVENTS DATA FOR MANUAL IMPORT:');
-    console.log('=' .repeat(60));
+    console.log('='.repeat(60));
 
     const eventsData = {
       source: 'manual-html-import',
@@ -263,11 +585,11 @@ async function storeEventsInDatabase(events) {
       events: events,
       summary: {
         totalEvents: events.length,
-        currencies: [...new Set(events.map(e => e.currency))],
-        impacts: [...new Set(events.map(e => e.impact))],
+        currencies: Array.from(new Set(events.map(e => e.currency))),
+        impacts: Array.from(new Set(events.map(e => e.impact))),
         dateRange: {
-          start: Math.min(...events.map(e => e.time_utc)),
-          end: Math.max(...events.map(e => e.time_utc))
+          start: events.length > 0 ? events.map(e => e.time_utc).sort()[0] : '',
+          end: events.length > 0 ? events.map(e => e.time_utc).sort().reverse()[0] : ''
         }
       }
     };
@@ -298,7 +620,7 @@ async function storeEventsInDatabase(events) {
  */
 async function importHTMLToDatabase(htmlFilePath) {
   console.log('🚀 MANUAL HTML IMPORT TO DATABASE\n');
-  console.log('=' .repeat(60));
+  console.log('='.repeat(60));
 
   try {
     // Check if HTML file exists
@@ -311,7 +633,7 @@ async function importHTMLToDatabase(htmlFilePath) {
     console.log(`📊 HTML file size: ${html.length.toLocaleString()} characters`);
 
     // Parse the HTML
-    const events = parseMyFXBookHTML(html);
+    const events = await parseMyFXBookWeeklyEnhanced(html);
 
     if (events.length === 0) {
       console.log('❌ No events found in HTML. Please check the HTML content.');
@@ -320,13 +642,13 @@ async function importHTMLToDatabase(htmlFilePath) {
 
     // Analyze the events
     console.log('\n📊 EVENTS ANALYSIS:');
-    const currencies = [...new Set(events.map(e => e.currency))];
-    const impacts = [...new Set(events.map(e => e.impact))];
-    const dates = [...new Set(events.map(e => e.time_utc.split('T')[0]))];
+    const currencies = Array.from(new Set(events.map(e => e.currency)));
+    const impacts = Array.from(new Set(events.map(e => e.impact)));
+    const dates = Array.from(new Set(events.map(e => e.time_utc.split('T')[0])));
 
     console.log(`💱 Currencies: ${currencies.join(', ')}`);
     console.log(`🎯 Impact levels: ${impacts.join(', ')}`);
-    console.log(`📅 Date range: ${Math.min(...dates)} to ${Math.max(...dates)}`);
+    console.log(`📅 Date range: ${dates.length > 0 ? dates.sort()[0] : 'N/A'} to ${dates.length > 0 ? dates.sort().reverse()[0] : 'N/A'}`);
     console.log(`📈 Total events: ${events.length}`);
 
     // Show sample events
@@ -339,7 +661,7 @@ async function importHTMLToDatabase(htmlFilePath) {
     // Ask for confirmation
     console.log('\n❓ Do you want to proceed with importing these events to the database?');
     console.log('   Press Ctrl+C to cancel, or wait 5 seconds to continue...');
-    
+
     await new Promise(resolve => setTimeout(resolve, 5000));
 
     // Store in database
@@ -356,9 +678,9 @@ async function importHTMLToDatabase(htmlFilePath) {
 }
 
 // Command line usage
-if (require.main === module) {
+async function main() {
   const htmlFilePath = process.argv[2];
-  
+
   if (!htmlFilePath) {
     console.log('📖 USAGE:');
     console.log('  node import-manual-html.js <path-to-html-file>');
@@ -375,12 +697,19 @@ if (require.main === module) {
     process.exit(1);
   }
 
-  importHTMLToDatabase(htmlFilePath).catch(console.error);
+  await importHTMLToDatabase(htmlFilePath);
 }
 
+// Export functions for module usage
 module.exports = {
-  parseMyFXBookHTML,
+  parseMyFXBookHTML: parseMyFXBookWeeklyEnhanced,
+  parseMyFXBookWeeklyEnhanced,
   storeEventsInDatabase,
   importHTMLToDatabase,
   cleanEventName
 };
+
+// Run main function if this file is executed directly
+if (require.main === module) {
+  main().catch(console.error);
+}
