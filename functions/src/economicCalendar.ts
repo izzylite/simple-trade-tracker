@@ -652,7 +652,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
           // Normalize time to remove milliseconds and create consistent format
           const normalizedTime = new Date(eventTime);
           normalizedTime.setSeconds(0, 0); // Remove seconds and milliseconds
-
+          flagClass = flagClass === "emu" || flagClass === "em" ? "eu" : flagClass;
           const event: EconomicEvent = {
             id: eventId,
             currency,
@@ -798,42 +798,73 @@ function cleanEventName(eventName: string): string {
 }
 
 /**
- * Test MyFXBook scraper (callable function for testing)
+ * Process HTML content and store economic events in database
+ * This function accepts HTML content (e.g., from manual MyFXBook export) and processes it
  */
-export const testMyFXBookScraper = onCall(
+export const processHtmlEconomicEvents = onCall(
   {
-    memory: '512MiB',
-    timeoutSeconds: 60,
-    region: 'us-central1'
+    region: 'us-central1',
+    memory: '1GiB', // Increased memory for HTML processing
+    timeoutSeconds: 300 // 5 minutes timeout for large HTML files
   },
-  async (_request) => {
-    logger.info('Testing MyFXBook scraper');
-
+  async (request) => {
     try {
-      const today = new Date();
-      const dateString = today.toISOString().split('T')[0];
+      const { htmlContent } = request.data;
 
-      logger.info(`Testing MyFXBook scraper for date: ${dateString}`);
+      if (!htmlContent || typeof htmlContent !== 'string') {
+        throw new Error('HTML content is required and must be a string');
+      }
 
-      // Test weekly MyFXBook scraping
-      const events = await fetchFromMyFXBookWeekly();
+      logger.info('🔄 Processing HTML content for economic events');
+      logger.info(`📊 HTML content size: ${htmlContent.length} characters`);
 
-      logger.info(`MyFXBook test completed. Found ${events.length} events`);
+      // Process the HTML using the same logic as fetchFromMyFXBookWeekly
+      const events = await parseMyFXBookWeeklyEnhanced(htmlContent);
+
+      logger.info(`🎉 Successfully processed ${events.length} events from HTML`);
+
+      // Filter for major currencies (same as auto-refresh)
+      const majorCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
+      const majorCurrencyEvents = events.filter(event =>
+        majorCurrencies.includes(event.currency)
+      );
+
+      logger.info(`✅ Filtered ${events.length} total events to ${majorCurrencyEvents.length} major currency events`);
+
+      // Store events in database
+      await storeEventsInDatabase(majorCurrencyEvents);
+
+      logger.info(`💾 Successfully stored ${majorCurrencyEvents.length} events in database`);
 
       return {
         success: true,
-        date: dateString,
-        eventCount: events.length,
-        events: events.slice(0, 5), // Return first 5 events as sample
-        message: `Successfully scraped ${events.length} events from MyFXBook`
+        message: `Successfully processed and stored economic events`,
+        totalEvents: events.length,
+        majorCurrencyEvents: majorCurrencyEvents.length,
+        currencies: [...new Set(events.map(e => e.currency))],
+        dateRange: {
+          start: events.length > 0 ? events.map(e => e.date).sort()[0] : null,
+          end: events.length > 0 ? events.map(e => e.date).sort().reverse()[0] : null
+        },
+        sampleEvents: majorCurrencyEvents.slice(0, 5).map(event => ({
+          id: event.id,
+          currency: event.currency,
+          event: event.event,
+          impact: event.impact,
+          time_utc: event.time_utc,
+          country: event.country,
+          flagCode: event.flagCode
+        }))
       };
+
     } catch (error) {
-      logger.error('MyFXBook test failed:', error);
+      logger.error('❌ Error processing HTML economic events:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        message: 'MyFXBook scraping test failed'
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }
 );
+
+ 
