@@ -1,5 +1,6 @@
 const cheerio = require('cheerio');
 const fs = require('fs');
+const crypto = require('crypto');
 
 // Add logger implementation
 const logger = {
@@ -64,6 +65,21 @@ function getFlagUrl(countryCode, size = 'w160') {
 
   // Use FlagCDN for reliable flag images
   return `https://flagcdn.com/${size}/${countryCode.toLowerCase()}.png`;
+}
+
+/**
+ * Generate a unique ID for an economic event
+ * Based on currency, event name, date, and time to ensure uniqueness
+ */
+function generateEventId(currency, eventName, dateTime, impact) {
+  // Create a string that uniquely identifies this event
+  const uniqueString = `${currency}-${eventName}-${dateTime}-${impact}`.toLowerCase();
+
+  // Generate a hash of the unique string
+  const hash = crypto.createHash('sha256').update(uniqueString).digest('hex');
+
+  // Return first 20 characters to match Firebase ID standards
+  return hash.substring(0, 20);
 }
 
 /**
@@ -298,7 +314,26 @@ async function parseMyFXBookWeeklyEnhanced(html) {
         // Extract event name from specific cell position (Cell 4 typically contains event description)
         // Only use structured table data, not pattern matching
         if (cellTexts.length >= 5) {
-          const potentialEventName = cellTexts[4]; // Cell 4 is typically the event description
+          let potentialEventName = cellTexts[4]; // Cell 4 is typically the event description
+
+          // Check if event name is split across multiple cells (common with MyFXBook)
+          // Look for incomplete parentheses and try to complete them from adjacent cells
+          if (potentialEventName && potentialEventName.includes('(') && !potentialEventName.includes(')')) {
+            // Try to find the closing part in the next few cells
+            for (let nextCell = 5; nextCell < Math.min(cellTexts.length, 8); nextCell++) {
+              const nextCellText = cellTexts[nextCell];
+              if (nextCellText && nextCellText.includes(')')) {
+                // Found potential closing part, combine them
+                potentialEventName = potentialEventName + ' ' + nextCellText;
+                break;
+              } else if (nextCellText && nextCellText.length > 0 && nextCellText.length < 10) {
+                // Short text that might be part of the event name
+                potentialEventName = potentialEventName + ' ' + nextCellText;
+                if (potentialEventName.includes(')')) break; // Stop if we found closing parenthesis
+              }
+            }
+          }
+
           if (potentialEventName &&
               potentialEventName.length > 3 &&
               !validCurrencies.includes(potentialEventName) &&
@@ -436,13 +471,25 @@ async function parseMyFXBookWeeklyEnhanced(html) {
           }
 
           if (!isoDate) {
-            // Fallback to current date if parsing fails
-            isoDate = new Date().toISOString();
+            // Skip events without valid dates - we only want actual scraped data
+            logger.info(`⚠️ Skipping event "${eventName}" - no valid date found`);
+            return; // Skip this row in the .each() loop
           }
 
+          const cleanedEventName = cleanEventName(eventName);
+
+          // Debug: Log the cleaning process for first few events
+          if (events.length < 5 && eventName !== cleanedEventName) {
+            logger.info(`🔧 Event cleaning: "${eventName}" → "${cleanedEventName}"`);
+          }
+
+          // Generate unique ID for the event
+          const eventId = generateEventId(currency, cleanedEventName, isoDate, impact || 'None');
+
           const event = {
+            id: eventId,
             currency,
-            event: cleanEventName(eventName), // Apply proper event name cleaning
+            event: cleanedEventName, // Apply proper event name cleaning
             impact: impact || 'None',
             time_utc: isoDate,
             actual: actual || '',
@@ -544,11 +591,48 @@ function cleanEventName(eventName) {
   // Remove leading "min" that appears in some events
   cleaned = cleaned.replace(/^min\s+/gi, '').trim();
 
-  // Remove trailing incomplete parentheses like "(May" or "(Jun"
-  cleaned = cleaned.replace(/\s*\([A-Za-z]{3}$/, '').trim();
+  // Don't remove trailing month abbreviations - we'll fix them by adding closing bracket
 
-  // Remove leading/trailing special characters and extra spaces
-  cleaned = cleaned.replace(/^[^\w]+|[^\w]+$/g, '').trim();
+
+
+  // Fix incomplete parentheses by adding missing closing bracket
+  // Only fix if there are unmatched opening parentheses
+  const openCount = (cleaned.match(/\(/g) || []).length;
+  const closeCount = (cleaned.match(/\)/g) || []).length;
+
+  if (openCount > closeCount) {
+    // More opening than closing - add missing closing parentheses
+    const missingClosing = openCount - closeCount;
+
+    // Only add closing brackets if the opening parenthesis has meaningful content
+    // Check if the last opening parenthesis has content after it
+    const lastOpenIndex = cleaned.lastIndexOf('(');
+    if (lastOpenIndex !== -1) {
+      const afterParen = cleaned.substring(lastOpenIndex + 1).trim();
+
+      // Only add closing bracket if there's meaningful content (not just whitespace)
+      if (afterParen.length > 0) {
+        // Add closing bracket at the end
+        cleaned = cleaned + ')'.repeat(missingClosing);
+      } else {
+        // If opening parenthesis has no content, remove it
+        cleaned = cleaned.substring(0, lastOpenIndex).trim();
+      }
+    }
+  } else if (closeCount > openCount) {
+    // More closing than opening - remove extra closing parentheses from the end
+    const extraClosing = closeCount - openCount;
+    for (let i = 0; i < extraClosing; i++) {
+      const lastCloseIndex = cleaned.lastIndexOf(')');
+      if (lastCloseIndex !== -1) {
+        cleaned = cleaned.substring(0, lastCloseIndex) + cleaned.substring(lastCloseIndex + 1);
+      }
+    }
+    cleaned = cleaned.trim();
+  }
+
+  // Remove leading/trailing special characters (but preserve parentheses) and extra spaces
+  cleaned = cleaned.replace(/^[^\w(]+|[^\w)]+$/g, '').trim();
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
   // Remove any remaining currency codes that might be embedded
@@ -563,6 +647,11 @@ function cleanEventName(eventName) {
   if (cleaned.length > 0) {
     cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
   }
+
+  // Debug logging for first few events to see what's happening
+  // if (originalName.includes('(') && originalName !== cleaned) {
+  //   logger.info(`🧹 Cleaned: "${originalName}" → "${cleaned}"`);
+  // }
 
   return cleaned;
 }
@@ -706,7 +795,8 @@ module.exports = {
   parseMyFXBookWeeklyEnhanced,
   storeEventsInDatabase,
   importHTMLToDatabase,
-  cleanEventName
+  cleanEventName,
+  generateEventId
 };
 
 // Run main function if this file is executed directly

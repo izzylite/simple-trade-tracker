@@ -29,8 +29,8 @@ interface EconomicEvent {
   source: string;
 }
 
- 
- 
+
+
 /**
  * Auto-refresh economic calendar data (runs weekly on Mondays at 6 AM UTC)
  * Stores individual events in economicEvents collection for efficient querying
@@ -120,7 +120,7 @@ async function fetchFromMyFXBookWeekly(): Promise<EconomicEvent[]> {
   }
 }
 
- 
+
 /**
  * Store events in database for efficient frontend querying with deduplication
  */
@@ -161,8 +161,8 @@ async function storeEventsInDatabase(events: EconomicEvent[]): Promise<void> {
   logger.info(`Successfully stored ${uniqueEventsArray.length} unique events in database`);
 }
 
-  
- 
+
+
 
 /**
  * Manually trigger database population (for testing)
@@ -197,7 +197,7 @@ export const populateDatabaseManually = onCall(
 
       // Store events in database with deduplication
       await storeEventsInDatabase(majorCurrencyEvents);
- 
+
 
       logger.info(`Manual population completed: ${majorCurrencyEvents.length} events stored`);
 
@@ -220,7 +220,7 @@ export const populateDatabaseManually = onCall(
     }
   }
 );
- 
+
 
 /**
  * Check if a value looks like a numeric economic indicator
@@ -504,12 +504,12 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
           }
 
           if (potentialEventName &&
-              potentialEventName.length > 3 &&
-              !validCurrencies.includes(potentialEventName) &&
-              !validImpacts.includes(potentialEventName) &&
-              !potentialEventName.match(/^\d{1,2}:\d{2}$/) &&
-              !potentialEventName.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}$/i) &&
-              !potentialEventName.match(/^\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/i)) {
+            potentialEventName.length > 3 &&
+            !validCurrencies.includes(potentialEventName) &&
+            !validImpacts.includes(potentialEventName) &&
+            !potentialEventName.match(/^\d{1,2}:\d{2}$/) &&
+            !potentialEventName.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}$/i) &&
+            !potentialEventName.match(/^\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/i)) {
             eventName = potentialEventName;
           }
         }
@@ -635,8 +635,9 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
           }
 
           if (!isoDate) {
-            // Fallback to current date if parsing fails
-            isoDate = new Date().toISOString();
+            // Skip events without valid dates - we only want actual scraped data
+            logger.warn(`⚠️ Skipping event "${eventName}" - no valid date found`);
+            return; // Skip this row in the .each() loop
           }
 
           const cleanedEventName = cleanEventName(eventName);
@@ -689,33 +690,9 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
       }
     });
 
-    // Analyze the types of events we extracted
-    const eventsWithData = events.filter(e => e.actual || e.forecast || e.previous);
-    const eventsWithoutData = events.filter(e => !e.actual && !e.forecast && !e.previous);
-    const eventsWithCountry = events.filter(e => e.country);
-    const countries = Array.from(new Set(events.map(e => e.country).filter(c => c)));
-    const flagCodes = Array.from(new Set(events.map(e => e.flagCode).filter(f => f)));
 
     logger.info(`🎉 Successfully extracted ${events.length} events`);
-    logger.info(`📊 Events with economic data: ${eventsWithData.length}`);
-    logger.info(`📅 Events without data (holidays/announcements): ${eventsWithoutData.length}`);
-    logger.info(`🏳️ Events with country info: ${eventsWithCountry.length}`);
-    logger.info(`🌍 Countries found: ${countries.join(', ')}`);
-    logger.info(`🚩 Flag codes found: ${flagCodes.join(', ')}`);
 
-    if (eventsWithData.length > 0) {
-      logger.info(`💰 Sample events with data:`);
-      eventsWithData.slice(0, 3).forEach((event, i) => {
-        const dataStr = [
-          event.actual ? `A:${event.actual}` : '',
-          event.forecast ? `F:${event.forecast}` : '',
-          event.previous ? `P:${event.previous}` : ''
-        ].filter(s => s).join(', ');
-        const locationStr = event.country ? ` [${event.country}]` : '';
-        const flagStr = event.flagUrl ? ` 🏳️ ${event.flagUrl}` : '';
-        logger.info(`  ${i + 1}. ${event.currency} ${event.event}${locationStr} (${dataStr})${flagStr}`);
-      });
-    }
 
     return events;
 
