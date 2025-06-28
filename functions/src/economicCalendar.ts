@@ -7,16 +7,26 @@ import { onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
+import * as crypto from 'crypto';
 
 // Types
 interface EconomicEvent {
+  id: string;
   currency: string;
   event: string;
   impact: string;
   time_utc: string;
+  time: Date;
+  timeUtc: string;
+  date: string;
   actual: string;
   forecast: string;
   previous: string;
+  country: string;
+  flagCode: string;
+  flagUrl: string;
+  lastUpdated: number;
+  source: string;
 }
 
  
@@ -117,49 +127,14 @@ async function fetchFromMyFXBookWeekly(): Promise<EconomicEvent[]> {
 async function storeEventsInDatabase(events: EconomicEvent[]): Promise<void> {
   const db = getFirestore();
 
-  logger.info(`Processing ${events.length} events for database storage with deduplication`);
+  logger.info(`Storing ${events.length} events in database`);
 
-  // Create deterministic event IDs based on content, not array index
-  const processedEvents = events.map(event => {
-    // Create a stable hash-like ID based on event content
-    const eventTime = new Date(event.time_utc);
-    const eventDate = event.time_utc.split('T')[0]; // YYYY-MM-DD
-
-    // Normalize time to remove milliseconds and create consistent format
-    const normalizedTime = new Date(eventTime);
-    normalizedTime.setSeconds(0, 0); // Remove seconds and milliseconds
-    const timeString = normalizedTime.toISOString().replace(/[:.T-]/g, '').substring(0, 12); // YYYYMMDDHHMM
-
-    // Normalize event name for consistent ID generation
-    const normalizedEventName = event.event
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '') // Remove all non-alphanumeric
-      .substring(0, 15); // Limit length
-
-    // Create unique ID based on currency, date, time (without seconds), and normalized event name
-    const eventId = `${event.currency}_${eventDate}_${timeString}_${normalizedEventName}`;
-
-    return {
-      id: eventId,
-      currency: event.currency,
-      event: cleanEventName(event.event), // ✅ Apply event name cleaning here!
-      impact: event.impact,
-      time: normalizedTime, // Use normalized time for consistency
-      timeUtc: event.time_utc,
-      date: eventDate, // String date for exact date queries
-      actual: event.actual || '',
-      forecast: event.forecast || '',
-      previous: event.previous || '',
-      lastUpdated: Date.now(),
-      source: 'myfxbook'
-    };
-  });
-
-  // Remove duplicates based on ID
-  const uniqueEvents = processedEvents.reduce((acc, event) => {
+  // Events are already processed with all necessary fields in fetchFromMyFXBookWeekly
+  // Remove duplicates based on ID (in case the same event appears multiple times in the source)
+  const uniqueEvents = events.reduce((acc, event) => {
     acc[event.id] = event; // This will overwrite duplicates
     return acc;
-  }, {} as Record<string, any>);
+  }, {} as Record<string, EconomicEvent>);
 
   const uniqueEventsArray = Object.values(uniqueEvents);
   logger.info(`Deduplicated ${events.length} events to ${uniqueEventsArray.length} unique events`);
@@ -296,6 +271,31 @@ function cleanNumericValue(value: string): string {
 }
 
 /**
+ * Get flag image URL from country code
+ */
+function getFlagUrl(countryCode: string, size: string = 'w160'): string {
+  if (!countryCode) return '';
+
+  // Use FlagCDN for reliable flag images
+  return `https://flagcdn.com/${size}/${countryCode.toLowerCase()}.png`;
+}
+
+/**
+ * Generate a unique ID for an economic event
+ * Based on currency, event name, date, and time to ensure uniqueness
+ */
+function generateEventId(currency: string, eventName: string, dateTime: string, impact: string): string {
+  // Create a string that uniquely identifies this event
+  const uniqueString = `${currency}-${eventName}-${dateTime}-${impact}`.toLowerCase();
+
+  // Generate a hash of the unique string
+  const hash = crypto.createHash('sha256').update(uniqueString).digest('hex');
+
+  // Return first 20 characters to match Firebase ID standards
+  return hash.substring(0, 20);
+}
+
+/**
  * Enhanced MyFXBook weekly parsing using our tested logic
  */
 async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[]> {
@@ -380,6 +380,8 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
         let actual = '';
         let forecast = '';
         let previous = '';
+        let country = '';
+        let flagClass = '';
 
         // Find currency (look for 3-letter currency codes)
         for (const cell of cellTexts) {
@@ -398,6 +400,73 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
           }
         }
 
+        // Extract country and flag information from the flag column (typically 3rd column)
+        const $flagCells = $row.find('td');
+        $flagCells.each((cellIndex: number, cell: any) => {
+          const $cell = $(cell);
+
+          // Debug: Log cell content for first few rows to understand structure
+          if (i < 3 && cellIndex < 5) {
+            const cellHtml = $cell.html();
+            if (cellHtml && cellHtml.includes('flag')) {
+              logger.info(`🔍 Flag cell ${cellIndex} HTML: ${cellHtml.substring(0, 200)}`);
+            }
+          }
+
+          // Look for flag elements - MyFXBook uses specific patterns
+          const $flagIcon = $cell.find('i[title]'); // Icon with title attribute
+          const $flagSpan = $cell.find('span.flag'); // Span with flag class
+          const $allFlags = $cell.find('[class*="flag"]'); // Any element with "flag" in class
+
+          if ($flagIcon.length > 0) {
+            // Extract country from title attribute
+            const titleAttr = $flagIcon.attr('title');
+            if (titleAttr && titleAttr.length > 0) {
+              country = titleAttr.trim();
+              if (i < 3) logger.info(`🏳️ Found country from title: ${country}`);
+            }
+
+            // Extract country from class attribute as backup
+            if (!country) {
+              const classAttr = $flagIcon.attr('class');
+              if (classAttr) {
+                // Look for country name in class (e.g., "United States align-center")
+                const countryMatch = classAttr.match(/^([A-Za-z\s]+)\s+align-center/);
+                if (countryMatch) {
+                  country = countryMatch[1].trim();
+                  if (i < 3) logger.info(`🏳️ Found country from class: ${country}`);
+                }
+              }
+            }
+          }
+
+          if ($flagSpan.length > 0) {
+            // Extract flag class (e.g., "flag-icon-us")
+            const spanClass = $flagSpan.attr('class');
+            if (spanClass) {
+              const flagMatch = spanClass.match(/flag-icon-([a-z]{2})/);
+              if (flagMatch) {
+                flagClass = flagMatch[1]; // Extract country code (e.g., "us")
+                if (i < 3) logger.info(`🚩 Found flag code: ${flagClass}`);
+              }
+            }
+          }
+
+          // Alternative: Look for any flag-related classes
+          if (!flagClass && $allFlags.length > 0) {
+            $allFlags.each((_idx: number, flagEl: any) => {
+              const flagElClass = $(flagEl).attr('class');
+              if (flagElClass) {
+                const flagMatch = flagElClass.match(/flag-icon-([a-z]{2})/);
+                if (flagMatch) {
+                  flagClass = flagMatch[1];
+                  if (i < 3) logger.info(`🚩 Found flag code from alternative search: ${flagClass}`);
+                }
+              }
+            });
+          }
+        });
+
         // Extract date from first cell - updated to handle all months
         const dateCell = cellTexts[0] || '';
         const dateMatch = dateCell.match(/((Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}|\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2})/i);
@@ -414,7 +483,26 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
         // Extract event name from specific cell position (Cell 4 typically contains event description)
         // Only use structured table data, not pattern matching
         if (cellTexts.length >= 5) {
-          const potentialEventName = cellTexts[4]; // Cell 4 is typically the event description
+          let potentialEventName = cellTexts[4]; // Cell 4 is typically the event description
+
+          // Check if event name is split across multiple cells (common with MyFXBook)
+          // Look for incomplete parentheses and try to complete them from adjacent cells
+          if (potentialEventName && potentialEventName.includes('(') && !potentialEventName.includes(')')) {
+            // Try to find the closing part in the next few cells
+            for (let nextCell = 5; nextCell < Math.min(cellTexts.length, 8); nextCell++) {
+              const nextCellText = cellTexts[nextCell];
+              if (nextCellText && nextCellText.includes(')')) {
+                // Found potential closing part, combine them
+                potentialEventName = potentialEventName + ' ' + nextCellText;
+                break;
+              } else if (nextCellText && nextCellText.length > 0 && nextCellText.length < 10) {
+                // Short text that might be part of the event name
+                potentialEventName = potentialEventName + ' ' + nextCellText;
+                if (potentialEventName.includes(')')) break; // Stop if we found closing parenthesis
+              }
+            }
+          }
+
           if (potentialEventName &&
               potentialEventName.length > 3 &&
               !validCurrencies.includes(potentialEventName) &&
@@ -551,14 +639,36 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
             isoDate = new Date().toISOString();
           }
 
+          const cleanedEventName = cleanEventName(eventName);
+
+          // Generate unique ID for the event
+          const eventId = generateEventId(currency, cleanedEventName, isoDate, impact || 'None');
+
+          // Add extra fields for database storage
+          const eventTime = new Date(isoDate);
+          const eventDate = isoDate.split('T')[0]; // YYYY-MM-DD
+
+          // Normalize time to remove milliseconds and create consistent format
+          const normalizedTime = new Date(eventTime);
+          normalizedTime.setSeconds(0, 0); // Remove seconds and milliseconds
+
           const event: EconomicEvent = {
+            id: eventId,
             currency,
-            event: cleanEventName(eventName), // Apply proper event name cleaning
+            event: cleanedEventName, // Apply proper event name cleaning
             impact: impact || 'None',
             time_utc: isoDate,
+            time: normalizedTime, // Use normalized time for consistency
+            timeUtc: isoDate,
+            date: eventDate, // String date for exact date queries
             actual: actual || '',
             forecast: forecast || '',
-            previous: previous || ''
+            previous: previous || '',
+            country: country || '',
+            flagCode: flagClass || '',
+            flagUrl: flagClass ? getFlagUrl(flagClass) : '',
+            lastUpdated: Date.now(),
+            source: 'myfxbook'
           };
 
           events.push(event);
@@ -567,7 +677,9 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
             const actualStr = actual ? ` | A:${actual}` : '';
             const forecastStr = forecast ? ` | F:${forecast}` : '';
             const previousStr = previous ? ` | P:${previous}` : '';
-            logger.info(`✅ Extracted: ${date || 'Unknown'} | ${time || '00:00'} | ${currency} ${eventName} | ${impact || 'Medium'}${actualStr}${forecastStr}${previousStr}`);
+            const countryStr = country ? ` | ${country}` : '';
+            const flagStr = flagClass ? ` | ${flagClass}` : '';
+            logger.info(`✅ Extracted: ${date || 'Unknown'} | ${time || '00:00'} | ${currency} ${eventName} | ${impact || 'Medium'}${actualStr}${forecastStr}${previousStr}${countryStr}${flagStr}`);
           }
         }
 
@@ -580,10 +692,16 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
     // Analyze the types of events we extracted
     const eventsWithData = events.filter(e => e.actual || e.forecast || e.previous);
     const eventsWithoutData = events.filter(e => !e.actual && !e.forecast && !e.previous);
+    const eventsWithCountry = events.filter(e => e.country);
+    const countries = Array.from(new Set(events.map(e => e.country).filter(c => c)));
+    const flagCodes = Array.from(new Set(events.map(e => e.flagCode).filter(f => f)));
 
     logger.info(`🎉 Successfully extracted ${events.length} events`);
     logger.info(`📊 Events with economic data: ${eventsWithData.length}`);
     logger.info(`📅 Events without data (holidays/announcements): ${eventsWithoutData.length}`);
+    logger.info(`🏳️ Events with country info: ${eventsWithCountry.length}`);
+    logger.info(`🌍 Countries found: ${countries.join(', ')}`);
+    logger.info(`🚩 Flag codes found: ${flagCodes.join(', ')}`);
 
     if (eventsWithData.length > 0) {
       logger.info(`💰 Sample events with data:`);
@@ -593,7 +711,9 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
           event.forecast ? `F:${event.forecast}` : '',
           event.previous ? `P:${event.previous}` : ''
         ].filter(s => s).join(', ');
-        logger.info(`  ${i + 1}. ${event.currency} ${event.event} (${dataStr})`);
+        const locationStr = event.country ? ` [${event.country}]` : '';
+        const flagStr = event.flagUrl ? ` 🏳️ ${event.flagUrl}` : '';
+        logger.info(`  ${i + 1}. ${event.currency} ${event.event}${locationStr} (${dataStr})${flagStr}`);
       });
     }
 
@@ -642,11 +762,46 @@ function cleanEventName(eventName: string): string {
   // Remove leading "min" that appears in some events
   cleaned = cleaned.replace(/^min\s+/gi, '').trim();
 
-  // Remove trailing incomplete parentheses like "(May" or "(Jun"
-  cleaned = cleaned.replace(/\s*\([A-Za-z]{3}$/, '').trim();
+  // Don't remove trailing month abbreviations - we'll fix them by adding closing bracket
 
-  // Remove leading/trailing special characters and extra spaces
-  cleaned = cleaned.replace(/^[^\w]+|[^\w]+$/g, '').trim();
+  // Fix incomplete parentheses by adding missing closing bracket
+  // Only fix if there are unmatched opening parentheses
+  const openCount = (cleaned.match(/\(/g) || []).length;
+  const closeCount = (cleaned.match(/\)/g) || []).length;
+
+  if (openCount > closeCount) {
+    // More opening than closing - add missing closing parentheses
+    const missingClosing = openCount - closeCount;
+
+    // Only add closing brackets if the opening parenthesis has meaningful content
+    // Check if the last opening parenthesis has content after it
+    const lastOpenIndex = cleaned.lastIndexOf('(');
+    if (lastOpenIndex !== -1) {
+      const afterParen = cleaned.substring(lastOpenIndex + 1).trim();
+
+      // Only add closing bracket if there's meaningful content (not just whitespace)
+      if (afterParen.length > 0) {
+        // Add closing bracket at the end
+        cleaned = cleaned + ')'.repeat(missingClosing);
+      } else {
+        // If opening parenthesis has no content, remove it
+        cleaned = cleaned.substring(0, lastOpenIndex).trim();
+      }
+    }
+  } else if (closeCount > openCount) {
+    // More closing than opening - remove extra closing parentheses from the end
+    const extraClosing = closeCount - openCount;
+    for (let i = 0; i < extraClosing; i++) {
+      const lastCloseIndex = cleaned.lastIndexOf(')');
+      if (lastCloseIndex !== -1) {
+        cleaned = cleaned.substring(0, lastCloseIndex) + cleaned.substring(lastCloseIndex + 1);
+      }
+    }
+    cleaned = cleaned.trim();
+  }
+
+  // Remove leading/trailing special characters (but preserve parentheses) and extra spaces
+  cleaned = cleaned.replace(/^[^\w(]+|[^\w)]+$/g, '').trim();
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
   // Remove any remaining currency codes that might be embedded
