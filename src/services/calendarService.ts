@@ -265,6 +265,8 @@ export const convertFirestoreDataToCalendar = (doc: DocumentData): Calendar => {
     daysNotes: daysNotesMap,
     // Score settings
     scoreSettings: data.scoreSettings,
+    // Economic calendar filter settings
+    economicCalendarFilters: data.economicCalendarFilters,
     // Statistics
     winRate: data.winRate || 0,
     profitFactor: data.profitFactor || 0,
@@ -358,6 +360,9 @@ const convertCalendarToFirestoreData = (calendar: Omit<Calendar, 'id' | 'cachedT
 
     // Score settings
     ...(calendar.scoreSettings !== undefined && { scoreSettings: calendar.scoreSettings }),
+
+    // Economic calendar filter settings
+    ...(calendar.economicCalendarFilters !== undefined && { economicCalendarFilters: calendar.economicCalendarFilters }),
 
     // Statistics fields
     ...(calendar.winRate !== undefined && { winRate: calendar.winRate }),
@@ -656,13 +661,14 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
       duplicatedCalendar: true,
       sourceCalendarId: sourceCalendarId,
       isDeleted: false,
-      // Copy notes, tags, and score settings
+      // Copy notes, tags, score settings, and economic calendar filters
       note: sourceCalendar.note,
       heroImageUrl: sourceCalendar.heroImageUrl,
       heroImageAttribution: sourceCalendar.heroImageAttribution,
       daysNotes: sourceCalendar.daysNotes,
       tags: sourceCalendar.tags || [],
       scoreSettings: sourceCalendar.scoreSettings,
+      economicCalendarFilters: sourceCalendar.economicCalendarFilters,
       // Copy statistics if including content, otherwise reset
       winRate: includeContent ? sourceCalendar.winRate : 0,
       profitFactor: includeContent ? sourceCalendar.profitFactor : 0,

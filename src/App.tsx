@@ -809,6 +809,8 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       onToggleDynamicRisk={(useActualAmounts) => onToggleDynamicRisk(calendar.id, useActualAmounts)}
       // Pass loading state
       isLoadingTrades={isLoadingTrades}
+      // Calendar access callback
+      getCurrentCalendar={() => calendar}
     />
   );
 };

@@ -112,6 +112,7 @@ interface TradeCalendarProps {
   onEditTrade?: (trade: Trade) => Promise<void>;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
+  getCurrentCalendar?: () => Calendar | undefined;
 
   onImageUpload?: (tradeId: string, image: TradeImage, add: boolean) => Promise<void>;
   onDeleteTrade?: (tradeId: string) => Promise<void>;
@@ -392,7 +393,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     // Dynamic risk toggle
     onToggleDynamicRisk,
     // Loading state
-    isLoadingTrades = false
+    isLoadingTrades = false,
+    getCurrentCalendar
   } = props;
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -1580,6 +1582,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       <EconomicCalendarDrawer
         open={isEconomicCalendarOpen}
         onClose={() => setIsEconomicCalendarOpen(false)}
+        getCurrentCalendar={getCurrentCalendar}
+        onUpdateCalendarProperty={onUpdateCalendarProperty}
       />
     </Box>
   );

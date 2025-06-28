@@ -36,6 +36,12 @@ export interface Calendar {
   daysNotes?: Map<string, string>;
   // Score settings
   scoreSettings?: ScoreSettings;
+  // Economic calendar filter settings
+  economicCalendarFilters?: {
+    currencies: string[];
+    impacts: string[];
+    viewType: 'day' | 'week' | 'month';
+  };
   // Statistics
   winRate?: number;
   profitFactor?: number;

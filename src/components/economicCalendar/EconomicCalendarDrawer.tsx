@@ -55,13 +55,26 @@ import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { QueryDocumentSnapshot } from 'firebase/firestore';
 import EconomicEventListItem from './EconomicEventListItem';
 import Shimmer from '../Shimmer';
-
 // View types for pagination
 type ViewType = 'day' | 'week' | 'month';
 
 // Available currencies and impacts
 const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
 const IMPACTS: ImpactLevel[] = ['High', 'Medium', 'Low'];
+
+// Interface for saved filter settings
+interface EconomicCalendarFilterSettings {
+  currencies: Currency[];
+  impacts: ImpactLevel[];
+  viewType: ViewType;
+}
+
+// Default filter settings
+const DEFAULT_FILTER_SETTINGS: EconomicCalendarFilterSettings = {
+  currencies: ['USD', 'EUR', 'GBP'],
+  impacts: ['High', 'Medium', 'Low'],
+  viewType: 'day'
+};
 
 // Helper function to get date header for month view
 const getDateHeader = (date: string) => {
@@ -162,12 +175,26 @@ const EconomicEventShimmer: React.FC = () => {
 
 const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   open,
-  onClose
+  onClose,
+  getCurrentCalendar,
+  onUpdateCalendarProperty
 }) => {
   const theme = useTheme();
 
+  // Get current calendar and its settings
+  const currentCalendar = getCurrentCalendar?.();
+  const savedSettings: EconomicCalendarFilterSettings = currentCalendar?.economicCalendarFilters || DEFAULT_FILTER_SETTINGS;
+
+  // Debug logging
+  useEffect(() => {
+    if (open && currentCalendar) {
+      console.log('📅 Economic Calendar opened for calendar:', currentCalendar.name);
+      console.log('📅 Current filter settings:', savedSettings);
+    }
+  }, [open, currentCalendar, savedSettings]);
+
   // State management
-  const [viewType, setViewType] = useState<ViewType>('day');
+  const [viewType, setViewType] = useState<ViewType>(savedSettings.viewType);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
@@ -183,17 +210,52 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
   // Filter state
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
-  
-  // Applied filters (used for queries)
-  const [appliedCurrencies, setAppliedCurrencies] = useState<Currency[]>(['USD', 'EUR', 'GBP']);
-  const [appliedImpacts, setAppliedImpacts] = useState<ImpactLevel[]>(['High', 'Medium', 'Low']);
-  
-  // Pending filters (temporary state before applying)
-  const [pendingCurrencies, setPendingCurrencies] = useState<Currency[]>(['USD', 'EUR', 'GBP']);
-  const [pendingImpacts, setPendingImpacts] = useState<ImpactLevel[]>(['High', 'Medium', 'Low']);
-  
+
+  // Applied filters (used for queries) - initialized from localStorage
+  const [appliedCurrencies, setAppliedCurrencies] = useState<Currency[]>(savedSettings.currencies);
+  const [appliedImpacts, setAppliedImpacts] = useState<ImpactLevel[]>(savedSettings.impacts);
+
+  // Pending filters (temporary state before applying) - initialized from localStorage
+  const [pendingCurrencies, setPendingCurrencies] = useState<Currency[]>(savedSettings.currencies);
+  const [pendingImpacts, setPendingImpacts] = useState<ImpactLevel[]>(savedSettings.impacts);
+
   // Track if filters have been modified
   const [filtersModified, setFiltersModified] = useState(false);
+
+  // Function to save filter settings to calendar
+  const saveFilterSettings = useCallback(async (currencies: Currency[], impacts: ImpactLevel[], viewTypeToSave: ViewType) => {
+    const calendar = getCurrentCalendar?.();
+    if (!calendar?.id || !onUpdateCalendarProperty) {
+      console.warn('⚠️ Cannot save economic calendar filter settings: missing calendar or update function');
+      return;
+    }
+
+    const settings: EconomicCalendarFilterSettings = {
+      currencies,
+      impacts,
+      viewType: viewTypeToSave
+    };
+
+    try {
+      await onUpdateCalendarProperty(calendar.id, (cal) => ({
+        ...cal,
+        economicCalendarFilters: settings
+      }));
+      console.log('📱 Economic calendar filter settings saved to calendar:', settings);
+    } catch (error) {
+      console.error('⚠️ Failed to save economic calendar filter settings:', error);
+    }
+  }, [getCurrentCalendar, onUpdateCalendarProperty]);
+
+  // Function to handle view type changes and save settings
+  const handleViewTypeChange = useCallback(async (newViewType: ViewType) => {
+    setViewType(newViewType);
+    setStartDate(null);
+    setEndDate(null);
+
+    // Save the new view type to calendar settings
+    await saveFilterSettings(appliedCurrencies, appliedImpacts, newViewType);
+  }, [appliedCurrencies, appliedImpacts, saveFilterSettings]);
 
   // Sync pending filters with applied filters on mount
   useEffect(() => {
@@ -394,11 +456,17 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   };
 
   // Apply filters function
-  const handleApplyFilters = () => {
+  const handleApplyFilters = async () => {
     setAppliedCurrencies(pendingCurrencies);
     setAppliedImpacts(pendingImpacts);
     setFiltersModified(false);
     setIsFilterExpanded(false); // Collapse filter section after applying
+
+    // Save filter settings to calendar
+    await saveFilterSettings(pendingCurrencies, pendingImpacts, viewType);
+
+    // Save filter settings to localStorage
+    saveFilterSettings(pendingCurrencies, pendingImpacts, viewType);
   };
 
   // Reset filters function
@@ -511,11 +579,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
             <ButtonGroup variant="outlined" size="small" fullWidth>
               <Button
                 startIcon={<EventIcon />}
-                onClick={() => {
-                  setViewType('day');
-                  setStartDate(null);
-                  setEndDate(null);
-                }}
+                onClick={() => handleViewTypeChange('day')}
                 variant={viewType === 'day' ? 'contained' : 'outlined'}
                 sx={{ flex: 1 }}
               >
@@ -523,11 +587,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
               </Button>
               <Button
                 startIcon={<WeekIcon />}
-                onClick={() => {
-                  setViewType('week');
-                  setStartDate(null);
-                  setEndDate(null);
-                }}
+                onClick={() => handleViewTypeChange('week')}
                 variant={viewType === 'week' ? 'contained' : 'outlined'}
                 sx={{ flex: 1 }}
               >
@@ -535,11 +595,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
               </Button>
               <Button
                 startIcon={<MonthIcon />}
-                onClick={() => {
-                  setViewType('month');
-                  setStartDate(null);
-                  setEndDate(null);
-                }}
+                onClick={() => handleViewTypeChange('month')}
                 variant={viewType === 'month' ? 'contained' : 'outlined'}
                 sx={{ flex: 1 }}
               >
