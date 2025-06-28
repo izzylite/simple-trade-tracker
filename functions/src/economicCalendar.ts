@@ -28,7 +28,7 @@ interface EconomicEvent {
  */
 export const autoRefreshEconomicCalendarV2 = onSchedule(
   {
-    schedule: '0 6 * * 1', // Every Monday at 6 AM UTC
+    schedule: '0 6 * * *', // Every day at 6 AM UTC (changed from weekly to daily)
     region: 'us-central1',
     memory: '1GiB', // Increased memory for enhanced scraping
     timeoutSeconds: 540 // 9 minutes timeout for comprehensive scraping
