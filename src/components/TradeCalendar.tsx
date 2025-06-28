@@ -36,6 +36,7 @@ import {
   LocalOffer as TagIcon,
   Search as SearchIcon,
   ViewCarousel as GalleryIcon,
+  Article as NewsIcon,
 
 } from '@mui/icons-material';
 import {
@@ -95,6 +96,7 @@ import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/
 import MonthlyStatisticsSection from './MonthlyStatisticsSection';
 import FloatingMonthNavigation from './FloatingMonthNavigation';
 import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
+import { EconomicCalendarDrawer } from './economicCalendar';
 
 interface TradeCalendarProps {
   trades: Trade[];
@@ -436,10 +438,15 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Image picker state
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
+  // Economic calendar drawer state
+  const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(false);
+
 
 
   const theme = useTheme();
   const { calendarId } = useParams();
+
+
 
   // Hero image handlers
   const handleHeroImageChange = async (imageUrl: string | null, attribution?: ImageAttribution) => {
@@ -479,6 +486,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     await handleHeroImageChange(imageUrl, attribution);
     setIsImagePickerOpen(false);
   };
+
+  // Economic calendar toggle handler
+  const handleToggleEconomicCalendar = useCallback(() => {
+    setIsEconomicCalendarOpen(true);
+  }, []);
 
 
 
@@ -1298,6 +1310,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             }}
             onOpenGalleryMode={openGalleryMode}
           />
+
+
         </Box>
 
         <DayDialog
@@ -1477,6 +1491,23 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
+        {/* Economic Calendar FAB */}
+        <Tooltip title="Economic Calendar" placement="left">
+          <Fab
+            color="primary"
+            aria-label="open economic calendar"
+            onClick={handleToggleEconomicCalendar}
+            sx={{
+              position: 'fixed',
+              bottom: 96,
+              right: 24,
+              zIndex: 1200
+            }}
+          >
+            <NewsIcon />
+          </Fab>
+        </Tooltip>
+
         {/* Search & Filter FAB */}
         <Fab
           color="primary"
@@ -1533,6 +1564,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onOpenGalleryMode={openGalleryMode}
         />
 
+
+
         {/* Image Picker Dialog */}
         <ImagePickerDialog
           open={isImagePickerOpen}
@@ -1542,6 +1575,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         />
 
       </Box>
+
+      {/* Economic Calendar Drawer */}
+      <EconomicCalendarDrawer
+        open={isEconomicCalendarOpen}
+        onClose={() => setIsEconomicCalendarOpen(false)}
+      />
     </Box>
   );
 };

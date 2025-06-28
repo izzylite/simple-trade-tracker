@@ -387,39 +387,73 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
         '& .MuiDrawer-paper': {
           width: { xs: '100%', sm: 450 },
           maxWidth: '100vw',
-          zIndex: 1300 // Ensure the paper also has high z-index
+          zIndex: 1300, // Ensure the paper also has high z-index
+          background: theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, rgba(18, 18, 18, 0.95) 0%, rgba(30, 30, 30, 0.95) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',
+          backdropFilter: 'blur(20px)',
+          borderLeft: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          boxShadow: theme.palette.mode === 'dark'
+            ? '0 8px 32px rgba(0, 0, 0, 0.4)'
+            : '0 8px 32px rgba(0, 0, 0, 0.12)'
         }
       }}
     >
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <Box sx={{
-          p: 2,
-          borderBottom: `1px solid ${theme.palette.divider}`,
+          p: 3,
+          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           display: 'flex',
           alignItems: 'center',
-          gap: 2
+          gap: 2,
+          background: alpha(theme.palette.background.paper, 0.8),
+          backdropFilter: 'blur(10px)'
         }}>
           <Box sx={{
-            p: 1,
-            borderRadius: 1,
-            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+            p: 1.5,
+            borderRadius: 2,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <SearchIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+            <SearchIcon sx={{ color: 'primary.main', fontSize: 22 }} />
           </Box>
-          <Typography variant="h6" sx={{ flex: 1, fontWeight: 600 }}>
-            Search & Filter Trades
-          </Typography>
-          <IconButton onClick={onClose} size="small">
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+              Search & Filter Trades
+            </Typography>
+            <Typography variant="caption" sx={{
+              color: 'text.secondary',
+              fontSize: '0.75rem'
+            }}>
+              Find trades by tags, notes, or date ranges
+            </Typography>
+          </Box>
+          <IconButton
+            onClick={onClose}
+            size="small"
+            sx={{
+              bgcolor: alpha(theme.palette.action.hover, 0.5),
+              '&:hover': {
+                bgcolor: alpha(theme.palette.action.hover, 0.8),
+                transform: 'scale(1.05)'
+              },
+              transition: 'all 0.2s ease-in-out'
+            }}
+          >
             <CloseIcon />
           </IconButton>
         </Box>
 
         {/* Search Input */}
-        <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
+        <Box sx={{
+          p: 3,
+          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          background: alpha(theme.palette.background.default, 0.3)
+        }}>
           <TextField
             fullWidth
             placeholder="Search by name, tags, notes, or session..."
@@ -439,9 +473,26 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
               }
             }}
             variant="outlined"
-            size="small"
+            size="medium"
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                backdropFilter: 'blur(8px)',
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.background.paper, 0.9)
+                },
+                '&.Mui-focused': {
+                  backgroundColor: alpha(theme.palette.background.paper, 1)
+                }
+              }
+            }}
           />
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+          <Typography variant="caption" color="text.secondary" sx={{
+            mt: 1.5,
+            display: 'block',
+            fontSize: '0.75rem', 
+          }}>
             💡 Use multiple tags separated by spaces, commas, or semicolons to find trades with ALL specified tags
           </Typography>
         </Box>
@@ -757,7 +808,13 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
 
           {/* Search Results */}
           {(searchQuery.trim() || selectedTags.length > 0 || dateFilter.type !== 'all') && (
-            <Box sx={{ p: 2 }}>
+            <Box sx={{
+              flex: 1,
+              overflow: 'auto',
+              background: alpha(theme.palette.background.default, 0.2),
+              ...scrollbarStyles(theme)
+            }}>
+              <Box sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                   {searchQuery.trim() ? 'Search Results' : 'Filtered Results'} {!isSearching && `(${filteredTrades.length})`}
@@ -934,6 +991,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                   ))}
                 </List>
               )}
+              </Box>
             </Box>
           )}
 

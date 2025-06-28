@@ -28,7 +28,8 @@ const CalendarHome = lazy(() => import('./components/CalendarHome'));
 const TradeCalendar = lazy(() => import('./components/TradeCalendar'));
 const CalendarTrash = lazy(() => import('./components/trash/CalendarTrash'));
 const SharedTradePage = lazy(() => import('./components/sharing/SharedTradePage'));
-const BlogHome = lazy(() => import('./components/blog/BlogHome'));
+
+
 
 // Loading component for Suspense
 const LoadingFallback = () => <AppLoadingProgress />;
@@ -415,19 +416,6 @@ function AppContent() {
           <Route
             path="/shared/:shareId"
             element={<SharedTradePage />}
-          />
-          <Route
-            path="/blog"
-            element={
-              user ? (
-                <BlogHome
-                  onToggleTheme={toggleColorMode}
-                  mode={mode}
-                />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            }
           />
 
           <Route path="*" element={<Navigate to="/" replace />} />

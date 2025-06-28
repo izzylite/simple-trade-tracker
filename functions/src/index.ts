@@ -11,8 +11,8 @@ export { cleanupExpiredCalendarsV2 } from './cleanupExpiredCalendars';
 // Export the sharing functions
 export { generateTradeShareLinkV2, getSharedTradeV2, deactivateSharedTradeV2 } from './sharing';
 
-// Export the news aggregation functions
-export { fetchNewsV2, getCachedNewsV2, autoRefreshNewsV2 } from './newsAggregator';
+// Export the economic calendar functions
+export { fetchEconomicCalendarV2, getCachedEconomicCalendarV2, autoRefreshEconomicCalendarV2, testMyFXBookScraper, populateDatabaseManually } from './economicCalendar';
 
  
 
