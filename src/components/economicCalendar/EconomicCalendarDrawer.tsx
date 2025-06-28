@@ -3,7 +3,7 @@
  * Redesigned to match search drawer style with day/week/month pagination
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Drawer,
   Box,
@@ -24,7 +24,9 @@ import {
   List,
   ListItem,
   ListItemText,
-  Divider
+  Divider,
+  TextField,
+  Avatar
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -34,9 +36,10 @@ import {
   FilterAlt as FilterIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  Today as TodayIcon,
   DateRange as WeekIcon,
-  CalendarMonth as MonthIcon
+  CalendarMonth as MonthIcon,
+  Event as EventIcon,
+  Check as CheckIcon
 } from '@mui/icons-material';
 import { format, addDays, addWeeks, addMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, isToday, isTomorrow, differenceInMinutes, differenceInHours, parseISO, isAfter } from 'date-fns';
 import {
@@ -132,41 +135,60 @@ const ShimmerLoader: React.FC = () => {
 };
 
 // Helper function to format time and countdown
-const formatTimeWithCountdown = (eventTime: string) => {
+const formatTimeWithCountdown = (eventTime: string, currentTime?: Date) => {
   const eventDate = parseISO(eventTime);
-  const now = new Date();
+  const now = currentTime || new Date();
   const eventDateFormatted = format(eventDate, 'MMM d, HH:mm');
 
   // Check if event is in the future
   if (isAfter(eventDate, now)) {
-    const minutesDiff = differenceInMinutes(eventDate, now);
-    const hoursDiff = differenceInHours(eventDate, now);
+    const totalSeconds = Math.floor((eventDate.getTime() - now.getTime()) / 1000);
+    const minutesDiff = Math.floor(totalSeconds / 60);
+    const hoursDiff = Math.floor(totalSeconds / 3600);
+    const daysDiff = Math.floor(hoursDiff / 24);
+
+    let countdown = '';
+    let isImminent = false;
 
     if (minutesDiff < 60) {
-      return {
-        time: eventDateFormatted,
-        countdown: `${minutesDiff}min`,
-        isUpcoming: true
-      };
+      isImminent = minutesDiff <= 30; // Imminent if within 30 minutes
+
+      if (isImminent && minutesDiff < 5) {
+        // Show seconds for very imminent events (less than 5 minutes)
+        const remainingMinutes = Math.floor(totalSeconds / 60);
+        const remainingSeconds = totalSeconds % 60;
+        countdown = remainingMinutes > 0
+          ? `${remainingMinutes}m ${remainingSeconds}s`
+          : `${remainingSeconds}s`;
+      } else {
+        countdown = `${minutesDiff} min`;
+      }
     } else if (hoursDiff < 24) {
-      return {
-        time: eventDateFormatted,
-        countdown: `${hoursDiff}h ${minutesDiff % 60}min`,
-        isUpcoming: true
-      };
-    } else {
-      return {
-        time: eventDateFormatted,
-        countdown: null,
-        isUpcoming: true
-      };
+      countdown = `${hoursDiff}h`;
+      isImminent = false;
+    } else if (daysDiff === 1) {
+      countdown = '1 day';
+      isImminent = false;
+    } else if (daysDiff > 1) {
+      countdown = `${daysDiff} days`;
+      isImminent = false;
     }
+
+    return {
+      time: eventDateFormatted,
+      countdown,
+      isUpcoming: true,
+      isImminent,
+      isPassed: false
+    };
   }
 
   return {
     time: eventDateFormatted,
     countdown: null,
-    isUpcoming: false
+    isUpcoming: false,
+    isImminent: false,
+    isPassed: true
   };
 };
 
@@ -181,6 +203,34 @@ const getDateHeader = (date: string) => {
     return 'Tomorrow';
   } else {
     return format(eventDate, 'EEE, MMM d');
+  }
+};
+
+// Helper function to get impact colors
+const getImpactColor = (impact: ImpactLevel, theme: any) => {
+  switch (impact) {
+    case 'High':
+      return theme.palette.error.main;
+    case 'Medium':
+      return theme.palette.warning.main;
+    case 'Low':
+      return theme.palette.success.main;
+    default:
+      return theme.palette.text.secondary;
+  }
+};
+
+// Helper function to get impact background color for imminent events
+const getImminentBackgroundColor = (impact: ImpactLevel, theme: any) => {
+  switch (impact) {
+    case 'High':
+      return alpha(theme.palette.error.main, 0.1);
+    case 'Medium':
+      return alpha(theme.palette.warning.main, 0.1);
+    case 'Low':
+      return alpha(theme.palette.success.main, 0.1);
+    default:
+      return alpha(theme.palette.text.secondary, 0.05);
   }
 };
 
@@ -214,9 +264,15 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   // State management
   const [viewType, setViewType] = useState<ViewType>('day');
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState(format(addDays(new Date(), 7), 'yyyy-MM-dd'));
   const [events, setEvents] = useState<EconomicEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Realtime countdown state
+  const [realtimeNow, setRealtimeNow] = useState(new Date());
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Pagination state
   const [hasMore, setHasMore] = useState(false);
@@ -229,8 +285,48 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const [selectedCurrencies, setSelectedCurrencies] = useState<Currency[]>(['USD', 'EUR', 'GBP']);
   const [selectedImpacts, setSelectedImpacts] = useState<ImpactLevel[]>(['High', 'Medium', 'Low']);
 
+  // Check if there are any imminent events that need realtime updates
+  const hasImminentEvents = useMemo(() => {
+    return events.some(event => {
+      const timeInfo = formatTimeWithCountdown(event.timeUtc, realtimeNow);
+      return timeInfo.isImminent;
+    });
+  }, [events, realtimeNow]);
+
+  // Realtime countdown effect for imminent events
+  useEffect(() => {
+    if (open && hasImminentEvents) {
+      // Update every second for imminent events
+      intervalRef.current = setInterval(() => {
+        setRealtimeNow(new Date());
+      }, 1000);
+    } else {
+      // Clear interval when no imminent events or drawer is closed
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [open, hasImminentEvents]);
+
   // Calculate date range based on view type and current date
   const dateRange = useMemo(() => {
+    // If custom date range is set, use it
+    if (startDate && endDate) {
+      return {
+        start: startDate,
+        end: endDate
+      };
+    }
+
     const date = currentDate;
 
     switch (viewType) {
@@ -264,7 +360,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           end: format(date, 'yyyy-MM-dd')
         };
     }
-  }, [viewType, currentDate]);
+  }, [viewType, currentDate, startDate, endDate]);
 
   // Fetch events when date range or filters change
   useEffect(() => {
@@ -305,7 +401,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     if (open) {
       fetchEvents();
     }
-  }, [dateRange, selectedCurrencies, selectedImpacts, open, viewType, pageSize]);
+  }, [dateRange, selectedCurrencies, selectedImpacts, open, viewType, pageSize, startDate, endDate]);
 
   // Load more events function
   const loadMoreEvents = async () => {
@@ -377,9 +473,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     }
   };
 
-  const handleToday = () => {
-    setCurrentDate(new Date());
-  };
+
 
   // Filter handlers
   const handleCurrencyChange = (currency: Currency) => {
@@ -495,7 +589,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           <Box sx={{ mb: 2 }}>
             <ButtonGroup variant="outlined" size="small" fullWidth>
               <Button
-                startIcon={<TodayIcon />}
+                startIcon={<EventIcon />}
                 onClick={() => setViewType('day')}
                 variant={viewType === 'day' ? 'contained' : 'outlined'}
                 sx={{ flex: 1 }}
@@ -536,16 +630,44 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
             </IconButton>
           </Box>
 
-          {/* Today Button */}
-          <Button
-            onClick={handleToday}
-            size="small"
-            variant="outlined"
-            fullWidth
-            sx={{ mb: 2 }}
-          >
-            Today
-          </Button>
+          {/* Date Range Picker */}
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+              <TextField
+                label="Start Date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                size="small"
+                sx={{ flex: 1 }}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
+              <TextField
+                label="End Date"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                size="small"
+                sx={{ flex: 1 }}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
+            </Box>
+            <Button
+              onClick={() => {
+                setStartDate(format(new Date(), 'yyyy-MM-dd'));
+                setEndDate(format(addDays(new Date(), 7), 'yyyy-MM-dd'));
+              }}
+              size="small"
+              variant="text"
+              sx={{ fontSize: '0.75rem' }}
+            >
+              Reset to This Week
+            </Button>
+          </Box>
 
           {/* Filter Toggle */}
           <Box sx={{
@@ -688,8 +810,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
               </Typography>
             </Box>
           ) : (
-            viewType === 'month' ? (
-              // Month view with date headers
+           
               <Box>
                 {groupEventsByDate(events).map((dayGroup, dayIndex) => (
                   <Box key={dayGroup.date}>
@@ -715,81 +836,150 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                     {/* Events for this date */}
                     <List sx={{ p: 0 }}>
                       {dayGroup.events.map((event, eventIndex) => {
-                        const timeInfo = formatTimeWithCountdown(event.timeUtc);
+                        const timeInfo = formatTimeWithCountdown(event.timeUtc, realtimeNow);
                         return (
                           <React.Fragment key={event.id || `${dayIndex}-${eventIndex}`}>
-                            <ListItem sx={{ px: 3, py: 2 }}>
-                              <ListItemText
-                                primary={
-                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                      <Typography variant="body2" sx={{
-                                        fontWeight: 600,
-                                        color: timeInfo.isUpcoming ? 'text.primary' : 'text.secondary'
-                                      }}>
-                                        {timeInfo.time}
-                                      </Typography>
-                                      {timeInfo.countdown && (
-                                        <Chip
-                                          label={timeInfo.countdown}
-                                          size="small"
-                                          color="warning"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 20,
-                                            fontSize: '0.7rem',
-                                            fontWeight: 600
-                                          }}
-                                        />
-                                      )}
+                            <ListItem sx={{
+                              px: 2,
+                              py: 1,
+                              backgroundColor: timeInfo.isImminent ? getImminentBackgroundColor(event.impact, theme) : 'transparent',
+                              borderLeft: timeInfo.isImminent ? `3px solid ${getImpactColor(event.impact, theme)}` : 'none',
+                              '&:hover': {
+                                backgroundColor: alpha(theme.palette.action.hover, 0.08)
+                              },
+                              borderRadius: 1,
+                              mb: 0.5
+                            }}>
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
+                                {/* Flag as Prefix Icon */}
+                                <Box sx={{ minWidth: 24, mt: 0.5, display: 'flex',flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                                   <img
+                                      src={event.flagUrl}
+                                      alt={event.country}
+                                      style={{
+                                        width: 24,
+                                        height: 18,
+                                        borderRadius: 3,
+                                        objectFit: 'cover',
+                                        border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
+                                      }}
+                                    />
+
+                                    {/* Currency */}
+                                    <Typography variant="body2" sx={{
+                                      fontWeight: 700,
+                                      textAlign: 'center',
+                                      fontSize: '0.875rem',
+                                      color: 'text.primary',
+                                      minWidth: 35
+                                    }}>
+                                      {event.currency}
+                                    </Typography>
+                                </Box>
+
+                                {/* Content Container */}
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, width: '100%', flex: 1 }}>
+
+                                  {/* First Row: Date | Check Icon | Currency | Impact Badge */}
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, width: '100%' }}>
+                                    {/* Date */}
+                                    <Typography variant="body2" sx={{
+                                      fontWeight: 600,
+                                      color: timeInfo.isUpcoming ? 'text.primary' : 'text.secondary',
+                                      fontSize: '0.875rem', 
+                                    }}>
+                                      {timeInfo.time}
+                                    </Typography>
+
+                                    {/* Check Icon or Countdown */}
+                                    <Box sx={{   display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      {timeInfo.isPassed ? (
+                                        <CheckIcon sx={{
+                                          color: 'success.main',
+                                          fontSize: '1.2rem',
+                                          mb:0.5
+                                        }} />
+                                      ) : timeInfo.countdown ? (
+                                        <Typography variant="caption" sx={{
+                                          color: 'warning.main',
+                                          fontWeight: 600,
+                                          fontSize: '0.75rem'
+                                        }}>
+                                          {timeInfo.countdown}
+                                        </Typography>
+                                      ) : null}
                                     </Box>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <Chip
-                                        label={event.currency}
-                                        size="small"
-                                        color="primary"
-                                        variant="outlined"
-                                        sx={{ height: 20, fontSize: '0.7rem' }}
-                                      />
-                                      <Box sx={{
-                                        width: 8,
-                                        height: 8,
-                                        borderRadius: '50%',
-                                        backgroundColor:
-                                          event.impact === 'High' ? theme.palette.error.main :
-                                          event.impact === 'Medium' ? theme.palette.warning.main :
-                                          theme.palette.success.main
-                                      }} />
-                                    </Box>
+
+                                  
+
+                                    {/* Spacer */}
+                                    <Box sx={{ flex: 1 }} />
+
+                                    {/* Impact Badge */}
+                                    <Chip
+                                      label={event.impact.toUpperCase()}
+                                      size="small"
+                                      sx={{
+                                        height: 22,
+                                        fontSize: '0.65rem',
+                                        fontWeight: 700,
+                                        backgroundColor: getImpactColor(event.impact, theme),
+                                        color: 'white',
+                                        minWidth: 45,
+                                        '& .MuiChip-label': {
+                                          px: 1
+                                        }
+                                      }}
+                                    />
                                   </Box>
-                                }
-                                secondary={
-                                  <Box>
-                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+
+                                  {/* Second Row: Event Name | Previous, Forecast, Actual */}
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                                    {/* Event Name */}
+                                    <Typography variant="body2" sx={{
+                                      fontWeight: 500,
+                                      fontSize: '0.875rem',
+                                      color: 'text.primary',
+                                      flex: 1
+                                    }}>
                                       {event.event}
                                     </Typography>
+
+                                    {/* Values */}
                                     {(event.actual || event.forecast || event.previous) && (
-                                      <Box sx={{ display: 'flex', gap: 2, fontSize: '0.75rem' }}>
+                                      <Box sx={{ display: 'flex', gap: 1.5 }}>
                                         {event.actual && (
-                                          <Typography variant="caption">
-                                            <strong>A:</strong> {event.actual}
+                                          <Typography variant="caption" sx={{
+                                            fontWeight: 700,
+                                            fontSize: '0.75rem',
+                                            color: 'text.primary'
+                                          }}>
+                                            A: {event.actual}
                                           </Typography>
                                         )}
                                         {event.forecast && (
-                                          <Typography variant="caption">
-                                            <strong>F:</strong> {event.forecast}
+                                          <Typography variant="caption" sx={{
+                                            color: 'text.secondary',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600
+                                          }}>
+                                            F: {event.forecast}
                                           </Typography>
                                         )}
                                         {event.previous && (
-                                          <Typography variant="caption">
-                                            <strong>P:</strong> {event.previous}
+                                          <Typography variant="caption" sx={{
+                                            color: 'text.disabled',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600
+                                          }}>
+                                            P: {event.previous}
                                           </Typography>
                                         )}
                                       </Box>
                                     )}
                                   </Box>
-                                }
-                              />
+                                </Box>
+                              </Box>
                             </ListItem>
                             {eventIndex < dayGroup.events.length - 1 && <Divider sx={{ ml: 3 }} />}
                           </React.Fragment>
@@ -799,92 +989,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                   </Box>
                 ))}
               </Box>
-            ) : (
-              // Day and Week view - simple list
-              <List sx={{ p: 0 }}>
-                {events.map((event, index) => {
-                  const timeInfo = formatTimeWithCountdown(event.timeUtc);
-                  return (
-                    <React.Fragment key={event.id || index}>
-                      <ListItem sx={{ px: 3, py: 2 }}>
-                        <ListItemText
-                          primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography variant="body2" sx={{
-                                  fontWeight: 600,
-                                  color: timeInfo.isUpcoming ? 'text.primary' : 'text.secondary'
-                                }}>
-                                  {timeInfo.time}
-                                </Typography>
-                                {timeInfo.countdown && (
-                                  <Chip
-                                    label={timeInfo.countdown}
-                                    size="small"
-                                    color="warning"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: '0.7rem',
-                                      fontWeight: 600
-                                    }}
-                                  />
-                                )}
-                              </Box>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Chip
-                                  label={event.currency}
-                                  size="small"
-                                  color="primary"
-                                  variant="outlined"
-                                  sx={{ height: 20, fontSize: '0.7rem' }}
-                                />
-                                <Box sx={{
-                                  width: 8,
-                                  height: 8,
-                                  borderRadius: '50%',
-                                  backgroundColor:
-                                    event.impact === 'High' ? theme.palette.error.main :
-                                    event.impact === 'Medium' ? theme.palette.warning.main :
-                                    theme.palette.success.main
-                                }} />
-                              </Box>
-                            </Box>
-                          }
-                          secondary={
-                            <Box>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                {event.event}
-                              </Typography>
-                              {(event.actual || event.forecast || event.previous) && (
-                                <Box sx={{ display: 'flex', gap: 2, fontSize: '0.75rem' }}>
-                                  {event.actual && (
-                                    <Typography variant="caption">
-                                      <strong>A:</strong> {event.actual}
-                                    </Typography>
-                                  )}
-                                  {event.forecast && (
-                                    <Typography variant="caption">
-                                      <strong>F:</strong> {event.forecast}
-                                    </Typography>
-                                  )}
-                                  {event.previous && (
-                                    <Typography variant="caption">
-                                      <strong>P:</strong> {event.previous}
-                                    </Typography>
-                                  )}
-                                </Box>
-                              )}
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                      {index < events.length - 1 && <Divider />}
-                    </React.Fragment>
-                  );
-                })}
-              </List>
-            )
+           
           )}
 
           {/* Loading More Indicator */}

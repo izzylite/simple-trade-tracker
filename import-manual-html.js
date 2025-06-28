@@ -485,7 +485,7 @@ async function parseMyFXBookWeeklyEnhanced(html) {
 
           // Generate unique ID for the event
           const eventId = generateEventId(currency, cleanedEventName, isoDate, impact || 'None');
-
+          flagClass = flagClass === "emu" || flagClass === "em" ? "eu" : flagClass;
           const event = {
             id: eventId,
             currency,

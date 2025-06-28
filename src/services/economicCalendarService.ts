@@ -85,6 +85,9 @@ class EconomicCalendarServiceImpl {
           forecast: data.forecast || '',
           previous: data.previous || '',
           date: data.date,
+          country: data.country || '',
+          flagCode: data.flagCode || '',
+          flagUrl: data.flagUrl || '',
           isAllDay: false
         });
       });
@@ -173,6 +176,9 @@ class EconomicCalendarServiceImpl {
           forecast: data.forecast || '',
           previous: data.previous || '',
           date: data.date,
+          country: data.country || '',
+          flagCode: data.flagCode || '',
+          flagUrl: data.flagUrl || '',
           isAllDay: false
         });
       });
@@ -302,6 +308,9 @@ class EconomicCalendarServiceImpl {
           forecast: data.forecast || '',
           previous: data.previous || '',
           date: data.date,
+          country: data.country || '',
+          flagCode: data.flagCode || '',
+          flagUrl: data.flagUrl || '',
           isAllDay: false
         });
       });

@@ -18,6 +18,9 @@ export interface EconomicEvent {
   forecast: string;
   previous: string;
   date: string; // YYYY-MM-DD format
+  country?: string;
+  flagCode?: string;
+  flagUrl?: string;
   isAllDay?: boolean;
   description?: string;
   url?: string;
