@@ -27,7 +27,7 @@ async function populateFreshData() {
     console.log(`Current event count: ${initialCount}`);
     
     if (initialCount === 0) {
-      console.log('✅ Database is clean and ready for fresh data');
+      console.log('✅ Database is clean and ready for fresh economic calendar data');
     } else {
       console.log(`⚠️ Database contains ${initialCount} events - will add new data`);
     }
