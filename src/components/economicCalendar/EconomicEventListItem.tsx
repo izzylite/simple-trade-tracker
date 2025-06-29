@@ -13,7 +13,8 @@ import {
   useTheme
 } from '@mui/material';
 import {
-  Check as CheckIcon
+  Check as CheckIcon,
+  HourglassEmpty as HourglassEmptyIcon
 } from '@mui/icons-material';
 import { format, parseISO, isAfter } from 'date-fns';
 import { EconomicEvent } from '../../types/economicCalendar';
@@ -251,8 +252,8 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
 
             {/* Values */}
             {(event.actual || event.forecast || event.previous) && (
-              <Box sx={{ display: 'flex', gap: 1.5 }}>
-                {event.actual && (
+              <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                {event.actual ? (
                   <Typography variant="caption" sx={{
                     fontWeight: 700,
                     fontSize: '0.75rem',
@@ -260,6 +261,22 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
                   }}>
                     A: {event.actual}
                   </Typography>
+                ) : (
+                  // Show hourglass if actual is missing but forecast or previous exists
+                  (event.forecast || event.previous) && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                     
+                      <Typography variant="caption" sx={{
+                        fontWeight: 700,
+                        alignItems: "center",
+                        fontSize: '0.75rem',
+                        color: 'text.disabled',
+                        opacity: 0.8
+                      }}>
+                        A:<HourglassEmptyIcon sx={{ fontSize: 16, mb: 0.5, color: 'warning.main', verticalAlign: 'middle' }} />
+                      </Typography>
+                    </Box>
+                  )
                 )}
                 {event.forecast && (
                   <Typography variant="caption" sx={{

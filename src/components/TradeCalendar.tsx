@@ -189,16 +189,15 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ date, trades, monthStart, weekInd
     <CalendarCell sx={{
       bgcolor: 'background.paper',
       borderRadius: 1,
-      border: `2px solid ${
-        netAmount > 0
+      border: `2px solid ${netAmount > 0
           ? alpha(theme.palette.success.main, 0.3)
           : netAmount < 0
             ? alpha(theme.palette.error.main, 0.3)
             : alpha(theme.palette.divider, 0.2)
-      }`, 
+        }`,
       justifyContent: 'center',
-      alignItems: 'center', 
-      position: 'relative',  
+      alignItems: 'center',
+      position: 'relative',
       ...sx
     }}>
       <Stack spacing={0.5} sx={{ alignItems: 'center', p: 1 }}>
@@ -448,7 +447,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   // Economic event notification state
   const [notificationEvent, setNotificationEvent] = useState<EconomicEvent | null>(null);
-  const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<EconomicEvent | null>(null);
+  const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ event: EconomicEvent, events: EconomicEvent[] } | null>(null);
 
   const theme = useTheme();
   const { calendarId } = useParams();
@@ -461,7 +460,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   });
 
   // Listen for economic event updates
-  useEconomicEventUpdates((event, updatedCalendarId) => {
+  useEconomicEventUpdates((event, events, updatedCalendarId) => {
     if (updatedCalendarId === calendarId) {
       console.log(`📊 Economic event "${event.event}" was updated for this calendar`);
 
@@ -470,7 +469,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
       // 2. Pass event to Economic Calendar Drawer if it's open
       if (isEconomicCalendarOpen) {
-        setEconomicCalendarUpdatedEvent(event);
+        setEconomicCalendarUpdatedEvent({
+          event,
+          events
+        });
         // Clear the updated event after a short delay to prevent re-triggering
         setTimeout(() => {
           setEconomicCalendarUpdatedEvent(null);
@@ -809,26 +811,26 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
       <AppHeader
         onToggleTheme={onToggleTheme}
-        mode={mode} 
+        mode={mode}
         showBackButton={true}
         backButtonPath="/dashboard"
       />
       <Toolbar />
 
-    <CalendarNote
-          calendarNote={calendarNote || ''}
-          calendarId={calendarId!!}
-          title={calendarName}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
-          heroImageUrl={heroImageUrl}
-          heroImageAttribution={heroImageAttribution}
-          onOpenImagePicker={handleOpenImagePicker}
-          onRemoveHeroImage={handleRemoveHeroImage}
-          trades={trades}
-          onOpenGalleryMode={openGalleryMode}
-          calendarDayNotes={calendarDayNotes || new Map()}
-          setIsDayNotesDialogOpen={setIsDayNotesDialogOpen}
-        />
+      <CalendarNote
+        calendarNote={calendarNote || ''}
+        calendarId={calendarId!!}
+        title={calendarName}
+        onUpdateCalendarProperty={onUpdateCalendarProperty}
+        heroImageUrl={heroImageUrl}
+        heroImageAttribution={heroImageAttribution}
+        onOpenImagePicker={handleOpenImagePicker}
+        onRemoveHeroImage={handleRemoveHeroImage}
+        trades={trades}
+        onOpenGalleryMode={openGalleryMode}
+        calendarDayNotes={calendarDayNotes || new Map()}
+        setIsDayNotesDialogOpen={setIsDayNotesDialogOpen}
+      />
 
       {/* Main Content Container */}
       <Box sx={{
@@ -879,16 +881,16 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             </Box>
 
             <Box sx={{ flex: 1, height: '100%' }}>
-             
-          <MonthlyStats
-            trades={filteredTrades}
-            accountBalance={accountBalance}
-            onImportTrades={onImportTrades}
-            currentDate={currentDate}
-            monthlyTarget={monthlyTarget}
-            onClearMonthTrades={onClearMonthTrades}
-          />
-                
+
+              <MonthlyStats
+                trades={filteredTrades}
+                accountBalance={accountBalance}
+                onImportTrades={onImportTrades}
+                currentDate={currentDate}
+                monthlyTarget={monthlyTarget}
+                onClearMonthTrades={onClearMonthTrades}
+              />
+
             </Box>
 
 
@@ -1006,32 +1008,32 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   );
                   return monthTrades.length > 0;
                 })() && (
-                  <Tooltip title="View all trades for this month in gallery mode" arrow>
-                    <Button
-                      startIcon={<GalleryIcon />}
-                      onClick={handleMonthlyGalleryMode}
-                      variant="outlined"
-                      size="medium"
-                      sx={{
-                        minWidth: { xs: '140px', sm: 'auto' },
-                        borderRadius: 2,
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        borderColor: alpha(theme.palette.primary.main, 0.3),
-                        color: 'primary.main',
-                        '&:hover': {
-                          borderColor: 'primary.main',
-                          bgcolor: alpha(theme.palette.primary.main, 0.1),
-                          transform: 'translateY(-1px)',
-                          boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`
-                        },
-                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                      }}
-                    >
-                      Gallery View
-                    </Button>
-                  </Tooltip>
-                )}
+                    <Tooltip title="View all trades for this month in gallery mode" arrow>
+                      <Button
+                        startIcon={<GalleryIcon />}
+                        onClick={handleMonthlyGalleryMode}
+                        variant="outlined"
+                        size="medium"
+                        sx={{
+                          minWidth: { xs: '140px', sm: 'auto' },
+                          borderRadius: 2,
+                          fontWeight: 600,
+                          textTransform: 'none',
+                          borderColor: alpha(theme.palette.primary.main, 0.3),
+                          color: 'primary.main',
+                          '&:hover': {
+                            borderColor: 'primary.main',
+                            bgcolor: alpha(theme.palette.primary.main, 0.1),
+                            transform: 'translateY(-1px)',
+                            boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`
+                          },
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                        }}
+                      >
+                        Gallery View
+                      </Button>
+                    </Tooltip>
+                  )}
               </Box>
 
               {/* Secondary Actions Group */}
@@ -1214,54 +1216,54 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                           <StyledCalendarDay
                             onClick={() => handleDayClick(day)}
                             $isCurrentMonth={isCurrentMonth}
-                             $isCurrentDay={isCurrentDay}
+                            $isCurrentDay={isCurrentDay}
                             $dayStatus={dayStats.status}
-                           
+
                           >
                             <DayNumber $isCurrentMonth={isCurrentMonth}>
                               {format(day, 'd')}
                             </DayNumber>
                             {dayTrades.length > 0 && (
                               //  <AnimatedPulse>
-                               
+
                               // </AnimatedPulse>
-                               <Box sx={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  gap: 0.5
-                                }}>
-                                  <TradeAmount $dayStatus={dayStats.status}>
-                                    {formatCurrency(Math.abs(dayStats.netAmount))}
-                                  </TradeAmount>
-                                  <TradeCount>
-                                    {dayTrades.length} trade{dayTrades.length !== 1 ? 's' : ''}
-                                  </TradeCount>
+                              <Box sx={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 0.5
+                              }}>
+                                <TradeAmount $dayStatus={dayStats.status}>
+                                  {formatCurrency(Math.abs(dayStats.netAmount))}
+                                </TradeAmount>
+                                <TradeCount>
+                                  {dayTrades.length} trade{dayTrades.length !== 1 ? 's' : ''}
+                                </TradeCount>
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: dayStats.status === 'win' ? 'success.main' :
+                                      dayStats.status === 'loss' ? 'error.main' : 'text.secondary',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500
+                                  }}
+                                >
+                                  {dayStats.percentage}%
+                                </Typography>
+                                {dayStats.isDrawdownViolation && (
                                   <Typography
                                     variant="caption"
                                     sx={{
-                                      color: dayStats.status === 'win' ? 'success.main' :
-                                        dayStats.status === 'loss' ? 'error.main' : 'text.secondary',
+                                      color: 'error.main',
                                       fontSize: '0.75rem',
-                                      fontWeight: 500
+                                      fontWeight: 700,
+                                      textTransform: 'uppercase'
                                     }}
                                   >
-                                    {dayStats.percentage}%
+                                    VIOLATED
                                   </Typography>
-                                  {dayStats.isDrawdownViolation && (
-                                    <Typography
-                                      variant="caption"
-                                      sx={{
-                                        color: 'error.main',
-                                        fontSize: '0.75rem',
-                                        fontWeight: 700,
-                                        textTransform: 'uppercase'
-                                      }}
-                                    >
-                                      VIOLATED
-                                    </Typography>
-                                  )}
-                                </Box>
+                                )}
+                              </Box>
                             )}
                           </StyledCalendarDay>
                         </CalendarCell>

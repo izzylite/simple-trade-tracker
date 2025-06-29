@@ -233,26 +233,7 @@ class EconomicCalendarServiceImpl {
       { impacts: impact }
     );
   }
-
-  /**
-   * Search events by query (client-side filtering)
-   */
-  async searchEvents(query: string): Promise<EconomicEvent[]> {
-    const today = new Date().toISOString().split('T')[0];
-    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    const events = await this.fetchEvents({ start: today, end: nextWeek });
-
-    if (!query.trim()) {
-      return events;
-    }
-
-    const searchTerm = query.toLowerCase();
-    return events.filter(event =>
-      event.event.toLowerCase().includes(searchTerm) ||
-      event.currency.toLowerCase().includes(searchTerm)
-    );
-  }
+ 
 
   /**
    * Subscribe to event updates
@@ -288,7 +269,7 @@ class EconomicCalendarServiceImpl {
       where('date', '>=', dateRange.start),
       where('date', '<=', dateRange.end),
       orderBy('date'),
-      orderBy('time')
+      orderBy('time'),limit(50)
     );
 
     // Set up real-time listener

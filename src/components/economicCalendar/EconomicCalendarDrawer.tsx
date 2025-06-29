@@ -186,14 +186,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const currentCalendar = getCurrentCalendar?.();
   const savedSettings: EconomicCalendarFilterSettings = currentCalendar?.economicCalendarFilters || DEFAULT_FILTER_SETTINGS;
 
-  // Debug logging
-  useEffect(() => {
-    if (open && currentCalendar) {
-      console.log('📅 Economic Calendar opened for calendar:', currentCalendar.name);
-      console.log('📅 Current filter settings:', savedSettings);
-    }
-  }, [open, currentCalendar, savedSettings]);
-
+  
 
 
   // State management
@@ -209,15 +202,25 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   useEffect(() => {
     if (updatedEvent) {
       console.log(`📊 Updating event in Economic Calendar: ${updatedEvent.event}`);
-
+      const events : EconomicEvent[] = updatedEvent.events || []
+      events.push(updatedEvent.event)
       // Find and update the specific event in the current events list
-      setEvents(prevEvents =>
-        prevEvents.map(event =>
-          event.id === updatedEvent.id
-            ? { ...event, ...updatedEvent }
-            : event
-        )
-      );
+      setEvents(prevEvents => {
+        if (!updatedEvent) return prevEvents;
+        const updatedEvents = updatedEvent.events || [];
+        let changed = false; 
+        // Replace any matching events with the updated ones
+        const newEvents = prevEvents.map(event => {
+          const idx = updatedEvents.findIndex(e => e.id === event.id);
+          if (idx >= 0) {
+            changed = true;
+            return { ...event, ...updatedEvents[idx] };
+          }
+          return event;
+        });
+        // If no changes, return prevEvents to avoid unnecessary re-renders
+        return changed ? newEvents : prevEvents;
+      });
     }
   }, [updatedEvent]);
 
@@ -240,6 +243,9 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
   // Track if filters have been modified
   const [filtersModified, setFiltersModified] = useState(false);
+
+  // Track if the month picker is active
+  const [isMonthPickerActive, setIsMonthPickerActive] = useState(false);
 
   // Function to save filter settings to calendar
   const saveFilterSettings = useCallback(async (currencies: Currency[], impacts: ImpactLevel[], viewTypeToSave: ViewType) => {
@@ -271,8 +277,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     setViewType(newViewType);
     setStartDate(null);
     setEndDate(null);
-
-    // Save the new view type to calendar settings
+    setCurrentDate(new Date());
+    setIsMonthPickerActive(false); // Deactivate month picker highlight when using view type buttons
     await saveFilterSettings(appliedCurrencies, appliedImpacts, newViewType);
   }, [appliedCurrencies, appliedImpacts, saveFilterSettings]);
 
@@ -307,8 +313,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         return dayResult;
 
       case 'week':
-        const weekStart = startOfWeek(date, { weekStartsOn: 1 }); // Monday
-        const weekEnd = endOfWeek(date, { weekStartsOn: 1 });
+        const weekStart = startOfWeek(date, { weekStartsOn: 0 }); // Sunday
+        const weekEnd = endOfWeek(date, { weekStartsOn: 0 });
         const weekResult = {
           start: format(weekStart, 'yyyy-MM-dd'),
           end: format(weekEnd, 'yyyy-MM-dd')
@@ -376,6 +382,61 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       fetchEvents();
     }
   }, [dateRange, appliedCurrencies, appliedImpacts, open, viewType, pageSize, startDate, endDate]);
+
+
+  // Set up real-time subscription when filters change
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+
+     // Get today's events for the specified currencies
+     const today = new Date();
+     const dateRange =  {
+      start: today.toISOString().split('T')[0],
+      end: today.toISOString().split('T')[0]
+    }
+    // Set up real-time subscription to database
+    const unsubscribe = economicCalendarService.subscribeToEvents(
+      dateRange,
+      (fetchedEvents) => {
+        console.log(`📊 Received ${fetchedEvents.length} events from real-time subscription`);
+
+        // Validate the fetched events
+        if (Array.isArray(fetchedEvents)) {
+          setEvents(prevEvents => {
+            if (!fetchedEvents) return prevEvents; 
+            let changed = false; 
+            // Replace any matching events with the updated ones
+            const newEvents = prevEvents.map(event => {
+              const idx = fetchedEvents.findIndex(e => e.id === event.id);
+              if (idx >= 0) {
+                changed = true;
+                return { ...event, ...fetchedEvents[idx] };
+              }
+              return event;
+            });
+            // If no changes, return prevEvents to avoid unnecessary re-renders
+            return changed ? newEvents : prevEvents;
+          });
+        } else {
+          console.warn('Invalid events data received:', fetchedEvents);
+          setEvents([]);
+          setError('Invalid data format received from database.');
+        }
+ 
+      },
+      {
+        currencies: appliedCurrencies,
+        impacts: appliedImpacts
+      }
+    );
+
+    // Cleanup subscription on unmount or filter change
+    return () => {
+      unsubscribe();
+    };
+  }, [dateRange, appliedCurrencies, appliedImpacts]);
+
 
   // Load more events function
   const loadMoreEvents = async () => {
@@ -506,8 +567,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       case 'day':
         return format(currentDate, 'EEEE, MMMM d, yyyy');
       case 'week':
-        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-        const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+        const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
         return `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`;
       case 'month':
         return format(currentDate, 'MMMM yyyy');
@@ -599,7 +660,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
               <Button
                 startIcon={<EventIcon />}
                 onClick={() => handleViewTypeChange('day')}
-                variant={viewType === 'day' ? 'contained' : 'outlined'}
+                variant={!isMonthPickerActive && viewType === 'day' ? 'contained' : 'outlined'}
                 sx={{ flex: 1 }}
               >
                 Today
@@ -607,7 +668,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
               <Button
                 startIcon={<WeekIcon />}
                 onClick={() => handleViewTypeChange('week')}
-                variant={viewType === 'week' ? 'contained' : 'outlined'}
+                variant={!isMonthPickerActive && viewType === 'week' ? 'contained' : 'outlined'}
                 sx={{ flex: 1 }}
               >
                 This Week
@@ -615,7 +676,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
               <Button
                 startIcon={<MonthIcon />}
                 onClick={() => handleViewTypeChange('month')}
-                variant={viewType === 'month' ? 'contained' : 'outlined'}
+                variant={!isMonthPickerActive && viewType === 'month' ? 'contained' : 'outlined'}
                 sx={{ flex: 1 }}
               >
                 This Month
@@ -759,9 +820,10 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                         selectedDate: format(selectedDate, 'yyyy-MM-dd') 
                       });
                       setCurrentDate(selectedDate);
-                      // Clear custom date range to ensure currentDate is used for date range calculation
+                      setViewType('month');
                       setStartDate(null);
                       setEndDate(null);
+                      setIsMonthPickerActive(true); // Activate month picker highlight
                     }}
                     size="small"
                     fullWidth
@@ -897,10 +959,12 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                         color="warning"
                         variant="outlined"
                         sx={{ 
+                          mx: 1,
                           fontSize: '0.75rem',
                           height: 20,
                           '& .MuiChip-label': {
                             px: 1,
+                           
                           }
                         }}
                       />
@@ -1070,11 +1134,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
               Showing {events.length} events{hasMore ? ' (more available)' : ''}
             </Typography>
           )}
-
-        
-          <Typography variant="caption" color="success.main" align="center" display="block" sx={{ mt: 0.5 }}>
-          Economic events updates every 30 minutes
-          </Typography>
+ 
         </Box>
       </Box>
     </Drawer>

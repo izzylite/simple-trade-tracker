@@ -1,11 +1,8 @@
 /**
  * Economic Calendar Components Export
  */
-
-export { default as EconomicCalendar } from './EconomicCalendar';
-export { default as EconomicEventCard } from './EconomicEventCard';
-export { default as EconomicCalendarDrawer } from './EconomicCalendarDrawer';
-export { default as EconomicCalendarFilters } from './EconomicCalendarFilters';
+  
+export { default as EconomicCalendarDrawer } from './EconomicCalendarDrawer'; 
 
 // Re-export types for convenience
 export type {

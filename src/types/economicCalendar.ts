@@ -101,7 +101,8 @@ export interface EconomicCalendarDrawerProps {
   onClose: () => void;
   getCurrentCalendar?: () => any; // Calendar type from calendar.ts
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: any) => any) => Promise<void>;
-  updatedEvent?: EconomicEvent | null; // For real-time event updates
+  updatedEvent?: {event : EconomicEvent, events : EconomicEvent[]} | null; // For real-time event updates
+   
 }
 
 // Service types

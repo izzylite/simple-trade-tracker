@@ -879,7 +879,7 @@ export const refreshEconomicCalendar = onCall(
   },
   async (request) => {
     try {
-      const { targetDate, currencies, eventId, eventName } = request.data;
+      const { targetDate, currencies, eventId, actual, eventName} = request.data;
 
       if (!targetDate || !currencies || !Array.isArray(currencies)) {
         throw new Error('Missing required parameters: targetDate and currencies array');
@@ -890,15 +890,42 @@ export const refreshEconomicCalendar = onCall(
 
       logger.info(`🔄 Refreshing economic calendar for date: ${targetDate}, currencies: ${currencies.join(', ')}`);
 
+      let updated = false;
+      let count = 0;
+      let targetEvents : EconomicEvent[] = []; 
+      let updatedEvent : EconomicEvent | undefined;
 
-      // Fetch fresh data from MyFXBook for the target date
-      const freshEvents = await fetchFromMyFXBookWeekly();
+      while (!updated) {
+        // Fetch fresh data from MyFXBook for the target date
+        const freshEvents = await fetchFromMyFXBookWeekly();
 
-      // Filter events for the target date and currencies
-      const targetEvents = freshEvents.filter(event => {
-        const eventDate = new Date(event.time_utc).toISOString().split('T')[0];
-        return eventDate === targetDate && currencies.includes(event.currency);
-      });
+        // Filter events for the target date and currencies
+        targetEvents = freshEvents.filter(event => {
+          const eventDate = new Date(event.time_utc).toISOString().split('T')[0];
+          return eventDate === targetDate && currencies.includes(event.currency);
+        });
+
+        // If specific event requested, find and return it
+        logger.info(`🎯 Looking for specific event ID: ${eventId} (${eventName || 'unknown name'})`);
+
+        updatedEvent = targetEvents.find(event => event.id === eventId);
+        // Break if event wasnt found or after 3 update refreash attempt
+        if (!updatedEvent || (count === 3 && !updatedEvent)) {
+          logger.info(`specificUpdatedEvent wasnt found or max retries reached ${count}`)
+          break;
+        }
+        // If specificUpdatedEvent.actual is different, this mean we've successfully retrieved the updated event from myfxbook
+        if (updatedEvent && updatedEvent.actual !== actual) {
+          updated = true;
+          break;
+        }
+        // Small delay to be respectful
+        await new Promise(resolve => setTimeout(resolve, count * 1000)); //Exponetial increase
+
+        count++;
+      }
+
+
 
       logger.info(`📊 Found ${targetEvents.length} events to update for ${targetDate}`);
 
@@ -906,13 +933,10 @@ export const refreshEconomicCalendar = onCall(
       await storeEventsInDatabase(targetEvents);
       const updatedCount = targetEvents.length;
 
-      // If specific event requested, find and return it
-      logger.info(`🎯 Looking for specific event ID: ${eventId} (${eventName || 'unknown name'})`);
-       
-      const specificUpdatedEvent = targetEvents.find(event => event.id === eventId);
 
-      if (specificUpdatedEvent) {
-        logger.info(`🎯 Found specific event: ${specificUpdatedEvent.event} - Actual: ${specificUpdatedEvent.actual}, Forecast: ${specificUpdatedEvent.forecast}`);
+
+      if (updatedEvent) {
+        logger.info(`🎯 Found specific event: ${updatedEvent.event} - Actual: ${updatedEvent.actual}, Forecast: ${updatedEvent.forecast}`);
       } else {
         logger.warn(`⚠️ Specific event not found with ID: ${eventId}`);
       }
@@ -922,10 +946,11 @@ export const refreshEconomicCalendar = onCall(
       return {
         success: true,
         updatedCount,
-        updatedEvent: specificUpdatedEvent, // Return the specific event if requested
+        targetEvents,  
+        updatedEvent,  
         targetDate,
         currencies,
-        message: `Updated ${updatedCount} events for ${targetDate}${specificUpdatedEvent ? `, found specific event: ${specificUpdatedEvent.event}` : ''}`
+        message: `Updated ${updatedCount} events for ${targetDate}${updatedEvent ? `, found specific event: ${updatedEvent.event}` : ''}`
       };
 
     } catch (error) {

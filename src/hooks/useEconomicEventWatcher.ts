@@ -36,12 +36,12 @@ export const useEconomicEventWatcher = ({
   useEffect(() => {
     if (!isInitialized.current) {
       economicEventWatcher.initialize({
-        onEventUpdated: (event: EconomicEvent, calendarId: string) => {
+        onEventUpdated: (event: EconomicEvent,events: EconomicEvent[], calendarId: string) => {
           console.log(`📊 Event updated: ${event.event} for calendar ${calendarId}`);
           
           // You could dispatch a custom event here to notify other parts of the app
           window.dispatchEvent(new CustomEvent('economicEventUpdated', {
-            detail: { event, calendarId }
+            detail: { event, events, calendarId }
           }));
         },
         onError: (error: Error, calendarId: string) => {
@@ -99,10 +99,10 @@ export const useEconomicEventWatcher = ({
 };
 
 // Custom hook for listening to economic event updates
-export const useEconomicEventUpdates = (callback: (event: EconomicEvent, calendarId: string) => void) => {
+export const useEconomicEventUpdates = (callback: (event: EconomicEvent, events: EconomicEvent[], calendarId: string) => void) => {
   useEffect(() => {
     const handleEventUpdate = (e: CustomEvent) => {
-      callback(e.detail.event, e.detail.calendarId);
+      callback(e.detail.event,e.detail.events, e.detail.calendarId);
     };
 
     window.addEventListener('economicEventUpdated', handleEventUpdate as EventListener);

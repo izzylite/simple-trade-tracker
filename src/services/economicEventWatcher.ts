@@ -22,7 +22,7 @@ interface WatchedEvent {
 }
 
 interface EventWatcherCallbacks {
-  onEventUpdated: (event: EconomicEvent, calendarId: string) => void;
+  onEventUpdated: (event: EconomicEvent,events: EconomicEvent[], calendarId: string) => void;
   onError: (error: Error, calendarId: string) => void;
 }
 
@@ -193,11 +193,9 @@ class EconomicEventWatcher {
     const eventTime = new Date(event.timeUtc);
     const now = new Date();
     const timeUntilEvent = eventTime.getTime() - now.getTime();
+ 
 
-    // Add a small buffer (30 seconds) after the event time to allow for data updates
-    const timeUntilUpdate = timeUntilEvent + (30 * 1000);
-
-    if (timeUntilUpdate <= 0) {
+    if (timeUntilEvent <= 0) {
       // Event has already passed, trigger update immediately
       this.triggerEventUpdate(event, calendarId);
       return;
@@ -214,7 +212,7 @@ class EconomicEventWatcher {
     // Set new timeout
     const timeoutId = setTimeout(() => {
       this.triggerEventUpdate(event, calendarId);
-    }, timeUntilUpdate);
+    }, timeUntilEvent);
 
     this.watchedEvents.set(watchKey, {
       event,
@@ -222,7 +220,7 @@ class EconomicEventWatcher {
       calendarId
     });
 
-    console.log(`⏰ Event "${event.event}" will be updated in ${Math.round(timeUntilUpdate / 1000 / 60)} minutes`);
+    console.log(`⏰ Event "${event.event}" will be updated in ${Math.round(timeUntilEvent / 1000 / 60)} minutes`);
   }
 
   /**
@@ -240,12 +238,14 @@ class EconomicEventWatcher {
         targetDate: event.date,
         currencies: [event.currency],
         eventId: event.id,
+        actual: event.actual,
         eventName: event.event // Optional for logging purposes
       });
 
       // Extract the specific updated event from the cloud function result
       const responseData = result.data as any;
       const updatedEvent = responseData?.updatedEvent;
+      const targetEvents = responseData?.targetEvents;
 
       // Use the updated event data if found, otherwise fall back to original
       const eventToNotify: EconomicEvent = updatedEvent ? {
@@ -265,7 +265,7 @@ class EconomicEventWatcher {
       }
 
       // Notify that the event was updated with fresh data
-      this.callbacks.onEventUpdated(eventToNotify, calendarId);
+      this.callbacks.onEventUpdated(eventToNotify, targetEvents, calendarId);
 
       // Remove this event from watching and find the next one
       this.watchedEvents.delete(calendarId);
