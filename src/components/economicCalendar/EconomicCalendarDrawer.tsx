@@ -177,7 +177,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   open,
   onClose,
   getCurrentCalendar,
-  onUpdateCalendarProperty
+  onUpdateCalendarProperty,
+  updatedEvent
 }) => {
   const theme = useTheme();
 
@@ -193,6 +194,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     }
   }, [open, currentCalendar, savedSettings]);
 
+
+
   // State management
   const [viewType, setViewType] = useState<ViewType>(savedSettings.viewType);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -201,6 +204,22 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const [events, setEvents] = useState<EconomicEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Handle real-time event updates
+  useEffect(() => {
+    if (updatedEvent) {
+      console.log(`📊 Updating event in Economic Calendar: ${updatedEvent.event}`);
+
+      // Find and update the specific event in the current events list
+      setEvents(prevEvents =>
+        prevEvents.map(event =>
+          event.id === updatedEvent.id
+            ? { ...event, ...updatedEvent }
+            : event
+        )
+      );
+    }
+  }, [updatedEvent]);
 
   // Pagination state
   const [hasMore, setHasMore] = useState(false);

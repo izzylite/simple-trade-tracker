@@ -867,4 +867,71 @@ export const processHtmlEconomicEvents = onCall(
   }
 );
 
- 
+/**
+ * On-demand refresh for specific economic events
+ * Called when events are about to occur to get updated actual/forecast/previous data
+ */
+export const refreshEconomicCalendar = onCall(
+  {
+    region: 'us-central1',
+    memory: '512MiB',
+    timeoutSeconds: 60
+  },
+  async (request) => {
+    try {
+      const { targetDate, currencies, eventId, eventName } = request.data;
+
+      if (!targetDate || !currencies || !Array.isArray(currencies)) {
+        throw new Error('Missing required parameters: targetDate and currencies array');
+      }
+      if (!eventId) {
+        throw new Error('Missing required parameter: eventId');
+      }
+
+      logger.info(`🔄 Refreshing economic calendar for date: ${targetDate}, currencies: ${currencies.join(', ')}`);
+
+
+      // Fetch fresh data from MyFXBook for the target date
+      const freshEvents = await fetchFromMyFXBookWeekly();
+
+      // Filter events for the target date and currencies
+      const targetEvents = freshEvents.filter(event => {
+        const eventDate = new Date(event.time_utc).toISOString().split('T')[0];
+        return eventDate === targetDate && currencies.includes(event.currency);
+      });
+
+      logger.info(`📊 Found ${targetEvents.length} events to update for ${targetDate}`);
+
+      // Update events in Firestore
+      await storeEventsInDatabase(targetEvents);
+      const updatedCount = targetEvents.length;
+
+      // If specific event requested, find and return it
+      logger.info(`🎯 Looking for specific event ID: ${eventId} (${eventName || 'unknown name'})`);
+       
+      const specificUpdatedEvent = targetEvents.find(event => event.id === eventId);
+
+      if (specificUpdatedEvent) {
+        logger.info(`🎯 Found specific event: ${specificUpdatedEvent.event} - Actual: ${specificUpdatedEvent.actual}, Forecast: ${specificUpdatedEvent.forecast}`);
+      } else {
+        logger.warn(`⚠️ Specific event not found with ID: ${eventId}`);
+      }
+
+      logger.info(`✅ Successfully updated ${updatedCount} economic events`);
+
+      return {
+        success: true,
+        updatedCount,
+        updatedEvent: specificUpdatedEvent, // Return the specific event if requested
+        targetDate,
+        currencies,
+        message: `Updated ${updatedCount} events for ${targetDate}${specificUpdatedEvent ? `, found specific event: ${specificUpdatedEvent.event}` : ''}`
+      };
+
+    } catch (error) {
+      logger.error('❌ Error refreshing economic calendar:', error);
+      throw new Error(`Failed to refresh economic calendar: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+);
+

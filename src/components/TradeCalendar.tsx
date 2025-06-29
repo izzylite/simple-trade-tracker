@@ -97,6 +97,9 @@ import MonthlyStatisticsSection from './MonthlyStatisticsSection';
 import FloatingMonthNavigation from './FloatingMonthNavigation';
 import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
 import { EconomicCalendarDrawer } from './economicCalendar';
+import { useEconomicEventWatcher, useEconomicEventUpdates } from '../hooks/useEconomicEventWatcher';
+import EconomicEventNotification from './notifications/EconomicEventNotification';
+import { EconomicEvent } from '../types/economicCalendar';
 
 interface TradeCalendarProps {
   trades: Trade[];
@@ -443,10 +446,38 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Economic calendar drawer state
   const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(false);
 
-
+  // Economic event notification state
+  const [notificationEvent, setNotificationEvent] = useState<EconomicEvent | null>(null);
+  const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<EconomicEvent | null>(null);
 
   const theme = useTheme();
   const { calendarId } = useParams();
+
+  // Economic event watcher for real-time updates
+  const { watchingStatus } = useEconomicEventWatcher({
+    calendarId,
+    economicCalendarFilters: getCurrentCalendar?.()?.economicCalendarFilters,
+    isActive: true // Always active when TradeCalendar is mounted
+  });
+
+  // Listen for economic event updates
+  useEconomicEventUpdates((event, updatedCalendarId) => {
+    if (updatedCalendarId === calendarId) {
+      console.log(`📊 Economic event "${event.event}" was updated for this calendar`);
+
+      // 1. Show notification slider
+      setNotificationEvent(event);
+
+      // 2. Pass event to Economic Calendar Drawer if it's open
+      if (isEconomicCalendarOpen) {
+        setEconomicCalendarUpdatedEvent(event);
+        // Clear the updated event after a short delay to prevent re-triggering
+        setTimeout(() => {
+          setEconomicCalendarUpdatedEvent(null);
+        }, 1000);
+      }
+    }
+  });
 
 
 
@@ -1584,6 +1615,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         onClose={() => setIsEconomicCalendarOpen(false)}
         getCurrentCalendar={getCurrentCalendar}
         onUpdateCalendarProperty={onUpdateCalendarProperty}
+        updatedEvent={economicCalendarUpdatedEvent}
+      />
+
+      {/* Economic Event Notification */}
+      <EconomicEventNotification
+        event={notificationEvent}
+        onClose={() => setNotificationEvent(null)}
+        autoHideDuration={6000} // 6 seconds
       />
     </Box>
   );

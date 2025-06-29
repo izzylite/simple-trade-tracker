@@ -1,4 +1,5 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../config/firebase';
 import { Trade } from '../types/trade';
 
 // Simplified sharing service - all operations now handled by cloud functions
@@ -26,7 +27,6 @@ export const generateTradeShareLink = async (
   tradeId: string
 ): Promise<{ shareLink: string; shareId: string; directLink: string }> => {
   try {
-    const functions = getFunctions();
     const generateShareLink = httpsCallable(functions, 'generateTradeShareLinkV2');
 
     const result = await generateShareLink({
