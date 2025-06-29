@@ -54,20 +54,7 @@ class EconomicCalendarServiceImpl {
 
 
       // Build Firestore query
-      let eventsQuery = filters?.currencies ? query(
-        collection(db, 'economicEvents'),
-        where('date', '>=', dateRange.start),
-        where('date', '<=', dateRange.end),
-        where('currency', 'in', filters?.currencies),
-        orderBy('date', 'desc'),
-        orderBy('time', 'desc'),
-      ) : query(
-        collection(db, 'economicEvents'),
-        where('date', '>=', dateRange.start),
-        where('date', '<=', dateRange.end),
-        orderBy('date', 'desc'),
-        orderBy('time', 'desc'),
-      );
+      let eventsQuery = this.buildBaseQuery(dateRange, filters);
 
       // Execute query
       const querySnapshot = await getDocs(eventsQuery);
@@ -313,6 +300,7 @@ class EconomicCalendarServiceImpl {
 
       console.log(`🔄 Real-time update: ${events.length} events`);
       callback(events);
+      this.notifySubscribers(events);
     }, (error) => {
       console.error('❌ Error in real-time subscription:', error);
     });

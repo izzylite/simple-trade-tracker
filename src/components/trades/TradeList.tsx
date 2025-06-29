@@ -46,9 +46,15 @@ interface TradeListProps {
   calendarId?: string; // Calendar ID for sharing functionality
   // Optional props for trade link navigation in notes
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
+  // Calendar data for economic events filtering
+  calendar?: {
+    economicCalendarFilters?: {
+      currencies: string[];
+      impacts: string[];
+      viewType: 'day' | 'week' | 'month';
+    };
+  };
 }
-
-
 
 const TradeList: React.FC<TradeListProps> = ({
   trades,
@@ -64,7 +70,8 @@ const TradeList: React.FC<TradeListProps> = ({
   sx,
   deletingTradeIds = [],
   calendarId,
-  onOpenGalleryMode
+  onOpenGalleryMode,
+  calendar
 }) => {
   const theme = useTheme();
   const [selectedTradeIds, setSelectedTradeIds] = useState<string[]>([]);
@@ -459,6 +466,7 @@ const TradeList: React.FC<TradeListProps> = ({
                   calendarId={calendarId}
                   trades={trades}
                   onOpenGalleryMode={onOpenGalleryMode}
+                  calendar={calendar}
                 />
               )}
             </React.Fragment>

@@ -1,6 +1,7 @@
 import { Trade } from './trade';
 import { ScoreSettings } from './score';
 import { ImageAttribution } from '../components/heroImage';
+import { EconomicCalendarFilterSettings } from '../components/economicCalendar/EconomicCalendarDrawer';
 
 export interface Calendar {
   id: string;
@@ -37,11 +38,7 @@ export interface Calendar {
   // Score settings
   scoreSettings?: ScoreSettings;
   // Economic calendar filter settings
-  economicCalendarFilters?: {
-    currencies: string[];
-    impacts: string[];
-    viewType: 'day' | 'week' | 'month';
-  };
+  economicCalendarFilters?: EconomicCalendarFilterSettings
   // Statistics
   winRate?: number;
   profitFactor?: number;

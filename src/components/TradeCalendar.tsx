@@ -114,8 +114,7 @@ interface TradeCalendarProps {
   onAddTrade?: (trade: Trade) => Promise<void>;
   onEditTrade?: (trade: Trade) => Promise<void>;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
-  getCurrentCalendar?: () => Calendar | undefined;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>; 
 
   onImageUpload?: (tradeId: string, image: TradeImage, add: boolean) => Promise<void>;
   onDeleteTrade?: (tradeId: string) => Promise<void>;
@@ -139,6 +138,8 @@ interface TradeCalendarProps {
   onToggleDynamicRisk?: (useActualAmounts: boolean) => void;
   // Loading state
   isLoadingTrades?: boolean;
+  // Calendar data for economic events filtering
+  calendar?: Calendar
 }
 
 
@@ -395,8 +396,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     // Dynamic risk toggle
     onToggleDynamicRisk,
     // Loading state
-    isLoadingTrades = false,
-    getCurrentCalendar
+    isLoadingTrades = false, 
+    calendar
   } = props;
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -455,7 +456,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Economic event watcher for real-time updates
   const { watchingStatus } = useEconomicEventWatcher({
     calendarId,
-    economicCalendarFilters: getCurrentCalendar?.()?.economicCalendarFilters,
+    economicCalendarFilters: calendar?.economicCalendarFilters,
     isActive: true // Always active when TradeCalendar is mounted
   });
 
@@ -1344,6 +1345,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               setZoomedImage(imageUrl, allImages, initialIndex);
             }}
             onOpenGalleryMode={openGalleryMode}
+            calendar={calendar}
           />
 
 
@@ -1372,6 +1374,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           allTrades={trades} /* Pass all trades for tag suggestions */
           deletingTradeIds={deletingTradeIds}
           onOpenGalleryMode={openGalleryMode}
+          calendar={calendar}
         />
 
 
@@ -1597,6 +1600,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           title={galleryMode.title}
           calendarId={calendarId}
           onOpenGalleryMode={openGalleryMode}
+          calendar={calendar}
         />
 
 
@@ -1615,7 +1619,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       <EconomicCalendarDrawer
         open={isEconomicCalendarOpen}
         onClose={() => setIsEconomicCalendarOpen(false)}
-        getCurrentCalendar={getCurrentCalendar}
+        calendar={calendar!}
         onUpdateCalendarProperty={onUpdateCalendarProperty}
         updatedEvent={economicCalendarUpdatedEvent}
       />

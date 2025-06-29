@@ -31,6 +31,14 @@ interface TradeGalleryDialogProps {
   calendarId?: string;
   // Optional props for trade link navigation in notes
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
+  // Calendar data for economic events filtering
+  calendar?: {
+    economicCalendarFilters?: {
+      currencies: string[];
+      impacts: string[];
+      viewType: 'day' | 'week' | 'month';
+    };
+  };
 }
 
 const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
@@ -42,7 +50,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   setZoomedImage,
   title = "Trade Gallery",
   calendarId,
-  onOpenGalleryMode
+  onOpenGalleryMode,
+  calendar
 }) => {
   const theme = useTheme();
   
@@ -218,6 +227,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           calendarId={calendarId}
           trades={trades}
           onOpenGalleryMode={onOpenGalleryMode}
+          calendar={calendar}
         />
       </Box>
     </Dialog>

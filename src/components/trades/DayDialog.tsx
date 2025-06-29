@@ -26,6 +26,14 @@ interface DayDialogProps {
   calendarId: string;
   deletingTradeIds?: string[];
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
+  // Calendar data for economic events filtering
+  calendar?: {
+    economicCalendarFilters?: {
+      currencies: string[];
+      impacts: string[];
+      viewType: 'day' | 'week' | 'month';
+    };
+  };
 }
 
 
@@ -47,7 +55,8 @@ const DayDialog: React.FC<DayDialogProps> = ({
   allTrades = [],
   calendarId,
   deletingTradeIds,
-  onOpenGalleryMode
+  onOpenGalleryMode,
+  calendar
 }) => {
 
   // State
@@ -152,6 +161,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
             enableBulkSelection={trades.length > 1} // Enable bulk selection when there are multiple trades
             deletingTradeIds={deletingTradeIds}
             calendarId={calendarId}
+            calendar={calendar}
           />
         </Box>
       </BaseDialog>

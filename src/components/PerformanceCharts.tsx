@@ -44,6 +44,14 @@ interface PerformanceChartsProps {
   // Dynamic risk settings
   dynamicRiskSettings?: DynamicRiskSettings;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
+  // Calendar data for economic events filtering
+  calendar?: {
+    economicCalendarFilters?: {
+      currencies: string[];
+      impacts: string[];
+      viewType: 'day' | 'week' | 'month';
+    };
+  };
 }
 
 type TimePeriod = 'month' | 'year' | 'all';
@@ -64,7 +72,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   onUpdateTradeProperty,
   onUpdateCalendarProperty,
   dynamicRiskSettings,
-  onOpenGalleryMode
+  onOpenGalleryMode,
+  calendar
 }) => {
   const theme = useTheme();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
@@ -555,6 +564,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         onDeleteClick={onDeleteTrade}
         onOpenGalleryMode={onOpenGalleryMode}
         calendarId={calendarId}
+        calendar={calendar}
       />
 
       {/* Header Section - Stack on mobile */}

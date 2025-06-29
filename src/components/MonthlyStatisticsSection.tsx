@@ -44,6 +44,14 @@ interface MonthlyStatisticsSectionProps {
   onDeleteMultipleTrades?: (tradeIds: string[]) => void;
   onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
+  // Calendar data for economic events filtering
+  calendar?: {
+    economicCalendarFilters?: {
+      currencies: string[];
+      impacts: string[];
+      viewType: 'day' | 'week' | 'month';
+    };
+  };
 }
 
 interface MultipleTradesDialog {
@@ -69,7 +77,8 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   onDeleteTrade,
   onDeleteMultipleTrades,
   onZoomImage,
-  onOpenGalleryMode
+  onOpenGalleryMode,
+  calendar
 }) => {
   const theme = useTheme();
   const [multipleTradesDialog, setMultipleTradesDialog] = useState<MultipleTradesDialog>({
@@ -283,6 +292,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         onDeleteClick={onDeleteTrade}
         onDeleteMultiple={onDeleteMultipleTrades}
         onOpenGalleryMode={onOpenGalleryMode}
+        calendar={calendar}
       />
 
       {/* Performance Details Dialog */}
@@ -329,6 +339,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
             onEditTrade={onEditTrade}
             onDeleteTrade={onDeleteTrade}
             onOpenGalleryMode={onOpenGalleryMode}
+            calendar={calendar}
           />
         </DialogContent>
       </Dialog>

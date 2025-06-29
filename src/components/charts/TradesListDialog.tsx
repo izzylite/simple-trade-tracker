@@ -36,6 +36,14 @@ interface TradesDialogProps {
   onDeleteMultiple?: (tradeIds: string[]) => void;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
   calendarId?: string;
+  // Calendar data for economic events filtering
+  calendar?: {
+    economicCalendarFilters?: {
+      currencies: string[];
+      impacts: string[];
+      viewType: 'day' | 'week' | 'month';
+    };
+  };
 }
 
 const TradesListDialog: React.FC<TradesDialogProps> = ({
@@ -54,7 +62,8 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   onDeleteClick,
   onDeleteMultiple,
   onOpenGalleryMode,
-  calendarId
+  calendarId,
+  calendar
 }) => {
   const theme = useTheme();
   const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
@@ -293,6 +302,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
           enableBulkSelection={trades.length > 1 && !!onDeleteMultiple} // Enable bulk selection when there are multiple trades and handler is provided
           calendarId={calendarId}
           onOpenGalleryMode={onOpenGalleryMode}
+          calendar={calendar}
         />
       </Box>
     </BaseDialog>

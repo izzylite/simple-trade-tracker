@@ -810,7 +810,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       // Pass loading state
       isLoadingTrades={isLoadingTrades}
       // Calendar access callback
-      getCurrentCalendar={() => calendar}
+      calendar={calendar}
     />
   );
 };

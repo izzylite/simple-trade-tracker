@@ -63,14 +63,14 @@ const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF']
 const IMPACTS: ImpactLevel[] = ['High', 'Medium', 'Low'];
 
 // Interface for saved filter settings
-interface EconomicCalendarFilterSettings {
+export interface EconomicCalendarFilterSettings {
   currencies: Currency[];
   impacts: ImpactLevel[];
   viewType: ViewType;
 }
 
 // Default filter settings
-const DEFAULT_FILTER_SETTINGS: EconomicCalendarFilterSettings = {
+export const DEFAULT_FILTER_SETTINGS: EconomicCalendarFilterSettings = {
   currencies: ['USD', 'EUR', 'GBP'],
   impacts: ['High', 'Medium', 'Low'],
   viewType: 'day'
@@ -176,15 +176,15 @@ const EconomicEventShimmer: React.FC = () => {
 const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   open,
   onClose,
-  getCurrentCalendar,
+  calendar,
   onUpdateCalendarProperty,
   updatedEvent
 }) => {
   const theme = useTheme();
 
   // Get current calendar and its settings
-  const currentCalendar = getCurrentCalendar?.();
-  const savedSettings: EconomicCalendarFilterSettings = currentCalendar?.economicCalendarFilters || DEFAULT_FILTER_SETTINGS;
+ 
+  const savedSettings: EconomicCalendarFilterSettings = calendar?.economicCalendarFilters || DEFAULT_FILTER_SETTINGS;
 
   
 
@@ -249,7 +249,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
   // Function to save filter settings to calendar
   const saveFilterSettings = useCallback(async (currencies: Currency[], impacts: ImpactLevel[], viewTypeToSave: ViewType) => {
-    const calendar = getCurrentCalendar?.();
+ 
     if (!calendar?.id || !onUpdateCalendarProperty) {
       console.warn('⚠️ Cannot save economic calendar filter settings: missing calendar or update function');
       return;
@@ -270,7 +270,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     } catch (error) {
       console.error('⚠️ Failed to save economic calendar filter settings:', error);
     }
-  }, [getCurrentCalendar, onUpdateCalendarProperty]);
+  }, [onUpdateCalendarProperty]);
 
   // Function to handle view type changes and save settings
   const handleViewTypeChange = useCallback(async (newViewType: ViewType) => {
