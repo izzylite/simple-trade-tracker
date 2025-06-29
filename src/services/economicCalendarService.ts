@@ -52,20 +52,21 @@ class EconomicCalendarServiceImpl {
     try {
       console.log('🔄 Fetching economic calendar data from database:', dateRange, filters);
 
+
       // Build Firestore query
       let eventsQuery = filters?.currencies ? query(
         collection(db, 'economicEvents'),
         where('date', '>=', dateRange.start),
         where('date', '<=', dateRange.end),
         where('currency', 'in', filters?.currencies),
-      orderBy('date','desc'),
-        orderBy('time','desc'),
+        orderBy('date', 'desc'),
+        orderBy('time', 'desc'),
       ) : query(
         collection(db, 'economicEvents'),
         where('date', '>=', dateRange.start),
         where('date', '<=', dateRange.end),
-        orderBy('date','desc'),
-        orderBy('time','desc'),
+        orderBy('date', 'desc'),
+        orderBy('time', 'desc'),
       );
 
       // Execute query
@@ -109,6 +110,35 @@ class EconomicCalendarServiceImpl {
     }
   }
 
+  private buildBaseQuery(dateRange: { start: string; end: string }, filters?: {
+    currencies?: Currency[];
+    impacts?: ImpactLevel[];
+  }) {
+    // Build base query
+    let baseQuery = query(
+      collection(db, 'economicEvents'),
+      where('date', '>=', dateRange.start),
+      where('date', '<=', dateRange.end),
+      orderBy('date', 'desc'),
+      orderBy('time', 'desc'),
+    );
+
+    // Add currency filter if specified
+    if (filters?.currencies && filters.currencies.length > 0) {
+      baseQuery = query(
+        collection(db, 'economicEvents'),
+        where('date', '>=', dateRange.start),
+        where('date', '<=', dateRange.end),
+        where('currency', 'in', filters.currencies),
+        orderBy('date', 'desc'),
+        orderBy('time', 'desc'),
+      );
+    }
+
+    return baseQuery;
+  };
+
+
   /**
    * Fetch economic events with pagination support
    */
@@ -124,26 +154,8 @@ class EconomicCalendarServiceImpl {
       const pageSize = options?.pageSize || this.DEFAULT_PAGE_SIZE;
       console.log(`🔄 Fetching paginated economic calendar data (page size: ${pageSize}):`, dateRange, filters);
 
-      // Build base query
-      let baseQuery = query(
-        collection(db, 'economicEvents'),
-        where('date', '>=', dateRange.start),
-        where('date', '<=', dateRange.end),
-        orderBy('date'),
-        orderBy('time')
-      );
 
-      // Add currency filter if specified
-      if (filters?.currencies && filters.currencies.length > 0) {
-        baseQuery = query(
-          collection(db, 'economicEvents'),
-          where('date', '>=', dateRange.start),
-          where('date', '<=', dateRange.end),
-          where('currency', 'in', filters.currencies),
-          orderBy('date'),
-          orderBy('time')
-        );
-      }
+      const baseQuery = this.buildBaseQuery(dateRange, filters);
 
       // Add pagination
       let paginatedQuery = query(baseQuery, limit(pageSize + 1)); // +1 to check if there are more
@@ -233,7 +245,7 @@ class EconomicCalendarServiceImpl {
       { impacts: impact }
     );
   }
- 
+
 
   /**
    * Subscribe to event updates
@@ -264,13 +276,7 @@ class EconomicCalendarServiceImpl {
     console.log('� Setting up real-time subscription for economic events');
 
     // Build Firestore query
-    const eventsQuery = query(
-      collection(db, 'economicEvents'),
-      where('date', '>=', dateRange.start),
-      where('date', '<=', dateRange.end),
-      orderBy('date'),
-      orderBy('time'),limit(50)
-    );
+    const eventsQuery = query(this.buildBaseQuery(dateRange, filters), limit(50));
 
     // Set up real-time listener
     const unsubscribe = onSnapshot(eventsQuery, (querySnapshot) => {

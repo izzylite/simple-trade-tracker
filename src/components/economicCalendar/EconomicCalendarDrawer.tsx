@@ -1065,12 +1065,19 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
                     {/* Events for this date */}
                     <List sx={{ p: 0 }}>
-                      {dayGroup.events.map((event, eventIndex) => (
-                        <React.Fragment key={event.id || `${dayIndex}-${eventIndex}`}>
-                          <EconomicEventListItem event={event} />
-                          {eventIndex < dayGroup.events.length - 1 && <Divider sx={{ ml: 3 }} />}
-                        </React.Fragment>
-                      ))}
+                      {dayGroup.events.map((event, eventIndex) => {
+                        // Create a unique key that combines multiple identifiers
+                        const uniqueKey = event.id 
+                          ? `${event.id}-${event.timeUtc}-${eventIndex}`
+                          : `${dayGroup.date}-${event.timeUtc}-${event.currency}-${event.event}-${eventIndex}`;
+                        
+                        return (
+                          <React.Fragment key={uniqueKey}>
+                            <EconomicEventListItem event={event} />
+                            {eventIndex < dayGroup.events.length - 1 && <Divider sx={{ ml: 3 }} />}
+                          </React.Fragment>
+                        );
+                      })}
                     </List>
                   </Box>
                 ))}
