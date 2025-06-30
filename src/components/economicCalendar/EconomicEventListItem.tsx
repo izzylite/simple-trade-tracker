@@ -21,6 +21,8 @@ import { EconomicEvent } from '../../types/economicCalendar';
 
 interface EconomicEventListItemProps {
   event: EconomicEvent;
+  px: number,
+  py: number,
   showDivider?: boolean;
 }
 
@@ -28,7 +30,7 @@ interface EconomicEventListItemProps {
 const formatTimeWithCountdown = (eventTime: string, currentTime: Date) => {
   const eventDate = parseISO(eventTime);
   const now = currentTime;
-  const eventDateFormatted = format(eventDate, 'MMM d, HH:mm');
+  const eventDateFormatted = format(eventDate, 'MMM d, h:mm a');
 
   // Check if event is in the future
   if (isAfter(eventDate, now)) {
@@ -41,7 +43,7 @@ const formatTimeWithCountdown = (eventTime: string, currentTime: Date) => {
     let isImminent = false;
 
     if (minutesDiff < 60) {
-      isImminent = minutesDiff <= 30; // Imminent if within 30 minutes
+      isImminent = true; // Imminent if within 60 minutes
 
       if (isImminent && minutesDiff < 5) {
         // Show seconds for very imminent events (less than 5 minutes)
@@ -112,6 +114,8 @@ const getImminentBackgroundColor = (impact: string, theme: any) => {
 
 const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
   event,
+  px= 2.5,
+   py= 1.5,
   showDivider = true
 }) => {
   const theme = useTheme();
@@ -130,6 +134,14 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
         setCurrentTime(new Date());
       }, 1000);
     }
+    else {
+      // For non-imminent events, we still want to update the current time,
+      // but we can do so less frequently to avoid unnecessary re-renders.
+      // Here, we update every 10 min (1000 ms * 60 * 10).
+      interval = setInterval(() => {
+        setCurrentTime(new Date());
+      }, 1000 * 60 * 10);
+    }
 
     return () => {
       if (interval) {
@@ -143,35 +155,36 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
 
   return (
     <ListItem sx={{
-      px: 2,
-      py: 1,
-      backgroundColor: timeInfo.isImminent ? getImminentBackgroundColor(event.impact, theme) : 'transparent',
-      borderLeft: timeInfo.isImminent ? `3px solid ${getImpactColor(event.impact, theme)}` : 'none',
-      
-      mb: 0.5
+      px,
+      py,
+      backgroundColor: timeInfo.isImminent ? alpha(getImpactColor(event.impact, theme), 0.12) : 'transparent',
+      borderLeft: 'none',
+      mb: 0,
+      minHeight: 'auto'
     }}>
+
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
-        {/* Flag as Prefix Icon */}
-        <Box sx={{ minWidth: 24, mt: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+        {/* Flag and Currency */}
+        <Box sx={{ minWidth: 32, mt: 0.25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
           <img
             src={event.flagUrl}
             alt={event.country}
             style={{
-              width: 24,
-              height: 18,
-              borderRadius: 3,
+              width: 20,
+              height: 15,
+              borderRadius: 2,
               objectFit: 'cover',
               border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
             }}
           />
 
           {/* Currency */}
-          <Typography variant="body2" sx={{
+          <Typography variant="caption" sx={{
             fontWeight: 700,
             textAlign: 'center',
-            fontSize: '0.875rem',
+            fontSize: '0.7rem',
             color: 'text.primary',
-            minWidth: 35
+            minWidth: 32
           }}>
             {event.currency}
           </Typography>
@@ -179,30 +192,30 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
 
         {/* Content Container */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, width: '100%', flex: 1 }}>
-          {/* First Row: Date | Check Icon | Currency | Impact Badge */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, width: '100%' }}>
-            {/* Date */}
-            <Typography variant="body2" sx={{
+          {/* First Row: Time | Status | Impact Badge */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+            {/* Time */}
+            <Typography variant="caption" sx={{
               fontWeight: 600,
               color: timeInfo.isUpcoming ? 'text.primary' : 'text.secondary',
-              fontSize: '0.875rem',
-              minWidth: 100
+              fontSize: '0.75rem',
+              minWidth: 80
             }}>
               {timeInfo.time}
             </Typography>
 
-            {/* Check Icon or Countdown */}
-            <Box sx={{   display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Status Icon or Countdown */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 24 }}>
               {timeInfo.isPassed ? (
                 <CheckIcon sx={{
                   color: 'success.main',
-                  fontSize: '1.2rem'
+                  fontSize: '1rem'
                 }} />
               ) : timeInfo.countdown ? (
                 <Typography variant="caption" sx={{
                   color: timeInfo.isImminent ? 'error.main' : 'warning.main',
                   fontWeight: 700,
-                  fontSize: '0.75rem',
+                  fontSize: '0.65rem',
                   animation: timeInfo.isImminent ? 'pulse 1s infinite' : 'none',
                   '@keyframes pulse': {
                     '0%': { opacity: 1 },
@@ -215,8 +228,6 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
               ) : null}
             </Box>
 
-         
-
             {/* Spacer */}
             <Box sx={{ flex: 1 }} />
 
@@ -225,82 +236,96 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
               label={event.impact.toUpperCase()}
               size="small"
               sx={{
-                height: 22,
-                fontSize: '0.65rem',
+                height: 20,
+                fontSize: '0.6rem',
                 fontWeight: 700,
                 backgroundColor: getImpactColor(event.impact, theme),
                 color: 'white',
-                minWidth: 45,
+                minWidth: 40,
+                borderRadius: 1,
                 '& .MuiChip-label': {
-                  px: 1
+                  px: 0.75,
+                  py: 0.25
                 }
               }}
             />
           </Box>
 
-          {/* Second Row: Event Name | Previous, Forecast, Actual */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-            {/* Event Name */}
-            <Typography variant="body2" sx={{
-              fontWeight: 500,
-              fontSize: '0.875rem',
-              color: 'text.primary',
-              flex: 1
-            }}>
-              {event.event}
-            </Typography>
+          {/* Second Row: Event Name */}
+          <Typography variant="body2" sx={{
+            fontWeight: 600,
+            fontSize: '0.9rem',
+            color: 'text.primary',
+            lineHeight: 1.3,
+            mb: 0.5
+          }}>
+            {event.event}
+          </Typography>
 
-            {/* Values */}
-            {(event.actual || event.forecast || event.previous) && (
-              <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                {event.actual ? (
-                  <Typography variant="caption" sx={{
-                    fontWeight: 700,
-                    fontSize: '0.75rem',
-                    color: 'text.primary'
-                  }}>
-                    A: {event.actual}
-                  </Typography>
-                ) : (
-                  // Show hourglass if actual is missing but forecast or previous exists
-                  (event.forecast || event.previous) && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                     
-                      <Typography variant="caption" sx={{
-                        fontWeight: 700,
-                        alignItems: "center",
-                        fontSize: '0.75rem',
-                        color: 'text.disabled',
-                        opacity: 0.8
-                      }}>
-                        A:<HourglassEmptyIcon sx={{ fontSize: 16, mb: 0.5, color: 'warning.main', verticalAlign: 'middle' }} />
-                      </Typography>
-                    </Box>
-                  )
-                )}
-                {event.forecast && (
-                  <Typography variant="caption" sx={{
-                    color: 'text.secondary',
-                    fontSize: '0.75rem',
-                    fontWeight: 600
-                  }}>
-                    F: {event.forecast}
-                  </Typography>
-                )}
-                {event.previous && (
-                  <Typography variant="caption" sx={{
-                    color: 'text.disabled',
-                    fontSize: '0.75rem',
-                    fontWeight: 600
-                  }}>
-                    P: {event.previous}
-                  </Typography>
-                )}
-              </Box>
-            )}
-          </Box>
+          {/* Third Row: Values (if available) */}
+          {(event.actual || event.forecast || event.previous) && (
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+              {event.actual ? (
+                <Typography variant="caption" sx={{
+                  fontWeight: 700,
+                  fontSize: '0.7rem',
+                  color: 'text.primary',
+                  backgroundColor: alpha(theme.palette.success.main, 0.1),
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: 1,
+                  border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`
+                }}>
+                  A: {event.actual}
+                </Typography>
+              ) : (
+                // Show hourglass if actual is missing but forecast or previous exists
+                (event.forecast || event.previous) && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant="caption" sx={{
+                      fontWeight: 700,
+                      fontSize: '0.7rem',
+                      color: 'text.disabled',
+                      opacity: 0.8
+                    }}>
+                      A: <HourglassEmptyIcon sx={{ fontSize: 12, mb: 0.25, color: 'warning.main', verticalAlign: 'middle' }} />
+                    </Typography>
+                  </Box>
+                )
+              )}
+              {event.forecast && (
+                <Typography variant="caption" sx={{
+                  color: 'text.secondary',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  backgroundColor: alpha(theme.palette.info.main, 0.1),
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: 1,
+                  border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
+                }}>
+                  F: {event.forecast}
+                </Typography>
+              )}
+              {event.previous && (
+                <Typography variant="caption" sx={{
+                  color: 'text.disabled',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  backgroundColor: alpha(theme.palette.grey[500], 0.1),
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: 1,
+                  border: `1px solid ${alpha(theme.palette.grey[500], 0.2)}`
+                }}>
+                  P: {event.previous}
+                </Typography>
+              )}
+            </Box>
+          )}
         </Box>
       </Box>
+
     </ListItem>
   );
 };

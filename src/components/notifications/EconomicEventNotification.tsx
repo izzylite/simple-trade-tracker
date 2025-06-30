@@ -19,24 +19,28 @@ import {
   TrendingDown as TrendingDownIcon,
   Remove as NeutralIcon
 } from '@mui/icons-material';
-import { EconomicEvent } from '../../types/economicCalendar';
+import { EconomicEvent, ImpactLevel, Currency } from '../../types/economicCalendar';
+import { alpha } from '@mui/material/styles';
+import { format, parseISO } from 'date-fns';
 
 interface EconomicEventNotificationProps {
   event: EconomicEvent | null;
   onClose: () => void;
   autoHideDuration?: number; // Duration in milliseconds
+  isRemoving?: boolean; // Whether this notification is being removed
 }
 
 const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
   event,
   onClose,
-  autoHideDuration = 5000 // 5 seconds default
+  autoHideDuration = 5000, // 5 seconds default
+  isRemoving = false
 }) => {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (event) {
+    if (event && !isRemoving) {
       setOpen(true);
       
       // Auto-hide after specified duration
@@ -46,15 +50,24 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
 
       return () => clearTimeout(timer);
     }
-  }, [event, autoHideDuration]);
+  }, [event, autoHideDuration, isRemoving]);
 
   const handleClose = () => {
+    if (isRemoving) return; // Prevent double-closing
+    
     setOpen(false);
     // Wait for slide animation to complete before calling onClose
     setTimeout(() => {
       onClose();
     }, 300);
   };
+
+  // Handle removal animation
+  useEffect(() => {
+    if (isRemoving) {
+      setOpen(false);
+    }
+  }, [isRemoving]);
 
   if (!event) return null;
 
@@ -93,119 +106,183 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
   const trendInfo = getTrendInfo();
 
   return (
-    <Slide direction="left" in={open} mountOnEnter unmountOnExit>
+    <Slide direction="right" in={open} mountOnEnter unmountOnExit>
       <Paper
         elevation={8}
         sx={{
-          position: 'fixed',
-          top: 80,
-          right: 16,
-          width: 400,
-          maxWidth: 'calc(100vw - 32px)',
-          zIndex: theme.zIndex.snackbar,
-          borderRadius: 2,
+          width: 320,
+          maxWidth: 'calc(100vw - 24px)',
+          borderRadius: 1,
           overflow: 'hidden',
-          background: `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
-          border: `1px solid ${theme.palette.divider}`,
+          background: theme.palette.mode === 'dark'
+            ? theme.palette.background.default
+            : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+          border: `1px solid ${alpha(theme.palette.divider, theme.palette.mode === 'dark' ? 0.3 : 0.15)}`,
+          boxShadow: theme.shadows[8],
+          borderLeft: `4px solid ${getImpactColor(event.impact)}`
         }}
       >
-        {/* Header */}
+        {/* Compact Header with Close Button */}
         <Box
           sx={{
-            background: `linear-gradient(90deg, ${getImpactColor(event.impact)} 0%, ${getImpactColor(event.impact)}80 100%)`,
-            color: 'white',
-            p: 1.5,
+            background: `linear-gradient(90deg, ${getImpactColor(event.impact)} 0%, ${alpha(getImpactColor(event.impact), 0.8)} 100%)`,
+            color: theme.palette.getContrastText(getImpactColor(event.impact)),
+            p: 1,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between'
+            justifyContent: 'space-between',
+            minHeight: 32
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
             {trendInfo.icon}
-            <Typography variant="subtitle2" fontWeight="bold">
+            <Typography variant="caption" fontWeight="bold" sx={{ fontSize: '0.8rem' }}>
               Economic Event Updated
             </Typography>
           </Box>
           <IconButton
             size="small"
             onClick={handleClose}
-            sx={{ color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+            sx={{ color: 'white', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }, p: 0.25 }}
           >
-            <CloseIcon fontSize="small" />
+            <CloseIcon sx={{ fontSize: '1rem' }} />
           </IconButton>
         </Box>
 
-        {/* Content */}
-        <Box sx={{ p: 2 }}>
-          {/* Event Name and Currency */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-            <Chip
-              label={event.currency}
-              size="small"
-              sx={{
-                backgroundColor: getImpactColor(event.impact),
-                color: 'white',
-                fontWeight: 'bold'
-              }}
-            />
-            <Typography variant="body1" fontWeight="medium" sx={{ flex: 1 }}>
-              {event.event}
-            </Typography>
-          </Box>
+        {/* Compact Content */}
+        <Box sx={{ p: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
+            {/* Flag and Currency */}
+            <Box sx={{ minWidth: 32, mt: 0.25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+              <img
+                src={event.flagUrl}
+                alt={event.country}
+                style={{
+                  width: 20,
+                  height: 15,
+                  borderRadius: 2,
+                  objectFit: 'cover',
+                  border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
+                }}
+              />
+              <Typography variant="caption" sx={{
+                fontWeight: 700,
+                textAlign: 'center',
+                fontSize: '0.7rem',
+                color: 'text.primary',
+                minWidth: 32
+              }}>
+                {event.currency}
+              </Typography>
+            </Box>
 
-          {/* Data Values */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {event.actual && (
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="body2" color="text.secondary">
-                  Actual:
+            {/* Content Container */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, width: '100%', flex: 1 }}>
+              {/* First Row: Time | Status | Impact Badge */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                {/* Time */}
+                <Typography variant="caption" sx={{
+                  fontWeight: 600,
+                  color: 'text.primary',
+                  fontSize: '0.75rem',
+                  minWidth: 80
+                }}>
+                  {format(parseISO(event.timeUtc), 'h:mm a')}
                 </Typography>
-                <Typography variant="body2" fontWeight="bold" color={trendInfo.color}>
-                  {event.actual}
-                </Typography>
-              </Box>
-            )}
-            
-            {event.forecast && (
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="body2" color="text.secondary">
-                  Forecast:
-                </Typography>
-                <Typography variant="body2">
-                  {event.forecast}
-                </Typography>
-              </Box>
-            )}
-            
-            {event.previous && (
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="body2" color="text.secondary">
-                  Previous:
-                </Typography>
-                <Typography variant="body2">
-                  {event.previous}
-                </Typography>
-              </Box>
-            )}
-          </Box>
 
-          {/* Trend Status */}
-          <Box
-            sx={{
-              mt: 1.5,
-              p: 1,
-              borderRadius: 1,
-              backgroundColor: `${trendInfo.color}15`,
-              border: `1px solid ${trendInfo.color}30`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1
-            }}
-          >
-            {trendInfo.icon}
-            <Typography variant="caption" color={trendInfo.color} fontWeight="medium">
-              {trendInfo.text}
-            </Typography>
+                {/* Status Icon */}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 24 }}>
+                  <Typography variant="caption" sx={{
+                    color: trendInfo.color,
+                    fontWeight: 700,
+                    fontSize: '0.65rem'
+                  }}>
+                    {trendInfo.text}
+                  </Typography>
+                </Box>
+
+                {/* Spacer */}
+                <Box sx={{ flex: 1 }} />
+
+                {/* Impact Badge */}
+                <Chip
+                  label={event.impact.toUpperCase()}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    backgroundColor: getImpactColor(event.impact),
+                    color: 'white',
+                    minWidth: 40,
+                    borderRadius: 1,
+                    '& .MuiChip-label': {
+                      px: 0.75,
+                      py: 0.25
+                    }
+                  }}
+                />
+              </Box>
+
+              {/* Second Row: Event Name */}
+              <Typography variant="body2" sx={{
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                color: 'text.primary',
+                lineHeight: 1.3,
+                mb: 0.5
+              }}>
+                {event.event}
+              </Typography>
+
+              {/* Third Row: Values (if available) */}
+              {(event.actual || event.forecast || event.previous) && (
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {event.actual && (
+                    <Typography variant="caption" sx={{
+                      fontWeight: 700,
+                      fontSize: '0.7rem',
+                      color: 'text.primary',
+                      backgroundColor: alpha(theme.palette.success.main, 0.1),
+                      px: 1,
+                      py: 0.25,
+                      borderRadius: 1,
+                      border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`
+                    }}>
+                      A: {event.actual}
+                    </Typography>
+                  )}
+                  {event.forecast && (
+                    <Typography variant="caption" sx={{
+                      color: 'text.secondary',
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      backgroundColor: alpha(theme.palette.info.main, 0.1),
+                      px: 1,
+                      py: 0.25,
+                      borderRadius: 1,
+                      border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
+                    }}>
+                      F: {event.forecast}
+                    </Typography>
+                  )}
+                  {event.previous && (
+                    <Typography variant="caption" sx={{
+                      color: 'text.disabled',
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      backgroundColor: alpha(theme.palette.grey[500], 0.1),
+                      px: 1,
+                      py: 0.25,
+                      borderRadius: 1,
+                      border: `1px solid ${alpha(theme.palette.grey[500], 0.2)}`
+                    }}>
+                      P: {event.previous}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </Box>
           </Box>
         </Box>
       </Paper>

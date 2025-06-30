@@ -20,6 +20,7 @@ import {
   FormGroup,
   FormControlLabel,
   Checkbox,
+  Switch,
   CircularProgress,
   List,
   ListItem,
@@ -41,7 +42,9 @@ import {
   DateRange as WeekIcon,
   CalendarMonth as MonthIcon,
   Event as EventIcon,
-  Check as CheckIcon
+  Check as CheckIcon,
+  Notifications as NotificationsIcon,
+  NotificationsOff as NotificationsOffIcon
 } from '@mui/icons-material';
 import { format, addDays, addWeeks, addMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, isToday, isTomorrow, parseISO } from 'date-fns';
 import {
@@ -67,13 +70,15 @@ export interface EconomicCalendarFilterSettings {
   currencies: Currency[];
   impacts: ImpactLevel[];
   viewType: ViewType;
+  notificationsEnabled: boolean;
 }
 
 // Default filter settings
 export const DEFAULT_FILTER_SETTINGS: EconomicCalendarFilterSettings = {
   currencies: ['USD', 'EUR', 'GBP'],
   impacts: ['High', 'Medium', 'Low'],
-  viewType: 'day'
+  viewType: 'day',
+  notificationsEnabled: true
 };
 
 // Helper function to get date header for month view
@@ -183,11 +188,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const theme = useTheme();
 
   // Get current calendar and its settings
- 
   const savedSettings: EconomicCalendarFilterSettings = calendar?.economicCalendarFilters || DEFAULT_FILTER_SETTINGS;
-
-  
-
 
   // State management
   const [viewType, setViewType] = useState<ViewType>(savedSettings.viewType);
@@ -241,6 +242,9 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const [pendingCurrencies, setPendingCurrencies] = useState<Currency[]>(savedSettings.currencies);
   const [pendingImpacts, setPendingImpacts] = useState<ImpactLevel[]>(savedSettings.impacts);
 
+  // Notification settings
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(savedSettings.notificationsEnabled);
+
   // Track if filters have been modified
   const [filtersModified, setFiltersModified] = useState(false);
 
@@ -248,8 +252,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const [isMonthPickerActive, setIsMonthPickerActive] = useState(false);
 
   // Function to save filter settings to calendar
-  const saveFilterSettings = useCallback(async (currencies: Currency[], impacts: ImpactLevel[], viewTypeToSave: ViewType) => {
- 
+  const saveFilterSettings = useCallback(async (currencies: Currency[], impacts: ImpactLevel[], viewTypeToSave: ViewType, notificationsEnabledToSave: boolean) => {
     if (!calendar?.id || !onUpdateCalendarProperty) {
       console.warn('⚠️ Cannot save economic calendar filter settings: missing calendar or update function');
       return;
@@ -258,7 +261,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     const settings: EconomicCalendarFilterSettings = {
       currencies,
       impacts,
-      viewType: viewTypeToSave
+      viewType: viewTypeToSave,
+      notificationsEnabled: notificationsEnabledToSave
     };
 
     try {
@@ -270,7 +274,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     } catch (error) {
       console.error('⚠️ Failed to save economic calendar filter settings:', error);
     }
-  }, [onUpdateCalendarProperty]);
+  }, [calendar, onUpdateCalendarProperty]);
 
   // Function to handle view type changes and save settings
   const handleViewTypeChange = useCallback(async (newViewType: ViewType) => {
@@ -279,8 +283,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     setEndDate(null);
     setCurrentDate(new Date());
     setIsMonthPickerActive(false); // Deactivate month picker highlight when using view type buttons
-    await saveFilterSettings(appliedCurrencies, appliedImpacts, newViewType);
-  }, [appliedCurrencies, appliedImpacts, saveFilterSettings]);
+    await saveFilterSettings(appliedCurrencies, appliedImpacts, newViewType, notificationsEnabled);
+  }, [appliedCurrencies, appliedImpacts, saveFilterSettings, notificationsEnabled]);
 
   // Sync pending filters with applied filters on mount
   useEffect(() => {
@@ -383,15 +387,14 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     }
   }, [dateRange, appliedCurrencies, appliedImpacts, open, viewType, pageSize, startDate, endDate]);
 
-
   // Set up real-time subscription when filters change
   useEffect(() => {
     setLoading(true);
     setError(null);
 
-     // Get today's events for the specified currencies
-     const today = new Date();
-     const dateRange =  {
+    // Get today's events for the specified currencies
+    const today = new Date();
+    const dateRange =  {
       start: today.toISOString().split('T')[0],
       end: today.toISOString().split('T')[0]
     }
@@ -423,7 +426,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           setEvents([]);
           setError('Invalid data format received from database.');
         }
- 
       },
       {
         currencies: appliedCurrencies,
@@ -436,7 +438,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       unsubscribe();
     };
   }, [dateRange, appliedCurrencies, appliedImpacts]);
-
 
   // Load more events function
   const loadMoreEvents = async () => {
@@ -543,10 +544,10 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     setIsFilterExpanded(false); // Collapse filter section after applying
 
     // Save filter settings to calendar
-    await saveFilterSettings(pendingCurrencies, pendingImpacts, viewType);
+    await saveFilterSettings(pendingCurrencies, pendingImpacts, viewType, notificationsEnabled);
 
     // Save filter settings to localStorage
-    saveFilterSettings(pendingCurrencies, pendingImpacts, viewType);
+    saveFilterSettings(pendingCurrencies, pendingImpacts, viewType, notificationsEnabled);
   };
 
   // Reset filters function
@@ -575,6 +576,12 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       default:
         return '';
     }
+  };
+
+  // Handle notification toggle
+  const handleNotificationToggle = async (enabled: boolean) => {
+    setNotificationsEnabled(enabled);
+    await saveFilterSettings(appliedCurrencies, appliedImpacts, viewType, enabled);
   };
 
   return (
@@ -839,6 +846,63 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                 </FormControl>
               </Paper>
 
+              {/* Notification Settings */}
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  borderRadius: 2,
+                  background: alpha(theme.palette.background.paper, 0.6),
+                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                }}
+              >
+                <FormControl component="fieldset" fullWidth>
+                  <FormLabel component="legend" sx={{ 
+                    mb: 1.5, 
+                    fontSize: '0.875rem', 
+                    fontWeight: 600,
+                    color: 'text.primary'
+                  }}>
+                    Notifications
+                  </FormLabel>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={notificationsEnabled}
+                        onChange={(e) => handleNotificationToggle(e.target.checked)}
+                        color="primary"
+                        size="small"
+                      />
+                    }
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {notificationsEnabled ? (
+                          <NotificationsIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                        ) : (
+                          <NotificationsOffIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
+                        )}
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {notificationsEnabled ? 'Notifications enabled' : 'Notifications disabled'}
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ 
+                      mr: 0,
+                      '& .MuiFormControlLabel-label': {
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                      }
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    {notificationsEnabled 
+                      ? 'You will receive notifications when economic events are updated'
+                      : 'Notifications are disabled for economic events'
+                    }
+                  </Typography>
+                </FormControl>
+              </Paper>
+
               {/* Currency Filters */}
               <Paper
                 elevation={0}
@@ -1073,7 +1137,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                         
                         return (
                           <React.Fragment key={uniqueKey}>
-                            <EconomicEventListItem event={event} />
+                            <EconomicEventListItem px={2.5} py={1.5}   event={event} />
                             {eventIndex < dayGroup.events.length - 1 && <Divider sx={{ ml: 3 }} />}
                           </React.Fragment>
                         );

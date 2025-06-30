@@ -412,6 +412,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [deletingTradeIds, setDeletingTradeIds] = useState<string[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+ 
 
   // Custom function to handle setting zoomed image and related state
   const setZoomedImage = useCallback((url: string, allImages?: string[], initialIndex?: number) => {
@@ -447,7 +448,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(false);
 
   // Economic event notification state
-  const [notificationEvent, setNotificationEvent] = useState<EconomicEvent | null>(null);
+   // Notification stack state (moved from App.tsx)
+   const [notifications, setNotifications] = useState<EconomicEvent[]>([]);
+   const [removingNotifications, setRemovingNotifications] = useState<Set<string>>(new Set());
   const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ event: EconomicEvent, events: EconomicEvent[] } | null>(null);
 
   const theme = useTheme();
@@ -466,7 +469,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       console.log(`📊 Economic event "${event.event}" was updated for this calendar`);
 
       // 1. Show notification slider
-      setNotificationEvent(event);
+      addNotification(event);
 
       // 2. Pass event to Economic Calendar Drawer if it's open
       if (isEconomicCalendarOpen) {
@@ -481,6 +484,49 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       }
     }
   });
+  
+ 
+   // Add a notification (call this when you want to show a new notification)
+   const addNotification = (event: EconomicEvent) => {
+     setNotifications((prev) => {
+       // If we already have 3 notifications, mark the oldest one for removal
+       if (prev.length >= 3) {
+         const oldestNotification = prev[0];
+         setRemovingNotifications(prevRemoving => {
+           const newSet = new Set(prevRemoving);
+           newSet.add(oldestNotification.id);
+           return newSet;
+         });
+         // Remove the oldest notification after animation delay
+         setTimeout(() => {
+           setNotifications(current => current.filter(n => n.id !== oldestNotification.id));
+           setRemovingNotifications(current => {
+             const newSet = new Set(current);
+             newSet.delete(oldestNotification.id);
+             return newSet;
+           });
+         }, 300);
+       }
+       return [...prev, event];
+     });
+   };
+ 
+   // Close notification handler
+   const handleCloseNotification = (id: string) => {
+     setRemovingNotifications(prev => {
+       const newSet = new Set(prev);
+       newSet.add(id);
+       return newSet;
+     });
+     setTimeout(() => {
+       setNotifications((prev) => prev.filter(n => n.id !== id));
+       setRemovingNotifications(current => {
+         const newSet = new Set(current);
+         newSet.delete(id);
+         return newSet;
+       });
+     }, 300);
+   };
 
 
 
@@ -1623,13 +1669,31 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         onUpdateCalendarProperty={onUpdateCalendarProperty}
         updatedEvent={economicCalendarUpdatedEvent}
       />
+ 
 
-      {/* Economic Event Notification */}
-      <EconomicEventNotification
-        event={notificationEvent}
-        onClose={() => setNotificationEvent(null)}
-        autoHideDuration={6000} // 6 seconds
-      />
+      {/* Notification stack container (bottom left, global) */}
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: 24,
+          left: 12,
+          zIndex: 1400,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          pointerEvents: 'none',
+        }}
+      >
+        {notifications.map(event => (
+          <EconomicEventNotification
+            key={event.id}
+            event={event}
+            onClose={() => handleCloseNotification(event.id)}
+            autoHideDuration={6000}
+            isRemoving={removingNotifications.has(event.id)}
+          />
+        ))}
+      </Box>
     </Box>
   );
 };

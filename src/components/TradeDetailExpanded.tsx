@@ -15,7 +15,10 @@ import {
   FormControl,
   Select,
   MenuItem,
-  OutlinedInput
+  OutlinedInput,
+  Autocomplete,
+  Checkbox,
+  TextField
 } from '@mui/material';
 import { alpha, useTheme, keyframes } from '@mui/material/styles';
 import { format } from 'date-fns';
@@ -35,7 +38,8 @@ import {
   TrendingUp as EconomicIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  FilterList as FilterIcon
+  FilterList as FilterIcon,
+  ListAlt as ListAltIcon
 } from '@mui/icons-material';
 import { AnimatedDropdown } from './Animations';
 import { TagsDisplay } from './common';
@@ -57,7 +61,7 @@ interface TradeDetailExpandedProps {
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   calendarId?: string;
   // Optional props for trade link navigation in notes
-  trades?: Array<{ id: string; [key: string]: any }>;
+  trades?: Array<{ id: string;[key: string]: any }>;
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
   // Calendar data for economic events filtering
   calendar?: {
@@ -114,7 +118,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   calendar
 }) => {
   const theme = useTheme();
-  const [trade, setTrade] = useState<Trade>(tradeData); 
+  const [trade, setTrade] = useState<Trade>(tradeData);
   const [isPinning, setIsPinning] = useState(false);
   const [loadingImages, setLoadingImages] = useState<{ [key: string]: boolean }>({});
   const [showTagGroups, setShowTagGroups] = useState(() => {
@@ -128,10 +132,13 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   const [loadingEconomicEvents, setLoadingEconomicEvents] = useState(false);
   const [showEconomicEvents, setShowEconomicEvents] = useState(false);
   const [economicEventsError, setEconomicEventsError] = useState<string | null>(null);
+  const [allEconomicEvents, setAllEconomicEvents] = useState<EconomicEvent[]>([]);
+  const [eventNameSearch, setEventNameSearch] = useState('');
+
+  // Add state
   const [selectedImpacts, setSelectedImpacts] = useState<ImpactLevel[]>(
     (calendar?.economicCalendarFilters?.impacts as ImpactLevel[]) || ['High', 'Medium', 'Low']
   );
-  const [allEconomicEvents, setAllEconomicEvents] = useState<EconomicEvent[]>([]);
 
   // Update local trade state when tradeData prop changes
   useEffect(() => {
@@ -173,8 +180,19 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     }
   }, [trade.images]);
 
-  // No need to organize tags here as TagsDisplay will handle it
- 
+  // Filter events by event name search
+  useEffect(() => {
+    if (!eventNameSearch) {
+      setEconomicEvents(allEconomicEvents);
+    } else {
+      const searchLower = eventNameSearch.toLowerCase();
+      setEconomicEvents(
+        allEconomicEvents.filter(event =>
+          event.event.toLowerCase().includes(searchLower)
+        )
+      );
+    }
+  }, [eventNameSearch, allEconomicEvents]);
 
   // Function to toggle pin status
   const handleTogglePin = async () => {
@@ -211,26 +229,22 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
       // Format the trade date to YYYY-MM-DD
       const tradeDate = format(trade.date, 'yyyy-MM-dd');
-      console.log(`filter setting ${calendar?.economicCalendarFilters}`)
-      
-      const filterSetting  = calendar?.economicCalendarFilters || DEFAULT_FILTER_SETTINGS
+      const filterSetting = calendar?.economicCalendarFilters || DEFAULT_FILTER_SETTINGS
       const events = await economicCalendarService.fetchEvents(
         { start: tradeDate, end: tradeDate },
-        { 
+        {
           currencies: (filterSetting?.currencies as Currency[]),
           impacts: (filterSetting?.impacts as ImpactLevel[])
         }
       );
 
       // Sort events by time
-      const sortedEvents = events.sort((a, b) => 
+      const sortedEvents = events.sort((a, b) =>
         new Date(a.timeUtc).getTime() - new Date(b.timeUtc).getTime()
       );
 
       setAllEconomicEvents(sortedEvents);
-      // Apply current impact filter
-      const filteredEvents = sortedEvents.filter(event => selectedImpacts.includes(event.impact));
-      setEconomicEvents(filteredEvents);
+      setEconomicEvents(sortedEvents);
     } catch (error) {
       console.error('Error fetching economic events:', error);
       setEconomicEventsError('Failed to load economic events');
@@ -243,23 +257,41 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   const handleToggleEconomicEvents = () => {
     const newValue = !showEconomicEvents;
     setShowEconomicEvents(newValue);
-    
+
     // Fetch events when expanding for the first time
     if (newValue && economicEvents.length === 0 && !loadingEconomicEvents) {
       fetchEconomicEvents();
     }
   };
 
-  // Function to handle impact filter changes
-  const handleImpactFilterChange = (newImpacts: ImpactLevel[]) => {
-    setSelectedImpacts(newImpacts);
-    
-    // Filter existing events based on new selection
-    if (allEconomicEvents.length > 0) {
-      const filteredEvents = allEconomicEvents.filter(event => newImpacts.includes(event.impact));
-      setEconomicEvents(filteredEvents);
-    }
-  };
+  useEffect(() => {
+    if (!showEconomicEvents) return;
+
+    const unsubscribe = economicCalendarService.subscribeToUpdates((updatedEvents) => {
+      setAllEconomicEvents((prevEvents) => {
+        // Create a map of previous events by id
+        const prevMap = new Map(prevEvents.map(e => [e.id, e]));
+        // Update or add each event from the update
+        updatedEvents.forEach(event => {
+          prevMap.set(event.id, { ...prevMap.get(event.id), ...event });
+        });
+        // Return the merged array, sorted by time
+        return Array.from(prevMap.values()).sort((a, b) => new Date(a.timeUtc).getTime() - new Date(b.timeUtc).getTime());
+      });
+    });
+
+    return () => unsubscribe();
+  }, [showEconomicEvents]);
+
+  // Update filtering logic
+  useEffect(() => {
+    setEconomicEvents(
+      allEconomicEvents.filter(event =>
+        selectedImpacts.includes(event.impact) &&
+        event.event.toLowerCase().includes(eventNameSearch.toLowerCase())
+      )
+    );
+  }, [eventNameSearch, allEconomicEvents, selectedImpacts]);
 
   if (!isExpanded) return null;
 
@@ -294,7 +326,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
             {/* Action Buttons */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-               {/* Pin Button */}
+              {/* Pin Button */}
               {onUpdateTradeProperty && (
                 <IconButton
                   onClick={handleTogglePin}
@@ -329,15 +361,18 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 />
               )}
 
-             
+
             </Box>
           </Box>
 
           {/* Properties Section */}
           <Box sx={{ width: '100%' }}>
-            <Typography variant="subtitle2" color="text.primary" sx={{ mb: 1.5, display: 'block', fontWeight: 700, fontSize: '0.9rem' }}>
-              Properties
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
+              <ListAltIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+              <Typography variant="subtitle2" color="text.primary" sx={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                Properties
+              </Typography>
+            </Box>
 
             <Stack spacing={2} sx={{ width: '100%' }}>
               {/* Key Properties Grid */}
@@ -436,7 +471,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       {trade.amount > 0 ? '+' : ''}{trade.amount.toFixed(2)}
                     </Typography>
 
-                    
+
                   </Box>
                 </Paper>
 
@@ -772,9 +807,12 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               {/* Tags Section */}
               <Box sx={{ mb: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="subtitle2" color="text.primary" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                    Tags
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <CategoryIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                    <Typography variant="subtitle2" color="text.primary" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                      Tags
+                    </Typography>
+                  </Box>
                   <Tooltip title={showTagGroups ? "Show flat tag list" : "Group tags by category"}>
                     <IconButton
                       size="small"
@@ -805,7 +843,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               <Box sx={{ mb: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <EconomicIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                    <EconomicIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                     <Typography variant="subtitle2" color="text.primary" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
                       Economic Events ({format(trade.date, 'MMM d, yyyy')})
                     </Typography>
@@ -830,99 +868,165 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 <Collapse in={showEconomicEvents}>
                   <Box sx={{
                     borderRadius: 1,
-                    backgroundColor: alpha(theme.palette.background.paper, 0.7),
-                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                    overflow: 'hidden',
-                    maxHeight: 400,
-                    overflowY: 'auto'
+                    backgroundColor: alpha(theme.palette.background.paper, 0.9),
+                    border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
                   }}>
                     {loadingEconomicEvents ? (
-                      <Box sx={{ p: 2, textAlign: 'center' }}>
-                        <CircularProgress size={24} sx={{ mb: 1 }} />
-                        <Typography variant="caption" color="text.secondary">
+                      <Box sx={{ p: 3, textAlign: 'center' }}>
+                        <CircularProgress size={32} sx={{ mb: 2, color: 'primary.main' }} />
+                        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
                           Loading economic events...
                         </Typography>
                       </Box>
                     ) : economicEventsError ? (
-                      <Box sx={{ p: 2, textAlign: 'center' }}>
-                        <Typography variant="caption" color="error.main" sx={{ mb: 1, display: 'block' }}>
+                      <Box sx={{ p: 3, textAlign: 'center' }}>
+                        <Typography variant="body2" color="error.main" sx={{ mb: 2, fontWeight: 500 }}>
                           {economicEventsError}
                         </Typography>
                         <Button
                           size="small"
                           variant="outlined"
                           onClick={fetchEconomicEvents}
-                          sx={{ fontSize: '0.75rem' }}
+                          sx={{
+                            fontSize: '0.8rem',
+                            borderRadius: 2,
+                            textTransform: 'none',
+                            fontWeight: 600
+                          }}
                         >
                           Retry
                         </Button>
                       </Box>
                     ) : (
                       <>
-                        {/* Impact Filter */}
+                        {/* Impact filter UI above the search bar */}
                         {allEconomicEvents.length > 0 && (
-                          <Box sx={{ p: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                              <FilterIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                                Filter by Impact:
-                              </Typography>
+                          <Box sx={{
+                            p: { xs: 1.5, sm: 2.5 },
+                            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                            backgroundColor: alpha(theme.palette.background.default, 0.3)
+                          }}>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                flexDirection: { xs: 'column', sm: 'row' },
+                                alignItems: { xs: 'stretch', sm: 'center' },
+                                gap: { xs: 1, sm: 2 },
+                                mb: 1.5
+                              }}
+                            >
+                              {/* Event Name Search Bar */}
+                              <TextField
+                                variant="outlined"
+                                size="small"
+                                label="Search events"
+                                placeholder="Type to search by event name"
+                                value={eventNameSearch || ''}
+                                onChange={e => setEventNameSearch(e.target.value)}
+                                sx={{
+                                  width: { xs: '100%', sm: 320 },
+                                  maxWidth: 400,
+                                  flexShrink: 0
+                                }}
+                              />
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: { xs: 'wrap', sm: 'nowrap' }, mt: { xs: 1, sm: 0 } }}>
+                                <FilterIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.8rem', minWidth: 80 }}>
+                                  Filter by Impact:
+                                </Typography>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 0.5, sm: 0.75 } }}>
+                                  {((calendar?.economicCalendarFilters?.impacts as ImpactLevel[]) || (['High', 'Medium', 'Low'] as ImpactLevel[])).map((impact: ImpactLevel) => (
+                                    <Chip
+                                      key={impact}
+                                      label={impact}
+                                      size="small"
+                                      variant={selectedImpacts.includes(impact) ? "filled" : "outlined"}
+                                      onClick={() => {
+                                        const newImpacts = selectedImpacts.includes(impact)
+                                          ? selectedImpacts.filter(i => i !== impact)
+                                          : [...selectedImpacts, impact];
+                                        setSelectedImpacts(newImpacts);
+                                      }}
+                                      sx={{
+                                        fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                        height: { xs: 24, sm: 28 },
+                                        fontWeight: 600,
+                                        borderRadius: 1.5,
+                                        backgroundColor: selectedImpacts.includes(impact) 
+                                          ? getImpactColor(impact, theme) 
+                                          : 'transparent',
+                                        color: selectedImpacts.includes(impact) ? 'white' : getImpactColor(impact, theme),
+                                        borderColor: getImpactColor(impact, theme),
+                                        borderWidth: selectedImpacts.includes(impact) ? 0 : 1.5,
+                                        '&:hover': {
+                                          backgroundColor: selectedImpacts.includes(impact)
+                                            ? alpha(getImpactColor(impact, theme), 0.8)
+                                            : alpha(getImpactColor(impact, theme), 0.08),
+                                          transform: 'translateY(-1px)',
+                                          transition: 'all 0.2s ease-in-out'
+                                        },
+                                        '& .MuiChip-label': {
+                                          px: 1.2,
+                                          py: 0.4
+                                        }
+                                      }}
+                                    />
+                                  ))}
+                                </Box>
+                              </Box>
                             </Box>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                              {((calendar?.economicCalendarFilters?.impacts as ImpactLevel[]) || (['High', 'Medium', 'Low'] as ImpactLevel[])).map((impact: ImpactLevel) => (
-                                <Chip
-                                  key={impact}
-                                  label={impact}
-                                  size="small"
-                                  variant={selectedImpacts.includes(impact) ? "filled" : "outlined"}
-                                  onClick={() => {
-                                    const newImpacts = selectedImpacts.includes(impact)
-                                      ? selectedImpacts.filter(i => i !== impact)
-                                      : [...selectedImpacts, impact];
-                                    handleImpactFilterChange(newImpacts);
-                                  }}
-                                  sx={{
-                                    fontSize: '0.7rem',
-                                    height: 24,
-                                    backgroundColor: selectedImpacts.includes(impact) 
-                                      ? getImpactColor(impact, theme) 
-                                      : 'transparent',
-                                    color: selectedImpacts.includes(impact) ? 'white' : getImpactColor(impact, theme),
-                                    borderColor: getImpactColor(impact, theme),
-                                    '&:hover': {
-                                      backgroundColor: selectedImpacts.includes(impact)
-                                        ? alpha(getImpactColor(impact, theme), 0.8)
-                                        : alpha(getImpactColor(impact, theme), 0.1)
-                                    }
-                                  }}
-                                />
-                              ))}
-                            </Box>
-                            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', fontSize: '0.75rem' }}>
                               Showing {economicEvents.length} of {allEconomicEvents.length} events
                             </Typography>
                           </Box>
                         )}
 
+
+
                         {/* Events List */}
                         {economicEvents.length === 0 ? (
-                          <Box sx={{ p: 2, textAlign: 'center' }}>
-                            <Typography variant="caption" color="text.secondary">
-                              {allEconomicEvents.length === 0 
+                          <Box sx={{ p: 4, textAlign: 'center' }}>
+                            <EconomicIcon sx={{
+                              fontSize: 48,
+                              color: 'text.disabled',
+                              mb: 2,
+                              opacity: 0.5
+                            }} />
+                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                              {allEconomicEvents.length === 0
                                 ? 'No economic events found for this date'
                                 : 'No events match the selected impact filters'
                               }
                             </Typography>
+                            {allEconomicEvents.length > 0 && (
+                              <Typography variant="caption" color="text.disabled" sx={{ mt: 1, display: 'block' }}>
+                                Try adjusting your impact filters above
+                              </Typography>
+                            )}
                           </Box>
                         ) : (
-                          <List sx={{ p: 0 }}>
+                          <Box sx={{ p: 0 }}>
                             {economicEvents.map((event, index) => (
                               <React.Fragment key={`${event.id}-${event.timeUtc}-${index}`}>
-                                <EconomicEventListItem event={event} />
-                                {index < economicEvents.length - 1 && <Divider sx={{ ml: 3 }} />}
+                                <Box sx={{
+                                  px: 2.5,
+                                  py: 1.5,
+                                  '&:hover': {
+                                    backgroundColor: alpha(theme.palette.action.hover, 0.04)
+                                  },
+                                  transition: 'background-color 0.2s ease-in-out'
+                                }}>
+                                  <EconomicEventListItem px={0} py={0} event={event} />
+                                </Box>
+                                {index < economicEvents.length - 1 && (
+                                  <Divider sx={{
+                                    mx: 2.5,
+                                    borderColor: alpha(theme.palette.divider, 0.1)
+                                  }} />
+                                )}
                               </React.Fragment>
                             ))}
-                          </List>
+                          </Box>
                         )}
                       </>
                     )}

@@ -7,6 +7,7 @@ import { EconomicEvent, Currency, ImpactLevel } from '../types/economicCalendar'
 import { economicCalendarService } from './economicCalendarService';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../config/firebase';
+import { endOfDay, format, startOfDay } from 'date-fns';
 
 // Default filter settings to use when no calendar filters are available
 const DEFAULT_FILTER_SETTINGS = {
@@ -94,15 +95,17 @@ class EconomicEventWatcher {
 
       // Get today's events for the specified currencies
       const today = new Date();
+      const dayStart = startOfDay(today);
+      const dayEnd = endOfDay(today);
       const dateRange = {
-        start: today.toISOString().split('T')[0],
-        end: today.toISOString().split('T')[0]
+        start: format(dayStart, 'yyyy-MM-dd'),
+        end: format(dayEnd, 'yyyy-MM-dd')
       };
 
       const todaysEvents = await economicCalendarService.fetchEventsPaginated(
         dateRange,
         { pageSize: 100 }, // Might not actually be 100. Depending on the events for the day
-        { currencies, impacts }
+        { currencies, impacts }, true // get event with emmpty 'actual' info
       );
 
       // Filter and sort upcoming events
@@ -120,7 +123,7 @@ class EconomicEventWatcher {
         impacts
       });
 
-      console.log(`📋 Cached ${upcomingEvents.length} upcoming events for calendar: ${calendarId}`);
+      console.log(`📋 Cached ${upcomingEvents.length} upcoming events for calendar: ${calendarId} ${todaysEvents.events.length}`);
     } else {
       console.log(`📋 Using cached events for calendar: ${calendarId}`);
     }

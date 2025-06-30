@@ -38,7 +38,7 @@ interface EconomicEvent {
  */
 export const autoRefreshEconomicCalendarV2 = onSchedule(
   {
-    schedule: '0 6 * * *', // Every day at 6 AM UTC (changed from weekly to daily)
+    schedule: '*/30 * * * *', // Every 30 minutes
     region: 'us-central1',
     memory: '1GiB', // Increased memory for enhanced scraping
     timeoutSeconds: 540 // 9 minutes timeout for comprehensive scraping
@@ -163,63 +163,7 @@ async function storeEventsInDatabase(events: EconomicEvent[]): Promise<void> {
 
 
 
-
-/**
- * Manually trigger database population (for testing)
- */
-export const populateDatabaseManually = onCall(
-  {
-    region: 'us-central1',
-    memory: '512MiB'
-  },
-  async () => {
-    try {
-      logger.info('Manually populating database with economic events');
-
-      // Define major currency pairs to fetch
-      const majorCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
-
-      // Fetch data for today and next 7 days
-      const today = new Date().toISOString().split('T')[0];
-      const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-      logger.info(`Fetching events from ${today} to ${nextWeek} for currencies: ${majorCurrencies.join(', ')}`);
-
-      // Fetch all events using weekly scraping
-      const allEvents = await fetchFromMyFXBookWeekly();
-
-      // Filter for major currencies
-      const majorCurrencyEvents = allEvents.filter((event: EconomicEvent) =>
-        majorCurrencies.includes(event.currency)
-      );
-
-      logger.info(`Filtered ${allEvents.length} total events to ${majorCurrencyEvents.length} major currency events`);
-
-      // Store events in database with deduplication
-      await storeEventsInDatabase(majorCurrencyEvents);
-
-
-      logger.info(`Manual population completed: ${majorCurrencyEvents.length} events stored`);
-
-      return {
-        success: true,
-        totalEvents: allEvents.length,
-        storedEvents: majorCurrencyEvents.length,
-        currencies: majorCurrencies,
-        dateRange: { start: today, end: nextWeek }
-      };
-
-    } catch (error) {
-      logger.error('Error in manual population:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        totalEvents: 0,
-        storedEvents: 0
-      };
-    }
-  }
-);
+ 
 
 
 /**
@@ -299,7 +243,7 @@ function generateEventId(currency: string, eventName: string, dateTime: string, 
  * Enhanced MyFXBook weekly parsing using our tested logic
  */
 async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[]> {
-  logger.info('🔧 Parsing MyFXBook HTML with enhanced weekly logic...');
+  // logger.info('🔧 Parsing MyFXBook HTML with enhanced weekly logic...');
 
   try {
     const cheerio = await import('cheerio');
@@ -310,7 +254,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
     const validCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
     const validImpacts = ['High', 'Medium', 'Low'];
 
-    logger.info('🔍 Looking for table rows with economic data...');
+    // logger.info('🔍 Looking for table rows with economic data...');
 
     // Find all table rows with proper structure (at least 4 cells)
     const tableRows = $('tr').filter((_i, el) => {
@@ -327,25 +271,25 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
       return hasEnoughCells && hasDatePattern && hasCurrency;
     });
 
-    logger.info(`📊 Found ${tableRows.length} potential event rows`);
+    // logger.info(`📊 Found ${tableRows.length} potential event rows`);
 
     // Debug: If no rows found, let's examine the HTML structure
     if (tableRows.length === 0) {
-      logger.info('🔍 No rows found with current criteria. Analyzing HTML structure...');
+      // logger.info('🔍 No rows found with current criteria. Analyzing HTML structure...');
 
       // Check total number of tables and rows
       const allTables = $('table');
       const allRows = $('tr');
-      logger.info(`📋 Total tables in HTML: ${allTables.length}`);
-      logger.info(`📋 Total rows in HTML: ${allRows.length}`);
+      // logger.info(`📋 Total tables in HTML: ${allTables.length}`);
+      // logger.info(`📋 Total rows in HTML: ${allRows.length}`);
 
       // Sample some row content for debugging
-      logger.info('📋 Sample of first 10 table rows:');
+      // logger.info('📋 Sample of first 10 table rows:');
       allRows.slice(0, 10).each((i, row) => {
         const $row = $(row);
         const cells = $row.find('td');
         const text = $row.text().trim().substring(0, 100); // First 100 chars
-        logger.info(`  Row ${i}: ${cells.length} cells, text: "${text}"`);
+        // logger.info(`  Row ${i}: ${cells.length} cells, text: "${text}"`);
       });
 
       // Check for any rows with currency codes
@@ -353,14 +297,14 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
         const text = $(el).text();
         return /\b(USD|EUR|GBP|JPY|AUD|CAD|CHF)\b/.test(text);
       });
-      logger.info(`📋 Rows containing currency codes: ${rowsWithCurrency.length}`);
+      // logger.info(`📋 Rows containing currency codes: ${rowsWithCurrency.length}`);
 
       // Check for any rows with date patterns
       const rowsWithDates = $('tr').filter((_i, el) => {
         const text = $(el).text();
         return /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}|\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2}/i.test(text);
       });
-      logger.info(`📋 Rows containing date patterns: ${rowsWithDates.length}`);
+      // logger.info(`📋 Rows containing date patterns: ${rowsWithDates.length}`);
     }
 
     // Process each row
@@ -406,12 +350,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
           const $cell = $(cell);
 
           // Debug: Log cell content for first few rows to understand structure
-          if (i < 3 && cellIndex < 5) {
-            const cellHtml = $cell.html();
-            if (cellHtml && cellHtml.includes('flag')) {
-              logger.info(`🔍 Flag cell ${cellIndex} HTML: ${cellHtml.substring(0, 200)}`);
-            }
-          }
+          // (Removed logger.info)
 
           // Look for flag elements - MyFXBook uses specific patterns
           const $flagIcon = $cell.find('i[title]'); // Icon with title attribute
@@ -423,7 +362,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
             const titleAttr = $flagIcon.attr('title');
             if (titleAttr && titleAttr.length > 0) {
               country = titleAttr.trim();
-              if (i < 3) logger.info(`🏳️ Found country from title: ${country}`);
+              // (Removed logger.info)
             }
 
             // Extract country from class attribute as backup
@@ -434,7 +373,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
                 const countryMatch = classAttr.match(/^([A-Za-z\s]+)\s+align-center/);
                 if (countryMatch) {
                   country = countryMatch[1].trim();
-                  if (i < 3) logger.info(`🏳️ Found country from class: ${country}`);
+                  // (Removed logger.info)
                 }
               }
             }
@@ -447,7 +386,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
               const flagMatch = spanClass.match(/flag-icon-([a-z]{2})/);
               if (flagMatch) {
                 flagClass = flagMatch[1]; // Extract country code (e.g., "us")
-                if (i < 3) logger.info(`🚩 Found flag code: ${flagClass}`);
+                // (Removed logger.info)
               }
             }
           }
@@ -460,7 +399,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
                 const flagMatch = flagElClass.match(/flag-icon-([a-z]{2})/);
                 if (flagMatch) {
                   flagClass = flagMatch[1];
-                  if (i < 3) logger.info(`🚩 Found flag code from alternative search: ${flagClass}`);
+                  // (Removed logger.info)
                 }
               }
             });
@@ -636,7 +575,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
 
           if (!isoDate) {
             // Skip events without valid dates - we only want actual scraped data
-            logger.warn(`⚠️ Skipping event "${eventName}" - no valid date found`);
+            // logger.warn(`⚠️ Skipping event "${eventName}" - no valid date found`);
             return; // Skip this row in the .each() loop
           }
 
@@ -680,18 +619,18 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
             const previousStr = previous ? ` | P:${previous}` : '';
             const countryStr = country ? ` | ${country}` : '';
             const flagStr = flagClass ? ` | ${flagClass}` : '';
-            logger.info(`✅ Extracted: ${date || 'Unknown'} | ${time || '00:00'} | ${currency} ${eventName} | ${impact || 'Medium'}${actualStr}${forecastStr}${previousStr}${countryStr}${flagStr}`);
+            // logger.info(`✅ Extracted: ${date || 'Unknown'} | ${time || '00:00'} | ${currency} ${eventName} | ${impact || 'Medium'}${actualStr}${forecastStr}${previousStr}${countryStr}${flagStr}`);
           }
         }
 
       } catch (rowError) {
         // Skip individual row errors
-        logger.warn(`⚠️ Error processing row ${i}:`, rowError);
+        // logger.warn(`⚠️ Error processing row ${i}:`, rowError);
       }
     });
 
 
-    logger.info(`🎉 Successfully extracted ${events.length} events`);
+    // logger.info(`🎉 Successfully extracted ${events.length} events`);
 
 
     return events;

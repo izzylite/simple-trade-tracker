@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, Box, useMediaQuery } from '@mui/material';
+import { ThemeProvider, CssBaseline, Box, useMediaQuery, Button } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -20,7 +20,8 @@ import {
   calculateRiskAmount,
   DynamicRiskSettings
 } from './utils/dynamicRiskUtils';
-
+import EconomicEventNotification from './components/notifications/EconomicEventNotification';
+import { Currency, EconomicEvent } from './types/economicCalendar';
 
 // Lazy load components
 const HomePage = lazy(() => import('./components/HomePage'));
@@ -28,8 +29,6 @@ const CalendarHome = lazy(() => import('./components/CalendarHome'));
 const TradeCalendar = lazy(() => import('./components/TradeCalendar'));
 const CalendarTrash = lazy(() => import('./components/trash/CalendarTrash'));
 const SharedTradePage = lazy(() => import('./components/sharing/SharedTradePage'));
-
-
 
 // Loading component for Suspense
 const LoadingFallback = () => <AppLoadingProgress />;
@@ -96,8 +95,6 @@ function AppContent() {
         }
       }
 
-
-
       // Update the calendar with all loaded trades
       setCalendars(prevCalendars => {
         return prevCalendars.map(cal => {
@@ -135,8 +132,6 @@ function AppContent() {
     }
   };
 
-
-
   const handleCreateCalendar = async (name: string, accountBalance: number, maxDailyDrawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamicRiskEnabled?: boolean, increasedRiskPercentage?: number, profitThresholdPercentage?: number, heroImageUrl?: string, heroImageAttribution?: any) => {
     if (!user) return;
 
@@ -155,7 +150,6 @@ function AppContent() {
       profitThresholdPercentage,
       heroImageUrl,
       heroImageAttribution
-
     };
 
     try {
@@ -204,28 +198,26 @@ function AppContent() {
     try {
       await calendarService.updateCalendar(id, updates);
       updateCalendarState(id, updates);
-
     } catch (error) {
       console.error('Error updating calendar:', error);
     }
   };
 
-   const setLoading = (
-      loading: boolean,
-      loadingAction: 'loading' | 'importing' | 'exporting' ="loading",
-      calendarName: string | undefined = undefined
-    ) => {
-      if (!loading) {
-        setIsLoadingTrades(false);
-        setLoadingCalendarName(undefined);
-        setLoadingAction('loading'); // Reset to default action
-      } else {
-        setIsLoadingTrades(true);
-        setLoadingCalendarName(calendarName);
-        setLoadingAction(loadingAction);
-      }
+  const setLoading = (
+    loading: boolean,
+    loadingAction: 'loading' | 'importing' | 'exporting' = "loading",
+    calendarName: string | undefined = undefined
+  ) => {
+    if (!loading) {
+      setIsLoadingTrades(false);
+      setLoadingCalendarName(undefined);
+      setLoadingAction('loading'); // Reset to default action
+    } else {
+      setIsLoadingTrades(true);
+      setLoadingCalendarName(calendarName);
+      setLoadingAction(loadingAction);
     }
-
+  }
 
   const updateCalendarState = (id: string, updates: Partial<Calendar>) => {
     setCalendars(prev => prev.map(cal =>
@@ -323,8 +315,6 @@ function AppContent() {
 
     // Execute the recalculation and get the results
     recalculateTrades();
-
-
   };
 
   return (
@@ -453,7 +443,6 @@ interface CalendarRouteProps {
   setLoadingTrades: (loading: boolean) => void
 }
 
-
 const CalendarRoute: React.FC<CalendarRouteProps> = ({
   calendars,
   onUpdateStateCalendar,
@@ -482,7 +471,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     }
   }, [calendar, loadAllTrades, loadAttempted]);
 
- // Subscribe to calendar changes to automatically update tags and other fields
+  // Subscribe to calendar changes to automatically update tags and other fields
   useEffect(() => {
     if (!calendar) return;
 
@@ -493,16 +482,14 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
 
         // Only update specific fields that might change from cloud functions
         // Preserve cached trades and loaded years from local state
-          onUpdateStateCalendar(calendar.id, {
-            tags: updatedCalendarData.tags || [],
-            lastModified: updatedCalendarData.lastModified?.toDate() || new Date(),
-            requiredTagGroups: updatedCalendarData.requiredTagGroups || calendar.requiredTagGroups,
-            scoreSettings: updatedCalendarData.scoreSettings || calendar.scoreSettings,
-             // Update any other fields that cloud functions might modify
+        onUpdateStateCalendar(calendar.id, {
+          tags: updatedCalendarData.tags || [],
+          lastModified: updatedCalendarData.lastModified?.toDate() || new Date(),
+          requiredTagGroups: updatedCalendarData.requiredTagGroups || calendar.requiredTagGroups,
+          scoreSettings: updatedCalendarData.scoreSettings || calendar.scoreSettings,
+          // Update any other fields that cloud functions might modify
           // but preserve local state for trades and UI-specific data
-          });
-
-        
+        });
       }
     }, (error) => {
       console.error('Error listening to calendar changes:', error);
@@ -548,7 +535,6 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       throw error;
     }
   };
-
 
   const onTagUpdated = async (oldTag: string, newTag: string) => {
     // Helper function to update tags in an array, handling group name changes
@@ -657,7 +643,6 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
   }
 
   const handleUpdateTradeProperty = async (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade): Promise<Trade | undefined> => {
-
     try {
       const result = await calendarService.updateTrade(calendar.id, tradeId, calendar.cachedTrades, updateCallback, createIfNotExists);
       // Update the cached trades and stats in the calendar
@@ -687,14 +672,11 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
           cachedTrades: [...calendar.cachedTrades],
           loadedYears: [...calendar.loadedYears]
         });
-
       }
     } catch (error) {
       console.error('Error updating trade:', error);
     }
   };
-
-
 
   const handleChangeAccountBalance = async (newBalance: number) => {
     try {
@@ -702,7 +684,6 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       onUpdateStateCalendar(calendar.id, {
         accountBalance: newBalance
       });
-
     } catch (error) {
       console.error('Error updating account balance:', error);
     }
@@ -726,7 +707,6 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
         ...updatedStats
       });
       // Update the calendar with the updated stats
-
     } catch (error) {
       console.error('Error importing trades:', error);
     } finally {
@@ -750,7 +730,6 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       onUpdateStateCalendar(calendar.id, {
         cachedTrades: tradesToKeep,
       });
-
 
       // Then update Firestore using the clearMonthTrades function and get the updated stats
       // Pass the cached trades to avoid fetching all trades from Firestore

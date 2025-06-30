@@ -100,29 +100,29 @@ class EconomicCalendarServiceImpl {
   private buildBaseQuery(dateRange: { start: string; end: string }, filters?: {
     currencies?: Currency[];
     impacts?: ImpactLevel[];
-  }) {
-    // Build base query
-    let baseQuery = query(
-      collection(db, 'economicEvents'),
+  },   watcher: boolean = false) {
+    // Optimized base query builder for economic events
+    const baseCollection = collection(db, 'economicEvents');
+    const queryConstraints = [
       where('date', '>=', dateRange.start),
       where('date', '<=', dateRange.end),
-      orderBy('date', 'desc'),
-      orderBy('time', 'desc'),
-    );
+      orderBy('date'),
+      orderBy('time'),
+    ];
 
     // Add currency filter if specified
     if (filters?.currencies && filters.currencies.length > 0) {
-      baseQuery = query(
-        collection(db, 'economicEvents'),
-        where('date', '>=', dateRange.start),
-        where('date', '<=', dateRange.end),
-        where('currency', 'in', filters.currencies),
-        orderBy('date', 'desc'),
-        orderBy('time', 'desc'),
-      );
+      queryConstraints.push(where('currency', 'in', filters.currencies));
     }
 
-    return baseQuery;
+    // Add watcher filter for events with empty 'actual'
+    if (watcher) {
+      queryConstraints.push(where('actual', '==', ""));
+      queryConstraints.push(where('time', '>=', new Date())); 
+    }
+
+    // Compose and return the query
+    return query(baseCollection, ...queryConstraints);
   };
 
 
@@ -135,15 +135,16 @@ class EconomicCalendarServiceImpl {
     filters?: {
       currencies?: Currency[];
       impacts?: ImpactLevel[];
-    }
+    },
+    watcher: boolean = false
   ): Promise<PaginatedResult> {
     try {
       const pageSize = options?.pageSize || this.DEFAULT_PAGE_SIZE;
       console.log(`🔄 Fetching paginated economic calendar data (page size: ${pageSize}):`, dateRange, filters);
 
 
-      const baseQuery = this.buildBaseQuery(dateRange, filters);
-
+      let baseQuery = this.buildBaseQuery(dateRange, filters,watcher);
+     
       // Add pagination
       let paginatedQuery = query(baseQuery, limit(pageSize + 1)); // +1 to check if there are more
 
@@ -263,7 +264,7 @@ class EconomicCalendarServiceImpl {
     console.log('� Setting up real-time subscription for economic events');
 
     // Build Firestore query
-    const eventsQuery = query(this.buildBaseQuery(dateRange, filters), limit(50));
+    const eventsQuery = query(this.buildBaseQuery(dateRange, filters,true), limit(50));
 
     // Set up real-time listener
     const unsubscribe = onSnapshot(eventsQuery, (querySnapshot) => {
@@ -289,14 +290,6 @@ class EconomicCalendarServiceImpl {
         });
       });
 
-      // Apply client-side filtering
-      if (filters?.currencies && filters.currencies.length > 0) {
-        events = events.filter(event => filters.currencies!.includes(event.currency));
-      }
-
-      if (filters?.impacts && filters.impacts.length > 0) {
-        events = events.filter(event => filters.impacts!.includes(event.impact));
-      }
 
       console.log(`🔄 Real-time update: ${events.length} events`);
       callback(events);
