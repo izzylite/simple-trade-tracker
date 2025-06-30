@@ -8,7 +8,7 @@ const logger = {
   warn: (message, ...args) => console.warn(message, ...args),
   error: (message, ...args) => console.error(message, ...args)
 };
-
+//node upload-html-to-cloud.js sample-economic-calendar-jan.html;node upload-html-to-cloud.js sample-economic-calendar-feb.html;node upload-html-to-cloud.js sample-economic-calendar-mar.html;node upload-html-to-cloud.js sample-economic-calendar-apr.html;node upload-html-to-cloud.js sample-economic-calendar-may.html;node upload-html-to-cloud.js sample-economic-calendar-jun.html
 /**
  * Check if a value looks like a numeric economic indicator
  */
@@ -127,6 +127,72 @@ async function parseMyFXBookWeeklyEnhanced(html) {
   try {
     const $ = cheerio.load(html);
     const events = [];
+
+    // Detect the selected timezone from MyFXBook's timezone selector
+    let timezoneOffsetHours = 0; // Default to UTC
+    const selectedTimezoneOption = $('select[name="timezoneoffset"] option[selected], select#timezoneoffset option[selected]');
+
+    if (selectedTimezoneOption.length > 0) {
+      const timezoneValue = selectedTimezoneOption.attr('value');
+      const timezoneText = selectedTimezoneOption.text();
+
+      if (timezoneValue) {
+        timezoneOffsetHours = parseFloat(timezoneValue);
+        logger.info(`🕐 Detected timezone from page: ${timezoneText.trim()} (offset: ${timezoneOffsetHours} hours)`);
+      } else {
+        logger.warn('⚠️ Found selected timezone option but no value attribute');
+      }
+    } else {
+      logger.warn('⚠️ Could not find selected timezone option, defaulting to UTC');
+    }
+
+    // Helper function to convert local time to UTC and handle date changes
+    const convertToUTC = (localTimeStr, offsetHours) => {
+      // Parse time like "13:00" or "1:00 PM"
+      let hours = 0;
+      let minutes = 0;
+
+      if (localTimeStr.includes('PM') || localTimeStr.includes('AM')) {
+        // Handle 12-hour format
+        const match = localTimeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (match) {
+          hours = parseInt(match[1]);
+          minutes = parseInt(match[2]);
+          const period = match[3].toUpperCase();
+
+          if (period === 'PM' && hours !== 12) hours += 12;
+          if (period === 'AM' && hours === 12) hours = 0;
+        }
+      } else {
+        // Handle 24-hour format
+        const match = localTimeStr.match(/(\d{1,2}):(\d{2})/);
+        if (match) {
+          hours = parseInt(match[1]);
+          minutes = parseInt(match[2]);
+        }
+      }
+
+      // Convert to UTC by subtracting the timezone offset
+      const utcHours = hours - offsetHours;
+      const utcMinutes = minutes;
+
+      // Handle day rollover
+      let adjustedHours = utcHours;
+      let dayOffset = 0;
+
+      if (adjustedHours < 0) {
+        adjustedHours += 24;
+        dayOffset = -1; // Previous day
+      } else if (adjustedHours >= 24) {
+        adjustedHours -= 24;
+        dayOffset = 1; // Next day
+      }
+
+      return {
+        utcTime: `${adjustedHours.toString().padStart(2, '0')}:${utcMinutes.toString().padStart(2, '0')}`,
+        dayOffset
+      };
+    };
 
     // Valid currencies and impacts for filtering
     const validCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
@@ -335,12 +401,12 @@ async function parseMyFXBookWeeklyEnhanced(html) {
           }
 
           if (potentialEventName &&
-              potentialEventName.length > 3 &&
-              !validCurrencies.includes(potentialEventName) &&
-              !validImpacts.includes(potentialEventName) &&
-              !potentialEventName.match(/^\d{1,2}:\d{2}$/) &&
-              !potentialEventName.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}$/i) &&
-              !potentialEventName.match(/^\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/i)) {
+            potentialEventName.length > 3 &&
+            !validCurrencies.includes(potentialEventName) &&
+            !validImpacts.includes(potentialEventName) &&
+            !potentialEventName.match(/^\d{1,2}:\d{2}$/) &&
+            !potentialEventName.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}$/i) &&
+            !potentialEventName.match(/^\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/i)) {
             eventName = potentialEventName;
           }
         }
@@ -424,98 +490,108 @@ async function parseMyFXBookWeeklyEnhanced(html) {
         const isSignificantEvent = impact && impact !== 'None' && impact !== '';
 
         if (currency && eventName && eventName.length > 3 && (hasEconomicData || isSignificantEvent)) {
-          // Create ISO date string
+          // Create ISO date string with UTC conversion
           let isoDate = '';
           if (date && time) {
-            // Convert to proper date format (assuming current year)
-            const year = new Date().getFullYear();
-            const monthMap = {
-              'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
-              'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
-              'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+            // Convert local time to UTC using detected timezone offset
+            const { utcTime, dayOffset } = convertToUTC(time, timezoneOffsetHours);
+
+            if (dayOffset !== 0) {
+              logger.info(`🕐 Time conversion: ${time} (local) → ${utcTime} (UTC) with ${dayOffset > 0 ? '+' : ''}${dayOffset} day offset`);
+            }
+
+            // Helper function to adjust date based on day offset
+            const adjustDateForOffset = (year, month, day, offset) => {
+              if (offset === 0) return { year, month, day };
+
+              const date = new Date(`${year}-${month}-${day}`);
+              date.setDate(date.getDate() + offset);
+
+              return {
+                year: date.getFullYear().toString(),
+                month: (date.getMonth() + 1).toString().padStart(2, '0'),
+                day: date.getDate().toString().padStart(2, '0')
+              };
             };
 
-            // Try different date formats
-            let dateMatch = date.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})/i);
-            if (dateMatch) {
-              const month = monthMap[dateMatch[1]];
-              const day = dateMatch[2].padStart(2, '0');
-              isoDate = `${year}-${month}-${day}T${time}:00+00:00`;
-            } else {
-              // Try reverse format: "15 Jan"
-              dateMatch = date.match(/(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
-              if (dateMatch) {
-                const day = dateMatch[1].padStart(2, '0');
-                const month = monthMap[dateMatch[2]];
-                isoDate = `${year}-${month}-${day}T${time}:00+00:00`;
-              } else {
-                // Try MM/DD/YYYY format
-                dateMatch = date.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-                if (dateMatch) {
-                  const month = dateMatch[1].padStart(2, '0');
-                  const day = dateMatch[2].padStart(2, '0');
-                  const yearPart = dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3];
-                  isoDate = `${yearPart}-${month}-${day}T${time}:00+00:00`;
-                } else {
-                  // Try YYYY-MM-DD format
-                  dateMatch = date.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-                  if (dateMatch) {
-                    const yearPart = dateMatch[1];
-                    const month = dateMatch[2].padStart(2, '0');
-                    const day = dateMatch[3].padStart(2, '0');
-                    isoDate = `${yearPart}-${month}-${day}T${time}:00+00:00`;
-                  }
-                }
+            // Try to extract precise date from data-calendardatetd attribute first
+            const calendarDateTd = $(row).find('[data-calendardatetd]').attr('data-calendardatetd');
+            if (calendarDateTd) {
+              // Format: "2025-06-17 12:30:00.0" - this appears to already be in UTC!
+              // Evidence: data-calendardatetd="12:30" while display shows "13:30" in GMT+1
+              const utcDateTime = new Date(calendarDateTd.replace(' ', 'T') + 'Z');
+              if (!isNaN(utcDateTime.getTime())) {
+                isoDate = utcDateTime.toISOString();
+                logger.info(`📅 Precise date: ${calendarDateTd} (already UTC) → ${isoDate}`);
               }
+            }
+
+            // Extract Unix timestamp from MyFXBook's time attribute
+            let unixTimestamp;
+            const timeElement = $(row).find('[time]');
+            if (timeElement.length > 0) {
+              const timeAttr = timeElement.attr('time');
+              if (timeAttr && /^\d+$/.test(timeAttr)) {
+                unixTimestamp = parseInt(timeAttr, 10);
+                logger.info(`⏰ Unix timestamp extracted: ${timeAttr} → ${new Date(unixTimestamp).toISOString()}`);
+              }
+            }
+
+
+            if (!isoDate) {
+              // Skip events without valid dates - we only want actual scraped data
+              logger.info(`⚠️ Skipping event "${eventName}" - no valid date found`);
+              return; // Skip this row in the .each() loop
+            }
+
+            const cleanedEventName = cleanEventName(eventName);
+
+            // Debug: Log the cleaning process for first few events
+            if (events.length < 5 && eventName !== cleanedEventName) {
+              logger.info(`🔧 Event cleaning: "${eventName}" → "${cleanedEventName}"`);
+            }
+
+            // Generate unique ID for the event
+            const eventId = generateEventId(currency, cleanedEventName, isoDate, impact || 'None');
+            flagClass = flagClass === "emu" || flagClass === "em" ? "eu" : flagClass;
+            const event = {
+              id: eventId,
+              currency,
+              event: cleanedEventName, // Apply proper event name cleaning
+              impact: impact || 'None',
+              time_utc: isoDate,
+              actual: actual || '',
+              forecast: forecast || '',
+              previous: previous || '',
+              country: country || '',
+              flagCode: flagClass || '',
+              flagUrl: flagClass ? getFlagUrl(flagClass) : '',
+              unixTimestamp: unixTimestamp // Unix timestamp from MyFXBook's time attribute
+            };
+
+            events.push(event);
+
+            if (events.length <= 10) { // Log first 10 events for debugging
+              const actualStr = actual ? ` | A:${actual}` : '';
+              const forecastStr = forecast ? ` | F:${forecast}` : '';
+              const previousStr = previous ? ` | P:${previous}` : '';
+              const countryStr = country ? ` | ${country}` : '';
+              const flagStr = flagClass ? ` | ${flagClass}` : '';
+
+              // Show timezone conversion info
+              const { utcTime } = convertToUTC(time, timezoneOffsetHours);
+              const timezoneInfo = timezoneOffsetHours !== 0 ? ` (${time} local → ${utcTime} UTC)` : '';
+
+              logger.info(`✅ Extracted: ${date || 'Unknown'} | ${time || '00:00'}${timezoneInfo} | ${currency} ${eventName} | ${impact || 'Medium'}${actualStr}${forecastStr}${previousStr}${countryStr}${flagStr}`);
             }
           }
 
-          if (!isoDate) {
-            // Skip events without valid dates - we only want actual scraped data
-            logger.info(`⚠️ Skipping event "${eventName}" - no valid date found`);
-            return; // Skip this row in the .each() loop
-          }
-
-          const cleanedEventName = cleanEventName(eventName);
-
-          // Debug: Log the cleaning process for first few events
-          if (events.length < 5 && eventName !== cleanedEventName) {
-            logger.info(`🔧 Event cleaning: "${eventName}" → "${cleanedEventName}"`);
-          }
-
-          // Generate unique ID for the event
-          const eventId = generateEventId(currency, cleanedEventName, isoDate, impact || 'None');
-          flagClass = flagClass === "emu" || flagClass === "em" ? "eu" : flagClass;
-          const event = {
-            id: eventId,
-            currency,
-            event: cleanedEventName, // Apply proper event name cleaning
-            impact: impact || 'None',
-            time_utc: isoDate,
-            actual: actual || '',
-            forecast: forecast || '',
-            previous: previous || '',
-            country: country || '',
-            flagCode: flagClass || '',
-            flagUrl: flagClass ? getFlagUrl(flagClass) : ''
-          };
-
-          events.push(event);
-
-          if (events.length <= 10) { // Log first 10 events for debugging
-            const actualStr = actual ? ` | A:${actual}` : '';
-            const forecastStr = forecast ? ` | F:${forecast}` : '';
-            const previousStr = previous ? ` | P:${previous}` : '';
-            const countryStr = country ? ` | ${country}` : '';
-            const flagStr = flagClass ? ` | ${flagClass}` : '';
-            logger.info(`✅ Extracted: ${date || 'Unknown'} | ${time || '00:00'} | ${currency} ${eventName} | ${impact || 'Medium'}${actualStr}${forecastStr}${previousStr}${countryStr}${flagStr}`);
-          }
         }
-
       } catch (rowError) {
         // Skip individual row errors
         logger.warn(`⚠️ Error processing row ${i}:`, rowError);
       }
+
     });
 
     // Analyze the types of events we extracted
@@ -544,6 +620,19 @@ async function parseMyFXBookWeeklyEnhanced(html) {
         const flagStr = event.flagUrl ? ` 🏳️ ${event.flagUrl}` : '';
         logger.info(`  ${i + 1}. ${event.currency} ${event.event}${locationStr} (${dataStr})${flagStr}`);
       });
+    }
+
+    // Summary logging
+    logger.info(`📊 Successfully parsed ${events.length} events from MyFXBook HTML`);
+    logger.info(`🕐 Timezone detected: GMT${timezoneOffsetHours >= 0 ? '+' : ''}${timezoneOffsetHours}`);
+    logger.info(`💱 Currencies found: ${Array.from(new Set(events.map(e => e.currency))).join(', ')}`);
+    logger.info(`🎯 Impact levels: ${Array.from(new Set(events.map(e => e.impact))).join(', ')}`);
+
+    // Show timezone conversion summary
+    if (timezoneOffsetHours !== 0) {
+      logger.info(`🔄 All times converted from local timezone to UTC`);
+    } else {
+      logger.info(`✅ Times are already in UTC (no conversion needed)`);
     }
 
     return events;
@@ -772,7 +861,7 @@ async function main() {
 
   if (!htmlFilePath) {
     console.log('📖 USAGE:');
-    console.log('  node import-manual-html.js <path-to-html-file>');
+    console.log('  node upload-html-to-cloud.js <path-to-html-file>');
     console.log('');
     console.log('📝 INSTRUCTIONS:');
     console.log('  1. Go to https://www.myfxbook.com/forex-economic-calendar');
@@ -801,5 +890,13 @@ module.exports = {
 
 // Run main function if this file is executed directly
 if (require.main === module) {
+  console.log('🚀 Starting MyFXBook HTML import with timezone detection...');
+  console.log('📋 This script will:');
+  console.log('   1. Detect the timezone from MyFXBook\'s timezone selector');
+  console.log('   2. Convert all times to UTC automatically');
+  console.log('   3. Handle day rollover when timezone conversion crosses midnight');
+  console.log('   4. Show detailed conversion logs for debugging');
+  console.log('');
+
   main().catch(console.error);
 }

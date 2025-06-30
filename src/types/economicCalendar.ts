@@ -26,6 +26,7 @@ export interface EconomicEvent {
   isAllDay?: boolean;
   description?: string;
   url?: string;
+  unixTimestamp?: number; // Unix timestamp in milliseconds from MyFXBook's time attribute
 }
 
 export interface EconomicCalendarDay {
@@ -103,7 +104,7 @@ export interface EconomicCalendarDrawerProps {
   onClose: () => void;
   calendar : Calendar // Calendar type from calendar.ts
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: any) => any) => Promise<void>;
-  updatedEvent?: {event : EconomicEvent, events : EconomicEvent[]} | null; // For real-time event updates
+  payload?: {updatedEvents : EconomicEvent[], allEvents : EconomicEvent[]} | null; // For real-time event updates
    
 }
 

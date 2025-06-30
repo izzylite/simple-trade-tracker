@@ -1,15 +1,9 @@
-/**
- * Economic Calendar Firebase Functions
- * Fetches economic calendar data from MyFXBook
- */
-
 import { onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import * as crypto from 'crypto';
 
-// Types
 interface EconomicEvent {
   id: string;
   currency: string;
@@ -27,65 +21,56 @@ interface EconomicEvent {
   flagUrl: string;
   lastUpdated: number;
   source: string;
+  unixTimestamp?: number; // Unix timestamp in milliseconds from MyFXBook's time attribute
 }
 
-
-
 /**
- * Auto-refresh economic calendar data (runs weekly on Mondays at 6 AM UTC)
- * Stores individual events in economicEvents collection for efficient querying
- * MyFXBook provides a full week view, so weekly scraping is optimal
+ * Auto-refresh economic calendar data - runs every 30 minutes
+ * Fetches from MyFXBook and stores events in economicEvents collection
  */
 export const autoRefreshEconomicCalendarV2 = onSchedule(
   {
-    schedule: '*/30 * * * *', // Every 30 minutes
+    schedule: '*/30 * * * *',
     region: 'us-central1',
-    memory: '1GiB', // Increased memory for enhanced scraping
-    timeoutSeconds: 540 // 9 minutes timeout for comprehensive scraping
+    memory: '1GiB',
+    timeoutSeconds: 540
   },
   async () => {
     try {
-      logger.info('🚀 Auto-refreshing economic calendar data (Weekly Enhanced Scraping)');
+      logger.info('🚀 Auto-refreshing economic calendar data');
 
-      // Define major currency pairs to fetch
       const majorCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
-
       logger.info(`📊 Fetching weekly economic calendar for currencies: ${majorCurrencies.join(', ')}`);
 
-      // Fetch all events using enhanced weekly scraping (MyFXBook shows full week)
       const allEvents = await fetchFromMyFXBookWeekly();
 
-      // Filter for major currencies and clean event names
       const majorCurrencyEvents = allEvents
         .filter(event => majorCurrencies.includes(event.currency))
         .map(event => ({
           ...event,
-          event: cleanEventName(event.event) // Apply event name cleaning
+          event: cleanEventName(event.event)
         }));
 
       logger.info(`✅ Filtered ${allEvents.length} total events to ${majorCurrencyEvents.length} major currency events`);
 
-      // Store events in database for frontend querying
       await storeEventsInDatabase(majorCurrencyEvents);
 
       logger.info(`🎉 Auto-refresh completed: ${majorCurrencyEvents.length} events stored in database`);
 
     } catch (error) {
       logger.error('❌ Error in auto-refresh:', error);
-      throw error; // Re-throw to ensure Cloud Functions logs the failure
+      throw error;
     }
   }
 );
 
 /**
- * Enhanced weekly fetch from MyFXBook (single request gets full week)
- * MyFXBook shows a week view regardless of date parameters
+ * Fetch economic calendar data from MyFXBook
  */
 async function fetchFromMyFXBookWeekly(): Promise<EconomicEvent[]> {
   logger.info('🔄 Fetching weekly economic calendar from MyFXBook...');
 
   try {
-    // Use main URL without date parameters since MyFXBook shows week view
     const url = 'https://www.myfxbook.com/forex-economic-calendar';
     logger.info(`📡 Fetching URL: ${url}`);
 
@@ -97,7 +82,7 @@ async function fetchFromMyFXBookWeekly(): Promise<EconomicEvent[]> {
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
-        'Cache-Control': 'no-cache'
+        'Cache-Control': 'no-cache' 
       }
     });
 
@@ -108,7 +93,6 @@ async function fetchFromMyFXBookWeekly(): Promise<EconomicEvent[]> {
     const html = await response.text();
     logger.info(`✅ Response received: ${response.status}, content length: ${html.length}`);
 
-    // Parse the HTML using enhanced logic
     const events = await parseMyFXBookWeeklyEnhanced(html);
 
     logger.info(`🎯 Successfully extracted ${events.length} events from MyFXBook`);
@@ -120,27 +104,23 @@ async function fetchFromMyFXBookWeekly(): Promise<EconomicEvent[]> {
   }
 }
 
-
 /**
- * Store events in database for efficient frontend querying with deduplication
+ * Store events in database with deduplication
  */
 async function storeEventsInDatabase(events: EconomicEvent[]): Promise<void> {
   const db = getFirestore();
 
   logger.info(`Storing ${events.length} events in database`);
 
-  // Events are already processed with all necessary fields in fetchFromMyFXBookWeekly
-  // Remove duplicates based on ID (in case the same event appears multiple times in the source)
   const uniqueEvents = events.reduce((acc, event) => {
-    acc[event.id] = event; // This will overwrite duplicates
+    acc[event.id] = event;
     return acc;
   }, {} as Record<string, EconomicEvent>);
 
   const uniqueEventsArray = Object.values(uniqueEvents);
   logger.info(`Deduplicated ${events.length} events to ${uniqueEventsArray.length} unique events`);
 
-  // Store events in batches (Firestore has 500 operation limit per batch)
-  const batchSize = 450; // Leave some margin
+  const batchSize = 450;
   const batches = [];
 
   for (let i = 0; i < uniqueEventsArray.length; i += batchSize) {
@@ -149,51 +129,40 @@ async function storeEventsInDatabase(events: EconomicEvent[]): Promise<void> {
 
     batchEvents.forEach(event => {
       const eventRef = db.collection('economicEvents').doc(event.id);
-      batch.set(eventRef, event, { merge: true }); // Use merge to update existing
+      batch.set(eventRef, event, { merge: true });
     });
 
     batches.push(batch);
   }
 
-  // Execute all batches
   await Promise.all(batches.map(batch => batch.commit()));
 
   logger.info(`Successfully stored ${uniqueEventsArray.length} unique events in database`);
 }
 
 
-
- 
-
-
-/**
- * Check if a value looks like a numeric economic indicator
- */
 function isNumericValue(value: string): boolean {
   if (!value || typeof value !== 'string') return false;
 
   const trimmed = value.trim();
 
-  // Skip obviously non-numeric values
   if (trimmed.length === 0 || trimmed.length > 25) return false;
-  if (/^[a-zA-Z\s]+$/.test(trimmed)) return false; // Only letters and spaces
-  if (trimmed.includes(':') && /\d{1,2}:\d{2}/.test(trimmed)) return false; // Time format
+  if (/^[a-zA-Z\s]+$/.test(trimmed)) return false;
+  if (trimmed.includes(':') && /\d{1,2}:\d{2}/.test(trimmed)) return false;
 
-  // Remove common formatting and check if it's a number
   const cleaned = trimmed
-    .replace(/[,%$€£¥]/g, '') // Remove currency symbols and formatting
-    .replace(/[()]/g, '') // Remove parentheses
-    .replace(/^\+/, '') // Remove leading plus sign
-    .replace(/\s+/g, ''); // Remove spaces
+    .replace(/[,%$€£¥]/g, '')
+    .replace(/[()]/g, '')
+    .replace(/^\+/, '')
+    .replace(/\s+/g, '');
 
-  // Check for various numeric patterns
   const numericPatterns = [
-    /^-?\d+\.?\d*$/, // Basic numbers: 123, 123.45, -123.45
-    /^-?\d+\.?\d*[KMB]$/i, // Numbers with K/M/B suffix: 123K, 1.5M, 2B
-    /^-?\d+\.?\d*%$/, // Percentages: 2.5%, -1.2%
-    /^-?\d{1,3}(,\d{3})*\.?\d*$/, // Numbers with comma separators: 1,234.56
-    /^\d+\.?\d*[KMB]?$/i, // Positive numbers with optional suffix
-    /^-?\d+\.?\d*[bp]$/i, // Basis points: 25bp, -10bp
+    /^-?\d+\.?\d*$/,
+    /^-?\d+\.?\d*[KMB]$/i,
+    /^-?\d+\.?\d*%$/,
+    /^-?\d{1,3}(,\d{3})*\.?\d*$/,
+    /^\d+\.?\d*[KMB]?$/i,
+    /^-?\d+\.?\d*[bp]$/i,
   ];
 
   const isNumeric = numericPatterns.some(pattern => pattern.test(cleaned));
@@ -202,110 +171,56 @@ function isNumericValue(value: string): boolean {
   return isNumeric && canParse && cleaned.length > 0;
 }
 
-/**
- * Clean and normalize numeric values
- */
 function cleanNumericValue(value: string): string {
   if (!value) return '';
 
   return value.trim()
-    .replace(/^\+/, '') // Remove leading plus
-    .replace(/,/g, '') // Remove commas
+    .replace(/^\+/, '')
+    .replace(/,/g, '')
     .trim();
 }
 
-/**
- * Get flag image URL from country code
- */
 function getFlagUrl(countryCode: string, size: string = 'w160'): string {
   if (!countryCode) return '';
 
-  // Use FlagCDN for reliable flag images
   return `https://flagcdn.com/${size}/${countryCode.toLowerCase()}.png`;
 }
 
 /**
- * Generate a unique ID for an economic event
- * Based on currency, event name, date, and time to ensure uniqueness
+ * Generate unique ID for economic event based on currency, event name, date, and time
  */
-function generateEventId(currency: string, eventName: string, dateTime: string, impact: string): string {
-  // Create a string that uniquely identifies this event
-  const uniqueString = `${currency}-${eventName}-${dateTime}-${impact}`.toLowerCase();
-
-  // Generate a hash of the unique string
+function generateEventId(currency: string, eventName: string, country: string, impact: string): string {
+  const uniqueString = `${currency}-${eventName}-${country}-${impact}`.toLowerCase();
   const hash = crypto.createHash('sha256').update(uniqueString).digest('hex');
-
-  // Return first 20 characters to match Firebase ID standards
   return hash.substring(0, 20);
 }
-
+ 
 /**
- * Enhanced MyFXBook weekly parsing using our tested logic
+ * Parse MyFXBook HTML to extract economic events
  */
 async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[]> {
-  // logger.info('🔧 Parsing MyFXBook HTML with enhanced weekly logic...');
-
   try {
     const cheerio = await import('cheerio');
     const $ = cheerio.load(html);
     const events: EconomicEvent[] = [];
 
-    // Valid currencies and impacts for filtering
+    
+
+
     const validCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
     const validImpacts = ['High', 'Medium', 'Low'];
 
-    // logger.info('🔍 Looking for table rows with economic data...');
-
-    // Find all table rows with proper structure (at least 4 cells)
     const tableRows = $('tr').filter((_i, el) => {
       const $row = $(el);
       const cells = $row.find('td');
       const text = $row.text();
 
-      // Only process rows with sufficient cells and date patterns
       const hasEnoughCells = cells.length >= 4;
-      // Updated to match all months, not just Jun/Jul
       const hasDatePattern = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}|\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2}/i.test(text);
       const hasCurrency = /\b(USD|EUR|GBP|JPY|AUD|CAD|CHF)\b/.test(text);
 
       return hasEnoughCells && hasDatePattern && hasCurrency;
     });
-
-    // logger.info(`📊 Found ${tableRows.length} potential event rows`);
-
-    // Debug: If no rows found, let's examine the HTML structure
-    if (tableRows.length === 0) {
-      // logger.info('🔍 No rows found with current criteria. Analyzing HTML structure...');
-
-      // Check total number of tables and rows
-      const allTables = $('table');
-      const allRows = $('tr');
-      // logger.info(`📋 Total tables in HTML: ${allTables.length}`);
-      // logger.info(`📋 Total rows in HTML: ${allRows.length}`);
-
-      // Sample some row content for debugging
-      // logger.info('📋 Sample of first 10 table rows:');
-      allRows.slice(0, 10).each((i, row) => {
-        const $row = $(row);
-        const cells = $row.find('td');
-        const text = $row.text().trim().substring(0, 100); // First 100 chars
-        // logger.info(`  Row ${i}: ${cells.length} cells, text: "${text}"`);
-      });
-
-      // Check for any rows with currency codes
-      const rowsWithCurrency = $('tr').filter((_i, el) => {
-        const text = $(el).text();
-        return /\b(USD|EUR|GBP|JPY|AUD|CAD|CHF)\b/.test(text);
-      });
-      // logger.info(`📋 Rows containing currency codes: ${rowsWithCurrency.length}`);
-
-      // Check for any rows with date patterns
-      const rowsWithDates = $('tr').filter((_i, el) => {
-        const text = $(el).text();
-        return /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}|\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2}/i.test(text);
-      });
-      // logger.info(`📋 Rows containing date patterns: ${rowsWithDates.length}`);
-    }
 
     // Process each row
     tableRows.each((i, row) => {
@@ -344,54 +259,41 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
           }
         }
 
-        // Extract country and flag information from the flag column (typically 3rd column)
         const $flagCells = $row.find('td');
         $flagCells.each((cellIndex: number, cell: any) => {
           const $cell = $(cell);
 
-          // Debug: Log cell content for first few rows to understand structure
-          // (Removed logger.info)
-
-          // Look for flag elements - MyFXBook uses specific patterns
-          const $flagIcon = $cell.find('i[title]'); // Icon with title attribute
-          const $flagSpan = $cell.find('span.flag'); // Span with flag class
-          const $allFlags = $cell.find('[class*="flag"]'); // Any element with "flag" in class
+          const $flagIcon = $cell.find('i[title]');
+          const $flagSpan = $cell.find('span.flag');
+          const $allFlags = $cell.find('[class*="flag"]');
 
           if ($flagIcon.length > 0) {
-            // Extract country from title attribute
             const titleAttr = $flagIcon.attr('title');
             if (titleAttr && titleAttr.length > 0) {
               country = titleAttr.trim();
-              // (Removed logger.info)
             }
 
-            // Extract country from class attribute as backup
             if (!country) {
               const classAttr = $flagIcon.attr('class');
               if (classAttr) {
-                // Look for country name in class (e.g., "United States align-center")
                 const countryMatch = classAttr.match(/^([A-Za-z\s]+)\s+align-center/);
                 if (countryMatch) {
                   country = countryMatch[1].trim();
-                  // (Removed logger.info)
                 }
               }
             }
           }
 
           if ($flagSpan.length > 0) {
-            // Extract flag class (e.g., "flag-icon-us")
             const spanClass = $flagSpan.attr('class');
             if (spanClass) {
               const flagMatch = spanClass.match(/flag-icon-([a-z]{2})/);
               if (flagMatch) {
-                flagClass = flagMatch[1]; // Extract country code (e.g., "us")
-                // (Removed logger.info)
+                flagClass = flagMatch[1];
               }
             }
           }
 
-          // Alternative: Look for any flag-related classes
           if (!flagClass && $allFlags.length > 0) {
             $allFlags.each((_idx: number, flagEl: any) => {
               const flagElClass = $(flagEl).attr('class');
@@ -399,7 +301,6 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
                 const flagMatch = flagElClass.match(/flag-icon-([a-z]{2})/);
                 if (flagMatch) {
                   flagClass = flagMatch[1];
-                  // (Removed logger.info)
                 }
               }
             });
@@ -527,111 +428,80 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
         const isSignificantEvent = impact && impact !== 'None' && impact !== '';
 
         if (currency && eventName && eventName.length > 3 && (hasEconomicData || isSignificantEvent)) {
-          // Create ISO date string
+          // Create ISO date string and extract Unix timestamp
           let isoDate = '';
-          if (date && time) {
-            // Convert to proper date format (assuming current year)
-            const year = new Date().getFullYear();
-            const monthMap: { [key: string]: string } = {
-              'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
-              'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
-              'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
-            };
+          let unixTimestamp: number | undefined;
 
-            // Try different date formats
-            let dateMatch = date.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})/i);
-            if (dateMatch) {
-              const month = monthMap[dateMatch[1]];
-              const day = dateMatch[2].padStart(2, '0');
-              isoDate = `${year}-${month}-${day}T${time}:00+00:00`;
-            } else {
-              // Try reverse format: "15 Jan"
-              dateMatch = date.match(/(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
-              if (dateMatch) {
-                const day = dateMatch[1].padStart(2, '0');
-                const month = monthMap[dateMatch[2]];
-                isoDate = `${year}-${month}-${day}T${time}:00+00:00`;
-              } else {
-                // Try MM/DD/YYYY format
-                dateMatch = date.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-                if (dateMatch) {
-                  const month = dateMatch[1].padStart(2, '0');
-                  const day = dateMatch[2].padStart(2, '0');
-                  const yearPart = dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3];
-                  isoDate = `${yearPart}-${month}-${day}T${time}:00+00:00`;
-                } else {
-                  // Try YYYY-MM-DD format
-                  dateMatch = date.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-                  if (dateMatch) {
-                    const yearPart = dateMatch[1];
-                    const month = dateMatch[2].padStart(2, '0');
-                    const day = dateMatch[3].padStart(2, '0');
-                    isoDate = `${yearPart}-${month}-${day}T${time}:00+00:00`;
-                  }
-                }
+          if (date && time) {
+            // Try to extract precise date from data-calendardatetd attribute first
+            const calendarDateTd = $(row).find('[data-calendardatetd]').attr('data-calendardatetd');
+            if (calendarDateTd) {
+              // Format: "2025-06-17 12:30:00.0" - this appears to already be in UTC!
+              // Evidence: data-calendardatetd="12:30" while display shows "13:30" in GMT+1
+              const utcDateTime = new Date(calendarDateTd.replace(' ', 'T') + 'Z');
+              if (!isNaN(utcDateTime.getTime())) {
+                isoDate = utcDateTime.toISOString();
+                logger.info(`📅 Precise date: ${calendarDateTd} (already UTC) → ${isoDate}`);
               }
             }
-          }
 
-          if (!isoDate) {
-            // Skip events without valid dates - we only want actual scraped data
-            // logger.warn(`⚠️ Skipping event "${eventName}" - no valid date found`);
-            return; // Skip this row in the .each() loop
-          }
+            // Extract Unix timestamp from MyFXBook's time attribute
+            const timeElement = $(row).find('[time]');
+            if (timeElement.length > 0) {
+              const timeAttr = timeElement.attr('time');
+              if (timeAttr && /^\d+$/.test(timeAttr)) {
+                unixTimestamp = parseInt(timeAttr, 10);
+                logger.info(`⏰ Unix timestamp extracted: ${timeAttr} → ${new Date(unixTimestamp).toISOString()}`);
+              }
+            }
 
-          const cleanedEventName = cleanEventName(eventName);
+            if (!isoDate) {
+              // Skip events without valid dates - we only want actual scraped data
+              // logger.warn(`⚠️ Skipping event "${eventName}" - no valid date found`);
+              return; // Skip this row in the .each() loop
+            }
 
-          // Generate unique ID for the event
-          const eventId = generateEventId(currency, cleanedEventName, isoDate, impact || 'None');
+            const cleanedEventName = cleanEventName(eventName);
 
-          // Add extra fields for database storage
-          const eventTime = new Date(isoDate);
-          const eventDate = isoDate.split('T')[0]; // YYYY-MM-DD
+            // Generate unique ID for the event
+            const eventId = generateEventId(currency, cleanedEventName, country || "global", impact || 'None');
 
-          // Normalize time to remove milliseconds and create consistent format
-          const normalizedTime = new Date(eventTime);
-          normalizedTime.setSeconds(0, 0); // Remove seconds and milliseconds
-          flagClass = flagClass === "emu" || flagClass === "em" ? "eu" : flagClass;
-          const event: EconomicEvent = {
-            id: eventId,
-            currency,
-            event: cleanedEventName, // Apply proper event name cleaning
-            impact: impact || 'None',
-            time_utc: isoDate,
-            time: normalizedTime, // Use normalized time for consistency
-            timeUtc: isoDate,
-            date: eventDate, // String date for exact date queries
-            actual: actual || '',
-            forecast: forecast || '',
-            previous: previous || '',
-            country: country || '',
-            flagCode: flagClass || '',
-            flagUrl: flagClass ? getFlagUrl(flagClass) : '',
-            lastUpdated: Date.now(),
-            source: 'myfxbook'
-          };
+            // Add extra fields for database storage
+            const eventTime = new Date(isoDate);
+            const eventDate = isoDate.split('T')[0]; // YYYY-MM-DD
 
-          events.push(event);
+            // Normalize time to remove milliseconds and create consistent format
+            const normalizedTime = new Date(eventTime);
+            normalizedTime.setSeconds(0, 0); // Remove seconds and milliseconds
+            flagClass = flagClass === "emu" || flagClass === "em" ? "eu" : flagClass;
+            const event: EconomicEvent = {
+              id: eventId,
+              currency,
+              event: cleanedEventName, // Apply proper event name cleaning
+              impact: impact || 'None',
+              time_utc: isoDate,
+              time: normalizedTime, // Use normalized time for consistency
+              timeUtc: isoDate,
+              date: eventDate, // String date for exact date queries
+              actual: actual || '',
+              forecast: forecast || '',
+              previous: previous || '',
+              country: country || '',
+              flagCode: flagClass || '',
+              flagUrl: flagClass ? getFlagUrl(flagClass) : '',
+              lastUpdated: Date.now(),
+              source: 'myfxbook',
+              unixTimestamp: unixTimestamp // Unix timestamp from MyFXBook's time attribute
+            };
 
-          if (events.length <= 10) { // Log first 10 events for debugging
-            const actualStr = actual ? ` | A:${actual}` : '';
-            const forecastStr = forecast ? ` | F:${forecast}` : '';
-            const previousStr = previous ? ` | P:${previous}` : '';
-            const countryStr = country ? ` | ${country}` : '';
-            const flagStr = flagClass ? ` | ${flagClass}` : '';
-            // logger.info(`✅ Extracted: ${date || 'Unknown'} | ${time || '00:00'} | ${currency} ${eventName} | ${impact || 'Medium'}${actualStr}${forecastStr}${previousStr}${countryStr}${flagStr}`);
+            events.push(event);
           }
         }
-
       } catch (rowError) {
         // Skip individual row errors
-        // logger.warn(`⚠️ Error processing row ${i}:`, rowError);
+        logger.warn(`⚠️ Error processing row: ${rowError}`);
       }
     });
-
-
-    // logger.info(`🎉 Successfully extracted ${events.length} events`);
-
 
     return events;
 
@@ -677,8 +547,6 @@ function cleanEventName(eventName: string): string {
 
   // Remove leading "min" that appears in some events
   cleaned = cleaned.replace(/^min\s+/gi, '').trim();
-
-  // Don't remove trailing month abbreviations - we'll fix them by adding closing bracket
 
   // Fix incomplete parentheses by adding missing closing bracket
   // Only fix if there are unmatched opening parentheses
@@ -738,13 +606,12 @@ function cleanEventName(eventName: string): string {
 
 /**
  * Process HTML content and store economic events in database
- * This function accepts HTML content (e.g., from manual MyFXBook export) and processes it
  */
 export const processHtmlEconomicEvents = onCall(
   {
     region: 'us-central1',
-    memory: '1GiB', // Increased memory for HTML processing
-    timeoutSeconds: 300 // 5 minutes timeout for large HTML files
+    memory: '1GiB',
+    timeoutSeconds: 300
   },
   async (request) => {
     try {
@@ -757,12 +624,10 @@ export const processHtmlEconomicEvents = onCall(
       logger.info('🔄 Processing HTML content for economic events');
       logger.info(`📊 HTML content size: ${htmlContent.length} characters`);
 
-      // Process the HTML using the same logic as fetchFromMyFXBookWeekly
       const events = await parseMyFXBookWeeklyEnhanced(htmlContent);
 
       logger.info(`🎉 Successfully processed ${events.length} events from HTML`);
 
-      // Filter for major currencies (same as auto-refresh)
       const majorCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
       const majorCurrencyEvents = events.filter(event =>
         majorCurrencies.includes(event.currency)
@@ -770,7 +635,6 @@ export const processHtmlEconomicEvents = onCall(
 
       logger.info(`✅ Filtered ${events.length} total events to ${majorCurrencyEvents.length} major currency events`);
 
-      // Store events in database
       await storeEventsInDatabase(majorCurrencyEvents);
 
       logger.info(`💾 Successfully stored ${majorCurrencyEvents.length} events in database`);
@@ -808,7 +672,6 @@ export const processHtmlEconomicEvents = onCall(
 
 /**
  * On-demand refresh for specific economic events
- * Called when events are about to occur to get updated actual/forecast/previous data
  */
 export const refreshEconomicCalendar = onCall(
   {
@@ -818,66 +681,94 @@ export const refreshEconomicCalendar = onCall(
   },
   async (request) => {
     try {
-      const { targetDate, currencies, eventId, actual, eventName} = request.data;
+      const {
+        targetDate,
+        currencies,
+        events // Optional list of specific events to watch for
+      } = request.data;
 
+      // Required fields
       if (!targetDate || !currencies || !Array.isArray(currencies)) {
         throw new Error('Missing required parameters: targetDate and currencies array');
       }
-      if (!eventId) {
-        throw new Error('Missing required parameter: eventId');
-      }
+
+      // Optional: specific events to look for (if not provided, just refresh all events for the date/currencies)
+      const requestedEvents = events || [];
+      const hasSpecificEvents = requestedEvents.length > 0;
 
       logger.info(`🔄 Refreshing economic calendar for date: ${targetDate}, currencies: ${currencies.join(', ')}`);
+      if (hasSpecificEvents) {
+        logger.info(`🎯 Looking for ${requestedEvents.length} specific event(s): ${requestedEvents.map((e: EconomicEvent) => e.event).join(', ')}`);
+      } else {
+        logger.info(`📊 Refreshing all events for the specified date and currencies`);
+      }
 
       let updated = false;
       let count = 0;
-      let targetEvents : EconomicEvent[] = []; 
-      let updatedEvent : EconomicEvent | undefined;
+      let allEventsForDate: EconomicEvent[] = [];
+      let foundEvents: EconomicEvent[] = [];
 
-      while (!updated) {
-        // Fetch fresh data from MyFXBook for the target date
+      while (!updated && count < 3) {
         const freshEvents = await fetchFromMyFXBookWeekly();
 
-        // Filter events for the target date and currencies
-        targetEvents = freshEvents.filter(event => {
+        allEventsForDate = freshEvents.filter(event => {
           const eventDate = new Date(event.time_utc).toISOString().split('T')[0];
           return eventDate === targetDate && currencies.includes(event.currency);
         });
 
-        // If specific event requested, find and return it
-        logger.info(`🎯 Looking for specific event ID: ${eventId} (${eventName || 'unknown name'})`);
+        if (hasSpecificEvents) {
+          // Find all requested events by matching IDs
+          const requestedEventIds = requestedEvents.map((e: EconomicEvent) => e.id);
+          foundEvents = allEventsForDate.filter(event => requestedEventIds.includes(event.id));
 
-        updatedEvent = targetEvents.find(event => event.id === eventId);
-        // Break if event wasnt found or after 3 update refreash attempt
-        if (!updatedEvent || (count === 3 && !updatedEvent)) {
-          logger.info(`specificUpdatedEvent wasnt found or max retries reached ${count}`)
-          break;
-        }
-        // If specificUpdatedEvent.actual is different, this mean we've successfully retrieved the updated event from myfxbook
-        if (updatedEvent && updatedEvent.actual !== actual) {
+          logger.info(`📊 Found ${foundEvents.length}/${requestedEvents.length} requested events in ${allEventsForDate.length} total events`);
+
+          // Check if any of the found events have updated actual values
+          let hasUpdates = false;
+          for (const foundEvent of foundEvents) {
+            const originalEvent = requestedEvents.find((e: EconomicEvent) => e.id === foundEvent.id);
+            if (originalEvent && foundEvent.actual !== originalEvent.actual) {
+              hasUpdates = true;
+              logger.info(`✅ Event updated: ${foundEvent.event} - Actual changed from "${originalEvent.actual}" to "${foundEvent.actual}"`);
+            }
+          }
+
+          if (hasUpdates || foundEvents.length === requestedEvents.length) {
+            updated = true;
+            break;
+          }
+
+          if (foundEvents.length === 0 || count >= 2) {
+            logger.info(`⚠️ Events not found or max retries reached (${count + 1}/3)`);
+            break;
+          }
+
+          await new Promise(resolve => setTimeout(resolve, (count + 1) * 1000));
+          count++;
+        } else {
+          // No specific events requested, just refresh all events for the date
           updated = true;
           break;
         }
-        // Small delay to be respectful
-        await new Promise(resolve => setTimeout(resolve, count * 1000)); //Exponetial increase
-
-        count++;
       }
 
+      logger.info(`📊 Found ${allEventsForDate.length} events to update for ${targetDate}`);
 
+       
+      await storeEventsInDatabase(allEventsForDate);
+      const updatedCount = allEventsForDate.length;
 
-      logger.info(`📊 Found ${targetEvents.length} events to update for ${targetDate}`);
-
-      // Update events in Firestore
-      await storeEventsInDatabase(targetEvents);
-      const updatedCount = targetEvents.length;
-
-
-
-      if (updatedEvent) {
-        logger.info(`🎯 Found specific event: ${updatedEvent.event} - Actual: ${updatedEvent.actual}, Forecast: ${updatedEvent.forecast}`);
-      } else {
-        logger.warn(`⚠️ Specific event not found with ID: ${eventId}`);
+      // Log details about found events
+      if (hasSpecificEvents) {
+        if (foundEvents.length > 0) {
+          logger.info(`🎯 Found ${foundEvents.length} specific event(s):`);
+          foundEvents.forEach(event => {
+            logger.info(`- ${event.event}: Actual: ${event.actual}, Forecast: ${event.forecast}, Previous: ${event.previous}`);
+          });
+        } else {
+          const requestedEventIds = requestedEvents.map((e: any) => e.id);
+          logger.warn(`⚠️ None of the requested events found. Requested IDs: ${requestedEventIds.join(', ')}`);
+        }
       }
 
       logger.info(`✅ Successfully updated ${updatedCount} economic events`);
@@ -885,11 +776,15 @@ export const refreshEconomicCalendar = onCall(
       return {
         success: true,
         updatedCount,
-        targetEvents,  
-        updatedEvent,  
+        targetEvents: allEventsForDate, // All events for the date/currencies
+        foundEvents, // The specific events that were requested (if any)
         targetDate,
         currencies,
-        message: `Updated ${updatedCount} events for ${targetDate}${updatedEvent ? `, found specific event: ${updatedEvent.event}` : ''}`
+        requestedEvents,
+        hasSpecificEvents,
+        message: hasSpecificEvents
+          ? `Updated ${updatedCount} events for ${targetDate}. Found ${foundEvents.length}/${requestedEvents.length} requested events.`
+          : `Updated ${updatedCount} events for ${targetDate}.`
       };
 
     } catch (error) {

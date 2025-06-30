@@ -96,10 +96,11 @@ import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/
 import MonthlyStatisticsSection from './MonthlyStatisticsSection';
 import FloatingMonthNavigation from './FloatingMonthNavigation';
 import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
-import { EconomicCalendarDrawer } from './economicCalendar';
-import { useEconomicEventWatcher, useEconomicEventUpdates } from '../hooks/useEconomicEventWatcher';
+import EconomicCalendarDrawer from './economicCalendar/EconomicCalendarDrawer';
+import { useEconomicEventWatcher, useEconomicEventsUpdates } from '../hooks/useEconomicEventWatcher';
 import EconomicEventNotification from './notifications/EconomicEventNotification';
 import { EconomicEvent } from '../types/economicCalendar';
+import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 
 interface TradeCalendarProps {
   trades: Trade[];
@@ -114,7 +115,7 @@ interface TradeCalendarProps {
   onAddTrade?: (trade: Trade) => Promise<void>;
   onEditTrade?: (trade: Trade) => Promise<void>;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>; 
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
 
   onImageUpload?: (tradeId: string, image: TradeImage, add: boolean) => Promise<void>;
   onDeleteTrade?: (tradeId: string) => Promise<void>;
@@ -191,10 +192,10 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ date, trades, monthStart, weekInd
       bgcolor: 'background.paper',
       borderRadius: 1,
       border: `2px solid ${netAmount > 0
-          ? alpha(theme.palette.success.main, 0.3)
-          : netAmount < 0
-            ? alpha(theme.palette.error.main, 0.3)
-            : alpha(theme.palette.divider, 0.2)
+        ? alpha(theme.palette.success.main, 0.3)
+        : netAmount < 0
+          ? alpha(theme.palette.error.main, 0.3)
+          : alpha(theme.palette.divider, 0.2)
         }`,
       justifyContent: 'center',
       alignItems: 'center',
@@ -396,7 +397,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     // Dynamic risk toggle
     onToggleDynamicRisk,
     // Loading state
-    isLoadingTrades = false, 
+    isLoadingTrades = false,
     calendar
   } = props;
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -412,7 +413,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [deletingTradeIds, setDeletingTradeIds] = useState<string[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
- 
+
 
   // Custom function to handle setting zoomed image and related state
   const setZoomedImage = useCallback((url: string, allImages?: string[], initialIndex?: number) => {
@@ -448,13 +449,21 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(false);
 
   // Economic event notification state
-   // Notification stack state (moved from App.tsx)
-   const [notifications, setNotifications] = useState<EconomicEvent[]>([]);
-   const [removingNotifications, setRemovingNotifications] = useState<Set<string>>(new Set());
-  const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ event: EconomicEvent, events: EconomicEvent[] } | null>(null);
+  // Notification stack state (moved from App.tsx)
+  const [notifications, setNotifications] = useState<EconomicEvent[]>([]);
+  const [removingNotifications, setRemovingNotifications] = useState<Set<string>>(new Set());
+  const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null>(null);
 
   const theme = useTheme();
   const { calendarId } = useParams();
+
+  // Use optimized hook for high-impact economic events
+  const { highImpactEventDates: monthlyHighImpactEvents } = useHighImpactEvents({
+    currentDate,
+    calendarId,
+    currencies: calendar?.economicCalendarFilters?.currencies,
+    enabled: !!calendar?.economicCalendarFilters
+  });
 
   // Economic event watcher for real-time updates
   const { watchingStatus } = useEconomicEventWatcher({
@@ -463,19 +472,31 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     isActive: true // Always active when TradeCalendar is mounted
   });
 
-  // Listen for economic event updates
-  useEconomicEventUpdates((event, events, updatedCalendarId) => {
+
+  // Listen for multiple economic event updates (same release time)
+  useEconomicEventsUpdates((updatedEvents, allEvents, updatedCalendarId) => {
     if (updatedCalendarId === calendarId) {
-      console.log(`📊 Economic event "${event.event}" was updated for this calendar`);
+      console.log(`📊 ${updatedEvents.length} economic events were updated simultaneously for this calendar`);
 
-      // 1. Show notification slider
-      addNotification(event);
+      // Check if notifications are enabled before showing them
+      const notificationsEnabled = calendar?.economicCalendarFilters?.notificationsEnabled ?? true;
 
-      // 2. Pass event to Economic Calendar Drawer if it's open
+      // 1. Show notification sliders for each event (leveraging stacking behavior) - only if enabled
+      if (notificationsEnabled) {
+        console.log(`🔔 Notifications enabled - showing ${updatedEvents.length} event notification(s)`);
+        updatedEvents.forEach(event => {
+          addNotification(event);
+        });
+      } else {
+        console.log(`🔕 Notifications disabled - skipping ${updatedEvents.length} event notification(s)`);
+      }
+
+      // 2. Pass events to Economic Calendar Drawer if it's open (always update drawer regardless of notification setting)
       if (isEconomicCalendarOpen) {
+        // For multiple events, we'll pass the first event but include all events in the events array
         setEconomicCalendarUpdatedEvent({
-          event,
-          events
+          updatedEvents, // Primary events for display
+          allEvents // All updated events
         });
         // Clear the updated event after a short delay to prevent re-triggering
         setTimeout(() => {
@@ -484,49 +505,49 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       }
     }
   });
-  
- 
-   // Add a notification (call this when you want to show a new notification)
-   const addNotification = (event: EconomicEvent) => {
-     setNotifications((prev) => {
-       // If we already have 3 notifications, mark the oldest one for removal
-       if (prev.length >= 3) {
-         const oldestNotification = prev[0];
-         setRemovingNotifications(prevRemoving => {
-           const newSet = new Set(prevRemoving);
-           newSet.add(oldestNotification.id);
-           return newSet;
-         });
-         // Remove the oldest notification after animation delay
-         setTimeout(() => {
-           setNotifications(current => current.filter(n => n.id !== oldestNotification.id));
-           setRemovingNotifications(current => {
-             const newSet = new Set(current);
-             newSet.delete(oldestNotification.id);
-             return newSet;
-           });
-         }, 300);
-       }
-       return [...prev, event];
-     });
-   };
- 
-   // Close notification handler
-   const handleCloseNotification = (id: string) => {
-     setRemovingNotifications(prev => {
-       const newSet = new Set(prev);
-       newSet.add(id);
-       return newSet;
-     });
-     setTimeout(() => {
-       setNotifications((prev) => prev.filter(n => n.id !== id));
-       setRemovingNotifications(current => {
-         const newSet = new Set(current);
-         newSet.delete(id);
-         return newSet;
-       });
-     }, 300);
-   };
+
+
+  // Add a notification (call this when you want to show a new notification)
+  const addNotification = (event: EconomicEvent) => {
+    setNotifications((prev) => {
+      // If we already have 3 notifications, mark the oldest one for removal
+      if (prev.length >= 3) {
+        const oldestNotification = prev[0];
+        setRemovingNotifications(prevRemoving => {
+          const newSet = new Set(prevRemoving);
+          newSet.add(oldestNotification.id);
+          return newSet;
+        });
+        // Remove the oldest notification after animation delay
+        setTimeout(() => {
+          setNotifications(current => current.filter(n => n.id !== oldestNotification.id));
+          setRemovingNotifications(current => {
+            const newSet = new Set(current);
+            newSet.delete(oldestNotification.id);
+            return newSet;
+          });
+        }, 300);
+      }
+      return [...prev, event];
+    });
+  };
+
+  // Close notification handler
+  const handleCloseNotification = (id: string) => {
+    setRemovingNotifications(prev => {
+      const newSet = new Set(prev);
+      newSet.add(id);
+      return newSet;
+    });
+    setTimeout(() => {
+      setNotifications((prev) => prev.filter(n => n.id !== id));
+      setRemovingNotifications(current => {
+        const newSet = new Set(current);
+        newSet.delete(id);
+        return newSet;
+      });
+    }, 300);
+  };
 
 
 
@@ -1258,6 +1279,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                       const isCurrentMonth = isSameMonth(day, currentDate);
                       const isCurrentDay = isToday(day);
 
+                      // Check if this day has high-impact economic events
+                      const dayDateString = format(day, 'yyyy-MM-dd');
+                      const hasHighImpactEvents = monthlyHighImpactEvents.get(dayDateString) || false;
+
                       return (
                         <CalendarCell key={day.toISOString()}>
                           <StyledCalendarDay
@@ -1270,6 +1295,24 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                             <DayNumber $isCurrentMonth={isCurrentMonth}>
                               {format(day, 'd')}
                             </DayNumber>
+
+                            {/* Red dot indicator for high-impact economic events */}
+                            {hasHighImpactEvents && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 8,
+                                  right: 8,
+                                  width: 5,
+                                  height: 5,
+                                  borderRadius: '50%',
+                                  backgroundColor: 'error.main',
+                                  zIndex: 1,
+                                  boxShadow: '0 0 4px rgba(244, 67, 54, 0.5)'
+                                }}
+                              />
+                            )}
+
                             {dayTrades.length > 0 && (
                               //  <AnimatedPulse>
 
@@ -1667,9 +1710,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         onClose={() => setIsEconomicCalendarOpen(false)}
         calendar={calendar!}
         onUpdateCalendarProperty={onUpdateCalendarProperty}
-        updatedEvent={economicCalendarUpdatedEvent}
+        payload={economicCalendarUpdatedEvent}
       />
- 
+
 
       {/* Notification stack container (bottom left, global) */}
       <Box

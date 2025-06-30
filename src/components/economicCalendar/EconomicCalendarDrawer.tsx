@@ -29,7 +29,8 @@ import {
   TextField,
   Avatar,
   Stack,
-  Paper
+  Paper,
+  Tooltip
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -57,6 +58,7 @@ import { economicCalendarService } from '../../services/economicCalendarService'
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { QueryDocumentSnapshot } from 'firebase/firestore';
 import EconomicEventListItem from './EconomicEventListItem';
+import EconomicCalendarFilters from './EconomicCalendarFilters';
 import Shimmer from '../Shimmer';
 // View types for pagination
 type ViewType = 'day' | 'week' | 'month';
@@ -71,6 +73,7 @@ export interface EconomicCalendarFilterSettings {
   impacts: ImpactLevel[];
   viewType: ViewType;
   notificationsEnabled: boolean;
+  onlyUpcomingEvents: boolean;
 }
 
 // Default filter settings
@@ -78,7 +81,8 @@ export const DEFAULT_FILTER_SETTINGS: EconomicCalendarFilterSettings = {
   currencies: ['USD', 'EUR', 'GBP'],
   impacts: ['High', 'Medium', 'Low'],
   viewType: 'day',
-  notificationsEnabled: true
+  notificationsEnabled: true,
+  onlyUpcomingEvents: false
 };
 
 // Helper function to get date header for month view
@@ -183,7 +187,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   onClose,
   calendar,
   onUpdateCalendarProperty,
-  updatedEvent
+  payload
 }) => {
   const theme = useTheme();
 
@@ -201,21 +205,21 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
   // Handle real-time event updates
   useEffect(() => {
-    if (updatedEvent) {
-      console.log(`📊 Updating event in Economic Calendar: ${updatedEvent.event}`);
-      const events : EconomicEvent[] = updatedEvent.events || []
-      events.push(updatedEvent.event)
+    if (payload) {
+      console.log(`📊 Updating event in Economic Calendar: ${payload.updatedEvents.join(', ')}`);
+      const events : EconomicEvent[] = payload.allEvents || []
+       
       // Find and update the specific event in the current events list
       setEvents(prevEvents => {
-        if (!updatedEvent) return prevEvents;
-        const updatedEvents = updatedEvent.events || [];
+        if (!payload) return prevEvents;
+        
         let changed = false; 
         // Replace any matching events with the updated ones
         const newEvents = prevEvents.map(event => {
-          const idx = updatedEvents.findIndex(e => e.id === event.id);
+          const idx = events.findIndex(e => e.id === event.id);
           if (idx >= 0) {
             changed = true;
-            return { ...event, ...updatedEvents[idx] };
+            return { ...event, ...events[idx] };
           }
           return event;
         });
@@ -223,7 +227,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         return changed ? newEvents : prevEvents;
       });
     }
-  }, [updatedEvent]);
+  }, [payload]);
 
   // Pagination state
   const [hasMore, setHasMore] = useState(false);
@@ -237,10 +241,12 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   // Applied filters (used for queries) - initialized from localStorage
   const [appliedCurrencies, setAppliedCurrencies] = useState<Currency[]>(savedSettings.currencies);
   const [appliedImpacts, setAppliedImpacts] = useState<ImpactLevel[]>(savedSettings.impacts);
+  const [appliedOnlyUpcoming, setAppliedOnlyUpcoming] = useState<boolean>(savedSettings.onlyUpcomingEvents);
 
   // Pending filters (temporary state before applying) - initialized from localStorage
   const [pendingCurrencies, setPendingCurrencies] = useState<Currency[]>(savedSettings.currencies);
   const [pendingImpacts, setPendingImpacts] = useState<ImpactLevel[]>(savedSettings.impacts);
+  const [pendingOnlyUpcoming, setPendingOnlyUpcoming] = useState<boolean>(savedSettings.onlyUpcomingEvents);
 
   // Notification settings
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(savedSettings.notificationsEnabled);
@@ -248,11 +254,20 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   // Track if filters have been modified
   const [filtersModified, setFiltersModified] = useState(false);
 
+  // Check if filters have been modified
+  useEffect(() => {
+    const modified =
+      JSON.stringify(pendingCurrencies) !== JSON.stringify(appliedCurrencies) ||
+      JSON.stringify(pendingImpacts) !== JSON.stringify(appliedImpacts) ||
+      pendingOnlyUpcoming !== appliedOnlyUpcoming;
+    setFiltersModified(modified);
+  }, [pendingCurrencies, appliedCurrencies, pendingImpacts, appliedImpacts, pendingOnlyUpcoming, appliedOnlyUpcoming]);
+
   // Track if the month picker is active
   const [isMonthPickerActive, setIsMonthPickerActive] = useState(false);
 
   // Function to save filter settings to calendar
-  const saveFilterSettings = useCallback(async (currencies: Currency[], impacts: ImpactLevel[], viewTypeToSave: ViewType, notificationsEnabledToSave: boolean) => {
+  const saveFilterSettings = useCallback(async (currencies: Currency[], impacts: ImpactLevel[], viewTypeToSave: ViewType, notificationsEnabledToSave: boolean, onlyUpcomingToSave: boolean) => {
     if (!calendar?.id || !onUpdateCalendarProperty) {
       console.warn('⚠️ Cannot save economic calendar filter settings: missing calendar or update function');
       return;
@@ -262,7 +277,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       currencies,
       impacts,
       viewType: viewTypeToSave,
-      notificationsEnabled: notificationsEnabledToSave
+      notificationsEnabled: notificationsEnabledToSave,
+      onlyUpcomingEvents: onlyUpcomingToSave
     };
 
     try {
@@ -283,13 +299,14 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     setEndDate(null);
     setCurrentDate(new Date());
     setIsMonthPickerActive(false); // Deactivate month picker highlight when using view type buttons
-    await saveFilterSettings(appliedCurrencies, appliedImpacts, newViewType, notificationsEnabled);
-  }, [appliedCurrencies, appliedImpacts, saveFilterSettings, notificationsEnabled]);
+    await saveFilterSettings(appliedCurrencies, appliedImpacts, newViewType, notificationsEnabled, appliedOnlyUpcoming);
+  }, [appliedCurrencies, appliedImpacts, saveFilterSettings, notificationsEnabled, appliedOnlyUpcoming]);
 
   // Sync pending filters with applied filters on mount
   useEffect(() => {
     setPendingCurrencies(appliedCurrencies);
     setPendingImpacts(appliedImpacts);
+    setPendingOnlyUpcoming(appliedOnlyUpcoming);
   }, []); // Only run on mount
 
   // Calculate date range based on view type and current date
@@ -362,7 +379,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           { pageSize },
           {
             currencies: appliedCurrencies,
-            impacts: appliedImpacts
+            impacts: appliedImpacts,
+            onlyUpcoming: appliedOnlyUpcoming
           }
         );
 
@@ -385,7 +403,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     if (open) {
       fetchEvents();
     }
-  }, [dateRange, appliedCurrencies, appliedImpacts, open, viewType, pageSize, startDate, endDate]);
+  }, [dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming, open, viewType, pageSize, startDate, endDate]);
 
   // Set up real-time subscription when filters change
   useEffect(() => {
@@ -429,7 +447,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       },
       {
         currencies: appliedCurrencies,
-        impacts: appliedImpacts
+        impacts: appliedImpacts,
+        onlyUpcoming: true
       }
     );
 
@@ -437,7 +456,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     return () => {
       unsubscribe();
     };
-  }, [dateRange, appliedCurrencies, appliedImpacts]);
+  }, [dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming]);
 
   // Load more events function
   const loadMoreEvents = async () => {
@@ -453,7 +472,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         { pageSize, lastDoc },
         {
           currencies: appliedCurrencies,
-          impacts: appliedImpacts
+          impacts: appliedImpacts,
+          onlyUpcoming: appliedOnlyUpcoming
         }
       );
 
@@ -524,7 +544,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         ? prev.filter(c => c !== currency)
         : [...prev, currency]
     );
-    setFiltersModified(true);
   };
 
   const handleImpactChange = (impact: ImpactLevel) => {
@@ -533,32 +552,42 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         ? prev.filter(i => i !== impact)
         : [...prev, impact]
     );
-    setFiltersModified(true);
+  };
+
+  const handleUpcomingEventsChange = (checked: boolean) => {
+    setPendingOnlyUpcoming(checked);
+  };
+
+  const handleMonthChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedDate = new Date(event.target.value + '-01');
+    setCurrentDate(selectedDate);
+    setIsMonthPickerActive(true);
   };
 
   // Apply filters function
   const handleApplyFilters = async () => {
     setAppliedCurrencies(pendingCurrencies);
     setAppliedImpacts(pendingImpacts);
+    setAppliedOnlyUpcoming(pendingOnlyUpcoming);
     setFiltersModified(false);
     setIsFilterExpanded(false); // Collapse filter section after applying
 
     // Save filter settings to calendar
-    await saveFilterSettings(pendingCurrencies, pendingImpacts, viewType, notificationsEnabled);
-
-    // Save filter settings to localStorage
-    saveFilterSettings(pendingCurrencies, pendingImpacts, viewType, notificationsEnabled);
+    await saveFilterSettings(pendingCurrencies, pendingImpacts, viewType, notificationsEnabled, pendingOnlyUpcoming);
   };
 
   // Reset filters function
   const handleResetFilters = () => {
     const defaultCurrencies: Currency[] = ['USD', 'EUR', 'GBP'];
     const defaultImpacts: ImpactLevel[] = ['High', 'Medium', 'Low'];
-    
+    const defaultOnlyUpcoming = false;
+
     setPendingCurrencies(defaultCurrencies);
     setPendingImpacts(defaultImpacts);
+    setPendingOnlyUpcoming(defaultOnlyUpcoming);
     setAppliedCurrencies(defaultCurrencies);
     setAppliedImpacts(defaultImpacts);
+    setAppliedOnlyUpcoming(defaultOnlyUpcoming);
     setFiltersModified(false);
   };
 
@@ -581,7 +610,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   // Handle notification toggle
   const handleNotificationToggle = async (enabled: boolean) => {
     setNotificationsEnabled(enabled);
-    await saveFilterSettings(appliedCurrencies, appliedImpacts, viewType, enabled);
+    await saveFilterSettings(appliedCurrencies, appliedImpacts, viewType, enabled, appliedOnlyUpcoming);
   };
 
   return (
@@ -746,7 +775,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Chip
-                      label={`${appliedCurrencies.length + appliedImpacts.length} active`}
+                      label={`${appliedCurrencies.length + appliedImpacts.length + (appliedOnlyUpcoming ? 1 : 0)} active`}
                       size="small"
                       color={filtersModified ? "warning" : "primary"}
                       variant={filtersModified ? "filled" : "outlined"}
@@ -776,301 +805,66 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                   </Box>
                 </Box>
               </Box>
-              <IconButton
-                size="small"
-                sx={{
-                  color: 'primary.main',
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                    transform: 'scale(1.1)',
-                  },
-                  transition: 'all 0.2s ease-in-out'
-                }}
-              >
-                {isFilterExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-              </IconButton>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {/* Notifications Toggle */}
+                <Tooltip
+                  title={notificationsEnabled ? "Disable event notifications" : "Enable event notifications"}
+                  placement="top"
+                >
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNotificationToggle(!notificationsEnabled);
+                    }}
+                    sx={{
+                      color: notificationsEnabled ? 'primary.main' : 'text.disabled',
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        transform: 'scale(1.1)',
+                      },
+                      transition: 'all 0.2s ease-in-out'
+                    }}
+                  >
+                    {notificationsEnabled ? <NotificationsIcon /> : <NotificationsOffIcon />}
+                  </IconButton>
+                </Tooltip>
+
+                {/* Expand/Collapse Toggle */}
+                <IconButton
+                  size="small"
+                  sx={{
+                    color: 'primary.main',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                      transform: 'scale(1.1)',
+                    },
+                    transition: 'all 0.2s ease-in-out'
+                  }}
+                >
+                  {isFilterExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+              </Box>
             </Box>
           </Paper>
         </Box>
 
         {/* Filters Section */}
-        <Collapse in={isFilterExpanded}>
-          <Box sx={{ px: 3, pb: 3 }}>
-            <Stack spacing={3}>
-              {/* Month Picker */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2.5,
-                  borderRadius: 2,
-                  background: alpha(theme.palette.background.paper, 0.6),
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                }}
-              >
-                <FormControl component="fieldset" fullWidth>
-                  <FormLabel component="legend" sx={{ 
-                    mb: 1.5, 
-                    fontSize: '0.875rem', 
-                    fontWeight: 600,
-                    color: 'text.primary'
-                  }}>
-                    Month Filter
-                  </FormLabel>
-                  <TextField
-                    label="Select Month"
-                    type="month"
-                    value={format(currentDate, 'yyyy-MM')}
-                    onChange={(e) => {
-                      const selectedDate = new Date(e.target.value + '-01');
-                      console.log('📅 Month picker changed:', { 
-                        selectedValue: e.target.value, 
-                        selectedDate: format(selectedDate, 'yyyy-MM-dd') 
-                      });
-                      setCurrentDate(selectedDate);
-                      setViewType('month');
-                      setStartDate(null);
-                      setEndDate(null);
-                      setIsMonthPickerActive(true); // Activate month picker highlight
-                    }}
-                    size="small"
-                    fullWidth
-                    InputLabelProps={{
-                      shrink: true,
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 1.5,
-                      }
-                    }}
-                  />
-                </FormControl>
-              </Paper>
-
-              {/* Notification Settings */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2.5,
-                  borderRadius: 2,
-                  background: alpha(theme.palette.background.paper, 0.6),
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                }}
-              >
-                <FormControl component="fieldset" fullWidth>
-                  <FormLabel component="legend" sx={{ 
-                    mb: 1.5, 
-                    fontSize: '0.875rem', 
-                    fontWeight: 600,
-                    color: 'text.primary'
-                  }}>
-                    Notifications
-                  </FormLabel>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={notificationsEnabled}
-                        onChange={(e) => handleNotificationToggle(e.target.checked)}
-                        color="primary"
-                        size="small"
-                      />
-                    }
-                    label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {notificationsEnabled ? (
-                          <NotificationsIcon sx={{ fontSize: 18, color: 'primary.main' }} />
-                        ) : (
-                          <NotificationsOffIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
-                        )}
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {notificationsEnabled ? 'Notifications enabled' : 'Notifications disabled'}
-                        </Typography>
-                      </Box>
-                    }
-                    sx={{ 
-                      mr: 0,
-                      '& .MuiFormControlLabel-label': {
-                        fontSize: '0.875rem',
-                        fontWeight: 500,
-                      }
-                    }}
-                  />
-                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                    {notificationsEnabled 
-                      ? 'You will receive notifications when economic events are updated'
-                      : 'Notifications are disabled for economic events'
-                    }
-                  </Typography>
-                </FormControl>
-              </Paper>
-
-              {/* Currency Filters */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2.5,
-                  borderRadius: 2,
-                  background: alpha(theme.palette.background.paper, 0.6),
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                }}
-              >
-                <FormControl component="fieldset" fullWidth>
-                  <FormLabel component="legend" sx={{ 
-                    mb: 1.5, 
-                    fontSize: '0.875rem', 
-                    fontWeight: 600,
-                    color: 'text.primary'
-                  }}>
-                    Currencies
-                  </FormLabel>
-                  <FormGroup row sx={{ gap: 1 }}>
-                    {CURRENCIES.map((currency) => (
-                      <FormControlLabel
-                        key={currency}
-                        control={
-                          <Checkbox
-                            checked={pendingCurrencies.includes(currency)}
-                            onChange={() => handleCurrencyChange(currency)}
-                            size="small"
-                            sx={{
-                              '&.Mui-checked': {
-                                color: 'primary.main',
-                              }
-                            }}
-                          />
-                        }
-                        label={currency}
-                        sx={{ 
-                          mr: 0,
-                          '& .MuiFormControlLabel-label': {
-                            fontSize: '0.875rem',
-                            fontWeight: 500,
-                          }
-                        }}
-                      />
-                    ))}
-                  </FormGroup>
-                </FormControl>
-              </Paper>
-
-              {/* Impact Filters */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2.5,
-                  borderRadius: 2,
-                  background: alpha(theme.palette.background.paper, 0.6),
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                }}
-              >
-                <FormControl component="fieldset" fullWidth>
-                  <FormLabel component="legend" sx={{ 
-                    mb: 1.5, 
-                    fontSize: '0.875rem', 
-                    fontWeight: 600,
-                    color: 'text.primary'
-                  }}>
-                    Impact Level
-                  </FormLabel>
-                  <FormGroup row sx={{ gap: 1 }}>
-                    {IMPACTS.map((impact) => (
-                      <FormControlLabel
-                        key={impact}
-                        control={
-                          <Checkbox
-                            checked={pendingImpacts.includes(impact)}
-                            onChange={() => handleImpactChange(impact)}
-                            size="small"
-                            sx={{
-                              '&.Mui-checked': {
-                                color: 'primary.main',
-                              }
-                            }}
-                          />
-                        }
-                        label={impact}
-                        sx={{ 
-                          mr: 0,
-                          '& .MuiFormControlLabel-label': {
-                            fontSize: '0.875rem',
-                            fontWeight: 500,
-                          }
-                        }}
-                      />
-                    ))}
-                  </FormGroup>
-                </FormControl>
-              </Paper>
-
-              {/* Filter Actions */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2.5,
-                  borderRadius: 2,
-                  background: alpha(theme.palette.background.paper, 0.6),
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                      {pendingCurrencies.length} currencies, {pendingImpacts.length} impact levels
-                    </Typography>
-                    {filtersModified && (
-                      <Chip
-                        label="Modified"
-                        size="small"
-                        color="warning"
-                        variant="outlined"
-                        sx={{ 
-                          mx: 1,
-                          fontSize: '0.75rem',
-                          height: 20,
-                          '& .MuiChip-label': {
-                            px: 1,
-                           
-                          }
-                        }}
-                      />
-                    )}
-                  </Box>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                      onClick={handleResetFilters}
-                      size="small"
-                      color="inherit"
-                      variant="outlined"
-                      sx={{
-                        borderRadius: 1.5,
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        px: 2,
-                      }}
-                    >
-                      Reset
-                    </Button>
-                    <Button
-                      onClick={handleApplyFilters}
-                      size="small"
-                      variant="contained"
-                      disabled={!filtersModified}
-                      startIcon={loading ? <CircularProgress size={16} /> : undefined}
-                      sx={{
-                        borderRadius: 1.5,
-                        textTransform: 'none',
-                        fontWeight: 600,
-                        px: 2,
-                        minWidth: 80,
-                      }}
-                    >
-                      Apply
-                    </Button>
-                  </Box>
-                </Box>
-              </Paper>
-            </Stack>
-          </Box>
-        </Collapse>
+        <EconomicCalendarFilters
+          isExpanded={isFilterExpanded}
+          currentDate={currentDate}
+          pendingCurrencies={pendingCurrencies}
+          pendingImpacts={pendingImpacts}
+          pendingOnlyUpcoming={pendingOnlyUpcoming}
+          filtersModified={filtersModified}
+          loading={loading}
+          onCurrencyChange={handleCurrencyChange}
+          onImpactChange={handleImpactChange}
+          onUpcomingEventsChange={handleUpcomingEventsChange}
+          onMonthChange={handleMonthChange}
+          onApplyFilters={handleApplyFilters}
+          onResetFilters={handleResetFilters}
+        />
 
         {/* Content */}
         <Box
@@ -1086,10 +880,10 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           ) : error ? (
             <Box sx={{ textAlign: 'center', py: 4, px: 3 }}>
               <CalendarIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
                 {error}
               </Typography>
-              <Button onClick={() => window.location.reload()} variant="outlined" size="small">
+              <Button variant="outlined" onClick={() => window.location.reload()}>
                 Retry
               </Button>
             </Box>
@@ -1104,7 +898,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
               </Typography>
             </Box>
           ) : (
-           
+
               <Box>
                 {groupEventsByDate(events).map((dayGroup, dayIndex) => (
                   <Box key={dayGroup.date}>
@@ -1120,21 +914,18 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                       py: 1.5
                     }}>
                       <Typography variant="subtitle2" sx={{
-                        fontWeight: 700,
-                        color: isToday(parseISO(dayGroup.date)) ? 'primary.main' : 'text.primary'
+                        fontWeight: 600,
+                        color: 'primary.main',
+                        fontSize: '0.875rem'
                       }}>
                         {getDateHeader(dayGroup.date)}
                       </Typography>
                     </Box>
 
-                    {/* Events for this date */}
-                    <List sx={{ p: 0 }}>
+                    {/* Events for this day */}
+                    <Box>
                       {dayGroup.events.map((event, eventIndex) => {
-                        // Create a unique key that combines multiple identifiers
-                        const uniqueKey = event.id 
-                          ? `${event.id}-${event.timeUtc}-${eventIndex}`
-                          : `${dayGroup.date}-${event.timeUtc}-${event.currency}-${event.event}-${eventIndex}`;
-                        
+                        const uniqueKey = `${event.id}-${eventIndex}`;
                         return (
                           <React.Fragment key={uniqueKey}>
                             <EconomicEventListItem px={2.5} py={1.5}   event={event} />
@@ -1142,58 +933,51 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                           </React.Fragment>
                         );
                       })}
-                    </List>
+                    </Box>
                   </Box>
                 ))}
+
+                {/* Load More Button */}
+                {hasMore && (
+                  <Box sx={{ p: 3 }}>
+                    <Button
+                      onClick={loadMoreEvents}
+                      disabled={loadingMore}
+                      variant="outlined"
+                      fullWidth
+                      startIcon={loadingMore ? <CircularProgress size={16} /> : undefined}
+                      sx={{
+                        borderRadius: 2,
+                        py: 1.5,
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        borderColor: alpha(theme.palette.primary.main, 0.3),
+                        color: 'primary.main',
+                        '&:hover': {
+                          borderColor: 'primary.main',
+                          backgroundColor: alpha(theme.palette.primary.main, 0.04),
+                        }
+                      }}
+                    >
+                      {loadingMore ? 'Loading more events...' : `Load more events`}
+                    </Button>
+                  </Box>
+                )}
+
+                {/* End of results indicator */}
+                {!hasMore && events.length > 0 && !loading && (
+                  <Box sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      No more events to load
+                    </Typography>
+                  </Box>
+                )}
               </Box>
-           
-          )}
-
-          {/* Loading More Indicator */}
-          {loadingMore && (
-            <Box sx={{ textAlign: 'center', py: 2 }}>
-              <CircularProgress size={24} sx={{ mb: 1 }} />
-              <Typography variant="caption" color="text.secondary" display="block">
-                Loading more events...
-              </Typography>
-            </Box>
-          )}
-
-          {/* Load More Button */}
-          {hasMore && !loading && !loadingMore && (
-            <Box sx={{ p: 3, textAlign: 'center' }}>
-              <Button
-                onClick={loadMoreEvents}
-                disabled={loadingMore}
-                variant="outlined"
-                fullWidth
-                startIcon={loadingMore ? <CircularProgress size={16} /> : undefined}
-                sx={{
-                  borderRadius: 2,
-                  py: 1.5,
-                  background: alpha(theme.palette.primary.main, 0.05),
-                  '&:hover': {
-                    background: alpha(theme.palette.primary.main, 0.1)
-                  }
-                }}
-              >
-                {loadingMore ? 'Loading more events...' : `Load more events`}
-              </Button>
-            </Box>
-          )}
-
-          {/* End of results indicator */}
-          {!hasMore && events.length > 0 && !loading && (
-            <Box sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="caption" color="text.secondary">
-                No more events to load
-              </Typography>
-            </Box>
-          )}
+            )}
         </Box>
 
         {/* Footer */}
-        <Box sx={{
+        {!isFilterExpanded && <Box sx={{
           p: 2,
           borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           background: alpha(theme.palette.background.paper, 0.8),
@@ -1205,8 +989,9 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
               Showing {events.length} events{hasMore ? ' (more available)' : ''}
             </Typography>
           )}
- 
-        </Box>
+
+        </Box>}
+        
       </Box>
     </Drawer>
   );

@@ -36,17 +36,17 @@ export const useEconomicEventWatcher = ({
   useEffect(() => {
     if (!isInitialized.current) {
       economicEventWatcher.initialize({
-        onEventUpdated: (event: EconomicEvent,events: EconomicEvent[], calendarId: string) => {
-          console.log(`📊 Event updated: ${event.event} for calendar ${calendarId}`);
-          
-          // You could dispatch a custom event here to notify other parts of the app
-          window.dispatchEvent(new CustomEvent('economicEventUpdated', {
-            detail: { event, events, calendarId }
+        onEventsUpdated: (events: EconomicEvent[], allEvents: EconomicEvent[], calendarId: string) => {
+          console.log(`📊 ${events.length} events updated simultaneously for calendar ${calendarId}`);
+
+          // Dispatch multiple events update
+          window.dispatchEvent(new CustomEvent('economicEventsUpdated', {
+            detail: { events, allEvents, calendarId }
           }));
         },
         onError: (error: Error, calendarId: string) => {
           console.error(`❌ Economic event watcher error for calendar ${calendarId}:`, error);
-          
+
           // You could show a toast notification or handle the error as needed
           window.dispatchEvent(new CustomEvent('economicEventWatcherError', {
             detail: { error: error.message, calendarId }
@@ -97,18 +97,18 @@ export const useEconomicEventWatcher = ({
     }
   };
 };
-
-// Custom hook for listening to economic event updates
-export const useEconomicEventUpdates = (callback: (event: EconomicEvent, events: EconomicEvent[], calendarId: string) => void) => {
+ 
+// Custom hook for listening to multiple economic event updates (same release time)
+export const useEconomicEventsUpdates = (callback: (events: EconomicEvent[], allEvents: EconomicEvent[], calendarId: string) => void) => {
   useEffect(() => {
-    const handleEventUpdate = (e: CustomEvent) => {
-      callback(e.detail.event,e.detail.events, e.detail.calendarId);
+    const handleEventsUpdate = (e: CustomEvent) => {
+      callback(e.detail.events, e.detail.allEvents, e.detail.calendarId);
     };
 
-    window.addEventListener('economicEventUpdated', handleEventUpdate as EventListener);
-    
+    window.addEventListener('economicEventsUpdated', handleEventsUpdate as EventListener);
+
     return () => {
-      window.removeEventListener('economicEventUpdated', handleEventUpdate as EventListener);
+      window.removeEventListener('economicEventsUpdated', handleEventsUpdate as EventListener);
     };
   }, [callback]);
 };

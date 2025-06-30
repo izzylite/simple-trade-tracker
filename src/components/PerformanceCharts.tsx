@@ -865,25 +865,27 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             </Box>
           </Paper>
 
-          {/* Session Performance Analysis */}
-          <SessionPerformanceAnalysis
-            sessionStats={sessionStats}
-            trades={trades}
-            selectedDate={selectedDate}
-            timePeriod={timePeriod}
-            setMultipleTradesDialog={setMultipleTradesDialog}
-          />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Session Performance Analysis */}
+            <SessionPerformanceAnalysis
+              sessionStats={sessionStats}
+              trades={trades}
+              selectedDate={selectedDate}
+              timePeriod={timePeriod}
+              setMultipleTradesDialog={setMultipleTradesDialog}
+            />
 
-          {/* Trading Score Section */}
-          <ScoreSection
-            trades={trades}
-            selectedDate={selectedDate}
-            calendarId={calendarId}
-            scoreSettings={scoreSettings}
-            onUpdateCalendarProperty={onUpdateCalendarProperty}
-            accountBalance={accountBalance}
-            dynamicRiskSettings={dynamicRiskSettings}
-          />
+            {/* Trading Score Section */}
+            <ScoreSection
+              trades={trades}
+              selectedDate={selectedDate}
+              calendarId={calendarId}
+              scoreSettings={scoreSettings}
+              onUpdateCalendarProperty={onUpdateCalendarProperty}
+              accountBalance={accountBalance}
+              dynamicRiskSettings={dynamicRiskSettings}
+            />
+          </Box>
         </>
       ) : (
         <Box

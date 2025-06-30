@@ -189,25 +189,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 Home
               </Button>
             )}
-            {(isDashboardPage || isBlogPage) && (
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => navigate('/blog')}
-                startIcon={<ArticleIcon />}
-                sx={{
-                  display: { xs: 'none', sm: 'flex' },
-                  borderColor: 'primary.main',
-                  color: isBlogPage ? 'primary.main' : 'text.secondary',
-                  bgcolor: isBlogPage ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  }
-                }}
-              >
-                News
-              </Button>
-            )}
+
             <IconButton
               onClick={onToggleTheme}
               color="inherit"

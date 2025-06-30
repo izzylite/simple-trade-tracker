@@ -12,7 +12,7 @@ export { cleanupExpiredCalendarsV2 } from './cleanupExpiredCalendars';
 export { generateTradeShareLinkV2, getSharedTradeV2, deactivateSharedTradeV2 } from './sharing';
 
 // Export the economic calendar functions
-export { autoRefreshEconomicCalendarV2, populateDatabaseManually, processHtmlEconomicEvents, refreshEconomicCalendar } from './economicCalendar';
+export { autoRefreshEconomicCalendarV2, processHtmlEconomicEvents, refreshEconomicCalendar } from './economicCalendar';
 
  
 

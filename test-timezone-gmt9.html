@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MyFXBook Economic Calendar Test - GMT+9 (Day Rollover Test)</title>
+</head>
+<body>
+    <!-- Timezone selector with GMT+9 selected -->
+    <select name="timezoneoffset" class="form-control" id="timezoneoffset">
+        <option value="-12.0" title="GMT -12:00">(GMT -12:00) International Date Line West</option>
+        <option value="0.0" title="GMT">(GMT) Western Europe Time, London, Lisbon, Casablanca</option>
+        <option value="1.0" title="GMT +1:00">(GMT +1:00) Brussels, Copenhagen, Madrid, Paris</option>
+        <option value="9.0" title="GMT +9:00" selected="selected">(GMT +9:00) Yakutsk, Tokyo, Seoul, Osaka, Sapporo</option>
+    </select>
+
+    <!-- Sample economic calendar table with times that will cause day rollover -->
+    <table>
+        <tr>
+            <td>Jul 01, 02:00</td>
+            <td></td>
+            <td>
+                <div class="display-flex-align-items-center gap-5">
+                    <i class="Japan align-center" title="Japan">
+                        <span class="flag flag-icon-jp"></span>
+                    </i>
+                </div>
+            </td>
+            <td>JPY</td>
+            <td>Bank of Japan Meeting</td>
+            <td>High</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Jul 01, 08:00</td>
+            <td></td>
+            <td>
+                <div class="display-flex-align-items-center gap-5">
+                    <i class="Japan align-center" title="Japan">
+                        <span class="flag flag-icon-jp"></span>
+                    </i>
+                </div>
+            </td>
+            <td>JPY</td>
+            <td>Manufacturing PMI (Jun)</td>
+            <td>Medium</td>
+            <td>50.1</td>
+            <td>50.4</td>
+            <td>50.4</td>
+            <td></td>
+        </tr>
+    </table>
+</body>
+</html>
