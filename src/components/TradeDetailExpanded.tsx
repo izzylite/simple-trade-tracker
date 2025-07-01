@@ -934,7 +934,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.8rem', minWidth: 80 }}>
                                   Filter by Impact:
                                 </Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 0.5, sm: 0.75 } }}>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 0.5, md: 0.75, sm: 0.75 } }}>
                                   {((calendar?.economicCalendarFilters?.impacts as ImpactLevel[]) || (['High', 'Medium', 'Low'] as ImpactLevel[])).map((impact: ImpactLevel) => (
                                     <Chip
                                       key={impact}
@@ -948,8 +948,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                         setSelectedImpacts(newImpacts);
                                       }}
                                       sx={{
-                                        fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                                        height: { xs: 24, sm: 28 },
+                                        fontSize: { xs: '0.7rem',md: '0.75rem', sm: '0.75rem' },
+                                        height: { xs: 24, md: 28, sm: 28 },
                                         fontWeight: 600,
                                         borderRadius: 1.5,
                                         backgroundColor: selectedImpacts.includes(impact) 
