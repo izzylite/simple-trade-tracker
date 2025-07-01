@@ -1,12 +1,12 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Box, Typography, useTheme, Tabs, Tab, Paper } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { Box, Typography, useTheme, Paper } from '@mui/material';
 import { Trade } from '../types/trade';
 import { Calendar } from '../types/calendar';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import ScoreSection from './ScoreSection';
+import RoundedTabs from './common/RoundedTabs';
 import { logger } from '../utils/logger';
 import {
   PnLChartsWrapper,
@@ -17,7 +17,8 @@ import {
   DailySummaryTable,
   SessionPerformanceAnalysis,
   TradesListDialog,
-  RiskRewardChart
+  RiskRewardChart,
+  EconomicEventCorrelationAnalysis
 } from './charts';
 import {
   calculateChartData,
@@ -40,7 +41,7 @@ interface PerformanceChartsProps {
   onSecondaryTagsChange?: (tags: string[]) => void;
   onEditTrade?: (trade: Trade) => void;
   onDeleteTrade?: (tradeId: string) => void;
- onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
+  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
   // Dynamic risk settings
   dynamicRiskSettings?: DynamicRiskSettings;
@@ -86,13 +87,17 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     open: boolean;
     trades: Trade[];
     showChartInfo?: boolean,
-    date: string;
+    date: string,
+    title?: string,
+    subtitle?: string,
     expandedTradeId: string | null;
   }>({
     open: false,
     trades: [],
     showChartInfo: true,
     date: '',
+    title: '',
+    subtitle: '',
     expandedTradeId: null
   });
 
@@ -162,6 +167,32 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     setTimePeriod(newValue);
     onTimePeriodChange?.(newValue);
   };
+
+  // Define tabs for time period selection
+  const timePeriodTabs = [
+    { label: 'Month', value: 'month' },
+    { label: 'Year', value: 'year' },
+    { label: 'All Time', value: 'all' }
+  ];
+
+  // Convert string value to tab index for RoundedTabs
+  const getTimePeriodTabIndex = (period: TimePeriod): number => {
+    return timePeriodTabs.findIndex(tab => tab.value === period);
+  };
+
+  // Handle tab change for time period
+  const handleTimePeriodTabChange = (_: React.SyntheticEvent, newIndex: number) => {
+    const newPeriod = timePeriodTabs[newIndex]?.value as TimePeriod;
+    if (newPeriod) {
+      handleTimePeriodChange(newPeriod);
+    }
+  };
+
+  // Define tabs for tag analysis
+  const tagAnalysisTabs = [
+    { label: 'Tag Performance' },
+    { label: 'Day of Week' }
+  ];
 
   // Use the utility function for filtering trades
   const getFilteredTrades = utilGetFilteredTrades;
@@ -460,8 +491,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     return Array.from(tags).sort();
   }, [trades]);
 
-   
-  
+
+
 
   // Calculate target value for monthly target
   const targetValue = useMemo(() => {
@@ -530,8 +561,9 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       // Open the dialog with the filtered trades
       setMultipleTradesDialog({
         open: true,
-        trades: categoryTrades, 
-        date: dialogTitle,
+        trades: categoryTrades,
+        title: dialogTitle,
+        date: selectedDate.toDateString(),
         expandedTradeId: categoryTrades.length === 1 ? categoryTrades[0].id : null
       });
     }
@@ -552,6 +584,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       <TradesListDialog
         open={multipleTradesDialog.open}
         trades={multipleTradesDialog.trades}
+        title={multipleTradesDialog.title}
         date={multipleTradesDialog.date}
         expandedTradeId={multipleTradesDialog.expandedTradeId}
         showChartInfo={multipleTradesDialog.showChartInfo || true}
@@ -591,96 +624,15 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               : 'All Time'
           }
         </Typography>
-        <Tabs
-          value={timePeriod}
-          onChange={(_, newValue: TimePeriod) => handleTimePeriodChange(newValue)}
+        <RoundedTabs
+          tabs={timePeriodTabs}
+          activeTab={getTimePeriodTabIndex(timePeriod)}
+          onTabChange={handleTimePeriodTabChange}
+          size="small"
           sx={{
-            minHeight: { xs: 36, sm: 40 },
-            backgroundColor: theme.palette.mode === 'light' ? '#f0f0f0' : alpha(theme.palette.background.paper, 0.4),
-            borderRadius: '20px',
-            padding: '4px',
-            alignSelf: { xs: 'center', sm: 'auto' },
-            '& .MuiTabs-flexContainer': {
-              gap: '4px'
-            },
-            '& .MuiTabs-indicator': {
-              display: 'none'
-            }
+            alignSelf: { xs: 'center', sm: 'auto' }
           }}
-        >
-          <Tab
-            label="Month"
-            value="month"
-            sx={{
-              minHeight: { xs: 28, sm: 32 },
-              my: 0.2,
-              textTransform: 'none',
-              fontSize: { xs: '0.75rem', sm: '0.875rem' },
-              fontWeight: 500,
-              color: 'text.secondary',
-              borderRadius: '16px',
-              padding: { xs: '4px 12px', sm: '6px 18px' },
-              minWidth: { xs: 'auto', sm: 'auto' },
-              '&.Mui-selected': {
-                color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                backgroundColor: 'primary.main',
-                boxShadow: theme.shadows[1]
-              },
-              '&:hover:not(.Mui-selected)': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                color: 'primary.main'
-              }
-            }}
-          />
-          <Tab
-            label="Year"
-            value="year"
-            sx={{
-              minHeight: { xs: 28, sm: 32 },
-              my: 0.2,
-              textTransform: 'none',
-              fontSize: { xs: '0.75rem', sm: '0.875rem' },
-              fontWeight: 500,
-              color: 'text.secondary',
-              borderRadius: '16px',
-              padding: { xs: '4px 12px', sm: '6px 18px' },
-              minWidth: { xs: 'auto', sm: 'auto' },
-              '&.Mui-selected': {
-                color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                backgroundColor: 'primary.main',
-                boxShadow: theme.shadows[1]
-              },
-              '&:hover:not(.Mui-selected)': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                color: 'primary.main'
-              }
-            }}
-          />
-          <Tab
-            label="All Time"
-            value="all"
-            sx={{
-              minHeight: { xs: 28, sm: 32 },
-              my: 0.2,
-              textTransform: 'none',
-              fontSize: { xs: '0.75rem', sm: '0.875rem' },
-              fontWeight: 500,
-              color: 'text.secondary',
-              borderRadius: '16px',
-              padding: { xs: '4px 12px', sm: '6px 18px' },
-              minWidth: { xs: 'auto', sm: 'auto' },
-              '&.Mui-selected': {
-                color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                backgroundColor: 'primary.main',
-                boxShadow: theme.shadows[1]
-              },
-              '&:hover:not(.Mui-selected)': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                color: 'primary.main'
-              }
-            }}
-          />
-        </Tabs>
+        />
       </Box>
 
       {/* Main content */}
@@ -752,75 +704,15 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               alignItems: 'center',
               mb: 2
             }}>
-              <Tabs
-                value={tagAnalysisTab}
-                onChange={handleTagAnalysisTabChange}
-                variant="scrollable"
-                scrollButtons="auto"
+              <RoundedTabs
+                tabs={tagAnalysisTabs}
+                activeTab={tagAnalysisTab}
+                onTabChange={handleTagAnalysisTabChange}
+                size="small"
                 sx={{
-                  minHeight: { xs: 36, sm: 40 },
-                  backgroundColor: theme.palette.mode === 'light' ? '#f0f0f0' : alpha(theme.palette.background.paper, 0.4),
-                  borderRadius: '20px',
-                  padding: '4px',
-                  maxWidth: { xs: '100%', sm: 'none' },
-                  '& .MuiTabs-flexContainer': {
-                    gap: '4px'
-                  },
-                  '& .MuiTabs-indicator': {
-                    display: 'none'
-                  },
-                  '& .MuiTabs-scrollButtons': {
-                    color: 'text.secondary'
-                  }
+                  maxWidth: { xs: '100%', sm: 'none' }
                 }}
-              >
-                <Tab
-                  label="Tag Performance"
-                  sx={{
-                    minHeight: { xs: 28, sm: 32 },
-                    my: 0.2,
-                    textTransform: 'none',
-                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                    fontWeight: 500,
-                    color: 'text.secondary',
-                    borderRadius: '16px',
-                    padding: { xs: '4px 8px', sm: '6px 18px' },
-                    minWidth: { xs: 'auto', sm: 'auto' },
-                    '&.Mui-selected': {
-                      color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                      backgroundColor: 'primary.main',
-                      boxShadow: theme.shadows[1]
-                    },
-                    '&:hover:not(.Mui-selected)': {
-                      backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                      color: 'primary.main'
-                    }
-                  }}
-                />
-                <Tab
-                  label="Day of Week"
-                  sx={{
-                    minHeight: { xs: 28, sm: 32 },
-                    my: 0.2,
-                    textTransform: 'none',
-                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                    fontWeight: 500,
-                    color: 'text.secondary',
-                    borderRadius: '16px',
-                    padding: { xs: '4px 8px', sm: '6px 18px' },
-                    minWidth: { xs: 'auto', sm: 'auto' },
-                    '&.Mui-selected': {
-                      color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                      backgroundColor: 'primary.main',
-                      boxShadow: theme.shadows[1]
-                    },
-                    '&:hover:not(.Mui-selected)': {
-                      backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                      color: 'primary.main'
-                    }
-                  }}
-                />
-              </Tabs>
+              />
             </Box>
 
             {/* Tab Panel 1: Tag Performance Analysis */}
@@ -834,12 +726,12 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
                 secondaryTags={secondaryTags}
                 setPrimaryTags={(tags) => {
                   setPrimaryTags(tags);
-                  onPrimaryTagsChange(tags); 
+                  onPrimaryTagsChange(tags);
                 }}
                 setSecondaryTags={(tags) => {
                   setSecondaryTags(tags);
-                  onSecondaryTagsChange(tags); 
-                }} 
+                  onSecondaryTagsChange(tags);
+                }}
                 setMultipleTradesDialog={setMultipleTradesDialog}
               />
             </Box>
@@ -876,6 +768,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               setMultipleTradesDialog={setMultipleTradesDialog}
             />
 
+         
+
             {/* Trading Score Section */}
             <ScoreSection
               trades={trades}
@@ -885,6 +779,15 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               onUpdateCalendarProperty={onUpdateCalendarProperty}
               accountBalance={accountBalance}
               dynamicRiskSettings={dynamicRiskSettings}
+            />
+
+               {/* Economic Event Correlation Analysis */}
+            <EconomicEventCorrelationAnalysis
+              trades={getFilteredTrades(trades, selectedDate, timePeriod)}
+              selectedDate={selectedDate}
+              timePeriod={timePeriod}
+              calendar={calendar}
+              setMultipleTradesDialog={setMultipleTradesDialog}
             />
           </Box>
         </>

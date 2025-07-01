@@ -5,9 +5,7 @@ import {
   CardContent,
   Typography,
   useTheme,
-  Stack,
-  Tabs,
-  Tab
+  Stack
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import {
@@ -24,6 +22,7 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { ScoreHistory as ScoreHistoryType } from '../../types/score';
+import RoundedTabs from '../common/RoundedTabs';
 
 interface ScoreHistoryProps {
   history: ScoreHistoryType[];
@@ -37,6 +36,27 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
   onPeriodChange
 }) => {
   const theme = useTheme();
+
+  // Define tabs for period selection
+  const periodTabs = [
+    { label: 'Daily', value: 'daily' },
+    { label: 'Weekly', value: 'weekly' },
+    { label: 'Monthly', value: 'monthly' },
+    { label: 'Yearly', value: 'yearly' }
+  ];
+
+  // Convert string value to tab index for RoundedTabs
+  const getPeriodTabIndex = (currentPeriod: string): number => {
+    return periodTabs.findIndex(tab => tab.value === currentPeriod);
+  };
+
+  // Handle tab change for period
+  const handlePeriodTabChange = (_: React.SyntheticEvent, newIndex: number) => {
+    const newPeriod = periodTabs[newIndex]?.value as 'daily' | 'weekly' | 'monthly' | 'yearly';
+    if (newPeriod) {
+      onPeriodChange(newPeriod);
+    }
+  };
 
   const chartData = useMemo(() => {
     return history.map(entry => ({
@@ -142,117 +162,12 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
             📈 Score History
           </Typography>
 
-          <Tabs
-            value={period}
-            onChange={(_, newPeriod) => newPeriod && onPeriodChange(newPeriod)}
-            sx={{
-              minHeight: 32,
-              backgroundColor: theme.palette.mode === 'light'
-                ? '#f0f0f0'
-                : alpha(theme.palette.background.paper, 0.4),
-              borderRadius: '16px',
-              padding: '2px',
-              '& .MuiTabs-flexContainer': {
-                gap: '2px'
-              },
-              '& .MuiTabs-indicator': {
-                display: 'none'
-              }
-            }}
-          >
-            <Tab
-              label="Daily"
-              value="daily"
-              sx={{
-                minHeight: 28,
-                textTransform: 'none',
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                color: 'text.secondary',
-                borderRadius: '12px',
-                padding: '4px 12px',
-                minWidth: 'auto',
-                '&.Mui-selected': {
-                  color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                  backgroundColor: 'primary.main',
-                  boxShadow: theme.shadows[1]
-                },
-                '&:hover:not(.Mui-selected)': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                  color: 'primary.main'
-                }
-              }}
-            />
-            <Tab
-              label="Weekly"
-              value="weekly"
-              sx={{
-                minHeight: 28,
-                textTransform: 'none',
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                color: 'text.secondary',
-                borderRadius: '12px',
-                padding: '4px 12px',
-                minWidth: 'auto',
-                '&.Mui-selected': {
-                  color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                  backgroundColor: 'primary.main',
-                  boxShadow: theme.shadows[1]
-                },
-                '&:hover:not(.Mui-selected)': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                  color: 'primary.main'
-                }
-              }}
-            />
-            <Tab
-              label="Monthly"
-              value="monthly"
-              sx={{
-                minHeight: 28,
-                textTransform: 'none',
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                color: 'text.secondary',
-                borderRadius: '12px',
-                padding: '4px 12px',
-                minWidth: 'auto',
-                '&.Mui-selected': {
-                  color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                  backgroundColor: 'primary.main',
-                  boxShadow: theme.shadows[1]
-                },
-                '&:hover:not(.Mui-selected)': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                  color: 'primary.main'
-                }
-              }}
-            />
-            <Tab
-              label="Yearly"
-              value="yearly"
-              sx={{
-                minHeight: 28,
-                textTransform: 'none',
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                color: 'text.secondary',
-                borderRadius: '12px',
-                padding: '4px 12px',
-                minWidth: 'auto',
-                '&.Mui-selected': {
-                  color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                  backgroundColor: 'primary.main',
-                  boxShadow: theme.shadows[1]
-                },
-                '&:hover:not(.Mui-selected)': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                  color: 'primary.main'
-                }
-              }}
-            />
-          </Tabs>
+          <RoundedTabs
+            tabs={periodTabs}
+            activeTab={getPeriodTabIndex(period)}
+            onTabChange={handlePeriodTabChange}
+            size="small"
+          />
         </Stack>
 
         {chartData.length === 0 ? (

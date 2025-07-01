@@ -9,3 +9,4 @@ export { default as DailySummaryTable } from './DailySummaryTable';
 export { default as SessionPerformanceAnalysis } from './SessionPerformanceAnalysis';
 export { default as TradesListDialog } from './TradesListDialog';
 export { default as RiskRewardChart } from './RiskRewardChart';
+export { default as EconomicEventCorrelationAnalysis } from './EconomicEventCorrelationAnalysis';

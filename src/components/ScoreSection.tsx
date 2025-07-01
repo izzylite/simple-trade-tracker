@@ -3,8 +3,6 @@ import {
   Box,
   Paper,
   Typography,
-  Tabs,
-  Tab,
   Stack,
   Alert,
   useTheme,
@@ -28,6 +26,7 @@ import ScoreBreakdown from './scoring/ScoreBreakdown';
 import ScoreHistory from './scoring/ScoreHistory';
 import ScoreSettingsComponent from './scoring/ScoreSettings';
 import TagPatternAnalysis from './TagPatternAnalysis';
+import RoundedTabs, { TabPanel } from './common/RoundedTabs';
 import { logger } from '../utils/logger';
 interface ScoreSectionProps {
   trades: Trade[];
@@ -41,25 +40,7 @@ interface ScoreSectionProps {
   allTags?: string[]; // Add allTags prop to receive calendar.tags
 }
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
 
-const TabPanel: React.FC<TabPanelProps> = ({ children, value, index, ...other }) => {
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`score-tabpanel-${index}`}
-      aria-labelledby={`score-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box>{children}</Box>}
-    </div>
-  );
-};
 
 const ScoreSection: React.FC<ScoreSectionProps> = ({
   trades,
@@ -203,6 +184,14 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
     setActiveTab(newValue);
   };
 
+  // Define tabs for RoundedTabs component
+  const tabs = [
+    { label: 'Overview' },
+    { label: 'History' },
+    { label: 'Patterns' },
+    { label: 'Settings' }
+  ];
+
   const handleHistoryPeriodChange = (newPeriod: 'daily' | 'weekly' | 'monthly' | 'yearly') => {
     setHistoryPeriod(newPeriod);
   };
@@ -326,113 +315,11 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
             📊 Trading Score Analysis
           </Typography>
 
-          <Tabs
-            value={activeTab}
-            onChange={handleTabChange}
-            sx={{
-              minHeight: 40,
-              backgroundColor: theme.palette.mode === 'light'
-                ? '#f0f0f0'
-                : alpha(theme.palette.background.paper, 0.4),
-              borderRadius: '20px',
-              padding: '4px',
-              '& .MuiTabs-flexContainer': {
-                gap: '4px'
-              },
-              '& .MuiTabs-indicator': {
-                display: 'none'
-              }
-            }}
-          >
-          <Tab
-            label="Overview"
-            sx={{
-              minHeight: 32,
-              my: 0.2,
-              textTransform: 'none',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              color: 'text.secondary',
-              borderRadius: '16px',
-              padding: '6px 18px',
-              '&.Mui-selected': {
-                color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                backgroundColor: 'primary.main',
-                boxShadow: theme.shadows[1]
-              },
-              '&:hover:not(.Mui-selected)': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                color: 'primary.main'
-              }
-            }}
+          <RoundedTabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
           />
-          <Tab
-            label="History"
-            sx={{
-              minHeight: 32,
-              my: 0.2,
-              textTransform: 'none',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              color: 'text.secondary',
-              borderRadius: '16px',
-              padding: '6px 18px',
-              '&.Mui-selected': {
-                color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                backgroundColor: 'primary.main',
-                boxShadow: theme.shadows[1]
-              },
-              '&:hover:not(.Mui-selected)': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                color: 'primary.main'
-              }
-            }}
-          />
-          <Tab
-            label="Patterns"
-            sx={{
-              minHeight: 32,
-              my: 0.2,
-              textTransform: 'none',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              color: 'text.secondary',
-              borderRadius: '16px',
-              padding: '6px 18px',
-              '&.Mui-selected': {
-                color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                backgroundColor: 'primary.main',
-                boxShadow: theme.shadows[1]
-              },
-              '&:hover:not(.Mui-selected)': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                color: 'primary.main'
-              }
-            }}
-          />
-          <Tab
-            label="Settings"
-            sx={{
-              minHeight: 32,
-              my: 0.2,
-              textTransform: 'none',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              color: 'text.secondary',
-              borderRadius: '16px',
-              padding: '6px 18px',
-              '&.Mui-selected': {
-                color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-                backgroundColor: 'primary.main',
-                boxShadow: theme.shadows[1]
-              },
-              '&:hover:not(.Mui-selected)': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                color: 'primary.main'
-              }
-            }}
-          />
-        </Tabs>
         </Stack>
       </Box>
 

@@ -22,6 +22,8 @@ import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
 interface TradesDialogProps {
   open: boolean;
   trades: Trade[];
+  title?: string;
+  subtitle?: string;
   date: string;
   expandedTradeId: string | null;
   showChartInfo?: boolean
@@ -49,6 +51,7 @@ interface TradesDialogProps {
 const TradesListDialog: React.FC<TradesDialogProps> = ({
   open,
   trades,
+  title, subtitle,
   date,
   showChartInfo,
   expandedTradeId,
@@ -113,8 +116,9 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   // Gallery mode handler
   const handleGalleryModeClick = () => {
     if (onOpenGalleryMode && trades.length > 0) {
-      const title = `${date} - ${trades.length} Trade${trades.length > 1 ? 's' : ''}`;
-      onOpenGalleryMode(trades, expandedTradeId || trades[0].id, title);
+      ;
+      onOpenGalleryMode(trades, expandedTradeId || trades[0].id,
+        `${title} - ${trades.length} Trade${trades.length > 1 ? 's' : ''}`);
       onClose(); // Close the dialog when opening gallery mode
     }
   };
@@ -134,9 +138,13 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   }, [trades]);
 
   const dialogTitle = (
-    <Typography variant="h6">
-      {trades.length} {trades.length === 1 ? 'Trade' : 'Trades'} for {date}
-    </Typography>
+    <>
+      <Typography variant="h6">
+        {trades.length} {trades.length === 1 ? 'Trade' : 'Trades'} for {(title || date).toLowerCase()}
+      </Typography>
+       
+    </>
+
   );
 
   // Custom actions for the dialog
@@ -171,7 +179,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
       <Box sx={{ p: 2 }}>
         {/* DayHeader with navigation buttons hidden */}
         <DayHeader
-          title={''}
+          title={subtitle || ''}
           accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(date), allTrades)}
           formInputVisible={true} // Set to true to hide navigation buttons
           totalPnL={totalPnL}
