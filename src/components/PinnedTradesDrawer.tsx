@@ -1,9 +1,7 @@
 import React, { useMemo } from 'react';
 import {
-  Drawer,
   Box,
   Typography,
-  IconButton,
   Chip,
   alpha,
   useTheme,
@@ -14,7 +12,6 @@ import {
   ListItemText
 } from '@mui/material';
 import {
-  Close as CloseIcon,
   PushPin as PinIcon,
   TrendingUp as WinIcon,
   TrendingDown as LossIcon,
@@ -23,6 +20,7 @@ import {
 } from '@mui/icons-material';
 import { Trade } from '../types/trade';
 import { format } from 'date-fns';
+import UnifiedDrawer from './common/UnifiedDrawer';
 
 interface PinnedTradesDrawerProps {
   open: boolean;
@@ -74,59 +72,29 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
 
 
   return (
-    <Drawer
-      anchor="right"
+    <UnifiedDrawer
       open={open}
       onClose={onClose}
-      sx={{
-        zIndex: 1300, // Higher than AppBar (1100) and other components
-        '& .MuiDrawer-paper': {
-          width: { xs: '100%', sm: 400 },
-          maxWidth: '100vw',
-          zIndex: 1300 // Ensure the paper also has high z-index
-        }
-      }}
+      title="Pinned Trades"
+      icon={<PinIcon />}
+      width={{ xs: '100%', sm: 400 }}
+      headerVariant="default"
+      headerActions={
+        sortedPinnedTrades.length > 0 ? (
+          <Chip
+            label={sortedPinnedTrades.length}
+            size="small"
+            sx={{
+              backgroundColor: alpha(theme.palette.primary.main, 0.1),
+              color: 'primary.main',
+              fontWeight: 600
+            }}
+          />
+        ) : undefined
+      }
     >
-      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <Box sx={{
-          p: 2,
-          borderBottom: `1px solid ${theme.palette.divider}`,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2
-        }}>
-          <Box sx={{
-            p: 1,
-            borderRadius: 1,
-            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <PinIcon sx={{ color: 'primary.main', fontSize: 20 }} />
-          </Box>
-          <Typography variant="h6" sx={{ flex: 1, fontWeight: 600 }}>
-            Pinned Trades
-          </Typography>
-          {sortedPinnedTrades.length > 0 && (
-            <Chip
-              label={sortedPinnedTrades.length}
-              size="small"
-              sx={{
-                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                color: 'primary.main',
-                fontWeight: 600
-              }}
-            />
-          )}
-          <IconButton onClick={onClose} size="small">
-            <CloseIcon />
-          </IconButton>
-        </Box>
-
-        {/* Content */}
-        <Box sx={{ flex: 1, overflow: 'auto' }}>
+      {/* Content */}
+      <Box sx={{ flex: 1, overflow: 'auto' }}>
           {sortedPinnedTrades.length === 0 ? (
             <Box
               sx={{
@@ -266,8 +234,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
             </List>
           )}
         </Box>
-      </Box>
-    </Drawer>
+    </UnifiedDrawer>
   );
 };
 

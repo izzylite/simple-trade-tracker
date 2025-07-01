@@ -4,8 +4,6 @@ import {
   Typography,
   useTheme,
   TextField,
-  Drawer,
-  IconButton,
   alpha,
   List,
   ListItem,
@@ -22,10 +20,10 @@ import {
   FormLabel,
   RadioGroup,
   FormControlLabel,
-  Radio
+  Radio,
+  IconButton
 } from '@mui/material';
 import {
-  Close as CloseIcon,
   Search as SearchIcon,
   TrendingUp as WinIcon,
   TrendingDown as LossIcon,
@@ -49,6 +47,7 @@ import {
 } from '../utils/tagColors';
 import { SelectInput } from './common';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
+import UnifiedDrawer from './common/UnifiedDrawer';
 
 interface SearchDrawerProps {
   open: boolean;
@@ -378,75 +377,15 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
   }, [onTradeClick, onClose]);
 
   return (
-    <Drawer
-      anchor="right"
+    <UnifiedDrawer
       open={open}
       onClose={onClose}
-      sx={{
-        zIndex: 1300, // Higher than AppBar (1100) and other components
-        '& .MuiDrawer-paper': {
-          width: { xs: '100%', sm: 450 },
-          maxWidth: '100vw',
-          zIndex: 1300, // Ensure the paper also has high z-index
-          background: theme.palette.mode === 'dark'
-            ? 'linear-gradient(135deg, rgba(18, 18, 18, 0.95) 0%, rgba(30, 30, 30, 0.95) 100%)'
-            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',
-          backdropFilter: 'blur(20px)',
-          borderLeft: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          boxShadow: theme.palette.mode === 'dark'
-            ? '0 8px 32px rgba(0, 0, 0, 0.4)'
-            : '0 8px 32px rgba(0, 0, 0, 0.12)'
-        }
-      }}
+      title="Search & Filter Trades"
+      subtitle="Find trades by tags, notes, or date ranges"
+      icon={<SearchIcon />}
+      width={{ xs: '100%', sm: 450 }}
+      headerVariant="enhanced"
     >
-      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <Box sx={{
-          p: 3,
-          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-          background: alpha(theme.palette.background.paper, 0.8),
-          backdropFilter: 'blur(10px)'
-        }}>
-          <Box sx={{
-            p: 1.5,
-            borderRadius: 2,
-            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-            border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <SearchIcon sx={{ color: 'primary.main', fontSize: 22 }} />
-          </Box>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-              Search & Filter Trades
-            </Typography>
-            <Typography variant="caption" sx={{
-              color: 'text.secondary',
-              fontSize: '0.75rem'
-            }}>
-              Find trades by tags, notes, or date ranges
-            </Typography>
-          </Box>
-          <IconButton
-            onClick={onClose}
-            size="small"
-            sx={{
-              bgcolor: alpha(theme.palette.action.hover, 0.5),
-              '&:hover': {
-                bgcolor: alpha(theme.palette.action.hover, 0.8),
-                transform: 'scale(1.05)'
-              },
-              transition: 'all 0.2s ease-in-out'
-            }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </Box>
 
         {/* Search Input */}
         <Box sx={{
@@ -1028,8 +967,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
             </Box>
           )}
         </Box>
-      </Box>
-    </Drawer>
+    </UnifiedDrawer>
   );
 };
 

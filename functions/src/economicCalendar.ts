@@ -441,7 +441,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
               const utcDateTime = new Date(calendarDateTd.replace(' ', 'T') + 'Z');
               if (!isNaN(utcDateTime.getTime())) {
                 isoDate = utcDateTime.toISOString();
-                logger.info(`📅 Precise date: ${calendarDateTd} (already UTC) → ${isoDate}`);
+               
               }
             }
 
@@ -451,8 +451,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
               const timeAttr = timeElement.attr('time');
               if (timeAttr && /^\d+$/.test(timeAttr)) {
                 unixTimestamp = parseInt(timeAttr, 10);
-                logger.info(`⏰ Unix timestamp extracted: ${timeAttr} → ${new Date(unixTimestamp).toISOString()}`);
-              }
+                  }
             }
 
             if (!isoDate) {
@@ -733,9 +732,12 @@ export const refreshEconomicCalendar = onCall(
             }
           }
 
-          if (hasUpdates || foundEvents.length === requestedEvents.length) {
+          if (hasUpdates) {
             updated = true;
             break;
+          }
+          else {
+            logger.info(`❌ No updates found for requested events. Retrying (${count + 1}/3) after ${count + 1} seconds...`);
           }
 
           if (foundEvents.length === 0 || count >= 2) {

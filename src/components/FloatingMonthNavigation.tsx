@@ -104,7 +104,7 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
               px: 2,
               py: 1,
               borderRadius: '16px',
-              minWidth: '120px',
+              minWidth: '100px',
               textAlign: 'center',
               transition: 'all 0.2s ease',
               position: 'relative',

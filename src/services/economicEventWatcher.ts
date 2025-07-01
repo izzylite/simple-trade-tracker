@@ -204,7 +204,7 @@ class EconomicEventWatcher {
 
       const todaysEvents = await economicCalendarService.fetchEventsPaginated(
         dateRange,
-        { pageSize: 100 }, // Might not actually be 100. Depending on the events for the day
+        { pageSize: 50 }, // Might not actually be 50. Depending on the events for the day
         { currencies, impacts, onlyUpcoming: true },
       );
 
@@ -493,8 +493,8 @@ class EconomicEventWatcher {
         return;
       }
 
-      // Move to the next event in the queue
-      queue.currentIndex++;
+      // Note: Don't increment currentIndex here - getNextEventGroup already advanced it
+      // to skip all events in the processed group
 
       // Check if we have more events in the queue
       if (queue.currentIndex < queue.events.length) {

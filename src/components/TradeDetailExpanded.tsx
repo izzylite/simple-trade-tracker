@@ -298,7 +298,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   return (
     <AnimatedDropdown>
       <Box sx={{
-        p: 2,
+        p: { xs: 1.5, sm: 2 }, // Reduced padding on mobile
         borderBottomLeftRadius: 8,
         borderBottomRightRadius: 8,
         borderTopRightRadius: 0,
@@ -312,20 +312,37 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
         mb: 1,
         width: '100%'
       }}>
-        <Stack spacing={3}>
+        <Stack spacing={{ xs: 2, sm: 3 }}> {/* Reduced spacing on mobile */}
           {/* Header Section */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+          <Box sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' }, // Stack vertically on mobile
+            justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', sm: 'flex-start' },
+            width: '100%',
+            gap: { xs: 1, sm: 0 } // Add gap on mobile
+          }}>
             {/* Trade Name */}
-            <Box sx={{ flex: 1 }}>
+            <Box sx={{ flex: 1, width: { xs: '100%', sm: 'auto' } }}>
               {trade.name && (
-                <Typography variant="h6" color="text.primary" sx={{ display: 'block', fontWeight: 700 }}>
+                <Typography variant="h6" color="text.primary" sx={{
+                  display: 'block',
+                  fontWeight: 700,
+                  fontSize: { xs: '1.1rem', sm: '1.25rem' } // Smaller on mobile
+                }}>
                   📈 {trade.name}
                 </Typography>
               )}
             </Box>
 
             {/* Action Buttons */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              width: { xs: '100%', sm: 'auto' },
+              justifyContent: { xs: 'flex-end', sm: 'flex-start' }
+            }}>
               {/* Pin Button */}
               {onUpdateTradeProperty && (
                 <IconButton
@@ -374,18 +391,18 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               </Typography>
             </Box>
 
-            <Stack spacing={2} sx={{ width: '100%' }}>
+            <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ width: '100%' }}>
               {/* Key Properties Grid */}
               <Box sx={{
                 display: 'grid',
                 gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-                gap: 2,
+                gap: { xs: 1.5, sm: 2 }, // Reduced gap on mobile
                 width: '100%'
               }}>
                 {/* Entry/Exit Prices */}
                 {(trade.entry || trade.exit) && (
                   <Paper elevation={0} sx={{
-                    p: 1.5,
+                    p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
                     borderRadius: 2,
                     backgroundColor: alpha(theme.palette.info.main, 0.05),
                     border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
@@ -426,7 +443,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 )}
                 {/* PnL */}
                 <Paper elevation={0} sx={{
-                  p: 1.5,
+                  p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
                   borderRadius: 2,
                   backgroundColor: alpha(
                     trade.amount > 0 ? theme.palette.success.main :
@@ -477,7 +494,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
                 {/* Date */}
                 <Paper elevation={0} sx={{
-                  p: 1.5,
+                  p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
                   borderRadius: 2,
                   backgroundColor: alpha(theme.palette.primary.main, 0.05),
                   border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
@@ -491,7 +508,10 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       Date
                     </Typography>
                   </Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+                  <Typography variant="h6" sx={{
+                    fontWeight: 700,
+                    fontSize: { xs: '1rem', sm: '1.1rem' } // Smaller on mobile
+                  }}>
                     {format(trade.date, 'MMMM d, yyyy')}
                   </Typography>
                 </Paper>
@@ -499,7 +519,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 {/* Risk to Reward */}
                 {trade.riskToReward && (
                   <Paper elevation={0} sx={{
-                    p: 1.5,
+                    p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
                     borderRadius: 2,
                     backgroundColor: alpha(theme.palette.warning.main, 0.05),
                     border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`,
@@ -536,7 +556,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 {/* Session */}
                 {trade.session && (
                   <Paper elevation={0} sx={{
-                    p: 1.5,
+                    p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
                     borderRadius: 2,
                     backgroundColor: alpha(theme.palette.info.main, 0.05),
                     border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
@@ -805,11 +825,21 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               )}
 
               {/* Tags Section */}
-              <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Box sx={{ mb: { xs: 1.5, sm: 2 } }}>
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  mb: 1,
+                  flexWrap: { xs: 'wrap', sm: 'nowrap' }, // Allow wrapping on mobile
+                  gap: { xs: 1, sm: 0 }
+                }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <CategoryIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                    <Typography variant="subtitle2" color="text.primary" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                    <Typography variant="subtitle2" color="text.primary" sx={{
+                      fontWeight: 600,
+                      fontSize: { xs: '0.85rem', sm: '0.9rem' } // Smaller on mobile
+                    }}>
                       Tags
                     </Typography>
                   </Box>
@@ -830,7 +860,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   </Tooltip>
                 </Box>
 
-                <Box sx={{ pl: 1 }}>
+                <Box sx={{ pl: { xs: 0, sm: 1 } }}> {/* Remove left padding on mobile */}
                   <TagsDisplay
                     tags={trade.tags || []}
                     showGroups={showTagGroups}
@@ -840,11 +870,24 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               </Box>
 
               {/* Economic Events Section */}
-              <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ mb: { xs: 1.5, sm: 2 } }}>
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  mb: 1,
+                  flexWrap: { xs: 'wrap', sm: 'nowrap' }, // Allow wrapping on mobile
+                  gap: { xs: 1, sm: 0 }
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
                     <EconomicIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                    <Typography variant="subtitle2" color="text.primary" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                    <Typography variant="subtitle2" color="text.primary" sx={{
+                      fontWeight: 600,
+                      fontSize: { xs: '0.8rem', sm: '0.9rem' }, // Smaller on mobile
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: { xs: 'nowrap', sm: 'normal' } // Prevent wrapping on mobile
+                    }}>
                       Economic Events ({format(trade.date, 'MMM d, yyyy')})
                     </Typography>
                   </Box>
@@ -854,6 +897,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       onClick={handleToggleEconomicEvents}
                       sx={{
                         color: 'text.secondary',
+                        flexShrink: 0, // Prevent button from shrinking
                         '&:hover': {
                           backgroundColor: alpha(theme.palette.primary.main, 0.1),
                           color: 'primary.main'
@@ -902,17 +946,16 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                         {/* Impact filter UI above the search bar */}
                         {allEconomicEvents.length > 0 && (
                           <Box sx={{
-                            p: { xs: 1.5, sm: 2.5 },
+                            p: { xs: 1, sm: 2.5 }, // Reduced padding on mobile
                             borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                             backgroundColor: alpha(theme.palette.background.default, 0.3)
                           }}>
                             <Box
                               sx={{
                                 display: 'flex',
-                                flexDirection: { xs: 'column', sm: 'row' },
-                                alignItems: { xs: 'stretch', sm: 'center' },
-                                gap: { xs: 1, sm: 2 },
-                                mb: 1.5
+                                flexDirection: 'column', // Always stack vertically for better mobile experience
+                                gap: { xs: 1, sm: 1.5 },
+                                mb: { xs: 1, sm: 1.5 }
                               }}
                             >
                               {/* Event Name Search Bar */}
@@ -924,17 +967,34 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                 value={eventNameSearch || ''}
                                 onChange={e => setEventNameSearch(e.target.value)}
                                 sx={{
-                                  width: { xs: '100%', sm: 320 },
-                                  maxWidth: 400,
-                                  flexShrink: 0
+                                  width: '100%', // Full width on all screen sizes
+                                  '& .MuiInputBase-input': {
+                                    fontSize: { xs: '0.875rem', sm: '1rem' } // Smaller text on mobile
+                                  }
                                 }}
                               />
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: { xs: 'wrap', sm: 'nowrap' }, mt: { xs: 1, sm: 0 } }}>
-                                <FilterIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.8rem', minWidth: 80 }}>
-                                  Filter by Impact:
-                                </Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 0.5, md: 0.75, sm: 0.75 } }}>
+
+                              {/* Impact Filter Section */}
+                              <Box sx={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 1
+                              }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <FilterIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                  <Typography variant="caption" color="text.secondary" sx={{
+                                    fontWeight: 600,
+                                    fontSize: { xs: '0.75rem', sm: '0.8rem' }
+                                  }}>
+                                    Filter by Impact:
+                                  </Typography>
+                                </Box>
+                                <Box sx={{
+                                  display: 'flex',
+                                  flexWrap: 'wrap',
+                                  gap: { xs: 0.5, sm: 0.75 },
+                                  justifyContent: { xs: 'flex-start', sm: 'flex-start' }
+                                }}>
                                   {((calendar?.economicCalendarFilters?.impacts as ImpactLevel[]) || (['High', 'Medium', 'Low'] as ImpactLevel[])).map((impact: ImpactLevel) => (
                                     <Chip
                                       key={impact}
@@ -948,12 +1008,12 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                         setSelectedImpacts(newImpacts);
                                       }}
                                       sx={{
-                                        fontSize: { xs: '0.7rem',md: '0.75rem', sm: '0.75rem' },
-                                        height: { xs: 24, md: 28, sm: 28 },
+                                        fontSize: { xs: '0.65rem', sm: '0.75rem' }, // Smaller on mobile
+                                        height: { xs: 22, sm: 28 }, // Smaller height on mobile
                                         fontWeight: 600,
                                         borderRadius: 1.5,
-                                        backgroundColor: selectedImpacts.includes(impact) 
-                                          ? getImpactColor(impact, theme) 
+                                        backgroundColor: selectedImpacts.includes(impact)
+                                          ? getImpactColor(impact, theme)
                                           : 'transparent',
                                         color: selectedImpacts.includes(impact) ? 'white' : getImpactColor(impact, theme),
                                         borderColor: getImpactColor(impact, theme),
@@ -966,7 +1026,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                           transition: 'all 0.2s ease-in-out'
                                         },
                                         '& .MuiChip-label': {
-                                          px: 1.2,
+                                          px: { xs: 0.8, sm: 1.2 }, // Reduced padding on mobile
                                           py: 0.4
                                         }
                                       }}
@@ -975,7 +1035,11 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                 </Box>
                               </Box>
                             </Box>
-                            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', fontSize: '0.75rem' }}>
+                            <Typography variant="caption" color="text.secondary" sx={{
+                              mt: 1,
+                              display: 'block',
+                              fontSize: { xs: '0.7rem', sm: '0.75rem' } // Smaller on mobile
+                            }}>
                               Showing {economicEvents.length} of {allEconomicEvents.length} events
                             </Typography>
                           </Box>
@@ -1009,8 +1073,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                             {economicEvents.map((event, index) => (
                               <React.Fragment key={`${event.id}-${event.timeUtc}-${index}`}>
                                 <Box sx={{
-                                  px: 2.5,
-                                  py: 1.5,
+                                  px: { xs: 1.5, sm: 2.5 }, // Reduced padding on mobile
+                                  py: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
                                   '&:hover': {
                                     backgroundColor: alpha(theme.palette.action.hover, 0.04)
                                   },
@@ -1020,7 +1084,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                 </Box>
                                 {index < economicEvents.length - 1 && (
                                   <Divider sx={{
-                                    mx: 2.5,
+                                    mx: { xs: 1.5, sm: 2.5 }, // Reduced margin on mobile
                                     borderColor: alpha(theme.palette.divider, 0.1)
                                   }} />
                                 )}

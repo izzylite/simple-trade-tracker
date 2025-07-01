@@ -15,8 +15,7 @@ import {
   Tooltip,
   Button,
   FormControlLabel,
-  Switch,
-  Drawer
+  Switch
 } from '@mui/material';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import {
@@ -24,9 +23,9 @@ import {
   Search as SearchIcon,
   FilterList as FilterListIcon,
   Info as InfoIcon,
-  Close as CloseIcon,
   Tag as TagIcon,
 } from '@mui/icons-material';
+import UnifiedDrawer from './common/UnifiedDrawer';
 import TagEditDialog from './TagEditDialog';
 import {
   getTagChipStyles,
@@ -161,49 +160,18 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
   };
 
   return (
-    <Drawer
-      anchor="right"
+    <UnifiedDrawer
       open={open}
       onClose={onClose}
-      sx={{
-        zIndex: 1300, // Higher than AppBar (1100) and other components
-        '& .MuiDrawer-paper': {
-          width: { xs: '100%', sm: 500 },
-          maxWidth: '100vw',
-          zIndex: 1300 // Ensure the paper also has high z-index
-        }
-      }}
+      title="Tag Management"
+      icon={<TagIcon />}
+      width={{ xs: '100%', sm: 500 }}
+      headerVariant="enhanced"
+      contentSx={{ p: 2, ...scrollbarStyles(theme) }}
     >
-      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <Box sx={{
-          p: 2,
-          borderBottom: `1px solid ${theme.palette.divider}`,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2
-        }}>
-          <Box sx={{
-            p: 1,
-            borderRadius: 1,
-            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <TagIcon sx={{ color: 'primary.main', fontSize: 20 }} />
-          </Box>
-          <Typography variant="h6" sx={{ flex: 1, fontWeight: 600 }}>
-            Tag Management
-          </Typography>
-          <IconButton onClick={onClose} size="small">
-            <CloseIcon />
-          </IconButton>
-        </Box>
-
-        {/* Content */}
-        <Box sx={{ flex: 1, p: 2, overflow: 'auto',...scrollbarStyles(theme) }}>
-          <Box sx={{ mb: 3 }}>
+      {/* Content */}
+      <Box>
+        <Box sx={{ mb: 3 }}>
             <Typography variant="body1" gutterBottom>
               Manage your tags and set required tag groups for new trades.
             </Typography>
@@ -379,7 +347,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
             </Box>
           </Box>
         </Box>
-      </Box>
+      
 
       {tagToEdit && (
         <TagEditDialog
@@ -390,7 +358,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
           onSuccess={handleTagEditSuccess}
         />
       )}
-    </Drawer>
+    </UnifiedDrawer>
   );
 };
 

@@ -270,7 +270,7 @@ class EconomicCalendarServiceImpl {
     console.log('� Setting up real-time subscription for economic events');
 
     // Build Firestore query
-    const eventsQuery = query(this.buildBaseQuery(dateRange, filters), limit(50));
+    const eventsQuery = query(this.buildBaseQuery(dateRange, filters), limit(10));
 
     // Set up real-time listener
     const unsubscribe = onSnapshot(eventsQuery, (querySnapshot) => {

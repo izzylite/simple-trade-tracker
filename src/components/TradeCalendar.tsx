@@ -1301,16 +1301,17 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                               <Box
                                 sx={{
                                   position: 'absolute',
-                                  top: 8,
-                                  right: 8,
-                                  width: 5,
-                                  height: 5,
+                                  top: 4,
+                                  right: 4,
+                                  width: 8,
+                                  height: 8,
                                   borderRadius: '50%',
-                                  backgroundColor: 'error.main',
-                                  zIndex: 1,
-                                  boxShadow: '0 0 4px rgba(244, 67, 54, 0.5)'
+                                  bgcolor: 'error.main',
+                                  border: `2px solid ${alpha(theme.palette.background.paper, 0.3)}`,
+                                  boxShadow: `0 0 0 1px ${alpha(theme.palette.error.main, 0.3)}`
                                 }}
                               />
+
                             )}
 
                             {dayTrades.length > 0 && (
@@ -1621,7 +1622,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         {/* Economic Calendar FAB */}
         <Tooltip title="Economic Calendar" placement="left">
           <Fab
-            color="primary"
+            color="secondary"
             aria-label="open economic calendar"
             onClick={handleToggleEconomicCalendar}
             sx={{
@@ -1732,7 +1733,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             key={event.id}
             event={event}
             onClose={() => handleCloseNotification(event.id)}
-            autoHideDuration={6000}
+            autoHideDuration={30000}
             isRemoving={removingNotifications.has(event.id)}
           />
         ))}
