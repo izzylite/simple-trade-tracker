@@ -172,14 +172,6 @@ const UnifiedDrawer: React.FC<UnifiedDrawerProps> = ({
           <IconButton
             onClick={onClose}
             size="small"
-            sx={headerVariant === 'enhanced' ? {
-              bgcolor: alpha(theme.palette.action.hover, 0.5),
-              '&:hover': {
-                bgcolor: alpha(theme.palette.action.hover, 0.8),
-                transform: 'scale(1.05)'
-              },
-              transition: 'all 0.2s ease-in-out'
-            } : {}}
           >
             <CloseIcon />
           </IconButton>
