@@ -228,11 +228,15 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
       setLoadingEconomicEvents(true);
       setEconomicEventsError(null);
 
+
+      const sessionRange = getSessionTimeRange(trade.session, trade.date);
+      const startDateStr = sessionRange.start.toISOString().split('T')[0];
+      const endDateStr = sessionRange.end.toISOString().split('T')[0];
       // Format the trade date to YYYY-MM-DD
-      const tradeDate = format(trade.date, 'yyyy-MM-dd');
+
       const filterSetting = calendar?.economicCalendarFilters || DEFAULT_FILTER_SETTINGS
       const events = await economicCalendarService.fetchEvents(
-        { start: tradeDate, end: tradeDate },
+        { start: startDateStr, end: endDateStr },
         {
           currencies: (filterSetting?.currencies as Currency[]),
           impacts: (filterSetting?.impacts as ImpactLevel[])
@@ -1111,3 +1115,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 };
 
 export default TradeDetailExpanded;
+function getSessionTimeRange(session: string | undefined, date: Date) {
+  throw new Error('Function not implemented.');
+}
+

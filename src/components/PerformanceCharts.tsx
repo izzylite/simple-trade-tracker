@@ -22,10 +22,7 @@ import {
 } from './charts';
 import {
   calculateChartData,
-  calculateSessionStats,
-  calculateTargetValue,
-  calculateDrawdownViolationValue,
-  getFilteredTrades as utilGetFilteredTrades
+  getFilteredTrades
 } from '../utils/chartDataUtils';
 
 interface PerformanceChartsProps {
@@ -189,7 +186,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   ];
  
    const filteredTrades = useMemo(() => { 
-    return utilGetFilteredTrades(trades, selectedDate, timePeriod);
+    return getFilteredTrades(trades, selectedDate, timePeriod);
   }, [trades, selectedDate, timePeriod]);
 
   // Calculate Risk to Reward statistics
