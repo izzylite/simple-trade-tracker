@@ -147,17 +147,24 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
       if (!open) return;
 
       if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        e.stopPropagation();
         navigatePrevious();
       } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        e.stopPropagation();
         navigateNext();
       } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
         onClose();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    // Use capture phase to handle events before they reach other components
+    window.addEventListener('keydown', handleKeyDown, true);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [open, imageData, imageArray.length, navigatePrevious, navigateNext, onClose]);
 

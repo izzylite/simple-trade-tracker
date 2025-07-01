@@ -1305,9 +1305,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                                   right: 4,
                                   width: 8,
                                   height: 8,
+                                  m:1,
                                   borderRadius: '50%',
                                   bgcolor: 'error.main',
-                                  border: `2px solid ${alpha(theme.palette.background.paper, 0.3)}`,
+                                  border: `2px solid ${alpha(theme.palette.background.paper, 0.8)}`,
                                   boxShadow: `0 0 0 1px ${alpha(theme.palette.error.main, 0.3)}`
                                 }}
                               />

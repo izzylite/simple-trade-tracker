@@ -103,8 +103,7 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
               cursor: 'pointer',
               px: 2,
               py: 1,
-              borderRadius: '16px',
-              minWidth: '100px',
+              borderRadius: '16px', 
               textAlign: 'center',
               transition: 'all 0.2s ease',
               position: 'relative',
@@ -125,6 +124,8 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
               }}
             >
               {format(currentDate, 'MMM')}
+
+           
             </Typography>
             <Typography
               variant="caption"
@@ -139,22 +140,7 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
               {format(currentDate, 'yyyy')}
             </Typography>
 
-            {/* Current month indicator */}
-            {isCurrentMonth && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 4,
-                  right: 4,
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  bgcolor: 'success.main',
-                  border: `2px solid ${theme.palette.background.paper}`,
-                  boxShadow: `0 0 0 1px ${alpha(theme.palette.success.main, 0.3)}`
-                }}
-              />
-            )}
+            
           </Box>
 
           {/* Next Month Button */}
