@@ -1,4 +1,5 @@
 import { Calendar } from '../../types/calendar';
+import { logger } from '../../utils/logger';
 
 /**
  * Updates the hero image URL for a calendar
@@ -16,7 +17,7 @@ export const updateCalendarHeroImage = async (
       };
     });
   } catch (error) {
-    console.error('Error updating calendar hero image:', error);
+    logger.error('Error updating calendar hero image:', error);
     throw error;
   }
 };

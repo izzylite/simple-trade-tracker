@@ -2,6 +2,8 @@
  * Safe localStorage operations with error handling
  */
 
+import { warn } from '../../../../utils/logger';
+
 export interface ColorItem {
   label: string;
   color: string;
@@ -20,8 +22,8 @@ export function safeGetLocalStorage<T>(key: string, defaultValue: T): T {
       return defaultValue;
     }
     return JSON.parse(item);
-  } catch (error) {
-    console.warn(`Failed to get localStorage item "${key}":`, error);
+  } catch (err) {
+    warn(`Failed to get localStorage item "${key}":`, err);
     return defaultValue;
   }
 }
@@ -37,7 +39,7 @@ export function safeSetLocalStorage<T>(key: string, value: T): boolean {
     localStorage.setItem(key, JSON.stringify(value));
     return true;
   } catch (error) {
-    console.warn(`Failed to set localStorage item "${key}":`, error);
+    warn(`Failed to set localStorage item "${key}":`, error);
     return false;
   }
 }

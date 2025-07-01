@@ -13,6 +13,7 @@ import {
 import { db } from '../firebase/config';
 import { Calendar } from '../types/calendar';
 import { convertFirestoreDataToCalendar } from './calendarService';
+import { log, error, logger } from '../utils/logger';
 
 const CALENDARS_COLLECTION = 'calendars';
 const TRASH_RETENTION_DAYS = 30;
@@ -41,9 +42,9 @@ export const moveCalendarToTrash = async (calendarId: string, userId: string): P
       lastModified: Timestamp.fromDate(now)
     });
 
-    console.log(`Calendar ${calendarId} moved to trash`);
+    logger.log(`Calendar ${calendarId} moved to trash`);
   } catch (error) {
-    console.error('Error moving calendar to trash:', error);
+    logger.error('Error moving calendar to trash:', error);
     throw error;
   }
 };
@@ -78,9 +79,9 @@ export const restoreCalendarFromTrash = async (calendarId: string): Promise<void
       });
     });
 
-    console.log(`Calendar ${calendarId} restored from trash`);
+    logger.log(`Calendar ${calendarId} restored from trash`);
   } catch (error) {
-    console.error('Error restoring calendar from trash:', error);
+    logger.error('Error restoring calendar from trash:', error);
     throw error;
   }
 };
@@ -109,9 +110,9 @@ export const permanentlyDeleteCalendar = async (calendarId: string): Promise<voi
       transaction.delete(calendarRef);
     });
 
-    console.log(`Calendar ${calendarId} permanently deleted`);
+    logger.log(`Calendar ${calendarId} permanently deleted`);
   } catch (error) {
-    console.error('Error permanently deleting calendar:', error);
+    logger.error('Error permanently deleting calendar:', error);
     throw error;
   }
 };
@@ -141,7 +142,7 @@ export const getTrashCalendars = async (userId: string): Promise<TrashCalendar[]
       } as TrashCalendar;
     });
   } catch (error) {
-    console.error('Error getting trash calendars:', error);
+    logger.error('Error getting trash calendars:', error);
     throw error;
   }
 };
@@ -173,7 +174,7 @@ export const getCalendarsReadyForDeletion = async (): Promise<TrashCalendar[]> =
       } as TrashCalendar;
     });
   } catch (error) {
-    console.error('Error getting calendars ready for deletion:', error);
+    logger.error('Error getting calendars ready for deletion:', error);
     throw error;
   }
 };
@@ -191,17 +192,17 @@ export const cleanupExpiredCalendars = async (): Promise<number> => {
       try {
         await permanentlyDeleteCalendar(calendar.id);
         deletedCount++;
-        console.log(`Auto-deleted expired calendar: ${calendar.id} (${calendar.name})`);
-      } catch (error) {
-        console.error(`Failed to auto-delete calendar ${calendar.id}:`, error);
+        log(`Auto-deleted expired calendar: ${calendar.id} (${calendar.name})`);
+      } catch (err) {
+        error(`Failed to auto-delete calendar ${calendar.id}:`, err);
       }
     }
 
-    console.log(`Cleanup completed: ${deletedCount} calendars permanently deleted`);
+    log(`Cleanup completed: ${deletedCount} calendars permanently deleted`);
     return deletedCount;
-  } catch (error) {
-    console.error('Error during cleanup:', error);
-    throw error;
+  } catch (err) {
+    error('Error during cleanup:', err);
+    throw err;
   }
 };
 
@@ -230,7 +231,7 @@ export const isCalendarInTrash = async (calendarId: string): Promise<boolean> =>
     const data = calendarDoc.data();
     return data.isDeleted === true;
   } catch (error) {
-    console.error('Error checking if calendar is in trash:', error);
+    logger.error('Error checking if calendar is in trash:', error);
     return false;
   }
 };

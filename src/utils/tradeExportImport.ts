@@ -1,6 +1,7 @@
 import { Trade } from '../types/trade';
 import { format, parse } from 'date-fns';
 import * as XLSX from 'xlsx';
+import { error, warn } from './logger';
 
 // Helper function to prepare trade data for export
 const prepareTradeDataForExport = (trades: Trade[], initialBalance: number = 0) => {
@@ -159,7 +160,7 @@ const importFromExcel = async (data: ArrayBuffer): Promise<Trade[]> => {
     try {
       return parseTradeData(jsonData);
     } catch (parseError) {
-      console.error('Trade data parsing error:', parseError);
+      error('Trade data parsing error:', parseError);
       // Provide more specific error messages for common issues
       if (parseError instanceof Error) {
         if (parseError.message.includes('Invalid time value')) {
@@ -169,9 +170,9 @@ const importFromExcel = async (data: ArrayBuffer): Promise<Trade[]> => {
       }
       throw new Error('Failed to parse trade data from Excel file.');
     }
-  } catch (error) {
-    console.error('Excel parsing error:', error);
-    throw error; // Re-throw to be handled by the caller
+  } catch (err) {
+    error('Excel parsing error:', err);
+    throw err; // Re-throw to be handled by the caller
   }
 };
 
@@ -237,8 +238,8 @@ const importFromCsv = async (data: string): Promise<Trade[]> => {
         if (obj.Date) {
           jsonData.push(obj);
         }
-      } catch (error) {
-        console.warn(`Skipping row ${i} due to parsing error:`, error);
+      } catch (err) {
+        warn(`Skipping row ${i} due to parsing error:`, err);
         // Continue with the next row
       }
     }
@@ -250,7 +251,7 @@ const importFromCsv = async (data: string): Promise<Trade[]> => {
     try {
       return parseTradeData(jsonData);
     } catch (parseError) {
-      console.error('Trade data parsing error:', parseError);
+      error('Trade data parsing error:', parseError);
       // Provide more specific error messages for common issues
       if (parseError instanceof Error) {
         if (parseError.message.includes('Invalid time value')) {
@@ -260,9 +261,9 @@ const importFromCsv = async (data: string): Promise<Trade[]> => {
       }
       throw new Error('Failed to parse trade data from CSV file.');
     }
-  } catch (error) {
-    console.error('CSV parsing error:', error);
-    throw error; // Re-throw to be handled by the caller
+  } catch (err) {
+    error('CSV parsing error:', err);
+    throw err; // Re-throw to be handled by the caller
   }
 };
 
@@ -334,7 +335,7 @@ const parseDate = (dateStr: string): Date => {
   }
 
   // If all attempts fail, use the current date and log a warning
-  console.warn(`Could not parse date: ${normalizedDateStr}. Using current date instead.`);
+  warn(`Could not parse date: ${normalizedDateStr}. Using current date instead.`);
   return new Date();
 };
 
@@ -350,8 +351,8 @@ const parseTradeData = (jsonData: any[]): Trade[] => {
       amount = row.Amount !== undefined ?
         (typeof row.Amount === 'string' ? parseFloat(row.Amount) : row.Amount) :
         parseFloat(row['P&L'] || '0');
-    } catch (error) {
-      console.warn(`Could not parse amount: ${row.Amount || row['P&L']}. Using 0 instead.`);
+    } catch (err) {
+      warn(`Could not parse amount: ${row.Amount || row['P&L']}. Using 0 instead.`);
     }
 
     // Parse tags from the Tags column
@@ -431,17 +432,17 @@ export const importTrades = async (file: File): Promise<Trade[]> => {
         }
 
         resolve(trades);
-      } catch (error) {
-        console.error('Import error:', error);
+      } catch (err) {
+        error('Import error:', err);
         let errorMessage = 'Failed to parse import file. ';
 
-        if (error instanceof Error) {
-          if (error.message.includes('Invalid time value')) {
+        if (err instanceof Error) {
+          if (err.message.includes('Invalid time value')) {
             errorMessage += 'There was an issue with a date format in your file. Please ensure all dates are in a standard format like MM/DD/YYYY.';
-          } else if (error.message.includes('is not a function')) {
+          } else if (err.message.includes('is not a function')) {
             errorMessage += 'There was an issue with the file structure. Please ensure the file has proper headers and data.';
           } else {
-            errorMessage += error.message;
+            errorMessage += err.message;
           }
         } else {
           errorMessage += 'Please ensure the file format is correct.';

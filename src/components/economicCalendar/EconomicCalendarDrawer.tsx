@@ -60,6 +60,7 @@ import { QueryDocumentSnapshot } from 'firebase/firestore';
 import EconomicEventListItem from './EconomicEventListItem';
 import EconomicCalendarFilters from './EconomicCalendarFilters';
 import Shimmer from '../Shimmer';
+import { log,error, logger, warn } from '../../utils/logger';
 // View types for pagination
 type ViewType = 'day' | 'week' | 'month';
 
@@ -206,7 +207,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   // Handle real-time event updates
   useEffect(() => {
     if (payload) {
-      console.log(`📊 Updating event in Economic Calendar: ${payload.updatedEvents.join(', ')}`);
+      log(`📊 Updating event in Economic Calendar: ${payload.updatedEvents.join(', ')}`);
       const events : EconomicEvent[] = payload.allEvents || []
        
       // Find and update the specific event in the current events list
@@ -269,7 +270,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   // Function to save filter settings to calendar
   const saveFilterSettings = useCallback(async (currencies: Currency[], impacts: ImpactLevel[], viewTypeToSave: ViewType, notificationsEnabledToSave: boolean, onlyUpcomingToSave: boolean) => {
     if (!calendar?.id || !onUpdateCalendarProperty) {
-      console.warn('⚠️ Cannot save economic calendar filter settings: missing calendar or update function');
+      warn('⚠️ Cannot save economic calendar filter settings: missing calendar or update function');
       return;
     }
 
@@ -286,9 +287,9 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         ...cal,
         economicCalendarFilters: settings
       }));
-      console.log('📱 Economic calendar filter settings saved to calendar:', settings);
+      log('📱 Economic calendar filter settings saved to calendar:', settings);
     } catch (error) {
-      console.error('⚠️ Failed to save economic calendar filter settings:', error);
+      logger.error('⚠️ Failed to save economic calendar filter settings:', error);
     }
   }, [calendar, onUpdateCalendarProperty]);
 
@@ -313,7 +314,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const dateRange = useMemo(() => {
     // If custom date range is explicitly set, use it
     if (startDate && endDate && startDate !== endDate) {
-      console.log('📅 Using custom date range:', { start: startDate, end: endDate });
+      log('📅 Using custom date range:', { start: startDate, end: endDate });
       return {
         start: startDate,
         end: endDate
@@ -330,7 +331,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           start: format(dayStart, 'yyyy-MM-dd'),
           end: format(dayEnd, 'yyyy-MM-dd')
         };
-        console.log('📅 Day view date range:', dayResult);
+        log('📅 Day view date range:', dayResult);
         return dayResult;
 
       case 'week':
@@ -340,7 +341,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           start: format(weekStart, 'yyyy-MM-dd'),
           end: format(weekEnd, 'yyyy-MM-dd')
         };
-        console.log('📅 Week view date range:', weekResult);
+        log('📅 Week view date range:', weekResult);
         return weekResult;
 
       case 'month':
@@ -350,7 +351,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           start: format(monthStart, 'yyyy-MM-dd'),
           end: format(monthEnd, 'yyyy-MM-dd')
         };
-        console.log('📅 Month view date range:', monthResult);
+        log('📅 Month view date range:', monthResult);
         return monthResult;
 
       default:
@@ -358,7 +359,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           start: format(date, 'yyyy-MM-dd'),
           end: format(date, 'yyyy-MM-dd')
         };
-        console.log('📅 Default date range:', defaultResult);
+        log('📅 Default date range:', defaultResult);
         return defaultResult;
     }
   }, [viewType, currentDate, startDate, endDate]);
@@ -372,7 +373,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       setLastDoc(undefined); // Reset pagination
 
       try {
-        console.log(`🔄 Fetching ${viewType} events for ${dateRange.start} to ${dateRange.end}`);
+        log(`🔄 Fetching ${viewType} events for ${dateRange.start} to ${dateRange.end}`);
 
         const result = await economicCalendarService.fetchEventsPaginated(
           dateRange,
@@ -387,10 +388,10 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         setEvents(result.events);
         setHasMore(result.hasMore);
         setLastDoc(result.lastDoc);
-        console.log(`✅ Fetched ${result.events.length} events (hasMore: ${result.hasMore})`);
+        log(`✅ Fetched ${result.events.length} events (hasMore: ${result.hasMore})`);
 
       } catch (err) {
-        console.error('❌ Error fetching events:', err);
+        logger.error('❌ Error fetching events:', err);
         setError('Failed to load economic events');
         setEvents([]);
         setHasMore(false);
@@ -420,7 +421,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     const unsubscribe = economicCalendarService.subscribeToEvents(
       dateRange,
       (fetchedEvents) => {
-        console.log(`📊 Received ${fetchedEvents.length} events from real-time subscription`);
+        log(`📊 Received ${fetchedEvents.length} events from real-time subscription`);
 
         // Validate the fetched events
         if (Array.isArray(fetchedEvents)) {
@@ -440,7 +441,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
             return changed ? newEvents : prevEvents;
           });
         } else {
-          console.warn('Invalid events data received:', fetchedEvents);
+          warn('Invalid events data received:', fetchedEvents);
           setEvents([]);
           setError('Invalid data format received from database.');
         }
@@ -465,7 +466,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     setLoadingMore(true);
 
     try {
-      console.log('🔄 Loading more events...');
+      log('🔄 Loading more events...');
 
       const result = await economicCalendarService.fetchEventsPaginated(
         dateRange,
@@ -480,10 +481,10 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       setEvents(prev => [...prev, ...result.events]);
       setHasMore(result.hasMore);
       setLastDoc(result.lastDoc);
-      console.log(`✅ Loaded ${result.events.length} more events (hasMore: ${result.hasMore})`);
+      log(`✅ Loaded ${result.events.length} more events (hasMore: ${result.hasMore})`);
 
     } catch (err) {
-      console.error('❌ Error loading more events:', err);
+      logger.error('❌ Error loading more events:', err);
     } finally {
       setLoadingMore(false);
     }
@@ -671,14 +672,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           <IconButton
             onClick={onClose}
             size="small"
-            sx={{
-              bgcolor: alpha(theme.palette.action.hover, 0.5),
-              '&:hover': {
-                bgcolor: alpha(theme.palette.action.hover, 0.8),
-                transform: 'scale(1.05)'
-              },
-              transition: 'all 0.2s ease-in-out'
-            }}
           >
             <CloseIcon />
           </IconButton>

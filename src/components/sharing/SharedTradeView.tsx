@@ -16,6 +16,7 @@ import { Trade } from '../../types/trade';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import TradeDetailExpanded from '../TradeDetailExpanded';
 import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
+import { logger } from '../../utils/logger';
 
 interface SharedTradeViewProps {
   shareId: string;
@@ -50,9 +51,9 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
         }
 
         // Debug: Log the raw data to understand the format
-        console.log('Raw shared trade data:', data);
-        console.log('Trade date:', data.trade.date);
-        console.log('Shared at:', data.sharedAt);
+        logger.log('Raw shared trade data:', data);
+        logger.log('Trade date:', data.trade.date);
+        logger.log('Shared at:', data.sharedAt);
 
         // Helper function to convert various timestamp formats to Date
         const convertToDate = (timestamp: any): Date => {
@@ -83,7 +84,7 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
           }
 
           // Fallback to current date
-          console.warn('Unknown timestamp format:', timestamp);
+          logger.warn('Unknown timestamp format:', timestamp);
           return new Date();
         };
 
@@ -96,7 +97,7 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
           sharedAt: convertToDate(data.sharedAt)
         });
       } catch (err) {
-        console.error('Error loading shared trade:', err);
+        logger.error('Error loading shared trade:', err);
         setError('Failed to load shared trade');
       } finally {
         setLoading(false);

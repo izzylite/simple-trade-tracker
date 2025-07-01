@@ -32,6 +32,7 @@ import { exportTrades, importTrades } from '../utils/tradeExportImport';
 import { formatCurrency } from '../utils/formatters';
 import { calculatePercentageOfValueAtDate } from '../utils/dynamicRiskUtils';
 import { calculateTargetProgress } from '../utils/statsUtils';
+import { error } from '../utils/logger';
 
 
 
@@ -148,11 +149,11 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
       setSnackbarMessage(`Successfully imported ${importedTrades.length} trades`);
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
-    } catch (error) {
-      console.error('Import failed:', error);
+    } catch (err) {
+      error('Import failed:', err);
 
       // Show error message
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error during import';
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error during import';
       setSnackbarMessage(`Error importing trades: ${errorMessage}`);
       setSnackbarSeverity('error');
       setSnackbarOpen(true);

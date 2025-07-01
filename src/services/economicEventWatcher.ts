@@ -8,6 +8,7 @@ import { economicCalendarService } from './economicCalendarService';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../config/firebase';
 import { endOfDay, format, startOfDay } from 'date-fns';
+import { error, log, logger } from '../utils/logger';
 
 // Default filter settings to use when no calendar filters are available
 const DEFAULT_FILTER_SETTINGS = {
@@ -78,11 +79,11 @@ class EconomicEventWatcher {
       const timeSinceRefresh = now - lastRefresh;
 
       const shouldRefresh = timeSinceRefresh > WATCHER_CONFIG.maxRefreshAge;
-      console.log(`📊 Last refresh for calendar ${calendarId}: ${Math.round(timeSinceRefresh / 1000 / 60)} minutes ago. Should refresh: ${shouldRefresh}`);
+      logger.log(`📊 Last refresh for calendar ${calendarId}: ${Math.round(timeSinceRefresh / 1000 / 60)} minutes ago. Should refresh: ${shouldRefresh}`);
 
       return shouldRefresh;
     } catch (error) {
-      console.warn('⚠️ Error checking refresh time from localStorage:', error);
+      logger.warn('⚠️ Error checking refresh time from localStorage:', error);
       return true; // Default to refresh on error
     }
   }
@@ -94,7 +95,7 @@ class EconomicEventWatcher {
     try {
       localStorage.setItem(this.getRefreshKey(calendarId), Date.now().toString());
     } catch (error) {
-      console.warn('⚠️ Error saving refresh time to localStorage:', error);
+      logger.warn('⚠️ Error saving refresh time to localStorage:', error);
     }
   }
 
@@ -103,7 +104,7 @@ class EconomicEventWatcher {
    */
   initialize(callbacks: EventWatcherCallbacks) {
     this.callbacks = callbacks;
-    console.log('📊 Economic Event Watcher initialized');
+    logger.log('📊 Economic Event Watcher initialized');
   }
 
   /**
@@ -111,12 +112,12 @@ class EconomicEventWatcher {
    */
   async startWatching(calendarId: string, economicCalendarFilters?: any) {
     if (!this.callbacks) {
-      console.warn('⚠️ Event watcher not initialized');
+      logger.warn('⚠️ Event watcher not initialized');
       return;
     }
 
     this.isActive = true;
-    console.log(`🔍 Starting event watching for calendar: ${calendarId}`);
+    logger.log(`🔍 Starting event watching for calendar: ${calendarId}`);
 
     // Get currencies from calendar filters or use defaults
     const currencies = economicCalendarFilters?.currencies || DEFAULT_FILTER_SETTINGS.currencies;
@@ -127,7 +128,7 @@ class EconomicEventWatcher {
       if (this.shouldRefreshData(calendarId)) {
         this.refreshCalendarData(currencies, calendarId);
       } else {
-        console.log(`⏭️ Skipping refresh for calendar ${calendarId} - data is still fresh`);
+        log(`⏭️ Skipping refresh for calendar ${calendarId} - data is still fresh`);
       }
 
       // Initialize or refresh the event queue for this calendar
@@ -136,9 +137,9 @@ class EconomicEventWatcher {
       // Start watching the next event from the queue
       this.watchNextEventFromQueue(calendarId);
 
-    } catch (error) {
-      console.error('❌ Error starting event watcher:', error);
-      this.callbacks.onError(error as Error, calendarId);
+    } catch (err) {
+      error('❌ Error starting event watcher:', err);
+      this.callbacks.onError(err as Error, calendarId);
     }
   }
 
@@ -147,7 +148,7 @@ class EconomicEventWatcher {
    */
   private async refreshCalendarData(currencies: Currency[], calendarId: string) {
     try {
-      console.log(`🔄 Refreshing economic calendar data for calendar ${calendarId}, currencies: ${currencies.join(', ')}`);
+      log(`🔄 Refreshing economic calendar data for calendar ${calendarId}, currencies: ${currencies.join(', ')}`);
 
       const today = new Date();
       const targetDate = format(today, 'yyyy-MM-dd');
@@ -164,16 +165,16 @@ class EconomicEventWatcher {
       const updatedCount = responseData?.updatedCount || 0;
       const foundEventsCount = responseData?.foundEvents?.length || 0;
 
-      console.log(`✅ Economic calendar refreshed for calendar ${calendarId}: ${updatedCount} total events updated`);
+      logger.log(`✅ Economic calendar refreshed for calendar ${calendarId}: ${updatedCount} total events updated`);
       if (foundEventsCount > 0) {
-        console.log(`📊 Found ${foundEventsCount} events with current data`);
+        logger.log(`📊 Found ${foundEventsCount} events with current data`);
       }
 
       // Save the refresh time to localStorage
       this.saveRefreshTime(calendarId);
 
     } catch (error) {
-      console.error('❌ Error refreshing economic calendar data:', error);
+      logger.error('❌ Error refreshing economic calendar data:', error);
       // Don't throw - this is not critical for watcher initialization
     }
   }
@@ -191,7 +192,7 @@ class EconomicEventWatcher {
       !this.arraysEqual(existingQueue.impacts, impacts);
 
     if (shouldRefresh) {
-      console.log(`📊 Fetching fresh events for calendar: ${calendarId}`);
+      logger.log(`📊 Fetching fresh events for calendar: ${calendarId}`);
 
       // Get today's events for the specified currencies
       const today = new Date();
@@ -223,9 +224,9 @@ class EconomicEventWatcher {
         impacts
       });
 
-      console.log(`📋 Cached ${upcomingEvents.length} upcoming events for calendar: ${calendarId} ${todaysEvents.events.length}`);
+      logger.log(`📋 Cached ${upcomingEvents.length} upcoming events for calendar: ${calendarId} ${todaysEvents.events.length}`);
     } else {
-      console.log(`📋 Using cached events for calendar: ${calendarId}`);
+      logger.log(`📋 Using cached events for calendar: ${calendarId}`);
     }
   }
 
@@ -235,7 +236,7 @@ class EconomicEventWatcher {
   private watchNextEventFromQueue(calendarId: string) {
     const queue = this.eventQueues.get(calendarId);
     if (!queue || queue.currentIndex >= queue.events.length) {
-      console.log(`📅 No more events to watch for calendar: ${calendarId}`);
+      logger.log(`📅 No more events to watch for calendar: ${calendarId}`);
       this.isActive = false;
       return;
     }
@@ -243,15 +244,15 @@ class EconomicEventWatcher {
     // Group events by release time starting from current index
     const eventGroup = this.getNextEventGroup(queue);
     if (eventGroup.events.length === 0) {
-      console.log(`📅 No more event groups to watch for calendar: ${calendarId}`);
+      logger.log(`📅 No more event groups to watch for calendar: ${calendarId}`);
       this.isActive = false;
       return;
     }
 
     this.watchEventGroup(eventGroup, calendarId);
-    console.log(`⏰ Watching ${eventGroup.events.length} event(s) releasing at ${eventGroup.releaseTime} for calendar: ${calendarId}`);
+    logger.log(`⏰ Watching ${eventGroup.events.length} event(s) releasing at ${eventGroup.releaseTime} for calendar: ${calendarId}`);
     eventGroup.events.forEach((event, index) => {
-      console.log(`   ${index + 1}. ${event.event}`);
+      logger.log(`   ${index + 1}. ${event.event}`);
     });
   }
 
@@ -300,7 +301,7 @@ class EconomicEventWatcher {
     if (watched) {
       clearTimeout(watched.timeoutId);
       this.watchedEventGroups.delete(watchKey);
-      console.log(`🛑 Stopped watching events for calendar: ${calendarId}`);
+      logger.log(`🛑 Stopped watching events for calendar: ${calendarId}`);
     }
 
     // Clear the event queue for this calendar
@@ -322,7 +323,7 @@ class EconomicEventWatcher {
     this.watchedEventGroups.clear();
     this.eventQueues.clear(); // Clear all event queues
     this.isActive = false;
-    console.log('🛑 Stopped all event watching');
+    logger.log('🛑 Stopped all event watching');
   }
 
   /**
@@ -331,9 +332,9 @@ class EconomicEventWatcher {
   clearRefreshCache(calendarId: string) {
     try {
       localStorage.removeItem(this.getRefreshKey(calendarId));
-      console.log(`🗑️ Cleared refresh cache for calendar: ${calendarId}`);
+      logger.log(`🗑️ Cleared refresh cache for calendar: ${calendarId}`);
     } catch (error) {
-      console.warn('⚠️ Error clearing refresh cache:', error);
+      logger.warn('⚠️ Error clearing refresh cache:', error);
     }
   }
 
@@ -353,9 +354,9 @@ class EconomicEventWatcher {
 
       // Remove all matching keys
       keysToRemove.forEach(key => localStorage.removeItem(key));
-      console.log(`🗑️ Cleared ${keysToRemove.length} refresh cache entries`);
+      logger.log(`🗑️ Cleared ${keysToRemove.length} refresh cache entries`);
     } catch (error) {
-      console.warn('⚠️ Error clearing all refresh caches:', error);
+      logger.warn('⚠️ Error clearing all refresh caches:', error);
     }
   }
 
@@ -395,7 +396,7 @@ class EconomicEventWatcher {
       releaseTime: eventGroup.releaseTime
     });
 
-    console.log(`⏰ Event group (${eventGroup.events.length} events) will be updated in ${Math.round(timeUntilRelease / 1000 / 60)} minutes`);
+    logger.log(`⏰ Event group (${eventGroup.events.length} events) will be updated in ${Math.round(timeUntilRelease / 1000 / 60)} minutes`);
   }
 
 
@@ -407,7 +408,7 @@ class EconomicEventWatcher {
     if (!this.callbacks || events.length === 0) return;
 
     try {
-      console.log(`🔄 Triggering update for ${events.length} event(s) releasing at the same time`);
+      logger.log(`🔄 Triggering update for ${events.length} event(s) releasing at the same time`);
 
       // Get unique currencies from the event group
       const currencySet = new Set(events.map(e => e.currency));
@@ -427,7 +428,7 @@ class EconomicEventWatcher {
       const targetEvents: EconomicEvent[] = responseData?.targetEvents || [];
       const foundEvents: EconomicEvent[] = responseData?.foundEvents || [];
 
-      console.log(`📊 Cloud function returned ${targetEvents.length} total events, ${foundEvents.length} specifically requested events`);
+      logger.log(`📊 Cloud function returned ${targetEvents.length} total events, ${foundEvents.length} specifically requested events`);
 
       // Process each event in the group
       const updatedEvents: EconomicEvent[] = [];
@@ -449,12 +450,12 @@ class EconomicEventWatcher {
 
         // Log individual event updates
         if (updatedEvent) {
-          console.log(`📊 Event "${originalEvent.event}" updated successfully:`);
-          console.log(`   Actual: ${originalEvent.actual} → ${updatedEvent.actual}`);
-          console.log(`   Forecast: ${originalEvent.forecast} → ${updatedEvent.forecast}`);
-          console.log(`   Previous: ${originalEvent.previous} → ${updatedEvent.previous}`);
+          logger.log(`📊 Event "${originalEvent.event}" updated successfully:`);
+          logger.log(`   Actual: ${originalEvent.actual} → ${updatedEvent.actual}`);
+          logger.log(`   Forecast: ${originalEvent.forecast} → ${updatedEvent.forecast}`);
+          logger.log(`   Previous: ${originalEvent.previous} → ${updatedEvent.previous}`);
         } else {
-          console.log(`⚠️ Event "${originalEvent.event}" not found in updated results, using original data`);
+          logger.log(`⚠️ Event "${originalEvent.event}" not found in updated results, using original data`);
         }
       }
 
@@ -471,9 +472,9 @@ class EconomicEventWatcher {
         }, 5000);
       }
 
-    } catch (error) {
-      console.error('❌ Error updating event group:', error);
-      this.callbacks.onError(error as Error, calendarId);
+    } catch (err) {
+      error('❌ Error updating event group:', err);
+      this.callbacks.onError(err as Error, calendarId);
     }
   }
 
@@ -484,12 +485,12 @@ class EconomicEventWatcher {
   private async continueWatching(calendarId: string) {
     if (!this.callbacks) return;
 
-    console.log(`🔄 Continuing to watch next event for calendar: ${calendarId}`);
+    log(`🔄 Continuing to watch next event for calendar: ${calendarId}`);
 
     try {
       const queue = this.eventQueues.get(calendarId);
       if (!queue) {
-        console.log(`📅 No event queue found for calendar: ${calendarId}`);
+        logger.log(`📅 No event queue found for calendar: ${calendarId}`);
         return;
       }
 
@@ -502,7 +503,7 @@ class EconomicEventWatcher {
         this.watchNextEventFromQueue(calendarId);
       } else {
         // Queue exhausted, try to refresh and get more events
-        console.log(`📋 Event queue exhausted for calendar: ${calendarId}, refreshing...`);
+        logger.log(`📋 Event queue exhausted for calendar: ${calendarId}, refreshing...`);
         await this.initializeEventQueue(calendarId, queue.currencies, queue.impacts);
 
         // Reset index and try again
@@ -511,14 +512,14 @@ class EconomicEventWatcher {
           refreshedQueue.currentIndex = 0;
           this.watchNextEventFromQueue(calendarId);
         } else {
-          console.log('📅 No more upcoming events found for today');
+          logger.log('📅 No more upcoming events found for today');
           this.isActive = false;
         }
       }
 
-    } catch (error) {
-      console.error('❌ Error continuing event watching:', error);
-      this.callbacks.onError(error as Error, calendarId);
+    } catch (err) {
+      error('❌ Error continuing event watching:', err);
+      this.callbacks.onError(err as Error, calendarId);
     }
   }
 

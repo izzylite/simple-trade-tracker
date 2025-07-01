@@ -48,7 +48,7 @@ import {
 import { SelectInput } from './common';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import UnifiedDrawer from './common/UnifiedDrawer';
-
+import { logger } from '../utils/logger';
 interface SearchDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -264,7 +264,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
           setFilteredTrades(results);
           setSuggestedTags(suggestions);
         } catch (error) {
-          console.error('Search error:', error);
+          logger.error('Search error:', error);
           setFilteredTrades([]);
           setSuggestedTags([]);
         } finally {

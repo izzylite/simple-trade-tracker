@@ -30,6 +30,7 @@ import {
   Insights,
   MonetizationOn
 } from '@mui/icons-material';
+import { logger } from '../utils/logger';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import AppHeader from './common/AppHeader';
@@ -186,7 +187,7 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleTheme, mode }) => {
         await signInWithGoogle();
         navigate('/dashboard');
       } catch (error) {
-        console.error('Failed to sign in:', error);
+        logger.error('Failed to sign in:', error);
       }
     }
   };

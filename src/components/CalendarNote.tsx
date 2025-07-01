@@ -15,6 +15,7 @@ import {
   ListItemIcon,
   ListItemText
 } from '@mui/material';
+import { logger } from '../utils/logger';
 import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
@@ -170,7 +171,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
       setTimeout(() => setSaveStatus('idle'), 2000);
     }
     catch (error) {
-      console.error('Error saving notes:', error);
+      logger.error('Error saving notes:', error);
       setSaveStatus('error');
       // Reset to idle after showing error status for 3 seconds
       setTimeout(() => setSaveStatus('idle'), 3000);

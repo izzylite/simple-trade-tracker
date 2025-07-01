@@ -14,6 +14,7 @@ import { alpha } from '@mui/material/styles';
 import { format } from 'date-fns';
 import { Trade } from '../../types/trade';
 import { formatValue } from '../../utils/formatters';
+import { log } from '../../utils/logger';
 
 interface CumulativePnLChartProps {
   chartData: any[];
@@ -178,7 +179,7 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
                   fill={theme.palette.primary.main}
                   style={{ cursor: 'pointer' }}
                   onClick={() => {
-                    console.log('Dot clicked, Index:', index);
+                    log('Dot clicked, Index:', index);
                     const dataPoint = chartData[index];
                     if (dataPoint && dataPoint.trades && dataPoint.trades.length > 0) {
                       const formattedDate = format(dataPoint.fullDate, 'MMMM d, yyyy');

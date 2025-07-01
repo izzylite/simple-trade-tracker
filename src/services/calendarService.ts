@@ -23,6 +23,7 @@ import { YearlyTrades } from '../types/yearlyTrades';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase/config';
 import { TradeImage } from '../components/trades/TradeForm';
+import { logger } from '../utils/logger';
 
 const CALENDARS_COLLECTION = 'calendars';
 const YEARS_SUBCOLLECTION = 'years';
@@ -583,7 +584,7 @@ export const getCalendar = async (calendarId: string): Promise<Calendar | null> 
 
     return convertFirestoreDataToCalendar(calendarDoc);
   } catch (error) {
-    console.error('Error getting calendar:', error);
+    logger.error('Error getting calendar:', error);
     throw error;
   }
 };
@@ -708,7 +709,7 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
           await importTrades(newCalendarId, sourceTrades);
         }
       } catch (error) {
-        console.error('Error copying trades to duplicated calendar:', error);
+        logger.error('Error copying trades to duplicated calendar:', error);
         // Don't throw here - the calendar was created successfully, just the trades failed to copy
       }
     }
@@ -718,7 +719,7 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
       ...duplicatedCalendar
     };
   } catch (error) {
-    console.error('Error duplicating calendar:', error);
+    logger.error('Error duplicating calendar:', error);
     throw error;
   }
 };
@@ -841,7 +842,7 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
       return stats;
     });
   } catch (error) {
-    console.error('Error adding trade:', error);
+    logger.error('Error adding trade:', error);
     throw error;
   }
 };
@@ -869,7 +870,7 @@ export const onUpdateCalendar = async (calendarId: string, updateCallback: (cale
       return updatedCalendar;
     });
   } catch (error) {
-    console.error('Error updating calendar:', error);
+    logger.error('Error updating calendar:', error);
     throw error;
   }
 };
@@ -885,7 +886,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
 
     // If not found in cache and createIfNotExists is provided, create a new trade
     if (trade === undefined && createIfNotExists) {
-      console.log(`Creating new trade with ID ${tradeId} since it wasn't found in cached trades`);
+      logger.log(`Creating new trade with ID ${tradeId} since it wasn't found in cached trades`);
       tempTrade = createIfNotExists(tradeId);
       trade = tempTrade;
       isNewTrade = true;
@@ -941,20 +942,20 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       if (tradeIndex === -1) {
         // If this is a new trade, add it to the arrays
         if (isNewTrade) {
-          console.log(`Adding new trade with ID ${trade!!.id} to year ${year}`);
+          logger.log(`Adding new trade with ID ${trade!!.id} to year ${year}`);
           newTrade = trade!!;
           yearTrades.push(newTrade);
           allTrades.push(newTrade);
           tradeIndex = yearTrades.length - 1;
         } else {
-          console.log(`Trade with ID ${trade!!.id} not found in year ${year}`)
+          logger.log(`Trade with ID ${trade!!.id} not found in year ${year}`)
         }
       }
 
       // Apply the update callback to the trade
       newTrade = updateCallback(yearTrades[tradeIndex]);
       // Get all trades (either from cache or Firestore)
-      console.log(`Updating trade with ID ${trade!!.id} in year ${year} : ${JSON.stringify(newTrade)}`);
+      logger.log(`Updating trade with ID ${trade!!.id} in year ${year} : ${JSON.stringify(newTrade)}`);
 
 
       if (newTrade.isDeleted) {
@@ -978,7 +979,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
         });
       } else {
         // Create new year document
-        console.log(`Creating new year document for year ${year}`);
+        logger.log(`Creating new year document for year ${year}`);
         transaction.set(yearDocRef, {
           year,
           trades: yearTrades.map(trade => convertTradeToFirestoreData(trade, calendarId)),
@@ -993,7 +994,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       return [stats, allTrades];
     });
   } catch (error) {
-    console.error('Error updating trade:', error);
+    logger.error('Error updating trade:', error);
     throw error;
   }
 };
@@ -1167,7 +1168,7 @@ export const uploadImage = async (
         },
         (error: any) => {
           // Handle errors
-          console.error('Error uploading image:', error);
+          logger.error('Error uploading image:', error);
           reject(error);
         },
         async () => {
@@ -1187,7 +1188,7 @@ export const uploadImage = async (
       );
     });
   } catch (error) {
-    console.error('Error setting up image upload:', error);
+    logger.error('Error setting up image upload:', error);
     throw error;
   }
 };
@@ -1212,7 +1213,7 @@ export const updateTag = async (calendarId: string, oldTag: string, newTag: stri
 
     return result.data as { success: boolean; tradesUpdated: number };
   } catch (error) {
-    console.error('Error updating tag:', error);
+    logger.error('Error updating tag:', error);
     throw error;
   }
 };

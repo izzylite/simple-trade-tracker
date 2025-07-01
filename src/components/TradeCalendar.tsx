@@ -101,6 +101,7 @@ import { useEconomicEventWatcher, useEconomicEventsUpdates } from '../hooks/useE
 import EconomicEventNotification from './notifications/EconomicEventNotification';
 import { EconomicEvent } from '../types/economicCalendar';
 import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
+import { log, logger } from '../utils/logger';
 
 interface TradeCalendarProps {
   trades: Trade[];
@@ -476,19 +477,19 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Listen for multiple economic event updates (same release time)
   useEconomicEventsUpdates((updatedEvents, allEvents, updatedCalendarId) => {
     if (updatedCalendarId === calendarId) {
-      console.log(`📊 ${updatedEvents.length} economic events were updated simultaneously for this calendar`);
+      log(`📊 ${updatedEvents.length} economic events were updated simultaneously for this calendar`);
 
       // Check if notifications are enabled before showing them
       const notificationsEnabled = calendar?.economicCalendarFilters?.notificationsEnabled ?? true;
 
       // 1. Show notification sliders for each event (leveraging stacking behavior) - only if enabled
       if (notificationsEnabled) {
-        console.log(`🔔 Notifications enabled - showing ${updatedEvents.length} event notification(s)`);
+        log(`🔔 Notifications enabled - showing ${updatedEvents.length} event notification(s)`);
         updatedEvents.forEach(event => {
           addNotification(event);
         });
       } else {
-        console.log(`🔕 Notifications disabled - skipping ${updatedEvents.length} event notification(s)`);
+        log(`🔕 Notifications disabled - skipping ${updatedEvents.length} event notification(s)`);
       }
 
       // 2. Pass events to Economic Calendar Drawer if it's open (always update drawer regardless of notification setting)
@@ -573,7 +574,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         return updatedCalendar;
       });
     } catch (error) {
-      console.error('Error saving hero image:', error);
+      logger.error('Error saving hero image:', error);
     }
   };
 
@@ -736,7 +737,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
       showSnackbar(successMessage, 'success');
     } catch (error) {
-      console.error('Error deleting trades:', error);
+      logger.error('Error deleting trades:', error);
       const errorMessage = tradesToDelete.length === 1
         ? 'Failed to delete trade. Please try again.'
         : `Failed to delete some trades. Please try again.`;
@@ -760,7 +761,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const handleDayClick = (date: Date) => {
     // Prevent adding new trades when app is loading all trades
     if (isLoadingTrades) {
-      console.log('Cannot add trade while trades are loading');
+      log('Cannot add trade while trades are loading');
       showSnackbar('Cannot add trade while trades are loading. Please wait...', 'warning');
       return;
     }

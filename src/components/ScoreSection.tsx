@@ -28,7 +28,7 @@ import ScoreBreakdown from './scoring/ScoreBreakdown';
 import ScoreHistory from './scoring/ScoreHistory';
 import ScoreSettingsComponent from './scoring/ScoreSettings';
 import TagPatternAnalysis from './TagPatternAnalysis';
-
+import { logger } from '../utils/logger';
 interface ScoreSectionProps {
   trades: Trade[];
   selectedDate: Date;
@@ -140,7 +140,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
         const analysis = await scoreService.calculateScore(trades, scorePeriod, selectedDate, updatedSettings);
         setScoreAnalysis(analysis);
       } catch (error) {
-        console.error('Error calculating score:', error);
+        logger.error('Error calculating score:', error);
         setScoreAnalysis(null);
       } finally {
         setIsCalculating(false);
@@ -165,7 +165,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
         const history = await scoreService.getScoreHistory(trades, historyPeriod, 12, updatedSettings);
         setScoreHistory(history);
       } catch (error) {
-        console.error('Error calculating score history:', error);
+        logger.error('Error calculating score history:', error);
         setScoreHistory([]);
       }
     };
@@ -188,7 +188,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
         const scores = await scoreService.calculateMultiPeriodScore(trades, selectedDate, updatedSettings);
         setMultiPeriodScores(scores);
       } catch (error) {
-        console.error('Error calculating multi-period scores:', error);
+        logger.error('Error calculating multi-period scores:', error);
         setMultiPeriodScores(null);
       }
     };
@@ -239,7 +239,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
         scoreSettings: updatedSettings
       }));
     } catch (error) {
-      console.error('Error saving score settings:', error);
+      logger.error('Error saving score settings:', error);
     } finally {
       setIsSaving(false);
     }
@@ -265,7 +265,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
           setSettings(parsedSettings);
           setSelectedTags(parsedSettings.selectedTags || []);
         } catch (error) {
-          console.error('Error loading saved settings from localStorage:', error);
+          logger.error('Error loading saved settings from localStorage:', error);
         }
       }
     }

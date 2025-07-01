@@ -9,7 +9,7 @@ import { EventNote as EventNoteIcon } from '@mui/icons-material';
 import RichTextEditor from './common/RichTextEditor';
 import { Calendar } from '../types/calendar';
 import { BaseDialog } from './common';
-
+import { logger } from '../utils/logger';
 interface DayNotesDialogProps {
   open: boolean;
   onClose: () => void;
@@ -76,7 +76,7 @@ const DayNotesDialog: React.FC<DayNotesDialogProps> = ({
       setHasChanges(false);
       onClose();
     } catch (error) {
-      console.error('Error saving notes:', error);
+      logger.error('Error saving notes:', error);
     } finally {
       setIsSaving(false);
     }

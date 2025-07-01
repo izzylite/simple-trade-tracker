@@ -8,6 +8,7 @@ import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { economicCalendarService } from '../services/economicCalendarService';
 import { Currency, ImpactLevel } from '../types/economicCalendar';
 import { DEFAULT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
+import { error as logError, log, warn } from '../utils/logger';
 
 interface UseHighImpactEventsProps {
   currentDate: Date;
@@ -113,7 +114,7 @@ export const useHighImpactEvents = ({
         const cacheAgeHours = Math.round(cacheAge / (1000 * 60 * 60));
         const currenciesInfo = currencies.join(', ');
 
-        console.log(`📋 Using cached high-impact events for ${monthKey} [${currenciesInfo}] (${cacheAgeHours}h old, ${isPreviousMonth ? 'permanent' : 'expires ' + new Date(parseInt(cacheExpiry)).toLocaleString()})`);
+        log(`📋 Using cached high-impact events for ${monthKey} [${currenciesInfo}] (${cacheAgeHours}h old, ${isPreviousMonth ? 'permanent' : 'expires ' + new Date(parseInt(cacheExpiry)).toLocaleString()})`);
 
         try {
           const eventDatesMap = new Map<string, boolean>(JSON.parse(cachedData));
@@ -124,7 +125,7 @@ export const useHighImpactEvents = ({
           setError(null);
           return;
         } catch (parseError) {
-          console.warn('Failed to parse cached data, fetching fresh data');
+          warn('Failed to parse cached data, fetching fresh data');
         }
       }
 
@@ -139,7 +140,7 @@ export const useHighImpactEvents = ({
           end: format(monthEnd, 'yyyy-MM-dd')
         };
 
-        console.log(`🔄 Fetching fresh high-impact events for ${monthKey} [${currencies.join(', ')}]`);
+        log(`🔄 Fetching fresh high-impact events for ${monthKey} [${currencies.join(', ')}]`);
         
         // Fetch only high-impact events for the month
         const events = await economicCalendarService.fetchEvents(dateRange, {
@@ -185,21 +186,21 @@ export const useHighImpactEvents = ({
 
         const cacheTypeMsg = isPreviousMonth ? 'permanently' :
           (currentDate.getMonth() === new Date().getMonth() ? 'until next Sunday' : 'for 1 day');
-        console.log(`📍 Found ${events.length} high-impact events for ${monthKey} [${currencies.join(', ')}] (cached ${cacheTypeMsg})`);
+        log(`📍 Found ${events.length} high-impact events for ${monthKey} [${currencies.join(', ')}] (cached ${cacheTypeMsg})`);
         
       } catch (fetchError) {
-        console.error('❌ Error fetching high-impact events:', fetchError);
+        logError('❌ Error fetching high-impact events:', fetchError);
         setError(fetchError instanceof Error ? fetchError.message : 'Failed to fetch events');
-        
+
         // If fetch fails, try to use expired cache as fallback
         if (cachedData) {
-          console.log(`🔄 Using expired cache as fallback for ${monthKey}`);
+          log(`🔄 Using expired cache as fallback for ${monthKey}`);
           try {
             const eventDatesMap = new Map<string, boolean>(JSON.parse(cachedData));
             setHighImpactEventDates(eventDatesMap);
             setError('Using cached data (may be outdated)');
           } catch (parseError) {
-            console.error('Failed to parse fallback cache data');
+            logError('Failed to parse fallback cache data');
           }
         }
       } finally {
@@ -240,7 +241,7 @@ export const clearHighImpactEventsCache = (calendarId?: string, currencies?: str
   });
 
   keysToRemove.forEach(key => localStorage.removeItem(key));
-  console.log(`🗑️ Cleared ${keysToRemove.length} cached high-impact event entries`);
+  log(`🗑️ Cleared ${keysToRemove.length} cached high-impact event entries`);
 };
 
 /**
@@ -260,7 +261,7 @@ export const clearOldCurrencyCache = (calendarId: string, newCurrencies: string[
 
   keysToRemove.forEach(key => localStorage.removeItem(key));
   if (keysToRemove.length > 0) {
-    console.log(`🧹 Cleared ${keysToRemove.length} old currency cache entries for calendar ${calendarId}`);
+    log(`🧹 Cleared ${keysToRemove.length} old currency cache entries for calendar ${calendarId}`);
   }
 };
 
@@ -381,6 +382,6 @@ const cleanupExpiredCache = () => {
   });
 
   if (cleanedCount > 0 || skippedPermanent > 0) {
-    console.log(`🧹 Cleaned up ${cleanedCount} expired cache entries, preserved ${skippedPermanent} permanent entries`);
+    log(`🧹 Cleaned up ${cleanedCount} expired cache entries, preserved ${skippedPermanent} permanent entries`);
   }
 };

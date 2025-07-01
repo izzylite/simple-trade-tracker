@@ -22,6 +22,7 @@ import {
   QueryDocumentSnapshot
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { log, error, logger } from '../utils/logger';
 
 interface PaginationOptions {
   pageSize?: number;
@@ -51,7 +52,7 @@ class EconomicCalendarServiceImpl {
     }
   ): Promise<EconomicEvent[]> {
     try {
-      console.log('🔄 Fetching economic calendar data from database:', dateRange, filters);
+      log('🔄 Fetching economic calendar data from database:', dateRange, filters);
 
 
       // Build Firestore query
@@ -87,14 +88,14 @@ class EconomicCalendarServiceImpl {
         events = events.filter(event => filters.impacts!.includes(event.impact));
       }
 
-      console.log(`✅ Successfully fetched ${events.length} economic events from database`);
+      logger.log(`✅ Successfully fetched ${events.length} economic events from database`);
 
       // Notify subscribers
       this.notifySubscribers(events);
 
       return events;
     } catch (error) {
-      console.error('❌ Error fetching economic events from database:', error);
+      logger.error('❌ Error fetching economic events from database:', error);
       throw error;
     }
   }
@@ -144,7 +145,7 @@ class EconomicCalendarServiceImpl {
   ): Promise<PaginatedResult> {
     try {
       const pageSize = options?.pageSize || this.DEFAULT_PAGE_SIZE;
-      console.log(`🔄 Fetching paginated economic calendar data (page size: ${pageSize}):`, dateRange, filters);
+      logger.log(`🔄 Fetching paginated economic calendar data (page size: ${pageSize}):`, dateRange, filters);
 
 
       let baseQuery = this.buildBaseQuery(dateRange, filters);
@@ -195,7 +196,7 @@ class EconomicCalendarServiceImpl {
 
       const lastDoc = eventsToReturn.length > 0 ? eventsToReturn[eventsToReturn.length - 1] : undefined;
 
-      console.log(`✅ Successfully fetched ${events.length} paginated events (hasMore: ${hasMore})`);
+      logger.log(`✅ Successfully fetched ${events.length} paginated events (hasMore: ${hasMore})`);
 
       return {
         events,
@@ -203,7 +204,7 @@ class EconomicCalendarServiceImpl {
         lastDoc
       };
     } catch (error) {
-      console.error('❌ Error fetching paginated economic events:', error);
+      logger.error('❌ Error fetching paginated economic events:', error);
       throw error;
     }
   }
@@ -267,7 +268,7 @@ class EconomicCalendarServiceImpl {
       onlyUpcoming?: boolean;
     }
   ): () => void {
-    console.log('� Setting up real-time subscription for economic events');
+    logger.log('� Setting up real-time subscription for economic events');
 
     // Build Firestore query
     const eventsQuery = query(this.buildBaseQuery(dateRange, filters), limit(10));
@@ -298,11 +299,11 @@ class EconomicCalendarServiceImpl {
       });
 
 
-      console.log(`🔄 Real-time update: ${events.length} events`);
+      log(`🔄 Real-time update: ${events.length} events`);
       callback(events);
       this.notifySubscribers(events);
-    }, (error) => {
-      console.error('❌ Error in real-time subscription:', error);
+    }, (err) => {
+      error('❌ Error in real-time subscription:', err);
     });
 
     return unsubscribe;
@@ -315,8 +316,8 @@ class EconomicCalendarServiceImpl {
     this.subscribers.forEach(callback => {
       try {
         callback(events);
-      } catch (error) {
-        console.error('Error notifying subscriber:', error);
+      } catch (err) {
+        error('Error notifying subscriber:', err);
       }
     });
   }

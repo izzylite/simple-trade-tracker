@@ -27,6 +27,7 @@ import {
 import { Trade } from '../../types/trade';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useAuth } from '../../contexts/AuthContext';
+import { logger } from '../../utils/logger';
 
 interface ShareTradeButtonProps {
   trade: Trade;
@@ -116,7 +117,7 @@ const ShareTradeButton: React.FC<ShareTradeButtonProps> = ({
             onTradeUpdated(updatedTrade);
           }
         } catch (error) {
-          console.error('Error updating trade with sharing information:', error);
+          logger.error('Error updating trade with sharing information:', error);
           // Still show the share dialog even if the trade update fails
         }
       } else if (onTradeUpdated) {
@@ -133,7 +134,7 @@ const ShareTradeButton: React.FC<ShareTradeButtonProps> = ({
 
       showSnackbar('Share link generated successfully!', 'success');
     } catch (error) {
-      console.error('Error sharing trade:', error);
+      logger.error('Error sharing trade:', error);
       showSnackbar('Failed to generate share link', 'error');
     } finally {
       setIsSharing(false);
@@ -146,7 +147,7 @@ const ShareTradeButton: React.FC<ShareTradeButtonProps> = ({
       showSnackbar('Link copied to clipboard!', 'success');
       setShareDialogOpen(false);
     } catch (error) {
-      console.error('Error copying to clipboard:', error);
+      logger.error('Error copying to clipboard:', error);
       showSnackbar('Failed to copy link', 'error');
     }
   };
@@ -180,7 +181,7 @@ const ShareTradeButton: React.FC<ShareTradeButtonProps> = ({
             onTradeUpdated(updatedTrade);
           }
         } catch (error) {
-          console.error('Error updating trade to remove sharing information:', error);
+          logger.error('Error updating trade to remove sharing information:', error);
           // Still show success message even if the trade update fails
         }
       } else if (onTradeUpdated) {
@@ -196,7 +197,7 @@ const ShareTradeButton: React.FC<ShareTradeButtonProps> = ({
 
       showSnackbar('Trade sharing stopped', 'success');
     } catch (error) {
-      console.error('Error unsharing trade:', error);
+      logger.error('Error unsharing trade:', error);
       showSnackbar('Failed to stop sharing', 'error');
     } finally {
       setIsSharing(false);

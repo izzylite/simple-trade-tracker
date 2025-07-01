@@ -13,6 +13,7 @@ import {
 import { Box, Paper, Typography, useTheme } from '@mui/material';
 import { format } from 'date-fns'; 
  import { formatValue } from '../../utils/formatters';
+import { log } from '../../utils/logger';
 
 interface DailyPnLChartProps {
   chartData: any[];
@@ -129,7 +130,7 @@ const DailyPnLChart: React.FC<DailyPnLChartProps> = ({
             name="Daily P&L"
             radius={[4, 4, 0, 0]}
             onClick={(data: any) => {
-              console.log('Bar clicked:', data);
+              log('Bar clicked:', data);
               if (data && data.payload) {
                 const payload = data.payload;
                 if (payload.trades && payload.trades.length > 0) {

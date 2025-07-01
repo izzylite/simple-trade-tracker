@@ -1,4 +1,5 @@
 import { EditorState, ContentState, convertFromRaw, convertToRaw } from 'draft-js';
+import { warn, error } from '../../../../utils/logger';
 
 /**
  * Safely create an EditorState from a value string
@@ -29,7 +30,7 @@ export function createEditorStateFromValue(value?: string): EditorState {
     }
   } catch (error) {
     // If parsing fails, create with plain text
-    console.warn('RichTextEditor: Failed to parse initial value as Draft.js raw content. Treating as plain text.', error);
+    warn('RichTextEditor: Failed to parse initial value as Draft.js raw content. Treating as plain text.', error);
     return EditorState.createWithContent(ContentState.createFromText(value));
   }
 }
@@ -54,7 +55,7 @@ export function hasContentChanged(state1: EditorState, state2: EditorState): boo
     const raw2 = convertToRaw(content2);
     return JSON.stringify(raw1) !== JSON.stringify(raw2);
   } catch (error) {
-    console.warn('Error comparing editor content:', error);
+    warn('Error comparing editor content:', error);
     // Fallback to reference comparison
     return content1 !== content2;
   }
@@ -70,8 +71,8 @@ export function getContentAsJson(editorState: EditorState): string {
     const contentState = editorState.getCurrentContent();
     const rawContent = convertToRaw(contentState);
     return JSON.stringify(rawContent);
-  } catch (error) {
-    console.error('Error converting editor content to JSON:', error);
+  } catch (error_) {
+    error('Error converting editor content to JSON:', error_);
     return '{"blocks":[],"entityMap":{}}'; // Return empty content as fallback
   }
 }

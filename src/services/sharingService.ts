@@ -1,6 +1,7 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../config/firebase';
 import { Trade } from '../types/trade';
+import { logger } from '../utils/logger';
 
 // Simplified sharing service - all operations now handled by cloud functions
 // This provides better security, consistency, and reduces client-side complexity
@@ -36,7 +37,7 @@ export const generateTradeShareLink = async (
 
     return result.data as { shareLink: string; shareId: string; directLink: string };
   } catch (error) {
-    console.error('Error generating share link:', error);
+    logger.error('Error generating share link:', error);
     throw new Error('Failed to generate share link');
   }
 };

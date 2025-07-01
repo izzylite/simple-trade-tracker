@@ -28,6 +28,7 @@ import {
   ListItemIcon,
   ListItemText
 } from '@mui/material';
+
 import CalendarFormDialog, { CalendarFormData } from './CalendarFormDialog';
 import {
   Add as AddIcon,
@@ -62,6 +63,7 @@ import { getCalendarStats } from '../services/calendarService';
 import Shimmer from './Shimmer';
 import AppHeader from './common/AppHeader';
 import CalendarCard from './CalendarCard';
+import { logger } from '../utils/logger';
 // TradeDetailDialog has been removed
 
 interface CalendarHomeProps {
@@ -334,7 +336,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
       );
       setIsCreateDialogOpen(false);
     } catch (error) {
-      console.error('Error creating calendar:', error);
+      logger.error('Error creating calendar:', error);
     } finally {
       setIsCreating(false);
     }
@@ -363,7 +365,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
       await onUpdateCalendar(calendarToEdit.id, updates);
       setIsEditDialogOpen(false);
     } catch (error) {
-      console.error('Error updating calendar:', error);
+      logger.error('Error updating calendar:', error);
     } finally {
       setIsEditing(false);
     }
@@ -413,7 +415,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
       setIsDuplicateOptionsDialogOpen(false);
       setCalendarToDuplicate(null);
     } catch (error) {
-      console.error('Error duplicating calendar:', error);
+      logger.error('Error duplicating calendar:', error);
     } finally {
       setIsDuplicating(false);
     }
@@ -541,7 +543,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     try {
       await signInWithGoogle();
     } catch (error) {
-      console.error('Failed to sign in:', error);
+      logger.error('Failed to sign in:', error);
     }
   };
 
@@ -549,7 +551,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     try {
       await signOut();
     } catch (error) {
-      console.error('Failed to sign out:', error);
+      logger.error('Failed to sign out:', error);
     }
   };
 

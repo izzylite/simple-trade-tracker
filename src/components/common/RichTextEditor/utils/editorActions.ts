@@ -1,4 +1,5 @@
 import { EditorState, RichUtils, Modifier } from 'draft-js';
+import { error } from '../../../../utils/logger';
 
 /**
  * Toggle inline styles (bold, italic, underline) with focus preservation
@@ -204,7 +205,7 @@ export const getCurrentBlockType = (editorState: EditorState): string => {
     const currentBlock = contentState.getBlockForKey(startKey);
     return currentBlock.getType();
   } catch (e) {
-    console.error("Error getting block type:", e);
+    error("Error getting block type:", e);
     return 'unstyled';
   }
 };

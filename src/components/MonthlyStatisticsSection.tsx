@@ -9,6 +9,7 @@ import {
   Typography,
   useTheme
 } from '@mui/material';
+import { logger } from '../utils/logger';
 import { Close as CloseIcon, Analytics as AnalyticsIcon } from '@mui/icons-material';
 import { Trade } from '../types/trade';
 import { Calendar } from '../types/calendar';
@@ -102,7 +103,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         const data = await calculateChartData(trades, selectedDate, timePeriod);
         setChartData(data);
       } catch (error) {
-        console.error('Error calculating chart data:', error);
+        logger.error('Error calculating chart data:', error);
         setChartData([]);
       } finally {
         setIsCalculatingChartData(false);

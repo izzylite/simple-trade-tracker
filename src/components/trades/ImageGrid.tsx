@@ -3,6 +3,7 @@ import { Box, IconButton, TextField, CircularProgress, Typography, keyframes } f
 import { Delete as DeleteIcon } from '@mui/icons-material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { PendingImage, TradeImage } from './TradeForm'; // Assuming these are defined elsewhere
+import { logger } from '../../utils/logger';
 
 // Extended TradeImage interface with grid positioning properties
 export interface GridImage extends TradeImage {
@@ -48,7 +49,7 @@ const organizeImagesIntoRows = (
   pendingImages: Array<PendingImage>,
   uploadedImages: Array<TradeImage>
 ): Array<Array<GridImage | GridPendingImage>> => {
-  console.log("Input to organizeImagesIntoRows:",
+  logger.log("Input to organizeImagesIntoRows:",
     "Pending:", pendingImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })),
     "Uploaded:", uploadedImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })));
 
@@ -63,7 +64,7 @@ const organizeImagesIntoRows = (
         column: img.column !== undefined ? img.column : undefined,
         columnWidth: img.columnWidth !== undefined ? img.columnWidth : undefined,
       };
-      console.log(`Processed pending image ${i}:`, result.id, result.row, result.column, result.columnWidth);
+      logger.log(`Processed pending image ${i}:`, result.id, result.row, result.column, result.columnWidth);
       return result;
     }),
     ...uploadedImages.map((img, i) => {
@@ -75,7 +76,7 @@ const organizeImagesIntoRows = (
         column: img.column !== undefined ? img.column : undefined,
         columnWidth: img.columnWidth !== undefined ? img.columnWidth : undefined,
       };
-      console.log(`Processed uploaded image ${i}:`, result.id, result.row, result.column, result.columnWidth);
+      logger.log(`Processed uploaded image ${i}:`, result.id, result.row, result.column, result.columnWidth);
       return result;
     }),
   ];
@@ -120,7 +121,7 @@ const organizeImagesIntoRows = (
    const rows: Array<Array<GridImage | GridPendingImage>> = Object.entries(rowMap)
    .sort(([a], [b]) => Number(a) - Number(b))
    .map(([rowIndex, images]) => {
-     console.log(`Processing row ${rowIndex} with ${images.length} images`);
+     logger.log(`Processing row ${rowIndex} with ${images.length} images`);
      return images;
    });
 
@@ -176,7 +177,7 @@ const organizeImagesIntoRows = (
   const finalRows = rows.filter((row) => row && row.length > 0);
 
   // Log the final organized rows
-  console.log("Final organized rows:", finalRows.map((row, i) =>
+  logger.log("Final organized rows:", finalRows.map((row, i) =>
     `Row ${i}: ` + row.map(img => `(id: ${img.id}, col: ${img.column}, width: ${img.columnWidth}%)`).join(', ')
   ));
 
@@ -215,10 +216,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({
   useEffect(() => {
     const newRows = organizeImagesIntoRows(pendingImages, uploadedImages);
     // Debug the layout information
-    console.log("Organizing images with layout info:",
+    logger.log("Organizing images with layout info:",
       pendingImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })),
       uploadedImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })));
-    // console.log("Organized Rows:", JSON.stringify(newRows, null, 2)); // Debugging
+    // logger.log("Organized Rows:", JSON.stringify(newRows, null, 2)); // Debugging
     setRows(newRows);
   }, [pendingImages, uploadedImages]);
 
@@ -250,7 +251,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
       return;
     }
     setDraggingImage(image);
-    // console.log("Drag Start:", image.id, `Row: ${rowIndex}`, `Col: ${columnIndex}`); // Debug
+    // logger.log("Drag Start:", image.id, `Row: ${rowIndex}`, `Col: ${columnIndex}`); // Debug
     e.dataTransfer.setData('text/plain', JSON.stringify({
       id: image.id, // Use image id for identification
       isPending: isPendingImage(image),
@@ -326,7 +327,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
     foundAtIndex = sourceCollection.findIndex(img => img.id === imageId);
 
     if (foundAtIndex === -1) {
-        console.error("Could not find dragged image in original collection!");
+        logger.error("Could not find dragged image in original collection!");
         handleDragEnd(); // Reset state
         return;
     }
@@ -334,18 +335,18 @@ const ImageGrid: React.FC<ImageGridProps> = ({
     imageToMove = rows[sourceRowIndex]?.[sourceColumnIndex];
 
      if (!imageToMove) {
-        console.error("Inconsistency: Dragged image not found in current rows state at source index");
+        logger.error("Inconsistency: Dragged image not found in current rows state at source index");
          // Fallback: Try finding by ID in flattened rows
         const flatImages = rows.flat();
         imageToMove = flatImages.find(img => img.id === imageId && isPendingImage(img) === isSourcePending);
         if (!imageToMove) {
-            console.error("Could not find dragged image anywhere!");
+            logger.error("Could not find dragged image anywhere!");
             handleDragEnd();
             return;
         }
         // If found via fallback, we might not know the exact sourceRow/Col index *relative to current state*
         // This indicates a potential logic issue elsewhere, but we can try to proceed
-        console.warn("Found image via fallback, drag/drop might be slightly off.");
+        logger.warn("Found image via fallback, drag/drop might be slightly off.");
     }
 
 
@@ -365,7 +366,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
      }
 
     if (actualSourceRowIndex === -1) {
-        console.error("Cannot find image to remove during drop!");
+        logger.error("Cannot find image to remove during drop!");
         handleDragEnd();
         return;
     }

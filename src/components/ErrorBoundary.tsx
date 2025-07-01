@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo } from 'react';
 import { Box, Typography, Button, Paper } from '@mui/material';
 import { Error as ErrorIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import { keyframes } from '@mui/system';
+import { error } from '../utils/logger';
 
 const shake = keyframes`
   0%, 100% {
@@ -39,13 +40,13 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  componentDidCatch(err: Error, errorInfo: ErrorInfo) {
     this.setState({
-      error,
+      error: err,
       errorInfo
     });
     // You can also log the error to an error reporting service here
-    console.error('Error caught by ErrorBoundary:', error, errorInfo);
+    error('Error caught by ErrorBoundary:', err, errorInfo);
   }
 
   handleRefresh = () => {

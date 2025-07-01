@@ -2,6 +2,8 @@
  * Utility functions for handling text selection and positioning
  */
 
+import { error } from "../../../../utils/logger";
+
 export interface Position {
   top: number;
   left: number;
@@ -31,8 +33,8 @@ export function getSelectionRect(): DOMRect | null {
     }
     
     return rect;
-  } catch (error) {
-    console.error('Error getting selection rect:', error);
+  } catch (error_) {
+    error('Error getting selection rect:', error_);
     return null;
   }
 }
@@ -45,8 +47,8 @@ export function hasValidSelection(): boolean {
   try {
     const selection = window.getSelection();
     return Boolean(selection && !selection.isCollapsed && selection.rangeCount > 0);
-  } catch (error) {
-    console.error('Error checking selection:', error);
+  } catch (error_) {
+    error('Error checking selection:', error_);
     return false;
   }
 }
@@ -124,8 +126,8 @@ export function getToolbarDimensions(toolbarElement: HTMLElement | null): Toolba
                    (toolbarElement.offsetHeight > 20) ? toolbarElement.offsetHeight : 48;
 
     return { width, height };
-  } catch (error) {
-    console.error('Error getting toolbar dimensions:', error);
+  } catch (error_) {
+    error('Error getting toolbar dimensions:', error_);
     return { width: 400, height: 48 };
   }
 }
@@ -141,8 +143,8 @@ export function isClickOutside(target: Node, elements: (HTMLElement | null)[]): 
     if (!element) return true;
     try {
       return !element.contains(target);
-    } catch (error) {
-      console.error('Error checking if click is outside element:', error);
+    } catch (error_) {
+      error('Error checking if click is outside element:', error_);
       return true;
     }
   });

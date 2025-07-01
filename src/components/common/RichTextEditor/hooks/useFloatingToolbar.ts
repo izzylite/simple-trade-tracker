@@ -8,6 +8,7 @@ import {
   isClickOutside,
   type Position 
 } from '../utils/selectionUtils';
+import { error } from '../../../../utils/logger';
 
 interface UseFloatingToolbarProps {
   disabled: boolean;
@@ -70,8 +71,8 @@ export function useFloatingToolbar({
           }
           return;
         }
-      } catch (error) {
-        console.error('Error positioning toolbar:', error);
+      } catch (err) {
+        error('Error positioning toolbar:', err);
         // Fall through to hide toolbar on error
       }
     }

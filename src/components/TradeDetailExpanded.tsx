@@ -50,6 +50,7 @@ import EconomicEventListItem from './economicCalendar/EconomicEventListItem';
 import { economicCalendarService } from '../services/economicCalendarService';
 import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
 import { DEFAULT_FILTER_SETTINGS } from './economicCalendar/EconomicCalendarDrawer';
+import { logger } from '../utils/logger';
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -206,7 +207,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
       }));
       setTrade(result!!);
     } catch (error) {
-      console.error('Error toggling pin status:', error);
+      logger.error('Error toggling pin status:', error);
     } finally {
       setIsPinning(false);
     }
@@ -246,7 +247,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
       setAllEconomicEvents(sortedEvents);
       setEconomicEvents(sortedEvents);
     } catch (error) {
-      console.error('Error fetching economic events:', error);
+      logger.error('Error fetching economic events:', error);
       setEconomicEventsError('Failed to load economic events');
     } finally {
       setLoadingEconomicEvents(false);

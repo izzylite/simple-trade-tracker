@@ -24,6 +24,7 @@ import {
 } from '@mui/icons-material';
 import Shimmer from '../Shimmer';
 import { unsplashCache, UnsplashImage } from '../../services/unsplashCache';
+import { logger } from '../../utils/logger';
 
 
 
@@ -120,7 +121,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
       // Check cache first
       const cachedImages = unsplashCache.getCachedImages(query);
       if (cachedImages) {
-        console.log(`Loading ${cachedImages.length} images from cache for query: "${query}"`);
+        logger.log(`Loading ${cachedImages.length} images from cache for query: "${query}"`);
         setImages(cachedImages);
         setIsFromCache(true);
         setLoading(false);
@@ -128,7 +129,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
       }
 
       if (!UNSPLASH_ACCESS_KEY) {
-        console.warn('Unsplash API key not configured, using placeholder images');
+        logger.warn('Unsplash API key not configured, using placeholder images');
         const placeholderImages = generatePlaceholderImages(query);
         setImages(placeholderImages);
         // Cache placeholder images too
@@ -137,7 +138,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
         return;
       }
 
-      console.log(`Fetching images from Unsplash API for query: "${query}"`);
+      logger.log(`Fetching images from Unsplash API for query: "${query}"`);
       const response = await fetch(
         `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=24&orientation=landscape`,
         {
@@ -152,16 +153,16 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
         setImages(data.results);
         // Cache the results
         unsplashCache.cacheImages(query, data.results);
-        console.log(`Cached ${data.results.length} images for query: "${query}"`);
+        logger.log(`Cached ${data.results.length} images for query: "${query}"`);
       } else {
-        console.error('Failed to fetch images from Unsplash');
+        logger.error('Failed to fetch images from Unsplash');
         const placeholderImages = generatePlaceholderImages(query);
         setImages(placeholderImages);
         // Cache placeholder images as fallback
         unsplashCache.cacheImages(query, placeholderImages);
       }
     } catch (error) {
-      console.error('Error fetching images:', error);
+      logger.error('Error fetching images:', error);
       const placeholderImages = generatePlaceholderImages(query);
       setImages(placeholderImages);
       // Cache placeholder images as fallback
@@ -181,7 +182,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
           },
         });
       } catch (error) {
-        console.error('Error triggering download endpoint:', error);
+        logger.error('Error triggering download endpoint:', error);
       }
     }
 
@@ -209,7 +210,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
       // Clean up expired cache entries
       const removedCount = unsplashCache.removeExpiredEntries();
       if (removedCount > 0) {
-        console.log(`Removed ${removedCount} expired cache entries`);
+        logger.log(`Removed ${removedCount} expired cache entries`);
       }
 
       // Load default images if none are loaded

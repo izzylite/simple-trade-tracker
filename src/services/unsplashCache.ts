@@ -1,3 +1,5 @@
+import { logger } from "../utils/logger";
+
 interface UnsplashImage {
   id: string;
   urls: {
@@ -64,7 +66,7 @@ class UnsplashCacheService {
 
       return entry.images;
     } catch (error) {
-      console.warn('Error reading from Unsplash cache:', error);
+      logger.warn('Error reading from Unsplash cache:', error);
       return null;
     }
   }
@@ -95,7 +97,7 @@ class UnsplashCacheService {
       // Save to localStorage
       this.saveCache(cache);
     } catch (error) {
-      console.warn('Error saving to Unsplash cache:', error);
+      logger.warn('Error saving to Unsplash cache:', error);
     }
   }
 
@@ -114,7 +116,7 @@ class UnsplashCacheService {
     try {
       localStorage.removeItem(this.CACHE_KEY);
     } catch (error) {
-      console.warn('Error clearing Unsplash cache:', error);
+      logger.warn('Error clearing Unsplash cache:', error);
     }
   }
 
@@ -145,7 +147,7 @@ class UnsplashCacheService {
         newestEntry: Math.max(...timestamps)
       };
     } catch (error) {
-      console.warn('Error getting cache stats:', error);
+      logger.warn('Error getting cache stats:', error);
       return {
         totalEntries: 0,
         totalSize: 0,
@@ -177,7 +179,7 @@ class UnsplashCacheService {
 
       return removedCount;
     } catch (error) {
-      console.warn('Error removing expired cache entries:', error);
+      logger.warn('Error removing expired cache entries:', error);
       return 0;
     }
   }
@@ -198,7 +200,7 @@ class UnsplashCacheService {
         .map(entry => entry.query)
         .filter(query => query.length > 0);
     } catch (error) {
-      console.warn('Error getting popular queries:', error);
+      logger.warn('Error getting popular queries:', error);
       return [];
     }
   }
@@ -210,7 +212,7 @@ class UnsplashCacheService {
       const cached = localStorage.getItem(this.CACHE_KEY);
       return cached ? JSON.parse(cached) : {};
     } catch (error) {
-      console.warn('Error parsing cache data, clearing cache:', error);
+      logger.warn('Error parsing cache data, clearing cache:', error);
       this.clearCache();
       return {};
     }
@@ -222,15 +224,15 @@ class UnsplashCacheService {
     } catch (error) {
       if (error instanceof DOMException && error.code === 22) {
         // Storage quota exceeded, clear some cache
-        console.warn('Storage quota exceeded, cleaning cache...');
+        logger.warn('Storage quota exceeded, cleaning cache...');
         this.aggressiveCleanup(cache);
         try {
           localStorage.setItem(this.CACHE_KEY, JSON.stringify(cache));
         } catch (retryError) {
-          console.warn('Failed to save cache even after cleanup:', retryError);
+          logger.warn('Failed to save cache even after cleanup:', retryError);
         }
       } else {
-        console.warn('Error saving cache:', error);
+        logger.warn('Error saving cache:', error);
       }
     }
   }
@@ -245,7 +247,7 @@ class UnsplashCacheService {
       delete cache[query];
       this.saveCache(cache);
     } catch (error) {
-      console.warn('Error removing cache entry:', error);
+      logger.warn('Error removing cache entry:', error);
     }
   }
 

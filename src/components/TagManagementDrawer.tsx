@@ -35,6 +35,7 @@ import {
   getUniqueTagGroups
 } from '../utils/tagColors';
 import { Calendar } from '../types/calendar';
+import { logger } from '../utils/logger';
 
 interface TagManagementDrawerProps {
   open: boolean;
@@ -124,7 +125,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
   }, [filteredTags]);
 
   const handleTagEditSuccess = (oldTag: string, newTag: string, tradesUpdated: number) => {
-    console.log(`Tag update completed: ${oldTag} -> ${newTag}, ${tradesUpdated} trades updated`);
+    logger.log(`Tag update completed: ${oldTag} -> ${newTag}, ${tradesUpdated} trades updated`);
 
     // Check if this was a tag group name change
     const oldGroup = isGroupedTag(oldTag) ? getTagGroup(oldTag) : null;

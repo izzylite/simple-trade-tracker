@@ -19,6 +19,7 @@ import {
   calculateRiskAmount,
   DynamicRiskSettings
 } from '../../utils/dynamicRiskUtils';
+import { error, log, logger } from '../../utils/logger';
 
 interface FormDialogProps {
   open: boolean;
@@ -168,7 +169,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       }
 
     } catch (error) {
-      console.error('Error creating empty trade:', error);
+      logger.error('Error creating empty trade:', error);
       showErrorSnackbar(error instanceof Error ?
         `Failed to create temporary trade: ${error.message}` :
         'Failed to create temporary trade. Please try again.');
@@ -254,7 +255,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     try {
       return onUpdateTradeProperty(tradeId, updateCallback, createIfNotExists);
     } catch (error) {
-      console.error('Error updating trade property:', error);
+      logger.error('Error updating trade property:', error);
       showErrorSnackbar(error instanceof Error ? error.message : 'Failed to update trade property. Please try again.');
     }
   };
@@ -309,7 +310,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
   const createFinalTradeData = (newTrade: NewTradeForm, date: Date) => {
     let finalAmount = calculateFinalAmount(newTrade);
-    console.log(`trade final amount ${finalAmount}`)
+    logger.log(`trade final amount ${finalAmount}`)
 
     // Process tags to ensure proper formatting
     let finalTags = processTagsForSubmission([...newTrade.tags]);
@@ -515,7 +516,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       }
     }
     catch (error) {
-      console.error('Error creating empty trade:', error);
+      logger.error('Error creating empty trade:', error);
     }
   };
   // Function to start uploading an image
@@ -613,7 +614,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
 
         } catch (updateError) {
-          console.error('Error updating trade with new image:', updateError);
+          logger.error('Error updating trade with new image:', updateError);
 
           // Show error message to the user
           showErrorSnackbar(updateError instanceof Error ?
@@ -624,7 +625,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         }
       }
     } catch (error) {
-      console.error('Error uploading image:', error);
+      logger.error('Error uploading image:', error);
 
       // Update UI to show upload failed
       setNewTrade(prev => ({
@@ -645,7 +646,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         if (image.uploadProgress !== undefined && image.uploadProgress > 0 && image.uploadProgress < 100) {
           // Image is currently uploading, we shouldn't allow caption changes
           // This is a fallback in case the UI field wasn't disabled properly
-          console.warn('Attempted to change caption of an image that is currently uploading');
+          logger.warn('Attempted to change caption of an image that is currently uploading');
           return;
         }
 
@@ -666,7 +667,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         }));
       }
     } catch (error) {
-      console.error('Error in handleImageCaptionChange:', error);
+      logger.error('Error in handleImageCaptionChange:', error);
       // Don't show error to user for caption changes as it's not critical
     }
   };
@@ -680,7 +681,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         if (image.uploadProgress !== undefined && image.uploadProgress > 0 && image.uploadProgress < 100) {
           // Image is currently uploading, we shouldn't allow deletion
           // This is a fallback in case the UI button wasn't hidden properly
-          console.warn('Attempted to delete an image that is currently uploading');
+          logger.warn('Attempted to delete an image that is currently uploading');
           showErrorSnackbar('Cannot delete an image while it\'s uploading. Please wait for the upload to complete.');
           return;
         }
@@ -709,21 +710,21 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             images: (trade.images || []).filter(img => img.id !== image.id)
           }));
 
-          console.log(`Image ${image.id} deleted and trade updated successfully`);
+          logger.log(`Image ${image.id} deleted and trade updated successfully`);
         } catch (deleteError) {
-          console.error('Error deleting image or updating trade:', deleteError);
+          logger.error('Error deleting image or updating trade:', deleteError);
           // Don't show error to user since the image is already removed from UI
           // and will be properly cleaned up when the form is submitted
         }
       }
     } catch (error) {
-      console.error('Error in handleImageRemove:', error);
+      logger.error('Error in handleImageRemove:', error);
       showErrorSnackbar('Failed to remove image. Please try again.');
     }
   };
   // Handle image reordering
   const handleImagesReordered = async (images: Array<GridImage | GridPendingImage>) => {
-    console.log("handleImagesReordered called with images:",
+    logger.log("handleImagesReordered called with images:",
       images.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })));
 
     // Separate pending and uploaded images
@@ -848,9 +849,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               ...trade,
               isDeleted: true
             }));
-            console.log('Cleaned up temporary trade after failed update');
+            log('Cleaned up temporary trade after failed update');
           } catch (cleanupError) {
-            console.error('Failed to cleanup temporary trade:', cleanupError);
+            error('Failed to cleanup temporary trade:', cleanupError);
           }
         }
 
@@ -858,9 +859,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         throw dbError;
       }
 
-    } catch (error) {
-      console.error('Error in trade submission:', error);
-      showErrorSnackbar(error instanceof Error ? error.message : 'Failed to add trade. Please try again.');
+    } catch (err) {
+      error('Error in trade submission:', err);
+      showErrorSnackbar(err instanceof Error ? err.message : 'Failed to add trade. Please try again.');
 
       // Don't close the dialog on error - let the user try again or cancel manually
 
@@ -955,7 +956,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           ];
 
           // Debug what's being saved to Firebase
-          // console.log("Saving images to Firebase with layout info in handleEditSubmit:",
+          // logger.log("Saving images to Firebase with layout info in handleEditSubmit:",
           //   updatedImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })));
 
           await handleUpdateTradeProperty(editingTrade.id, (trade) => {
@@ -982,12 +983,12 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               images: updatedImages
             };
           });
-          console.log('Trade updated successfully');
+          logger.log('Trade updated successfully');
         } else {
           throw new Error('Cannot update trade: Missing trade ID');
         }
       } catch (editError) {
-        console.error('Error updating trade:', editError);
+        logger.error('Error updating trade:', editError);
         throw new Error(`Failed to update trade: ${editError instanceof Error ? editError.message : 'Unknown error'}`);
       }
 
@@ -998,7 +999,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       // No need to explicitly recalculate cumulative PnL
       // It will be calculated directly in the DayHeader component
     } catch (error) {
-      console.error('Error editing trade:', error);
+      logger.error('Error editing trade:', error);
       showErrorSnackbar(error instanceof Error ? error.message : 'Failed to edit trade. Please try again.');
     } finally {
       setIsSubmitting(false);

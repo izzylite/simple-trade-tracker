@@ -27,6 +27,7 @@ import {
   isSameMonth,
   isSameYear
 } from 'date-fns';
+import { logger } from '../utils/logger';
 
 /**
  * Main score calculation service
@@ -275,7 +276,7 @@ export class ScoreService {
         return 'stable';
       }
     } catch (error) {
-      console.error('Error calculating trend:', error);
+      logger.error('Error calculating trend:', error);
       return 'stable';
     }
   }

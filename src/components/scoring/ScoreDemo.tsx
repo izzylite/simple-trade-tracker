@@ -3,6 +3,7 @@ import { Box, Typography, Paper, Chip, useTheme } from '@mui/material';
 import { Trade } from '../../types/trade';
 import { scoreService } from '../../services/scoreService';
 import { getTagChipStyles } from '../../utils/tagColors';
+import { logger } from '../../utils/logger';
 
 // Demo component to test scoring functionality
 const ScoreDemo: React.FC = () => {
@@ -76,7 +77,7 @@ const ScoreDemo: React.FC = () => {
         setScoreAnalysis(analysis);
         setScoreSummary(summary);
       } catch (error) {
-        console.error('Error calculating demo scores:', error);
+        logger.error('Error calculating demo scores:', error);
       } finally {
         setLoading(false);
       }

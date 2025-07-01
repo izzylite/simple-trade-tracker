@@ -10,6 +10,7 @@ import {
 import * as calendarService from '../services/calendarService';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../utils/tagColors';
 import { BaseDialog } from './common';
+import { logger } from '../utils/logger';
 
 interface TagEditDialogProps {
   open: boolean;
@@ -67,7 +68,7 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
         setError('Failed to update tag');
       }
     } catch (error) {
-      console.error('Error updating tag:', error);
+      logger.error('Error updating tag:', error);
       setError(error instanceof Error ? error.message : 'An unknown error occurred');
     } finally {
       setIsSubmitting(false);

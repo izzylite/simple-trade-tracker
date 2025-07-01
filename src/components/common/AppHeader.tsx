@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -22,6 +22,8 @@ import {
 import { useTheme, alpha } from '@mui/material/styles';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { error } from '../../utils/logger';
+import DebugPanel from './DebugPanel';
 
 interface AppHeaderProps {
   onToggleTheme: () => void;
@@ -44,25 +46,42 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut, signInWithGoogle } = useAuth();
+  const [debugPanelOpen, setDebugPanelOpen] = useState(false);
 
   const isHomePage = location.pathname === '/';
   const isDashboardPage = location.pathname === '/dashboard';
   const isBlogPage = location.pathname === '/blog';
 
+  // Check if current user is authorized for debug panel
+  const isDebugAuthorized = user?.email === 'isl.israelite@gmail.com';
+
+  // Debug panel keyboard shortcut (Ctrl+Shift+D) - only for authorized user
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key === 'D' && isDebugAuthorized) {
+        event.preventDefault();
+        setDebugPanelOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDebugAuthorized]);
+
   const handleSignOut = async () => {
     try {
       await signOut();
       navigate('/');
-    } catch (error) {
-      console.error('Error signing out:', error);
+    } catch (err) {
+      error('Error signing out:', err);
     }
   };
 
   const handleSignIn = async () => {
     try {
       await signInWithGoogle();
-    } catch (error) {
-      console.error('Failed to sign in:', error);
+    } catch (err) {
+      error('Failed to sign in:', err);
     }
   };
 
@@ -75,6 +94,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   };
 
   return (
+    <>
     <AppBar
       position="fixed"
       color="transparent"
@@ -296,6 +316,15 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         )}
       </Toolbar>
     </AppBar>
+
+    {/* Debug Panel - Only for authorized user */}
+    {isDebugAuthorized && (
+      <DebugPanel
+        open={debugPanelOpen}
+        onClose={() => setDebugPanelOpen(false)}
+      />
+    )}
+  </>
   );
 };
 

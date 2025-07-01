@@ -1,5 +1,6 @@
 import { convertFromRaw } from 'draft-js';
 import { stateToHTML } from 'draft-js-export-html';
+import { logger } from './logger';
 
 /**
  * Converts Draft.js raw content to HTML
@@ -67,7 +68,7 @@ export const convertRichTextToHtml = (rawContent: string): string => {
 
     return html;
   } catch (error) {
-    console.error('Error converting rich text to HTML:', error);
+    logger.error('Error converting rich text to HTML:', error);
     // If conversion fails, return the raw content as plain text
     try {
       // Try to extract text from the JSON

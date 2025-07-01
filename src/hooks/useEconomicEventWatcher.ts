@@ -5,6 +5,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { economicEventWatcher } from '../services/economicEventWatcher';
 import { EconomicEvent } from '../types/economicCalendar';
+import { error, log } from '../utils/logger';
 
 interface UseEconomicEventWatcherProps {
   calendarId?: string;
@@ -37,19 +38,19 @@ export const useEconomicEventWatcher = ({
     if (!isInitialized.current) {
       economicEventWatcher.initialize({
         onEventsUpdated: (events: EconomicEvent[], allEvents: EconomicEvent[], calendarId: string) => {
-          console.log(`📊 ${events.length} events updated simultaneously for calendar ${calendarId}`);
+          log(`📊 ${events.length} events updated simultaneously for calendar ${calendarId}`);
 
           // Dispatch multiple events update
           window.dispatchEvent(new CustomEvent('economicEventsUpdated', {
             detail: { events, allEvents, calendarId }
           }));
         },
-        onError: (error: Error, calendarId: string) => {
-          console.error(`❌ Economic event watcher error for calendar ${calendarId}:`, error);
+        onError: (err: Error, calendarId: string) => {
+          error(`❌ Economic event watcher error for calendar ${calendarId}:`, err);
 
           // You could show a toast notification or handle the error as needed
           window.dispatchEvent(new CustomEvent('economicEventWatcherError', {
-            detail: { error: error.message, calendarId }
+            detail: { error: err.message, calendarId }
           }));
         }
       });
@@ -59,14 +60,14 @@ export const useEconomicEventWatcher = ({
 
   const startWatching = useCallback(() => {
     if (calendarId && isActive) {
-      console.log(`🔍 Starting economic event watching for calendar: ${calendarId}`);
+      log(`🔍 Starting economic event watching for calendar: ${calendarId}`);
       economicEventWatcher.startWatching(calendarId, economicCalendarFilters);
     }
   }, [calendarId, economicCalendarFilters, isActive]);
 
   const stopWatching = useCallback(() => {
     if (calendarId) {
-      console.log(`🛑 Stopping economic event watching for calendar: ${calendarId}`);
+      log(`🛑 Stopping economic event watching for calendar: ${calendarId}`);
       economicEventWatcher.stopWatching(calendarId);
     }
   }, [calendarId]);

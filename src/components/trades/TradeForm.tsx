@@ -468,7 +468,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
 
       {/* Debug layout information */}
       {/* {(() => {
-        console.log("TradeForm rendering with images:",
+        logger.log("TradeForm rendering with images:",
           "Pending:", newTrade.pendingImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })),
           "Uploaded:", newTrade.uploadedImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })));
         return null;

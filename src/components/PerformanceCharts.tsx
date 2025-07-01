@@ -7,6 +7,7 @@ import { Calendar } from '../types/calendar';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import ScoreSection from './ScoreSection';
+import { logger } from '../utils/logger';
 import {
   PnLChartsWrapper,
   WinLossDistribution,
@@ -147,7 +148,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         const data = await calculateChartData(trades, selectedDate, timePeriod);
         setChartData(data);
       } catch (error) {
-        console.error('Error calculating chart data:', error);
+        logger.error('Error calculating chart data:', error);
         setChartData([]);
       } finally {
         setIsCalculatingChartData(false);
