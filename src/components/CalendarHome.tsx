@@ -924,6 +924,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                       monthlyTarget={selectedCalendarForCharts.monthlyTarget ?? undefined}
                       maxDailyDrawdown={selectedCalendarForCharts.maxDailyDrawdown}
                       calendarId={selectedCalendarForCharts.id}
+                      calendar={selectedCalendarForCharts}
                       dynamicRiskSettings={{
                         accountBalance: selectedCalendarForCharts.accountBalance,
                         riskPerTrade: selectedCalendarForCharts.riskPerTrade,

@@ -49,6 +49,7 @@ export interface NewTradeForm {
   pendingImages: Array<PendingImage>;
   uploadedImages: Array<TradeImage>;
   isTemporary?: boolean;
+  economicEvents?: import('../../types/trade').TradeEconomicEvent[];
 }
 
 export interface PendingImage {

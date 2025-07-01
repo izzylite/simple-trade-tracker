@@ -286,6 +286,7 @@ export const createNewTradeData = (): NewTradeForm => ({
   notes: '',
   pendingImages: [],
   uploadedImages: [],
+  economicEvents: [],
 });
 
 

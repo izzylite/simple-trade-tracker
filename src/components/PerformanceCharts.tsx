@@ -47,13 +47,7 @@ interface PerformanceChartsProps {
   dynamicRiskSettings?: DynamicRiskSettings;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
   // Calendar data for economic events filtering
-  calendar?: {
-    economicCalendarFilters?: {
-      currencies: string[];
-      impacts: string[];
-      viewType: 'day' | 'week' | 'month';
-    };
-  };
+  calendar?: Calendar;
 }
 
 type TimePeriod = 'month' | 'year' | 'all';
@@ -193,36 +187,36 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     { label: 'Tag Performance' },
     { label: 'Day of Week' }
   ];
-
-  // Use the utility function for filtering trades
-  const getFilteredTrades = utilGetFilteredTrades;
+ 
+   const filteredTrades = useMemo(() => { 
+    return utilGetFilteredTrades(trades, selectedDate, timePeriod);
+  }, [trades, selectedDate, timePeriod]);
 
   // Calculate Risk to Reward statistics
   const riskRewardStats = useMemo(() => {
-    const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod)
-      .filter(trade => trade.riskToReward !== undefined)
+    const filteredTrades_ = filteredTrades.filter(trade => trade.riskToReward !== undefined)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    if (filteredTrades.length === 0) return { average: 0, max: 0, data: [] };
+    if (filteredTrades_.length === 0) return { average: 0, max: 0, data: [] };
 
-    const riskRewardValues = filteredTrades.map(trade => trade.riskToReward!);
+    const riskRewardValues = filteredTrades_.map(trade => trade.riskToReward!);
     const average = riskRewardValues.reduce((sum, value) => sum + value, 0) / riskRewardValues.length;
     const max = Math.max(...riskRewardValues);
 
     // Create data points for the line graph
-    const data = filteredTrades.map(trade => ({
+    const data = filteredTrades_.map(trade => ({
       date: format(new Date(trade.date), timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
       rr: trade.riskToReward || 0
     }));
 
     return { average, max, data };
-  }, [trades, selectedDate, timePeriod, getFilteredTrades]);
+  }, [trades, selectedDate, timePeriod]);
 
   // Chart data is now calculated asynchronously in useEffect above
 
   // Calculate win/loss statistics
   const winLossStats = useMemo(() => {
-    const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod);
+    
 
     const wins = filteredTrades.filter(trade => trade.type === 'win');
     const losses = filteredTrades.filter(trade => trade.type === 'loss');
@@ -318,7 +312,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         avgAmount: avgBreakeven
       }
     };
-  }, [trades, selectedDate, timePeriod, getFilteredTrades]);
+  }, [trades, selectedDate, timePeriod, filteredTrades]);
 
   // Calculate win/loss distribution data for pie chart
   const winLossData = useMemo(() => {
@@ -335,27 +329,26 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   const comparisonWinLossData = useMemo(() => {
     if (comparisonTags.length === 0) return null;
 
-    const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod)
+    const filteredTrades_ = filteredTrades
       .filter(trade => {
         if (!trade.tags) return false;
         return comparisonTags.some(tag => trade.tags!.includes(tag));
       });
 
-    const wins = filteredTrades.filter(trade => trade.type === 'win');
-    const losses = filteredTrades.filter(trade => trade.type === 'loss');
-    const breakevens = filteredTrades.filter(trade => trade.type === 'breakeven');
+    const wins = filteredTrades_.filter(trade => trade.type === 'win');
+    const losses = filteredTrades_.filter(trade => trade.type === 'loss');
+    const breakevens = filteredTrades_.filter(trade => trade.type === 'breakeven');
 
     return [
       { name: 'Wins', value: wins.length },
       { name: 'Losses', value: losses.length },
       { name: 'Breakeven', value: breakevens.length }
     ].filter(item => item.value > 0); // Only include categories with values > 0
-  }, [trades, selectedDate, timePeriod, comparisonTags, getFilteredTrades]);
+  }, [trades, selectedDate, timePeriod, comparisonTags, filteredTrades]);
 
   // Calculate daily summary data
   const dailySummaryData = useMemo(() => {
-    // Get trades filtered by the selected time period
-    const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod);
+   
 
     // Group trades by date
     const tradesByDate = filteredTrades.reduce((acc, trade) => {
@@ -399,12 +392,11 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         };
       })
       .sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
-  }, [trades, selectedDate, timePeriod, getFilteredTrades]);
+  }, [trades, selectedDate, timePeriod, filteredTrades]);
 
   // Add new useMemo for tag statistics
   const tagStats = useMemo(() => {
-    const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod);
-
+   
     // Create a map to store stats for each tag
     const tagMap = new Map<string, { wins: number; losses: number; breakevens: number; totalPnL: number }>();
 
@@ -442,17 +434,17 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         totalPnL: stats.totalPnL
       };
     }).sort((a, b) => b.totalTrades - a.totalTrades); // Sort by total trades descending
-  }, [trades, selectedDate, timePeriod, getFilteredTrades]);
+  }, [trades, selectedDate, timePeriod, filteredTrades]);
 
   // Calculate session performance statistics
   const sessionStats = useMemo(() => {
-    const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod).filter(trade => trade.session !== undefined);
+    const filteredTrades_ = filteredTrades.filter(trade => trade.session !== undefined);
 
     const sessions = ['Asia', 'London', 'NY AM', 'NY PM'];
 
 
     return sessions.map(sessionName => {
-      const sessionTrades = filteredTrades.filter(trade => trade.session === sessionName);
+      const sessionTrades = filteredTrades_.filter(trade => trade.session === sessionName);
       const totalTrades = sessionTrades.length;
       const winners = sessionTrades.filter(trade => trade.type === 'win').length;
       const losers = sessionTrades.filter(trade => trade.type === 'loss').length;
@@ -478,7 +470,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         pnlPercentage
       };
     });
-  }, [trades, selectedDate, timePeriod, accountBalance, getFilteredTrades]);
+  }, [trades, selectedDate, timePeriod, accountBalance, filteredTrades]);
 
   // Get all unique tags
   const allTags = useMemo(() => {
@@ -524,7 +516,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
   // Handle pie chart click to show trades
   const handlePieClick = (category: string) => {
-    const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod);
+     
     let categoryTrades: Trade[] = [];
     let dialogTitle = '';
 
@@ -644,7 +636,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
           {/* Winners and Losers Statistics */}
           <WinLossStats
             winLossStats={winLossStats}
-            trades={getFilteredTrades(trades, selectedDate, timePeriod)}
+            trades={filteredTrades}
             onTradeClick={handleTradeExpand}
           />
 
@@ -783,10 +775,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
                {/* Economic Event Correlation Analysis */}
             <EconomicEventCorrelationAnalysis
-              trades={getFilteredTrades(trades, selectedDate, timePeriod)}
-              selectedDate={selectedDate}
-              timePeriod={timePeriod}
-              calendar={calendar}
+              trades={filteredTrades} 
+              calendar={calendar!}
               setMultipleTradesDialog={setMultipleTradesDialog}
             />
           </Box>

@@ -446,6 +446,8 @@ const convertTradeToFirestoreData = (trade: Trade, calendarId: string) => {
     ...(trade.isTemporary !== undefined && { isTemporary: trade.isTemporary }),
     ...(trade.isPinned !== undefined && { isPinned: trade.isPinned }),
     ...(processedImages && { images: processedImages }),
+    // Economic events
+    ...(trade.economicEvents !== undefined && { economicEvents: trade.economicEvents }),
     // Sharing fields
     ...(trade.shareLink !== undefined && { shareLink: trade.shareLink }),
     ...(trade.isShared !== undefined && { isShared: trade.isShared }),
@@ -554,6 +556,8 @@ const convertFirestoreDataToYearlyTrades = (doc: DocumentData): YearlyTrades => 
       ...trade,
       date: trade.date.toDate(),
       isPinned: trade.isPinned || false, // Ensure isPinned field is included
+      // Economic events
+      ...(trade.economicEvents && { economicEvents: trade.economicEvents }),
       // Sharing fields
       ...(trade.shareLink && { shareLink: trade.shareLink }),
       ...(trade.isShared !== undefined && { isShared: trade.isShared }),

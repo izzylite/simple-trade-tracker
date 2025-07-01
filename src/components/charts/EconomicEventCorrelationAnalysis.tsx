@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -6,29 +6,30 @@ import {
   useTheme,
   Card,
   CardContent,
-  LinearProgress,
   Alert,
   Stack,
   alpha,
-  IconButton,
-  Collapse
+  LinearProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent
 } from '@mui/material';
 import {
   InfoOutlined,
   Analytics,
   TrendingDown,
   TrendingUp,
-  EventNote,
-  ExpandMore,
-  ExpandLess
+  EventNote
 } from '@mui/icons-material';
-import { format, isSameDay, parseISO } from 'date-fns';
-import { Trade } from '../../types/trade';
-import { EconomicEvent, ImpactLevel, Currency } from '../../types/economicCalendar';
-import { economicCalendarService } from '../../services/economicCalendarService';
+import { Trade, TradeEconomicEvent } from '../../types/trade';
+import { ImpactLevel, Currency } from '../../types/economicCalendar';
 import { formatValue } from '../../utils/formatters';
-import { logger } from '../../utils/logger';
+
 import RoundedTabs from '../common/RoundedTabs';
+import { Calendar } from '../../types/calendar';
+import { DEFAULT_FILTER_SETTINGS } from '../economicCalendar/EconomicCalendarDrawer';
 
 // Helper function to get flag URL
 const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {
@@ -38,21 +39,13 @@ const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {
 
 interface EconomicEventCorrelationAnalysisProps {
   trades: Trade[];
-  selectedDate: Date;
-  timePeriod: 'month' | 'year' | 'all';
-  calendar?: {
-    economicCalendarFilters?: {
-      currencies: string[];
-      impacts: string[];
-      viewType: 'day' | 'week' | 'month';
-    };
-  };
+  calendar: Calendar;
   setMultipleTradesDialog?: (dialogState: any) => void;
 }
 
 interface TradeEventCorrelation {
   trade: Trade;
-  economicEvents: EconomicEvent[];
+  economicEvents: TradeEconomicEvent[];
   hasHighImpactEvents: boolean;
   hasMediumImpactEvents: boolean;
   eventCount: number;
@@ -73,8 +66,6 @@ interface EventTradeDetails {
     country?: string;
     flagCode?: string;
     flagUrl?: string;
-    currency: Currency;
-    impact: ImpactLevel;
   };
 }
 
@@ -106,25 +97,30 @@ interface CorrelationStats {
   impactDistribution: Record<ImpactLevel, number>;
 }
 
+
+
 const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysisProps> = ({
   trades,
-  selectedDate,
-  timePeriod,
   calendar,
   setMultipleTradesDialog
 }) => {
   const theme = useTheme();
-  const [economicEvents, setEconomicEvents] = useState<EconomicEvent[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedImpact, setSelectedImpact] = useState<ImpactLevel>('High');
-  const [expanded, setExpanded] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
 
   // Define tabs for impact level selection
   const impactTabs = [
     { label: 'High', value: 'High' },
     { label: 'Medium', value: 'Medium' },
   ];
+
+    
+// Currency options for filtering - using same currencies as calendar settings
+const CURRENCIES = calendar.economicCalendarFilters?.currencies || DEFAULT_FILTER_SETTINGS.currencies
+const CURRENCY_OPTIONS = [
+  { value: 'ALL', label: 'All Currencies' },
+  ...CURRENCIES.map(currency => ({ value: currency, label: currency }))
+];
 
   // Convert string value to tab index for RoundedTabs
   const getImpactTabIndex = (currentImpact: ImpactLevel): number => {
@@ -138,174 +134,40 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
       setSelectedImpact(newImpact);
     }
   };
-
-  // Filter trades based on time period
-  const filteredTrades = useMemo(() => {
-    return trades.filter(trade => {
-      if (timePeriod === 'month') {
-        return trade.date.getMonth() === selectedDate.getMonth() && 
-               trade.date.getFullYear() === selectedDate.getFullYear();
-      } else if (timePeriod === 'year') {
-        return trade.date.getFullYear() === selectedDate.getFullYear();
-      }
-      return true; // 'all' period
-    });
-  }, [trades, selectedDate, timePeriod]);
+ 
 
   // Get losing and winning trades
   const losingTrades = useMemo(() => {
-    return filteredTrades.filter(trade => trade.type === 'loss');
-  }, [filteredTrades]);
+    return trades.filter(trade => trade.type === 'loss');
+  }, [trades]);
 
   const winningTrades = useMemo(() => {
-    return filteredTrades.filter(trade => trade.type === 'win');
-  }, [filteredTrades]);
+    return trades.filter(trade => trade.type === 'win');
+  }, [trades]);
 
-  const allRelevantTrades = useMemo(() => {
-    return [...losingTrades, ...winningTrades];
-  }, [losingTrades, winningTrades]);
 
-  // Helper function to get session time ranges in UTC
-  const getSessionTimeRange = (session: string, tradeDate: Date): { start: Date; end: Date } => {
-    const year = tradeDate.getFullYear();
-    const month = tradeDate.getMonth();
-    const day = tradeDate.getDate();
 
-    // Determine if it's daylight saving time (approximate: March-October)
-    const isDST = month >= 2 && month <= 9;
 
-    let startHour: number, endHour: number;
 
-    switch (session) {
-      case 'London':
-        startHour = isDST ? 7 : 8;  // 7:00 AM UTC (summer) / 8:00 AM UTC (winter)
-        endHour = isDST ? 16 : 17;  // 4:00 PM UTC (summer) / 5:00 PM UTC (winter)
-        break;
-      case 'NY AM':
-        startHour = isDST ? 12 : 13; // 12:00 PM UTC (summer) / 1:00 PM UTC (winter)
-        endHour = isDST ? 17 : 18;   // 5:00 PM UTC (summer) / 6:00 PM UTC (winter)
-        break;
-      case 'NY PM':
-        startHour = isDST ? 17 : 18; // 5:00 PM UTC (summer) / 6:00 PM UTC (winter)
-        endHour = isDST ? 21 : 22;   // 9:00 PM UTC (summer) / 10:00 PM UTC (winter)
-        break;
-      case 'Asia':
-        // Asia session spans midnight, so we need to handle day boundaries
-        const asiaStartHour = isDST ? 22 : 23; // 10:00 PM UTC (summer) / 11:00 PM UTC (winter)
-        const asiaEndHour = isDST ? 7 : 8;     // 7:00 AM UTC (summer) / 8:00 AM UTC (winter)
-
-        // Start time is on the previous day
-        const startDate = new Date(year, month, day - 1, asiaStartHour, 0, 0);
-        const endDate = new Date(year, month, day, asiaEndHour, 0, 0);
-        return { start: startDate, end: endDate };
-      default:
-        // Default to full day range if session is unknown
-        startHour = 0;
-        endHour = 23;
+  // Helper function to filter events by selected currency
+  const filterEventsByCurrency = (events: TradeEconomicEvent[]): TradeEconomicEvent[] => {
+    if (selectedCurrency === 'ALL') {
+      return events.filter(event => CURRENCIES.includes(event.currency));
     }
-
-    const start = new Date(year, month, day, startHour, 0, 0);
-    const end = new Date(year, month, day, endHour, 59, 59);
-
-    return { start, end };
+    return events.filter(event => event.currency === selectedCurrency);
   };
 
-  // Fetch economic events for the date range based on selected impact level
-  useEffect(() => {
-    const fetchEconomicEvents = async () => {
-      if (allRelevantTrades.length === 0 || !expanded) return;
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        // Calculate optimized date range based on trade sessions
-        let overallStartDate: Date | null = null;
-        let overallEndDate: Date | null = null;
-
-        allRelevantTrades.forEach(trade => {
-          if (trade.session) {
-            const sessionRange = getSessionTimeRange(trade.session, trade.date);
-
-            if (!overallStartDate || sessionRange.start < overallStartDate) {
-              overallStartDate = sessionRange.start;
-            }
-            if (!overallEndDate || sessionRange.end > overallEndDate) {
-              overallEndDate = sessionRange.end;
-            }
-          } else {
-            // Fallback for trades without session info - use full day
-            const tradeStart = new Date(trade.date.getFullYear(), trade.date.getMonth(), trade.date.getDate(), 0, 0, 0);
-            const tradeEnd = new Date(trade.date.getFullYear(), trade.date.getMonth(), trade.date.getDate(), 23, 59, 59);
-
-            if (!overallStartDate || tradeStart < overallStartDate) {
-              overallStartDate = tradeStart;
-            }
-            if (!overallEndDate || tradeEnd > overallEndDate) {
-              overallEndDate = tradeEnd;
-            }
-          }
-        });
-
-        // Fallback to simple date range if no session-specific ranges found
-        if (!overallStartDate || !overallEndDate) {
-          const tradeDates = allRelevantTrades.map(trade => trade.date);
-          overallStartDate = new Date(Math.min(...tradeDates.map(d => d.getTime())));
-          overallEndDate = new Date(Math.max(...tradeDates.map(d => d.getTime())));
-        }
-
-        const dateRange = {
-          start: format(overallStartDate, 'yyyy-MM-dd'),
-          end: format(overallEndDate, 'yyyy-MM-dd')
-        };
-
-        const filterSettings = calendar?.economicCalendarFilters;
-        // Only fetch events for the selected impact level to reduce data transfer
-        const events = await economicCalendarService.fetchEvents(dateRange, {
-          currencies: filterSettings?.currencies as Currency[] || ['USD', 'EUR', 'GBP'],
-          impacts: [selectedImpact] // Fetch only the selected impact level
-        });
-
-        setEconomicEvents(events);
-        logger.log(`📊 Fetched ${events.length} ${selectedImpact} impact economic events for session-optimized correlation analysis`);
-        logger.log(`📅 Date range optimized from ${format(overallStartDate, 'yyyy-MM-dd HH:mm')} to ${format(overallEndDate, 'yyyy-MM-dd HH:mm')}`);
-      } catch (err) {
-        logger.error('Failed to fetch economic events for correlation analysis:', err);
-        setError('Failed to load economic events data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEconomicEvents();
-  }, [selectedImpact, expanded, allRelevantTrades.length, calendar?.economicCalendarFilters]);
-
-  // Helper function to check if an economic event falls within a trade's session range
-  const isEventInTradeSession = (event: EconomicEvent, trade: Trade): boolean => {
-    if (!trade.session) {
-      // If trade has no session, fall back to same day matching
-      const eventDate = parseISO(event.date);
-      return isSameDay(trade.date, eventDate);
-    }
-
-    // Get the session time range for the trade
-    const sessionRange = getSessionTimeRange(trade.session, trade.date);
-
-    // Parse the event time (assuming it's in UTC)
-    const eventTime = parseISO(event.timeUtc || event.time);
-
-    // Check if event time falls within the session range
-    return eventTime >= sessionRange.start && eventTime <= sessionRange.end;
-  };
-
-  // Calculate trade-event correlations for both winning and losing trades
+  // Calculate trade-event correlations for both winning and losing trades using stored events
   const losingTradeCorrelations = useMemo((): TradeEventCorrelation[] => {
     return losingTrades.map(trade => {
-      // Find events within the trade's session range
-      const tradeEvents = economicEvents.filter(event => isEventInTradeSession(event, trade));
+      // Use stored economic events from the trade, filtered by selected currency
+      const allTradeEvents = trade.economicEvents || [];
+      const tradeEvents = filterEventsByCurrency(allTradeEvents);
 
-      const hasHighImpactEvents = tradeEvents.some(event => event.impact === 'High');
-      const hasMediumImpactEvents = tradeEvents.some(event => event.impact === 'Medium');
+      // Since we only store mid and high impact events, we can determine impact levels
+      // For now, we'll treat all stored events as having some impact
+      const hasHighImpactEvents = tradeEvents.length > 0; // Simplified - all stored events are considered impactful
+      const hasMediumImpactEvents = tradeEvents.length > 0;
 
       return {
         trade,
@@ -315,15 +177,18 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
         eventCount: tradeEvents.length
       };
     });
-  }, [losingTrades, economicEvents]);
+  }, [losingTrades, selectedCurrency]);
 
   const winningTradeCorrelations = useMemo((): TradeEventCorrelation[] => {
     return winningTrades.map(trade => {
-      // Find events within the trade's session range
-      const tradeEvents = economicEvents.filter(event => isEventInTradeSession(event, trade));
+      // Use stored economic events from the trade, filtered by selected currency
+      const allTradeEvents = trade.economicEvents || [];
+      const tradeEvents = filterEventsByCurrency(allTradeEvents);
 
-      const hasHighImpactEvents = tradeEvents.some(event => event.impact === 'High');
-      const hasMediumImpactEvents = tradeEvents.some(event => event.impact === 'Medium');
+      // Since we only store mid and high impact events, we can determine impact levels
+      // For now, we'll treat all stored events as having some impact
+      const hasHighImpactEvents = tradeEvents.length > 0; // Simplified - all stored events are considered impactful
+      const hasMediumImpactEvents = tradeEvents.length > 0;
 
       return {
         trade,
@@ -333,7 +198,7 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
         eventCount: tradeEvents.length
       };
     });
-  }, [winningTrades, economicEvents]);
+  }, [winningTrades, selectedCurrency]);
 
   // Calculate correlation statistics
   const correlationStats = useMemo((): CorrelationStats => {
@@ -425,18 +290,15 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
       totalLoss: number;
       totalWin: number;
       economicEventDetails?: {
-        country?: string;
         flagCode?: string;
         flagUrl?: string;
-        currency: Currency;
-        impact: ImpactLevel;
       };
     }>();
 
     // Process losing trades
     losingTradeCorrelations.forEach(tc => {
       tc.economicEvents.forEach(event => {
-        const existing = eventTypeMap.get(event.event) || {
+        const existing = eventTypeMap.get(event.name) || {
           losingTrades: [],
           winningTrades: [],
           totalLoss: 0,
@@ -448,22 +310,19 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
         // Store economic event details (use first occurrence)
         if (!existing.economicEventDetails) {
           existing.economicEventDetails = {
-            country: event.country,
             flagCode: event.flagCode,
-            flagUrl: event.flagUrl,
-            currency: event.currency,
-            impact: event.impact
+            flagUrl: getFlagUrl(event.flagCode)
           };
         }
 
-        eventTypeMap.set(event.event, existing);
+        eventTypeMap.set(event.name, existing);
       });
     });
 
     // Process winning trades
     winningTradeCorrelations.forEach(tc => {
       tc.economicEvents.forEach(event => {
-        const existing = eventTypeMap.get(event.event) || {
+        const existing = eventTypeMap.get(event.name) || {
           losingTrades: [],
           winningTrades: [],
           totalLoss: 0,
@@ -475,15 +334,12 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
         // Store economic event details (use first occurrence)
         if (!existing.economicEventDetails) {
           existing.economicEventDetails = {
-            country: event.country,
             flagCode: event.flagCode,
-            flagUrl: event.flagUrl,
-            currency: event.currency,
-            impact: event.impact
+            flagUrl: getFlagUrl(event.flagCode)
           };
         }
 
-        eventTypeMap.set(event.event, existing);
+        eventTypeMap.set(event.name, existing);
       });
     });
 
@@ -546,17 +402,11 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
       mostCommonEventTypes,
       impactDistribution
     };
-  }, [losingTradeCorrelations, winningTradeCorrelations, selectedImpact]);
+  }, [losingTradeCorrelations, winningTradeCorrelations, selectedCurrency]);
 
 
 
-  if (error) {
-    return (
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Alert severity="error">{error}</Alert>
-      </Paper>
-    );
-  }
+
 
   if (losingTrades.length === 0 && winningTrades.length === 0) {
     return (
@@ -572,63 +422,71 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
     );
   }
 
+  const handleCurrencyChange = (event: SelectChangeEvent<string>) => {
+    setSelectedCurrency(event.target.value);
+  };
+
   return (
     <Paper sx={{ mb: 3 }}>
-      <Box sx={{ p: 3, pb: expanded ? 0 : 3 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: expanded ? 2 : 0 }}>
+      <Box sx={{ p: 3 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2, gap: 2 }}>
           <Stack direction="row" alignItems="center" spacing={2} sx={{ flex: 1 }}>
             <Typography
               variant="h6"
               sx={{
                 display: 'flex',
-                width: '100%',
                 alignItems: 'center',
-                fontWeight: 600,
-                color: theme.palette.text.primary
+               
+                gap: 1,
+                color: theme.palette.text.primary,
+                fontWeight: 600
               }}
             >
-              <Analytics sx={{ mr: 1, color: theme.palette.primary.main }} />
+              <Analytics sx={{ color: theme.palette.primary.main }} />
               Economic Event Correlation Analysis
             </Typography>
 
-            {expanded && (
-              <RoundedTabs
-                tabs={impactTabs}
-                activeTab={getImpactTabIndex(selectedImpact)}
-                onTabChange={handleImpactTabChange}
-                size="small"
-               
-              />
-            )}
           </Stack>
 
-          <IconButton
-            onClick={() => setExpanded(!expanded)}
-            sx={{ color: theme.palette.text.secondary }}
-          >
-            {expanded ? <ExpandLess /> : <ExpandMore />}
-          </IconButton>
+          
+            <RoundedTabs
+              tabs={impactTabs}
+              activeTab={getImpactTabIndex(selectedImpact)}
+              onTabChange={handleImpactTabChange}
+              size="small"
+            />
+
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Currency</InputLabel>
+            <Select
+              value={selectedCurrency}
+              onChange={handleCurrencyChange}
+              label="Currency"
+            >
+              {CURRENCY_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Stack>
 
-        {expanded && (
-          <Typography
-            variant="body2"
-            sx={{
-              mb: 3,
-              color: theme.palette.text.secondary,
-              lineHeight: 1.6,
-              maxWidth: '100%'
-            }}
-          >
-            Analyze how economic events impact your trading performance during specific sessions.
-            This analysis correlates your trades with market-moving events to help you identify optimal trading times,
-            improve risk management, and develop session-specific strategies based on historical event patterns.
-          </Typography>
-        )}
-      </Box>
-
-      <Collapse in={expanded}>
-        <Box sx={{ px: 3, pb: 3 }}>
+        <Alert
+          severity="info"
+          sx={{
+            mb: 2,
+            backgroundColor: alpha(theme.palette.info.main, 0.1),
+            '& .MuiAlert-icon': {
+              color: theme.palette.info.main
+            }
+          }}
+        >
+          This analysis correlates your trades with economic events that occurred during the same trading sessions to help identify patterns.
+          {selectedCurrency !== 'ALL' && (
+            <> Currently filtering events for <strong>{selectedCurrency}</strong> currency.</>
+          )}
+        </Alert>
 
       {/* Summary Statistics - Losing Trades */}
       <Typography variant="h6" sx={{ mb: 2, color: 'error.main' }}>
@@ -843,15 +701,7 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
         <Card>
           <CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>Most Common Event Types</Typography>
-            {loading ? (
-              <Box sx={{ py: 3 }}>
-                <LinearProgress />
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-                  Analyzing correlation between trades and economic events...
-                </Typography>
-              </Box>
-            ) : (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                 {correlationStats.mostCommonEventTypes.map((eventType, index) => (
                 <Card
                   key={index}
@@ -870,7 +720,7 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
                             <Box
                               component="img"
                               src={getFlagUrl(eventType.economicEventDetails.flagCode)}
-                              alt={eventType.economicEventDetails.country || eventType.economicEventDetails.currency}
+                              alt={eventType.economicEventDetails.flagCode || 'flag'}
                               sx={{
                                 width: 20,
                                 height: 15,
@@ -988,11 +838,9 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
                   </Typography>
                 )}
               </Box>
-            )}
           </CardContent>
         </Card>
-        </Box>
-      </Collapse>
+      </Box>
     </Paper>
   );
 };

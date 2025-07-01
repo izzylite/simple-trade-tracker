@@ -20,6 +20,7 @@ import {
   DynamicRiskSettings
 } from '../../utils/dynamicRiskUtils';
 import { error, log, logger } from '../../utils/logger';
+import { tradeEconomicEventService } from '../../services/tradeEconomicEventService';
 
 interface FormDialogProps {
   open: boolean;
@@ -97,6 +98,7 @@ export const createEditTradeData = (trade: Trade): NewTradeForm => {
     notes: trade.notes || '',
     pendingImages: [],
     isTemporary: trade.isTemporary,
+    economicEvents: trade.economicEvents || [],
     uploadedImages: trade.images ? trade.images.map((img, index) => ({
       ...img,
       // Ensure layout properties are explicitly preserved
@@ -162,7 +164,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           name: 'New Trade'
         }));
 
-        await onAddTrade({ ...createFinalTradeData(data, date), name: 'New Trade', isTemporary: true });
+        const tradeData = await createFinalTradeData(data, date);
+        await onAddTrade({ ...tradeData, name: 'New Trade', isTemporary: true });
       } else {
         // Handle case where calendarId or onAddTrade is missing
         throw new Error('Unable to create trade: Missing calendar ID or add trade function');
@@ -308,7 +311,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     return trade.type === 'loss' ? -Math.abs(amount) : Math.abs(amount);
   };
 
-  const createFinalTradeData = (newTrade: NewTradeForm, date: Date) => {
+  const createFinalTradeData = async (newTrade: NewTradeForm, date: Date) => {
     let finalAmount = calculateFinalAmount(newTrade);
     logger.log(`trade final amount ${finalAmount}`)
 
@@ -327,6 +330,23 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     // Use the trade's date if it exists (when editing), otherwise use the provided date
     const tradeDate = newTrade.date || date;
 
+    // Fetch economic events for this trade session
+    let economicEvents = newTrade.economicEvents || [];
+
+    // Only fetch events if not already provided (e.g., when editing existing trade)
+    if (economicEvents.length === 0 && newTrade.session) {
+      try {
+        economicEvents = await tradeEconomicEventService.fetchEventsForTrade(
+          tradeDate,
+          newTrade.session
+        );
+        logger.log(`📊 Fetched ${economicEvents.length} economic events for trade session ${newTrade.session}`);
+      } catch (error) {
+        logger.error('Failed to fetch economic events for trade:', error);
+        // Continue without events - don't block trade creation
+      }
+    }
+
     return {
       id: newTrade.id || uuidv4(),
       isTemporary: newTrade.isTemporary,
@@ -344,6 +364,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       ...(newTrade.session && { session: newTrade.session }),
       ...(newTrade.notes && { notes: newTrade.notes }),
       images: newTrade.uploadedImages || [],
+      ...(economicEvents.length > 0 && { economicEvents }),
     }
   }
 
@@ -492,8 +513,34 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         (tradeid: string) => {
           // setIsCreatingEmptyTrade(true);
           // Create a temporary trade object if it doesnt exist
+          // Note: Economic events will be added later via async update
+          const currentDate = new Date();
+          const tradeDate = newTrade!.date || date;
+          const finalAmount = calculateFinalAmount(newTrade!);
+          let finalTags = processTagsForSubmission([...newTrade!.tags]);
+
+          if (newTrade!.partialsTaken) {
+            finalTags = finalTags.filter((tag: string) => !tag.startsWith('Partials:'));
+            finalTags.push('Partials:Yes');
+          }
+
           return {
-            ...createFinalTradeData(newTrade!, date), id: tradeid, name: newTrade!.name || 'New Trade', isTemporary: true
+            id: tradeid,
+            isTemporary: true,
+            date: new Date(tradeDate.getFullYear(), tradeDate.getMonth(), tradeDate.getDate(),
+              currentDate.getHours(), currentDate.getMinutes(), currentDate.getSeconds()),
+            type: newTrade!.type,
+            amount: finalAmount,
+            isDeleting: false,
+            name: newTrade!.name || 'New Trade',
+            ...(newTrade!.entry && { entry: newTrade!.entry }),
+            ...(newTrade!.exit && { exit: newTrade!.exit }),
+            ...(finalTags.length > 0 && { tags: finalTags }),
+            ...(newTrade!.riskToReward && { riskToReward: parseFloat(newTrade!.riskToReward) }),
+            partialsTaken: newTrade!.partialsTaken,
+            ...(newTrade!.session && { session: newTrade!.session }),
+            ...(newTrade!.notes && { notes: newTrade!.notes }),
+            images: newTrade!.uploadedImages || [],
           };
         });
 
@@ -825,7 +872,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       }
       setIsSubmitting(true);
       // Prepare data
-      let tradeData = createFinalTradeData(newTrade!, date);
+      let tradeData = await createFinalTradeData(newTrade!, date);
 
       try {
         // Update the temporary trade with the final data
@@ -983,6 +1030,29 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               images: updatedImages
             };
           });
+
+          // Fetch and update economic events if session changed or if trade doesn't have events
+          if (newTrade!.session && editingTrade.id) {
+            try {
+              const tradeDate = newTrade!.date || editingTrade.date;
+              const economicEvents = await tradeEconomicEventService.fetchEventsForTrade(
+                tradeDate,
+                newTrade!.session
+              );
+
+              if (economicEvents.length > 0) {
+                await handleUpdateTradeProperty(editingTrade.id, (trade) => ({
+                  ...trade,
+                  economicEvents
+                }));
+                logger.log(`📊 Updated trade with ${economicEvents.length} economic events`);
+              }
+            } catch (eventError) {
+              logger.error('Failed to fetch economic events for edited trade:', eventError);
+              // Don't throw - trade update was successful, events are optional
+            }
+          }
+
           logger.log('Trade updated successfully');
         } else {
           throw new Error('Cannot update trade: Missing trade ID');

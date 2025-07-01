@@ -45,14 +45,7 @@ interface MonthlyStatisticsSectionProps {
   onDeleteMultipleTrades?: (tradeIds: string[]) => void;
   onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
-  // Calendar data for economic events filtering
-  calendar?: {
-    economicCalendarFilters?: {
-      currencies: string[];
-      impacts: string[];
-      viewType: 'day' | 'week' | 'month';
-    };
-  };
+  calendar?: Calendar
 }
 
 interface MultipleTradesDialog {

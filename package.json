@@ -45,7 +45,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "migrate-events": "npx ts-node src/scripts/backfillTradeEconomicEvents.ts",
+    "migrate-trade-events": "node migrate-trade-economic-events.js"
   },
   "eslintConfig": {
     "extends": [
