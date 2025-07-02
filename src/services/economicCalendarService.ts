@@ -19,7 +19,8 @@ import {
   limit,
   startAfter,
   DocumentSnapshot,
-  QueryDocumentSnapshot
+  QueryDocumentSnapshot,
+  DocumentData
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { log, error, logger } from '../utils/logger';
@@ -64,23 +65,7 @@ class EconomicCalendarServiceImpl {
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        events.push({
-          id: data.id,
-          currency: data.currency as Currency,
-          event: data.event,
-          impact: data.impact as ImpactLevel,
-          time: data.time?.toDate?.()?.toISOString() || data.timeUtc,
-          timeUtc: data.timeUtc,
-          actual: data.actual || '',
-          forecast: data.forecast || '',
-          previous: data.previous || '',
-          date: data.date,
-          country: data.country || '',
-          flagCode: data.flagCode || '',
-          flagUrl: data.flagUrl || '',
-          isAllDay: false,
-          unixTimestamp: data.unixTimestamp
-        });
+        events.push(this.convertToEconomicEvent(data));
       });
 
       // Apply client-side filtering for  impacts 
@@ -170,23 +155,7 @@ class EconomicCalendarServiceImpl {
 
       eventsToReturn.forEach((doc) => {
         const data = doc.data();
-        events.push({
-          id: data.id,
-          currency: data.currency as Currency,
-          event: data.event,
-          impact: data.impact as ImpactLevel,
-          time: data.time?.toDate?.()?.toISOString() || data.timeUtc,
-          timeUtc: data.timeUtc,
-          actual: data.actual || '',
-          forecast: data.forecast || '',
-          previous: data.previous || '',
-          date: data.date,
-          country: data.country || '',
-          flagCode: data.flagCode || '',
-          flagUrl: data.flagUrl || '',
-          isAllDay: false,
-          unixTimestamp: data.unixTimestamp
-        });
+        events.push(this.convertToEconomicEvent(data));
       });
 
       // Apply client-side filtering for impacts
@@ -256,6 +225,27 @@ class EconomicCalendarServiceImpl {
     };
   }
 
+  convertToEconomicEvent(data: DocumentData): EconomicEvent {
+    return {
+      id: data.id,
+      currency: data.currency as Currency,
+      event: data.event,
+      impact: data.impact as ImpactLevel,
+      time: data.time?.toDate?.()?.toISOString() || data.timeUtc,
+      actualResultType: data.actualResultType || '',
+      timeUtc: data.timeUtc,
+      actual: data.actual || '',
+      forecast: data.forecast || '',
+      previous: data.previous || '',
+      date: data.date,
+      country: data.country || '',
+      flagCode: data.flagCode || '',
+      flagUrl: data.flagUrl || '',
+      isAllDay: false,
+      unixTimestamp: data.unixTimestamp
+    }
+  }
+
   /**
    * Subscribe to real-time updates from database
    */
@@ -279,23 +269,7 @@ class EconomicCalendarServiceImpl {
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        events.push({
-          id: data.id,
-          currency: data.currency as Currency,
-          event: data.event,
-          impact: data.impact as ImpactLevel,
-          time: data.time?.toDate?.()?.toISOString() || data.timeUtc,
-          timeUtc: data.timeUtc,
-          actual: data.actual || '',
-          forecast: data.forecast || '',
-          previous: data.previous || '',
-          date: data.date,
-          country: data.country || '',
-          flagCode: data.flagCode || '',
-          flagUrl: data.flagUrl || '',
-          isAllDay: false,
-          unixTimestamp: data.unixTimestamp
-        });
+        events.push(this.convertToEconomicEvent(data));
       });
 
 
@@ -325,3 +299,5 @@ class EconomicCalendarServiceImpl {
 
 // Export singleton instance
 export const economicCalendarService = new EconomicCalendarServiceImpl();
+
+
