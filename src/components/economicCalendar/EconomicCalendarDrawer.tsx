@@ -67,7 +67,7 @@ import { cleanEventNameForPinning, isEventPinned } from '../../utils/eventNameUt
 type ViewType = 'day' | 'week' | 'month';
 
 // Available currencies and impacts
-const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
+const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF','NZD'];
 const IMPACTS: ImpactLevel[] = ['High', 'Medium', 'Low'];
 
 // Interface for saved filter settings

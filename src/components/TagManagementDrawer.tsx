@@ -136,16 +136,32 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
       setSelectedTagGroup(newGroup);
     }
 
-    // Update local required groups if a group name changed
-    if (oldGroup && newGroup && oldGroup !== newGroup) {
-      const updatedRequiredGroups = localRequiredGroups.map(group =>
-        group === oldGroup ? newGroup : group
+    if (onTagUpdated) {
+      onTagUpdated(oldTag, newTag);
+    }
+  };
+
+  const handleTagDelete = (deletedTag: string, tradesUpdated: number) => {
+    logger.log(`Tag deletion completed: ${deletedTag}, ${tradesUpdated} trades updated`);
+
+    // Check if the deleted tag was from a group we're currently filtering by
+    const deletedGroup = isGroupedTag(deletedTag) ? getTagGroup(deletedTag) : null;
+
+    // If we were filtering by the deleted tag's group, reset the filter to show all groups
+    if (deletedGroup && selectedTagGroup === deletedGroup) {
+      // Check if there are any other tags in this group
+      const otherTagsInGroup = allTags.filter(tag =>
+        tag !== deletedTag && isGroupedTag(tag) && getTagGroup(tag) === deletedGroup
       );
-      setLocalRequiredGroups(updatedRequiredGroups);
+
+      // If no other tags in this group, reset the filter
+      if (otherTagsInGroup.length === 0) {
+        setSelectedTagGroup('');
+      }
     }
 
     if (onTagUpdated) {
-      onTagUpdated(oldTag, newTag);
+      onTagUpdated(deletedTag, ''); // Pass empty string to indicate deletion
     }
   };
 
@@ -357,6 +373,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
           tag={tagToEdit}
           calendarId={calendarId}
           onSuccess={handleTagEditSuccess}
+          onDelete={handleTagDelete}
         />
       )}
     </UnifiedDrawer>

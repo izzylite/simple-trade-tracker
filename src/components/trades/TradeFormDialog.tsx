@@ -20,7 +20,7 @@ import {
   DynamicRiskSettings
 } from '../../utils/dynamicRiskUtils';
 import { error, log, logger } from '../../utils/logger';
-import { tradeEconomicEventService } from '../../services/tradeEconomicEventService';
+import { getRelevantCurrenciesFromTags, tradeEconomicEventService } from '../../services/tradeEconomicEventService';
 
 interface FormDialogProps {
   open: boolean;
@@ -338,7 +338,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       try {
         economicEvents = await tradeEconomicEventService.fetchEventsForTrade(
           tradeDate,
-          newTrade.session
+          newTrade.session,
+          getRelevantCurrenciesFromTags(newTrade!.tags) // Pass trade tags for currency filtering
         );
         logger.log(`📊 Fetched ${economicEvents.length} economic events for trade session ${newTrade.session}`);
       } catch (error) {
@@ -812,7 +813,13 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
   // Check if all required tag groups are present in the trade's tags
   const validateRequiredTagGroups = (tags: string[]): { valid: boolean; missingGroups: string[] } => {
-    if (!requiredTagGroups || requiredTagGroups.length === 0) {
+    // Automatically add "pair" to required tag groups if not already present
+    const effectiveRequiredGroups = [...(requiredTagGroups || [])];
+    if (!effectiveRequiredGroups.includes('pair')) {
+      effectiveRequiredGroups.push('pair');
+    }
+
+    if (effectiveRequiredGroups.length === 0) {
       return { valid: true, missingGroups: [] };
     }
 
@@ -826,7 +833,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     });
 
     // Find missing required groups
-    const missingGroups = requiredTagGroups.filter(group => !presentGroups.has(group));
+    const missingGroups = effectiveRequiredGroups.filter(group => !presentGroups.has(group));
 
     return {
       valid: missingGroups.length === 0,
@@ -1037,7 +1044,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               const tradeDate = newTrade!.date || editingTrade.date;
               const economicEvents = await tradeEconomicEventService.fetchEventsForTrade(
                 tradeDate,
-                newTrade!.session
+                newTrade!.session,
+                getRelevantCurrenciesFromTags(newTrade!.tags)
+                 // Pass trade tags for currency filtering
               );
 
               if (economicEvents.length > 0) {

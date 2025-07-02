@@ -484,6 +484,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
       subtitle="Find trades by tags, notes, or date ranges"
       icon={<SearchIcon />}
       width={{ xs: '100%', sm: 450 }}
+      contentSx={{...scrollbarStyles(theme) }}
       headerVariant="enhanced"
     >
 
