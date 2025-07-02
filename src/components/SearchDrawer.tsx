@@ -170,6 +170,10 @@ const performSearch = (trades: Trade[], query: string, selectedTags: string[] = 
       if (trade.session && trade.session.toLowerCase().includes(term)) {
         return true;
       }
+      // Search by economic events
+      if(trade.economicEvents && trade.economicEvents.some(event => event.name.toLowerCase().includes(term))) {
+        return true;
+      }
 
       return false;
     }
@@ -395,7 +399,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
         }}>
           <TextField
             fullWidth
-            placeholder="Search by name, tags, notes, or session..."
+            placeholder="Search by name, tags, events, or session..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             slotProps={{
