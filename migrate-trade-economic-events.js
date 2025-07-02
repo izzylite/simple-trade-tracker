@@ -61,7 +61,8 @@ function getSessionTimeRange(session, tradeDate) {
   switch (session) {
     case 'London':
       startHour = isDST ? 7 : 8;  // 7:00 AM UTC (summer) / 8:00 AM UTC (winter)
-      endHour = isDST ? 16 : 17;  // 4:00 PM UTC (summer) / 5:00 PM UTC (winter)
+      endHour = isDST ? 12 : 13; // 12:00 PM UTC (summer) / 1:00 PM UTC (winter)
+     // endHour = isDST ? 16 : 17;  // 4:00 PM UTC (summer) / 5:00 PM UTC (winter)  // Right session range but overlaps with NY PM
       break;
     case 'NY AM':
       startHour = isDST ? 12 : 13; // 12:00 PM UTC (summer) / 1:00 PM UTC (winter)
@@ -135,18 +136,15 @@ async function fetchEventsForTrade(tradeDate, session) {
       startDate = new Date(tradeDate.getFullYear(), tradeDate.getMonth(), tradeDate.getDate(), 0, 0, 0);
       endDate = new Date(tradeDate.getFullYear(), tradeDate.getMonth(), tradeDate.getDate(), 23, 59, 59);
     }
-
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
+ 
 
     // Build Firestore query with server-side filtering (same as economicCalendarService)
     const baseCollection = collection(db, 'economicEvents');
     const queryConstraints = [
-      where('date', '>=', startDateStr),
-      where('date', '<=', endDateStr),
+      where('time', '>=', startDate),
+      where('time', '<=', endDate),
       where('impact', 'in', ['High', 'Medium']), // Server-side currency filtering
-      orderBy('date'),
-      orderBy('time'),
+      orderBy('time'), 
     ];
 
     const eventsQuery = query(baseCollection, ...queryConstraints);
@@ -241,10 +239,7 @@ async function updateTradesWithEconomicEvents(calendarId, yearDoc, dryRun = fals
     const batch = trades.slice(i, i + BATCH_SIZE);
     const results = await Promise.all(batch.map(async trade => {
       // Skip if trade already has events or no session
-      if (trade.economicEvents?.length > 0) {
-        console.log(`⏭️  Skipping trade ${trade.id} - has ${trade.economicEvents.length} events`);
-        return { trade, updated: false };
-      }
+    
       if (!trade.session) {
         console.log(`⏭️  Skipping trade ${trade.id} - no session`);
         return { trade, updated: false };

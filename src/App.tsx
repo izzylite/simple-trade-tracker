@@ -19,10 +19,7 @@ import {
   calculateEffectiveRiskPercentage,
   calculateRiskAmount,
   DynamicRiskSettings
-} from './utils/dynamicRiskUtils';
-import EconomicEventNotification from './components/notifications/EconomicEventNotification';
-import { Currency, EconomicEvent } from './types/economicCalendar';
-import { error } from './utils/logger';
+} from './utils/dynamicRiskUtils'; 
 
 // Lazy load components
 const HomePage = lazy(() => import('./components/HomePage'));
@@ -524,8 +521,8 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
         ...updatedStats
       });
 
-    } catch (err) {
-      error('Error adding trade:', err);
+    } catch (error) {
+      console.error('Error adding trade:', error);
 
       // Revert the optimistic update on error
       onUpdateStateCalendar(calendar.id, {

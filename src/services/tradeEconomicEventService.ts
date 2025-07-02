@@ -14,7 +14,7 @@ export class TradeEconomicEventService {
   /**
    * Get session time ranges in UTC for a given trade date
    */
-  private getSessionTimeRange(session: string, tradeDate: Date): { start: Date; end: Date } {
+  getSessionTimeRange(session: string, tradeDate: Date): { start: Date; end: Date } {
     const year = tradeDate.getFullYear();
     const month = tradeDate.getMonth();
     const day = tradeDate.getDate();
@@ -27,7 +27,8 @@ export class TradeEconomicEventService {
     switch (session) {
       case 'London':
         startHour = isDST ? 7 : 8;  // 7:00 AM UTC (summer) / 8:00 AM UTC (winter)
-        endHour = isDST ? 16 : 17;  // 4:00 PM UTC (summer) / 5:00 PM UTC (winter)
+        endHour = isDST ? 12 : 13; // 12:00 PM UTC (summer) / 1:00 PM UTC (winter)
+     // endHour = isDST ? 16 : 17;  // 4:00 PM UTC (summer) / 5:00 PM UTC (winter)  // Right session range but overlaps with NY PM
         break;
       case 'NY AM':
         startHour = isDST ? 12 : 13; // 12:00 PM UTC (summer) / 1:00 PM UTC (winter)

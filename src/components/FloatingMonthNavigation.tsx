@@ -33,11 +33,9 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
   isVisible,
   onPrevMonth,
   onNextMonth,
-  onMonthClick,
-  onTodayClick
+  onMonthClick, 
 }) => {
-  const theme = useTheme();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const theme = useTheme(); 
   const isCurrentMonth = isToday(currentDate);
 
   return (
@@ -164,102 +162,10 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
             </IconButton>
           </Tooltip>
 
-          {/* Expand/Collapse Button */}
-          <Tooltip title={isExpanded ? "Collapse" : "More options"} placement="bottom">
-            <IconButton
-              onClick={() => setIsExpanded(!isExpanded)}
-              size="small"
-              sx={{
-                width: 32,
-                height: 32,
-                color: 'text.secondary',
-                ml: 0.5,
-                transition: 'all 0.2s ease',
-                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                '&:hover': {
-                  color: 'primary.main',
-                  bgcolor: alpha(theme.palette.primary.main, 0.1)
-                }
-              }}
-            >
-              <KeyboardArrowDown fontSize="small" />
-            </IconButton>
-          </Tooltip>
+         
         </Box>
 
-        {/* Expanded Options */}
-        <Fade in={isExpanded}>
-          <Box
-            sx={{
-              display: isExpanded ? 'flex' : 'none',
-              flexDirection: 'column',
-              gap: 0.5,
-              alignItems: 'flex-end'
-            }}
-          >
-            {/* Today Button */}
-            {onTodayClick && (
-              <Tooltip title="Go to today" placement="left">
-                <Chip
-                  icon={<Today fontSize="small" />}
-                  label="Today"
-                  onClick={onTodayClick}
-                  size="small"
-                  variant={isCurrentMonth ? "filled" : "outlined"}
-                  sx={{
-                    backgroundColor: isCurrentMonth
-                      ? alpha(theme.palette.success.main, 0.1)
-                      : alpha(theme.palette.background.paper, 0.95),
-                    backdropFilter: 'blur(20px)',
-                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                    boxShadow: `0 4px 16px ${alpha(theme.palette.common.black, 0.08)}`,
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    height: 32,
-                    px: 1.5,
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      transform: 'scale(1.05)',
-                      boxShadow: `0 6px 20px ${alpha(theme.palette.common.black, 0.12)}`
-                    },
-                    '& .MuiChip-icon': {
-                      fontSize: '16px'
-                    }
-                  }}
-                />
-              </Tooltip>
-            )}
-
-            {/* Calendar Icon Button */}
-            <Tooltip title="Select month" placement="left">
-              <Chip
-                icon={<CalendarMonth fontSize="small" />}
-                label="Calendar"
-                onClick={onMonthClick}
-                size="small"
-                variant="outlined"
-                sx={{
-                  backgroundColor: alpha(theme.palette.background.paper, 0.95),
-                  backdropFilter: 'blur(20px)',
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                  boxShadow: `0 4px 16px ${alpha(theme.palette.common.black, 0.08)}`,
-                  fontWeight: 600,
-                  fontSize: '0.75rem',
-                  height: 32,
-                  px: 1.5,
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    transform: 'scale(1.05)',
-                    boxShadow: `0 6px 20px ${alpha(theme.palette.common.black, 0.12)}`
-                  },
-                  '& .MuiChip-icon': {
-                    fontSize: '16px'
-                  }
-                }}
-              />
-            </Tooltip>
-          </Box>
-        </Fade>
+        
       </Box>
     </Slide>
   );

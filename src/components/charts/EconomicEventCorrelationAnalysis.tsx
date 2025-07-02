@@ -152,9 +152,9 @@ const CURRENCY_OPTIONS = [
   // Helper function to filter events by selected currency
   const filterEventsByCurrency = (events: TradeEconomicEvent[]): TradeEconomicEvent[] => {
     if (selectedCurrency === 'ALL') {
-      return events.filter(event => CURRENCIES.includes(event.currency));
+      return events.filter(event => CURRENCIES.includes(event.currency) && event.impact === selectedImpact);
     }
-    return events.filter(event => event.currency === selectedCurrency);
+    return events.filter(event => event.currency === selectedCurrency && event.impact === selectedImpact);
   };
 
   // Calculate trade-event correlations for both winning and losing trades using stored events
@@ -177,7 +177,7 @@ const CURRENCY_OPTIONS = [
         eventCount: tradeEvents.length
       };
     });
-  }, [losingTrades, selectedCurrency]);
+  }, [losingTrades, selectedCurrency,selectedImpact]);
 
   const winningTradeCorrelations = useMemo((): TradeEventCorrelation[] => {
     return winningTrades.map(trade => {
@@ -742,16 +742,7 @@ const CURRENCY_OPTIONS = [
                           {eventType.count} trades • {eventType.winRate.toFixed(1)}% win rate
                         </Typography>
                       </Box>
-                      {setMultipleTradesDialog && (
-                        <InfoOutlined
-                          fontSize="small"
-                          sx={{
-                            color: 'text.secondary',
-                            ml: 1,
-                            opacity: 0.7
-                          }}
-                        />
-                      )}
+                      
                     </Box>
 
                     <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>

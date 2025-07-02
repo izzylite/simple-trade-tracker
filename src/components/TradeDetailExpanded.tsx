@@ -51,6 +51,7 @@ import { economicCalendarService } from '../services/economicCalendarService';
 import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
 import { DEFAULT_FILTER_SETTINGS } from './economicCalendar/EconomicCalendarDrawer';
 import { logger } from '../utils/logger';
+import { tradeEconomicEventService } from '../services/tradeEconomicEventService';
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -229,14 +230,10 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
       setEconomicEventsError(null);
 
 
-      const sessionRange = getSessionTimeRange(trade.session, trade.date);
-      const startDateStr = sessionRange.start.toISOString().split('T')[0];
-      const endDateStr = sessionRange.end.toISOString().split('T')[0];
-      // Format the trade date to YYYY-MM-DD
-
+      const sessionRange = tradeEconomicEventService.getSessionTimeRange(trade.session!, trade.date); 
       const filterSetting = calendar?.economicCalendarFilters || DEFAULT_FILTER_SETTINGS
       const events = await economicCalendarService.fetchEvents(
-        { start: startDateStr, end: endDateStr },
+        { start: sessionRange.start, end: sessionRange.end },
         {
           currencies: (filterSetting?.currencies as Currency[]),
           impacts: (filterSetting?.impacts as ImpactLevel[])
@@ -1115,7 +1112,4 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 };
 
 export default TradeDetailExpanded;
-function getSessionTimeRange(session: string | undefined, date: Date) {
-  throw new Error('Function not implemented.');
-}
-
+ 

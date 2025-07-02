@@ -44,7 +44,7 @@ class EconomicCalendarServiceImpl {
    * Fetch economic events with database queries and filtering
    */
   async fetchEvents(
-    dateRange: { start: string; end: string },
+    dateRange: { start: string | Date; end: string | Date },
     filters?: {
       currencies?: Currency[];
       impacts?: ImpactLevel[];
@@ -100,7 +100,7 @@ class EconomicCalendarServiceImpl {
     }
   }
 
-  private buildBaseQuery(dateRange: { start: string; end: string }, filters?: {
+  private buildBaseQuery(dateRange: { start: string | Date; end: string | Date }, filters?: {
     currencies?: Currency[];
     impacts?: ImpactLevel[];
     onlyUpcoming?: boolean;
@@ -108,10 +108,10 @@ class EconomicCalendarServiceImpl {
     // Optimized base query builder for economic events
     const baseCollection = collection(db, 'economicEvents');
     const queryConstraints = [
-      where('date', '>=', dateRange.start),
-      where('date', '<=', dateRange.end),
-      orderBy('date'),
-      orderBy('time'),
+      where(typeof dateRange.start === 'string' ? 'date' : 'time', '>=', dateRange.start),
+      where(typeof dateRange.end === 'string' ? 'date' : 'time', '<=', dateRange.end),
+      orderBy(typeof dateRange.end === 'string' ? 'date' : 'time'),
+      orderBy(typeof dateRange.end === 'string' ? 'time' : 'date'),
     ];
 
     // Add currency filter if specified
@@ -135,7 +135,7 @@ class EconomicCalendarServiceImpl {
    * Fetch economic events with pagination support
    */
   async fetchEventsPaginated(
-    dateRange: { start: string; end: string },
+    dateRange: { start: string | Date; end: string | Date },
     options?: PaginationOptions,
     filters?: {
       currencies?: Currency[];
