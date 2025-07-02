@@ -33,7 +33,8 @@ import {
   FilterAlt as FilterIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  DateRange as DateRangeIcon
+  DateRange as DateRangeIcon,
+  Event as EventIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers';
 import { Trade } from '../types/trade';
@@ -102,8 +103,7 @@ interface SearchIndex {
   searchableText: string;
   tags: string[];
   displayTags: string[];
-  date: number;
-  economicEvents: string[];
+  date: number; 
 }
 
 // Build search index for trades
@@ -118,10 +118,15 @@ const buildSearchIndex = (trades: Trade[]): SearchIndex[] => {
       ...(trade.tags || []).map(tag => formatTagForDisplay(tag)),
       ...(trade.economicEvents || []).map(event => event.name)
     ].join(' ').toLowerCase(),
-    tags: (trade.tags || []).map(tag => tag.toLowerCase()),
-    displayTags: (trade.tags || []).map(tag => formatTagForDisplay(tag).toLowerCase()),
+    tags: [
+      ...(trade.tags || []).map(tag => tag.toLowerCase()),
+      ...(trade.economicEvents || []).map(event => event.name.toLowerCase())
+    ],
+    displayTags: [
+      ...(trade.tags || []).map(tag => formatTagForDisplay(tag).toLowerCase()),
+      ...(trade.economicEvents || []).map(event => event.name.toLowerCase())
+    ],
     date: new Date(trade.date).getTime(),
-    economicEvents: (trade.economicEvents || []).map(event => event.name.toLowerCase())
   }));
 };
 
@@ -181,7 +186,7 @@ const performOptimizedSearch = (
       // Multiple terms - ALL must match in tags
       filteredIndices = filteredIndices.filter(index =>
         searchTerms.every(term =>
-          index.tags.some(tag => tag.includes(term)) ||
+          index.tags.some(tag => tag.includes(term)) || 
           index.displayTags.some(tag => tag.includes(term))
         )
       );
@@ -202,56 +207,58 @@ const performOptimizedSearch = (
 };
 
 // Optimized tag suggestion function with memoization
-const getSuggestedTags = (() => {
+const getSuggestedTagsAndEvents = (() => {
   const cache = new Map<string, string[]>();
   const MAX_CACHE_SIZE = 100;
 
-  return (allTags: string[], query: string): string[] => {
+  return (allTags: string[], allEvents: string[], query: string): string[] => {
     if (!query.trim()) return [];
 
-    // Check cache first
-    const cacheKey = `${allTags.length}-${query.toLowerCase()}`;
+    const cacheKey = `${allTags.length}-${allEvents.length}-${query.toLowerCase()}`;
     if (cache.has(cacheKey)) {
       return cache.get(cacheKey)!;
     }
 
-    // Get the last term being typed (for multi-tag support)
     const terms = query.split(/[,;\s]+/).map(term => term.trim()).filter(term => term.length > 0);
     const lastTerm = terms[terms.length - 1]?.toLowerCase() || '';
-
     if (!lastTerm) return [];
 
-    // Filter out tags that are already in the search query
     const existingTags = new Set(terms.slice(0, -1).map(term => term.toLowerCase()));
 
-    const suggestions = allTags
-      .filter(tag => {
+    // Combine tags and events for suggestions
+    const suggestions = [
+      ...allTags.filter(tag => {
         const lowerTag = tag.toLowerCase();
         const displayTag = formatTagForDisplay(tag).toLowerCase();
-
-        // Don't suggest tags that are already included
-        if (existingTags.has(lowerTag) || existingTags.has(displayTag)) {
-          return false;
-        }
-
-        // Match the current term being typed
+        if (existingTags.has(lowerTag) || existingTags.has(displayTag)) return false;
         return lowerTag.includes(lastTerm) || displayTag.includes(lastTerm);
+      }),
+      ...allEvents.filter(eventName => {
+        const lowerEvent = eventName.toLowerCase();
+        if (existingTags.has(lowerEvent)) return false;
+        return lowerEvent.includes(lastTerm);
       })
-      .slice(0, 5); // Limit to 5 suggestions
+    ].slice(0, 5);
 
-    // Cache the result
     if (cache.size >= MAX_CACHE_SIZE) {
-      // Clear oldest entries
       const firstKey = cache.keys().next().value;
-      if (firstKey) {
-        cache.delete(firstKey);
-      }
+      if (firstKey) cache.delete(firstKey);
     }
     cache.set(cacheKey, suggestions);
 
     return suggestions;
   };
 })();
+
+const getAllEventNames = (trades: Trade[]): string[] => {
+  const eventSet = new Set<string>();
+  trades.forEach(trade => {
+    (trade.economicEvents || []).forEach(event => {
+      if (event.name) eventSet.add(event.name);
+    });
+  });
+  return Array.from(eventSet);
+};
 
 const SearchDrawer: React.FC<SearchDrawerProps> = ({
   open,
@@ -338,13 +345,13 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
       scheduleWork(() => {
         try {
           const results = performOptimizedSearch(trades, searchIndex, debouncedSearchQuery, selectedTags, dateFilter);
-          const suggestions = getSuggestedTags(allTags, debouncedSearchQuery);
+          const suggestedTagsAndEvents = getSuggestedTagsAndEvents(allTags, getAllEventNames(trades), debouncedSearchQuery);
 
           // Store all results for pagination
           setAllFilteredTrades(results);
           // Reset to first page when search changes
           setCurrentPage(1);
-          setSuggestedTags(suggestions);
+          setSuggestedTags(suggestedTagsAndEvents);
         } catch (error) {
           logger.error('Search error:', error);
           setAllFilteredTrades([]);
@@ -449,17 +456,14 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
   };
 
   const handleTagClick = useCallback((tag: string) => {
-    // Smart tag appending for multi-tag search with memoized term parsing
-    const currentTerms = useMemo(() =>
-      searchQuery.split(/[,;\s]+/).map(term => term.trim()).filter(term => term.length > 0),
-      [searchQuery]
-    );
+    const currentTerms = searchQuery
+      .split(/[,;\s]+/)
+      .map(term => term.trim())
+      .filter(term => term.length > 0);
 
     if (currentTerms.length === 0) {
-      // No existing terms, just set the tag
       setSearchQuery(tag);
     } else {
-      // Replace the last term (which is being typed) with the selected tag
       const newTerms = [...currentTerms.slice(0, -1), tag];
       setSearchQuery(newTerms.join(', ') + ', ');
     }
@@ -469,6 +473,8 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
     onTradeClick?.(trade);
     onClose();
   }, [onTradeClick, onClose]);
+
+  const allEventNames = useMemo(() => getAllEventNames(trades), [trades]);
 
   return (
     <UnifiedDrawer
@@ -817,22 +823,24 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
           {suggestedTags.length > 0 && (
             <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
               <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                Tag Suggestions
+                Tag & Event Suggestions
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {suggestedTags.map((tag) => (
+                {suggestedTags.map((tagOrEvent) => (
                   <Chip
-                    key={tag}
-                    label={formatTagForDisplay(tag, true)}
+                    key={tagOrEvent}
+                    label={formatTagForDisplay(tagOrEvent, true)}
                     size="small"
                     clickable
-                    onClick={() => handleTagClick(tag)}
+                    onClick={() => handleTagClick(tagOrEvent)}
                     sx={{
-                      ...getTagChipStyles(tag, theme),
-                      '&:hover': {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.1)
-                      }
+                      ...getTagChipStyles(tagOrEvent, theme),
+                      ...(allEventNames.includes(tagOrEvent) && {
+                        border: '1px dashed #1976d2', // Example: dashed border for events
+                        
+                      })
                     }}
+                    icon={allEventNames.includes(tagOrEvent) ? <EventIcon color="primary" fontSize="small" sx={{ color: '#ffffff' }} /> : undefined}
                   />
                 ))}
               </Box>

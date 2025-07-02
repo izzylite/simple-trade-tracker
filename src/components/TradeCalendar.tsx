@@ -36,7 +36,7 @@ import {
   LocalOffer as TagIcon,
   Search as SearchIcon,
   ViewCarousel as GalleryIcon,
-  Article as NewsIcon,
+  Event as EventIcon
 
 } from '@mui/icons-material';
 import {
@@ -1635,7 +1635,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               zIndex: 1200
             }}
           >
-            <NewsIcon />
+            <EventIcon />
           </Fab>
         </Tooltip>
 
