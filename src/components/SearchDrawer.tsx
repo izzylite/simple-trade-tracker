@@ -21,7 +21,8 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
-  IconButton
+  IconButton,
+  Pagination
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -36,7 +37,7 @@ import {
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers';
 import { Trade } from '../types/trade';
-import { format, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
 import {
   getTagChipStyles,
   formatTagForDisplay,
@@ -69,6 +70,15 @@ interface DateFilter {
   endDate: Date | null;
 }
 
+// Pagination configuration
+const ITEMS_PER_PAGE = 20;
+
+interface PaginationState {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+}
+
 // Debounce hook for search optimization
 const useDebounce = (value: string, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -86,130 +96,162 @@ const useDebounce = (value: string, delay: number) => {
   return debouncedValue;
 };
 
-// Background search worker function
-const performSearch = (trades: Trade[], query: string, selectedTags: string[] = [], dateFilter: DateFilter): Trade[] => {
-  // First apply tag filtering if any tags are selected
-  let filteredTrades = trades;
+// Create search index for faster lookups
+interface SearchIndex {
+  tradeId: string;
+  searchableText: string;
+  tags: string[];
+  displayTags: string[];
+  date: number;
+  economicEvents: string[];
+}
+
+// Build search index for trades
+const buildSearchIndex = (trades: Trade[]): SearchIndex[] => {
+  return trades.map(trade => ({
+    tradeId: trade.id,
+    searchableText: [
+      trade.name || '',
+      trade.notes || '',
+      trade.session || '',
+      ...(trade.tags || []),
+      ...(trade.tags || []).map(tag => formatTagForDisplay(tag)),
+      ...(trade.economicEvents || []).map(event => event.name)
+    ].join(' ').toLowerCase(),
+    tags: (trade.tags || []).map(tag => tag.toLowerCase()),
+    displayTags: (trade.tags || []).map(tag => formatTagForDisplay(tag).toLowerCase()),
+    date: new Date(trade.date).getTime(),
+    economicEvents: (trade.economicEvents || []).map(event => event.name.toLowerCase())
+  }));
+};
+
+// Optimized search function using index
+const performOptimizedSearch = (
+  trades: Trade[],
+  searchIndex: SearchIndex[],
+  query: string,
+  selectedTags: string[] = [],
+  dateFilter: DateFilter
+): Trade[] => {
+  // Create a map for quick trade lookup
+  const tradeMap = new Map(trades.map(trade => [trade.id, trade]));
+
+  // Start with all trade indices
+  let filteredIndices = searchIndex;
+
+  // Apply tag filtering first (most selective)
   if (selectedTags.length > 0) {
-    filteredTrades = trades.filter(trade =>
-      trade.tags?.some(tag => selectedTags.includes(tag))
+    const selectedTagsLower = selectedTags.map(tag => tag.toLowerCase());
+    filteredIndices = filteredIndices.filter(index =>
+      selectedTagsLower.some(selectedTag =>
+        index.tags.some(tag => tag.includes(selectedTag)) ||
+        index.displayTags.some(tag => tag.includes(selectedTag))
+      )
     );
   }
 
   // Apply date filtering
   if (dateFilter.type !== 'all') {
-    filteredTrades = filteredTrades.filter(trade => {
-      const tradeDate = new Date(trade.date);
-
+    filteredIndices = filteredIndices.filter(index => {
       if (dateFilter.type === 'single' && dateFilter.startDate) {
-        const filterDate = startOfDay(dateFilter.startDate);
-        const endOfFilterDate = endOfDay(dateFilter.startDate);
-        return !isBefore(tradeDate, filterDate) && !isAfter(tradeDate, endOfFilterDate);
+        const filterDate = startOfDay(dateFilter.startDate).getTime();
+        const endOfFilterDate = endOfDay(dateFilter.startDate).getTime();
+        return index.date >= filterDate && index.date <= endOfFilterDate;
       }
 
       if (dateFilter.type === 'range' && dateFilter.startDate && dateFilter.endDate) {
-        const startFilterDate = startOfDay(dateFilter.startDate);
-        const endFilterDate = endOfDay(dateFilter.endDate);
-        return !isBefore(tradeDate, startFilterDate) && !isAfter(tradeDate, endFilterDate);
+        const startFilterDate = startOfDay(dateFilter.startDate).getTime();
+        const endFilterDate = endOfDay(dateFilter.endDate).getTime();
+        return index.date >= startFilterDate && index.date <= endFilterDate;
       }
 
       return true;
     });
   }
 
-  // If no search query, return filtered results
-  if (!query.trim()) {
-    return filteredTrades.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }
-
-  const lowerQuery = query.toLowerCase();
-
-  // Check if query contains multiple tags (separated by spaces, commas, or semicolons)
-  const searchTerms = lowerQuery
-    .split(/[,;\s]+/) // Split by comma, semicolon, or whitespace
-    .map(term => term.trim())
-    .filter(term => term.length > 0);
-
-  return filteredTrades.filter(trade => {
-    // For multiple search terms, check if ALL terms match (AND logic)
-    // For single term, use the original OR logic across different fields
+  // Apply text search if query exists
+  if (query.trim()) {
+    const lowerQuery = query.toLowerCase();
+    const searchTerms = lowerQuery
+      .split(/[,;\s]+/)
+      .map(term => term.trim())
+      .filter(term => term.length > 0);
 
     if (searchTerms.length > 1) {
-      // Multiple terms - check if ALL terms are found in the trade's tags
-      return searchTerms.every(term => {
-        if (!trade.tags || trade.tags.length === 0) return false;
-
-        return trade.tags.some(tag =>
-          tag.toLowerCase().includes(term) ||
-          formatTagForDisplay(tag).toLowerCase().includes(term)
-        );
-      });
+      // Multiple terms - ALL must match in tags
+      filteredIndices = filteredIndices.filter(index =>
+        searchTerms.every(term =>
+          index.tags.some(tag => tag.includes(term)) ||
+          index.displayTags.some(tag => tag.includes(term))
+        )
+      );
     } else {
-      // Single term - search across all fields (original behavior)
+      // Single term - search in all searchable text
       const term = searchTerms[0];
-
-      // Search by trade name
-      if (trade.name && trade.name.toLowerCase().includes(term)) {
-        return true;
-      }
-
-      // Search by tags
-      if (trade.tags && trade.tags.some(tag =>
-        tag.toLowerCase().includes(term) ||
-        formatTagForDisplay(tag).toLowerCase().includes(term)
-      )) {
-        return true;
-      }
-
-      // Search by notes
-      if (trade.notes && trade.notes.toLowerCase().includes(term)) {
-        return true;
-      }
-
-      // Search by session
-      if (trade.session && trade.session.toLowerCase().includes(term)) {
-        return true;
-      }
-      // Search by economic events
-      if(trade.economicEvents && trade.economicEvents.some(event => event.name.toLowerCase().includes(term))) {
-        return true;
-      }
-
-      return false;
+      filteredIndices = filteredIndices.filter(index =>
+        index.searchableText.includes(term)
+      );
     }
-  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Sort by date, newest first
+  }
+
+  // Convert back to trades and sort by date (newest first)
+  return filteredIndices
+    .sort((a, b) => b.date - a.date)
+    .map(index => tradeMap.get(index.tradeId))
+    .filter((trade): trade is Trade => trade !== undefined);
 };
 
-// Background tag suggestion function
-const getSuggestedTags = (allTags: string[], query: string): string[] => {
-  if (!query.trim()) return [];
+// Optimized tag suggestion function with memoization
+const getSuggestedTags = (() => {
+  const cache = new Map<string, string[]>();
+  const MAX_CACHE_SIZE = 100;
 
-  // Get the last term being typed (for multi-tag support)
-  const terms = query.split(/[,;\s]+/).map(term => term.trim()).filter(term => term.length > 0);
-  const lastTerm = terms[terms.length - 1]?.toLowerCase() || '';
+  return (allTags: string[], query: string): string[] => {
+    if (!query.trim()) return [];
 
-  if (!lastTerm) return [];
+    // Check cache first
+    const cacheKey = `${allTags.length}-${query.toLowerCase()}`;
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey)!;
+    }
 
-  // Filter out tags that are already in the search query
-  const existingTags = terms.slice(0, -1).map(term => term.toLowerCase());
+    // Get the last term being typed (for multi-tag support)
+    const terms = query.split(/[,;\s]+/).map(term => term.trim()).filter(term => term.length > 0);
+    const lastTerm = terms[terms.length - 1]?.toLowerCase() || '';
 
-  return allTags
-    .filter(tag => {
-      const lowerTag = tag.toLowerCase();
-      const displayTag = formatTagForDisplay(tag).toLowerCase();
+    if (!lastTerm) return [];
 
-      // Don't suggest tags that are already included
-      if (existingTags.some(existing =>
-        lowerTag.includes(existing) || displayTag.includes(existing)
-      )) {
-        return false;
+    // Filter out tags that are already in the search query
+    const existingTags = new Set(terms.slice(0, -1).map(term => term.toLowerCase()));
+
+    const suggestions = allTags
+      .filter(tag => {
+        const lowerTag = tag.toLowerCase();
+        const displayTag = formatTagForDisplay(tag).toLowerCase();
+
+        // Don't suggest tags that are already included
+        if (existingTags.has(lowerTag) || existingTags.has(displayTag)) {
+          return false;
+        }
+
+        // Match the current term being typed
+        return lowerTag.includes(lastTerm) || displayTag.includes(lastTerm);
+      })
+      .slice(0, 5); // Limit to 5 suggestions
+
+    // Cache the result
+    if (cache.size >= MAX_CACHE_SIZE) {
+      // Clear oldest entries
+      const firstKey = cache.keys().next().value;
+      if (firstKey) {
+        cache.delete(firstKey);
       }
+    }
+    cache.set(cacheKey, suggestions);
 
-      // Match the current term being typed
-      return lowerTag.includes(lastTerm) || displayTag.includes(lastTerm);
-    })
-    .slice(0, 5); // Limit to 5 suggestions
-};
+    return suggestions;
+  };
+})();
 
 const SearchDrawer: React.FC<SearchDrawerProps> = ({
   open,
@@ -223,8 +265,11 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [filteredTrades, setFilteredTrades] = useState<Trade[]>([]);
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [allFilteredTrades, setAllFilteredTrades] = useState<Trade[]>([]);
 
   // Tag filtering state
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
@@ -252,6 +297,28 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
   // Debounce search query to avoid excessive calculations
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
+  // Memoize search index for performance
+  const searchIndex = useMemo(() => {
+    return buildSearchIndex(trades);
+  }, [trades]);
+
+  // Calculate pagination values
+  const paginationData = useMemo(() => {
+    const totalItems = allFilteredTrades.length;
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const paginatedTrades = allFilteredTrades.slice(startIndex, endIndex);
+
+    return {
+      totalItems,
+      totalPages,
+      paginatedTrades,
+      hasResults: totalItems > 0,
+      showPagination: totalPages > 1
+    };
+  }, [allFilteredTrades, currentPage]);
+
   // Perform search in background when debounced query or selected tags change
   useEffect(() => {
     if (!open) return; // Don't search if drawer is closed
@@ -259,34 +326,46 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
     const performBackgroundSearch = async () => {
       setIsSearching(true);
 
-      // Use setTimeout to move computation to next tick (background)
-      setTimeout(() => {
+      // Use requestIdleCallback for better performance if available, otherwise setTimeout
+      const scheduleWork = (callback: () => void) => {
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(callback, { timeout: 100 });
+        } else {
+          setTimeout(callback, 0);
+        }
+      };
+
+      scheduleWork(() => {
         try {
-          const results = performSearch(trades, debouncedSearchQuery, selectedTags, dateFilter);
+          const results = performOptimizedSearch(trades, searchIndex, debouncedSearchQuery, selectedTags, dateFilter);
           const suggestions = getSuggestedTags(allTags, debouncedSearchQuery);
 
-          setFilteredTrades(results);
+          // Store all results for pagination
+          setAllFilteredTrades(results);
+          // Reset to first page when search changes
+          setCurrentPage(1);
           setSuggestedTags(suggestions);
         } catch (error) {
           logger.error('Search error:', error);
-          setFilteredTrades([]);
+          setAllFilteredTrades([]);
           setSuggestedTags([]);
         } finally {
           setIsSearching(false);
         }
-      }, 0);
+      });
     };
 
     performBackgroundSearch();
-  }, [debouncedSearchQuery, selectedTags, dateFilter, trades, allTags, open]);
+  }, [debouncedSearchQuery, selectedTags, dateFilter, trades, searchIndex, allTags, open]);
 
   // Reset search when drawer closes
   useEffect(() => {
     if (!open) {
       setSearchQuery('');
-      setFilteredTrades([]);
+      setAllFilteredTrades([]);
       setSuggestedTags([]);
       setIsSearching(false);
+      setCurrentPage(1);
       setSelectedTagGroup('');
       setIsDateFilterExpanded(false);
       setDateFilter({
@@ -297,14 +376,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
     }
   }, [open]);
 
-  // Tag filtering handlers
-  const handleTagsChange = useCallback((tags: string[]) => {
-    onTagsChange?.(tags);
-  }, [onTagsChange]);
-
-  const handleClearTags = useCallback(() => {
-    onTagsChange?.([]);
-  }, [onTagsChange]);
+  // Tag filtering handlers (removed - using new handlers with pagination reset)
 
   // Date filtering handlers
   const handleDateFilterChange = useCallback((type: DateFilterType) => {
@@ -315,6 +387,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
       startDate: type === 'all' ? null : prev.startDate,
       endDate: type === 'all' ? null : prev.endDate
     }));
+    setCurrentPage(1); // Reset to first page when changing date filter
   }, []);
 
   const handleStartDateChange = useCallback((date: Date | null) => {
@@ -322,6 +395,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
       ...prev,
       startDate: date
     }));
+    setCurrentPage(1); // Reset to first page when changing start date
   }, []);
 
   const handleEndDateChange = useCallback((date: Date | null) => {
@@ -329,6 +403,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
       ...prev,
       endDate: date
     }));
+    setCurrentPage(1); // Reset to first page when changing end date
   }, []);
 
   const handleClearDateFilter = useCallback(() => {
@@ -337,7 +412,19 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
       startDate: null,
       endDate: null
     });
+    setCurrentPage(1); // Reset to first page when clearing filters
   }, []);
+
+  // Reset to first page when tag filters change
+  const handleTagsChangeWithReset = useCallback((tags: string[]) => {
+    onTagsChange?.(tags);
+    setCurrentPage(1);
+  }, [onTagsChange]);
+
+  const handleClearTagsWithReset = useCallback(() => {
+    onTagsChange?.([]);
+    setCurrentPage(1);
+  }, [onTagsChange]);
 
   const getTradeTypeIcon = (type: Trade['type']) => {
     switch (type) {
@@ -362,8 +449,11 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
   };
 
   const handleTagClick = useCallback((tag: string) => {
-    // Smart tag appending for multi-tag search
-    const currentTerms = searchQuery.split(/[,;\s]+/).map(term => term.trim()).filter(term => term.length > 0);
+    // Smart tag appending for multi-tag search with memoized term parsing
+    const currentTerms = useMemo(() =>
+      searchQuery.split(/[,;\s]+/).map(term => term.trim()).filter(term => term.length > 0),
+      [searchQuery]
+    );
 
     if (currentTerms.length === 0) {
       // No existing terms, just set the tag
@@ -501,7 +591,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                     multiple
                     options={filteredTagOptions}
                     value={selectedTags}
-                    onChange={(_, newValue) => handleTagsChange(newValue)}
+                    onChange={(_, newValue) => handleTagsChangeWithReset(newValue)}
                     slotProps={{
                       listbox: {
                         sx: {
@@ -554,7 +644,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                       <Typography variant="body2" color="text.secondary">
                         {selectedTags.length} tag{selectedTags.length > 1 ? 's' : ''} selected
                       </Typography>
-                      <Button onClick={handleClearTags} size="small" color="inherit">
+                      <Button onClick={handleClearTagsWithReset} size="small" color="inherit">
                         Clear All
                       </Button>
                     </Box>
@@ -760,7 +850,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
               <Box sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  {searchQuery.trim() ? 'Search Results' : 'Filtered Results'} {!isSearching && `(${filteredTrades.length})`}
+                  {searchQuery.trim() ? 'Search Results' : 'Filtered Results'} {!isSearching && `(${paginationData.totalItems})`}
                 </Typography>
                 {(() => {
                   const terms = searchQuery.split(/[,;\s]+/).map(term => term.trim()).filter(term => term.length > 0);
@@ -804,7 +894,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                     Searching trades...
                   </Typography>
                 </Box>
-              ) : filteredTrades.length === 0 ? (
+              ) : !paginationData.hasResults ? (
                 <Box sx={{ textAlign: 'center', py: 4 }}>
                   <SearchIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
                   <Typography variant="body1" color="text.secondary">
@@ -819,7 +909,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                   p: 0,
                   ...scrollbarStyles(theme)
                 }}>
-                  {filteredTrades.map((trade, index) => (
+                  {paginationData.paginatedTrades.map((trade, index) => (
                     <React.Fragment key={trade.id}>
                       <ListItem disablePadding>
                         <ListItemButton
@@ -929,10 +1019,40 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                           </Box>
                         </ListItemButton>
                       </ListItem>
-                      {index < filteredTrades.length - 1 && <Divider />}
+                      {index < paginationData.paginatedTrades.length - 1 && <Divider />}
                     </React.Fragment>
                   ))}
                 </List>
+              )}
+
+              {/* Pagination */}
+              {paginationData.showPagination && paginationData.hasResults && (
+                <Box sx={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  py: 3,
+                  borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                  gap: 2
+                }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, paginationData.totalItems)} of {paginationData.totalItems} trades
+                  </Typography>
+                  <Pagination
+                    count={paginationData.totalPages}
+                    page={currentPage}
+                    onChange={(_, page) => setCurrentPage(page)}
+                    color="primary"
+                    size="small"
+                    showFirstButton
+                    showLastButton
+                    sx={{
+                      '& .MuiPaginationItem-root': {
+                        borderRadius: 2
+                      }
+                    }}
+                  />
+                </Box>
               )}
               </Box>
             </Box>
