@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Box,
   Typography,
@@ -9,43 +9,78 @@ import {
   List,
   ListItem,
   ListItemButton,
-  ListItemText
+  ListItemText,
+  Tabs,
+  Tab,
+  Badge,
+  Avatar
 } from '@mui/material';
 import {
   PushPin as PinIcon,
   TrendingUp as WinIcon,
   TrendingDown as LossIcon,
   Remove as BreakevenIcon,
-  CalendarToday as DateIcon
+  CalendarToday as DateIcon,
+  Event as EventIcon,
+  ArrowBack as BackIcon
 } from '@mui/icons-material';
 import { Trade } from '../types/trade';
+import { Calendar } from '../types/calendar';
 import { format } from 'date-fns';
 import UnifiedDrawer from './common/UnifiedDrawer';
+import { eventNamesMatch } from '../utils/eventNameUtils';
 
 interface PinnedTradesDrawerProps {
   open: boolean;
   onClose: () => void;
   trades: Trade[];
-  onTradeClick?: (trade: Trade) => void;
+  calendar?: Calendar;
+  onTradeClick?: (trade: Trade,trades: Trade[],title : string) => void;
 }
 
 const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   open,
   onClose,
   trades,
+  calendar,
   onTradeClick
 }) => {
   const theme = useTheme();
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState(0);
+  const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
 
   // Get pinned trades
   const pinnedTrades = useMemo(() => {
     return trades.filter(trade => trade.isPinned);
   }, [trades]);
 
+  // Get pinned events from calendar
+  const pinnedEvents = useMemo(() => {
+    return calendar?.pinnedEvents || [];
+  }, [calendar?.pinnedEvents]);
+
   // Sort pinned trades by date (most recent first)
   const sortedPinnedTrades = useMemo(() => {
     return [...pinnedTrades].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [pinnedTrades]);
+
+  // Get trades that contain a specific economic event
+  const getTradesWithEvent = useMemo(() => {
+    return (eventName: string) => {
+      return trades.filter(trade =>
+        trade.economicEvents?.some(event =>
+           eventNamesMatch(event.name, eventName)
+        )
+      ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    };
+  }, [trades]);
+
+  // Get trades for selected event
+  const tradesWithSelectedEvent = useMemo(() => {
+    return selectedEvent ? getTradesWithEvent(selectedEvent) : [];
+  }, [selectedEvent, getTradesWithEvent]);
 
   const getTradeTypeIcon = (type: Trade['type']) => {
     switch (type) {
@@ -71,31 +106,261 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
 
 
 
+  // Get dynamic title and icon
+  const getTitle = () => {
+    if (selectedEvent) {
+      return `Trades with "${selectedEvent}"`;
+    }
+    return activeTab === 0 ? "Pinned Trades" : "Pinned Events";
+  };
+
+  const getIcon = () => {
+    if (selectedEvent) {
+      return <EventIcon />;
+    }
+    return activeTab === 0 ? <PinIcon /> : <EventIcon />;
+  };
+
+  const getHeaderActions = () => {
+    if (selectedEvent) {
+      return (
+        <Chip
+          label={tradesWithSelectedEvent.length}
+          size="small"
+          sx={{
+            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+            color: 'primary.main',
+            fontWeight: 600
+          }}
+        />
+      );
+    }
+
+    if (activeTab === 0) {
+      return sortedPinnedTrades.length > 0 ? (
+        <Chip
+          label={sortedPinnedTrades.length}
+          size="small"
+          sx={{
+            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+            color: 'primary.main',
+            fontWeight: 600
+          }}
+        />
+      ) : undefined;
+    } else {
+      return pinnedEvents.length > 0 ? (
+        <Chip
+          label={pinnedEvents.length}
+          size="small"
+          sx={{
+            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+            color: 'primary.main',
+            fontWeight: 600
+          }}
+        />
+      ) : undefined;
+    }
+  };
+
   return (
     <UnifiedDrawer
       open={open}
       onClose={onClose}
-      title="Pinned Trades"
-      icon={<PinIcon />}
+      title={getTitle()}
+      icon={getIcon()}
       width={{ xs: '100%', sm: 400 }}
       headerVariant="default"
-      headerActions={
-        sortedPinnedTrades.length > 0 ? (
-          <Chip
-            label={sortedPinnedTrades.length}
-            size="small"
-            sx={{
-              backgroundColor: alpha(theme.palette.primary.main, 0.1),
-              color: 'primary.main',
-              fontWeight: 600
-            }}
-          />
-        ) : undefined
-      }
+      headerActions={getHeaderActions()}
     >
+      {/* Back button when viewing event trades */}
+      {selectedEvent && (
+        <Box sx={{ p: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+          <ListItemButton
+            onClick={() => setSelectedEvent(null)}
+            sx={{
+              borderRadius: 1,
+              p: 1,
+              '&:hover': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.05)
+              }
+            }}
+          >
+            <BackIcon sx={{ mr: 1, fontSize: 20 }} />
+            <Typography variant="body2">Back to Pinned Events</Typography>
+          </ListItemButton>
+        </Box>
+      )}
+
+      {/* Tabs - only show when not viewing event trades */}
+      {!selectedEvent && (
+        <Box sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+          <Tabs
+            value={activeTab}
+            onChange={(_, newValue) => setActiveTab(newValue)}
+            variant="fullWidth"
+            sx={{
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '0.9rem'
+              }
+            }}
+          >
+            <Tab
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <PinIcon sx={{ fontSize: 18 }} />
+                  Trades
+                  {sortedPinnedTrades.length > 0 && (
+                    <Badge
+                      badgeContent={sortedPinnedTrades.length}
+                      color="primary"
+                      sx={{ ml: 0.5 }}
+                    />
+                  )}
+                </Box>
+              }
+            />
+            <Tab
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <EventIcon sx={{ fontSize: 18 }} />
+                  Events
+                  {pinnedEvents.length > 0 && (
+                    <Badge
+                      badgeContent={pinnedEvents.length}
+                      color="primary"
+                      sx={{ ml: 0.5 }}
+                    />
+                  )}
+                </Box>
+              }
+            />
+          </Tabs>
+        </Box>
+      )}
+
       {/* Content */}
       <Box sx={{ flex: 1, overflow: 'auto' }}>
-          {sortedPinnedTrades.length === 0 ? (
+        {/* Render content based on current state */}
+        {selectedEvent ? (
+          // Show trades with selected event
+          tradesWithSelectedEvent.length === 0 ? (
+            <Box
+              sx={{
+                p: 4,
+                textAlign: 'center',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}
+            >
+              <EventIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+              <Typography variant="h6" sx={{ mb: 1, fontWeight: 600, color: 'text.secondary' }}>
+                No Trades Found
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 300 }}>
+                No trades contain the economic event "{selectedEvent}". Try selecting a different event.
+              </Typography>
+            </Box>
+          ) : (
+            <List sx={{ p: 0, overflow: 'auto', height: '100%' }}>
+              {tradesWithSelectedEvent.map((trade, index) => (
+                <React.Fragment key={trade.id}>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      onClick={() => onTradeClick?.(trade,tradesWithSelectedEvent,`Trades with ${selectedEvent}`)}
+                      sx={{
+                        p: 2,
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
+                        {/* Trade Type Icon */}
+                        <Box sx={{ mt: 0.5 }}>
+                          {getTradeTypeIcon(trade.type)}
+                        </Box>
+
+                        {/* Trade Content */}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <ListItemText
+                            primary={
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+                                <Typography
+                                  variant="subtitle1"
+                                  sx={{
+                                    fontWeight: 600,
+                                    color: 'text.primary',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    flex: 1,
+                                    mr: 1
+                                  }}
+                                >
+                                  {trade.name}
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    color: getTradeTypeColor(trade.type),
+                                    fontWeight: 600,
+                                    fontSize: '0.85rem'
+                                  }}
+                                >
+                                  {trade.type === 'win' ? '+' : trade.type === 'loss' ? '-' : ''}
+                                  {trade.amount ? `$${Math.abs(trade.amount).toFixed(2)}` : ''}
+                                </Typography>
+                              </Box>
+                            }
+                            secondary={
+                              <Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                                  <DateIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+                                    {format(new Date(trade.date), 'MMM d, yyyy')}
+                                  </Typography>
+                                </Box>
+                                {/* Show matching economic events */}
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                  {trade.economicEvents?.filter(event =>
+                                    event.name.toLowerCase().includes(selectedEvent.toLowerCase()) ||
+                                    selectedEvent.toLowerCase().includes(event.name.toLowerCase())
+                                  ).map((event, eventIndex) => (
+                                    <Chip
+                                      key={eventIndex}
+                                      label={event.name}
+                                      size="small"
+                                      sx={{
+                                        height: 20,
+                                        fontSize: '0.65rem',
+                                        backgroundColor: alpha(theme.palette.warning.main, 0.1),
+                                        color: 'warning.main',
+                                        '& .MuiChip-label': { px: 0.75 }
+                                      }}
+                                    />
+                                  ))}
+                                </Box>
+                              </Box>
+                            }
+                          />
+                        </Box>
+                      </Box>
+                    </ListItemButton>
+                  </ListItem>
+                  {index < tradesWithSelectedEvent.length - 1 && <Divider sx={{ ml: 3 }} />}
+                </React.Fragment>
+              ))}
+            </List>
+          )
+        ) : activeTab === 0 ? (
+          // Pinned Trades Tab
+          sortedPinnedTrades.length === 0 ? (
             <Box
               sx={{
                 p: 4,
@@ -121,7 +386,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                 <React.Fragment key={trade.id}>
                   <ListItem disablePadding>
                     <ListItemButton
-                      onClick={() => onTradeClick?.(trade)}
+                      onClick={() => onTradeClick?.(trade,sortedPinnedTrades,"Pinned Trades")}
                       sx={{
                         p: 2,
                         '&:hover': {
@@ -232,8 +497,102 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                 </React.Fragment>
               ))}
             </List>
-          )}
-        </Box>
+          )
+        ) : (
+          // Pinned Events Tab
+          pinnedEvents.length === 0 ? (
+            <Box
+              sx={{
+                p: 4,
+                textAlign: 'center',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}
+            >
+              <EventIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+              <Typography variant="h6" sx={{ mb: 1, fontWeight: 600, color: 'text.secondary' }}>
+                No Pinned Events
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 300 }}>
+                Pin important economic events from the calendar to track trades that occurred during those events.
+              </Typography>
+            </Box>
+          ) : (
+            <List sx={{ p: 0, overflow: 'auto', height: '100%' }}>
+              {pinnedEvents.map((eventName, index) => {
+                const tradesWithEvent = getTradesWithEvent(eventName);
+                return (
+                  <React.Fragment key={eventName}>
+                    <ListItem disablePadding>
+                      <ListItemButton
+                        onClick={() => setSelectedEvent(eventName)}
+                        sx={{
+                          p: 2,
+                          '&:hover': {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                          }
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+                          {/* Event Icon */}
+                          <Avatar
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              backgroundColor: alpha(theme.palette.warning.main, 0.1),
+                              color: 'warning.main'
+                            }}
+                          >
+                            <EventIcon sx={{ fontSize: 18 }} />
+                          </Avatar>
+
+                          {/* Event Content */}
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography
+                              variant="subtitle1"
+                              sx={{
+                                fontWeight: 600,
+                                color: 'text.primary',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                mb: 0.5
+                              }}
+                            >
+                              {eventName}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+                              {tradesWithEvent.length} trade{tradesWithEvent.length !== 1 ? 's' : ''} found
+                            </Typography>
+                          </Box>
+
+                          {/* Trade Count Badge */}
+                          {tradesWithEvent.length > 0 && (
+                            <Chip
+                              label={tradesWithEvent.length}
+                              size="small"
+                              sx={{
+                                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                color: 'primary.main',
+                                fontWeight: 600,
+                                minWidth: 32
+                              }}
+                            />
+                          )}
+                        </Box>
+                      </ListItemButton>
+                    </ListItem>
+                    {index < pinnedEvents.length - 1 && <Divider />}
+                  </React.Fragment>
+                );
+              })}
+            </List>
+          )
+        )}
+      </Box>
     </UnifiedDrawer>
   );
 };

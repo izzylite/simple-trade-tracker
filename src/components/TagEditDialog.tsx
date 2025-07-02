@@ -5,8 +5,11 @@ import {
   Box,
   Chip,
   alpha,
-  useTheme
+  useTheme,
+  Button,
+  CircularProgress
 } from '@mui/material';
+import { Delete as DeleteIcon } from '@mui/icons-material';
 import * as calendarService from '../services/calendarService';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../utils/tagColors';
 import { BaseDialog } from './common';
@@ -18,6 +21,7 @@ interface TagEditDialogProps {
   tag: string;
   calendarId: string;
   onSuccess?: (oldTag: string, newTag: string, tradesUpdated: number) => void;
+  onDelete?: (deletedTag: string, tradesUpdated: number) => void;
 }
 
 const TagEditDialog: React.FC<TagEditDialogProps> = ({
@@ -25,11 +29,13 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
   onClose,
   tag,
   calendarId,
-  onSuccess
+  onSuccess,
+  onDelete
 }) => {
   const theme = useTheme();
   const [newTag, setNewTag] = useState(tag);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -94,11 +100,35 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
     handleSubmit(e as React.FormEvent);
   };
 
+  const handleDelete = async () => {
+    if (!onDelete) return;
+
+    setIsDeleting(true);
+    setError(null);
+
+    try {
+      // Call the cloud function with empty string to delete the tag
+      const result = await calendarService.updateTag(calendarId, tag, '');
+
+      if (result.success) {
+        onDelete(tag, result.tradesUpdated);
+        onClose();
+      } else {
+        setError('Failed to delete tag');
+      }
+    } catch (error) {
+      logger.error('Error deleting tag:', error);
+      setError(error instanceof Error ? error.message : 'An unknown error occurred');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
 
-  // Create a safe onClose function that checks if submission is in progress
+
+  // Create a safe onClose function that checks if submission or deletion is in progress
   const safeOnClose = () => {
-    if (!isSubmitting) {
+    if (!isSubmitting && !isDeleting) {
       onClose();
     }
   };
@@ -112,10 +142,24 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
       title="Edit Tag"
       primaryButtonText={isSubmitting ? 'Updating...' : 'Update Tag'}
       primaryButtonAction={handleFormSubmit}
-      isSubmitting={isSubmitting}
+      isSubmitting={isSubmitting || isDeleting}
       cancelButtonText="Cancel"
       cancelButtonAction={safeOnClose}
-      hideCloseButton={isSubmitting}
+      hideCloseButton={isSubmitting || isDeleting}
+      actions={
+        onDelete && (
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={isDeleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+            onClick={handleDelete}
+            disabled={isSubmitting || isDeleting}
+            sx={{ mr: 1 }}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete Tag'}
+          </Button>
+        )
+      }
     >
       <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         <Box sx={{

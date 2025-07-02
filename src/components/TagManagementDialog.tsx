@@ -157,6 +157,40 @@ const TagManagementDialog: React.FC<TagManagementDialogProps> = ({
     }
   };
 
+  const handleTagDelete = (deletedTag: string, tradesUpdated: number) => {
+    logger.log(`Tag deletion completed: ${deletedTag}, ${tradesUpdated} trades updated`);
+
+    // Check if the deleted tag was from a group we're currently filtering by
+    const deletedGroup = isGroupedTag(deletedTag) ? getTagGroup(deletedTag) : null;
+
+    // If we were filtering by the deleted tag's group, check if the group still has other tags
+    if (deletedGroup && selectedTagGroup === deletedGroup) {
+      // The memoized tagGroups will handle this - if the group no longer exists,
+      // the filter will show no results, which is correct behavior
+      // Alternatively, we could reset to show all groups:
+      // setSelectedTagGroup('');
+    }
+
+    // Remove the deleted tag from required groups if it was there
+    if (deletedGroup && localRequiredGroups.includes(deletedGroup)) {
+      // Check if there are any other tags in this group
+      const otherTagsInGroup = allTags.filter(tag =>
+        tag !== deletedTag && isGroupedTag(tag) && getTagGroup(tag) === deletedGroup
+      );
+
+      // If no other tags in this group, remove it from required groups
+      if (otherTagsInGroup.length === 0) {
+        const updatedRequiredGroups = localRequiredGroups.filter(group => group !== deletedGroup);
+        setLocalRequiredGroups(updatedRequiredGroups);
+        handleRequiredTagGroupsChange(updatedRequiredGroups);
+      }
+    }
+
+    if (onTagUpdated) {
+      onTagUpdated(deletedTag, ''); // Pass empty string to indicate deletion
+    }
+  };
+
   const handleRequiredTagGroupsChange = (groups: string[]) => {
     setLocalRequiredGroups(groups);
 
@@ -364,6 +398,7 @@ const TagManagementDialog: React.FC<TagManagementDialogProps> = ({
           tag={tagToEdit}
           calendarId={calendarId}
           onSuccess={handleTagEditSuccess}
+          onDelete={handleTagDelete}
         />
       )}
     </BaseDialog>

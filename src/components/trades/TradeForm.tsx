@@ -16,7 +16,8 @@ import {
   Chip,
   alpha,
   useTheme,
-  Autocomplete
+  Autocomplete,
+  Button
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers';
 import { Trade } from '../../types/trade';
@@ -33,6 +34,10 @@ import {
   generateCommonTradeNamePatterns
 }
   from '../../utils/tradeNameSuggestions';
+import { Currency } from '../../types/economicCalendar';
+import { CURRENCY_PAIRS } from '../../services/tradeEconomicEventService';
+
+
 export interface NewTradeForm {
   id: string;
   name: string;
@@ -145,9 +150,18 @@ const TradeForm: React.FC<TradeFormProps> = ({
 }) => {
   const theme = useTheme();
 
+  // Automatically add "pair" to required tag groups if not already present
+  const effectiveRequiredTagGroups = useMemo(() => {
+    const groups = [...requiredTagGroups];
+    if (!groups.includes('pair')) {
+      groups.push('pair');
+    }
+    return groups;
+  }, [requiredTagGroups]);
+
   // Calculate which required tag groups are still missing
   const missingRequiredGroups = useMemo(() => {
-    if (!requiredTagGroups || requiredTagGroups.length === 0) return [];
+    if (!effectiveRequiredTagGroups || effectiveRequiredTagGroups.length === 0) return [];
 
     // Get the groups that are already satisfied by current tags
     const satisfiedGroups = new Set<string>();
@@ -159,10 +173,23 @@ const TradeForm: React.FC<TradeFormProps> = ({
     });
 
     // Return groups that are required but not satisfied
-    return requiredTagGroups.filter(group => !satisfiedGroups.has(group));
-  }, [requiredTagGroups, newTrade.tags]);
+    return effectiveRequiredTagGroups.filter(group => !satisfiedGroups.has(group));
+  }, [effectiveRequiredTagGroups, newTrade.tags]);
 
   const cumulativePnl = calculateCumulativePnl(newTrade);
+
+  // Function to add a currency pair tag
+  const handleAddCurrencyPair = (pair: string) => {
+    const pairTag = `pair:${pair}`;
+    if (!newTrade.tags.includes(pairTag)) {
+      const newTags = [...newTrade.tags, pairTag];
+      // Create a synthetic event for compatibility with existing handler
+      const syntheticEvent = {
+        target: { value: newTags }
+      } as any;
+      onTagsChange(syntheticEvent, newTags);
+    }
+  };
 
   // Calculate and update the amount based on risk
   const calculateAmountFromRisk = (): string => {
@@ -447,6 +474,49 @@ const TradeForm: React.FC<TradeFormProps> = ({
                     }
                   }}
                 />
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        {/* Currency Pair Quick Add - Show only if pair group is missing */}
+        {missingRequiredGroups.includes('pair') && (
+          <Box sx={{
+            mb: 2,
+            p: 2,
+            borderRadius: 1,
+            bgcolor: alpha(theme.palette.primary.main, 0.05),
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
+          }}>
+            <Typography variant="body2" color="primary.main" sx={{ fontWeight: 600, mb: 1 }}>
+              Quick Add Currency Pair
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+              Select a currency pair to quickly add to your trade:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxHeight: 120, overflowY: 'auto' }}>
+              {CURRENCY_PAIRS.map(pair => (
+                <Button
+                  key={pair}
+                  size="small"
+                  variant="outlined"
+                  onClick={() => handleAddCurrencyPair(pair)}
+                  sx={{
+                    minWidth: 'auto',
+                    px: 1,
+                    py: 0.5,
+                    fontSize: '0.75rem',
+                    textTransform: 'none',
+                    borderColor: alpha(theme.palette.primary.main, 0.3),
+                    color: theme.palette.primary.main,
+                    '&:hover': {
+                      borderColor: theme.palette.primary.main,
+                      bgcolor: alpha(theme.palette.primary.main, 0.1)
+                    }
+                  }}
+                >
+                  {pair}
+                </Button>
               ))}
             </Box>
           </Box>

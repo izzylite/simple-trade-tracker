@@ -739,7 +739,6 @@ export const refreshEconomicCalendar = onCall(
 
       let updated = false;
       let count = 0;
-      let maxRetries = 5;
       let allEventsForDate: EconomicEvent[] = [];
       let foundEvents: EconomicEvent[] = [];
 
@@ -773,11 +772,11 @@ export const refreshEconomicCalendar = onCall(
             break;
           }
           else {
-            logger.info(`❌ No updates found for requested events. Retrying (${count + 1}/${maxRetries}) after ${count + 1} seconds...`);
+            logger.info(`❌ No updates found for requested events. Retrying (${count + 1}/3) after ${count + 1} seconds...`);
           }
 
-          if (foundEvents.length === 0 || count >= maxRetries) {
-            logger.info(`⚠️ Events not found or max retries reached (${count + 1}/${maxRetries})`);
+          if (foundEvents.length === 0 || count >= 2) {
+            logger.info(`⚠️ Events not found or max retries reached (${count + 1}/3)`);
             break;
           }
 

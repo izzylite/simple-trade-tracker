@@ -44,6 +44,21 @@ const TagsInput: React.FC<TagsInputProps> = ({
     }
   };
 
+  const handleTagDelete = (deletedTag: string, tradesUpdated: number) => {
+    // Remove the deleted tag from current tags if it exists
+    if (tags.includes(deletedTag)) {
+      const updatedTags = tags.filter(tag => tag !== deletedTag);
+      // Create a synthetic event for the onTagsChange callback
+      // Using 'unknown' first to avoid TypeScript strict type checking
+      const syntheticEvent = {} as unknown as React.SyntheticEvent;
+      onTagsChange(syntheticEvent, updatedTags);
+    }
+
+    if (onTagUpdated) {
+      onTagUpdated(deletedTag, ''); // Pass empty string to indicate deletion
+    }
+  };
+
   // Validate and filter tags to prevent multiple colons
   const handleTagsChangeWithValidation = (event: React.SyntheticEvent, value: string[]) => {
     const validTags: string[] = [];
@@ -153,6 +168,7 @@ const TagsInput: React.FC<TagsInputProps> = ({
           tag={tagToEdit}
           calendarId={calendarId}
           onSuccess={handleTagEditSuccess}
+          onDelete={handleTagDelete}
         />
       )}
 
