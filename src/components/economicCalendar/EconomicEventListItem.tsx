@@ -112,6 +112,36 @@ const getImminentBackgroundColor = (impact: string, theme: any) => {
   }
 };
 
+// Helper function to get actual result background color and border
+const getActualResultStyle = (actualResultType: string, theme: any) => {
+  switch (actualResultType) {
+    case 'good':
+      return {
+        backgroundColor: alpha(theme.palette.success.main, 0.15),
+        border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
+        color: theme.palette.success.dark
+      };
+    case 'bad':
+      return {
+        backgroundColor: alpha(theme.palette.error.main, 0.15),
+        border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+        color: theme.palette.error.dark
+      };
+    case 'neutral':
+      return {
+        backgroundColor: alpha(theme.palette.info.main, 0.1),
+        border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+        color: theme.palette.info.dark
+      };
+    default:
+      return {
+        backgroundColor: alpha(theme.palette.success.main, 0.1),
+        border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+        color: 'text.primary'
+      };
+  }
+};
+
 const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
   event,
   px= 2.5,
@@ -269,12 +299,10 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
                 <Typography variant="caption" sx={{
                   fontWeight: 700,
                   fontSize: '0.7rem',
-                  color: 'text.primary',
-                  backgroundColor: alpha(theme.palette.success.main, 0.1),
                   px: 1,
                   py: 0.25,
                   borderRadius: 1,
-                  border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`
+                  ...getActualResultStyle(event.actualResultType, theme)
                 }}>
                   A: {event.actual}
                 </Typography>

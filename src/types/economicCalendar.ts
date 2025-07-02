@@ -14,6 +14,7 @@ export interface EconomicEvent {
   currency: Currency;
   event: string;
   impact: ImpactLevel;
+  actualResultType: 'good' | 'bad' | 'neutral' | '';
   time: string; // ISO string
   timeUtc: string; // UTC timestamp
   actual: string;

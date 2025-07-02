@@ -58,6 +58,36 @@ function cleanNumericValue(value) {
 }
 
 /**
+ * Determine if an actual result is good or bad based on MyFXBook indicators
+ */
+function determineResultType($cell, actual, forecast) {
+  // Method 1: Check CSS classes for background color indicators
+  const cellClass = $cell.attr('class') || '';
+  if (cellClass.includes('background-transparent-red')) {
+    return 'bad';
+  }
+  if (cellClass.includes('background-transparent-green')) {
+    return 'good';
+  }
+
+  // Method 2: Check data-content attribute for explicit descriptions
+  const dataContent = $cell.find('[data-content]').attr('data-content') || '';
+  if (dataContent.toLowerCase().includes('worse than expected')) {
+    return 'bad';
+  }
+  if (dataContent.toLowerCase().includes('better than expected')) {
+    return 'good';
+  }
+  if (dataContent.toLowerCase().includes('as expected')) {
+    return 'neutral';
+  }
+
+  
+
+  return ''; // Unable to determine
+}
+
+/**
  * Get flag image URL from country code
  */
 function getFlagUrl(countryCode, size = 'w160') {
@@ -125,6 +155,8 @@ async function parseMyFXBookWeeklyEnhanced(html) {
   logger.info('🔧 Parsing MyFXBook HTML with enhanced weekly logic...');
 
   try {
+    
+
     const $ = cheerio.load(html);
     const events = [];
 
@@ -413,6 +445,7 @@ async function parseMyFXBookWeeklyEnhanced(html) {
 
         // Extract forecast, previous, and actual values using MyFXBook's specific structure
         // MyFXBook uses data attributes and CSS classes to identify these values
+        let actualResultType = ''; // 'good', 'bad', or ''
 
         // Method 1: Use data attributes (most reliable)
         const $cells = $row.find('td');
@@ -435,12 +468,15 @@ async function parseMyFXBookWeeklyEnhanced(html) {
             }
           }
 
-          // Look for actual value
+          // Look for actual value and determine if it's good or bad
           if ($cell.attr('data-actual')) {
             const actualValue = $cell.text().trim();
             if (actualValue && isNumericValue(actualValue)) {
               actual = cleanNumericValue(actualValue);
             }
+
+            // Determine if the actual result is good or bad
+            actualResultType = determineResultType($cell, actual, forecast);
           }
         });
 
@@ -481,7 +517,8 @@ async function parseMyFXBookWeeklyEnhanced(html) {
 
         // Debug: Log what we extracted for first few rows
         if (i < 3 && (actual || forecast || previous)) {
-          logger.info(`🔢 Row ${i} extracted - Previous: "${previous}", Forecast: "${forecast}", Actual: "${actual}"`);
+          const resultTypeStr = actualResultType ? ` | Result: ${actualResultType}` : '';
+          logger.info(`🔢 Row ${i} extracted - Previous: "${previous}", Forecast: "${forecast}", Actual: "${actual}"${resultTypeStr}`);
         }
 
         // Validate and create event
@@ -566,7 +603,8 @@ async function parseMyFXBookWeeklyEnhanced(html) {
               country: country || '',
               flagCode: flagClass || '',
               flagUrl: flagClass ? getFlagUrl(flagClass) : '',
-              unixTimestamp: unixTimestamp // Unix timestamp from MyFXBook's time attribute
+              unixTimestamp: unixTimestamp, // Unix timestamp from MyFXBook's time attribute
+              actualResultType: actualResultType || '' // 'good', 'bad', 'neutral', or ''
             };
 
             events.push(event);
@@ -577,12 +615,13 @@ async function parseMyFXBookWeeklyEnhanced(html) {
               const previousStr = previous ? ` | P:${previous}` : '';
               const countryStr = country ? ` | ${country}` : '';
               const flagStr = flagClass ? ` | ${flagClass}` : '';
+              const resultTypeStr = actualResultType ? ` | ${actualResultType.toUpperCase()}` : '';
 
               // Show timezone conversion info
               const { utcTime } = convertToUTC(time, timezoneOffsetHours);
               const timezoneInfo = timezoneOffsetHours !== 0 ? ` (${time} local → ${utcTime} UTC)` : '';
 
-              logger.info(`✅ Extracted: ${date || 'Unknown'} | ${time || '00:00'}${timezoneInfo} | ${currency} ${eventName} | ${impact || 'Medium'}${actualStr}${forecastStr}${previousStr}${countryStr}${flagStr}`);
+              logger.info(`✅ Extracted: ${date || 'Unknown'} | ${time || '00:00'}${timezoneInfo} | ${currency} ${eventName} | ${impact || 'Medium'}${actualStr}${forecastStr}${previousStr}${resultTypeStr}${countryStr}${flagStr}`);
             }
           }
 
@@ -601,12 +640,22 @@ async function parseMyFXBookWeeklyEnhanced(html) {
     const countries = [...new Set(events.map(e => e.country).filter(c => c))];
     const flagCodes = [...new Set(events.map(e => e.flagCode).filter(f => f))];
 
+    // Analyze result types
+    const eventsWithResultType = events.filter(e => e.actualResultType);
+    const goodResults = events.filter(e => e.actualResultType === 'good');
+    const badResults = events.filter(e => e.actualResultType === 'bad');
+    const neutralResults = events.filter(e => e.actualResultType === 'neutral');
+
     logger.info(`🎉 Successfully extracted ${events.length} events`);
     logger.info(`📊 Events with economic data: ${eventsWithData.length}`);
     logger.info(`📅 Events without data (holidays/announcements): ${eventsWithoutData.length}`);
     logger.info(`🏳️ Events with country info: ${eventsWithCountry.length}`);
     logger.info(`🌍 Countries found: ${countries.join(', ')}`);
     logger.info(`🚩 Flag codes found: ${flagCodes.join(', ')}`);
+    logger.info(`📈 Result analysis: ${eventsWithResultType.length} events with result classification`);
+    logger.info(`   ✅ Good results: ${goodResults.length}`);
+    logger.info(`   ❌ Bad results: ${badResults.length}`);
+    logger.info(`   ⚪ Neutral results: ${neutralResults.length}`);
 
     if (eventsWithData.length > 0) {
       logger.info(`💰 Sample events with data:`);

@@ -13,6 +13,7 @@ interface EconomicEvent {
   time: Date;
   timeUtc: string;
   date: string;
+  actualResultType: string;
   actual: string;
   forecast: string;
   previous: string;
@@ -82,7 +83,7 @@ async function fetchFromMyFXBookWeekly(): Promise<EconomicEvent[]> {
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
-        'Cache-Control': 'no-cache' 
+        'Cache-Control': 'no-cache'
       }
     });
 
@@ -170,7 +171,35 @@ function isNumericValue(value: string): boolean {
 
   return isNumeric && canParse && cleaned.length > 0;
 }
+/**
+ * Determine if an actual result is good or bad based on MyFXBook indicators
+ */
+function determineResultType($cell: any, actual: any, forecast: any) {
+  // Method 1: Check CSS classes for background color indicators
+  const cellClass = $cell.attr('class') || '';
+  if (cellClass.includes('background-transparent-red')) {
+    return 'bad';
+  }
+  if (cellClass.includes('background-transparent-green')) {
+    return 'good';
+  }
 
+  // Method 2: Check data-content attribute for explicit descriptions
+  const dataContent = $cell.find('[data-content]').attr('data-content') || '';
+  if (dataContent.toLowerCase().includes('worse than expected')) {
+    return 'bad';
+  }
+  if (dataContent.toLowerCase().includes('better than expected')) {
+    return 'good';
+  }
+  if (dataContent.toLowerCase().includes('as expected')) {
+    return 'neutral';
+  }
+
+   
+
+  return ''; // Unable to determine
+}
 function cleanNumericValue(value: string): string {
   if (!value) return '';
 
@@ -194,7 +223,7 @@ function generateEventId(currency: string, eventName: string, country: string, i
   const hash = crypto.createHash('sha256').update(uniqueString).digest('hex');
   return hash.substring(0, 20);
 }
- 
+
 /**
  * Parse MyFXBook HTML to extract economic events
  */
@@ -204,7 +233,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
     const $ = cheerio.load(html);
     const events: EconomicEvent[] = [];
 
-    
+
 
 
     const validCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
@@ -237,6 +266,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
         let time = '';
         let date = '';
         let actual = '';
+        let actualResultType = '';
         let forecast = '';
         let previous = '';
         let country = '';
@@ -384,6 +414,8 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
             if (actualValue && isNumericValue(actualValue)) {
               actual = cleanNumericValue(actualValue);
             }
+            // Determine if the actual result is good or bad
+            actualResultType = determineResultType($cell, actual, forecast);
           }
         });
 
@@ -406,6 +438,8 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
               actual = cleanNumericValue(actualText);
             }
           }
+           // Determine if the actual result is good or bad
+            actualResultType = determineResultType($row, actual, forecast);
         }
 
         // Method 3: Fallback to position-based extraction (MyFXBook standard layout)
@@ -441,7 +475,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
               const utcDateTime = new Date(calendarDateTd.replace(' ', 'T') + 'Z');
               if (!isNaN(utcDateTime.getTime())) {
                 isoDate = utcDateTime.toISOString();
-               
+
               }
             }
 
@@ -451,7 +485,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
               const timeAttr = timeElement.attr('time');
               if (timeAttr && /^\d+$/.test(timeAttr)) {
                 unixTimestamp = parseInt(timeAttr, 10);
-                  }
+              }
             }
 
             if (!isoDate) {
@@ -483,6 +517,7 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
               timeUtc: isoDate,
               date: eventDate, // String date for exact date queries
               actual: actual || '',
+              actualResultType: actualResultType || '',
               forecast: forecast || '',
               previous: previous || '',
               country: country || '',
@@ -756,7 +791,7 @@ export const refreshEconomicCalendar = onCall(
 
       logger.info(`📊 Found ${allEventsForDate.length} events to update for ${targetDate}`);
 
-       
+
       await storeEventsInDatabase(allEventsForDate);
       const updatedCount = allEventsForDate.length;
 

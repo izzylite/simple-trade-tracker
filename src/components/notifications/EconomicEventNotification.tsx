@@ -81,9 +81,58 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
     }
   };
 
-  // Determine trend icon and color based on actual vs forecast
+  // Helper function to get actual result background color and border
+  const getActualResultStyle = (actualResultType: string) => {
+    switch (actualResultType) {
+      case 'good':
+        return {
+          backgroundColor: alpha(theme.palette.success.main, 0.15),
+          border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
+          color: theme.palette.success.dark
+        };
+      case 'bad':
+        return {
+          backgroundColor: alpha(theme.palette.error.main, 0.15),
+          border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+          color: theme.palette.error.dark
+        };
+      case 'neutral':
+        return {
+          backgroundColor: alpha(theme.palette.info.main, 0.1),
+          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+          color: theme.palette.info.dark
+        };
+      default:
+        return {
+          backgroundColor: alpha(theme.palette.success.main, 0.1),
+          border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+          color: 'text.primary'
+        };
+    }
+  };
+
+  // Determine trend icon and color based on actualResultType
   const getTrendInfo = () => {
-    if (!event.actual || !event.forecast) {
+    if (!event.actual) {
+      return { icon: <NeutralIcon />, color: theme.palette.grey[500], text: 'Updated' };
+    }
+
+    // Use actualResultType if available, otherwise fall back to comparison logic
+    if (event.actualResultType) {
+      switch (event.actualResultType) {
+        case 'good':
+          return { icon: <TrendingUpIcon />, color: theme.palette.success.main, text: 'Good Result' };
+        case 'bad':
+          return { icon: <TrendingDownIcon />, color: theme.palette.error.main, text: 'Bad Result' };
+        case 'neutral':
+          return { icon: <NeutralIcon />, color: theme.palette.info.main, text: 'As Expected' };
+        default:
+          return { icon: <NeutralIcon />, color: theme.palette.grey[500], text: 'Updated' };
+      }
+    }
+
+    // Fallback to old comparison logic if actualResultType is not available
+    if (!event.forecast) {
       return { icon: <NeutralIcon />, color: theme.palette.grey[500], text: 'Updated' };
     }
 
@@ -242,12 +291,10 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
                     <Typography variant="caption" sx={{
                       fontWeight: 700,
                       fontSize: '0.7rem',
-                      color: 'text.primary',
-                      backgroundColor: alpha(theme.palette.success.main, 0.1),
                       px: 1,
                       py: 0.25,
                       borderRadius: 1,
-                      border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`
+                      ...getActualResultStyle(event.actualResultType)
                     }}>
                       A: {event.actual}
                     </Typography>
