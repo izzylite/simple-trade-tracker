@@ -54,6 +54,7 @@ import {
   Currency,
   ImpactLevel
 } from '../../types/economicCalendar';
+import { Calendar } from '../../types/calendar';
 import { economicCalendarService } from '../../services/economicCalendarService';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { QueryDocumentSnapshot } from 'firebase/firestore';
@@ -61,6 +62,7 @@ import EconomicEventListItem from './EconomicEventListItem';
 import EconomicCalendarFilters from './EconomicCalendarFilters';
 import Shimmer from '../Shimmer';
 import { log,error, logger, warn } from '../../utils/logger';
+import { cleanEventNameForPinning, isEventPinned } from '../../utils/eventNameUtils';
 // View types for pagination
 type ViewType = 'day' | 'week' | 'month';
 
@@ -203,6 +205,9 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const [events, setEvents] = useState<EconomicEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pinningEventId, setPinningEventId] = useState<string | null>(null);
+
+  
 
   // Handle real-time event updates
   useEffect(() => {
@@ -614,6 +619,56 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     await saveFilterSettings(appliedCurrencies, appliedImpacts, viewType, enabled, appliedOnlyUpcoming);
   };
 
+  // Handle pin event
+  const handlePinEvent = async (eventName: string) => {
+    if (!calendar?.id || !onUpdateCalendarProperty) return;
+
+    try {
+      setPinningEventId(eventName);
+      await onUpdateCalendarProperty(calendar.id, (calendar: Calendar) => {
+        const currentPinnedEvents = calendar.pinnedEvents || [];
+        const cleanedEventName =  cleanEventNameForPinning(eventName);
+        // Check if event is already pinned
+        if (isEventPinned(cleanedEventName, currentPinnedEvents)) {
+          return calendar; // Already pinned, no change needed
+        }
+        return {
+          ...calendar,
+          pinnedEvents: [...currentPinnedEvents, cleanedEventName]
+        };
+      });
+      logger.log(`📌 Successfully pinned event: ${eventName}`);
+    } catch (error) {
+      logger.error('Error pinning event:', error);
+    } finally {
+      setPinningEventId(null);
+    }
+  };
+
+  // Handle unpin event
+  const handleUnpinEvent = async (eventName: string) => {
+    if (!calendar?.id || !onUpdateCalendarProperty) return;
+
+    try {
+      setPinningEventId(eventName);
+      await onUpdateCalendarProperty(calendar.id, (calendar: Calendar) => {
+        const currentPinnedEvents = calendar.pinnedEvents || [];
+        const cleanedEventName =  cleanEventNameForPinning(eventName);
+        return {
+          ...calendar,
+          pinnedEvents: currentPinnedEvents.filter((pinnedEvent: string) =>
+            pinnedEvent.toLowerCase() !== cleanedEventName.toLowerCase()
+          )
+        };
+      });
+      logger.log(`📌 Successfully unpinned event: ${eventName}`);
+    } catch (error) {
+      logger.error('Error unpinning event:', error);
+    } finally {
+      setPinningEventId(null);
+    }
+  };
+
   return (
     <Drawer
       anchor="right"
@@ -921,7 +976,15 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                         const uniqueKey = `${event.id}-${eventIndex}`;
                         return (
                           <React.Fragment key={uniqueKey}>
-                            <EconomicEventListItem px={2.5} py={1.5}   event={event} />
+                            <EconomicEventListItem
+                              px={2.5}
+                              py={1.5}
+                              event={event}
+                              pinnedEvents={calendar?.pinnedEvents || []}
+                              onPinEvent={handlePinEvent}
+                              onUnpinEvent={handleUnpinEvent}
+                              isPinning={pinningEventId === event.event}
+                            />
                             {eventIndex < dayGroup.events.length - 1 && <Divider sx={{ ml: 3 }} />}
                           </React.Fragment>
                         );

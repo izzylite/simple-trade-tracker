@@ -24,6 +24,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase/config';
 import { TradeImage } from '../components/trades/TradeForm';
 import { logger } from '../utils/logger';
+import { cleanEventNameForPinning } from '../utils/eventNameUtils';
 
 const CALENDARS_COLLECTION = 'calendars';
 const YEARS_SUBCOLLECTION = 'years';
@@ -268,6 +269,8 @@ export const convertFirestoreDataToCalendar = (doc: DocumentData): Calendar => {
     scoreSettings: data.scoreSettings,
     // Economic calendar filter settings
     economicCalendarFilters: data.economicCalendarFilters,
+    // Pinned economic events
+    pinnedEvents: data.pinnedEvents || [],
     // Statistics
     winRate: data.winRate || 0,
     profitFactor: data.profitFactor || 0,
@@ -364,6 +367,9 @@ const convertCalendarToFirestoreData = (calendar: Omit<Calendar, 'id' | 'cachedT
 
     // Economic calendar filter settings
     ...(calendar.economicCalendarFilters !== undefined && { economicCalendarFilters: calendar.economicCalendarFilters }),
+
+    // Pinned economic events
+    ...(calendar.pinnedEvents !== undefined && { pinnedEvents: calendar.pinnedEvents }),
 
     // Statistics fields
     ...(calendar.winRate !== undefined && { winRate: calendar.winRate }),
@@ -615,6 +621,8 @@ export const createCalendar = async (userId: string, calendar: Omit<Calendar, 'i
     daysNotes: calendar.daysNotes ? Object.fromEntries(calendar.daysNotes) : {},
     // Initialize tags
     tags: calendar.tags || [],
+    // Initialize pinned events
+    pinnedEvents: calendar.pinnedEvents || [],
     // Initialize statistics
     winRate: 0,
     profitFactor: 0,
@@ -674,6 +682,7 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
       tags: sourceCalendar.tags || [],
       scoreSettings: sourceCalendar.scoreSettings,
       economicCalendarFilters: sourceCalendar.economicCalendarFilters,
+      pinnedEvents: sourceCalendar.pinnedEvents || [],
       // Copy statistics if including content, otherwise reset
       winRate: includeContent ? sourceCalendar.winRate : 0,
       profitFactor: includeContent ? sourceCalendar.profitFactor : 0,
@@ -1221,5 +1230,6 @@ export const updateTag = async (calendarId: string, oldTag: string, newTag: stri
     throw error;
   }
 };
+ 
 
 

@@ -39,6 +39,8 @@ export interface Calendar {
   scoreSettings?: ScoreSettings;
   // Economic calendar filter settings
   economicCalendarFilters?: EconomicCalendarFilterSettings
+  // Pinned economic events (cleaned event names)
+  pinnedEvents?: string[];
   // Statistics
   winRate?: number;
   profitFactor?: number;

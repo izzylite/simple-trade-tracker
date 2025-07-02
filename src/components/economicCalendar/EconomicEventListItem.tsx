@@ -10,20 +10,29 @@ import {
   Chip,
   ListItem,
   alpha,
-  useTheme
+  useTheme,
+  IconButton,
+  CircularProgress
 } from '@mui/material';
 import {
   Check as CheckIcon,
-  HourglassEmpty as HourglassEmptyIcon
+  HourglassEmpty as HourglassEmptyIcon,
+  PushPin as PinIcon,
+  PushPinOutlined as UnpinIcon
 } from '@mui/icons-material';
 import { format, parseISO, isAfter } from 'date-fns';
 import { EconomicEvent } from '../../types/economicCalendar';
+import { isEventPinned } from '../../utils/eventNameUtils';
 
 interface EconomicEventListItemProps {
   event: EconomicEvent;
   px: number,
   py: number,
   showDivider?: boolean;
+  pinnedEvents?: string[];
+  onPinEvent?: (eventName: string) => void;
+  onUnpinEvent?: (eventName: string) => void;
+  isPinning?: boolean;
 }
 
 // Helper function to format time and countdown with realtime updates
@@ -146,10 +155,28 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
   event,
   px= 2.5,
    py= 1.5,
-  showDivider = true
+  showDivider = true,
+  pinnedEvents = [],
+  onPinEvent,
+  onUnpinEvent,
+  isPinning = false
 }) => {
   const theme = useTheme();
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Check if this event is pinned
+  const eventIsPinned = isEventPinned(event.event, pinnedEvents);
+
+  // Handle pin/unpin toggle
+  const handleTogglePin = () => {
+    if (isPinning) return;
+
+    if (eventIsPinned) {
+      onUnpinEvent?.(event.event);
+    } else {
+      onPinEvent?.(event.event);
+    }
+  };
 
   // Get initial time info to check if event is imminent
   const initialTimeInfo = formatTimeWithCountdown(event.timeUtc, currentTime);
@@ -279,6 +306,32 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
                 }
               }}
             />
+
+            {/* Pin Button */}
+            {(onPinEvent || onUnpinEvent) && (
+              <IconButton
+                onClick={handleTogglePin}
+                disabled={isPinning}
+                size="small"
+                sx={{
+                  ml: 0.5,
+                  color: eventIsPinned ? 'primary.main' : 'text.secondary',
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    color: 'primary.main'
+                  },
+                  '&:disabled': {
+                    color: 'text.disabled'
+                  }
+                }}
+              >
+                {isPinning ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  eventIsPinned ? <PinIcon sx={{ fontSize: 16 }} /> : <UnpinIcon sx={{ fontSize: 16 }} />
+                )}
+              </IconButton>
+            )}
           </Box>
 
           {/* Second Row: Event Name */}

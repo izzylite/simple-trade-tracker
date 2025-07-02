@@ -834,11 +834,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                     clickable
                     onClick={() => handleTagClick(tagOrEvent)}
                     sx={{
-                      ...getTagChipStyles(tagOrEvent, theme),
-                      ...(allEventNames.includes(tagOrEvent) && {
-                        border: '1px dashed #1976d2', // Example: dashed border for events
-                        
-                      })
+                      ...getTagChipStyles(tagOrEvent, theme)
                     }}
                     icon={allEventNames.includes(tagOrEvent) ? <EventIcon color="primary" fontSize="small" sx={{ color: '#ffffff' }} /> : undefined}
                   />

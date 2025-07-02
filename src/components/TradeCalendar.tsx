@@ -1674,11 +1674,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           open={pinnedTradesDrawerOpen}
           onClose={() => setPinnedTradesDrawerOpen(false)}
           trades={trades}
-          onTradeClick={(trade) => {
+          calendar={calendar}
+          onTradeClick={(trade,allTrades,title) => {
             // Close drawer and open the trade in gallery mode
             setPinnedTradesDrawerOpen(false);
-            const pinnedTrades = trades.filter(t => t.isPinned);
-            openGalleryMode(pinnedTrades, trade.id, "Pinned Trades");
+            openGalleryMode(allTrades, trade.id,title);
           }}
         />
 
