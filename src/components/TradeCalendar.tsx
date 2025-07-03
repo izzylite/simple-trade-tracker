@@ -766,6 +766,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       showSnackbar('Cannot add trade while trades are loading. Please wait...', 'warning');
       return;
     }
+    if (date > new Date()) {
+      log('Cannot add trade in the future');
+      showSnackbar('Cannot add trade in the future. Please select a valid date.', 'warning');
+      return;
+    }
 
     if (!isDynamicRiskToggled) {
       // Reset to use actual amounts set to false before adding any trade

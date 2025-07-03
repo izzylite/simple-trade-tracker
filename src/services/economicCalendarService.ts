@@ -244,27 +244,6 @@ convertToEconomicEvent(data: DocumentData): EconomicEvent {
     };
   }
 
-  convertToEconomicEvent(data: DocumentData): EconomicEvent {
-    return {
-      id: data.id,
-      currency: data.currency as Currency,
-      event: data.event,
-      impact: data.impact as ImpactLevel,
-      time: data.time?.toDate?.()?.toISOString() || data.timeUtc,
-      actualResultType: data.actualResultType || '',
-      timeUtc: data.timeUtc,
-      actual: data.actual || '',
-      forecast: data.forecast || '',
-      previous: data.previous || '',
-      date: data.date,
-      country: data.country || '',
-      flagCode: data.flagCode || '',
-      flagUrl: data.flagUrl || '',
-      isAllDay: false,
-      unixTimestamp: data.unixTimestamp
-    }
-  }
-
   /**
    * Subscribe to real-time updates from database
    */
@@ -318,5 +297,3 @@ convertToEconomicEvent(data: DocumentData): EconomicEvent {
 
 // Export singleton instance
 export const economicCalendarService = new EconomicCalendarServiceImpl();
-
-

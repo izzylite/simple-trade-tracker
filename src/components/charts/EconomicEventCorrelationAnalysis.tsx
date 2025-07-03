@@ -28,8 +28,8 @@ import { ImpactLevel, Currency } from '../../types/economicCalendar';
 import { formatValue } from '../../utils/formatters';
 
 import RoundedTabs from '../common/RoundedTabs';
-import { Calendar } from '../../types/calendar';
-import { DEFAULT_FILTER_SETTINGS } from '../economicCalendar/EconomicCalendarDrawer';
+import { Calendar } from '../../types/calendar'; 
+import { getCurrenciesForPair } from '../../services/tradeEconomicEventService';
 
 // Helper function to get flag URL
 const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {
@@ -115,8 +115,18 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
   ];
 
     
-// Currency options for filtering - using same currencies as calendar settings
-const CURRENCIES = calendar.economicCalendarFilters?.currencies || DEFAULT_FILTER_SETTINGS.currencies
+// Currency options for filtering - using same currencies as calendar settings 
+const CURRENCIES = useMemo(() => {
+  const currencyTags = trades
+    .map(trade => trade.tags)
+    .flat()
+    .filter(tag => tag?.includes('pair:'))
+    .map(tag => tag?.split(':')[1])
+    .filter((pair): pair is string => pair !== undefined).map(pair => getCurrenciesForPair(pair)).flat();
+  
+  return Array.from(new Set(currencyTags));
+}, [trades]);
+
 const CURRENCY_OPTIONS = [
   { value: 'ALL', label: 'All Currencies' },
   ...CURRENCIES.map(currency => ({ value: currency, label: currency }))

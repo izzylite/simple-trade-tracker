@@ -13,7 +13,8 @@ import {
   Menu,
   MenuItem,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  Button
 } from '@mui/material';
 import { logger } from '../utils/logger';
 import {
@@ -28,7 +29,8 @@ import {
   EventNote as EventNoteIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
-  Note
+  Note,
+  Save as SaveIcon
 } from '@mui/icons-material';
 import RichTextEditor from './common/RichTextEditor';
 import { Calendar } from '../types/calendar';
@@ -71,6 +73,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   const [editedData, setEditedData] = useState(calendarNote);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [imageMenuAnchor, setImageMenuAnchor] = useState<HTMLElement | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // State for hiding day notes section
   const [isDayNotesHidden, setIsDayNotesHidden] = useState(() => {
@@ -84,22 +87,41 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   // Update editedData when calendarNote prop changes
   useEffect(() => {
     setEditedData(calendarNote);
+    setHasUnsavedChanges(false);
   }, [calendarNote]);
 
-  // Auto-save when editedData changes
+  // Track changes
   useEffect(() => {
-    if (editedData !== calendarNote) {
-      setSaveStatus('saving');
-      const saveTimeout = setTimeout(() => {
-        handleSave();
-      }, 1000); // Debounce save for 1 second
+    setHasUnsavedChanges(editedData !== calendarNote);
+  }, [editedData, calendarNote]);
 
-      return () => clearTimeout(saveTimeout);
-    }
-  }, [editedData]);
-
-  const handleToggleExpand = () => {
+  const handleToggleExpand = async () => {
     setExpanded(!expanded);
+    // If we're collapsing and there are unsaved changes, save them automatically
+    if (expanded && hasUnsavedChanges && onUpdateCalendarProperty) {
+      try {
+        setSaveStatus('saving');
+        await onUpdateCalendarProperty(calendarId, (calendar) => {
+          return {
+            ...calendar,
+            note: editedData
+          };
+        });
+        setSaveStatus('saved');
+        setHasUnsavedChanges(false);
+        // Reset to idle after showing saved status for 2 seconds
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } catch (error) {
+        logger.error('Error auto-saving notes:', error);
+        setSaveStatus('error');
+        // Reset to idle after showing error status for 3 seconds
+        setTimeout(() => setSaveStatus('idle'), 3000);
+        // Don't collapse if save failed
+        return;
+      }
+    }
+    
+    
   };
 
   const handleToggleDayNotesHidden = () => {
@@ -149,8 +171,6 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
     }
   };
 
-
-
   const handleSave = async () => {
     try {
       if (!onUpdateCalendarProperty) {
@@ -167,6 +187,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
       });
 
       setSaveStatus('saved');
+      setHasUnsavedChanges(false);
       // Reset to idle after showing saved status for 2 seconds
       setTimeout(() => setSaveStatus('idle'), 2000);
     }
@@ -178,11 +199,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
     }
   };
 
-
-
   return (
-
-
     <Paper
       elevation={3}
       sx={{
@@ -196,13 +213,10 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
           boxShadow: `0 4px 12px ${alpha(theme.palette.grey[500], 0.15)}`,
           transform: 'translateY(-2px)'
         },
-
       }}
     >
       <Box sx={{
-
         backgroundColor: heroImageUrl ? 'transparent' : alpha(theme.palette.primary.main, 0.08),
-
         zIndex: 2
       }}>
         {/* Hero Image Section */}
@@ -362,8 +376,52 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
                 )}
               </Box>
             )}
+
+            {/* Unsaved Changes Indicator */}
+            {hasUnsavedChanges && saveStatus === 'idle' && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Typography variant="caption" sx={{
+                  color: heroImageUrl ? 'white' : theme.palette.warning.main,
+                  fontSize: '0.7rem',
+                  textShadow: heroImageUrl ? '0 1px 2px rgba(0,0,0,0.8)' : 'none',
+                  fontWeight: 500
+                }}>
+                  Unsaved changes
+                </Typography>
+              </Box>
+            )}
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
+            {/* Save Button */}
+            {onUpdateCalendarProperty && hasUnsavedChanges && (
+              <Tooltip title="Save changes (Ctrl+S)">
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={saveStatus === 'saving' ? <CircularProgress size={16} /> : <SaveIcon />}
+                  onClick={handleSave}
+                  disabled={saveStatus === 'saving'}
+                  sx={{
+                    minWidth: 'auto',
+                    px: 2,
+                    py: 0.5,
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    borderRadius: 1.5,
+                    boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.3)}`,
+                    '&:hover': {
+                      boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.4)}`,
+                      transform: 'translateY(-1px)'
+                    },
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                  }}
+                >
+                  {saveStatus === 'saving' ? 'Saving...' : 'Save'}
+                </Button>
+              </Tooltip>
+            )}
+
             {onUpdateCalendarProperty && onOpenImagePicker && (
               <>
                 <Tooltip title={heroImageUrl ? "Manage cover image" : "Add cover image"}>
@@ -429,8 +487,6 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
         </Box>
       </Box>
 
-
-
       <Collapse in={expanded}>
         <Box sx={{ p: 2 }} onKeyDown={handleKeyDown}>
           <RichTextEditor
@@ -453,7 +509,6 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
 
         if (hasNoteForToday) {
           const noteContent = calendarDayNotes.get(currentDayOfWeek) || '';
-          // const richTextHtml = convertRichTextToHtml(noteContent);
 
           return (
             <Box sx={{
@@ -481,7 +536,6 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
                 </Box>
 
                 <Box
-
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
@@ -513,7 +567,6 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
                     </Typography>
                   </Box>
 
-
                   <Box
                     onClick={handleToggleDayNotesHidden}
                     sx={{
@@ -537,20 +590,18 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
                     </Typography>
                   </Box>
                 </Box>
-
               </Box>
               {!isDayNotesHidden && (
-
-                  <RichTextEditor
-                    value={noteContent}
-                    disabled={true}
-                    hideCharacterCount={true}
-                    minHeight={50}
-                    maxHeight={400}
-                    calendarId={calendarId}
-                    trades={trades}
-                    onOpenGalleryMode={onOpenGalleryMode}
-                  />
+                <RichTextEditor
+                  value={noteContent}
+                  disabled={true}
+                  hideCharacterCount={true}
+                  minHeight={50}
+                  maxHeight={400}
+                  calendarId={calendarId}
+                  trades={trades}
+                  onOpenGalleryMode={onOpenGalleryMode}
+                />
               )}
             </Box>
           );
@@ -558,7 +609,6 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
         return null;
       })()}
     </Paper>
-
   );
 };
 

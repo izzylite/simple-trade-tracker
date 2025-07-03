@@ -528,7 +528,9 @@ async function parseMyFXBookWeeklyEnhanced(html: string): Promise<EconomicEvent[
               unixTimestamp: unixTimestamp // Unix timestamp from MyFXBook's time attribute
             };
 
-            events.push(event);
+            if(!event.event.toLowerCase().includes('myfxbook')) {
+              events.push(event);
+            }
           }
         }
       } catch (rowError) {

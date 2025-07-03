@@ -163,8 +163,8 @@ async function fetchEventsForTrade(tradeDate, session) {
         flagCode: data.flagCode || '',
         time: data.time?.toDate?.()?.toISOString() || data.timeUtc
       });
-    });
- 
+    })
+    events = events.filter(event => event.currency === 'USD' || event.currency === 'EUR');  
 
     // Filter events that fall within trade session
     const sessionEvents = events.filter(event =>
@@ -253,7 +253,7 @@ async function updateTradesWithEconomicEvents(calendarId, yearDoc, dryRun = fals
 
         if (economicEvents.length > 0) {
           console.log(`✅ Found ${economicEvents.length} events for trade ${trade.id}`);
-          return { trade: { ...trade, economicEvents }, updated: true };
+          return { trade: { ...trade, economicEvents, tags: [...new Set([...trade.tags, ...['pair:EURUSD']])] }, updated: true };
         }
         console.log(`ℹ️  No events for trade ${trade.id}`);
         return { trade, updated: false };
