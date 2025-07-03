@@ -629,12 +629,13 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         const currentPinnedEvents = calendar.pinnedEvents || [];
         const cleanedEventName =  cleanEventNameForPinning(eventName);
         // Check if event is already pinned
-        if (isEventPinned(cleanedEventName, currentPinnedEvents)) {
+        const eventNames = currentPinnedEvents.map(pe => pe.event);
+        if (isEventPinned(cleanedEventName, eventNames)) {
           return calendar; // Already pinned, no change needed
         }
         return {
           ...calendar,
-          pinnedEvents: [...currentPinnedEvents, cleanedEventName]
+          pinnedEvents: [...currentPinnedEvents, { event: cleanedEventName }]
         };
       });
       logger.log(`📌 Successfully pinned event: ${eventName}`);
@@ -656,8 +657,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         const cleanedEventName =  cleanEventNameForPinning(eventName);
         return {
           ...calendar,
-          pinnedEvents: currentPinnedEvents.filter((pinnedEvent: string) =>
-            pinnedEvent.toLowerCase() !== cleanedEventName.toLowerCase()
+          pinnedEvents: currentPinnedEvents.filter(pinnedEvent =>
+            pinnedEvent.event.toLowerCase() !== cleanedEventName.toLowerCase()
           )
         };
       });
@@ -980,7 +981,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                               px={2.5}
                               py={1.5}
                               event={event}
-                              pinnedEvents={calendar?.pinnedEvents || []}
+                              pinnedEvents={calendar?.pinnedEvents?.map(pe => pe.event) || []}
                               onPinEvent={handlePinEvent}
                               onUnpinEvent={handleUnpinEvent}
                               isPinning={pinningEventId === event.event}

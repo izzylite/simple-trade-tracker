@@ -1685,6 +1685,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             setPinnedTradesDrawerOpen(false);
             openGalleryMode(allTrades, trade.id,title);
           }}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
         />
 
         {/* Trade Gallery Dialog */}

@@ -3,6 +3,11 @@ import { ScoreSettings } from './score';
 import { ImageAttribution } from '../components/heroImage';
 import { EconomicCalendarFilterSettings } from '../components/economicCalendar/EconomicCalendarDrawer';
 
+export interface PinnedEvent {
+  event: string;
+  notes?: string;
+}
+
 export interface Calendar {
   id: string;
   name: string;
@@ -39,8 +44,8 @@ export interface Calendar {
   scoreSettings?: ScoreSettings;
   // Economic calendar filter settings
   economicCalendarFilters?: EconomicCalendarFilterSettings
-  // Pinned economic events (cleaned event names)
-  pinnedEvents?: string[];
+  // Pinned economic events (cleaned event names with optional notes)
+  pinnedEvents?: PinnedEvent[];
   // Statistics
   winRate?: number;
   profitFactor?: number;

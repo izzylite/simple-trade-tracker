@@ -17,7 +17,7 @@ import {
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { isSameWeek, isSameMonth } from 'date-fns';
 import { auth, db } from '../firebase/config';
-import { Calendar } from '../types/calendar';
+import { Calendar, PinnedEvent } from '../types/calendar';
 import { Trade } from '../types/trade';
 import { YearlyTrades } from '../types/yearlyTrades';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -28,6 +28,24 @@ import { cleanEventNameForPinning } from '../utils/eventNameUtils';
 
 const CALENDARS_COLLECTION = 'calendars';
 const YEARS_SUBCOLLECTION = 'years';
+
+// Migration function to handle transition from string[] to PinnedEvent[]
+const migratePinnedEvents = (pinnedEvents: any[]): PinnedEvent[] => {
+  if (!Array.isArray(pinnedEvents)) return [];
+
+  return pinnedEvents.map(event => {
+    // If it's already in the new format (object with event property)
+    if (typeof event === 'object' && event.event) {
+      return event as PinnedEvent;
+    }
+    // If it's in the old format (string)
+    if (typeof event === 'string') {
+      return { event };
+    }
+    // Fallback for unexpected formats
+    return { event: String(event) };
+  });
+};
 
 // Interface for calendar statistics
 interface CalendarStats {
@@ -269,8 +287,8 @@ export const convertFirestoreDataToCalendar = (doc: DocumentData): Calendar => {
     scoreSettings: data.scoreSettings,
     // Economic calendar filter settings
     economicCalendarFilters: data.economicCalendarFilters,
-    // Pinned economic events
-    pinnedEvents: data.pinnedEvents || [],
+    // Pinned economic events (handle migration from string[] to PinnedEvent[])
+    pinnedEvents: migratePinnedEvents(data.pinnedEvents || []),
     // Statistics
     winRate: data.winRate || 0,
     profitFactor: data.profitFactor || 0,

@@ -13,7 +13,15 @@ import {
   Tabs,
   Tab,
   Badge,
-  Avatar
+  Avatar,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Tooltip
 } from '@mui/material';
 import {
   PushPin as PinIcon,
@@ -22,10 +30,12 @@ import {
   Remove as BreakevenIcon,
   CalendarToday as DateIcon,
   Event as EventIcon,
-  ArrowBack as BackIcon
+  ArrowBack as BackIcon,
+  Note as NoteIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
 import { Trade } from '../types/trade';
-import { Calendar } from '../types/calendar';
+import { Calendar, PinnedEvent } from '../types/calendar';
 import { format } from 'date-fns';
 import UnifiedDrawer from './common/UnifiedDrawer';
 import { eventNamesMatch } from '../utils/eventNameUtils';
@@ -36,6 +46,7 @@ interface PinnedTradesDrawerProps {
   trades: Trade[];
   calendar?: Calendar;
   onTradeClick?: (trade: Trade,trades: Trade[],title : string) => void;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: any) => any) => Promise<void>;
 }
 
 const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
@@ -43,13 +54,19 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   onClose,
   trades,
   calendar,
-  onTradeClick
+  onTradeClick,
+  onUpdateCalendarProperty
 }) => {
   const theme = useTheme();
 
   // Tab state
   const [activeTab, setActiveTab] = useState(0);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
+
+  // Notes dialog state
+  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<PinnedEvent | null>(null);
+  const [notesText, setNotesText] = useState('');
 
   // Get pinned trades
   const pinnedTrades = useMemo(() => {
@@ -81,6 +98,46 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   const tradesWithSelectedEvent = useMemo(() => {
     return selectedEvent ? getTradesWithEvent(selectedEvent) : [];
   }, [selectedEvent, getTradesWithEvent]);
+
+  // Handle opening notes dialog
+  const handleEditNotes = (pinnedEvent: PinnedEvent) => {
+    setEditingEvent(pinnedEvent);
+    setNotesText(pinnedEvent.notes || '');
+    setNotesDialogOpen(true);
+  };
+
+  // Handle saving notes
+  const handleSaveNotes = async () => {
+    if (!editingEvent || !calendar?.id || !onUpdateCalendarProperty) return;
+
+    try {
+      await onUpdateCalendarProperty(calendar.id, (calendar: Calendar) => {
+        const updatedPinnedEvents = calendar.pinnedEvents?.map(event =>
+          event.event === editingEvent.event
+            ? { ...event, notes: notesText.trim() || undefined }
+            : event
+        ) || [];
+
+        return {
+          ...calendar,
+          pinnedEvents: updatedPinnedEvents
+        };
+      });
+
+      setNotesDialogOpen(false);
+      setEditingEvent(null);
+      setNotesText('');
+    } catch (error) {
+      console.error('Error saving notes:', error);
+    }
+  };
+
+  // Handle closing notes dialog
+  const handleCloseNotesDialog = () => {
+    setNotesDialogOpen(false);
+    setEditingEvent(null);
+    setNotesText('');
+  };
 
   const getTradeTypeIcon = (type: Trade['type']) => {
     switch (type) {
@@ -522,13 +579,13 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
             </Box>
           ) : (
             <List sx={{ p: 0, overflow: 'auto', height: '100%' }}>
-              {pinnedEvents.map((eventName, index) => {
-                const tradesWithEvent = getTradesWithEvent(eventName);
+              {pinnedEvents.map((pinnedEvent, index) => {
+                const tradesWithEvent = getTradesWithEvent(pinnedEvent.event);
                 return (
-                  <React.Fragment key={eventName}>
+                  <React.Fragment key={pinnedEvent.event}>
                     <ListItem disablePadding>
                       <ListItemButton
-                        onClick={() => setSelectedEvent(eventName)}
+                        onClick={() => setSelectedEvent(pinnedEvent.event)}
                         sx={{
                           p: 2,
                           '&:hover': {
@@ -562,12 +619,52 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                                 mb: 0.5
                               }}
                             >
-                              {eventName}
+                              {pinnedEvent.event}
                             </Typography>
                             <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
                               {tradesWithEvent.length} trade{tradesWithEvent.length !== 1 ? 's' : ''} found
+                              {pinnedEvent.notes && (
+                                <Box component="span" sx={{ ml: 1, display: 'inline-flex', alignItems: 'center' }}>
+                                  • <NoteIcon sx={{ fontSize: 12, ml: 0.5 }} />
+                                </Box>
+                              )}
                             </Typography>
+                            {pinnedEvent.notes && (
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  fontStyle: 'italic',
+                                  mt: 0.5,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {pinnedEvent.notes}
+                              </Typography>
+                            )}
                           </Box>
+
+                          {/* Notes Button */}
+                          <Tooltip title={pinnedEvent.notes ? "Edit notes" : "Add notes"}>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditNotes(pinnedEvent);
+                              }}
+                              sx={{
+                                color: pinnedEvent.notes ? 'primary.main' : 'text.secondary',
+                                '&:hover': {
+                                  backgroundColor: alpha(theme.palette.primary.main, 0.1)
+                                }
+                              }}
+                            >
+                              {pinnedEvent.notes ? <NoteIcon sx={{ fontSize: 18 }} /> : <EditIcon sx={{ fontSize: 18 }} />}
+                            </IconButton>
+                          </Tooltip>
 
                           {/* Trade Count Badge */}
                           {tradesWithEvent.length > 0 && (
@@ -593,6 +690,41 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
           )
         )}
       </Box>
+
+      {/* Notes Dialog */}
+      <Dialog
+        open={notesDialogOpen}
+        onClose={handleCloseNotesDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {editingEvent?.notes ? 'Edit Notes' : 'Add Notes'}
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {editingEvent?.event}
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            multiline
+            rows={4}
+            fullWidth
+            variant="outlined"
+            label="Notes"
+            value={notesText}
+            onChange={(e) => setNotesText(e.target.value)}
+            placeholder="Add your notes about this economic event..."
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseNotesDialog}>Cancel</Button>
+          <Button onClick={handleSaveNotes} variant="contained">
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
     </UnifiedDrawer>
   );
 };
