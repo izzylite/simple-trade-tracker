@@ -1048,7 +1048,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       {/* Main Editor Wrapper */}
       <Box
         sx={{
-          opacity: disabled ? 0.6 : 1,
+          
           position: 'relative', // Crucial for absolute positioning of toolbar
 
           overflow: 'hidden', // Clip potential overflows (like toolbar if not positioned carefully)

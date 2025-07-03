@@ -30,6 +30,7 @@ import { formatValue } from '../../utils/formatters';
 import RoundedTabs from '../common/RoundedTabs';
 import { Calendar } from '../../types/calendar'; 
 import { getCurrenciesForPair } from '../../services/tradeEconomicEventService';
+import { cleanEventNameForPinning } from '../../utils/eventNameUtils';
 
 // Helper function to get flag URL
 const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {
@@ -308,7 +309,7 @@ const CURRENCY_OPTIONS = [
     // Process losing trades
     losingTradeCorrelations.forEach(tc => {
       tc.economicEvents.forEach(event => {
-        const existing = eventTypeMap.get(event.name) || {
+        const existing = eventTypeMap.get(cleanEventNameForPinning(event.name)) || {
           losingTrades: [],
           winningTrades: [],
           totalLoss: 0,
@@ -325,14 +326,14 @@ const CURRENCY_OPTIONS = [
           };
         }
 
-        eventTypeMap.set(event.name, existing);
+        eventTypeMap.set(cleanEventNameForPinning(event.name), existing);
       });
     });
 
     // Process winning trades
     winningTradeCorrelations.forEach(tc => {
       tc.economicEvents.forEach(event => {
-        const existing = eventTypeMap.get(event.name) || {
+        const existing = eventTypeMap.get(cleanEventNameForPinning(event.name)) || {
           losingTrades: [],
           winningTrades: [],
           totalLoss: 0,
@@ -349,7 +350,7 @@ const CURRENCY_OPTIONS = [
           };
         }
 
-        eventTypeMap.set(event.name, existing);
+        eventTypeMap.set(cleanEventNameForPinning(event.name), existing);
       });
     });
 
@@ -372,7 +373,7 @@ const CURRENCY_OPTIONS = [
         };
       })
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+      .slice(0, 9);
 
     // Impact distribution
     const impactDistribution: Record<ImpactLevel, number> = {

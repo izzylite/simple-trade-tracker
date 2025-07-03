@@ -138,8 +138,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   const [eventNameSearch, setEventNameSearch] = useState('');
 
   // Add state
-  const [selectedImpacts, setSelectedImpacts] = useState<ImpactLevel[]>(
-    (calendar?.economicCalendarFilters?.impacts as ImpactLevel[]) || ['High', 'Medium', 'Low']
+  const [selectedImpacts, setSelectedImpacts] = useState<ImpactLevel[]>(['High']
   );
 
   // Update local trade state when tradeData prop changes

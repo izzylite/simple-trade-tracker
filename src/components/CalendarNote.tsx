@@ -14,7 +14,8 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
-  Button
+  Button,
+  Divider
 } from '@mui/material';
 import { logger } from '../utils/logger';
 import {
@@ -120,8 +121,8 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
         return;
       }
     }
-    
-    
+
+
   };
 
   const handleToggleDayNotesHidden = () => {
@@ -601,17 +602,21 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
                   </Box>
                 </Box>
               </Box>
+
               {!isDayNotesHidden && (
-                <RichTextEditor
-                  value={noteContent}
-                  disabled={true}
-                  hideCharacterCount={true}
-                  minHeight={50}
-                  maxHeight={400}
-                  calendarId={calendarId}
-                  trades={trades}
-                  onOpenGalleryMode={onOpenGalleryMode}
-                />
+                <>
+                  <Divider sx={{ my: 1, borderColor: theme.palette.divider, borderRadius: 1 }} />
+                  <RichTextEditor
+                    value={noteContent}
+                    disabled={true}
+                    hideCharacterCount={true}
+                    minHeight={50}
+                    maxHeight={400}
+                    calendarId={calendarId}
+                    trades={trades}
+                    onOpenGalleryMode={onOpenGalleryMode}
+                  />
+                </>
               )}
             </Box>
           );

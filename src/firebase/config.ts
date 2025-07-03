@@ -6,6 +6,13 @@ import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
+// For development debugging only
+if (process.env.NODE_ENV === 'development') {
+  // @ts-ignore
+  window.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  console.log('🔧 Firebase App Check debug mode enabled');
+}
+
 const firebaseConfig = {
   apiKey: "AIzaSyCcIgXUCcuWmlmf9Vapvg_wpcQllHQBc-o",
   authDomain: "tradetracker-30ec1.firebaseapp.com",
@@ -29,11 +36,5 @@ const appCheck = initializeAppCheck(app, {
   provider: new ReCaptchaV3Provider('6LdtDHYrAAAAAJQOQhrUoTjaDvC2K6w-1Q83TDpF'),
   isTokenAutoRefreshEnabled: true
 });
-
-// For development debugging only
-if (process.env.NODE_ENV === 'development') {
-  // @ts-expect-error: FIREBASE_APPCHECK_DEBUG_TOKEN is used for local AppCheck debugging
-  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-}
 
 export { app, analytics, auth, db, storage, functions, appCheck };
