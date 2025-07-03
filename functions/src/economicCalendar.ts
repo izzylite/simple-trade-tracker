@@ -3,6 +3,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import * as crypto from 'crypto';
+import { enforceAppCheck } from '.';
 
 interface EconomicEvent {
   id: string;
@@ -647,10 +648,14 @@ export const processHtmlEconomicEvents = onCall(
   {
     region: 'us-central1',
     memory: '1GiB',
-    timeoutSeconds: 300
+    timeoutSeconds: 300,
+    enforceAppCheck: true // Enable App Check verification
   },
   async (request) => {
     try {
+      // Ensure App Check is valid
+      await enforceAppCheck(request);
+
       const { htmlContent } = request.data;
 
       if (!htmlContent || typeof htmlContent !== 'string') {
@@ -713,10 +718,14 @@ export const refreshEconomicCalendar = onCall(
   {
     region: 'us-central1',
     memory: '512MiB',
-    timeoutSeconds: 60
+    timeoutSeconds: 60,
+    enforceAppCheck: true // Enable App Check verification
   },
   async (request) => {
     try {
+      // Ensure App Check is valid
+        await enforceAppCheck(request);
+
       const {
         targetDate,
         currencies,

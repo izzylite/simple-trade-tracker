@@ -1,8 +1,10 @@
 import * as admin from 'firebase-admin';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions/v2';
+import { enforceAppCheck } from '.';
 
 const db = admin.firestore();
+ 
 
 /**
  * Helper function to find a trade by ID in a calendar's year documents
@@ -42,8 +44,12 @@ interface ShareLinkRequest {
  */
 export const generateTradeShareLinkV2 = onCall({
   cors: true, // Enable CORS for web requests
+  enforceAppCheck: true, // Enable App Check verification
 }, async (request) => {
   try {
+    // Ensure App Check is valid
+    await enforceAppCheck(request);
+
     // Ensure user is authenticated
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'User must be authenticated');
@@ -75,8 +81,6 @@ export const generateTradeShareLinkV2 = onCall({
     if (!trade) {
       throw new HttpsError('not-found', 'Trade not found in calendar');
     }
-
-
 
     // Generate a unique share ID using modern approach (avoiding deprecated substr)
     const shareId = `share_${tradeId}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -123,8 +127,12 @@ export const generateTradeShareLinkV2 = onCall({
  */
 export const getSharedTradeV2 = onCall({
   cors: true, // Enable CORS for web requests
+  enforceAppCheck: true, // Enable App Check verification
 }, async (request) => {
   try {
+    // Ensure App Check is valid
+    await enforceAppCheck(request);
+
     const { shareId } = request.data;
 
     if (!shareId) {
@@ -188,8 +196,12 @@ export const getSharedTradeV2 = onCall({
  */
 export const deactivateSharedTradeV2 = onCall({
   cors: true, // Enable CORS for web requests
+  enforceAppCheck: true, // Enable App Check verification
 }, async (request) => {
   try {
+    // Ensure App Check is valid
+    await enforceAppCheck(request);
+
     // Ensure user is authenticated
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'User must be authenticated');

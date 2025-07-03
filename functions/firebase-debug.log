@@ -1,0 +1,16 @@
+[debug] [2025-07-03T10:28:54.448Z] ----------------------------------------------------------------------
+[debug] [2025-07-03T10:28:54.451Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\izzy\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions
+[debug] [2025-07-03T10:28:54.451Z] CLI Version:   14.1.0
+[debug] [2025-07-03T10:28:54.452Z] Platform:      win32
+[debug] [2025-07-03T10:28:54.452Z] Node Version:  v22.14.0
+[debug] [2025-07-03T10:28:54.452Z] Time:          Thu Jul 03 2025 11:28:54 GMT+0100 (West Africa Standard Time)
+[debug] [2025-07-03T10:28:54.452Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-07-03T10:28:54.723Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-07-03T10:28:54.724Z] > authorizing via signed-in user (isl.israelite.official@gmail.com)
+[debug] [2025-07-03T10:28:54.724Z] [iam] checking project tradetracker-30ec1 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2025-07-03T10:28:54.726Z] Checked if tokens are valid: true, expires at: 1751542003557
+[debug] [2025-07-03T10:28:54.726Z] Checked if tokens are valid: true, expires at: 1751542003557
+[debug] [2025-07-03T10:28:54.727Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/tradetracker-30ec1:testIamPermissions [none]
+[debug] [2025-07-03T10:28:54.727Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/tradetracker-30ec1:testIamPermissions x-goog-quota-user=projects/tradetracker-30ec1
+[debug] [2025-07-03T10:28:54.727Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/tradetracker-30ec1:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}

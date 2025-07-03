@@ -5,6 +5,16 @@ import { handleTradeYearChanges, canDeleteImage, cleanupRemovedImagesHelper, hav
 
 admin.initializeApp();
 
+// Enforce App Check on all callable functions
+export const enforceAppCheck = async (context: any) => {
+  if (context.app == undefined) {
+    throw new HttpsError(
+      'failed-precondition',
+      'The function must be called from an App Check verified app.'
+    );
+  }
+};
+
 // Export the cleanup function
 export { cleanupExpiredCalendarsV2 } from './cleanupExpiredCalendars';
 
@@ -156,8 +166,11 @@ export const cleanupDeletedCalendarV2 = onDocumentDeleted('calendars/{calendarId
 // Cloud function to update a tag across all trades in a calendar (v2)
 export const updateTagV2 = onCall({
   cors: true, // Enable CORS for web requests
+  enforceAppCheck: true, // Enable App Check verification
 }, async (request) => {
   try {
+    // Ensure App Check is valid
+    await enforceAppCheck(request);
     
     // Ensure user is authenticated
     if (!request.auth) {

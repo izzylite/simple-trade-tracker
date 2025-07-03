@@ -165,9 +165,19 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
 
   // Handle keyboard shortcuts
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    if ((event.ctrlKey || event.metaKey) && event.key === 's') {
-      event.preventDefault();
-      handleSave();
+    // Only handle shortcuts when expanded
+    if (!expanded) return;
+
+    if ((event.ctrlKey || event.metaKey)) {
+      if (event.key === 's') {
+        event.preventDefault();
+        if (hasUnsavedChanges) {
+          handleSave();
+        }
+      } else if (event.key === 'b') {
+        event.preventDefault();
+        handleToggleExpand();
+      }
     }
   };
 
@@ -468,7 +478,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
               </>
             )}
 
-            <Tooltip title={expanded ? "Hide description" : "Show description"}>
+            <Tooltip title={expanded ? "Hide description (Ctrl+B)" : "Show description"}>
               <IconButton
                 size="small"
                 onClick={handleToggleExpand}
@@ -488,7 +498,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
       </Box>
 
       <Collapse in={expanded}>
-        <Box sx={{ p: 2 }} onKeyDown={handleKeyDown}>
+        <Box sx={{ p: 2 }} onKeyDown={handleKeyDown} tabIndex={0}>
           <RichTextEditor
             value={editedData}
             onChange={setEditedData}
