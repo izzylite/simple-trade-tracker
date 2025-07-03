@@ -36,8 +36,7 @@ interface EventWatcherCallbacks {
 }
 
 interface CalendarEventQueue {
-  events: EconomicEvent[];
-  currentIndex: number;
+  events: EconomicEvent[]; 
   lastFetched: number;
   currencies: Currency[];
   impacts: ImpactLevel[];
@@ -218,7 +217,6 @@ class EconomicEventWatcher {
       // Store in memory queue
       this.eventQueues.set(calendarId, {
         events: upcomingEvents,
-        currentIndex: 0,
         lastFetched: now,
         currencies,
         impacts
@@ -235,7 +233,7 @@ class EconomicEventWatcher {
    */
   private watchNextEventFromQueue(calendarId: string) {
     const queue = this.eventQueues.get(calendarId);
-    if (!queue || queue.currentIndex >= queue.events.length) {
+    if (!queue || queue.events.length === 0) {
       logger.log(`📅 No more events to watch for calendar: ${calendarId}`);
       this.isActive = false;
       return;
@@ -260,27 +258,16 @@ class EconomicEventWatcher {
    * Get the next group of events that have the same release time
    */
   private getNextEventGroup(queue: CalendarEventQueue): EventTimeGroup {
-    if (queue.currentIndex >= queue.events.length) {
+    if (queue.events.length === 0) {
       return { releaseTime: '', events: [] };
     }
 
-    const firstEvent = queue.events[queue.currentIndex];
-    const releaseTime = firstEvent.timeUtc;
-    const eventsAtSameTime: EconomicEvent[] = [];
-
-    // Collect all events with the same release time
-    let index = queue.currentIndex;
-    while (index < queue.events.length && queue.events[index].timeUtc === releaseTime) {
-      eventsAtSameTime.push(queue.events[index]);
-      index++;
-    }
-
-    // Update the queue's current index to skip all events we just collected
-    queue.currentIndex = index;
+    const firstEvent = queue.events[0]
+    const releaseTime = firstEvent.timeUtc; 
 
     return {
-      releaseTime,
-      events: eventsAtSameTime
+      releaseTime, // Collect all events with the same release time
+      events: queue.events.filter((e) => e.timeUtc === releaseTime)
     };
   }
 
@@ -423,6 +410,7 @@ class EconomicEventWatcher {
         events // Pass the entire events list
       });
 
+
       // Extract updated events from the cloud function result
       const responseData = result.data as any;
       const targetEvents: EconomicEvent[] = responseData?.targetEvents || [];
@@ -458,7 +446,12 @@ class EconomicEventWatcher {
           logger.log(`⚠️ Event "${originalEvent.event}" not found in updated results, using original data`);
         }
       }
-
+      // Remove the events from the queue
+      const queue = this.eventQueues.get(calendarId);
+      if (queue) {
+        const eventIds = events.map((e) => e.id);
+        queue.events = queue.events.filter((e) => !eventIds.includes(e.id)) || []; 
+      }
       this.callbacks.onEventsUpdated(updatedEvents, targetEvents, calendarId);
 
       // Remove this event group from watching
@@ -498,7 +491,7 @@ class EconomicEventWatcher {
       // to skip all events in the processed group
 
       // Check if we have more events in the queue
-      if (queue.currentIndex < queue.events.length) {
+      if (queue.events.length > 0) {
         // Watch the next event from the existing queue
         this.watchNextEventFromQueue(calendarId);
       } else {
@@ -509,7 +502,7 @@ class EconomicEventWatcher {
         // Reset index and try again
         const refreshedQueue = this.eventQueues.get(calendarId);
         if (refreshedQueue && refreshedQueue.events.length > 0) {
-          refreshedQueue.currentIndex = 0;
+         
           this.watchNextEventFromQueue(calendarId);
         } else {
           logger.log('📅 No more upcoming events found for today');
@@ -535,9 +528,7 @@ class EconomicEventWatcher {
 
       return {
         calendarId,
-        totalEvents: queue.events.length,
-        currentIndex: queue.currentIndex,
-        remainingEvents: queue.events.length - queue.currentIndex,
+        totalEvents: queue.events.length, 
         lastFetched: new Date(queue.lastFetched).toISOString(),
         lastRefresh: lastRefresh ? new Date(lastRefresh).toISOString() : null,
         minutesSinceRefresh: timeSinceRefresh ? Math.round(timeSinceRefresh / 1000 / 60) : null,
