@@ -68,6 +68,10 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   const [editingEvent, setEditingEvent] = useState<PinnedEvent | null>(null);
   const [notesText, setNotesText] = useState('');
 
+  // View notes dialog state
+  const [viewNotesDialogOpen, setViewNotesDialogOpen] = useState(false);
+  const [viewingEvent, setViewingEvent] = useState<PinnedEvent | null>(null);
+
   // Get pinned trades
   const pinnedTrades = useMemo(() => {
     return trades.filter(trade => trade.isPinned);
@@ -99,11 +103,28 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
     return selectedEvent ? getTradesWithEvent(selectedEvent) : [];
   }, [selectedEvent, getTradesWithEvent]);
 
+  // Get the selected pinned event object (for notes)
+  const selectedPinnedEvent = useMemo(() => {
+    return selectedEvent ? pinnedEvents.find(pe => pe.event === selectedEvent) : null;
+  }, [selectedEvent, pinnedEvents]);
+
   // Handle opening notes dialog
   const handleEditNotes = (pinnedEvent: PinnedEvent) => {
     setEditingEvent(pinnedEvent);
     setNotesText(pinnedEvent.notes || '');
     setNotesDialogOpen(true);
+  };
+
+  // Handle viewing notes dialog
+  const handleViewNotes = (pinnedEvent: PinnedEvent) => {
+    setViewingEvent(pinnedEvent);
+    setViewNotesDialogOpen(true);
+  };
+
+  // Handle closing view notes dialog
+  const handleCloseViewNotesDialog = () => {
+    setViewNotesDialogOpen(false);
+    setViewingEvent(null);
   };
 
   // Handle saving notes
@@ -303,28 +324,82 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
         {/* Render content based on current state */}
         {selectedEvent ? (
           // Show trades with selected event
-          tradesWithSelectedEvent.length === 0 ? (
-            <Box
-              sx={{
-                p: 4,
-                textAlign: 'center',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center'
-              }}
-            >
-              <EventIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-              <Typography variant="h6" sx={{ mb: 1, fontWeight: 600, color: 'text.secondary' }}>
-                No Trades Found
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 300 }}>
-                No trades contain the economic event "{selectedEvent}". Try selecting a different event.
-              </Typography>
-            </Box>
-          ) : (
-            <List sx={{ p: 0, overflow: 'auto', height: '100%' }}>
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {/* Event Notes Section */}
+            {selectedPinnedEvent?.notes && (
+              <Box
+                sx={{
+                  p: 2,
+                  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                  backgroundColor: alpha(theme.palette.primary.main, 0.02)
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                  <NoteIcon sx={{ fontSize: 20, color: 'primary.main', mt: 0.5 }} />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{
+                        fontWeight: 600,
+                        color: 'primary.main',
+                        mb: 0.5
+                      }}
+                    >
+                      Event Notes
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.5
+                      }}
+                    >
+                      {selectedPinnedEvent.notes}
+                    </Typography>
+                  </Box>
+                  <Tooltip title="Edit notes">
+                    <IconButton
+                      size="small"
+                      onClick={() => selectedPinnedEvent && handleEditNotes(selectedPinnedEvent)}
+                      sx={{
+                        color: 'primary.main',
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.primary.main, 0.1)
+                        }
+                      }}
+                    >
+                      <EditIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </Box>
+            )}
+
+            {/* Trades List */}
+            {tradesWithSelectedEvent.length === 0 ? (
+              <Box
+                sx={{
+                  p: 4,
+                  textAlign: 'center',
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}
+              >
+                <EventIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                <Typography variant="h6" sx={{ mb: 1, fontWeight: 600, color: 'text.secondary' }}>
+                  No Trades Found
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 300 }}>
+                  No trades contain the economic event "{selectedEvent}". Try selecting a different event.
+                </Typography>
+              </Box>
+            ) : (
+              <List sx={{ p: 0, overflow: 'auto', flex: 1 }}>
               {tradesWithSelectedEvent.map((trade, index) => (
                 <React.Fragment key={trade.id}>
                   <ListItem disablePadding>
@@ -414,7 +489,8 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                 </React.Fragment>
               ))}
             </List>
-          )
+            )}
+          </Box>
         ) : activeTab === 0 ? (
           // Pinned Trades Tab
           sortedPinnedTrades.length === 0 ? (
@@ -633,13 +709,22 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                               <Typography
                                 variant="body2"
                                 color="text.secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewNotes(pinnedEvent);
+                                }}
                                 sx={{
                                   fontSize: '0.75rem',
                                   fontStyle: 'italic',
                                   mt: 0.5,
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap'
+                                  whiteSpace: 'nowrap',
+                                  cursor: 'pointer',
+                                  '&:hover': {
+                                    color: 'primary.main',
+                                    textDecoration: 'underline'
+                                  }
                                 }}
                               >
                                 {pinnedEvent.notes}
@@ -691,7 +776,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
         )}
       </Box>
 
-      {/* Notes Dialog */}
+      {/* Edit Notes Dialog */}
       <Dialog
         open={notesDialogOpen}
         onClose={handleCloseNotesDialog}
@@ -722,6 +807,47 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
           <Button onClick={handleCloseNotesDialog}>Cancel</Button>
           <Button onClick={handleSaveNotes} variant="contained">
             Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View Notes Dialog */}
+      <Dialog
+        open={viewNotesDialogOpen}
+        onClose={handleCloseViewNotesDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Event Notes
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {viewingEvent?.event}
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Typography
+            variant="body1"
+            sx={{
+              mt: 1,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word'
+            }}
+          >
+            {viewingEvent?.notes || 'No notes available.'}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseViewNotesDialog}>Close</Button>
+          <Button
+            onClick={() => {
+              handleCloseViewNotesDialog();
+              if (viewingEvent) {
+                handleEditNotes(viewingEvent);
+              }
+            }}
+            variant="outlined"
+          >
+            Edit Notes
           </Button>
         </DialogActions>
       </Dialog>
