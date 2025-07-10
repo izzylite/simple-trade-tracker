@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Dialog,
   Box,
@@ -54,7 +54,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   calendar
 }) => {
   const theme = useTheme();
-  
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   // Find initial index based on initialTradeId
   const initialIndex = useMemo(() => {
     if (!initialTradeId) return 0;
@@ -85,6 +86,25 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     setCurrentIndex((prev) => (prev - 1 + trades.length) % trades.length);
   }, [trades.length]);
 
+  // Scroll functions
+  const scrollUp = useCallback(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({
+        top: -200, // Scroll up by 200px
+        behavior: 'smooth'
+      });
+    }
+  }, []);
+
+  const scrollDown = useCallback(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({
+        top: 200, // Scroll down by 200px
+        behavior: 'smooth'
+      });
+    }
+  }, []);
+
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -96,6 +116,12 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         navigateNext();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        scrollUp();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        scrollDown();
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -106,7 +132,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, navigatePrevious, navigateNext, onClose]);
+  }, [open, navigatePrevious, navigateNext, scrollUp, scrollDown, onClose]);
 
   if (!currentTrade) {
     return null;
@@ -214,11 +240,14 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       </Box>
 
       {/* Content */}
-      <Box sx={{
-        flex: 1,
-        overflow: 'auto',
-        ...scrollbarStyles(theme)
-      }}>
+      <Box
+        ref={scrollContainerRef}
+        sx={{
+          flex: 1,
+          overflow: 'auto',
+          ...scrollbarStyles(theme)
+        }}
+      >
         <TradeDetailExpanded
           tradeData={currentTrade}
           isExpanded={true}

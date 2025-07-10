@@ -12,7 +12,9 @@ This implementation adds a gallery mode feature that allows users to navigate th
 
 ### ⌨️ Keyboard Navigation
 - **Left Arrow (←)**: Navigate to previous trade
-- **Right Arrow (→)**: Navigate to next trade  
+- **Right Arrow (→)**: Navigate to next trade
+- **Up Arrow (↑)**: Scroll up within trade details
+- **Down Arrow (↓)**: Scroll down within trade details
 - **Escape**: Close gallery mode
 - Keyboard shortcuts work globally when gallery is open
 
@@ -138,7 +140,7 @@ const handleTradeClick = (trade: Trade) => {
 - [ ] Gallery opens from search results
 - [ ] Gallery opens from pinned trades
 - [ ] Gallery opens from day dialog
-- [ ] Keyboard navigation works (←, →, Escape)
+- [ ] Keyboard navigation works (←, →, ↑, ↓, Escape)
 - [ ] Navigation buttons work
 - [ ] Trade counter updates correctly
 - [ ] All trade functionality works (pin, toggle, images)

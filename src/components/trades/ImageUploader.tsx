@@ -213,7 +213,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           </Tooltip>
         </Box>
         <Typography variant="caption" color="text.secondary" display="block">
-          You can also paste images directly (Ctrl+V)
+          You can also paste images directly (Ctrl+V). Maximum file size: 1MB per image.
         </Typography>
       </Box>
 

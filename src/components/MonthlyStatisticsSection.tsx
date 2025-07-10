@@ -220,6 +220,16 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         </Button>
       </Box>
 
+        {/* Session Performance*/}
+        <SessionPerformanceAnalysis
+            sessionStats={sessionStats}
+            trades={trades}
+            selectedDate={selectedDate}
+            timePeriod={timePeriod}
+            setMultipleTradesDialog={setMultipleTradesDialog}
+          />
+        
+
       {/* Score Section */}
       <ScoreSection
         trades={trades}
@@ -241,29 +251,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         timePeriod={timePeriod}
       />
 
-      {/* Session Performance and Win Distribution side by side */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3, mb: 3 }}>
-        <Box sx={{ flex: 1, width: { xs: '100%', md: '50%' } }}>
-          <SessionPerformanceAnalysis
-            sessionStats={sessionStats}
-            trades={trades}
-            selectedDate={selectedDate}
-            timePeriod={timePeriod}
-            setMultipleTradesDialog={setMultipleTradesDialog}
-          />
-        </Box>
-        <Box sx={{ flex: 1, width: { xs: '100%', md: '50%' } }}>
-          <WinLossDistribution
-            winLossData={winLossData}
-            comparisonWinLossData={null}
-            allTags={allTags}
-            comparisonTags={comparisonTags}
-            setComparisonTags={setComparisonTags}
-            onPieClick={handlePieClick}
-            tagStats={tagStats}
-          />
-        </Box>
-      </Box>
+    
 
 
 

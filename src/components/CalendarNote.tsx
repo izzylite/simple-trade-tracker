@@ -184,7 +184,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
         if (hasUnsavedChanges) {
           handleSave();
         }
-      } else if (event.key === 'b') {
+      } else if (event.key === 'e') {
         event.preventDefault();
         handleToggleExpand();
       }
@@ -498,7 +498,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
                 
             )}
 
-            <Tooltip title={expanded ? "Hide description (Ctrl+B)" : "Show description"}>
+            <Tooltip title={expanded ? "Hide description (Ctrl+E)" : "Show description"}>
               <IconButton
                 size="small"
                 onClick={handleToggleExpand}

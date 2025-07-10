@@ -21,6 +21,7 @@ import {
 } from '../../utils/dynamicRiskUtils';
 import { error, log, logger } from '../../utils/logger';
 import { getRelevantCurrenciesFromTags, tradeEconomicEventService } from '../../services/tradeEconomicEventService';
+import { validateFiles, FILE_SIZE_LIMITS } from '../../utils/fileValidation';
 
 interface FormDialogProps {
   open: boolean;
@@ -410,6 +411,29 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
 
   const handleImageUpload = async (files: FileList) => {
+    // Validate files using utility function
+    const { validFiles, oversizedFiles, invalidTypeFiles } = validateFiles(files, FILE_SIZE_LIMITS.IMAGE_1MB);
+
+    // Show error messages for rejected files
+    const errorMessages: string[] = [];
+
+    if (oversizedFiles.length > 0) {
+      errorMessages.push(`The following files exceed the 1MB size limit: ${oversizedFiles.join(', ')}`);
+    }
+
+    if (invalidTypeFiles.length > 0) {
+      errorMessages.push(`The following files are not supported image types: ${invalidTypeFiles.join(', ')}`);
+    }
+
+    if (errorMessages.length > 0) {
+      showErrorSnackbar(errorMessages.join(' '));
+    }
+
+    // If no valid files, return early
+    if (validFiles.length === 0) {
+      return;
+    }
+
     const getDimensions = (url: string): Promise<{ width: number; height: number }> => {
       return new Promise((resolve) => {
         const img = new Image();
@@ -424,7 +448,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     };
 
     const newPendingImages = await Promise.all(
-      Array.from(files).map(async (file) => {
+      validFiles.map(async (file) => {
         const preview = URL.createObjectURL(file);
         const dimensions = await getDimensions(preview);
 

@@ -21,7 +21,8 @@ import {
   DialogActions,
   Button,
   TextField,
-  Tooltip
+  Tooltip,
+  InputAdornment
 } from '@mui/material';
 import {
   PushPin as PinIcon,
@@ -32,13 +33,16 @@ import {
   Event as EventIcon,
   ArrowBack as BackIcon,
   Note as NoteIcon,
-  Edit as EditIcon
+  Edit as EditIcon,
+  Search as SearchIcon,
+  Clear as ClearIcon
 } from '@mui/icons-material';
 import { Trade } from '../types/trade';
 import { Calendar, PinnedEvent } from '../types/calendar';
 import { format } from 'date-fns';
 import UnifiedDrawer from './common/UnifiedDrawer';
 import { eventNamesMatch } from '../utils/eventNameUtils';
+import { scrollbarStyles } from '../styles/scrollbarStyles';
 
 interface PinnedTradesDrawerProps {
   open: boolean;
@@ -66,6 +70,9 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   const [activeTab, setActiveTab] = useState(0);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Notes dialog state
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PinnedEvent | null>(null);
@@ -89,6 +96,47 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   const sortedPinnedTrades = useMemo(() => {
     return [...pinnedTrades].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [pinnedTrades]);
+
+  // Filter pinned trades based on search query
+  const filteredPinnedTrades = useMemo(() => {
+    if (!searchQuery.trim()) return sortedPinnedTrades;
+
+    const query = searchQuery.toLowerCase().trim();
+    return sortedPinnedTrades.filter(trade => {
+      // Search in trade name
+      if (trade.name?.toLowerCase().includes(query)) return true;
+
+      // Search in tags
+      if (trade.tags?.some(tag => tag.toLowerCase().includes(query))) return true;
+
+      // Search in session
+      if (trade.session?.toLowerCase().includes(query)) return true;
+
+      // Search in economic events
+      if (trade.economicEvents?.some(event => event.name.toLowerCase().includes(query))) return true;
+
+      // Search in notes (if available)
+      if (trade.notes?.toLowerCase().includes(query)) return true;
+
+      return false;
+    });
+  }, [sortedPinnedTrades, searchQuery]);
+
+  // Filter pinned events based on search query
+  const filteredPinnedEvents = useMemo(() => {
+    if (!searchQuery.trim()) return pinnedEvents;
+
+    const query = searchQuery.toLowerCase().trim();
+    return pinnedEvents.filter(pinnedEvent => {
+      // Search in event name
+      if (pinnedEvent.event.toLowerCase().includes(query)) return true;
+
+      // Search in notes
+      if (pinnedEvent.notes?.toLowerCase().includes(query)) return true;
+
+      return false;
+    });
+  }, [pinnedEvents, searchQuery]);
 
   // Get trades that contain a specific economic event
   const getTradesWithEvent = useMemo(() => {
@@ -218,9 +266,14 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
     }
 
     if (activeTab === 0) {
-      return sortedPinnedTrades.length > 0 ? (
+      const totalCount = sortedPinnedTrades.length;
+      const filteredCount = filteredPinnedTrades.length;
+
+      if (totalCount === 0) return undefined;
+
+      return (
         <Chip
-          label={sortedPinnedTrades.length}
+          label={searchQuery.trim() ? `${filteredCount}/${totalCount}` : totalCount}
           size="small"
           sx={{
             backgroundColor: alpha(theme.palette.primary.main, 0.1),
@@ -228,11 +281,16 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
             fontWeight: 600
           }}
         />
-      ) : undefined;
+      );
     } else {
-      return pinnedEvents.length > 0 ? (
+      const totalCount = pinnedEvents.length;
+      const filteredCount = filteredPinnedEvents.length;
+
+      if (totalCount === 0) return undefined;
+
+      return (
         <Chip
-          label={pinnedEvents.length}
+          label={searchQuery.trim() ? `${filteredCount}/${totalCount}` : totalCount}
           size="small"
           sx={{
             backgroundColor: alpha(theme.palette.primary.main, 0.1),
@@ -240,7 +298,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
             fontWeight: 600
           }}
         />
-      ) : undefined;
+      );
     }
   };
 
@@ -251,19 +309,28 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
       title={getTitle()}
       icon={getIcon()}
       width={{ xs: '100%', sm: 400 }}
-      headerVariant="default"
+      headerVariant="enhanced"
       headerActions={getHeaderActions()}
     >
       {/* Back button when viewing event trades */}
       {selectedEvent && (
-        <Box sx={{ p: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+        <Box sx={{
+          p: 2,
+          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          backgroundColor: alpha(theme.palette.background.paper, 0.5)
+        }}>
           <ListItemButton
-            onClick={() => setSelectedEvent(null)}
+            onClick={() => {
+              setSelectedEvent(null);
+              setSearchQuery(''); // Clear search when going back
+            }}
             sx={{
               borderRadius: 1,
               p: 1,
+              backgroundColor: alpha(theme.palette.primary.main, 0.02),
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
               '&:hover': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                backgroundColor: alpha(theme.palette.primary.main, 0.08)
               }
             }}
           >
@@ -278,7 +345,10 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
         <Box sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
           <Tabs
             value={activeTab}
-            onChange={(_, newValue) => setActiveTab(newValue)}
+            onChange={(_, newValue) => {
+              setActiveTab(newValue);
+              setSearchQuery(''); // Clear search when switching tabs
+            }}
             variant="fullWidth"
             sx={{
               '& .MuiTab-root': {
@@ -293,9 +363,9 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <PinIcon sx={{ fontSize: 18 }} />
                   Trades
-                  {sortedPinnedTrades.length > 0 && (
+                  {filteredPinnedTrades.length > 0 && (
                     <Badge
-                      badgeContent={sortedPinnedTrades.length}
+                      badgeContent={searchQuery.trim() ? filteredPinnedTrades.length : sortedPinnedTrades.length}
                       color="primary"
                       sx={{ ml: 0.5 }}
                     />
@@ -308,9 +378,9 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <EventIcon sx={{ fontSize: 18 }} />
                   Events
-                  {pinnedEvents.length > 0 && (
+                  {filteredPinnedEvents.length > 0 && (
                     <Badge
-                      badgeContent={pinnedEvents.length}
+                      badgeContent={searchQuery.trim() ? filteredPinnedEvents.length : pinnedEvents.length}
                       color="primary"
                       sx={{ ml: 0.5 }}
                     />
@@ -322,8 +392,54 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
         </Box>
       )}
 
+      {/* Search Input - only show when not viewing event trades */}
+      {!selectedEvent && (
+        <Box sx={{
+          p: 2,
+          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          backgroundColor: alpha(theme.palette.background.paper, 0.3)
+        }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder={activeTab === 0 ? "Search pinned trades..." : "Search pinned events..."}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery && (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => setSearchQuery('')}
+                    sx={{ color: 'text.secondary' }}
+                  >
+                    <ClearIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.background.paper, 0.8)
+                },
+                '&.Mui-focused': {
+                  backgroundColor: theme.palette.background.paper
+                }
+              }
+            }}
+          />
+        </Box>
+      )}
+
       {/* Content */}
-      <Box sx={{ flex: 1, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, overflow: 'auto', ...scrollbarStyles(theme) }}>
         {/* Render content based on current state */}
         {selectedEvent ? (
           // Show trades with selected event
@@ -334,7 +450,8 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                 sx={{
                   p: 2,
                   borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.02)
+                  backgroundColor: alpha(theme.palette.warning.main, 0.05),
+                  borderLeft: `3px solid ${theme.palette.warning.main}`
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
@@ -404,7 +521,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                 </Typography>
               </Box>
             ) : (
-              <List sx={{ p: 0, overflow: 'auto', flex: 1 }}>
+              <List sx={{ p: 0, overflow: 'auto', flex: 1, ...scrollbarStyles(theme) }}>
               {tradesWithSelectedEvent.map((trade, index) => (
                 <React.Fragment key={trade.id}>
                   <ListItem disablePadding>
@@ -412,8 +529,30 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                       onClick={() => onTradeClick?.(trade,tradesWithSelectedEvent,`Trades with ${selectedEvent}`)}
                       sx={{
                         p: 2,
+                        backgroundColor: alpha(
+                          trade.type === 'win'
+                            ? theme.palette.success.main
+                            : trade.type === 'loss'
+                            ? theme.palette.error.main
+                            : theme.palette.warning.main,
+                          0.03
+                        ),
+                        borderLeft: `3px solid ${
+                          trade.type === 'win'
+                            ? theme.palette.success.main
+                            : trade.type === 'loss'
+                            ? theme.palette.error.main
+                            : theme.palette.warning.main
+                        }`,
                         '&:hover': {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                          backgroundColor: alpha(
+                            trade.type === 'win'
+                              ? theme.palette.success.main
+                              : trade.type === 'loss'
+                              ? theme.palette.error.main
+                              : theme.palette.warning.main,
+                            0.08
+                          )
                         }
                       }}
                     >
@@ -518,17 +657,59 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                 Pin important trades to keep them easily accessible. Open any trade and click the pin button to add trades here.
               </Typography>
             </Box>
+          ) : filteredPinnedTrades.length === 0 ? (
+            <Box
+              sx={{
+                p: 4,
+                textAlign: 'center',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}
+            >
+              <SearchIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+              <Typography variant="h6" sx={{ mb: 1, fontWeight: 600, color: 'text.secondary' }}>
+                No Matching Trades
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 300 }}>
+                No pinned trades match your search query "{searchQuery}". Try adjusting your search terms.
+              </Typography>
+            </Box>
           ) : (
-            <List sx={{ p: 0, overflow: 'auto', height: '100%' }}>
-              {sortedPinnedTrades.map((trade, index) => (
+            <List sx={{ p: 0, overflow: 'auto', height: '100%', ...scrollbarStyles(theme) }}>
+              {filteredPinnedTrades.map((trade, index) => (
                 <React.Fragment key={trade.id}>
                   <ListItem disablePadding>
                     <ListItemButton
-                      onClick={() => onTradeClick?.(trade,sortedPinnedTrades,"Pinned Trades")}
+                      onClick={() => onTradeClick?.(trade,filteredPinnedTrades,"Pinned Trades")}
                       sx={{
                         p: 2,
+                        backgroundColor: alpha(
+                          trade.type === 'win'
+                            ? theme.palette.success.main
+                            : trade.type === 'loss'
+                            ? theme.palette.error.main
+                            : theme.palette.warning.main,
+                          0.03
+                        ),
+                        borderLeft: `3px solid ${
+                          trade.type === 'win'
+                            ? theme.palette.success.main
+                            : trade.type === 'loss'
+                            ? theme.palette.error.main
+                            : theme.palette.warning.main
+                        }`,
                         '&:hover': {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                          backgroundColor: alpha(
+                            trade.type === 'win'
+                              ? theme.palette.success.main
+                              : trade.type === 'loss'
+                              ? theme.palette.error.main
+                              : theme.palette.warning.main,
+                            0.08
+                          )
                         }
                       }}
                     >
@@ -631,7 +812,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                       </Box>
                     </ListItemButton>
                   </ListItem>
-                  {index < sortedPinnedTrades.length - 1 && <Divider />}
+                  {index < filteredPinnedTrades.length - 1 && <Divider />}
                 </React.Fragment>
               ))}
             </List>
@@ -658,9 +839,29 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                 Pin important economic events from the calendar to track trades that occurred during those events.
               </Typography>
             </Box>
+          ) : filteredPinnedEvents.length === 0 ? (
+            <Box
+              sx={{
+                p: 4,
+                textAlign: 'center',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}
+            >
+              <SearchIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+              <Typography variant="h6" sx={{ mb: 1, fontWeight: 600, color: 'text.secondary' }}>
+                No Matching Events
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 300 }}>
+                No pinned events match your search query "{searchQuery}". Try adjusting your search terms.
+              </Typography>
+            </Box>
           ) : (
-            <List sx={{ p: 0, overflow: 'auto', height: '100%' }}>
-              {pinnedEvents.map((pinnedEvent, index) => {
+            <List sx={{ p: 0, overflow: 'auto', height: '100%', ...scrollbarStyles(theme) }}>
+              {filteredPinnedEvents.map((pinnedEvent, index) => {
                 const tradesWithEvent = getTradesWithEvent(pinnedEvent.event);
                 return (
                   <React.Fragment key={pinnedEvent.event}>
@@ -669,8 +870,10 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                         onClick={() => setSelectedEvent(pinnedEvent.event)}
                         sx={{
                           p: 2,
+                          backgroundColor: alpha(theme.palette.warning.main, 0.03),
+                          borderLeft: `3px solid ${theme.palette.warning.main}`,
                           '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                            backgroundColor: alpha(theme.palette.warning.main, 0.08)
                           }
                         }}
                       >
@@ -774,7 +977,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                         </Box>
                       </ListItemButton>
                     </ListItem>
-                    {index < pinnedEvents.length - 1 && <Divider />}
+                    {index < filteredPinnedEvents.length - 1 && <Divider />}
                   </React.Fragment>
                 );
               })}
