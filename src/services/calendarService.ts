@@ -18,9 +18,9 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase/config';
 import { isSameWeek, isSameMonth } from 'date-fns';
 import { auth, db } from '../firebase/config';
-import { Calendar, PinnedEvent } from '../types/calendar';
-import { Trade } from '../types/trade';
-import { YearlyTrades } from '../types/yearlyTrades';
+import { Calendar, calendarConverter } from '../types/calendar';
+import { Trade, tradeConverter } from '../types/trade';
+import { YearlyTrades, yearlyTradesConverter } from '../types/yearlyTrades';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase/config';
 import { TradeImage } from '../components/trades/TradeForm';
@@ -29,24 +29,6 @@ import { cleanEventNameForPinning } from '../utils/eventNameUtils';
 
 const CALENDARS_COLLECTION = 'calendars';
 const YEARS_SUBCOLLECTION = 'years';
-
-// Migration function to handle transition from string[] to PinnedEvent[]
-const migratePinnedEvents = (pinnedEvents: any[]): PinnedEvent[] => {
-  if (!Array.isArray(pinnedEvents)) return [];
-
-  return pinnedEvents.map(event => {
-    // If it's already in the new format (object with event property)
-    if (typeof event === 'object' && event.event) {
-      return event as PinnedEvent;
-    }
-    // If it's in the old format (string)
-    if (typeof event === 'string') {
-      return { event };
-    }
-    // Fallback for unexpected formats
-    return { event: String(event) };
-  });
-};
 
 // Interface for calendar statistics
 interface CalendarStats {
@@ -244,247 +226,11 @@ export const calculateCalendarStats = (trades: Trade[], calendar: Calendar): Cal
   };
 };
 
-// Convert Firestore data to Calendar object
-export const convertFirestoreDataToCalendar = (doc: DocumentData): Calendar => {
-  const data = doc.data();
 
-  // Convert daysNotes from Firestore object to Map
-  let daysNotesMap: Map<string, string> | undefined;
-  if (data.daysNotes) {
-    daysNotesMap = new Map(Object.entries(data.daysNotes));
-  }
 
-  return {
-    id: doc.id,
-    name: data.name,
-    createdAt: data.createdAt.toDate(),
-    lastModified: data.lastModified.toDate(),
-    accountBalance: data.accountBalance,
-    maxDailyDrawdown: data.maxDailyDrawdown,
-    weeklyTarget: data.weeklyTarget,
-    monthlyTarget: data.monthlyTarget,
-    yearlyTarget: data.yearlyTarget,
-    riskPerTrade: data.riskPerTrade,
-    requiredTagGroups: data.requiredTagGroups || [],
-    dynamicRiskEnabled: data.dynamicRiskEnabled,
-    increasedRiskPercentage: data.increasedRiskPercentage,
-    profitThresholdPercentage: data.profitThresholdPercentage,
-    // Duplication tracking
-    duplicatedCalendar: data.duplicatedCalendar,
-    sourceCalendarId: data.sourceCalendarId,
-    // Trash/deletion tracking
-    isDeleted: data.isDeleted,
-    deletedAt: data.deletedAt ? data.deletedAt.toDate() : undefined,
-    deletedBy: data.deletedBy,
-    autoDeleteAt: data.autoDeleteAt ? data.autoDeleteAt.toDate() : undefined,
-    // Tags
-    tags: data.tags || [],
-    // Notes
-    note: data.note,
-    heroImageUrl: data.heroImageUrl,
-    heroImageAttribution: data.heroImageAttribution,
-    daysNotes: daysNotesMap,
-    // Score settings
-    scoreSettings: data.scoreSettings,
-    // Economic calendar filter settings
-    economicCalendarFilters: data.economicCalendarFilters,
-    // Pinned economic events (handle migration from string[] to PinnedEvent[])
-    pinnedEvents: migratePinnedEvents(data.pinnedEvents || []),
-    // Statistics
-    winRate: data.winRate || 0,
-    profitFactor: data.profitFactor || 0,
-    maxDrawdown: data.maxDrawdown || 0,
-    targetProgress: data.targetProgress || 0,
-    pnlPerformance: data.pnlPerformance || 0,
-    totalTrades: data.totalTrades || 0,
-    winCount: data.winCount || 0,
-    lossCount: data.lossCount || 0,
-    totalPnL: data.totalPnL || 0,
-    drawdownStartDate: data.drawdownStartDate ? data.drawdownStartDate.toDate() : null,
-    drawdownEndDate: data.drawdownEndDate ? data.drawdownEndDate.toDate() : null,
-    drawdownRecoveryNeeded: data.drawdownRecoveryNeeded || 0,
-    drawdownDuration: data.drawdownDuration || 0,
-    avgWin: data.avgWin || 0,
-    avgLoss: data.avgLoss || 0,
-    currentBalance: data.currentBalance || data.accountBalance,
 
-    // Weekly, monthly, and yearly statistics
-    weeklyPnL: data.weeklyPnL || 0,
-    monthlyPnL: data.monthlyPnL || 0,
-    yearlyPnL: data.yearlyPnL || 0,
-    weeklyPnLPercentage: data.weeklyPnLPercentage || 0,
-    monthlyPnLPercentage: data.monthlyPnLPercentage || 0,
-    yearlyPnLPercentage: data.yearlyPnLPercentage || 0,
-    weeklyProgress: data.weeklyProgress || 0,
-    monthlyProgress: data.monthlyProgress || 0,
-    // Cached data
-    loadedYears: [],
-    cachedTrades: []
-  };
-};
 
-// Convert Calendar object to Firestore data
-const convertCalendarToFirestoreData = (calendar: Omit<Calendar, 'id' | 'cachedTrades' | 'loadedYears'> & { _deleteHeroImage?: boolean }) => {
-  // Create the base object with required fields
-  const baseData = {
-    name: calendar.name,
-    createdAt: Timestamp.fromDate(calendar.createdAt),
-    lastModified: Timestamp.fromDate(calendar.lastModified),
-    accountBalance: calendar.accountBalance,
-    maxDailyDrawdown: calendar.maxDailyDrawdown,
-    requiredTagGroups: calendar.requiredTagGroups ? calendar.requiredTagGroups : []
-  };
 
-  // Convert daysNotes Map to a plain object for Firestore
-  let daysNotesObj: Record<string, string> | undefined;
-  if (calendar.daysNotes && calendar.daysNotes.size > 0) {
-    daysNotesObj = Object.fromEntries(calendar.daysNotes);
-  }
-
-  // Add optional fields only if they are not undefined
-  const optionalFields = {
-    // Configuration fields
-    ...(calendar.weeklyTarget !== undefined && { weeklyTarget: calendar.weeklyTarget }),
-    ...(calendar.monthlyTarget !== undefined && { monthlyTarget: calendar.monthlyTarget }),
-    ...(calendar.yearlyTarget !== undefined && { yearlyTarget: calendar.yearlyTarget }),
-    ...(calendar.riskPerTrade !== undefined && { riskPerTrade: calendar.riskPerTrade }),
-    ...(calendar.dynamicRiskEnabled !== undefined && { dynamicRiskEnabled: calendar.dynamicRiskEnabled }),
-    ...(calendar.increasedRiskPercentage !== undefined && { increasedRiskPercentage: calendar.increasedRiskPercentage }),
-    ...(calendar.profitThresholdPercentage !== undefined && { profitThresholdPercentage: calendar.profitThresholdPercentage }),
-
-    // Duplication tracking
-    ...(calendar.duplicatedCalendar !== undefined && { duplicatedCalendar: calendar.duplicatedCalendar }),
-    ...(calendar.sourceCalendarId !== undefined && { sourceCalendarId: calendar.sourceCalendarId }),
-
-    // Trash/deletion tracking
-    ...(calendar.isDeleted !== undefined && { isDeleted: calendar.isDeleted }),
-    ...(calendar.deletedAt !== undefined && {
-      deletedAt: calendar.deletedAt ? Timestamp.fromDate(calendar.deletedAt) : null
-    }),
-    ...(calendar.deletedBy !== undefined && { deletedBy: calendar.deletedBy }),
-    ...(calendar.autoDeleteAt !== undefined && {
-      autoDeleteAt: calendar.autoDeleteAt ? Timestamp.fromDate(calendar.autoDeleteAt) : null
-    }),
-
-    // Tags
-    ...(calendar.tags !== undefined && { tags: calendar.tags }),
-
-    // Notes fields
-    ...(calendar.note !== undefined && { note: calendar.note }),
-    ...(calendar.heroImageUrl !== undefined && { heroImageUrl: calendar.heroImageUrl }),
-    ...(calendar.heroImageAttribution !== undefined && { heroImageAttribution: calendar.heroImageAttribution }),
-    ...(daysNotesObj && { daysNotes: daysNotesObj }),
-
-    // Handle hero image deletion
-    ...(calendar._deleteHeroImage && {
-      heroImageUrl: deleteField(),
-      heroImageAttribution: deleteField()
-    }),
-
-    // Score settings
-    ...(calendar.scoreSettings !== undefined && { scoreSettings: calendar.scoreSettings }),
-
-    // Economic calendar filter settings
-    ...(calendar.economicCalendarFilters !== undefined && { economicCalendarFilters: calendar.economicCalendarFilters }),
-
-    // Pinned economic events
-    ...(calendar.pinnedEvents !== undefined && { pinnedEvents: calendar.pinnedEvents }),
-
-    // Statistics fields
-    ...(calendar.winRate !== undefined && { winRate: calendar.winRate }),
-    ...(calendar.profitFactor !== undefined && { profitFactor: calendar.profitFactor }),
-    ...(calendar.maxDrawdown !== undefined && { maxDrawdown: calendar.maxDrawdown }),
-    ...(calendar.targetProgress !== undefined && { targetProgress: calendar.targetProgress }),
-    ...(calendar.pnlPerformance !== undefined && { pnlPerformance: calendar.pnlPerformance }),
-    ...(calendar.totalTrades !== undefined && { totalTrades: calendar.totalTrades }),
-    ...(calendar.winCount !== undefined && { winCount: calendar.winCount }),
-    ...(calendar.lossCount !== undefined && { lossCount: calendar.lossCount }),
-    ...(calendar.totalPnL !== undefined && { totalPnL: calendar.totalPnL }),
-
-    // New statistics fields
-    ...(calendar.drawdownStartDate !== undefined && {
-      drawdownStartDate: calendar.drawdownStartDate ? Timestamp.fromDate(calendar.drawdownStartDate) : null
-    }),
-    ...(calendar.drawdownEndDate !== undefined && {
-      drawdownEndDate: calendar.drawdownEndDate ? Timestamp.fromDate(calendar.drawdownEndDate) : null
-    }),
-    ...(calendar.drawdownRecoveryNeeded !== undefined && { drawdownRecoveryNeeded: calendar.drawdownRecoveryNeeded }),
-    ...(calendar.drawdownDuration !== undefined && { drawdownDuration: calendar.drawdownDuration }),
-    ...(calendar.avgWin !== undefined && { avgWin: calendar.avgWin }),
-    ...(calendar.avgLoss !== undefined && { avgLoss: calendar.avgLoss }),
-    ...(calendar.currentBalance !== undefined && { currentBalance: calendar.currentBalance }),
-
-    // Weekly, monthly, and yearly statistics
-    ...(calendar.weeklyPnL !== undefined && { weeklyPnL: calendar.weeklyPnL }),
-    ...(calendar.monthlyPnL !== undefined && { monthlyPnL: calendar.monthlyPnL }),
-    ...(calendar.yearlyPnL !== undefined && { yearlyPnL: calendar.yearlyPnL }),
-    ...(calendar.weeklyPnLPercentage !== undefined && { weeklyPnLPercentage: calendar.weeklyPnLPercentage }),
-    ...(calendar.monthlyPnLPercentage !== undefined && { monthlyPnLPercentage: calendar.monthlyPnLPercentage }),
-    ...(calendar.yearlyPnLPercentage !== undefined && { yearlyPnLPercentage: calendar.yearlyPnLPercentage }),
-    ...(calendar.weeklyProgress !== undefined && { weeklyProgress: calendar.weeklyProgress }),
-    ...(calendar.monthlyProgress !== undefined && { monthlyProgress: calendar.monthlyProgress }),
-  };
-
-  return {
-    ...baseData,
-    ...optionalFields
-  };
-};
-
-// Convert Trade object to Firestore data
-const convertTradeToFirestoreData = (trade: Trade, calendarId: string) => {
-  // Create base object with required fields
-  const baseData = {
-    id: trade.id,
-    date: Timestamp.fromDate(new Date(trade.date)),
-    amount: trade.amount,
-    type: trade.type,
-    calendarId: calendarId
-  };
-
-  // Process images to ensure no undefined values
-  let processedImages;
-  if (trade.images) {
-    processedImages = trade.images.map(img => ({
-      id: img.id,
-      url: img.url,
-      caption: img.caption || '',
-      width: img.width || 0,
-      height: img.height || 0,
-      row: img.row !== undefined ? img.row : 0,
-      column: img.column !== undefined ? img.column : 0,
-      columnWidth: img.columnWidth !== undefined ? img.columnWidth : 50,
-      pending: img.pending || false
-    }));
-  }
-
-  // Add optional fields only if they are defined
-  const optionalFields = {
-    ...(trade.name !== undefined && { name: trade.name }),
-    ...(trade.entry !== undefined && { entry: trade.entry }),
-    ...(trade.exit !== undefined && { exit: trade.exit }),
-    ...(trade.tags !== undefined && { tags: trade.tags }),
-    ...(trade.riskToReward !== undefined && { riskToReward: trade.riskToReward }),
-    ...(trade.partialsTaken !== undefined && { partialsTaken: trade.partialsTaken }),
-    ...(trade.session !== undefined && { session: trade.session }),
-    ...(trade.notes !== undefined && { notes: trade.notes }),
-    ...(trade.isTemporary !== undefined && { isTemporary: trade.isTemporary }),
-    ...(trade.isPinned !== undefined && { isPinned: trade.isPinned }),
-    ...(processedImages && { images: processedImages }),
-    // Economic events
-    ...(trade.economicEvents !== undefined && { economicEvents: trade.economicEvents }),
-    // Sharing fields
-    ...(trade.shareLink !== undefined && { shareLink: trade.shareLink }),
-    ...(trade.isShared !== undefined && { isShared: trade.isShared }),
-    ...(trade.sharedAt !== undefined && { sharedAt: Timestamp.fromDate(trade.sharedAt) }),
-    ...(trade.shareId !== undefined && { shareId: trade.shareId })
-  };
-
-  return {
-    ...baseData,
-    ...optionalFields
-  };
-};
 
 // Helper function to get trades (either from cache or Firestore)
 const getTrades = async (calendarId: string, cachedTrades: Trade[] = []): Promise<Trade[]> => {
@@ -571,35 +317,7 @@ export const getCalendarStats = (calendar: Calendar) => {
   };
 };
 
-// Convert Firestore data to YearlyTrades object
-const convertFirestoreDataToYearlyTrades = (doc: DocumentData): YearlyTrades => {
-  const data = doc.data();
-  return {
-    year: data.year,
-    lastModified: data.lastModified.toDate(),
-    trades: data.trades.map((trade: any) => ({
-      ...trade,
-      date: trade.date.toDate(),
-      isPinned: trade.isPinned || false, // Ensure isPinned field is included
-      // Economic events
-      ...(trade.economicEvents && { economicEvents: trade.economicEvents }),
-      // Sharing fields
-      ...(trade.shareLink && { shareLink: trade.shareLink }),
-      ...(trade.isShared !== undefined && { isShared: trade.isShared }),
-      ...(trade.sharedAt && { sharedAt: trade.sharedAt.toDate() }),
-      ...(trade.shareId && { shareId: trade.shareId })
-    }))
-  };
-};
 
-// Convert YearlyTrades object to Firestore data
-const convertYearlyTradesToFirestoreData = (yearlyTrades: YearlyTrades, calendarId: string) => {
-  return {
-    year: yearlyTrades.year,
-    lastModified: Timestamp.fromDate(yearlyTrades.lastModified),
-    trades: yearlyTrades.trades.map(trade => convertTradeToFirestoreData(trade, calendarId))
-  };
-};
 
 // Get a single calendar by ID
 export const getCalendar = async (calendarId: string): Promise<Calendar | null> => {
@@ -611,7 +329,7 @@ export const getCalendar = async (calendarId: string): Promise<Calendar | null> 
       return null;
     }
 
-    return convertFirestoreDataToCalendar(calendarDoc);
+    return calendarConverter.fromJson(calendarDoc);
   } catch (error) {
     logger.error('Error getting calendar:', error);
     throw error;
@@ -627,13 +345,13 @@ export const getUserCalendars = async (userId: string): Promise<Calendar[]> => {
     where("isDeleted", "!=", true)
   );
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(convertFirestoreDataToCalendar);
+  return querySnapshot.docs.map(doc => calendarConverter.fromJson(doc));
 };
 
 // Create a new calendar
 export const createCalendar = async (userId: string, calendar: Omit<Calendar, 'id' | 'cachedTrades' | 'loadedYears'>): Promise<string> => {
   const calendarData = {
-    ...convertCalendarToFirestoreData(calendar),
+    ...calendarConverter.toJson(calendar),
     userId,
     // Initialize notes
     note: calendar.note || '',
@@ -787,7 +505,7 @@ export const getYearlyTrades = async (calendarId: string, year: number): Promise
   const yearDoc = await getDoc(yearDocRef);
 
   if (yearDoc.exists()) {
-    const yearlyTrades = convertFirestoreDataToYearlyTrades(yearDoc);
+    const yearlyTrades = yearlyTradesConverter.fromJson(yearDoc);
     return yearlyTrades.trades;
   }
 
@@ -802,7 +520,7 @@ export const getAllTrades = async (calendarId: string): Promise<Trade[]> => {
   let allTrades: Trade[] = [];
 
   yearsSnapshot.docs.forEach(yearDoc => {
-    const yearlyTrades = convertFirestoreDataToYearlyTrades(yearDoc);
+    const yearlyTrades = yearlyTradesConverter.fromJson(yearDoc);
     allTrades = [...allTrades, ...yearlyTrades.trades];
   });
 
@@ -823,7 +541,7 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
       if (!calendarDoc.exists()) {
         throw new Error('Calendar not found');
       }
-      const calendar = convertFirestoreDataToCalendar(calendarDoc);
+      const calendar = calendarConverter.fromJson(calendarDoc);
 
       // Get trades (either from cache or Firestore)
       const existingTrades = await getTrades(calendarId, cachedTrades);
@@ -839,11 +557,11 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
 
       if (yearDoc.exists()) {
         // Year document exists, update it
-        const yearlyTrades = convertFirestoreDataToYearlyTrades(yearDoc);
+        const yearlyTrades = yearlyTradesConverter.fromJson(yearDoc);
         yearlyTrades.trades.push(trade);
         yearlyTrades.lastModified = new Date();
 
-        transaction.update(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades, calendarId));
+        transaction.update(yearDocRef, yearlyTradesConverter.toJson(yearlyTrades, calendarId));
       } else {
         // Year document doesn't exist, create it
         const yearlyTrades: YearlyTrades = {
@@ -852,7 +570,7 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
           trades: [trade]
         };
 
-        transaction.set(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades, calendarId));
+        transaction.set(yearDocRef, yearlyTradesConverter.toJson(yearlyTrades, calendarId));
       }
 
       // Update the calendar with stats
@@ -890,7 +608,7 @@ export const onUpdateCalendar = async (calendarId: string, updateCallback: (cale
       if (!calendarDoc.exists()) {
         throw new Error('Calendar not found');
       }
-      const calendar = convertFirestoreDataToCalendar(calendarDoc);
+      const calendar = calendarConverter.fromJson(calendarDoc);
 
       // Apply the update callback to get the updated calendar
       const updatedCalendar = updateCallback(calendar);
@@ -898,7 +616,7 @@ export const onUpdateCalendar = async (calendarId: string, updateCallback: (cale
       // Convert daysNotes Map to a plain object for Firestore
 
       // Update the calendar document
-      transaction.update(calendarRef, convertCalendarToFirestoreData(updatedCalendar));
+      transaction.update(calendarRef, calendarConverter.toJson(updatedCalendar));
       return updatedCalendar;
     });
   } catch (error) {
@@ -947,7 +665,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       if (!calendarDoc.exists()) {
         throw new Error('Calendar not found');
       }
-      const calendar = convertFirestoreDataToCalendar(calendarDoc);
+      const calendar = calendarConverter.fromJson(calendarDoc);
 
       // Get the year document
       const yearDoc = await transaction.get(yearDocRef);
@@ -964,7 +682,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       // Handle the case where the year document exists
       if (yearDoc.exists()) {
         // Get the trades for this year
-        const yearData = convertFirestoreDataToYearlyTrades(yearDoc);
+        const yearData = yearlyTradesConverter.fromJson(yearDoc);
         yearTrades = yearData.trades;
       }
 
@@ -1006,7 +724,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       if (yearDoc.exists()) {
         // Update existing year document
         transaction.update(yearDocRef, {
-          trades: yearTrades.map(trade => convertTradeToFirestoreData(trade, calendarId)),
+          trades: yearTrades.map(trade => tradeConverter.toJson(trade, calendarId)),
           lastModified: Timestamp.fromDate(new Date())
         });
       } else {
@@ -1014,7 +732,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
         logger.log(`Creating new year document for year ${year}`);
         transaction.set(yearDocRef, {
           year,
-          trades: yearTrades.map(trade => convertTradeToFirestoreData(trade, calendarId)),
+          trades: yearTrades.map(trade => tradeConverter.toJson(trade, calendarId)),
           lastModified: Timestamp.fromDate(new Date())
         });
       }
@@ -1045,10 +763,10 @@ export const clearMonthTrades = async (calendarId: string, month: number, year: 
     throw new Error('Calendar not found');
   }
 
-  const calendar = convertFirestoreDataToCalendar(calendarDoc);
+  const calendar = calendarConverter.fromJson(calendarDoc);
 
   if (yearDoc.exists()) {
-    const yearlyTrades = convertFirestoreDataToYearlyTrades(yearDoc);
+    const yearlyTrades = yearlyTradesConverter.fromJson(yearDoc);
 
     // Filter out trades from the specified month
     const filteredTrades = yearlyTrades.trades.filter(trade => {
@@ -1073,7 +791,7 @@ export const clearMonthTrades = async (calendarId: string, month: number, year: 
     // Calculate stats
     const stats = calculateCalendarStats(allTrades, calendar);
 
-    await updateDoc(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades, calendarId));
+    await updateDoc(yearDocRef, yearlyTradesConverter.toJson(yearlyTrades, calendarId));
 
     // Update the calendar with stats and lastModified timestamp
     await updateCalendarStats(calendarRef, stats);
@@ -1095,7 +813,7 @@ export const importTrades = async (calendarId: string, trades: Trade[]): Promise
     throw new Error('Calendar not found');
   }
 
-  const calendar = convertFirestoreDataToCalendar(calendarDoc);
+  const calendar = calendarConverter.fromJson(calendarDoc);
 
   // Calculate stats for the imported trades
   const stats = calculateCalendarStats(trades, calendar);
@@ -1129,7 +847,7 @@ export const importTrades = async (calendarId: string, trades: Trade[]): Promise
     };
 
     const yearDocRef = doc(db, CALENDARS_COLLECTION, calendarId, YEARS_SUBCOLLECTION, year);
-    await setDoc(yearDocRef, convertYearlyTradesToFirestoreData(yearlyTrades, calendarId));
+    await setDoc(yearDocRef, yearlyTradesConverter.toJson(yearlyTrades, calendarId));
   }
 
   // Update the calendar with stats and lastModified timestamp
@@ -1151,7 +869,7 @@ export const getTrade = async (calendarId: string, tradeId: string): Promise<Tra
   const yearsSnapshot = await getDocs(yearsRef);
 
   for (const yearDoc of yearsSnapshot.docs) {
-    const yearlyTrades = convertFirestoreDataToYearlyTrades(yearDoc);
+    const yearlyTrades = yearlyTradesConverter.fromJson(yearDoc);
     const trade = yearlyTrades.trades.find(t => t.id === tradeId);
 
     if (trade) {

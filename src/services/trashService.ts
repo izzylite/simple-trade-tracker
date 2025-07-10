@@ -11,8 +11,7 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { Calendar } from '../types/calendar';
-import { convertFirestoreDataToCalendar } from './calendarService';
+import { Calendar, calendarConverter } from '../types/calendar';
 import { log, error, logger } from '../utils/logger';
 
 const CALENDARS_COLLECTION = 'calendars';
@@ -131,7 +130,7 @@ export const getTrashCalendars = async (userId: string): Promise<TrashCalendar[]
     const querySnapshot = await getDocs(q);
     
     return querySnapshot.docs.map(doc => {
-      const calendar = convertFirestoreDataToCalendar(doc);
+      const calendar = calendarConverter.fromJson(doc);
       const data = doc.data();
       
       return {
@@ -163,7 +162,7 @@ export const getCalendarsReadyForDeletion = async (): Promise<TrashCalendar[]> =
     const querySnapshot = await getDocs(q);
     
     return querySnapshot.docs.map(doc => {
-      const calendar = convertFirestoreDataToCalendar(doc);
+      const calendar = calendarConverter.fromJson(doc);
       const data = doc.data();
       
       return {

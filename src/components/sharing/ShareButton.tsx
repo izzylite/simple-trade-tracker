@@ -245,6 +245,7 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
           anchorEl={anchorEl}
           open={Boolean(anchorEl)}
           onClose={handleClose}
+          onClick={(e) => e.stopPropagation()}
           anchorOrigin={{
             vertical: 'bottom',
             horizontal: 'right',
@@ -287,6 +288,7 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
         <Dialog
           open={shareDialogOpen}
           onClose={() => setShareDialogOpen(false)}
+          onClick={(e) => e.stopPropagation()}
           maxWidth="sm"
           fullWidth
         >
