@@ -76,4 +76,10 @@ export interface Calendar {
   cachedTrades: Trade[];
   // Track which years have been loaded
   loadedYears: number[];
+
+  // Sharing fields
+  shareLink?: string;
+  isShared?: boolean;
+  sharedAt?: Date;
+  shareId?: string;
 }

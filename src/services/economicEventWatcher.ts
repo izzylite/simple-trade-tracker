@@ -5,8 +5,8 @@
 
 import { EconomicEvent, Currency, ImpactLevel } from '../types/economicCalendar';
 import { economicCalendarService } from './economicCalendarService';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../config/firebase';
+import { httpsCallable } from 'firebase/functions'; 
+import { functions } from '../firebase/config';
 import { endOfDay, format, startOfDay } from 'date-fns';
 import { error, log, logger } from '../utils/logger';
 

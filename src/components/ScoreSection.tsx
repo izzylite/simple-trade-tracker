@@ -33,7 +33,7 @@ interface ScoreSectionProps {
   selectedDate: Date;
   calendarId: string;
   scoreSettings?: ScoreSettings;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
   // Dynamic risk settings
   accountBalance?: number;
   dynamicRiskSettings?: DynamicRiskSettings;

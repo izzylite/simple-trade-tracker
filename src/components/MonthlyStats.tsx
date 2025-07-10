@@ -44,6 +44,8 @@ interface MonthlyStatsProps {
   currentDate?: Date;
   monthlyTarget?: number;
   onClearMonthTrades?: (month: number, year: number) => void;
+  // Read-only mode for shared calendars
+  isReadOnly?: boolean;
 }
 
 
@@ -54,7 +56,8 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   onDeleteTrade,
   currentDate = new Date(),
   monthlyTarget,
-  onClearMonthTrades
+  onClearMonthTrades,
+  isReadOnly = false
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const monthTrades = trades.filter(trade =>
@@ -218,42 +221,46 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
             flex: 1,
             alignItems: 'flex-start'
           }}>
-            <input
-              type="file"
-              accept=".xlsx,.csv"
-              style={{ display: 'none' }}
-              id="import-file"
-              onChange={handleImport}
-            />
-            <Tooltip title="Import trades from Excel or CSV. Custom columns will be converted to tags (e.g., 'Strategy: Breakout' becomes 'Strategy:Breakout' tag)">
-              <label htmlFor="import-file">
-                <Button
-                  component="span"
-                  size="small"
-                  variant="outlined"
-                  startIcon={<FileUpload />}
-                  sx={{
-                    color: 'text.secondary',
-                    fontSize: '0.75rem',
-                    fontWeight: 500,
-                    textTransform: 'none',
-                    minWidth: 'auto',
-                    p: 0.5,
-                    px: 1,
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    '&:hover': {
-                      bgcolor: 'action.hover',
-                      color: 'text.primary',
-                      borderColor: 'text.primary'
-                    }
-                  }}
-                >
-                  Import
-                </Button>
-              </label>
-            </Tooltip>
+            {!isReadOnly && (
+              <>
+                <input
+                  type="file"
+                  accept=".xlsx,.csv"
+                  style={{ display: 'none' }}
+                  id="import-file"
+                  onChange={handleImport}
+                />
+                <Tooltip title="Import trades from Excel or CSV. Custom columns will be converted to tags (e.g., 'Strategy: Breakout' becomes 'Strategy:Breakout' tag)">
+                  <label htmlFor="import-file">
+                    <Button
+                      component="span"
+                      size="small"
+                      variant="outlined"
+                      startIcon={<FileUpload />}
+                      sx={{
+                        color: 'text.secondary',
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        textTransform: 'none',
+                        minWidth: 'auto',
+                        p: 0.5,
+                        px: 1,
+                        bgcolor: 'background.paper',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                          color: 'text.primary',
+                          borderColor: 'text.primary'
+                        }
+                      }}
+                    >
+                      Import
+                    </Button>
+                  </label>
+                </Tooltip>
+              </>
+            )}
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <Button
                 size="small"
@@ -300,35 +307,37 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               </Tooltip>
             </Box>
 
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={handleClearClick}
-              disabled={monthTrades.length === 0}
-              sx={{
-                color: 'error.main',
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                textTransform: 'none',
-                minWidth: 'auto',
-                p: 0.5,
-                px: 1,
-                bgcolor: 'background.paper',
-                border: '1px solid',
-                borderColor: 'divider',
-                '&:hover': {
-                  bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
-                  borderColor: 'error.main'
-                },
-                '&.Mui-disabled': {
-                  color: 'text.disabled',
-                  bgcolor: 'action.disabledBackground',
-                  borderColor: 'divider'
-                }
-              }}
-            >
-              Clear Month
-            </Button>
+            {!isReadOnly && (
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={handleClearClick}
+                disabled={monthTrades.length === 0}
+                sx={{
+                  color: 'error.main',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  minWidth: 'auto',
+                  p: 0.5,
+                  px: 1,
+                  bgcolor: 'background.paper',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  '&:hover': {
+                    bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
+                    borderColor: 'error.main'
+                  },
+                  '&.Mui-disabled': {
+                    color: 'text.disabled',
+                    bgcolor: 'action.disabledBackground',
+                    borderColor: 'divider'
+                  }
+                }}
+              >
+                Clear Month
+              </Button>
+            )}
           </Box>
         </Box>
 

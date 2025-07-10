@@ -246,3 +246,217 @@ export const deactivateSharedTradeV2 = onCall({
     throw new HttpsError('internal', 'Failed to deactivate shared trade');
   }
 });
+
+/**
+ * Generate a shareable link for a calendar
+ * Uses direct links instead of Firebase Dynamic Links (which will be deprecated Aug 25, 2025)
+ * This creates a simple, reliable shareable link that works on any device
+ */
+export const generateCalendarShareLinkV2 = onCall({
+  cors: true, // Enable CORS for web requests
+  enforceAppCheck: true, // Enable App Check verification
+}, async (request) => {
+  try {
+    // Ensure App Check is valid
+    await enforceAppCheck(request);
+
+    // Ensure user is authenticated
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    const uid = request.auth.uid;
+    const { calendarId } = request.data as { calendarId: string };
+
+    // Validate input data
+    if (!calendarId) {
+      throw new HttpsError('invalid-argument', 'Missing required parameter: calendarId');
+    }
+
+    // Verify the calendar exists and the user has access to it
+    const calendarRef = db.collection('calendars').doc(calendarId);
+    const calendarDoc = await calendarRef.get();
+
+    if (!calendarDoc.exists) {
+      throw new HttpsError('not-found', 'Calendar not found');
+    }
+
+    const calendarData = calendarDoc.data();
+    if (!calendarData || calendarData.userId !== uid) {
+      throw new HttpsError('permission-denied', 'Unauthorized access to calendar');
+    }
+
+    // Generate a unique share ID using modern approach (avoiding deprecated substr)
+    const shareId = `calendar_share_${calendarId}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+    // Create the shared calendar document (store only ID, not the full calendar)
+    const sharedCalendarData = {
+      id: shareId,
+      calendarId,
+      userId: uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      isActive: true,
+      viewCount: 0
+    };
+
+    // Save the shared calendar document
+    await db.collection('sharedCalendars').doc(shareId).set(sharedCalendarData);
+
+    // Generate direct share link (no Firebase Dynamic Links dependency)
+    const baseUrl = 'https://tradetracker-30ec1.web.app'; // Your app's domain
+    const shareLink = `${baseUrl}/shared-calendar/${shareId}`;
+
+    logger.info(`Generated share link for calendar ${calendarId}: ${shareLink}`);
+
+    return {
+      shareLink,
+      shareId,
+      directLink: shareLink // Same as shareLink now
+    };
+
+  } catch (error) {
+    logger.error('Error generating calendar share link:', error);
+
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+
+    throw new HttpsError('internal', 'Failed to generate calendar share link');
+  }
+});
+
+/**
+ * Get a shared calendar by share ID
+ * This function is called when someone visits a shared calendar link
+ * It returns the calendar data and increments the view count
+ */
+export const getSharedCalendarV2 = onCall({
+   cors: true, // Enable CORS for web requests
+  enforceAppCheck: true, // Enable App Check verification
+}, async (request) => {
+  try {
+    await enforceAppCheck(request);
+    const { shareId } = request.data;
+
+    if (!shareId) {
+      throw new HttpsError('invalid-argument', 'Missing shareId parameter');
+    }
+
+    // Get the shared calendar document
+    const sharedCalendarRef = db.collection('sharedCalendars').doc(shareId);
+    const sharedCalendarDoc = await sharedCalendarRef.get();
+
+    if (!sharedCalendarDoc.exists) {
+      throw new HttpsError('not-found', 'Shared calendar not found');
+    }
+
+    const sharedCalendarData = sharedCalendarDoc.data();
+
+    // Check if the share is still active
+    if (!sharedCalendarData?.isActive) {
+      throw new HttpsError('permission-denied', 'This shared calendar is no longer available');
+    }
+
+    // Get the actual calendar data
+    const calendarId = sharedCalendarData.calendarId;
+    const calendarRef = db.collection('calendars').doc(calendarId);
+    const calendarDoc = await calendarRef.get();
+
+    if (!calendarDoc.exists) {
+      throw new HttpsError('not-found', 'The shared calendar no longer exists');
+    }
+
+    const calendarData = calendarDoc.data();
+
+    // Increment view count
+    await sharedCalendarRef.update({
+      viewCount: admin.firestore.FieldValue.increment(1)
+    });
+
+    logger.info(`Shared calendar ${shareId} viewed (calendar: ${calendarId})`);
+
+    return {
+      calendar: calendarData,
+      shareInfo: {
+        id: sharedCalendarData.id,
+        createdAt: sharedCalendarData.createdAt,
+        viewCount: (sharedCalendarData.viewCount || 0) + 1,
+        userId: sharedCalendarData.userId // Include the calendar owner's userId
+      }
+    };
+
+  } catch (error) {
+    logger.error('Error getting shared calendar:', error);
+
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+
+    throw new HttpsError('internal', 'Failed to get shared calendar');
+  }
+});
+
+/**
+ * Deactivate a shared calendar
+ * This function allows the calendar owner to stop sharing their calendar
+ */
+export const deactivateSharedCalendarV2 = onCall({
+  cors: true, // Enable CORS for web requests
+  enforceAppCheck: true, // Enable App Check verification
+}, async (request) => {
+  try {
+    // Ensure App Check is valid
+    await enforceAppCheck(request);
+
+    // Ensure user is authenticated
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    const uid = request.auth.uid;
+    const { shareId } = request.data;
+
+    if (!shareId) {
+      throw new HttpsError('invalid-argument', 'Missing shareId parameter');
+    }
+
+    // Get the shared calendar document
+    const sharedCalendarRef = db.collection('sharedCalendars').doc(shareId);
+    const sharedCalendarDoc = await sharedCalendarRef.get();
+
+    if (!sharedCalendarDoc.exists) {
+      throw new HttpsError('not-found', 'Shared calendar not found');
+    }
+
+    const sharedCalendarData = sharedCalendarDoc.data();
+
+    // Verify the user owns this shared calendar
+    if (sharedCalendarData?.userId !== uid) {
+      throw new HttpsError('permission-denied', 'You do not have permission to modify this shared calendar');
+    }
+
+    // Delete the shared calendar document completely
+    await sharedCalendarRef.delete();
+
+    logger.info(`Deleted shared calendar ${shareId} by user ${uid}`);
+
+    return { success: true };
+
+  } catch (error) {
+    logger.error('Error deactivating shared calendar:', error);
+
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+
+    throw new HttpsError('internal', 'Failed to deactivate shared calendar');
+  }
+});
+
+
+
+ 
+
+
+
+

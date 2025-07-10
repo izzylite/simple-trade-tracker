@@ -7,7 +7,7 @@ import { logger } from '../../utils/logger';
 export const updateCalendarHeroImage = async (
   calendarId: string,
   imageUrl: string | null,
-  onUpdateCalendarProperty: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>
+  onUpdateCalendarProperty: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>
 ): Promise<void> => {
   try {
     await onUpdateCalendarProperty(calendarId, (calendar) => {

@@ -44,7 +44,6 @@ import {
 import { AnimatedDropdown } from './Animations';
 import { TagsDisplay } from './common';
 import { TradeImage } from './trades/TradeForm';
-import ShareTradeButton from './sharing/ShareTradeButton';
 import RichTextEditor from './common/RichTextEditor';
 import EconomicEventListItem from './economicCalendar/EconomicEventListItem';
 import { economicCalendarService } from '../services/economicCalendarService';
@@ -52,6 +51,7 @@ import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar'
 import { DEFAULT_FILTER_SETTINGS } from './economicCalendar/EconomicCalendarDrawer';
 import { logger } from '../utils/logger';
 import { tradeEconomicEventService } from '../services/tradeEconomicEventService';
+import ShareButton from './sharing/ShareButton';
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -229,7 +229,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
       setEconomicEventsError(null);
 
 
-      const sessionRange = tradeEconomicEventService.getSessionTimeRange(trade.session!, trade.date); 
+      const sessionRange = tradeEconomicEventService.getSessionTimeRange(trade.session!, trade.date);
       const filterSetting = calendar?.economicCalendarFilters || DEFAULT_FILTER_SETTINGS
       const events = await economicCalendarService.fetchEvents(
         { start: sessionRange.start, end: sessionRange.end },
@@ -369,11 +369,11 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               )}
               {/* Share Button */}
               {calendarId && (
-                <ShareTradeButton
-                  trade={trade}
+                <ShareButton
+                  type="trade"
+                  item={trade}
                   calendarId={calendarId}
-                  onTradeUpdated={(updatedTrade) => setTrade(updatedTrade)}
-                  onUpdateTradeProperty={onUpdateTradeProperty}
+                  onUpdateItemProperty={onUpdateTradeProperty}
                   size="small"
                   color="inherit"
                 />
@@ -1111,4 +1111,4 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 };
 
 export default TradeDetailExpanded;
- 
+

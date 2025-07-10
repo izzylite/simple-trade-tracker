@@ -19,7 +19,7 @@ export const enforceAppCheck = async (context: any) => {
 export { cleanupExpiredCalendarsV2 } from './cleanupExpiredCalendars';
 
 // Export the sharing functions
-export { generateTradeShareLinkV2, getSharedTradeV2, deactivateSharedTradeV2 } from './sharing';
+export { generateTradeShareLinkV2, getSharedTradeV2, deactivateSharedTradeV2, generateCalendarShareLinkV2, getSharedCalendarV2, deactivateSharedCalendarV2, getSharedTradesWithCalendarV2 } from './sharing';
 
 // Export the economic calendar functions
 export { autoRefreshEconomicCalendarV2, processHtmlEconomicEvents, refreshEconomicCalendar } from './economicCalendar';

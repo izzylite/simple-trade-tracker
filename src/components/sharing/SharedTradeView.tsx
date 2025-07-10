@@ -13,16 +13,16 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import { format } from 'date-fns';
 import { Trade } from '../../types/trade';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import TradeDetailExpanded from '../TradeDetailExpanded';
 import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 import { logger } from '../../utils/logger';
+import { getSharedTrade, SharedTradeData } from '../../services/sharingService';
 
 interface SharedTradeViewProps {
   shareId: string;
 }
 
-interface SharedTradeData {
+interface ProcessedSharedTradeData {
   trade: Trade;
   viewCount: number;
   sharedAt: Date;
@@ -30,7 +30,7 @@ interface SharedTradeData {
 
 const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
   const theme = useTheme();
-  const [sharedTrade, setSharedTrade] = useState<SharedTradeData | null>(null);
+  const [sharedTrade, setSharedTrade] = useState<ProcessedSharedTradeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
@@ -39,11 +39,7 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
     const loadSharedTrade = async () => {
       try {
         setLoading(true);
-        const functions = getFunctions();
-        const getSharedTradeFunction = httpsCallable(functions, 'getSharedTradeV2');
-
-        const result = await getSharedTradeFunction({ shareId });
-        const data = result.data as any;
+        const data = await getSharedTrade(shareId);
 
         if (!data || !data.trade) {
           setError('Shared trade not found or no longer available');

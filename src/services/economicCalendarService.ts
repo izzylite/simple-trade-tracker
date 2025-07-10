@@ -22,7 +22,8 @@ import {
   QueryDocumentSnapshot,
   DocumentData
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db } from '../firebase/config';
+
 import { log, error, logger } from '../utils/logger';
 
 interface PaginationOptions {

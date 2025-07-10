@@ -39,7 +39,7 @@ interface PerformanceChartsProps {
   onEditTrade?: (trade: Trade) => void;
   onDeleteTrade?: (tradeId: string) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
   // Dynamic risk settings
   dynamicRiskSettings?: DynamicRiskSettings;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;

@@ -36,13 +36,15 @@ interface MonthlyStatisticsSectionProps {
   calendarId: string;
   scoreSettings?: import('../types/score').ScoreSettings;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
   dynamicRiskSettings?: DynamicRiskSettings;
   allTags?: string[]; // Add allTags prop to receive calendar.tags
   // Optional handlers for trade interactions
   onEditTrade?: (trade: Trade) => void;
   onDeleteTrade?: (tradeId: string) => void;
   onDeleteMultipleTrades?: (tradeIds: string[]) => void;
+  // Read-only mode for shared calendars
+  isReadOnly?: boolean;
   onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
   calendar?: Calendar
@@ -72,7 +74,8 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   onDeleteMultipleTrades,
   onZoomImage,
   onOpenGalleryMode,
-  calendar
+  calendar,
+  isReadOnly = false
 }) => {
   const theme = useTheme();
   const [multipleTradesDialog, setMultipleTradesDialog] = useState<MultipleTradesDialog>({

@@ -27,6 +27,8 @@ const CalendarHome = lazy(() => import('./components/CalendarHome'));
 const TradeCalendar = lazy(() => import('./components/TradeCalendar'));
 const CalendarTrash = lazy(() => import('./components/trash/CalendarTrash'));
 const SharedTradePage = lazy(() => import('./components/sharing/SharedTradePage'));
+const SharedCalendarPage = lazy(() => import('./components/sharing/SharedCalendarPage'));
+
 
 // Loading component for Suspense
 const LoadingFallback = () => <AppLoadingProgress />;
@@ -405,6 +407,10 @@ function AppContent() {
             path="/shared/:shareId"
             element={<SharedTradePage />}
           />
+          <Route
+            path="/shared-calendar/:shareId"
+            element={<SharedCalendarPage />}
+          />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -659,7 +665,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     }
   };
 
-  const onUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<void> => {
+  const onUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<Calendar | undefined> => {
     try {
       const updatedCalendar = await calendarService.onUpdateCalendar(calendarId, updateCallback);
       // Update the cached trades and stats in the calendar
@@ -670,9 +676,12 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
           cachedTrades: [...calendar.cachedTrades],
           loadedYears: [...calendar.loadedYears]
         });
+        return updatedCalendar;
       }
+      return undefined;
     } catch (error) {
-      console.error('Error updating trade:', error);
+      console.error('Error updating calendar:', error);
+      return undefined;
     }
   };
 

@@ -31,17 +31,19 @@ import {
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
   Note,
-  Save as SaveIcon
+  Save as SaveIcon,
+  Share as ShareIcon
 } from '@mui/icons-material';
 import RichTextEditor from './common/RichTextEditor';
 import { Calendar } from '../types/calendar';
 import { ImageAttribution } from './heroImage';
-import { convertRichTextToHtml } from '../utils/richTextUtils';
+import { convertRichTextToHtml } from '../utils/richTextUtils'; 
+import ShareButton from './sharing/ShareButton';
 
 interface CalendarNoteDataProps {
   calendarNote: string;
   calendarId: string;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
   title?: string;
   heroImageUrl?: string;
   heroImageAttribution?: ImageAttribution;
@@ -54,6 +56,11 @@ interface CalendarNoteDataProps {
   // Day notes props
   calendarDayNotes?: Map<string, string>;
   setIsDayNotesDialogOpen?: (day: string) => void;
+  // Calendar sharing props
+  calendar?: Calendar;
+
+  // Read-only mode
+  isReadOnly?: boolean;
 }
 
 const CalendarNote: React.FC<CalendarNoteDataProps> = ({
@@ -68,12 +75,14 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   trades,
   onOpenGalleryMode,
   calendarDayNotes,
-  setIsDayNotesDialogOpen
+  setIsDayNotesDialogOpen,
+  calendar,
+  isReadOnly = false
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [editedData, setEditedData] = useState(calendarNote);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [imageMenuAnchor, setImageMenuAnchor] = useState<HTMLElement | null>(null);
+  const [imageMenuAnchor, setImageMenuAnchor] = useState<HTMLElement | null>(null); 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // State for hiding day notes section
@@ -479,6 +488,16 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
               </>
             )}
 
+            {/* Share Calendar Button */}
+            {calendar && onUpdateCalendarProperty && ( 
+                <ShareButton
+                    type="calendar"
+                    item={calendar} 
+                    onUpdateItemProperty={onUpdateCalendarProperty} 
+                  />
+                
+            )}
+
             <Tooltip title={expanded ? "Hide description (Ctrl+B)" : "Show description"}>
               <IconButton
                 size="small"
@@ -499,15 +518,17 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
       </Box>
 
       <Collapse in={expanded}>
-        <Box sx={{ p: 2 }} onKeyDown={handleKeyDown} tabIndex={0}>
+        <Box sx={{ p: 2 }} onKeyDown={isReadOnly ? undefined : handleKeyDown} tabIndex={isReadOnly ? -1 : 0}>
           <RichTextEditor
             value={editedData}
-            onChange={setEditedData}
+            onChange={isReadOnly ? () => { } : setEditedData}
             placeholder="Enter a description about your calendar, trading strategy, plans, or mindset..."
             minHeight={300}
             calendarId={calendarId}
             trades={trades}
             onOpenGalleryMode={onOpenGalleryMode}
+            disabled={isReadOnly}
+            hideCharacterCount={isReadOnly}
           />
         </Box>
       </Collapse>

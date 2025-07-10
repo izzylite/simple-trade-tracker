@@ -34,6 +34,8 @@ interface DayDialogProps {
       viewType: 'day' | 'week' | 'month';
     };
   };
+  // Read-only mode for shared calendars
+  isReadOnly?: boolean;
 }
 
 
@@ -56,7 +58,8 @@ const DayDialog: React.FC<DayDialogProps> = ({
   calendarId,
   deletingTradeIds,
   onOpenGalleryMode,
-  calendar
+  calendar,
+  isReadOnly = false
 }) => {
 
   // State
@@ -119,9 +122,8 @@ const DayDialog: React.FC<DayDialogProps> = ({
         maxWidth="md"
         fullWidth
         hideCloseButton={false}
-        primaryButtonText={'Add Trade'}
-        primaryButtonAction={() => handleAddClick()
-        }
+        primaryButtonText={isReadOnly ? undefined : 'Add Trade'}
+        primaryButtonAction={isReadOnly ? undefined : () => handleAddClick()}
         hideFooterCancelButton={false}
         actions={
           onOpenGalleryMode && trades.length > 0 ? (
@@ -157,8 +159,9 @@ const DayDialog: React.FC<DayDialogProps> = ({
             onDeleteClick={onDeleteTrade}
             onDeleteMultiple={onDeleteMultipleTrades}
             onZoomedImage={setZoomedImage}
-            onUpdateTradeProperty={onUpdateTradeProperty}
-            enableBulkSelection={trades.length > 1} // Enable bulk selection when there are multiple trades
+            onUpdateTradeProperty={isReadOnly ? undefined : onUpdateTradeProperty}
+            hideActions={isReadOnly} // Hide edit/delete actions in read-only mode
+            enableBulkSelection={isReadOnly ? false : trades.length > 1} // Disable bulk selection in read-only mode
             deletingTradeIds={deletingTradeIds}
             calendarId={calendarId}
             calendar={calendar}

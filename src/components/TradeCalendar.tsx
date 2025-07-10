@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { FC } from 'react';
 import {
@@ -13,14 +13,10 @@ import {
   Tooltip,
   SxProps,
   Theme,
-  AppBar,
   Toolbar,
-  Avatar,
   Snackbar,
   Alert,
-  Badge,
   Fab,
-  colors,
 
 } from '@mui/material';
 import {
@@ -112,11 +108,14 @@ interface TradeCalendarProps {
   yearlyTarget?: number;
   dynamicRiskSettings: DynamicRiskSettings;
   requiredTagGroups?: string[];
+  title?: string;
   allTags?: string[]; // Add allTags prop to receive calendar.tags
   onAddTrade?: (trade: Trade) => Promise<void>;
   onEditTrade?: (trade: Trade) => Promise<void>;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
+  // Read-only mode for shared calendars
+  isReadOnly?: boolean;
 
   onImageUpload?: (tradeId: string, image: TradeImage, add: boolean) => Promise<void>;
   onDeleteTrade?: (tradeId: string) => Promise<void>;
@@ -384,6 +383,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     onUpdateCalendarProperty,
     onAccountBalanceChange,
     onImportTrades,
+    title,
     calendarName,
     calendarNote,
     heroImageUrl,
@@ -400,7 +400,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     onToggleDynamicRisk,
     // Loading state
     isLoadingTrades = false,
-    calendar
+    calendar,
+    // Read-only mode
+    isReadOnly = false
   } = props;
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -760,6 +762,15 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
   const handleDayClick = (date: Date) => {
+    // In read-only mode, only allow viewing existing trades
+    if (isReadOnly) {
+      const trades = filteredTrades.filter(trade => isSameDay(new Date(trade.date), date));
+      if (trades.length > 0) {
+        setSelectedDate(date);
+      }
+      return;
+    }
+
     // Prevent adding new trades when app is loading all trades
     if (isLoadingTrades) {
       log('Cannot add trade while trades are loading');
@@ -886,6 +897,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
       <AppHeader
         onToggleTheme={onToggleTheme}
+        title={title}
         mode={mode}
         showBackButton={true}
         backButtonPath="/dashboard"
@@ -896,15 +908,18 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         calendarNote={calendarNote || ''}
         calendarId={calendarId!!}
         title={calendarName}
-        onUpdateCalendarProperty={onUpdateCalendarProperty}
+        onUpdateCalendarProperty={isReadOnly ? undefined : onUpdateCalendarProperty}
         heroImageUrl={heroImageUrl}
         heroImageAttribution={heroImageAttribution}
-        onOpenImagePicker={handleOpenImagePicker}
-        onRemoveHeroImage={handleRemoveHeroImage}
+        onOpenImagePicker={isReadOnly ? undefined : handleOpenImagePicker}
+        onRemoveHeroImage={isReadOnly ? undefined : handleRemoveHeroImage}
         trades={trades}
         onOpenGalleryMode={openGalleryMode}
         calendarDayNotes={calendarDayNotes || new Map()}
-        setIsDayNotesDialogOpen={setIsDayNotesDialogOpen}
+        setIsDayNotesDialogOpen={isReadOnly ? undefined : setIsDayNotesDialogOpen}
+        calendar={calendar}
+        
+        isReadOnly={isReadOnly}
       />
 
       {/* Main Content Container */}
@@ -952,6 +967,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   }
                 }}
                 isDynamicRiskToggled={isDynamicRiskToggled}
+                isReadOnly={isReadOnly}
               />
             </Box>
 
@@ -964,6 +980,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 currentDate={currentDate}
                 monthlyTarget={monthlyTarget}
                 onClearMonthTrades={onClearMonthTrades}
+                isReadOnly={isReadOnly}
               />
 
             </Box>
@@ -1155,31 +1172,33 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   onOpenDrawer={() => setIsSearchDrawerOpen(true)}
                 />
 
-                <Tooltip title="Manage tags and required tag groups" arrow>
-                  <Button
-                    variant="outlined"
-                    size="medium"
-                    startIcon={<TagIcon />}
-                    onClick={() => setIsTagManagementDrawerOpen(true)}
-                    sx={{
-                      minWidth: { xs: '140px', sm: 'auto' },
-                      borderRadius: 2,
-                      fontWeight: 600,
-                      textTransform: 'none',
-                      borderColor: alpha(theme.palette.text.secondary, 0.3),
-                      color: 'text.secondary',
-                      '&:hover': {
-                        borderColor: 'primary.main',
-                        bgcolor: alpha(theme.palette.primary.main, 0.1),
-                        color: 'primary.main',
-                        transform: 'translateY(-1px)'
-                      },
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}
-                  >
-                    Manage Tags
-                  </Button>
-                </Tooltip>
+                {!isReadOnly && (
+                  <Tooltip title="Manage tags and required tag groups" arrow>
+                    <Button
+                      variant="outlined"
+                      size="medium"
+                      startIcon={<TagIcon />}
+                      onClick={() => setIsTagManagementDrawerOpen(true)}
+                      sx={{
+                        minWidth: { xs: '140px', sm: 'auto' },
+                        borderRadius: 2,
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        borderColor: alpha(theme.palette.text.secondary, 0.3),
+                        color: 'text.secondary',
+                        '&:hover': {
+                          borderColor: 'primary.main',
+                          bgcolor: alpha(theme.palette.primary.main, 0.1),
+                          color: 'primary.main',
+                          transform: 'translateY(-1px)'
+                        },
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                    >
+                      Manage Tags
+                    </Button>
+                  </Tooltip>
+                )}
               </Box>
             </Box>
           </Box>
@@ -1204,13 +1223,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   <WeekdayHeader
                     key={day}
                     onClick={() => {
-                      if (index < 7) {
+                      if (index < 7 && !isReadOnly) {
                         setIsDayNotesDialogOpen(day);
                       }
                     }}
                     sx={{
                       display: index === 7 ? { xs: 'none', sm: 'flex' } : 'flex',
-                      cursor: index < 7 ? 'pointer' : 'default',
+                      cursor: index < 7 && !isReadOnly ? 'pointer' : 'default',
                       position: 'relative',
                       justifyContent: 'center',
                       alignItems: 'center',
@@ -1219,7 +1238,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                       fontSize: { xs: '0.875rem', md: '1rem' },
                       color: 'text.secondary',
                       transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      '&:hover': index < 7 ? {
+                      '&:hover': index < 7 && !isReadOnly ? {
                         color: 'primary.main'
                       } : {}
                     }}
@@ -1227,7 +1246,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                     {day}
                     {hasNotes && (
                       <Tooltip
-                        title="This day has notes. Click to view or edit."
+                        title={isReadOnly ? "This day has notes." : "This day has notes. Click to view or edit."}
                         placement="top"
                         arrow
                       >
@@ -1423,22 +1442,22 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             monthlyTarget={monthlyTarget}
             calendarId={calendarId!!}
             scoreSettings={scoreSettings}
-            onUpdateTradeProperty={onUpdateTradeProperty}
-            onUpdateCalendarProperty={onUpdateCalendarProperty}
+            onUpdateTradeProperty={isReadOnly ? undefined : onUpdateTradeProperty}
+            onUpdateCalendarProperty={isReadOnly ? undefined : onUpdateCalendarProperty}
             dynamicRiskSettings={dynamicRiskSettings}
             allTags={allTags}
-            onEditTrade={(trade) => {
+            onEditTrade={isReadOnly ? undefined : (trade) => {
               // Use the same edit handler as in DayDialog
               if (props.onUpdateTradeProperty) {
                 setNewTrade(() => (createEditTradeData(trade)));
                 setShowAddForm({ open: true, date: new Date(trade.date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
               }
             }}
-            onDeleteTrade={(tradeId) => {
+            onDeleteTrade={isReadOnly ? undefined : (tradeId) => {
               // Use the same delete handler as in DayDialog
               handleDeleteClick(tradeId);
             }}
-            onDeleteMultipleTrades={handleDeleteMultipleTrades}
+            onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
             onZoomImage={(imageUrl, allImages, initialIndex) => {
               setZoomedImage(imageUrl, allImages, initialIndex);
             }}
@@ -1454,7 +1473,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onClose={() => {
             setSelectedDate(null);
           }}
-          showAddForm={(trade) => {
+          showAddForm={isReadOnly ? () => {} : (trade) => {
             if (trade !== null) {
               setNewTrade(() => (createEditTradeData(trade!!)));
             }
@@ -1462,9 +1481,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           }}
           date={selectedDate || new Date()}
           trades={selectedDate ? tradesForSelectedDay : []}
-          onUpdateTradeProperty={onUpdateTradeProperty}
-          onDeleteTrade={handleDeleteClick}
-          onDeleteMultipleTrades={handleDeleteMultipleTrades}
+          onUpdateTradeProperty={isReadOnly ? undefined : onUpdateTradeProperty}
+          onDeleteTrade={isReadOnly ? () => {} : handleDeleteClick}
+          onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
           calendarId={calendarId!!}
           onDateChange={handleDayChange}
           setZoomedImage={setZoomedImage}
@@ -1473,50 +1492,53 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           deletingTradeIds={deletingTradeIds}
           onOpenGalleryMode={openGalleryMode}
           calendar={calendar}
+          isReadOnly={isReadOnly}
         />
 
 
-        <TradeFormDialog
-          open={(!!showAddForm?.date && showAddForm?.open) || false}
-          onClose={() => {
-            setSelectedDate(null);
-            setShowAddForm(null);
-            if (newTrade != null && newTrade.pendingImages) {
-              // Release object URLs to avoid memory leaks
-              newTrade.pendingImages.forEach(image => {
-                URL.revokeObjectURL(image.preview);
-              });
-              setNewTrade(null);
-            }
-          }}
-          onCancel={() => {
-            if (showAddForm?.showDayDialogWhenDone) {
+        {!isReadOnly && (
+          <TradeFormDialog
+            open={(!!showAddForm?.date && showAddForm?.open) || false}
+            onClose={() => {
               setSelectedDate(null);
-              setSelectedDate(showAddForm?.date!!); // show the day dialog
-            }
-            setShowAddForm(null);
-          }}
-          showForm={{ open: showAddForm?.open || false, editTrade: showAddForm?.editTrade || null, createTempTrade: showAddForm?.createTempTrade || false }}
-          date={showAddForm?.date || new Date()}
-          trades={showAddForm?.date ? tradesForSelectedDay : []}
-          onAddTrade={handleAddTrade}
-          onTagUpdated={onTagUpdated}
-          newMainTrade={newTrade}
-          setNewMainTrade={prev => setNewTrade(prev(newTrade!!))}
-          onUpdateTradeProperty={onUpdateTradeProperty}
-          calendarId={calendarId!!}
-          setZoomedImage={setZoomedImage}
-          accountBalance={accountBalance}
-          onAccountBalanceChange={onAccountBalanceChange}
-          allTrades={trades}
-          tags={allTags}
-          dynamicRiskSettings={dynamicRiskSettings}
-          requiredTagGroups={requiredTagGroups}
-          onOpenGalleryMode={openGalleryMode}
-        />
+              setShowAddForm(null);
+              if (newTrade != null && newTrade.pendingImages) {
+                // Release object URLs to avoid memory leaks
+                newTrade.pendingImages.forEach(image => {
+                  URL.revokeObjectURL(image.preview);
+                });
+                setNewTrade(null);
+              }
+            }}
+            onCancel={() => {
+              if (showAddForm?.showDayDialogWhenDone) {
+                setSelectedDate(null);
+                setSelectedDate(showAddForm?.date!!); // show the day dialog
+              }
+              setShowAddForm(null);
+            }}
+            showForm={{ open: showAddForm?.open || false, editTrade: showAddForm?.editTrade || null, createTempTrade: showAddForm?.createTempTrade || false }}
+            date={showAddForm?.date || new Date()}
+            trades={showAddForm?.date ? tradesForSelectedDay : []}
+            onAddTrade={handleAddTrade}
+            onTagUpdated={onTagUpdated}
+            newMainTrade={newTrade}
+            setNewMainTrade={prev => setNewTrade(prev(newTrade!!))}
+            onUpdateTradeProperty={onUpdateTradeProperty}
+            calendarId={calendarId!!}
+            setZoomedImage={setZoomedImage}
+            accountBalance={accountBalance}
+            onAccountBalanceChange={onAccountBalanceChange}
+            allTrades={trades}
+            tags={allTags}
+            dynamicRiskSettings={dynamicRiskSettings}
+            requiredTagGroups={requiredTagGroups}
+            onOpenGalleryMode={openGalleryMode}
+          />
+        )}
 
         {/* Day Notes Dialog */}
-        {isDayNotesDialogOpen && (
+        {isDayNotesDialogOpen && !isReadOnly && (
           <DayNotesDialog
             open={!!isDayNotesDialogOpen}
             onClose={() => {
@@ -1564,6 +1586,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onTagUpdated={onTagUpdated}
           requiredTagGroups={requiredTagGroups}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
+          isReadOnly={isReadOnly}
         />
 
         {/* Snackbar for notifications */}
@@ -1627,22 +1650,24 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
-        {/* Economic Calendar FAB */}
-        <Tooltip title="Economic Calendar" placement="left">
-          <Fab
-            color="secondary"
-            aria-label="open economic calendar"
-            onClick={handleToggleEconomicCalendar}
-            sx={{
-              position: 'fixed',
-              bottom: 96,
-              right: 24,
-              zIndex: 1200
-            }}
-          >
-            <EventIcon />
-          </Fab>
-        </Tooltip>
+        {/* Economic Calendar FAB - Hidden in read-only mode */}
+        {!isReadOnly && (
+          <Tooltip title="Economic Calendar" placement="left">
+            <Fab
+              color="secondary"
+              aria-label="open economic calendar"
+              onClick={handleToggleEconomicCalendar}
+              sx={{
+                position: 'fixed',
+                bottom: 96,
+                right: 24,
+                zIndex: 1200
+              }}
+            >
+              <EventIcon />
+            </Fab>
+          </Tooltip>
+        )}
 
         {/* Search & Filter FAB */}
         <Fab
@@ -1686,6 +1711,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             openGalleryMode(allTrades, trade.id,title);
           }}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
+          isReadOnly={isReadOnly}
         />
 
         {/* Trade Gallery Dialog */}

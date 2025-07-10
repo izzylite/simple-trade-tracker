@@ -44,7 +44,9 @@ interface TagManagementDrawerProps {
   calendarId: string;
   onTagUpdated?: (oldTag: string, newTag: string) => void;
   requiredTagGroups?: string[];
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
+  // Read-only mode for shared calendars
+  isReadOnly?: boolean;
 }
 
 const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
@@ -54,7 +56,8 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
   calendarId,
   onTagUpdated,
   requiredTagGroups = [],
-  onUpdateCalendarProperty
+  onUpdateCalendarProperty,
+  isReadOnly = false
 }) => {
   const theme = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
@@ -190,35 +193,39 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
       <Box>
         <Box sx={{ mb: 3 }}>
             <Typography variant="body1" gutterBottom>
-              Manage your tags and set required tag groups for new trades.
+              {isReadOnly ? "View your tags" : "Manage your tags and set required tag groups for new trades."}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              When a tag group is set as required, every new trade must include at least one tag from this group.
-            </Typography>
+            {!isReadOnly && (
+              <Typography variant="body2" color="text.secondary">
+                When a tag group is set as required, every new trade must include at least one tag from this group.
+              </Typography>
+            )}
           </Box>
 
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-              Required Tag Groups
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-              {localRequiredGroups.length > 0 ? (
-                localRequiredGroups.map(group => (
-                  <Chip
-                    key={group}
-                    label={group}
-                    color="primary"
-                    variant="outlined"
-                    sx={{ fontWeight: 600 }}
-                  />
-                ))
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No required tag groups set. Edit a tag group to make it required.
-                </Typography>
-              )}
+          {!isReadOnly && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                Required Tag Groups
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                {localRequiredGroups.length > 0 ? (
+                  localRequiredGroups.map(group => (
+                    <Chip
+                      key={group}
+                      label={group}
+                      color="primary"
+                      variant="outlined"
+                      sx={{ fontWeight: 600 }}
+                    />
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No required tag groups set. Edit a tag group to make it required.
+                  </Typography>
+                )}
+              </Box>
             </Box>
-          </Box>
+          )}
 
           <Box sx={{ mb: 3 }}>
             <TextField
@@ -285,7 +292,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
                         <Typography variant="subtitle2" fontWeight={600}>
                           {group}
                         </Typography>
-                        {group !== 'Ungrouped' && (
+                        {group !== 'Ungrouped' && !isReadOnly && (
                           <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
                             <FormControlLabel
                               control={
@@ -324,13 +331,15 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
                         <ListItem
                           key={tag}
                           secondaryAction={
-                            <Button
-                              color="primary"
-                              sx={{ minWidth: 'auto', p: 0.5 }}
-                              onClick={() => setTagToEdit(tag)}
-                            >
-                              Edit
-                            </Button>
+                            !isReadOnly ? (
+                              <Button
+                                color="primary"
+                                sx={{ minWidth: 'auto', p: 0.5 }}
+                                onClick={() => setTagToEdit(tag)}
+                              >
+                                Edit
+                              </Button>
+                            ) : undefined
                           }
                           sx={{
                             '&:hover': {

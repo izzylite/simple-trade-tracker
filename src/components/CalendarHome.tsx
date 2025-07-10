@@ -501,16 +501,34 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   };
 
   // Create a wrapper function for calendar updates that matches the expected signature
-  const handleUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<void> => {
+  const handleUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<Calendar | undefined> => {
     const calendar = calendars.find(c => c.id === calendarId);
     if (!calendar) return;
 
     const updatedCalendar = updateCallback(calendar);
     const updates: Partial<Calendar> = {
+      ...updatedCalendar,
       scoreSettings: updatedCalendar.scoreSettings
     };
 
     await onUpdateCalendar(calendarId, updates);
+  };
+
+  // Create a wrapper function for sharing-related calendar updates
+  const handleUpdateCalendarPropertyForSharing = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<Calendar | undefined> => {
+    const calendar = calendars.find(c => c.id === calendarId);
+    if (!calendar) return undefined;
+
+    const updatedCalendar = updateCallback(calendar);
+    const updates: Partial<Calendar> = {
+      shareLink: updatedCalendar.shareLink,
+      shareId: updatedCalendar.shareId,
+      isShared: updatedCalendar.isShared,
+      sharedAt: updatedCalendar.sharedAt
+    };
+
+    await onUpdateCalendar(calendarId, updates);
+    return updatedCalendar;
   };
 
   // Get available months for the selected calendar
@@ -662,7 +680,8 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                           onViewCharts={handleViewCharts}
                           onEditCalendar={handleEditCalendar}
                           onDuplicateCalendar={handleDuplicateCalendar}
-                          onDeleteCalendar={handleDeleteCalendar}
+                          onDeleteCalendar={handleDeleteCalendar} 
+                          onUpdateCalendarProperty={handleUpdateCalendarPropertyForSharing}
                           formatCurrency={formatCurrency}
                         />
                       </Box>

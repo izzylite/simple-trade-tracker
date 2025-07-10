@@ -14,7 +14,8 @@ import {
   runTransaction,
   deleteField
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebase/config';
 import { isSameWeek, isSameMonth } from 'date-fns';
 import { auth, db } from '../firebase/config';
 import { Calendar, PinnedEvent } from '../types/calendar';
@@ -1232,9 +1233,6 @@ export const updateTag = async (calendarId: string, oldTag: string, newTag: stri
     if (!user) {
       throw new Error('User not authenticated');
     }
-
-    // Get Firebase Functions instance
-    const functions = getFunctions();
 
     // Get the cloud function
     const updateTagFunction = httpsCallable(functions, 'updateTagV2');

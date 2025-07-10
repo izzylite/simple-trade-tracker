@@ -46,7 +46,9 @@ interface PinnedTradesDrawerProps {
   trades: Trade[];
   calendar?: Calendar;
   onTradeClick?: (trade: Trade,trades: Trade[],title : string) => void;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: any) => any) => Promise<void>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: any) => any) => Promise<Calendar | undefined>;
+  // Read-only mode for shared calendars
+  isReadOnly?: boolean;
 }
 
 const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
@@ -55,7 +57,8 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   trades,
   calendar,
   onTradeClick,
-  onUpdateCalendarProperty
+  onUpdateCalendarProperty,
+  isReadOnly = false
 }) => {
   const theme = useTheme();
 
@@ -359,20 +362,22 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                       {selectedPinnedEvent.notes}
                     </Typography>
                   </Box>
-                  <Tooltip title="Edit notes">
-                    <IconButton
-                      size="small"
-                      onClick={() => selectedPinnedEvent && handleEditNotes(selectedPinnedEvent)}
-                      sx={{
-                        color: 'primary.main',
-                        '&:hover': {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.1)
-                        }
-                      }}
-                    >
-                      <EditIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  </Tooltip>
+                  {!isReadOnly && (
+                    <Tooltip title="Edit notes">
+                      <IconButton
+                        size="small"
+                        onClick={() => selectedPinnedEvent && handleEditNotes(selectedPinnedEvent)}
+                        sx={{
+                          color: 'primary.main',
+                          '&:hover': {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.1)
+                          }
+                        }}
+                      >
+                        <EditIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </Box>
               </Box>
             )}
@@ -733,23 +738,25 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                           </Box>
 
                           {/* Notes Button */}
-                          <Tooltip title={pinnedEvent.notes ? "Edit notes" : "Add notes"}>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditNotes(pinnedEvent);
-                              }}
-                              sx={{
-                                color: pinnedEvent.notes ? 'primary.main' : 'text.secondary',
-                                '&:hover': {
-                                  backgroundColor: alpha(theme.palette.primary.main, 0.1)
-                                }
-                              }}
-                            >
-                              {pinnedEvent.notes ? <NoteIcon sx={{ fontSize: 18 }} /> : <EditIcon sx={{ fontSize: 18 }} />}
-                            </IconButton>
-                          </Tooltip>
+                          {!isReadOnly && (
+                            <Tooltip title={pinnedEvent.notes ? "Edit notes" : "Add notes"}>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditNotes(pinnedEvent);
+                                }}
+                                sx={{
+                                  color: pinnedEvent.notes ? 'primary.main' : 'text.secondary',
+                                  '&:hover': {
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.1)
+                                  }
+                                }}
+                              >
+                                {pinnedEvent.notes ? <NoteIcon sx={{ fontSize: 18 }} /> : <EditIcon sx={{ fontSize: 18 }} />}
+                              </IconButton>
+                            </Tooltip>
+                          )}
 
                           {/* Trade Count Badge */}
                           {tradesWithEvent.length > 0 && (
@@ -838,17 +845,19 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseViewNotesDialog}>Close</Button>
-          <Button
-            onClick={() => {
-              handleCloseViewNotesDialog();
-              if (viewingEvent) {
-                handleEditNotes(viewingEvent);
-              }
-            }}
-            variant="outlined"
-          >
-            Edit Notes
-          </Button>
+          {!isReadOnly && (
+            <Button
+              onClick={() => {
+                handleCloseViewNotesDialog();
+                if (viewingEvent) {
+                  handleEditNotes(viewingEvent);
+                }
+              }}
+              variant="outlined"
+            >
+              Edit Notes
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </UnifiedDrawer>

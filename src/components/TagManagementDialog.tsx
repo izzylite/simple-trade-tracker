@@ -43,7 +43,7 @@ interface TagManagementDialogProps {
   calendarId: string;
   onTagUpdated?: (oldTag: string, newTag: string) => void;
   requiredTagGroups?: string[];
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
 }
 
 const TagManagementDialog: React.FC<TagManagementDialogProps> = ({

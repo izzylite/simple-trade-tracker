@@ -28,6 +28,8 @@ interface AccountBalanceProps {
   dynamicRiskSettings?: DynamicRiskSettings;
   onToggleDynamicRisk?: (useActualAmounts: boolean) => void;
   isDynamicRiskToggled?: boolean;
+  // Read-only mode for shared calendars
+  isReadOnly?: boolean;
 }
 
 
@@ -40,7 +42,8 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
   riskPerTrade,
   dynamicRiskSettings,
   onToggleDynamicRisk,
-  isDynamicRiskToggled = true // Default to true (using actual amounts)
+  isDynamicRiskToggled = true, // Default to true (using actual amounts)
+  isReadOnly = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempBalance, setTempBalance] = useState(balance.toString());
@@ -142,13 +145,13 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
           />
         ) : (
           <Typography
-            onClick={() => setIsEditing(true)}
+            onClick={isReadOnly ? undefined : () => setIsEditing(true)}
             sx={{
-              cursor: 'pointer',
+              cursor: isReadOnly ? 'default' : 'pointer',
               fontSize: '1.5rem',
               fontWeight: 700,
               color: 'text.primary',
-              '&:hover': {
+              '&:hover': isReadOnly ? {} : {
                 color: 'primary.main'
               },
               display: 'flex',
@@ -301,11 +304,12 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
                   control={
                     <Switch
                       checked={isDynamicRiskToggled}
-                      onChange={(e) => {
+                      onChange={isReadOnly ? undefined : (e) => {
                         if (onToggleDynamicRisk) {
                           onToggleDynamicRisk(e.target.checked);
                         }
                       }}
+                      disabled={isReadOnly}
                       size="small"
                       color="primary"
                     />

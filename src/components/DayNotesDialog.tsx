@@ -16,7 +16,7 @@ interface DayNotesDialogProps {
   day: string;
   notes: string;
   calendarId: string;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<void>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
   // Optional props for trade link navigation
   trades?: Array<{ id: string; [key: string]: any }>;
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;

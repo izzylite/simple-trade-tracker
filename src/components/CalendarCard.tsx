@@ -33,6 +33,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { Calendar } from '../types/calendar';
+import ShareButton from './sharing/ShareButton';
 
 interface CalendarStats {
   totalPnL: number;
@@ -69,6 +70,7 @@ interface CalendarCardProps {
   onEditCalendar: (calendar: Calendar) => void;
   onDuplicateCalendar: (calendar: Calendar) => void;
   onDeleteCalendar: (calendarId: string) => void;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
   formatCurrency: (amount: number) => string;
 }
 
@@ -82,6 +84,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
   onEditCalendar,
   onDuplicateCalendar,
   onDeleteCalendar,
+  onUpdateCalendarProperty,
   formatCurrency
 }) => {
   const theme = useTheme();
@@ -733,6 +736,8 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
         </Button>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+
+
           {onToggleExpand && (
             <IconButton
               size="small"
@@ -751,6 +756,16 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               {isExpanded ? <ExpandLess /> : <ExpandMore />}
             </IconButton>
           )}
+
+          {/* Share Calendar Button */}
+          {onUpdateCalendarProperty && (
+            <ShareButton
+              type="calendar"
+              item={calendar}
+              onUpdateItemProperty={onUpdateCalendarProperty}
+            />
+          )}
+
           <IconButton
             size="small"
             onClick={handleMenuClick}
@@ -786,6 +801,8 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               </ListItemIcon>
               <ListItemText>Duplicate</ListItemText>
             </MenuItem>
+
+
 
             <MenuItem
               onClick={() => handleMenuItemClick(() => onDeleteCalendar(calendar.id))}
