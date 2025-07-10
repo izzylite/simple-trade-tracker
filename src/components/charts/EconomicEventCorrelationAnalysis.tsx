@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -14,7 +14,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  SelectChangeEvent
+  SelectChangeEvent,
+  CircularProgress
 } from '@mui/material';
 import {
   InfoOutlined,
@@ -28,9 +29,10 @@ import { ImpactLevel, Currency } from '../../types/economicCalendar';
 import { formatValue } from '../../utils/formatters';
 
 import RoundedTabs from '../common/RoundedTabs';
-import { Calendar } from '../../types/calendar'; 
+import { Calendar } from '../../types/calendar';
 import { getCurrenciesForPair } from '../../services/tradeEconomicEventService';
 import { cleanEventNameForPinning } from '../../utils/eventNameUtils';
+import { performanceCalculationService, CalculationProgress } from '../../services/performanceCalculationService';
 
 // Helper function to get flag URL
 const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {
@@ -109,6 +111,33 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
   const [selectedImpact, setSelectedImpact] = useState<ImpactLevel>('High');
   const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
 
+  // Async calculation states
+  const [losingTradeCorrelations, setLosingTradeCorrelations] = useState<any[]>([]);
+  const [winningTradeCorrelations, setWinningTradeCorrelations] = useState<any[]>([]);
+  const [correlationStats, setCorrelationStats] = useState<any>({
+    totalLosingTrades: 0,
+    totalWinningTrades: 0,
+    highImpactLossCorrelationRate: 0,
+    mediumImpactLossCorrelationRate: 0,
+    anyEventLossCorrelationRate: 0,
+    highImpactWinCorrelationRate: 0,
+    mediumImpactWinCorrelationRate: 0,
+    anyEventWinCorrelationRate: 0,
+    losingTradesWithHighImpact: 0,
+    losingTradesWithMediumImpact: 0,
+    losingTradesWithAnyEvents: 0,
+    winningTradesWithHighImpact: 0,
+    winningTradesWithMediumImpact: 0,
+    winningTradesWithAnyEvents: 0,
+    avgLossWithEvents: 0,
+    avgLossWithoutEvents: 0,
+    avgWinWithEvents: 0,
+    avgWinWithoutEvents: 0,
+    mostCommonEventTypes: []
+  });
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [calculationProgress, setCalculationProgress] = useState<CalculationProgress | null>(null);
+
   // Define tabs for impact level selection
   const impactTabs = [
     { label: 'High', value: 'High' },
@@ -145,9 +174,37 @@ const CURRENCY_OPTIONS = [
       setSelectedImpact(newImpact);
     }
   };
- 
 
-  // Get losing and winning trades
+  // Calculate economic event correlations asynchronously
+  useEffect(() => {
+    const calculateCorrelations = async () => {
+      setIsCalculating(true);
+      setCalculationProgress(null);
+      try {
+        const result = await performanceCalculationService.calculateEconomicEventCorrelations(
+          trades,
+          selectedCurrency,
+          selectedImpact,
+          setCalculationProgress
+        );
+        setLosingTradeCorrelations(result.losingTradeCorrelations);
+        setWinningTradeCorrelations(result.winningTradeCorrelations);
+        setCorrelationStats(result.correlationStats);
+      } catch (error) {
+        console.error('Error calculating economic event correlations:', error);
+        setLosingTradeCorrelations([]);
+        setWinningTradeCorrelations([]);
+        setCorrelationStats({});
+      } finally {
+        setIsCalculating(false);
+        setCalculationProgress(null);
+      }
+    };
+
+    calculateCorrelations();
+  }, [trades, selectedCurrency, selectedImpact]);
+
+  // Get losing and winning trades (kept for legacy compatibility)
   const losingTrades = useMemo(() => {
     return trades.filter(trade => trade.type === 'loss');
   }, [trades]);
@@ -160,260 +217,9 @@ const CURRENCY_OPTIONS = [
 
 
 
-  // Helper function to filter events by selected currency
-  const filterEventsByCurrency = (events: TradeEconomicEvent[]): TradeEconomicEvent[] => {
-    if (selectedCurrency === 'ALL') {
-      return events.filter(event => CURRENCIES.includes(event.currency) && event.impact === selectedImpact);
-    }
-    return events.filter(event => event.currency === selectedCurrency && event.impact === selectedImpact);
-  };
+  // Note: Heavy calculations moved to async service
 
-  // Calculate trade-event correlations for both winning and losing trades using stored events
-  const losingTradeCorrelations = useMemo((): TradeEventCorrelation[] => {
-    return losingTrades.map(trade => {
-      // Use stored economic events from the trade, filtered by selected currency
-      const allTradeEvents = trade.economicEvents || [];
-      const tradeEvents = filterEventsByCurrency(allTradeEvents);
-
-      // Since we only store mid and high impact events, we can determine impact levels
-      // For now, we'll treat all stored events as having some impact
-      const hasHighImpactEvents = tradeEvents.length > 0; // Simplified - all stored events are considered impactful
-      const hasMediumImpactEvents = tradeEvents.length > 0;
-
-      return {
-        trade,
-        economicEvents: tradeEvents,
-        hasHighImpactEvents,
-        hasMediumImpactEvents,
-        eventCount: tradeEvents.length
-      };
-    });
-  }, [losingTrades, selectedCurrency,selectedImpact]);
-
-  const winningTradeCorrelations = useMemo((): TradeEventCorrelation[] => {
-    return winningTrades.map(trade => {
-      // Use stored economic events from the trade, filtered by selected currency
-      const allTradeEvents = trade.economicEvents || [];
-      const tradeEvents = filterEventsByCurrency(allTradeEvents);
-
-      // Since we only store mid and high impact events, we can determine impact levels
-      // For now, we'll treat all stored events as having some impact
-      const hasHighImpactEvents = tradeEvents.length > 0; // Simplified - all stored events are considered impactful
-      const hasMediumImpactEvents = tradeEvents.length > 0;
-
-      return {
-        trade,
-        economicEvents: tradeEvents,
-        hasHighImpactEvents,
-        hasMediumImpactEvents,
-        eventCount: tradeEvents.length
-      };
-    });
-  }, [winningTrades, selectedCurrency]);
-
-  // Calculate correlation statistics
-  const correlationStats = useMemo((): CorrelationStats => {
-    const totalLosingTrades = losingTradeCorrelations.length;
-    const totalWinningTrades = winningTradeCorrelations.length;
-
-    if (totalLosingTrades === 0 && totalWinningTrades === 0) {
-      return {
-        // Losing trades stats
-        totalLosingTrades: 0,
-        losingTradesWithHighImpact: 0,
-        losingTradesWithMediumImpact: 0,
-        losingTradesWithAnyEvents: 0,
-        highImpactLossCorrelationRate: 0,
-        mediumImpactLossCorrelationRate: 0,
-        anyEventLossCorrelationRate: 0,
-        avgLossWithEvents: 0,
-        avgLossWithoutEvents: 0,
-
-        // Winning trades stats
-        totalWinningTrades: 0,
-        winningTradesWithHighImpact: 0,
-        winningTradesWithMediumImpact: 0,
-        winningTradesWithAnyEvents: 0,
-        highImpactWinCorrelationRate: 0,
-        mediumImpactWinCorrelationRate: 0,
-        anyEventWinCorrelationRate: 0,
-        avgWinWithEvents: 0,
-        avgWinWithoutEvents: 0,
-
-        // Combined stats
-        mostCommonEventTypes: [],
-        impactDistribution: { 'Low': 0, 'Medium': 0, 'High': 0, 'Holiday': 0, 'Non-Economic': 0 }
-      };
-    }
-
-    // Since we're now fetching only events for the selected impact level,
-    // any trade with events has events of the selected impact level
-    const losingTradesWithSelectedImpact = losingTradeCorrelations.filter(tc => tc.eventCount > 0);
-    const losingTradesWithAnyEvents = losingTradesWithSelectedImpact; // Same as selected impact now
-
-    // For display purposes, we'll use the selected impact data for all calculations
-    const selectedImpactLossCorrelationRate = totalLosingTrades > 0 ? (losingTradesWithSelectedImpact.length / totalLosingTrades) * 100 : 0;
-
-    // Use selected impact rate for all legacy fields to maintain UI compatibility
-    const highImpactLossCorrelationRate = selectedImpactLossCorrelationRate;
-    const mediumImpactLossCorrelationRate = selectedImpactLossCorrelationRate;
-    const anyEventLossCorrelationRate = selectedImpactLossCorrelationRate;
-
-    // Winning trades calculations - same logic as losing trades
-    const winningTradesWithSelectedImpact = winningTradeCorrelations.filter(tc => tc.eventCount > 0);
-    const winningTradesWithAnyEvents = winningTradesWithSelectedImpact; // Same as selected impact now
-
-    const selectedImpactWinCorrelationRate = totalWinningTrades > 0 ? (winningTradesWithSelectedImpact.length / totalWinningTrades) * 100 : 0;
-
-    // Use selected impact rate for all legacy fields to maintain UI compatibility
-    const highImpactWinCorrelationRate = selectedImpactWinCorrelationRate;
-    const mediumImpactWinCorrelationRate = selectedImpactWinCorrelationRate;
-    const anyEventWinCorrelationRate = selectedImpactWinCorrelationRate;
-
-    // Calculate average losses
-    const losingTradesWithEvents = losingTradeCorrelations.filter(tc => tc.eventCount > 0);
-    const losingTradesWithoutEvents = losingTradeCorrelations.filter(tc => tc.eventCount === 0);
-
-    const avgLossWithEvents = losingTradesWithEvents.length > 0
-      ? losingTradesWithEvents.reduce((sum, tc) => sum + Math.abs(tc.trade.amount), 0) / losingTradesWithEvents.length
-      : 0;
-
-    const avgLossWithoutEvents = losingTradesWithoutEvents.length > 0
-      ? losingTradesWithoutEvents.reduce((sum, tc) => sum + Math.abs(tc.trade.amount), 0) / losingTradesWithoutEvents.length
-      : 0;
-
-    // Calculate average wins
-    const winningTradesWithEvents = winningTradeCorrelations.filter(tc => tc.eventCount > 0);
-    const winningTradesWithoutEvents = winningTradeCorrelations.filter(tc => tc.eventCount === 0);
-
-    const avgWinWithEvents = winningTradesWithEvents.length > 0
-      ? winningTradesWithEvents.reduce((sum, tc) => sum + tc.trade.amount, 0) / winningTradesWithEvents.length
-      : 0;
-
-    const avgWinWithoutEvents = winningTradesWithoutEvents.length > 0
-      ? winningTradesWithoutEvents.reduce((sum, tc) => sum + tc.trade.amount, 0) / winningTradesWithoutEvents.length
-      : 0;
-
-    // Find most common event types with detailed trade information
-    const eventTypeMap = new Map<string, {
-      losingTrades: Trade[];
-      winningTrades: Trade[];
-      totalLoss: number;
-      totalWin: number;
-      economicEventDetails?: {
-        flagCode?: string;
-        flagUrl?: string;
-      };
-    }>();
-
-    // Process losing trades
-    losingTradeCorrelations.forEach(tc => {
-      tc.economicEvents.forEach(event => {
-        const existing = eventTypeMap.get(cleanEventNameForPinning(event.name)) || {
-          losingTrades: [],
-          winningTrades: [],
-          totalLoss: 0,
-          totalWin: 0
-        };
-        existing.losingTrades.push(tc.trade);
-        existing.totalLoss += Math.abs(tc.trade.amount);
-
-        // Store economic event details (use first occurrence)
-        if (!existing.economicEventDetails) {
-          existing.economicEventDetails = {
-            flagCode: event.flagCode,
-            flagUrl: getFlagUrl(event.flagCode)
-          };
-        }
-
-        eventTypeMap.set(cleanEventNameForPinning(event.name), existing);
-      });
-    });
-
-    // Process winning trades
-    winningTradeCorrelations.forEach(tc => {
-      tc.economicEvents.forEach(event => {
-        const existing = eventTypeMap.get(cleanEventNameForPinning(event.name)) || {
-          losingTrades: [],
-          winningTrades: [],
-          totalLoss: 0,
-          totalWin: 0
-        };
-        existing.winningTrades.push(tc.trade);
-        existing.totalWin += tc.trade.amount;
-
-        // Store economic event details (use first occurrence)
-        if (!existing.economicEventDetails) {
-          existing.economicEventDetails = {
-            flagCode: event.flagCode,
-            flagUrl: getFlagUrl(event.flagCode)
-          };
-        }
-
-        eventTypeMap.set(cleanEventNameForPinning(event.name), existing);
-      });
-    });
-
-    const mostCommonEventTypes: EventTradeDetails[] = Array.from(eventTypeMap.entries())
-      .map(([event, data]) => {
-        const totalTrades = data.losingTrades.length + data.winningTrades.length;
-        const winRate = totalTrades > 0 ? (data.winningTrades.length / totalTrades) * 100 : 0;
-
-        return {
-          event,
-          losingTrades: data.losingTrades,
-          winningTrades: data.winningTrades,
-          totalLoss: data.totalLoss,
-          totalWin: data.totalWin,
-          avgLoss: data.losingTrades.length > 0 ? data.totalLoss / data.losingTrades.length : 0,
-          avgWin: data.winningTrades.length > 0 ? data.totalWin / data.winningTrades.length : 0,
-          count: totalTrades,
-          winRate,
-          economicEventDetails: data.economicEventDetails
-        };
-      })
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 9);
-
-    // Impact distribution
-    const impactDistribution: Record<ImpactLevel, number> = {
-      'Low': 0, 'Medium': 0, 'High': 0, 'Holiday': 0, 'Non-Economic': 0
-    };
-
-    [...losingTradeCorrelations, ...winningTradeCorrelations].forEach(tc => {
-      tc.economicEvents.forEach(event => {
-        impactDistribution[event.impact]++;
-      });
-    });
-
-    return {
-      // Losing trades stats
-      totalLosingTrades,
-      losingTradesWithHighImpact: losingTradesWithSelectedImpact.length,
-      losingTradesWithMediumImpact: losingTradesWithSelectedImpact.length,
-      losingTradesWithAnyEvents: losingTradesWithAnyEvents.length,
-      highImpactLossCorrelationRate,
-      mediumImpactLossCorrelationRate,
-      anyEventLossCorrelationRate,
-      avgLossWithEvents,
-      avgLossWithoutEvents,
-
-      // Winning trades stats
-      totalWinningTrades,
-      winningTradesWithHighImpact: winningTradesWithSelectedImpact.length,
-      winningTradesWithMediumImpact: winningTradesWithSelectedImpact.length,
-      winningTradesWithAnyEvents: winningTradesWithAnyEvents.length,
-      highImpactWinCorrelationRate,
-      mediumImpactWinCorrelationRate,
-      anyEventWinCorrelationRate,
-      avgWinWithEvents,
-      avgWinWithoutEvents,
-
-      // Combined stats
-      mostCommonEventTypes,
-      impactDistribution
-    };
-  }, [losingTradeCorrelations, winningTradeCorrelations, selectedCurrency]);
+  // Note: Correlation statistics now calculated asynchronously in service
 
 
 
@@ -499,10 +305,40 @@ const CURRENCY_OPTIONS = [
           )}
         </Alert>
 
-      {/* Summary Statistics - Losing Trades */}
-      <Typography variant="h6" sx={{ mb: 2, color: 'error.main' }}>
-      Losing Trades - {selectedImpact} Impact Events
-      </Typography>
+        {/* Loading State */}
+        {isCalculating && (
+          <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            py: 4,
+            gap: 2
+          }}>
+            <CircularProgress size={40} />
+            <Typography variant="body2" color="text.secondary">
+              Calculating economic event correlations...
+            </Typography>
+            {calculationProgress && (
+              <Box sx={{ width: '100%', maxWidth: 400 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  {calculationProgress.step} ({calculationProgress.progress}/{calculationProgress.total})
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={(calculationProgress.progress / calculationProgress.total) * 100}
+                />
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {/* Summary Statistics - Losing Trades */}
+        {!isCalculating && (
+          <>
+            <Typography variant="h6" sx={{ mb: 2, color: 'error.main' }}>
+              Losing Trades - {selectedImpact} Impact Events
+            </Typography>
       <Box sx={{
         display: 'grid',
         gridTemplateColumns: {
@@ -519,7 +355,7 @@ const CURRENCY_OPTIONS = [
               <Typography variant="body2" color="text.secondary">Total Losing Trades</Typography>
             </Box>
             <Typography variant="h4" color="error.main">
-              {correlationStats.totalLosingTrades}
+              {correlationStats.totalLosingTrades || 0}
             </Typography>
           </CardContent>
         </Card>
@@ -550,14 +386,14 @@ const CURRENCY_OPTIONS = [
                      selectedImpact === 'Low' ? 'success.main' :
                      'secondary.main' // Holiday
             }}>
-              {selectedImpact === 'High' ? correlationStats.highImpactLossCorrelationRate.toFixed(1) :
-               selectedImpact === 'Medium' ? correlationStats.mediumImpactLossCorrelationRate.toFixed(1) :
-               correlationStats.anyEventLossCorrelationRate.toFixed(1)}%
+              {selectedImpact === 'High' ? (correlationStats.highImpactLossCorrelationRate || 0).toFixed(1) :
+               selectedImpact === 'Medium' ? (correlationStats.mediumImpactLossCorrelationRate || 0).toFixed(1) :
+               (correlationStats.anyEventLossCorrelationRate || 0).toFixed(1)}%
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {selectedImpact === 'High' ? correlationStats.losingTradesWithHighImpact :
-               selectedImpact === 'Medium' ? correlationStats.losingTradesWithMediumImpact :
-               correlationStats.losingTradesWithAnyEvents} trades
+              {selectedImpact === 'High' ? (correlationStats.losingTradesWithHighImpact || 0) :
+               selectedImpact === 'Medium' ? (correlationStats.losingTradesWithMediumImpact || 0) :
+               (correlationStats.losingTradesWithAnyEvents || 0)} trades
             </Typography>
           </CardContent>
         </Card>
@@ -583,7 +419,7 @@ const CURRENCY_OPTIONS = [
               <Typography variant="body2" color="text.secondary">Total Winning Trades</Typography>
             </Box>
             <Typography variant="h4" color="success.main">
-              {correlationStats.totalWinningTrades}
+              {correlationStats.totalWinningTrades || 0}
             </Typography>
           </CardContent>
         </Card>
@@ -614,14 +450,14 @@ const CURRENCY_OPTIONS = [
                      selectedImpact === 'Low' ? 'success.main' :
                      'secondary.main' // Holiday
             }}>
-              {selectedImpact === 'High' ? correlationStats.highImpactWinCorrelationRate.toFixed(1) :
-               selectedImpact === 'Medium' ? correlationStats.mediumImpactWinCorrelationRate.toFixed(1) :
-               correlationStats.anyEventWinCorrelationRate.toFixed(1)}%
+              {selectedImpact === 'High' ? (correlationStats.highImpactWinCorrelationRate || 0).toFixed(1) :
+               selectedImpact === 'Medium' ? (correlationStats.mediumImpactWinCorrelationRate || 0).toFixed(1) :
+               (correlationStats.anyEventWinCorrelationRate || 0).toFixed(1)}%
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {selectedImpact === 'High' ? correlationStats.winningTradesWithHighImpact :
-               selectedImpact === 'Medium' ? correlationStats.winningTradesWithMediumImpact :
-               correlationStats.winningTradesWithAnyEvents} trades
+              {selectedImpact === 'High' ? (correlationStats.winningTradesWithHighImpact || 0) :
+               selectedImpact === 'Medium' ? (correlationStats.winningTradesWithMediumImpact || 0) :
+               (correlationStats.winningTradesWithAnyEvents || 0)} trades
             </Typography>
           </CardContent>
         </Card>
@@ -644,12 +480,12 @@ const CURRENCY_OPTIONS = [
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2">With Economic Events</Typography>
                     <Typography variant="body2" color="error.main">
-                      {formatValue(correlationStats.avgLossWithEvents)}
+                      {formatValue(correlationStats.avgLossWithEvents || 0)}
                     </Typography>
                   </Box>
                   <LinearProgress
                     variant="determinate"
-                    value={correlationStats.avgLossWithEvents > 0 ? 100 : 0}
+                    value={(correlationStats.avgLossWithEvents || 0) > 0 ? 100 : 0}
                     color="error"
                   />
                 </Box>
@@ -657,13 +493,13 @@ const CURRENCY_OPTIONS = [
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2">Without Economic Events</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {formatValue(correlationStats.avgLossWithoutEvents)}
+                      {formatValue(correlationStats.avgLossWithoutEvents || 0)}
                     </Typography>
                   </Box>
                   <LinearProgress
                     variant="determinate"
-                    value={correlationStats.avgLossWithoutEvents > 0 ?
-                      (correlationStats.avgLossWithoutEvents / Math.max(correlationStats.avgLossWithEvents, correlationStats.avgLossWithoutEvents)) * 100 : 0}
+                    value={(correlationStats.avgLossWithoutEvents || 0) > 0 ?
+                      ((correlationStats.avgLossWithoutEvents || 0) / Math.max((correlationStats.avgLossWithEvents || 0), (correlationStats.avgLossWithoutEvents || 0))) * 100 : 0}
                     color="inherit"
                   />
                 </Box>
@@ -680,12 +516,12 @@ const CURRENCY_OPTIONS = [
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2">With Economic Events</Typography>
                     <Typography variant="body2" color="success.main">
-                      {formatValue(correlationStats.avgWinWithEvents)}
+                      {formatValue(correlationStats.avgWinWithEvents || 0)}
                     </Typography>
                   </Box>
                   <LinearProgress
                     variant="determinate"
-                    value={correlationStats.avgWinWithEvents > 0 ? 100 : 0}
+                    value={(correlationStats.avgWinWithEvents || 0) > 0 ? 100 : 0}
                     color="success"
                   />
                 </Box>
@@ -693,13 +529,13 @@ const CURRENCY_OPTIONS = [
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2">Without Economic Events</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {formatValue(correlationStats.avgWinWithoutEvents)}
+                      {formatValue(correlationStats.avgWinWithoutEvents || 0)}
                     </Typography>
                   </Box>
                   <LinearProgress
                     variant="determinate"
-                    value={correlationStats.avgWinWithoutEvents > 0 ?
-                      (correlationStats.avgWinWithoutEvents / Math.max(correlationStats.avgWinWithEvents, correlationStats.avgWinWithoutEvents)) * 100 : 0}
+                    value={(correlationStats.avgWinWithoutEvents || 0) > 0 ?
+                      ((correlationStats.avgWinWithoutEvents || 0) / Math.max((correlationStats.avgWinWithEvents || 0), (correlationStats.avgWinWithoutEvents || 0))) * 100 : 0}
                     color="inherit"
                   />
                 </Box>
@@ -713,7 +549,7 @@ const CURRENCY_OPTIONS = [
           <CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>Most Common Event Types</Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {correlationStats.mostCommonEventTypes.map((eventType, index) => (
+                {(correlationStats.mostCommonEventTypes || []).map((eventType: any, index: number) => (
                 <Card
                   key={index}
                   variant="outlined"
@@ -750,7 +586,7 @@ const CURRENCY_OPTIONS = [
                         </Box>
 
                         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                          {eventType.count} trades • {eventType.winRate.toFixed(1)}% win rate
+                          {eventType.count || 0} trades • {(eventType.winRate || 0).toFixed(1)}% win rate
                         </Typography>
                       </Box>
                       
@@ -834,7 +670,7 @@ const CURRENCY_OPTIONS = [
                   </CardContent>
                 </Card>
               ))}
-                {correlationStats.mostCommonEventTypes.length === 0 && (
+                {(correlationStats.mostCommonEventTypes || []).length === 0 && (
                   <Typography variant="body2" color="text.secondary">
                     No common event types found
                   </Typography>
@@ -842,6 +678,8 @@ const CURRENCY_OPTIONS = [
               </Box>
           </CardContent>
         </Card>
+          </>
+        )}
       </Box>
     </Paper>
   );

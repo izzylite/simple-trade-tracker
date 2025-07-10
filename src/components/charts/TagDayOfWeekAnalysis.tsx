@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BarChart,
   Bar,
@@ -10,13 +10,14 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
-import { Box, Paper, Typography, useTheme, Button, alpha, Tooltip as MuiTooltip } from '@mui/material';
+import { Box, Paper, Typography, useTheme, Button, alpha, Tooltip as MuiTooltip, CircularProgress } from '@mui/material';
 import { InfoOutlined } from '@mui/icons-material';
 
 import { Trade } from '../../types/trade';
 import { formatCurrency } from '../../utils/formatters';
 import TagFilterDialog from '../TagFilterDialog';
 import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
+import { performanceCalculationService } from '../../services/performanceCalculationService';
 
 interface TagDayOfWeekAnalysisProps {
   trades: Trade[];
@@ -47,44 +48,42 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
   const [primaryTagsDialogOpen, setPrimaryTagsDialogOpen] = useState(false);
   const [secondaryTagsDialogOpen, setSecondaryTagsDialogOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
+  const [filteredTrades, setFilteredTrades] = useState<Trade[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [isCalculating, setIsCalculating] = useState(false);
 
-  // Format data for the chart based on selected metric
-  const filteredTrades = React.useMemo(() => {
-    // If no tags selected, return empty array
-    if (primaryTags.length === 0) {
-      return [];
-    }
-
-    // Filter trades by selected tags
-    return trades.filter(trade => {
-      // Check if trade has tags
-      if (!trade.tags || trade.tags.length === 0) {
-        return false;
+  // Calculate filtered trades and chart data asynchronously
+  useEffect(() => {
+    const calculateData = async () => {
+      if (primaryTags.length === 0) {
+        setFilteredTrades([]);
+        setChartData([]);
+        return;
       }
 
-      // Check if trade has any of the primary tags
-      const hasPrimaryTag = primaryTags.some(tag => trade.tags?.includes(tag));
-      if (!hasPrimaryTag) {
-        return false;
+      setIsCalculating(true);
+      try {
+        const filtered = await performanceCalculationService.calculateFilteredTradesForTags(
+          trades,
+          primaryTags,
+          secondaryTags
+        );
+        setFilteredTrades(filtered);
+
+        // Calculate chart data
+        const chartDataResult = getTagDayOfWeekChartData(filtered, theme, selectedMetric === 'winRate');
+        setChartData(chartDataResult);
+      } catch (error) {
+        console.error('Error calculating day of week data:', error);
+        setFilteredTrades([]);
+        setChartData([]);
+      } finally {
+        setIsCalculating(false);
       }
+    };
 
-      // If secondary tags are selected, check if trade has all of them
-      if (secondaryTags.length > 0) {
-        return secondaryTags.every(tag => trade.tags?.includes(tag));
-      }
-
-      return true;
-    });
-  }, [trades, primaryTags, secondaryTags]);
-
-
-  // Format data for the chart based on selected metric
-  
-  const chartData = React.useMemo(() => {
-
-    return getTagDayOfWeekChartData(filteredTrades, theme, selectedMetric === 'winRate');
-      
-  }, [selectedMetric,filteredTrades]);
+    calculateData();
+  }, [trades, primaryTags, secondaryTags, selectedMetric, theme]);
 
   // Custom tooltip for the chart
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -218,6 +217,22 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
           </Typography>
           <Typography variant="body2" color="text.secondary" align="center">
             Please select primary tags to view day of week performance analysis.
+          </Typography>
+        </Box>
+      ) : isCalculating ? (
+        <Box sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: 300,
+          bgcolor: alpha(theme.palette.background.paper, 0.4),
+          borderRadius: 2,
+          p: 3
+        }}>
+          <CircularProgress size={40} sx={{ mb: 2 }} />
+          <Typography variant="body2" color="text.secondary">
+            Calculating day of week performance...
           </Typography>
         </Box>
       ) : (

@@ -265,6 +265,19 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     }
   };
 
+  // Re-fetch economic events when trade changes (for gallery mode)
+  useEffect(() => {
+    // Clear existing events when trade changes
+    setEconomicEvents([]);
+    setAllEconomicEvents([]);
+    setEconomicEventsError(null);
+
+    // Re-fetch events if section is expanded
+    if (showEconomicEvents) {
+      fetchEconomicEvents();
+    }
+  }, [trade.id, trade.date, trade.session]);
+
   useEffect(() => {
     if (!showEconomicEvents) return;
 

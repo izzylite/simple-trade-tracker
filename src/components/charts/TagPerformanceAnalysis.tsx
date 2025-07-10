@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BarChart,
   Bar,
@@ -10,13 +10,14 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
-import { Box, Paper, Typography, useTheme, Button, alpha, Tooltip as MuiTooltip } from '@mui/material';
+import { Box, Paper, Typography, useTheme, Button, alpha, Tooltip as MuiTooltip, CircularProgress } from '@mui/material';
 import { InfoOutlined } from '@mui/icons-material';
 import { format, isSameMonth } from 'date-fns';
 import { Trade } from '../../types/trade';
 import { formatValue } from '../../utils/formatters';
 import TagFilterDialog from '../TagFilterDialog';
 import { getTradesStats } from '../../utils/chartDataUtils';
+import { performanceCalculationService } from '../../services/performanceCalculationService';
 
 interface TagPerformanceAnalysisProps {
   trades: Trade[];
@@ -44,44 +45,45 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
   const theme = useTheme();
   const [primaryTagsDialogOpen, setPrimaryTagsDialogOpen] = useState(false);
   const [secondaryTagsDialogOpen, setSecondaryTagsDialogOpen] = useState(false);
+  const [filteredTagStats, setFilteredTagStats] = useState<any[]>([]);
+  const [isCalculating, setIsCalculating] = useState(false);
 
 
-  const filteredTagStats: any = React.useMemo(() => {
-    // If no tags selected, return empty array
-    if (primaryTags.length === 0) {
-      return [];
-    }
-    const result = trades.filter(trade => {
-      // Check if trade has tags
-      if (!trade.tags || trade.tags.length === 0) {
-        return false;
+  // Calculate filtered tag stats asynchronously
+  useEffect(() => {
+    const calculateFilteredStats = async () => {
+      if (primaryTags.length === 0) {
+        setFilteredTagStats([]);
+        return;
       }
 
-      // Check if trade has any of the primary tags
-      const hasPrimaryTag = primaryTags.some(tag => trade.tags?.includes(tag));
-      if (!hasPrimaryTag) {
-        return false;
+      setIsCalculating(true);
+      try {
+        const filteredTrades = await performanceCalculationService.calculateFilteredTradesForTags(
+          trades,
+          primaryTags,
+          secondaryTags
+        );
+
+        // Process each primary tag
+        const tagStats = primaryTags.map((tag) => {
+          const tagTrades = filteredTrades.filter(trade => trade.tags?.includes(tag));
+          return {
+            ...getTradesStats(tagTrades),
+            tag: tag.substring(tag.indexOf(":") + 1, tag.length)
+          };
+        }).filter(stats => stats.trades.length > 0);
+
+        setFilteredTagStats(tagStats);
+      } catch (error) {
+        console.error('Error calculating filtered tag stats:', error);
+        setFilteredTagStats([]);
+      } finally {
+        setIsCalculating(false);
       }
+    };
 
-      // If secondary tags are selected, check if trade has all of them
-      if (secondaryTags.length > 0) {
-        return secondaryTags.every(tag => trade.tags?.includes(tag));
-      }
-
-      return true;
-    });
-
-    return primaryTags.map((tag) =>  {
-     return ({
-        ...getTradesStats(result.filter(trade => trade.tags?.includes(tag))),
-        tag : tag.substring(tag.indexOf(":")+1,tag.length)
-      })
-    }).filter(stats=> stats.trades.length > 0)
-    // Filter trades by selected tags 
-     
-
-
-
+    calculateFilteredStats();
   }, [trades, primaryTags, secondaryTags]);
 
 
@@ -178,6 +180,22 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
           </Typography>
           <Typography variant="body2" color="text.secondary" align="center">
             Please select primary or secondary tags to view performance analysis.
+          </Typography>
+        </Box>
+      ) : isCalculating ? (
+        <Box sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: 300,
+          bgcolor: alpha(theme.palette.background.paper, 0.4),
+          borderRadius: 2,
+          p: 3
+        }}>
+          <CircularProgress size={40} sx={{ mb: 2 }} />
+          <Typography variant="body2" color="text.secondary">
+            Calculating tag performance...
           </Typography>
         </Box>
       ) : (

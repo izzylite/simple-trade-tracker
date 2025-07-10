@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { format, parseISO } from 'date-fns';
-import { Box, Typography, useTheme, Paper } from '@mui/material';
+import { format } from 'date-fns';
+import { Box, Typography, useTheme, Paper, CircularProgress, LinearProgress, Alert, Button } from '@mui/material';
 import { Trade } from '../types/trade';
 import { Calendar } from '../types/calendar';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
@@ -24,6 +24,12 @@ import {
   calculateChartData,
   getFilteredTrades
 } from '../utils/chartDataUtils';
+import {
+  performanceCalculationService,
+  PerformanceCalculationResult,
+  CalculationProgress
+} from '../services/performanceCalculationService';
+import ShimmerLoader from './common/ShimmerLoader';
 
 interface PerformanceChartsProps {
   trades: Trade[];
@@ -135,6 +141,12 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   const [chartData, setChartData] = useState<any[]>([]);
   const [isCalculatingChartData, setIsCalculatingChartData] = useState(false);
 
+  // Performance calculation states
+  const [performanceData, setPerformanceData] = useState<PerformanceCalculationResult | null>(null);
+  const [isCalculatingPerformance, setIsCalculatingPerformance] = useState(false);
+  const [calculationProgress, setCalculationProgress] = useState<CalculationProgress | null>(null);
+  const [calculationError, setCalculationError] = useState<string | null>(null);
+
 
   // Calculate chart data using the async utility function
   useEffect(() => {
@@ -153,6 +165,35 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
     calculateChartDataAsync();
   }, [trades, selectedDate, timePeriod]);
+
+  // Calculate performance metrics asynchronously
+  useEffect(() => {
+    const calculatePerformanceAsync = async () => {
+      setIsCalculatingPerformance(true);
+      setCalculationProgress(null);
+      setCalculationError(null);
+      try {
+        const data = await performanceCalculationService.calculatePerformanceMetrics(
+          trades,
+          selectedDate,
+          timePeriod,
+          accountBalance,
+          comparisonTags,
+          setCalculationProgress
+        );
+        setPerformanceData(data);
+      } catch (error) {
+        logger.error('Error calculating performance metrics:', error);
+        setCalculationError(error instanceof Error ? error.message : 'Failed to calculate performance metrics');
+        setPerformanceData(null);
+      } finally {
+        setIsCalculatingPerformance(false);
+        setCalculationProgress(null);
+      }
+    };
+
+    calculatePerformanceAsync();
+  }, [trades, selectedDate, timePeriod, accountBalance, comparisonTags]);
 
   const handleTimePeriodChange = (newValue: TimePeriod) => {
     setTimePeriod(newValue);
@@ -184,301 +225,42 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     { label: 'Tag Performance' },
     { label: 'Day of Week' }
   ];
- 
-   const filteredTrades = useMemo(() => { 
+
+  const filteredTrades = useMemo(() => {
     return getFilteredTrades(trades, selectedDate, timePeriod);
   }, [trades, selectedDate, timePeriod]);
 
-  // Calculate Risk to Reward statistics
-  const riskRewardStats = useMemo(() => {
-    const filteredTrades_ = filteredTrades.filter(trade => trade.riskToReward !== undefined)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    if (filteredTrades_.length === 0) return { average: 0, max: 0, data: [] };
-
-    const riskRewardValues = filteredTrades_.map(trade => trade.riskToReward!);
-    const average = riskRewardValues.reduce((sum, value) => sum + value, 0) / riskRewardValues.length;
-    const max = Math.max(...riskRewardValues);
-
-    // Create data points for the line graph
-    const data = filteredTrades_.map(trade => ({
-      date: format(new Date(trade.date), timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
-      rr: trade.riskToReward || 0
-    }));
-
-    return { average, max, data };
-  }, [trades, selectedDate, timePeriod]);
+  // Get performance data from async calculations
+  const riskRewardStats = performanceData?.riskRewardStats || { average: 0, max: 0, data: [] };
 
   // Chart data is now calculated asynchronously in useEffect above
 
-  // Calculate win/loss statistics
-  const winLossStats = useMemo(() => {
-    
+  // Get win/loss statistics from async calculations
+  const winLossStats = performanceData?.winLossStats || {
+    totalTrades: 0,
+    winRate: 0,
+    winners: { total: 0, avgAmount: 0, maxConsecutive: 0, avgConsecutive: 0 },
+    losers: { total: 0, avgAmount: 0, maxConsecutive: 0, avgConsecutive: 0 },
+    breakevens: { total: 0, avgAmount: 0 }
+  };
 
-    const wins = filteredTrades.filter(trade => trade.type === 'win');
-    const losses = filteredTrades.filter(trade => trade.type === 'loss');
-    const breakevens = filteredTrades.filter(trade => trade.type === 'breakeven');
+  // Get win/loss distribution data from async calculations
+  const winLossData = performanceData?.winLossData || [];
 
-    const totalWins = wins.length;
-    const totalLosses = losses.length;
-    const totalBreakevens = breakevens.length;
-    const totalTrades = totalWins + totalLosses + totalBreakevens;
+  // Get comparison win/loss data from async calculations
+  const comparisonWinLossData = performanceData?.comparisonWinLossData || null;
 
-    // Calculate win rate excluding breakevens from the denominator
-    const winRateDenominator = totalWins + totalLosses;
-    const winRate = winRateDenominator > 0 ? (totalWins / winRateDenominator) * 100 : 0;
+  // Get daily summary data from async calculations
+  const dailySummaryData = performanceData?.dailySummaryData || [];
 
-    const totalWinAmount = wins.reduce((sum, trade) => sum + trade.amount, 0);
-    const totalLossAmount = losses.reduce((sum, trade) => sum + trade.amount, 0);
-    const totalBreakevenAmount = breakevens.reduce((sum, trade) => sum + trade.amount, 0);
+  // Get tag statistics from async calculations
+  const tagStats = performanceData?.tagStats || [];
 
-    const avgWin = totalWins > 0 ? totalWinAmount / totalWins : 0;
-    const avgLoss = totalLosses > 0 ? totalLossAmount / totalLosses : 0;
-    const avgBreakeven = totalBreakevens > 0 ? totalBreakevenAmount / totalBreakevens : 0;
+  // Get session statistics from async calculations
+  const sessionStats = performanceData?.sessionStats || [];
 
-    // Calculate consecutive wins and losses
-    let currentWinStreak = 0;
-    let maxWinStreak = 0;
-    let totalWinStreaks = 0;
-    let winStreakCount = 0;
-
-    let currentLossStreak = 0;
-    let maxLossStreak = 0;
-    let totalLossStreaks = 0;
-    let lossStreakCount = 0;
-
-    // Sort trades by date
-    const sortedTrades = [...filteredTrades].sort((a, b) =>
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-
-    sortedTrades.forEach(trade => {
-      if (trade.type === 'win') {
-        currentWinStreak++;
-        currentLossStreak = 0;
-
-        if (currentWinStreak > maxWinStreak) {
-          maxWinStreak = currentWinStreak;
-        }
-      } else if (trade.type === 'loss') {
-        if (currentWinStreak > 0) {
-          totalWinStreaks += currentWinStreak;
-          winStreakCount++;
-        }
-        currentWinStreak = 0;
-        currentLossStreak++;
-
-        if (currentLossStreak > maxLossStreak) {
-          maxLossStreak = currentLossStreak;
-        }
-      } else if (trade.type === 'breakeven') {
-        // For breakeven trades, we don't reset the streaks
-        // This allows a breakeven trade to maintain an existing streak
-      }
-    });
-
-    // Handle the last streak
-    if (currentWinStreak > 0) {
-      totalWinStreaks += currentWinStreak;
-      winStreakCount++;
-    } else if (currentLossStreak > 0) {
-      totalLossStreaks += currentLossStreak;
-      lossStreakCount++;
-    }
-
-    const avgWinStreak = winStreakCount > 0 ? totalWinStreaks / winStreakCount : 0;
-    const avgLossStreak = lossStreakCount > 0 ? totalLossStreaks / lossStreakCount : 0;
-
-    return {
-      totalTrades,
-      winRate,
-      winners: {
-        total: totalWins,
-        avgAmount: avgWin,
-        maxConsecutive: maxWinStreak,
-        avgConsecutive: avgWinStreak
-      },
-      losers: {
-        total: totalLosses,
-        avgAmount: avgLoss,
-        maxConsecutive: maxLossStreak,
-        avgConsecutive: avgLossStreak
-      },
-      breakevens: {
-        total: totalBreakevens,
-        avgAmount: avgBreakeven
-      }
-    };
-  }, [trades, selectedDate, timePeriod, filteredTrades]);
-
-  // Calculate win/loss distribution data for pie chart
-  const winLossData = useMemo(() => {
-    const { winners, losers, breakevens } = winLossStats;
-
-    return [
-      { name: 'Wins', value: winners.total },
-      { name: 'Losses', value: losers.total },
-      { name: 'Breakeven', value: breakevens?.total || 0 }
-    ].filter(item => item.value > 0); // Only include categories with values > 0
-  }, [winLossStats]);
-
-  // Calculate comparison win/loss data for selected tags
-  const comparisonWinLossData = useMemo(() => {
-    if (comparisonTags.length === 0) return null;
-
-    const filteredTrades_ = filteredTrades
-      .filter(trade => {
-        if (!trade.tags) return false;
-        return comparisonTags.some(tag => trade.tags!.includes(tag));
-      });
-
-    const wins = filteredTrades_.filter(trade => trade.type === 'win');
-    const losses = filteredTrades_.filter(trade => trade.type === 'loss');
-    const breakevens = filteredTrades_.filter(trade => trade.type === 'breakeven');
-
-    return [
-      { name: 'Wins', value: wins.length },
-      { name: 'Losses', value: losses.length },
-      { name: 'Breakeven', value: breakevens.length }
-    ].filter(item => item.value > 0); // Only include categories with values > 0
-  }, [trades, selectedDate, timePeriod, comparisonTags, filteredTrades]);
-
-  // Calculate daily summary data
-  const dailySummaryData = useMemo(() => {
-   
-
-    // Group trades by date
-    const tradesByDate = filteredTrades.reduce((acc, trade) => {
-      const dateKey = format(new Date(trade.date), 'yyyy-MM-dd');
-      if (!acc[dateKey]) {
-        acc[dateKey] = [];
-      }
-      acc[dateKey].push(trade);
-      return acc;
-    }, {} as { [key: string]: Trade[] });
-
-    // Calculate daily statistics
-    return Object.entries(tradesByDate)
-      .map(([date, dayTrades]) => {
-        const totalPnL = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
-
-        // Get the most common session for the day
-        const sessionCounts = dayTrades.reduce((acc, trade) => {
-          if (trade.session) {
-            acc[trade.session] = (acc[trade.session] || 0) + 1;
-          }
-          return acc;
-        }, {} as { [key: string]: number });
-
-        // Find the session with the highest count
-        let mostCommonSession = '';
-        let highestCount = 0;
-
-        Object.entries(sessionCounts).forEach(([session, count]) => {
-          if (count > highestCount) {
-            mostCommonSession = session;
-            highestCount = count;
-          }
-        });
-
-        return {
-          date: parseISO(date),
-          trades: dayTrades.length,
-          session: mostCommonSession,
-          pnl: totalPnL
-        };
-      })
-      .sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
-  }, [trades, selectedDate, timePeriod, filteredTrades]);
-
-  // Add new useMemo for tag statistics
-  const tagStats = useMemo(() => {
-   
-    // Create a map to store stats for each tag
-    const tagMap = new Map<string, { wins: number; losses: number; breakevens: number; totalPnL: number }>();
-
-    filteredTrades.forEach(trade => {
-      if (trade.tags) {
-        trade.tags.forEach(tag => {
-          const stats = tagMap.get(tag) || { wins: 0, losses: 0, breakevens: 0, totalPnL: 0 };
-          if (trade.type === 'win') {
-            stats.wins++;
-          } else if (trade.type === 'loss') {
-            stats.losses++;
-          } else if (trade.type === 'breakeven') {
-            stats.breakevens++;
-          }
-          stats.totalPnL += trade.amount;
-          tagMap.set(tag, stats);
-        });
-      }
-    });
-
-    // Convert map to array and calculate win rates
-    return Array.from(tagMap.entries()).map(([tag, stats]) => {
-      // Calculate win rate excluding breakevens from the denominator
-      const totalTradesForWinRate = stats.wins + stats.losses;
-      const winRate = totalTradesForWinRate > 0 ? Math.round((stats.wins / totalTradesForWinRate) * 100) : 0;
-      const totalTrades = stats.wins + stats.losses + stats.breakevens;
-
-      return {
-        tag,
-        wins: stats.wins,
-        losses: stats.losses,
-        breakevens: stats.breakevens,
-        totalTrades,
-        winRate,
-        totalPnL: stats.totalPnL
-      };
-    }).sort((a, b) => b.totalTrades - a.totalTrades); // Sort by total trades descending
-  }, [trades, selectedDate, timePeriod, filteredTrades]);
-
-  // Calculate session performance statistics
-  const sessionStats = useMemo(() => {
-    const filteredTrades_ = filteredTrades.filter(trade => trade.session !== undefined);
-
-    const sessions = ['Asia', 'London', 'NY AM', 'NY PM'];
-
-
-    return sessions.map(sessionName => {
-      const sessionTrades = filteredTrades_.filter(trade => trade.session === sessionName);
-      const totalTrades = sessionTrades.length;
-      const winners = sessionTrades.filter(trade => trade.type === 'win').length;
-      const losers = sessionTrades.filter(trade => trade.type === 'loss').length;
-      const breakevens = sessionTrades.filter(trade => trade.type === 'breakeven').length;
-
-      // Calculate win rate excluding breakevens from the denominator
-      const totalTradesForWinRate = winners + losers;
-      const winRate = totalTradesForWinRate > 0 ? (winners / totalTradesForWinRate) * 100 : 0;
-
-      const totalPnL = sessionTrades.reduce((sum, trade) => sum + trade.amount, 0);
-      const averagePnL = totalTrades > 0 ? totalPnL / totalTrades : 0;
-      const pnlPercentage = accountBalance > 0 ? (totalPnL / accountBalance) * 100 : 0;
-
-      return {
-        session: sessionName,
-        totalTrades,
-        winners,
-        losers,
-        breakevens,
-        winRate,
-        totalPnL,
-        averagePnL,
-        pnlPercentage
-      };
-    });
-  }, [trades, selectedDate, timePeriod, accountBalance, filteredTrades]);
-
-  // Get all unique tags
-  const allTags = useMemo(() => {
-    const tags = new Set<string>();
-    trades.forEach(trade => {
-      if (trade.tags) {
-        trade.tags.forEach(tag => tags.add(tag));
-      }
-    });
-    return Array.from(tags).sort();
-  }, [trades]);
+  // Get all unique tags from async calculations
+  const allTags = performanceData?.allTags || [];
 
 
 
@@ -513,7 +295,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
   // Handle pie chart click to show trades
   const handlePieClick = (category: string) => {
-     
+
     let categoryTrades: Trade[] = [];
     let dialogTitle = '';
 
@@ -624,8 +406,63 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         />
       </Box>
 
+      {/* Loading State */}
+      {(isCalculatingPerformance || isCalculatingChartData) && (
+        <>
+          <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+              <CircularProgress size={40} />
+              <Typography variant="h6" color="text.secondary">
+                {isCalculatingChartData ? 'Calculating chart data...' : 'Calculating performance metrics...'}
+              </Typography>
+              {calculationProgress && (
+                <Box sx={{ width: '100%', maxWidth: 400 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    {calculationProgress.step} ({calculationProgress.progress}/{calculationProgress.total})
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={(calculationProgress.progress / calculationProgress.total) * 100}
+                  />
+                </Box>
+              )}
+            </Box>
+          </Paper>
+
+          {/* Shimmer loaders for different sections */}
+         
+          <ShimmerLoader variant="chart" height={400} />
+           
+        </>
+      )}
+
+      {/* Error State */}
+      {calculationError && !isCalculatingPerformance && (
+        <Alert
+          severity="error"
+          sx={{ mb: 3 }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() => {
+                setCalculationError(null);
+                // Trigger recalculation by updating a dependency
+                setPerformanceData(null);
+              }}
+            >
+              Retry
+            </Button>
+          }
+        >
+          <Typography variant="body2">
+            Failed to calculate performance metrics: {calculationError}
+          </Typography>
+        </Alert>
+      )}
+
       {/* Main content */}
-      {chartData.some(data => data.pnl !== 0) || winLossData.some(data => data.value > 0) ? (
+      {!isCalculatingPerformance && !isCalculatingChartData && (chartData.some(data => data.pnl !== 0) || winLossData.some(data => data.value > 0)) ? (
         <>
           {/* Risk to Reward Statistics Card */}
           <RiskRewardChart riskRewardStats={riskRewardStats} />
@@ -757,7 +594,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               setMultipleTradesDialog={setMultipleTradesDialog}
             />
 
-         
+
 
             {/* Trading Score Section */}
             <ScoreSection
@@ -770,15 +607,15 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               dynamicRiskSettings={dynamicRiskSettings}
             />
 
-               {/* Economic Event Correlation Analysis */}
+            {/* Economic Event Correlation Analysis */}
             <EconomicEventCorrelationAnalysis
-              trades={filteredTrades} 
+              trades={filteredTrades}
               calendar={calendar!}
               setMultipleTradesDialog={setMultipleTradesDialog}
             />
           </Box>
         </>
-      ) : (
+      ) : !isCalculatingPerformance && !isCalculatingChartData ? (
         <Box
           sx={{
             height: 300,
@@ -799,7 +636,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             }
           </Typography>
         </Box>
-      )}
+      ) : null}
     </Box>
   );
 };
