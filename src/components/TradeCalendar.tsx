@@ -32,7 +32,8 @@ import {
   LocalOffer as TagIcon,
   Search as SearchIcon,
   ViewCarousel as GalleryIcon,
-  Event as EventIcon
+  Event as EventIcon,
+  SmartToy as AIIcon
 
 } from '@mui/icons-material';
 import {
@@ -86,6 +87,7 @@ import ConfirmationDialog from './common/ConfirmationDialog';
 import PinnedTradesDrawer from './PinnedTradesDrawer';
 import TradeGalleryDialog from './TradeGalleryDialog';
 import { ImagePickerDialog, ImageAttribution } from './heroImage';
+import AIChatDrawer from './aiChat/AIChatDrawer';
 
 import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 
@@ -453,6 +455,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Economic calendar drawer state
   const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(false);
 
+  // AI Chat drawer state
+  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+
   // Economic event notification state
   // Notification stack state (moved from App.tsx)
   const [notifications, setNotifications] = useState<EconomicEvent[]>([]);
@@ -603,6 +608,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Economic calendar toggle handler
   const handleToggleEconomicCalendar = useCallback(() => {
     setIsEconomicCalendarOpen(true);
+  }, []);
+
+  // AI Chat toggle handler
+  const handleToggleAIChat = useCallback(() => {
+    setIsAIChatOpen(true);
   }, []);
 
 
@@ -1656,6 +1666,25 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
+        {/* AI Chat FAB - Hidden in read-only mode */}
+        {!isReadOnly && (
+          <Tooltip title="AI Trading Assistant" placement="left">
+            <Fab
+              color="info"
+              aria-label="open ai chat"
+              onClick={handleToggleAIChat}
+              sx={{
+                position: 'fixed',
+                bottom: 168,
+                right: 24,
+                zIndex: 1200
+              }}
+            >
+              <AIIcon />
+            </Fab>
+          </Tooltip>
+        )}
+
         {/* Economic Calendar FAB - Hidden in read-only mode */}
         {!isReadOnly && (
           <Tooltip title="Economic Calendar" placement="left">
@@ -1753,6 +1782,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         calendar={calendar!}
         onUpdateCalendarProperty={onUpdateCalendarProperty}
         payload={economicCalendarUpdatedEvent}
+      />
+
+      {/* AI Chat Drawer */}
+      <AIChatDrawer
+        open={isAIChatOpen}
+        onClose={() => setIsAIChatOpen(false)}
+        trades={trades}
+        calendar={calendar!}
       />
 
 
