@@ -293,6 +293,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     setTagAnalysisTab(newValue);
   };
 
+
+
   // Handle pie chart click to show trades
   const handlePieClick = (category: string) => {
 
@@ -637,6 +639,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
           </Typography>
         </Box>
       ) : null}
+
+
     </Box>
   );
 };

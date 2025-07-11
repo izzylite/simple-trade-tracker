@@ -98,6 +98,7 @@ import EconomicEventNotification from './notifications/EconomicEventNotification
 import { EconomicEvent } from '../types/economicCalendar';
 import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
+import { playNotificationSound } from '../utils/notificationSound';
 
 interface TradeCalendarProps {
   trades: Trade[];
@@ -513,6 +514,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   // Add a notification (call this when you want to show a new notification)
   const addNotification = (event: EconomicEvent) => {
+    // Play notification sound
+    playNotificationSound().catch(error => {
+      logger.warn('Failed to play notification sound:', error);
+    });
+
     setNotifications((prev) => {
       // If we already have 3 notifications, mark the oldest one for removal
       if (prev.length >= 3) {

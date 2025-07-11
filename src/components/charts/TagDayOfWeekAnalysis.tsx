@@ -207,7 +207,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          height: 300,
+          height: 200,
           bgcolor: alpha(theme.palette.background.paper, 0.4),
           borderRadius: 2,
           p: 3
