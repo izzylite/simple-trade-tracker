@@ -17,13 +17,19 @@ export const calculateTotalPnL = (trades: Trade[]): number => {
 /**
  * Calculate win rate for a set of trades
  * @param trades Array of trades
- * @returns Win rate percentage
+ * @returns Win rate percentage (excludes breakeven trades from calculation)
  */
 export const calculateWinRate = (trades: Trade[]): number => {
   if (trades.length === 0) return 0;
 
   const winCount = trades.filter(trade => trade.type === 'win').length;
-  return (winCount / trades.length) * 100;
+  const lossCount = trades.filter(trade => trade.type === 'loss').length;
+  const totalWinLossTrades = winCount + lossCount;
+
+  // If no wins or losses, return 0
+  if (totalWinLossTrades === 0) return 0;
+
+  return (winCount / totalWinLossTrades) * 100;
 };
 
 /**

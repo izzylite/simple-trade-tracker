@@ -1,9 +1,9 @@
 /**
  * AI Chat Types and Interfaces
- * Defines all TypeScript interfaces for the AI chat feature
+ * Defines all TypeScript interfaces for the AI chat feature using Firebase AI Logic
  */
 
-export type AIProvider = 'openai' | 'anthropic' | 'google' | 'custom';
+export type AIProvider = 'firebase-ai';
 
 export type MessageRole = 'user' | 'assistant' | 'system';
 
@@ -43,20 +43,13 @@ export interface ChartData {
   colors?: string[];
 }
 
-export interface APIKeySettings {
-  provider: AIProvider;
-  apiKey: string;
-  model?: string;
-  baseUrl?: string; // For custom providers
-  isValid?: boolean;
-  lastValidated?: Date;
-  // Provider-specific settings
+export interface AIModelSettings {
+  model: string;
+  // Model-specific settings
   settings?: {
     temperature?: number;
     maxTokens?: number;
     topP?: number;
-    frequencyPenalty?: number;
-    presencePenalty?: number;
   };
 }
 
@@ -144,7 +137,7 @@ export interface TradingDataContext {
   trades: {
     id: string;
     name: string;
-    date: string;
+    date: number; // Unix timestamp for trade date
     session: string;
     type: 'win' | 'loss' | 'breakeven';
     amount: number;
@@ -158,8 +151,8 @@ export interface TradingDataContext {
       time: string;
     }[];
     images?: string[];
-    createdAt: string;
-    updatedAt: string;
+    createdAt: number; // Unix timestamp
+    updatedAt: number | null; // Unix timestamp or null if never updated
   }[];
 }
 
@@ -220,153 +213,51 @@ export interface ChatState {
   isTyping: boolean;
   currentSession: ChatSession | null;
   sessions: ChatSession[];
-  apiKeys: Record<AIProvider, APIKeySettings>;
+  modelSettings: AIModelSettings;
   config: AIChatConfig;
   error: ChatError | null;
 }
 
 // Default configurations for supported AI providers
 export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
-  openai: {
-    provider: 'openai',
-    name: 'OpenAI',
-    description: 'GPT models from OpenAI',
+  'firebase-ai': {
+    provider: 'firebase-ai',
+    name: 'Firebase AI Logic',
+    description: 'Gemini models via Firebase AI Logic',
     models: [
       {
-        id: 'gpt-4-turbo-preview',
-        name: 'GPT-4 Turbo',
-        description: 'Most capable model, best for complex analysis',
-        maxTokens: 128000,
-        costPer1kTokens: 0.01
+        id: 'gemini-2.5-flash',
+        name: 'Gemini 2.5 Flash',
+        description: 'Latest fast and efficient model for most tasks',
+        maxTokens: 1048576
       },
-      {
-        id: 'gpt-4',
-        name: 'GPT-4',
-        description: 'High-quality responses, good for detailed analysis',
-        maxTokens: 8192,
-        costPer1kTokens: 0.03
-      },
-      {
-        id: 'gpt-3.5-turbo',
-        name: 'GPT-3.5 Turbo',
-        description: 'Fast and cost-effective for basic queries',
-        maxTokens: 16384,
-        costPer1kTokens: 0.001
-      }
-    ],
-    apiKeyFormat: /^sk-[a-zA-Z0-9]{48}$/,
-    testEndpoint: '/v1/models',
-    baseUrl: 'https://api.openai.com',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    supportsStreaming: true,
-    supportsImages: true,
-    supportsFunctions: true
-  },
-  anthropic: {
-    provider: 'anthropic',
-    name: 'Anthropic',
-    description: 'Claude models from Anthropic',
-    models: [
-      {
-        id: 'claude-3-opus-20240229',
-        name: 'Claude 3 Opus',
-        description: 'Most powerful model for complex reasoning',
-        maxTokens: 200000,
-        costPer1kTokens: 0.015
-      },
-      {
-        id: 'claude-3-sonnet-20240229',
-        name: 'Claude 3 Sonnet',
-        description: 'Balanced performance and speed',
-        maxTokens: 200000,
-        costPer1kTokens: 0.003
-      },
-      {
-        id: 'claude-3-haiku-20240307',
-        name: 'Claude 3 Haiku',
-        description: 'Fast and cost-effective',
-        maxTokens: 200000,
-        costPer1kTokens: 0.00025
-      }
-    ],
-    apiKeyFormat: /^sk-ant-[a-zA-Z0-9\-_]{95}$/,
-    testEndpoint: '/v1/messages',
-    baseUrl: 'https://api.anthropic.com',
-    headers: {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01'
-    },
-    supportsStreaming: true,
-    supportsImages: true,
-    supportsFunctions: false
-  },
-  google: {
-    provider: 'google',
-    name: 'Google',
-    description: 'Gemini models from Google',
-    models: [
       {
         id: 'gemini-1.5-flash',
         name: 'Gemini 1.5 Flash',
         description: 'Fast and efficient model for most tasks',
-        maxTokens: 1048576,
-        costPer1kTokens: 0.00015
+        maxTokens: 1048576
       },
       {
         id: 'gemini-1.5-pro',
         name: 'Gemini 1.5 Pro',
         description: 'Most capable model for complex reasoning',
-        maxTokens: 2097152,
-        costPer1kTokens: 0.0035
-      },
-      {
-        id: 'gemini-pro',
-        name: 'Gemini Pro (Legacy)',
-        description: 'Previous generation model',
-        maxTokens: 32768,
-        costPer1kTokens: 0.0005
+        maxTokens: 2097152
       }
     ],
-    apiKeyFormat: /^[a-zA-Z0-9\-_]{39}$/,
-    testEndpoint: '/v1/models',
-    baseUrl: 'https://generativelanguage.googleapis.com',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    apiKeyFormat: /^.*$/, // Not used with Firebase AI Logic
+    testEndpoint: '', // Not used with Firebase AI Logic
+    baseUrl: '', // Not used with Firebase AI Logic
+    headers: {},
     supportsStreaming: true,
     supportsImages: true,
     supportsFunctions: true
-  },
-  custom: {
-    provider: 'custom',
-    name: 'Custom Provider',
-    description: 'Custom API endpoint',
-    models: [
-      {
-        id: 'custom-model',
-        name: 'Custom Model',
-        description: 'Custom model configuration',
-        maxTokens: 4096
-      }
-    ],
-    apiKeyFormat: /^.+$/,
-    testEndpoint: '/health',
-    baseUrl: '',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    supportsStreaming: false,
-    supportsImages: false,
-    supportsFunctions: false
   }
 };
 
 // Default configuration
 export const DEFAULT_AI_CHAT_CONFIG: AIChatConfig = {
-  defaultProvider: 'google',
-  defaultModel: 'gemini-1.5-flash',
+  defaultProvider: 'firebase-ai',
+  defaultModel: 'gemini-2.5-flash',
   autoScroll: true,
   showTokenCount: false,
   enableSyntaxHighlighting: true,

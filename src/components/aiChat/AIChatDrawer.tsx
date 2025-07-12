@@ -27,19 +27,20 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import UnifiedDrawer from '../common/UnifiedDrawer';
 import ChatMessage from './ChatMessage';
-import APIKeySetupDialog from './APIKeySetupDialog';
-import { 
-  ChatMessage as ChatMessageType, 
-  AIProvider, 
+import AIChatSettingsDialog from './AIChatSettingsDialogSimplified';
+import {
+  ChatMessage as ChatMessageType,
+  AIProvider,
   TradingDataContext,
   ChatError,
-  DEFAULT_AI_CHAT_CONFIG
+  AIChatConfig,
+  AIModelSettings
 } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
-import { apiKeyService } from '../../services/apiKeyService';
-import { aiChatService, AIChatService } from '../../services/aiChatService';
+import { firebaseAIChatService } from '../../services/firebaseAIChatService';
 import { tradingDataContextService } from '../../services/tradingDataContextService';
+import { aiChatConfigService } from '../../services/aiChatConfigService';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
 
@@ -65,11 +66,20 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [currentProvider, setCurrentProvider] = useState<AIProvider>('openai');
+  const [currentProvider] = useState<AIProvider>('firebase-ai');
   const [tradingContext, setTradingContext] = useState<TradingDataContext | null>(null);
   const [error, setError] = useState<ChatError | null>(null);
-  const [showSetupDialog, setShowSetupDialog] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [isGeneratingContext, setIsGeneratingContext] = useState(false);
+  const [chatConfig, setChatConfig] = useState(aiChatConfigService.getConfig());
+  const [modelSettings, setModelSettings] = useState<AIModelSettings>({
+    model: chatConfig.defaultModel,
+    settings: {
+      temperature: 0.7,
+      maxTokens: 2000,
+      topP: 1
+    }
+  });
 
   // Auto-scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -85,10 +95,10 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
   // Auto-scroll when messages change
   useEffect(() => {
-    if (DEFAULT_AI_CHAT_CONFIG.autoScroll) {
+    if (chatConfig.autoScroll) {
       scrollToBottom();
     }
-  }, [messages, scrollToBottom]);
+  }, [messages, scrollToBottom, chatConfig.autoScroll]);
 
   // Focus input when drawer opens
   useEffect(() => {
@@ -97,16 +107,16 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     }
   }, [open, isLoading]);
 
-  const generateTradingContext = async () => {
+  const generateTradingContext = async (reason?: string) => {
     setIsGeneratingContext(true);
     try {
       const context = await tradingDataContextService.generateContext(
         trades,
         calendar,
-        DEFAULT_AI_CHAT_CONFIG
+        chatConfig
       );
       setTradingContext(context);
-      logger.log('Trading context generated for AI chat');
+      logger.log(`Trading context generated for AI chat${reason ? ` (${reason})` : ''}`);
     } catch (error) {
       logger.error('Error generating trading context:', error);
       setError({
@@ -120,39 +130,17 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     }
   };
 
-  const checkAPIKeySetup = (): boolean => {
-    const hasValidKey = apiKeyService.hasValidAPIKey();
-    if (!hasValidKey) {
-      setShowSetupDialog(true);
-      return false;
-    }
-
-    // Get first valid provider
-    const validProvider = apiKeyService.getFirstValidProvider();
-    if (validProvider) {
-      setCurrentProvider(validProvider);
-      return true;
-    }
-
-    setShowSetupDialog(true);
-    return false;
-  };
-
   const handleSendMessage = async () => {
     const messageText = inputMessage.trim();
     if (!messageText || isLoading) return;
 
-    // Check API key setup
-    if (!checkAPIKeySetup()) return;
-
-    // Validate message
-    const validation = aiChatService.validateMessage(messageText, currentProvider);
-    if (!validation.isValid) {
+    // Check if we have trading context
+    if (!tradingContext) {
       setError({
         type: 'context_too_large',
-        message: validation.error || 'Invalid message',
-        details: 'Please shorten your message and try again',
-        retryable: false
+        message: 'Trading context not available',
+        details: 'Please wait for trading data to be analyzed',
+        retryable: true
       });
       return;
     }
@@ -175,12 +163,13 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     setIsTyping(true);
 
     try {
-      // Send message to AI
-      const response = await aiChatService.sendMessage(
+      // Send message to AI using Firebase AI Logic
+      const response = await firebaseAIChatService.sendMessage(
         messageText,
         currentProvider,
-        tradingContext!,
-        messages
+        tradingContext,
+        messages,
+        modelSettings
       );
 
       // Add AI response
@@ -195,14 +184,14 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       };
 
       setMessages(prev => [...prev, aiMessage]);
-      logger.log(`AI response received from ${currentProvider}`);
+      logger.log(`AI response received from Firebase AI Logic`);
 
     } catch (error) {
-      logger.error('Error sending message to AI:', error);
-      
-      // Extract chat error if available
-      const chatError = AIChatService.extractChatError(error as Error);
-      if (chatError) {
+      logger.error('Error sending message to Firebase AI Logic:', error);
+
+      // Handle Firebase AI Logic errors
+      const chatError = error as ChatError;
+      if (chatError && chatError.type) {
         setError(chatError);
       } else {
         setError({
@@ -240,9 +229,130 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const handleRetry = () => {
     setError(null);
     if (error?.type === 'context_too_large') {
-      generateTradingContext();
+      generateTradingContext('retry after error');
     }
   };
+
+  const handleMessageRetry = useCallback(async (messageId: string) => {
+    // Find the message to retry
+    const messageIndex = messages.findIndex(msg => msg.id === messageId);
+    if (messageIndex === -1) return;
+
+    const messageToRetry = messages[messageIndex];
+    if (messageToRetry.role !== 'assistant') return;
+
+    // Find the user message that prompted this response
+    let userMessageIndex = messageIndex - 1;
+    while (userMessageIndex >= 0 && messages[userMessageIndex].role !== 'user') {
+      userMessageIndex--;
+    }
+
+    if (userMessageIndex < 0) return;
+
+    const userMessage = messages[userMessageIndex];
+
+    try {
+      // Remove the assistant message being retried
+      const updatedMessages = messages.filter(msg => msg.id !== messageId);
+      setMessages(updatedMessages);
+
+      // Set loading state
+      setIsLoading(true);
+
+      // Create conversation history up to the user message
+      const conversationHistory = updatedMessages.slice(0, userMessageIndex + 1);
+
+      // Regenerate the response using Firebase AI Logic
+      const response = await firebaseAIChatService.sendMessage(
+        userMessage.content,
+        currentProvider,
+        tradingContext!,
+        conversationHistory,
+        modelSettings
+      );
+
+      // Add the new response
+      const newAssistantMessage: ChatMessageType = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: response.response,
+        timestamp: new Date(),
+        status: 'received',
+        provider: currentProvider,
+        tokenCount: response.tokenCount
+      };
+
+      setMessages(prev => [...prev, newAssistantMessage]);
+      logger.log('Message regenerated successfully');
+
+    } catch (error) {
+      logger.error('Error regenerating message:', error);
+
+      // Add error message
+      const errorMessage: ChatMessageType = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'Sorry, I encountered an error while regenerating the response. Please try again.',
+        timestamp: new Date(),
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [messages, tradingContext, currentProvider]);
+
+  const handleConfigChange = useCallback((newConfig: AIChatConfig, newModelSettings?: AIModelSettings) => {
+    const oldConfig = chatConfig; // Capture current state before update
+    aiChatConfigService.saveConfig(newConfig);
+
+    // Check if context-affecting settings changed
+    const contextAffectingSettings = [
+      'includeDetailedTrades',
+      'includeTagAnalysis',
+      'includeEconomicEvents',
+      'includeRecentTrades',
+      'maxContextTrades'
+    ] as const;
+
+    const shouldRegenerateContext = contextAffectingSettings.some(
+      setting => newConfig[setting] !== oldConfig[setting]
+    );
+
+    // Update state
+    setChatConfig(newConfig);
+
+    // Update model settings if provided
+    if (newModelSettings) {
+      setModelSettings(newModelSettings);
+    }
+
+    // Regenerate context if needed (using the new config directly)
+    if (shouldRegenerateContext) {
+      logger.log('Regenerating trading context due to preference changes');
+      setIsGeneratingContext(true);
+      // Pass the new config directly to avoid stale state
+      tradingDataContextService.generateContext(trades, calendar, newConfig)
+        .then(context => {
+          setTradingContext(context);
+          logger.log('Trading context updated with new settings');
+        })
+        .catch(error => {
+          logger.error('Error regenerating trading context:', error);
+          setError({
+            type: 'context_too_large',
+            message: 'Failed to update trading data',
+            details: 'Unable to regenerate context with new settings',
+            retryable: true
+          });
+        })
+        .finally(() => {
+          setIsGeneratingContext(false);
+        });
+    }
+  }, [chatConfig, trades, calendar]);
 
 
 
@@ -279,7 +389,7 @@ What would you like to know about your trading?`,
         open={open}
         onClose={onClose}
         title="AI Trading Assistant"
-        subtitle={tradingContext ? `${tradingContext.totalTrades} trades analyzed` : 'Analyzing your trading data...'}
+        subtitle={tradingContext ? `${tradingContext.totalTrades} trades analyzed • ${chatConfig.defaultProvider.toUpperCase()} ${chatConfig.defaultModel}` : 'Analyzing your trading data...'}
         icon={<AIIcon />}
         headerActions={
           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -292,7 +402,7 @@ What would you like to know about your trading?`,
             <Tooltip title="Settings">
               <IconButton
                 size="small"
-                onClick={() => setShowSetupDialog(true)}
+                onClick={() => setShowSettingsDialog(true)}
                 sx={{ color: 'text.secondary' }}
               >
                 <SettingsIcon fontSize="small" />
@@ -339,16 +449,16 @@ What would you like to know about your trading?`,
 
           {/* Loading Context */}
           {isGeneratingContext && (
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 1, 
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
               p: 2,
               backgroundColor: alpha(theme.palette.primary.main, 0.1)
             }}>
               <CircularProgress size={16} />
               <Typography variant="body2" color="text.secondary">
-                Analyzing your trading data...
+                {tradingContext ? 'Updating trading data analysis...' : 'Analyzing your trading data...'}
               </Typography>
             </Box>
           )}
@@ -367,7 +477,8 @@ What would you like to know about your trading?`,
                 key={message.id}
                 message={message}
                 showTimestamp={true}
-                showTokenCount={DEFAULT_AI_CHAT_CONFIG.showTokenCount}
+                showTokenCount={chatConfig.showTokenCount}
+                onRetry={handleMessageRetry}
               />
             ))}
 
@@ -444,15 +555,13 @@ What would you like to know about your trading?`,
         </Box>
       </UnifiedDrawer>
 
-      {/* API Key Setup Dialog */}
-      <APIKeySetupDialog
-        open={showSetupDialog}
-        onClose={() => setShowSetupDialog(false)}
-        onSave={(provider) => {
-          setCurrentProvider(provider);
-          setError(null);
-        }}
-        initialProvider={currentProvider}
+      {/* AI Chat Settings Dialog */}
+      <AIChatSettingsDialog
+        open={showSettingsDialog}
+        onClose={() => setShowSettingsDialog(false)}
+        config={chatConfig}
+        modelSettings={modelSettings}
+        onConfigChange={handleConfigChange}
       />
     </>
   );

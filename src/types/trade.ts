@@ -47,6 +47,9 @@ export interface Trade {
   // Economic events that occurred during this trade's session
   economicEvents?: TradeEconomicEvent[];
 
+  // Update timestamp
+  updatedAt?: Date;
+
   // Sharing fields
   shareLink?: string;
   isShared?: boolean;
@@ -76,6 +79,8 @@ export class TradeConverter implements FirestoreConvertible<Trade> {
       isPinned: data.isPinned || false,
       // Economic events
       economicEvents: data.economicEvents,
+      // Update timestamp
+      updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt ? new Date(data.updatedAt) : undefined,
       // Sharing fields
       shareLink: data.shareLink,
       isShared: data.isShared || false,
@@ -125,6 +130,8 @@ export class TradeConverter implements FirestoreConvertible<Trade> {
       ...(processedImages && { images: processedImages }),
       // Economic events
       ...(trade.economicEvents !== undefined && { economicEvents: trade.economicEvents }),
+      // Update timestamp
+      ...(trade.updatedAt !== undefined && { updatedAt: Timestamp.fromDate(trade.updatedAt) }),
       // Sharing fields
       ...(trade.shareLink !== undefined && { shareLink: trade.shareLink }),
       ...(trade.isShared !== undefined && { isShared: trade.isShared }),

@@ -22,7 +22,8 @@ import {
   ContentCopy as CopyIcon,
   CheckCircle as CheckIcon,
   Error as ErrorIcon,
-  Schedule as ScheduleIcon
+  Schedule as ScheduleIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { ChatMessage as ChatMessageType, MessageStatus } from '../../types/aiChat';
 import { format } from 'date-fns';
@@ -32,12 +33,14 @@ interface ChatMessageProps {
   message: ChatMessageType;
   showTimestamp?: boolean;
   showTokenCount?: boolean;
+  onRetry?: (messageId: string) => void;
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
   showTimestamp = true,
-  showTokenCount = false
+  showTokenCount = false,
+  onRetry
 }) => {
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
@@ -244,6 +247,24 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               gap: 0.5
             }}
           >
+            {/* Retry button for assistant messages */}
+            {isAssistant && onRetry && (
+              <Tooltip title="Regenerate response">
+                <IconButton
+                  size="small"
+                  onClick={() => onRetry(message.id)}
+                  sx={{
+                    backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.background.paper, 0.9)
+                    }
+                  }}
+                >
+                  <RefreshIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+
             <Tooltip title={copied ? 'Copied!' : 'Copy message'}>
               <IconButton
                 size="small"

@@ -465,7 +465,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     );
 
     // Add the new images to the state with grid layout information
-    let pendingImages : PendingImage[] = []
+    let pendingImages: PendingImage[] = []
     setNewTrade((prev) => {
       const existingPendingImages = prev!.pendingImages;
       const existingUploadedImages = prev!.uploadedImages;
@@ -584,7 +584,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
 
       for (const image of newPendingImages) {
-        await startImageUpload(image, newTrade!.id!!,pendingImages);
+        await startImageUpload(image, newTrade!.id!!, pendingImages);
       }
     }
     catch (error) {
@@ -592,7 +592,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     }
   };
   // Function to start uploading an image
-  const startImageUpload = async (image: PendingImage, tradeId: string,pendingImages: PendingImage[]): Promise<void> => {
+  const startImageUpload = async (image: PendingImage, tradeId: string, pendingImages: PendingImage[]): Promise<void> => {
     try {
       // Update progress to show upload has started
       setNewTrade(prev => ({
@@ -623,7 +623,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
       // Once upload is complete, move from pendingImages to uploadedImages
       // Find the original pending image to get its layout information
-      const originalPendingImage =  pendingImages.find(img => img.id === image.id); 
+      const originalPendingImage = pendingImages.find(img => img.id === image.id);
       // Preserve layout information
       const updatedImage = {
         ...uploadedImage,
@@ -908,7 +908,11 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       try {
         // Update the temporary trade with the final data
         if (newTrade!.isTemporary && newTrade!.id) {
-          await handleUpdateTradeProperty(newTrade!.id, () => ({ ...tradeData, isTemporary: false })); // Mark as a permanent trade
+          await handleUpdateTradeProperty(newTrade!.id, () => ({
+            ...tradeData,
+            isTemporary: false,
+            updatedAt: new Date() // Set updatedAt when making trade permanent
+          })); // Mark as a permanent trade
         }
         else {
           await onAddTrade(tradeData);
@@ -1058,7 +1062,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               partialsTaken: newTrade!.partialsTaken,
               session: newTrade!.session || "London",
               notes: newTrade!.notes || "",
-              images: updatedImages
+              images: updatedImages,
+              updatedAt: new Date() // Set updatedAt when editing trades
             };
           });
 
@@ -1070,7 +1075,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
                 tradeDate,
                 newTrade!.session,
                 getRelevantCurrenciesFromTags(newTrade!.tags)
-                 // Pass trade tags for currency filtering
+                // Pass trade tags for currency filtering
               );
 
               if (economicEvents.length > 0) {
@@ -1163,8 +1168,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               newTrade={newTrade!}
               editingTrade={editingTrade}
               allTags={allTags}
-               allTrades={allTrades}
-              isSubmitting={isSubmitting} 
+              allTrades={allTrades}
+              isSubmitting={isSubmitting}
               calculateAmountFromRiskToReward={calculateAmountFromRiskToReward}
               onNameChange={handleNameChange}
               onAmountChange={handleAmountChange}

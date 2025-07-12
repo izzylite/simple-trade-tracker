@@ -22,8 +22,8 @@ class TradingDataContextService {
    * Generate comprehensive trading data context for AI analysis
    */
   async generateContext(
-    trades: Trade[], 
-    calendar: Calendar, 
+    trades: Trade[],
+    _calendar: Calendar,
     config: AIChatConfig
   ): Promise<TradingDataContext> {
     try {
@@ -311,23 +311,23 @@ class TradingDataContextService {
   private prepareTradeDetails(trades: Trade[]) {
     return trades.map(trade => ({
       id: trade.id,
-      name: trade.name,
-      date: format(new Date(trade.date), 'yyyy-MM-dd'),
-      session: trade.session,
+      name: trade.name || 'Unnamed Trade',
+      date: Math.floor(new Date(trade.date).getTime() / 1000), // Unix timestamp for trade date
+      session: trade.session || 'Unknown',
       type: trade.type,
       amount: trade.amount,
       riskToReward: trade.riskToReward,
       tags: trade.tags || [],
       notes: trade.notes || '',
       economicEvents: trade.economicEvents?.map(event => ({
-        event: event.event,
+        event: event.name,
         impact: event.impact,
         currency: event.currency,
-        time: event.time
+        time: event.timeUtc
       })) || [],
-      images: trade.images || [],
-      createdAt: format(new Date(trade.createdAt), 'yyyy-MM-dd HH:mm:ss'),
-      updatedAt: format(new Date(trade.updatedAt), 'yyyy-MM-dd HH:mm:ss')
+      images: trade.images?.map(img => img.url) || [],
+      createdAt: Math.floor(new Date(trade.date).getTime() / 1000), // Unix timestamp for creation time
+      updatedAt: trade.updatedAt ? Math.floor(new Date(trade.updatedAt).getTime() / 1000) : null
     }));
   }
 
@@ -352,8 +352,8 @@ class TradingDataContextService {
     const eventCounts = new Map<string, number>();
     tradesWithEvents.forEach(trade => {
       trade.economicEvents?.forEach(event => {
-        const count = eventCounts.get(event.event) || 0;
-        eventCounts.set(event.event, count + 1);
+        const count = eventCounts.get(event.name) || 0;
+        eventCounts.set(event.name, count + 1);
       });
     });
 

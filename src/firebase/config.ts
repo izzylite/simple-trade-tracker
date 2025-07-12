@@ -5,6 +5,7 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { getAI, GoogleAIBackend } from "firebase/ai";
 
 // For development debugging only
 if (process.env.NODE_ENV === 'development') {
@@ -31,10 +32,13 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const functions = getFunctions(app, 'us-central1');
 
+// Initialize Firebase AI Logic
+const ai = getAI(app, { backend: new GoogleAIBackend() });
+
 // Initialize App Check
 const appCheck = initializeAppCheck(app, {
   provider: new ReCaptchaV3Provider('6LdtDHYrAAAAAJQOQhrUoTjaDvC2K6w-1Q83TDpF'),
   isTokenAutoRefreshEnabled: true
 });
 
-export { app, analytics, auth, db, storage, functions, appCheck };
+export { app, analytics, auth, db, storage, functions, appCheck, ai };
