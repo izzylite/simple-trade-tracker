@@ -83,7 +83,7 @@ export const generateTradeShareLinkV2 = onCall({
     }
 
     // Generate a unique share ID using modern approach (avoiding deprecated substr)
-    const shareId = `share_${tradeId}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    const shareId = `share_${calendarId}_${tradeId}`;
 
     // Create the shared trade document (store only IDs, not the full trade)
     const sharedTradeData = {
@@ -287,7 +287,7 @@ export const generateCalendarShareLinkV2 = onCall({
     }
 
     // Generate a unique share ID using modern approach (avoiding deprecated substr)
-    const shareId = `calendar_share_${calendarId}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    const shareId = `calendar_share_${calendarId}`;
 
     // Create the shared calendar document (store only ID, not the full calendar)
     const sharedCalendarData = {

@@ -47,7 +47,8 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "migrate-events": "npx ts-node src/scripts/backfillTradeEconomicEvents.ts",
-    "migrate-trade-events": "node migrate-trade-economic-events.js"
+    "migrate-trade-events": "node migrate-trade-economic-events.js",
+    "setup-vector-index": "node scripts/setup-vector-index.js"
   },
   "eslintConfig": {
     "extends": [

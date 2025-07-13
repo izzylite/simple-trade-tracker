@@ -75,6 +75,32 @@ export interface ChatSession {
   };
 }
 
+// Trimmed trade interface - excludes heavy fields like images
+export interface TrimmedTrade {
+  id: string;
+  name?: string;
+  date: number; // Unix timestamp
+  session?: string;
+  type: 'win' | 'loss' | 'breakeven';
+  amount: number;
+  tags?: string[];
+  notes?: string;
+  entry?: string;
+  exit?: string;
+  riskToReward?: number;
+  partialsTaken?: boolean;
+  createdAt: number; // Unix timestamp
+  updatedAt?: number; // Unix timestamp
+  economicEvents?: Array<{
+    name: string;
+    impact: string;
+    currency: string;
+    time: string;
+  }>;
+  // Excluded: images, isDeleted, isTemporary, and other heavy fields
+}
+
+
 export interface TradingDataContext {
   // Basic statistics
   totalTrades: number;
@@ -134,45 +160,28 @@ export interface TradingDataContext {
   };
 
   // Detailed trade information
-  trades: {
-    id: string;
-    name: string;
-    date: number; // Unix timestamp for trade date
-    session: string;
-    type: 'win' | 'loss' | 'breakeven';
-    amount: number;
-    riskToReward?: number;
-    tags?: string[];
-    notes?: string;
-    economicEvents?: {
-      event: string;
-      impact: string;
-      currency: string;
-      time: string;
-    }[];
-    images?: string[];
-    createdAt: number; // Unix timestamp
-    updatedAt: number | null; // Unix timestamp or null if never updated
-  }[];
+  trades: TrimmedTrade[];
 }
 
 export interface AIChatConfig {
   // Default provider settings
   defaultProvider: AIProvider;
   defaultModel: string;
-  
+
   // UI preferences
   autoScroll: boolean;
   showTokenCount: boolean;
   enableSyntaxHighlighting: boolean;
-  
+
   // Context settings
   includeRecentTrades: boolean;
   includeTagAnalysis: boolean;
   includeEconomicEvents: boolean;
   maxContextTrades: number; // Limit for performance
   includeDetailedTrades: boolean; // Include full trade details
-  
+
+  // Note: Vector search removed - now using keyword-based filtering without limits
+
   // Session settings
   maxSessionHistory: number;
   autoSaveSessions: boolean;

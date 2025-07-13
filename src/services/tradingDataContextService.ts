@@ -5,7 +5,7 @@
 
 import { Trade } from '../types/trade';
 import { Calendar } from '../types/calendar';
-import { TradingDataContext, AIChatConfig } from '../types/aiChat';
+import { TradingDataContext, AIChatConfig, TrimmedTrade } from '../types/aiChat';
 import { calculateWinRate, calculateProfitFactor } from '../utils/statsUtils';
 import { logger } from '../utils/logger';
 import {
@@ -308,7 +308,7 @@ class TradingDataContextService {
   /**
    * Prepare detailed trade information for AI context
    */
-  private prepareTradeDetails(trades: Trade[]) {
+  private prepareTradeDetails(trades: Trade[]) : TrimmedTrade[] {
     return trades.map(trade => ({
       id: trade.id,
       name: trade.name || 'Unnamed Trade',
@@ -320,14 +320,14 @@ class TradingDataContextService {
       tags: trade.tags || [],
       notes: trade.notes || '',
       economicEvents: trade.economicEvents?.map(event => ({
-        event: event.name,
+        name: event.name,
         impact: event.impact,
         currency: event.currency,
         time: event.timeUtc
       })) || [],
       images: trade.images?.map(img => img.url) || [],
       createdAt: Math.floor(new Date(trade.date).getTime() / 1000), // Unix timestamp for creation time
-      updatedAt: trade.updatedAt ? Math.floor(new Date(trade.updatedAt).getTime() / 1000) : null
+      updatedAt: trade.updatedAt ? Math.floor(new Date(trade.updatedAt).getTime() / 1000) : undefined
     }));
   }
 
@@ -368,49 +368,7 @@ class TradingDataContextService {
       commonEvents
     };
   }
-
-  /**
-   * Generate a human-readable summary of the trading context
-   */
-  generateContextSummary(context: TradingDataContext): string {
-    const summary = [
-      `Trading Performance Summary:`,
-      `• Total Trades: ${context.totalTrades}`,
-      `• Win Rate: ${context.winRate.toFixed(1)}%`,
-      `• Profit Factor: ${context.profitFactor.toFixed(2)}`,
-      `• Total P&L: $${context.totalPnL.toFixed(2)}`,
-      `• Max Drawdown: ${context.maxDrawdown.toFixed(1)}%`,
-      `• Trading Period: ${format(context.dateRange.start, 'MMM dd, yyyy')} - ${format(context.dateRange.end, 'MMM dd, yyyy')}`,
-      `• Average Trades per Day: ${context.avgTradesPerDay.toFixed(1)}`,
-      ``
-    ];
-
-    if (context.sessionStats.length > 0) {
-      summary.push(`Session Performance:`);
-      context.sessionStats.forEach(session => {
-        summary.push(`• ${session.session}: ${session.trades} trades, ${session.winRate.toFixed(1)}% win rate, $${session.pnl.toFixed(2)} P&L`);
-      });
-      summary.push(``);
-    }
-
-    if (context.topTags.length > 0) {
-      summary.push(`Top Trading Tags:`);
-      context.topTags.slice(0, 5).forEach(tag => {
-        summary.push(`• ${tag.tag}: ${tag.count} trades, ${tag.winRate.toFixed(1)}% win rate`);
-      });
-      summary.push(``);
-    }
-
-    if (context.recentTrends.length > 0) {
-      summary.push(`Recent Performance:`);
-      context.recentTrends.forEach(trend => {
-        summary.push(`• ${trend.period}: ${trend.tradeCount} trades, ${trend.winRate.toFixed(1)}% win rate, $${trend.pnl.toFixed(2)} P&L`);
-      });
-    }
-
-    return summary.join('\n');
-  }
-}
+ }
 
 // Export singleton instance
 export const tradingDataContextService = new TradingDataContextService();

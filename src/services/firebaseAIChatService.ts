@@ -4,26 +4,16 @@
  */
 
 import {
-  AIProvider,
   ChatMessage,
   AIModelSettings,
-  TradingDataContext,
   ChatError
 } from '../types/aiChat';
 import { ai } from '../firebase/config';
 import { getGenerativeModel } from 'firebase/ai';
 import { logger } from '../utils/logger';
+import { optimizedAIContextService, OptimizedTradingContext } from './optimizedAIContextService';
 
-interface ChatCompletionRequest {
-  messages: Array<{
-    role: 'system' | 'user' | 'assistant';
-    content: string;
-  }>;
-  model: string;
-  temperature?: number;
-  maxTokens?: number;
-  topP?: number;
-}
+
 
 class FirebaseAIChatService {
   private readonly SYSTEM_PROMPT = `You are an expert trading analyst assistant. You help traders analyze their trading performance, identify patterns, and provide actionable insights.
@@ -49,20 +39,19 @@ Guidelines:
 Current date and time: ${new Date().toISOString()}`;
 
   /**
-   * Send a chat message and get AI response using Firebase AI Logic
+   * Send a chat message and get AI response using Firebase AI Logic with optimized context
    */
-  async sendMessage(
+  async sendMessageOptimized(
     message: string,
-    provider: AIProvider,
-    tradingContext: TradingDataContext,
+    optimizedContext: OptimizedTradingContext,
     conversationHistory: ChatMessage[] = [],
     modelSettings?: AIModelSettings
   ): Promise<{ response: string; tokenCount?: number }> {
     try {
-      logger.log('Sending message to Firebase AI Logic...');
+      logger.log('Sending message to Firebase AI Logic with optimized context...');
 
-      // Prepare messages for Firebase AI Logic
-      const messages = this.prepareMessages(message, tradingContext, conversationHistory);
+      // Prepare messages with optimized context
+      const messages = this.prepareOptimizedMessages(message, optimizedContext, conversationHistory);
 
       // Get the model to use
       const modelName = modelSettings?.model || 'gemini-2.5-flash';
@@ -85,7 +74,7 @@ Current date and time: ${new Date().toISOString()}`;
       const response = result.response;
       const text = response.text();
 
-      logger.log('Received response from Firebase AI Logic');
+      logger.log('Received response from Firebase AI Logic (optimized)');
 
       return {
         response: text || 'No response received',
@@ -93,32 +82,33 @@ Current date and time: ${new Date().toISOString()}`;
       };
 
     } catch (error) {
-      logger.error('Error sending message to Firebase AI Logic:', error);
+      logger.error('Error sending message to Firebase AI Logic (optimized):', error);
       throw this.createNetworkError(error);
     }
   }
 
+
+
   /**
-   * Prepare messages with trading context and conversation history
+   * Prepare messages with optimized trading context and conversation history
    */
-  private prepareMessages(
+  private prepareOptimizedMessages(
     message: string,
-    tradingContext: TradingDataContext,
+    optimizedContext: OptimizedTradingContext,
     conversationHistory: ChatMessage[]
   ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
 
-    // Add system prompt with trading context
-    const contextualSystemPrompt = this.buildContextualSystemPrompt(tradingContext);
-    logger.log('Contextual system prompt:', contextualSystemPrompt);
+    // Add system prompt with optimized trading context
+    const contextualSystemPrompt = this.buildOptimizedContextualSystemPrompt(optimizedContext);
+    logger.log('Optimized contextual system prompt:', contextualSystemPrompt);
     messages.push({
       role: 'system',
       content: contextualSystemPrompt
     });
 
-    // Add conversation history (last 10 messages to avoid context limits)
-    const recentHistory = conversationHistory.slice(-10);
-    for (const historyMessage of recentHistory) {
+    // Add conversation history
+    for (const historyMessage of conversationHistory) {
       if (historyMessage.role !== 'system') {
         messages.push({
           role: historyMessage.role as 'user' | 'assistant',
@@ -136,54 +126,17 @@ Current date and time: ${new Date().toISOString()}`;
     return messages;
   }
 
+
+
   /**
-   * Build system prompt with trading context
+   * Build system prompt with optimized trading context
    */
-  private buildContextualSystemPrompt(tradingContext: TradingDataContext): string {
-    const contextSummary = `
-TRADING PERFORMANCE CONTEXT:
-- Total Trades: ${tradingContext.totalTrades}
-- Win Rate: ${tradingContext.winRate.toFixed(1)}%
-- Profit Factor: ${tradingContext.profitFactor.toFixed(2)}
-- Total P&L: $${tradingContext.totalPnL.toFixed(2)}
-- Average Win: $${tradingContext.avgWin.toFixed(2)}
-- Average Loss: $${tradingContext.avgLoss.toFixed(2)}
-- Max Drawdown: $${tradingContext.maxDrawdown.toFixed(2)}
-- Trading Period: ${tradingContext.dateRange.start.toLocaleDateString()} to ${tradingContext.dateRange.end.toLocaleDateString()}
-- Trading Days: ${tradingContext.tradingDays}
-- Average Trades per Day: ${tradingContext.avgTradesPerDay.toFixed(1)}
-
-RISK METRICS:
-- Average Risk/Reward: ${tradingContext.riskMetrics.avgRiskReward.toFixed(2)}
-- Max Consecutive Losses: ${tradingContext.riskMetrics.maxConsecutiveLosses}
-- Max Consecutive Wins: ${tradingContext.riskMetrics.maxConsecutiveWins}
-- Largest Win: $${tradingContext.riskMetrics.largestWin.toFixed(2)}
-- Largest Loss: $${tradingContext.riskMetrics.largestLoss.toFixed(2)}
-
-TOP PERFORMING TAGS:
-${tradingContext.topTags.slice(0, 5).map(tag =>
-      `- ${tag.tag}: ${tag.count} trades, ${tag.winRate.toFixed(1)}% win rate, $${tag.avgPnL.toFixed(2)} avg P&L`
-    ).join('\n')}
-
-RECENT TRENDS:
-${tradingContext.recentTrends.map(trend =>
-      `- ${trend.period}: ${trend.winRate.toFixed(1)}% win rate, $${trend.pnl.toFixed(2)} P&L, ${trend.tradeCount} trades`
-    ).join('\n')}
-
-${tradingContext.economicEventsImpact ? `
-ECONOMIC EVENTS IMPACT:
-- High Impact Trades: ${tradingContext.economicEventsImpact.highImpactTrades}
-- High Impact Win Rate: ${tradingContext.economicEventsImpact.highImpactWinRate.toFixed(1)}%
-- Common Events: ${tradingContext.economicEventsImpact.commonEvents.join(', ')}
-` : ''}
-
-DETAILED TRADES DATA:
-The following ${tradingContext.trades.length} trades are available for analysis as JSON data${tradingContext.trades.length < tradingContext.totalTrades ? ` (showing ${tradingContext.trades.length} out of ${tradingContext.totalTrades} total trades - this is a limited dataset)` : ''}:
-${JSON.stringify(tradingContext.trades)}
-`;
-
+  private buildOptimizedContextualSystemPrompt(optimizedContext: OptimizedTradingContext): string {
+    const contextSummary = optimizedAIContextService.generateContextSummary(optimizedContext);
     return this.SYSTEM_PROMPT + '\n\n' + contextSummary;
   }
+
+
 
   /**
    * Format messages for Firebase AI Logic
