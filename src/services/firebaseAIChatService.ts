@@ -7,14 +7,14 @@ import {
   ChatMessage,
   AIModelSettings,
   ChatError,
-  AIChatConfig,
-  DEFAULT_AI_CHAT_CONFIG
+  AIChatConfig
 } from '../types/aiChat';
 import { ai } from '../firebase/config';
 import { getGenerativeModel } from 'firebase/ai';
 import { logger } from '../utils/logger';
 import { optimizedAIContextService, OptimizedTradingContext } from './optimizedAIContextService';
 import { vectorSearchService, TradeSearchResult } from './vectorSearchService';
+import { aiChatConfigService } from './aiChatConfigService';
 import { Trade } from '../types/trade';
 import { Calendar } from '../types/calendar';
 
@@ -52,10 +52,14 @@ Current date and time: ${new Date().toISOString()}`;
     calendar: Calendar,
     userId: string,
     conversationHistory: ChatMessage[] = [],
-    modelSettings?: AIModelSettings
+    modelSettings?: AIModelSettings,
+    config?: AIChatConfig
   ): Promise<{ response: string; tokenCount?: number; relevantTrades?: TradeSearchResult[] }> {
     try {
       logger.log('Sending message with vector search enhancement...');
+
+      // Get the current config or use the provided one
+      const currentConfig = config || aiChatConfigService.getConfig();
 
       // Use vector search to find relevant trades
       const relevantTrades = await vectorSearchService.searchSimilarTrades(
@@ -63,8 +67,8 @@ Current date and time: ${new Date().toISOString()}`;
         userId,
         calendar.id,
         {
-          maxResults: 15, // Get top 15 most relevant trades
-          similarityThreshold: 0.6 // Lower threshold for broader search
+          maxResults: currentConfig.maxContextTrades, // Use configured max context trades
+          similarityThreshold: 0.3 // Lower threshold for broader search (updated after migration testing)
         }
       );
 
@@ -80,8 +84,8 @@ Current date and time: ${new Date().toISOString()}`;
 
         // Create focused context with only relevant trades
         const vectorSearchConfig: AIChatConfig = {
-          ...DEFAULT_AI_CHAT_CONFIG,
-          maxContextTrades: 15
+          ...currentConfig,
+          maxContextTrades: Math.min(currentConfig.maxContextTrades, relevantTrades.length)
         };
 
         contextToUse = await optimizedAIContextService.generateOptimizedContext(
@@ -98,8 +102,8 @@ Current date and time: ${new Date().toISOString()}`;
         // Fallback to regular optimized context if no relevant trades found
         logger.log('No relevant trades found via vector search, using regular context');
         const fallbackConfig: AIChatConfig = {
-          ...DEFAULT_AI_CHAT_CONFIG,
-          maxContextTrades: 20
+          ...currentConfig,
+          maxContextTrades: Math.min(currentConfig.maxContextTrades, 20)
         };
 
         contextToUse = await optimizedAIContextService.generateOptimizedContext(
@@ -126,11 +130,14 @@ Current date and time: ${new Date().toISOString()}`;
     } catch (error) {
       logger.error('Error in sendMessageWithVectorSearch:', error);
 
+      // Get the current config for error fallback
+      const currentConfig = config || aiChatConfigService.getConfig();
+
       // Fallback to regular optimized context
       logger.log('Falling back to regular optimized context');
       const errorFallbackConfig: AIChatConfig = {
-        ...DEFAULT_AI_CHAT_CONFIG,
-        maxContextTrades: 20
+        ...currentConfig,
+        maxContextTrades: Math.min(currentConfig.maxContextTrades, 20)
       };
 
       const fallbackContext = await optimizedAIContextService.generateOptimizedContext(

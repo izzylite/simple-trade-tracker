@@ -149,7 +149,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         calendar,
         user.uid,
         messages,
-        modelSettings
+        modelSettings,
+        chatConfig
       );
 
       const relevantTrades = response.relevantTrades || [];
@@ -259,7 +260,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         calendar,
         user.uid,
         conversationHistory,
-        modelSettings
+        modelSettings,
+        chatConfig
       );
       setLastVectorSearchResults(response.relevantTrades || []);
 

@@ -296,7 +296,7 @@ const VectorMigrationDialog: React.FC<VectorMigrationDialogProps> = ({
           calendar.id,
           {
             maxResults: 100, // Get up to 100 results to see all matches
-            similarityThreshold: 0.1 // Very low threshold to catch all potential matches
+            similarityThreshold: 0.3 // Very low threshold to catch all potential matches
           }
         );
 
