@@ -6,12 +6,17 @@
 import {
   ChatMessage,
   AIModelSettings,
-  ChatError
+  ChatError,
+  AIChatConfig,
+  DEFAULT_AI_CHAT_CONFIG
 } from '../types/aiChat';
 import { ai } from '../firebase/config';
 import { getGenerativeModel } from 'firebase/ai';
 import { logger } from '../utils/logger';
 import { optimizedAIContextService, OptimizedTradingContext } from './optimizedAIContextService';
+import { vectorSearchService, TradeSearchResult } from './vectorSearchService';
+import { Trade } from '../types/trade';
+import { Calendar } from '../types/calendar';
 
 
 
@@ -37,6 +42,112 @@ Guidelines:
 - When data appears limited (e.g., showing only 100 out of 181 trades), acknowledge this limitation and suggest increasing the context if needed for complete analysis
 
 Current date and time: ${new Date().toISOString()}`;
+
+  /**
+   * Send a chat message with vector search enhanced context
+   */
+  async sendMessageWithVectorSearch(
+    message: string,
+    trades: Trade[],
+    calendar: Calendar,
+    userId: string,
+    conversationHistory: ChatMessage[] = [],
+    modelSettings?: AIModelSettings
+  ): Promise<{ response: string; tokenCount?: number; relevantTrades?: TradeSearchResult[] }> {
+    try {
+      logger.log('Sending message with vector search enhancement...');
+
+      // Use vector search to find relevant trades
+      const relevantTrades = await vectorSearchService.searchSimilarTrades(
+        message,
+        userId,
+        calendar.id,
+        {
+          maxResults: 15, // Get top 15 most relevant trades
+          similarityThreshold: 0.6 // Lower threshold for broader search
+        }
+      );
+
+      logger.log(`Found ${relevantTrades.length} relevant trades via vector search`);
+
+      // If we have relevant trades, create focused context
+      let contextToUse: OptimizedTradingContext;
+
+      if (relevantTrades.length > 0) {
+        // Get the actual trade objects for the relevant trades
+        const relevantTradeIds = relevantTrades.map(rt => rt.tradeId);
+        const relevantTradeObjects = trades.filter(trade => relevantTradeIds.includes(trade.id));
+
+        // Create focused context with only relevant trades
+        const vectorSearchConfig: AIChatConfig = {
+          ...DEFAULT_AI_CHAT_CONFIG,
+          maxContextTrades: 15
+        };
+
+        contextToUse = await optimizedAIContextService.generateOptimizedContext(
+          message,
+          relevantTradeObjects,
+          calendar,
+          vectorSearchConfig
+        );
+
+        // Add vector search info to context
+        contextToUse.contextInfo.queryUsed = message;
+        contextToUse.contextInfo.optimizationMethod = 'trimmed-full-dataset';
+      } else {
+        // Fallback to regular optimized context if no relevant trades found
+        logger.log('No relevant trades found via vector search, using regular context');
+        const fallbackConfig: AIChatConfig = {
+          ...DEFAULT_AI_CHAT_CONFIG,
+          maxContextTrades: 20
+        };
+
+        contextToUse = await optimizedAIContextService.generateOptimizedContext(
+          message,
+          trades,
+          calendar,
+          fallbackConfig
+        );
+      }
+
+      // Send message with the enhanced context
+      const result = await this.sendMessageOptimized(
+        message,
+        contextToUse,
+        conversationHistory,
+        modelSettings
+      );
+
+      return {
+        ...result,
+        relevantTrades
+      };
+
+    } catch (error) {
+      logger.error('Error in sendMessageWithVectorSearch:', error);
+
+      // Fallback to regular optimized context
+      logger.log('Falling back to regular optimized context');
+      const errorFallbackConfig: AIChatConfig = {
+        ...DEFAULT_AI_CHAT_CONFIG,
+        maxContextTrades: 20
+      };
+
+      const fallbackContext = await optimizedAIContextService.generateOptimizedContext(
+        message,
+        trades,
+        calendar,
+        errorFallbackConfig
+      );
+
+      return await this.sendMessageOptimized(
+        message,
+        fallbackContext,
+        conversationHistory,
+        modelSettings
+      );
+    }
+  }
 
   /**
    * Send a chat message and get AI response using Firebase AI Logic with optimized context

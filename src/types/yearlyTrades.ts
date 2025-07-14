@@ -3,6 +3,7 @@ import { Timestamp, DocumentData } from 'firebase/firestore';
 
 export interface YearlyTrades {
   year: number;
+  userId: string;
   trades: Trade[];
   lastModified: Date;
 }
@@ -13,6 +14,7 @@ export class YearlyTradesConverter implements FirestoreConvertible<YearlyTrades>
     const data = doc.data();
     return {
       year: data.year,
+      userId: data.userId,
       lastModified: data.lastModified.toDate(),
       trades: data.trades.map((trade: any) => tradeConverter.fromJson(trade))
     };
@@ -21,6 +23,7 @@ export class YearlyTradesConverter implements FirestoreConvertible<YearlyTrades>
   toJson(yearlyTrades: YearlyTrades, calendarId: string): any {
     return {
       year: yearlyTrades.year,
+      userId: yearlyTrades.userId,
       lastModified: Timestamp.fromDate(yearlyTrades.lastModified),
       trades: yearlyTrades.trades.map(trade => tradeConverter.toJson(trade, calendarId))
     };

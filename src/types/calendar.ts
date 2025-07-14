@@ -12,6 +12,7 @@ export interface PinnedEvent {
 export interface Calendar {
   id: string;
   name: string;
+  userId: string;
   createdAt: Date;
   lastModified: Date;
   accountBalance: number;
@@ -117,6 +118,7 @@ export class CalendarConverter implements FirestoreConvertible<Calendar> {
     return {
       id: doc.id,
       name: data.name,
+      userId: data.userId,
       createdAt: data.createdAt.toDate(),
       lastModified: data.lastModified.toDate(),
       accountBalance: data.accountBalance,
@@ -192,6 +194,7 @@ export class CalendarConverter implements FirestoreConvertible<Calendar> {
     // Create the base object with required fields
     const baseData = {
       name: calendar.name,
+      userId: calendar.userId,
       createdAt: Timestamp.fromDate(calendar.createdAt),
       lastModified: Timestamp.fromDate(calendar.lastModified),
       accountBalance: calendar.accountBalance,

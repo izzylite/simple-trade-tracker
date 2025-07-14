@@ -32,7 +32,9 @@ import {
 import {
   Close as CloseIcon,
   Restore as RestoreIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  Search as SearchIcon,
+  Psychology as PsychologyIcon
 } from '@mui/icons-material';
 import { 
   AIChatConfig, 
@@ -47,6 +49,8 @@ interface AIChatSettingsDialogProps {
   config: AIChatConfig;
   modelSettings?: AIModelSettings;
   onConfigChange: (config: AIChatConfig, modelSettings?: AIModelSettings) => void;
+  useVectorSearch?: boolean;
+  onVectorSearchChange?: (enabled: boolean) => void;
 }
 
 interface TabPanelProps {
@@ -80,7 +84,9 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
   onClose,
   config,
   modelSettings,
-  onConfigChange
+  onConfigChange,
+  useVectorSearch = true,
+  onVectorSearchChange
 }) => {
   const [tabValue, setTabValue] = useState(0);
   const [localConfig, setLocalConfig] = useState<AIChatConfig>(config);
@@ -266,6 +272,55 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
 
         {/* Chat Preferences Tab */}
         <TabPanel value={tabValue} index={1}>
+          <Card variant="outlined" sx={{ mb: 2 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <SearchIcon />
+                Vector Search
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Use semantic search to find the most relevant trades for each question
+              </Typography>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={useVectorSearch}
+                    onChange={(e) => onVectorSearchChange?.(e.target.checked)}
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body2">
+                      Enable Vector Search
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {useVectorSearch
+                        ? "AI gets the most relevant trades for better insights"
+                        : "AI uses standard context with all trades"
+                      }
+                    </Typography>
+                  </Box>
+                }
+                sx={{ mb: 2 }}
+              />
+
+              {useVectorSearch && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <Typography variant="body2">
+                    <strong>Vector Search Benefits:</strong>
+                  </Typography>
+                  <Typography variant="caption" component="div">
+                    • Finds trades by meaning, not just keywords<br/>
+                    • Faster AI responses with focused context<br/>
+                    • Better insights from relevant trade patterns<br/>
+                    • Works great with queries like "profitable EUR/USD trades"
+                  </Typography>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
           <Card variant="outlined">
             <CardContent>
               <Typography variant="h6" gutterBottom>

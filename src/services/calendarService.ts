@@ -30,6 +30,8 @@ import { cleanEventNameForPinning } from '../utils/eventNameUtils';
 const CALENDARS_COLLECTION = 'calendars';
 const YEARS_SUBCOLLECTION = 'years';
 
+
+
 // Interface for calendar statistics
 interface CalendarStats {
   winRate: number;
@@ -559,6 +561,7 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
         // Year document exists, update it
         const yearlyTrades = yearlyTradesConverter.fromJson(yearDoc);
         yearlyTrades.trades.push(trade);
+        yearlyTrades.userId = calendar.userId;
         yearlyTrades.lastModified = new Date();
 
         transaction.update(yearDocRef, yearlyTradesConverter.toJson(yearlyTrades, calendarId));
@@ -566,6 +569,7 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
         // Year document doesn't exist, create it
         const yearlyTrades: YearlyTrades = {
           year,
+          userId: calendar.userId,
           lastModified: new Date(),
           trades: [trade]
         };
@@ -677,7 +681,7 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       // get updated all trade if this is a delete process
       let allTrades: Trade[] = await getTrades(calendarId, tradeIndex >= 0 && updateCallback(cachedTrades[tradeIndex]).isDeleted ? [] : cachedTrades);
       let yearTrades: Trade[] = [];
-      let newTrade: Trade;
+      let updatedTrade: Trade;
 
       // Handle the case where the year document exists
       if (yearDoc.exists()) {
@@ -693,9 +697,9 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
         // If this is a new trade, add it to the arrays
         if (isNewTrade) {
           logger.log(`Adding new trade with ID ${trade!!.id} to year ${year}`);
-          newTrade = trade!!;
-          yearTrades.push(newTrade);
-          allTrades.push(newTrade);
+          updatedTrade = trade!!;
+          yearTrades.push(updatedTrade);
+          allTrades.push(updatedTrade);
           tradeIndex = yearTrades.length - 1;
         } else {
           logger.log(`Trade with ID ${trade!!.id} not found in year ${year}`)
@@ -703,19 +707,19 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       }
 
       // Apply the update callback to the trade
-      newTrade = updateCallback(yearTrades[tradeIndex]);
+      updatedTrade = updateCallback(yearTrades[tradeIndex]);
       // Get all trades (either from cache or Firestore)
-      logger.log(`Updating trade with ID ${trade!!.id} in year ${year} : ${JSON.stringify(newTrade)}`);
+      logger.log(`Updating trade with ID ${trade!!.id} in year ${year} : ${JSON.stringify(updatedTrade)}`);
 
 
-      if (newTrade.isDeleted) {
+      if (updatedTrade.isDeleted) {
         yearTrades.splice(tradeIndex, 1);
-        allTrades = allTrades.filter(t => t.id !== newTrade.id);
+        allTrades = allTrades.filter(t => t.id !== updatedTrade.id);
       }
       else {
         // Update the trade in the array
-        yearTrades[tradeIndex] = newTrade;
-        allTrades = allTrades.map(t => t.id === newTrade.id ? newTrade : t);
+        yearTrades[tradeIndex] = updatedTrade;
+        allTrades = allTrades.map(t => t.id === updatedTrade.id ? updatedTrade : t);
       }
 
       // Calculate stats
@@ -741,7 +745,16 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       transaction.update(calendarRef, getUpdateCalendarData(stats));
 
       // Return both the stats and the updated trades list
-      return [stats, allTrades];
+      return [stats, allTrades, updatedTrade];
+    }).then(async (result) => {
+      if (result) {
+        const [stats, allTrades, updatedTrade] = result;
+
+        // Vector sync now handled by cloud functions
+
+        return [stats, allTrades] as [CalendarStats, Trade[]];
+      }
+      return undefined;
     });
   } catch (error) {
     logger.error('Error updating trade:', error);
@@ -795,6 +808,8 @@ export const clearMonthTrades = async (calendarId: string, month: number, year: 
 
     // Update the calendar with stats and lastModified timestamp
     await updateCalendarStats(calendarRef, stats);
+
+    // Vector sync now handled by cloud functions
 
     // Return the updated stats
     return stats;
@@ -852,6 +867,8 @@ export const importTrades = async (calendarId: string, trades: Trade[]): Promise
 
   // Update the calendar with stats and lastModified timestamp
   await updateCalendarStats(calendarRef, stats);
+
+  // Vector sync now handled by cloud functions
 
   // Return the updated stats
   return stats;
@@ -964,6 +981,6 @@ export const updateTag = async (calendarId: string, oldTag: string, newTag: stri
     throw error;
   }
 };
- 
+
 
 
