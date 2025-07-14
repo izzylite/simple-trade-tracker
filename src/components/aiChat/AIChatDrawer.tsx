@@ -135,12 +135,12 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         throw new Error('User not authenticated');
       }
 
-      // Use vector search for enhanced context
+      // Use AI-driven function calling for dynamic data fetching
       setIsSearchingVectors(true);
       setIsGeneratingContext(true);
 
-      // Send message with vector search enhancement
-      const response = await firebaseAIChatService.sendMessageWithVectorSearch(
+      // Send message with AI-driven function calling
+      const response = await firebaseAIChatService.sendMessageWithFunctionCalling(
         messageText,
         trades,
         calendar,
@@ -150,12 +150,12 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         chatConfig
       );
 
-      const relevantTrades = response.relevantTrades || [];
+      const functionCalls = response.functionCalls || [];
 
       setIsSearchingVectors(false);
       setIsGeneratingContext(false);
 
-      logger.log(`Vector search found ${relevantTrades.length} relevant trades`);
+      logger.log(`AI executed ${functionCalls.length} function calls`);
 
       // Add AI response
       const aiMessage: ChatMessageType = {
@@ -249,8 +249,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         throw new Error('User not authenticated');
       }
 
-      // Regenerate the response using vector search
-      const response = await firebaseAIChatService.sendMessageWithVectorSearch(
+      // Regenerate the response using function calling
+      const response = await firebaseAIChatService.sendMessageWithFunctionCalling(
         userMessage.content,
         trades,
         calendar,
@@ -441,8 +441,8 @@ What would you like to know about your trading?`,
                 sx={{ fontWeight: 500 }}
               >
                 {isSearchingVectors
-                  ? 'Finding relevant trades...'
-                  : 'Analyzing your trading data...'
+                  ? 'AI is analyzing your request...'
+                  : 'Processing your trading data...'
                 }
               </Typography>
             </Box>
