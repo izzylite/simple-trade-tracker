@@ -212,7 +212,7 @@ Current date and time: ${new Date().toISOString()}`;
 
     // Add system prompt with optimized trading context
     const contextualSystemPrompt = this.buildOptimizedContextualSystemPrompt(optimizedContext);
-    logger.log('Optimized contextual system prompt:', contextualSystemPrompt);
+    // logger.log('Optimized contextual system prompt:', contextualSystemPrompt);
     messages.push({
       role: 'system',
       content: contextualSystemPrompt

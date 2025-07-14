@@ -190,11 +190,10 @@ export class CalendarConverter implements FirestoreConvertible<Calendar> {
     };
   }
 
-  toJson(calendar: Omit<Calendar, 'id' | 'cachedTrades' | 'loadedYears'> & { _deleteHeroImage?: boolean }): any {
+  toJson(calendar: Omit<Calendar, 'id' | 'userId' | 'cachedTrades' | 'loadedYears'> & { _deleteHeroImage?: boolean }): any {
     // Create the base object with required fields
     const baseData = {
       name: calendar.name,
-      userId: calendar.userId,
       createdAt: Timestamp.fromDate(calendar.createdAt),
       lastModified: Timestamp.fromDate(calendar.lastModified),
       accountBalance: calendar.accountBalance,

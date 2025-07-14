@@ -135,7 +135,7 @@ function AppContent() {
   const handleCreateCalendar = async (name: string, accountBalance: number, maxDailyDrawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamicRiskEnabled?: boolean, increasedRiskPercentage?: number, profitThresholdPercentage?: number, heroImageUrl?: string, heroImageAttribution?: any) => {
     if (!user) return;
 
-    const newCalendar: Omit<Calendar, 'id' | 'cachedTrades' | 'loadedYears'> = {
+    const newCalendar: Omit<Calendar, 'id' | 'userId' | 'cachedTrades' | 'loadedYears'> = {
       name,
       createdAt: new Date(),
       lastModified: new Date(),
@@ -154,7 +154,7 @@ function AppContent() {
 
     try {
       const calendarId = await calendarService.createCalendar(user.uid, newCalendar);
-      setCalendars(prev => [...prev, { ...newCalendar, id: calendarId, cachedTrades: [], loadedYears: [] }]);
+      setCalendars(prev => [...prev, { ...newCalendar, id: calendarId, userId : user.uid, cachedTrades: [], loadedYears: [] }]);
     } catch (error) {
       console.error('Error creating calendar:', error);
     }

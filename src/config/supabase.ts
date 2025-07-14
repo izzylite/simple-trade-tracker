@@ -35,7 +35,7 @@ export const SUPABASE_TABLES = {
 // Vector similarity search configuration
 export const VECTOR_CONFIG = {
   EMBEDDING_DIMENSION: 384, // all-MiniLM-L6-v2 dimension
-  SIMILARITY_THRESHOLD: 0.7, // Minimum similarity score
+  SIMILARITY_THRESHOLD: 0.3, // Minimum similarity score (lowered after migration testing)
   MAX_RESULTS: 20, // Maximum results to return
 } as const;
 

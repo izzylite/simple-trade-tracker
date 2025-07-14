@@ -30,10 +30,10 @@ class EmbeddingService {
       // Configure environment for transformers.js
       const { env } = await import('@xenova/transformers');
 
-      // Use local cache and fallback CDNs
-      env.allowLocalModels = true;
+      // Disable local models and browser cache to avoid corrupted cache issues
+      env.allowLocalModels = false;
       env.allowRemoteModels = true;
-      env.useBrowserCache = true;
+      env.useBrowserCache = false;
 
       this.embeddingPipeline = await pipeline(
         'feature-extraction',
@@ -58,6 +58,12 @@ class EmbeddingService {
       // Try alternative approach with different configuration
       try {
         logger.log('Trying alternative model configuration...');
+
+        // Ensure environment is still configured correctly for fallback
+        const { env } = await import('@xenova/transformers');
+        env.allowLocalModels = false;
+        env.allowRemoteModels = true;
+        env.useBrowserCache = false;
 
         this.embeddingPipeline = await pipeline(
           'feature-extraction',
@@ -127,7 +133,7 @@ class EmbeddingService {
   /**
    * Convert trade data to searchable text content
    */
-  tradeToSearchableText(trade: Trade): string {
+  public tradeToSearchableText(trade: Trade): string {
     const parts: string[] = [];
 
     // Basic trade info
@@ -181,8 +187,21 @@ class EmbeddingService {
     const date = new Date(trade.date);
     const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
     const month = date.toLocaleDateString('en-US', { month: 'long' });
-    parts.push(`day ${dayOfWeek} month ${month}`);
-
+    const year = date.getFullYear();
+    const quarter = Math.ceil((date.getMonth() + 1) / 3);
+  
+    parts.push(`day ${dayOfWeek} month ${month} year ${year} quarter ${quarter}`);
+  
+    // Add week-related terms
+    const isWeekend = dayOfWeek === 'Saturday' || dayOfWeek === 'Sunday';
+    const isWeekday = !isWeekend;
+    if (isWeekend) parts.push('weekend');
+    if (isWeekday) parts.push('weekday');
+  
+    // Add month groupings
+    const season = ['winter', 'winter', 'spring', 'spring', 'spring', 'summer', 'summer', 'summer', 'fall', 'fall', 'fall', 'winter'][date.getMonth()];
+    parts.push(`season ${season}`);
+    
     return parts.join(' ').toLowerCase();
   }
 

@@ -26,9 +26,62 @@ import { storage } from '../firebase/config';
 import { TradeImage } from '../components/trades/TradeForm';
 import { logger } from '../utils/logger';
 import { cleanEventNameForPinning } from '../utils/eventNameUtils';
+import { vectorSearchService } from './vectorSearchService';
+import { embeddingService } from './embeddingService';
+import { getAuth } from '@firebase/auth';
 
 const CALENDARS_COLLECTION = 'calendars';
 const YEARS_SUBCOLLECTION = 'years';
+
+// Vector sync helper functions
+const syncTradeToVectors = async (
+  trade: Trade,
+  calendarId: string, 
+  operation: 'add' | 'update' | 'delete'
+): Promise<void> => {
+  try {
+    const userId =  getAuth().currentUser!.uid
+    if (operation === 'delete') {
+      // Delete the embedding
+      await vectorSearchService.deleteTradeEmbedding(trade.id, userId, calendarId);
+      logger.log(`Deleted vector embedding for trade ${trade.id}`);
+    } else {
+      // Generate and store embedding
+      const { embedding, content } = await embeddingService.generateTradeEmbedding(trade);
+      await vectorSearchService.storeTradeEmbedding(trade, embedding, content, userId, calendarId);
+      logger.log(`${operation === 'add' ? 'Added' : 'Updated'} vector embedding for trade ${trade.id}`);
+    }
+  } catch (error) {
+    logger.error(`Failed to sync trade ${trade.id} to vectors:`, error);
+    // Don't throw here - vector sync failure shouldn't break the main operation
+  }
+};
+
+const syncMultipleTradesToVectors = async (
+  trades: Trade[],
+  calendarId: string, 
+  operation: 'add' | 'update' | 'delete'
+): Promise<void> => {
+  try {
+    const userId =  getAuth().currentUser!.uid
+    if (operation === 'delete') {
+      // Delete multiple embeddings individually
+      const deletePromises = trades.map(trade =>
+        vectorSearchService.deleteTradeEmbedding(trade.id, userId, calendarId)
+      );
+      await Promise.allSettled(deletePromises);
+      logger.log(`Deleted vector embeddings for ${trades.length} trades`);
+    } else {
+      // Generate and store multiple embeddings
+      const tradeEmbeddings = await embeddingService.generateTradeEmbeddings(trades);
+      await vectorSearchService.storeTradeEmbeddings(tradeEmbeddings, userId, calendarId);
+      logger.log(`${operation === 'add' ? 'Added' : 'Updated'} vector embeddings for ${trades.length} trades`);
+    }
+  } catch (error) {
+    logger.error(`Failed to sync ${trades.length} trades to vectors:`, error);
+    // Don't throw here - vector sync failure shouldn't break the main operation
+  }
+};
 
 
 
@@ -351,7 +404,7 @@ export const getUserCalendars = async (userId: string): Promise<Calendar[]> => {
 };
 
 // Create a new calendar
-export const createCalendar = async (userId: string, calendar: Omit<Calendar, 'id' | 'cachedTrades' | 'loadedYears'>): Promise<string> => {
+export const createCalendar = async (userId: string, calendar: Omit<Calendar, 'id' | 'userId' | 'cachedTrades' | 'loadedYears'>): Promise<string> => {
   const calendarData = {
     ...calendarConverter.toJson(calendar),
     userId,
@@ -399,6 +452,7 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
       name: newName,
       createdAt: new Date(),
       lastModified: new Date(),
+      userId: sourceCalendar.userId,
       accountBalance: sourceCalendar.accountBalance,
       maxDailyDrawdown: sourceCalendar.maxDailyDrawdown,
       weeklyTarget: sourceCalendar.weeklyTarget,
@@ -446,7 +500,8 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
       monthlyPnLPercentage: includeContent ? sourceCalendar.monthlyPnLPercentage : 0,
       yearlyPnLPercentage: includeContent ? sourceCalendar.yearlyPnLPercentage : 0,
       weeklyProgress: includeContent ? sourceCalendar.weeklyProgress : 0,
-      monthlyProgress: includeContent ? sourceCalendar.monthlyProgress : 0
+      monthlyProgress: includeContent ? sourceCalendar.monthlyProgress : 0,
+      
     };
 
     // Create the new calendar
@@ -593,6 +648,10 @@ export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: T
         calendar.tags = calendarTags;
         return calendar;
       });
+
+      // Sync trade to vector database
+      await syncTradeToVectors(trade, calendarId, 'add');
+
       return stats;
     });
   } catch (error) {
@@ -748,9 +807,12 @@ export const updateTrade = async (calendarId: string, tradeId: string, cachedTra
       return [stats, allTrades, updatedTrade];
     }).then(async (result) => {
       if (result) {
-        const [stats, allTrades, updatedTrade] = result;
-
-        // Vector sync now handled by cloud functions
+        const [stats, allTrades, updatedTrade] = result as [CalendarStats, Trade[], Trade];
+        if (updatedTrade.isDeleted) {
+          await syncTradeToVectors(updatedTrade, calendarId, 'delete');
+        } else {
+          await syncTradeToVectors(updatedTrade, calendarId, 'update');
+        }
 
         return [stats, allTrades] as [CalendarStats, Trade[]];
       }
@@ -809,7 +871,15 @@ export const clearMonthTrades = async (calendarId: string, month: number, year: 
     // Update the calendar with stats and lastModified timestamp
     await updateCalendarStats(calendarRef, stats);
 
-    // Vector sync now handled by cloud functions
+    // Sync deleted trades to vector database
+    const deletedTrades = existingTrades.filter(trade => {
+      const tradeDate = new Date(trade.date);
+      return tradeDate.getMonth() === month && tradeDate.getFullYear() === year;
+    });
+
+    if (deletedTrades.length > 0) {
+      await syncMultipleTradesToVectors(deletedTrades, calendarId, 'delete');
+    }
 
     // Return the updated stats
     return stats;
@@ -856,6 +926,7 @@ export const importTrades = async (calendarId: string, trades: Trade[]): Promise
   // Create new year documents
   for (const [year, yearTrades] of Object.entries(tradesByYear)) {
     const yearlyTrades: YearlyTrades = {
+      userId: calendar.userId,
       year: parseInt(year),
       lastModified: new Date(),
       trades: yearTrades
@@ -868,7 +939,10 @@ export const importTrades = async (calendarId: string, trades: Trade[]): Promise
   // Update the calendar with stats and lastModified timestamp
   await updateCalendarStats(calendarRef, stats);
 
-  // Vector sync now handled by cloud functions
+  // Sync all imported trades to vector database
+  if (trades.length > 0) {
+    await syncMultipleTradesToVectors(trades, calendarId, 'add');
+  }
 
   // Return the updated stats
   return stats;

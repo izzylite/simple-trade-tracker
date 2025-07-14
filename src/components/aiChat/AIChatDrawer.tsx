@@ -23,8 +23,7 @@ import {
   Settings as SettingsIcon,
   SmartToy as AIIcon,
   Refresh as RefreshIcon,
-  Search as SearchIcon,
-  Psychology as PsychologyIcon
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { v4 as uuidv4 } from 'uuid';
 import UnifiedDrawer from '../common/UnifiedDrawer';
@@ -40,7 +39,7 @@ import {
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
 import { firebaseAIChatService } from '../../services/firebaseAIChatService';
-import { optimizedAIContextService, OptimizedTradingContext } from '../../services/optimizedAIContextService';
+import { OptimizedTradingContext } from '../../services/optimizedAIContextService';
 import { aiChatConfigService } from '../../services/aiChatConfigService';
 import { TradeSearchResult } from '../../services/vectorSearchService';
 import { VectorSearchResults } from './VectorSearchResults';
@@ -78,10 +77,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const [isGeneratingContext, setIsGeneratingContext] = useState(false);
   const [isSearchingVectors, setIsSearchingVectors] = useState(false);
   const [lastVectorSearchResults, setLastVectorSearchResults] = useState<TradeSearchResult[]>([]);
-  const [useVectorSearch, setUseVectorSearch] = useState(() => {
-    const saved = localStorage.getItem('aiChat_useVectorSearch');
-    return saved !== null ? JSON.parse(saved) : true;
-  });
   const [chatConfig, setChatConfig] = useState(aiChatConfigService.getConfig());
   const [modelSettings, setModelSettings] = useState<AIModelSettings>({
     model: chatConfig.defaultModel,
@@ -106,10 +101,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     }
   }, [messages, scrollToBottom, chatConfig.autoScroll]);
 
-  // Save vector search preference
-  useEffect(() => {
-    localStorage.setItem('aiChat_useVectorSearch', JSON.stringify(useVectorSearch));
-  }, [useVectorSearch]);
+
 
   // Focus input when drawer opens
   useEffect(() => {
@@ -146,52 +138,27 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         throw new Error('User not authenticated');
       }
 
-      // Use vector search for enhanced context if enabled
-      let response;
-      let relevantTrades: TradeSearchResult[] = [];
+      // Use vector search for enhanced context
+      setIsSearchingVectors(true);
+      setIsGeneratingContext(true);
 
-      if (useVectorSearch) {
-        setIsSearchingVectors(true);
-        setIsGeneratingContext(true);
+      // Send message with vector search enhancement
+      const response = await firebaseAIChatService.sendMessageWithVectorSearch(
+        messageText,
+        trades,
+        calendar,
+        user.uid,
+        messages,
+        modelSettings
+      );
 
-        // Send message with vector search enhancement
-        const vectorResponse = await firebaseAIChatService.sendMessageWithVectorSearch(
-          messageText,
-          trades,
-          calendar,
-          user.uid,
-          messages,
-          modelSettings
-        );
+      const relevantTrades = response.relevantTrades || [];
+      setLastVectorSearchResults(relevantTrades);
 
-        response = vectorResponse;
-        relevantTrades = vectorResponse.relevantTrades || [];
-        setLastVectorSearchResults(relevantTrades);
+      setIsSearchingVectors(false);
+      setIsGeneratingContext(false);
 
-        setIsSearchingVectors(false);
-        setIsGeneratingContext(false);
-
-        logger.log(`Vector search found ${relevantTrades.length} relevant trades`);
-      } else {
-        // Fallback to regular optimized context
-        setIsGeneratingContext(true);
-        const optimizedCtx = await optimizedAIContextService.generateOptimizedContext(
-          messageText,
-          trades,
-          calendar,
-          chatConfig
-        );
-        setOptimizedContext(optimizedCtx);
-        setIsGeneratingContext(false);
-
-        // Send message with optimized context
-        response = await firebaseAIChatService.sendMessageOptimized(
-          messageText,
-          optimizedCtx,
-          messages,
-          modelSettings
-        );
-      }
+      logger.log(`Vector search found ${relevantTrades.length} relevant trades`);
 
       // Add AI response
       const aiMessage: ChatMessageType = {
@@ -285,36 +252,16 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         throw new Error('User not authenticated');
       }
 
-      // Regenerate the response using vector search if enabled
-      let response;
-      if (useVectorSearch) {
-        const vectorResponse = await firebaseAIChatService.sendMessageWithVectorSearch(
-          userMessage.content,
-          trades,
-          calendar,
-          user.uid,
-          conversationHistory,
-          modelSettings
-        );
-        response = vectorResponse;
-        setLastVectorSearchResults(vectorResponse.relevantTrades || []);
-      } else {
-        // Generate optimized context for retry
-        const optimizedCtx = await optimizedAIContextService.generateOptimizedContext(
-          userMessage.content,
-          trades,
-          calendar,
-          chatConfig
-        );
-
-        // Regenerate the response using optimized context
-        response = await firebaseAIChatService.sendMessageOptimized(
-          userMessage.content,
-          optimizedCtx,
-          conversationHistory,
-          modelSettings
-        );
-      }
+      // Regenerate the response using vector search
+      const response = await firebaseAIChatService.sendMessageWithVectorSearch(
+        userMessage.content,
+        trades,
+        calendar,
+        user.uid,
+        conversationHistory,
+        modelSettings
+      );
+      setLastVectorSearchResults(response.relevantTrades || []);
 
       // Add the new response
       const newAssistantMessage: ChatMessageType = {
@@ -392,7 +339,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     return {
       id: 'welcome',
       role: 'assistant',
-      content: `👋 Hello! I'm your AI trading analyst with ${useVectorSearch ? '🔍 **Vector Search**' : '🧠 **Standard Analysis**'} capabilities. ${contextSummary}I can help you analyze your trading performance, identify patterns, and provide insights to improve your trading.
+      content: `👋 Hello! I'm your AI trading analyst with 🔍 **Vector Search** capabilities. ${contextSummary}I can help you analyze your trading performance, identify patterns, and provide insights to improve your trading.
 
 Here are some things you can ask me:
 • "What are my strongest trading sessions?"
@@ -400,10 +347,10 @@ Here are some things you can ask me:
 • "Which trading strategies work best for me?"
 • "What's my risk management like?"
 • "Show me patterns in my winning trades"
-${useVectorSearch ? '• "Find trades similar to my best EUR/USD wins"' : ''}
-${useVectorSearch ? '• "Show me high risk-reward ratio trades"' : ''}
+• "Find trades similar to my best EUR/USD wins"
+• "Show me high risk-reward ratio trades"
 
-${useVectorSearch ? '💡 **Vector Search** finds the most relevant trades for each question, giving you more focused and accurate insights!' : ''}
+💡 **Vector Search** finds the most relevant trades for each question, giving you more focused and accurate insights!
 
 What would you like to know about your trading?`,
       timestamp: new Date(),
@@ -423,29 +370,22 @@ What would you like to know about your trading?`,
         title="AI Trading Assistant"
         subtitle={
           optimizedContext
-            ? `${optimizedContext.summary.totalTrades} trades analyzed • ${useVectorSearch ? 'Vector Search' : 'Standard'} • ${chatConfig.defaultProvider.toUpperCase()} ${chatConfig.defaultModel}`
+            ? `${optimizedContext.summary.totalTrades} trades analyzed • Vector Search • ${chatConfig.defaultProvider.toUpperCase()} ${chatConfig.defaultModel}`
             : trades.length > 0
-              ? `${trades.length} trades ready • ${useVectorSearch ? 'Vector Search' : 'Standard'} • ${chatConfig.defaultProvider.toUpperCase()} ${chatConfig.defaultModel}`
+              ? `${trades.length} trades ready • Vector Search • ${chatConfig.defaultProvider.toUpperCase()} ${chatConfig.defaultModel}`
               : 'Ready for trading analysis...'
         }
         icon={<AIIcon />}
         headerActions={
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Tooltip title={useVectorSearch ? "Vector Search: ON - Using semantic search for better context" : "Vector Search: OFF - Using standard context"}>
+            <Tooltip title="Vector Search: ON - Using semantic search for better context">
               <Chip
-                icon={useVectorSearch ? <SearchIcon sx={{ fontSize: '0.7rem' }} /> : <PsychologyIcon sx={{ fontSize: '0.7rem' }} />}
-                label={useVectorSearch ? "Vector" : "Standard"}
+                icon={<SearchIcon sx={{ fontSize: '0.7rem' }} />}
+                label="Vector"
                 size="small"
-                variant={useVectorSearch ? "filled" : "outlined"}
-                color={useVectorSearch ? "primary" : "default"}
-                onClick={() => setUseVectorSearch(!useVectorSearch)}
-                sx={{
-                  fontSize: '0.7rem',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    backgroundColor: useVectorSearch ? 'primary.dark' : 'action.hover'
-                  }
-                }}
+                variant="filled"
+                color="primary"
+                sx={{ fontSize: '0.7rem' }}
               />
             </Tooltip>
 
@@ -504,7 +444,7 @@ What would you like to know about your trading?`,
           )}
 
           {/* Vector Search Results */}
-          {useVectorSearch && lastVectorSearchResults.length > 0 && !isLoading && (
+          {lastVectorSearchResults.length > 0 && !isLoading && (
             <VectorSearchResults
               results={lastVectorSearchResults}
               query={messages.length > 0 ? messages[messages.length - 2]?.content : undefined}
@@ -527,7 +467,7 @@ What would you like to know about your trading?`,
                   : 'Generating context for your query...'
                 }
               </Typography>
-              {useVectorSearch && lastVectorSearchResults.length > 0 && !isLoading && (
+              {lastVectorSearchResults.length > 0 && !isLoading && (
                 <Chip
                   label={`${lastVectorSearchResults.length} relevant trades`}
                   size="small"
@@ -639,8 +579,7 @@ What would you like to know about your trading?`,
         config={chatConfig}
         modelSettings={modelSettings}
         onConfigChange={handleConfigChange}
-        useVectorSearch={useVectorSearch}
-        onVectorSearchChange={setUseVectorSearch}
+        calendar={calendar}
       />
        
     </>

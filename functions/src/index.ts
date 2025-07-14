@@ -2,7 +2,7 @@ import * as admin from 'firebase-admin';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onDocumentUpdated, onDocumentDeleted } from 'firebase-functions/v2/firestore';
 import { handleTradeYearChanges, canDeleteImage, cleanupRemovedImagesHelper, haveTagsChanged, updateTagsWithGroupNameChange, updateTradeTagsWithGroupNameChange, updateCalendarTagsFromTradeChanges, findDuplicatedCalendarsQuery } from './utils';
-import { handleVectorSyncOnYearUpdate, handleVectorSyncOnYearDelete } from './vectorSync';
+// Vector sync moved to client-side calendarService.ts
 
 admin.initializeApp();
 
@@ -41,7 +41,6 @@ export const onTradeChangedV2 = onDocumentUpdated('calendars/{calendarId}/years/
     // Check if tags have changed before updating calendar tags
     const beforeData = event.data?.before.data();
     const afterData = event.data?.after.data();
-    const userId =  event.data?.after.data().userId;
 
     if (haveTagsChanged(beforeData, afterData)) {
       console.log(`Tags changed in calendar ${event.params.calendarId}, updating calendar tags`);
@@ -50,20 +49,7 @@ export const onTradeChangedV2 = onDocumentUpdated('calendars/{calendarId}/years/
       console.log(`No tag changes detected in calendar ${event.params.calendarId}, skipping calendar tags update`);
     }
 
-    // Handle vector sync for Supabase embeddings
-    try {
-      // Get calendar owner from calendar document
-      await handleVectorSyncOnYearUpdate(
-        event.params.calendarId,
-        event.params.yearId,
-        beforeData,
-        afterData,
-        userId
-      );
-    } catch (vectorError) {
-      console.error('Error in vector sync:', vectorError);
-      // Don't throw here - vector sync failure shouldn't break the main function
-    }
+    // Vector sync now handled by client-side calendarService.ts
   } catch (error) {
     console.error('Error in onTradeChanged function:', error);
   }
@@ -168,18 +154,7 @@ export const cleanupDeletedCalendarV2 = onDocumentDeleted('calendars/{calendarId
 
       await Promise.all(deletePromises);
 
-      // 5. Clean up vector embeddings for all year documents
-      try {
-        const vectorCleanupPromises : Promise<void>[] = yearsSnapshot.docs.map(async (yearDoc) => {
-          const yearData = yearDoc.data();
-          return handleVectorSyncOnYearDelete(calendarId, yearDoc.id, yearData, userId);
-        });
-        await Promise.all(vectorCleanupPromises);
-        console.log(`Vector embeddings cleaned up for calendar ${calendarId}`);
-      } catch (vectorError) {
-        console.error('Error cleaning up vector embeddings:', vectorError);
-        // Continue with deletion even if vector cleanup fails
-      }
+      // 5. Vector cleanup now handled by client-side calendarService.ts
 
       // 6. Delete all year documents
       const yearDeletePromises = yearsSnapshot.docs.map(async (yearDoc) => {

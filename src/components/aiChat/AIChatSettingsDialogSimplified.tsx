@@ -33,15 +33,16 @@ import {
   Close as CloseIcon,
   Restore as RestoreIcon,
   Info as InfoIcon,
-  Search as SearchIcon,
-  Psychology as PsychologyIcon
+  Build as BuildIcon
 } from '@mui/icons-material';
-import { 
-  AIChatConfig, 
-  AIModelSettings, 
-  AI_PROVIDERS, 
-  DEFAULT_AI_CHAT_CONFIG 
+import VectorMigrationDialog from '../VectorMigrationDialog';
+import {
+  AIChatConfig,
+  AIModelSettings,
+  AI_PROVIDERS,
+  DEFAULT_AI_CHAT_CONFIG
 } from '../../types/aiChat';
+import { Calendar } from '../../types/calendar';
 
 interface AIChatSettingsDialogProps {
   open: boolean;
@@ -49,8 +50,7 @@ interface AIChatSettingsDialogProps {
   config: AIChatConfig;
   modelSettings?: AIModelSettings;
   onConfigChange: (config: AIChatConfig, modelSettings?: AIModelSettings) => void;
-  useVectorSearch?: boolean;
-  onVectorSearchChange?: (enabled: boolean) => void;
+  calendar?: Calendar;
 }
 
 interface TabPanelProps {
@@ -85,10 +85,10 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
   config,
   modelSettings,
   onConfigChange,
-  useVectorSearch = true,
-  onVectorSearchChange
+  calendar
 }) => {
   const [tabValue, setTabValue] = useState(0);
+  const [showMigrationDialog, setShowMigrationDialog] = useState(false);
   const [localConfig, setLocalConfig] = useState<AIChatConfig>(config);
   const [localModelSettings, setLocalModelSettings] = useState<AIModelSettings>(
     modelSettings || {
@@ -132,6 +132,7 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
   const availableModels = AI_PROVIDERS['firebase-ai'].models;
 
   return (
+    <>
     <Dialog
       open={open}
       onClose={onClose}
@@ -159,6 +160,7 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
             <Tab label="Model Settings" />
             <Tab label="Chat Preferences" />
             <Tab label="Context Settings" />
+            <Tab label="Vector Migration" />
           </Tabs>
         </Box>
 
@@ -272,54 +274,17 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
 
         {/* Chat Preferences Tab */}
         <TabPanel value={tabValue} index={1}>
-          <Card variant="outlined" sx={{ mb: 2 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <SearchIcon />
-                Vector Search
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Use semantic search to find the most relevant trades for each question
-              </Typography>
-
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={useVectorSearch}
-                    onChange={(e) => onVectorSearchChange?.(e.target.checked)}
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography variant="body2">
-                      Enable Vector Search
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {useVectorSearch
-                        ? "AI gets the most relevant trades for better insights"
-                        : "AI uses standard context with all trades"
-                      }
-                    </Typography>
-                  </Box>
-                }
-                sx={{ mb: 2 }}
-              />
-
-              {useVectorSearch && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  <Typography variant="body2">
-                    <strong>Vector Search Benefits:</strong>
-                  </Typography>
-                  <Typography variant="caption" component="div">
-                    • Finds trades by meaning, not just keywords<br/>
-                    • Faster AI responses with focused context<br/>
-                    • Better insights from relevant trade patterns<br/>
-                    • Works great with queries like "profitable EUR/USD trades"
-                  </Typography>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>Vector Search is Always Enabled:</strong>
+            </Typography>
+            <Typography variant="caption" component="div">
+              • Finds trades by meaning, not just keywords<br/>
+              • Faster AI responses with focused context<br/>
+              • Better insights from relevant trade patterns<br/>
+              • Works great with queries like "profitable EUR/USD trades"
+            </Typography>
+          </Alert>
 
           <Card variant="outlined">
             <CardContent>
@@ -468,6 +433,48 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
             </CardContent>
           </Card>
         </TabPanel>
+
+        {/* Vector Migration Tab */}
+        <TabPanel value={tabValue} index={3}>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>Vector Embedding Migration Tool</strong>
+            </Typography>
+            <Typography variant="caption" component="div">
+              If time-based queries like "how many monday trades do i have?" return zero results,
+              this tool can fix the embedding mismatch by regenerating all trade embeddings
+              using the correct transformer model.
+            </Typography>
+          </Alert>
+
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Fix Vector Embeddings
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                This migration tool fixes issues where vector search doesn't work for time-based queries.
+                It regenerates all trade embeddings using the proper transformer model instead of hash-based embeddings.
+              </Typography>
+
+              <Button
+                variant="contained"
+                color="warning"
+                startIcon={<BuildIcon />}
+                onClick={() => setShowMigrationDialog(true)}
+                fullWidth
+                sx={{ mt: 1 }}
+              >
+                Open Vector Migration Tool
+              </Button>
+
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                ⚠️ This process may take several minutes depending on the number of trades.
+                Only run this if vector search is not working properly for time-based queries.
+              </Typography>
+            </CardContent>
+          </Card>
+        </TabPanel>
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -487,6 +494,14 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
         </Button>
       </DialogActions>
     </Dialog>
+
+    {/* Vector Migration Dialog */}
+    <VectorMigrationDialog
+      open={showMigrationDialog}
+      onClose={() => setShowMigrationDialog(false)}
+      calendar={calendar}
+    />
+    </>
   );
 };
 
