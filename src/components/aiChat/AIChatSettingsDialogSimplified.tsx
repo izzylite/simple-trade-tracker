@@ -32,17 +32,16 @@ import {
 import {
   Close as CloseIcon,
   Restore as RestoreIcon,
-  Info as InfoIcon,
-  Build as BuildIcon
+  Info as InfoIcon
 } from '@mui/icons-material';
-import VectorMigrationDialog from '../VectorMigrationDialog';
+
 import {
   AIChatConfig,
   AIModelSettings,
   AI_PROVIDERS,
   DEFAULT_AI_CHAT_CONFIG
 } from '../../types/aiChat';
-import { Calendar } from '../../types/calendar';
+
 
 interface AIChatSettingsDialogProps {
   open: boolean;
@@ -50,7 +49,6 @@ interface AIChatSettingsDialogProps {
   config: AIChatConfig;
   modelSettings?: AIModelSettings;
   onConfigChange: (config: AIChatConfig, modelSettings?: AIModelSettings) => void;
-  calendar?: Calendar;
 }
 
 interface TabPanelProps {
@@ -84,11 +82,9 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
   onClose,
   config,
   modelSettings,
-  onConfigChange,
-  calendar
+  onConfigChange
 }) => {
   const [tabValue, setTabValue] = useState(0);
-  const [showMigrationDialog, setShowMigrationDialog] = useState(false);
   const [localConfig, setLocalConfig] = useState<AIChatConfig>(config);
   const [localModelSettings, setLocalModelSettings] = useState<AIModelSettings>(
     modelSettings || {
@@ -160,7 +156,6 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
             <Tab label="Model Settings" />
             <Tab label="Chat Preferences" />
             <Tab label="Context Settings" />
-            <Tab label="Vector Migration" />
           </Tabs>
         </Box>
 
@@ -434,47 +429,7 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
           </Card>
         </TabPanel>
 
-        {/* Vector Migration Tab */}
-        <TabPanel value={tabValue} index={3}>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            <Typography variant="body2">
-              <strong>Vector Embedding Migration Tool</strong>
-            </Typography>
-            <Typography variant="caption" component="div">
-              If time-based queries like "how many monday trades do i have?" return zero results,
-              this tool can fix the embedding mismatch by regenerating all trade embeddings
-              using the correct transformer model.
-            </Typography>
-          </Alert>
 
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Fix Vector Embeddings
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                This migration tool fixes issues where vector search doesn't work for time-based queries.
-                It regenerates all trade embeddings using the proper transformer model instead of hash-based embeddings.
-              </Typography>
-
-              <Button
-                variant="contained"
-                color="warning"
-                startIcon={<BuildIcon />}
-                onClick={() => setShowMigrationDialog(true)}
-                fullWidth
-                sx={{ mt: 1 }}
-              >
-                Open Vector Migration Tool
-              </Button>
-
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                ⚠️ This process may take several minutes depending on the number of trades.
-                Only run this if vector search is not working properly for time-based queries.
-              </Typography>
-            </CardContent>
-          </Card>
-        </TabPanel>
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -495,12 +450,7 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
       </DialogActions>
     </Dialog>
 
-    {/* Vector Migration Dialog */}
-    <VectorMigrationDialog
-      open={showMigrationDialog}
-      onClose={() => setShowMigrationDialog(false)}
-      calendar={calendar}
-    />
+
     </>
   );
 };

@@ -39,7 +39,6 @@ Guidelines:
 - Focus on practical improvements the trader can implement
 - When analyzing time-based data, consider that timestamps are in Unix format (seconds since epoch)
 - You can calculate day of week, time of day, and other time-based insights from Unix timestamps
-- When data appears limited (e.g., showing only 100 out of 181 trades), acknowledge this limitation and suggest increasing the context if needed for complete analysis
 
 Current date and time: ${new Date().toISOString()}`;
 

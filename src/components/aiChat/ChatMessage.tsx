@@ -16,6 +16,7 @@ import {
   useTheme,
   alpha
 } from '@mui/material';
+import AnimatedText from './AnimatedText';
 import {
   Person as PersonIcon,
   SmartToy as AIIcon,
@@ -34,13 +35,17 @@ interface ChatMessageProps {
   showTimestamp?: boolean;
   showTokenCount?: boolean;
   onRetry?: (messageId: string) => void;
+  isLatestMessage?: boolean;
+  enableAnimation?: boolean;
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
   showTimestamp = true,
   showTokenCount = false,
-  onRetry
+  onRetry,
+  isLatestMessage = false,
+  enableAnimation = true
 }) => {
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
@@ -182,41 +187,63 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       sx={{
         display: 'flex',
         flexDirection: isUser ? 'row-reverse' : 'row',
-        gap: 1,
-        mb: 2,
-        alignItems: 'flex-start'
+        gap: 1.5,
+        mb: 3,
+        alignItems: 'flex-start',
+        px: 1,
+        animation: isLatestMessage && isAssistant ? 'fadeInUp 0.3s ease-out' : 'none',
+        '@keyframes fadeInUp': {
+          '0%': {
+            opacity: 0,
+            transform: 'translateY(10px)'
+          },
+          '100%': {
+            opacity: 1,
+            transform: 'translateY(0)'
+          }
+        }
       }}
     >
       {/* Avatar */}
       <Avatar
         sx={{
-          width: 32,
-          height: 32,
+          width: 36,
+          height: 36,
           backgroundColor: isUser ? 'primary.main' : 'secondary.main',
-          flexShrink: 0
+          flexShrink: 0,
+          boxShadow: 1
         }}
       >
-        {isUser ? <PersonIcon sx={{ fontSize: 18 }} /> : <AIIcon sx={{ fontSize: 18 }} />}
+        {isUser ? <PersonIcon sx={{ fontSize: 20 }} /> : <AIIcon sx={{ fontSize: 20 }} />}
       </Avatar>
 
       {/* Message Content */}
       <Box
         sx={{
-          maxWidth: '75%',
-          minWidth: 0
+          maxWidth: isUser ? '80%' : '85%',
+          minWidth: 0,
+          flex: 1
         }}
       >
         {/* Message Bubble */}
         <Paper
-          elevation={1}
+          elevation={0}
           sx={{
-            p: 2,
+            p: 2.5,
             backgroundColor: getMessageBackground(),
             color: getTextColor(),
-            borderRadius: 2,
-            borderTopLeftRadius: isUser ? 2 : 0.5,
-            borderTopRightRadius: isUser ? 0.5 : 2,
+            borderRadius: 4,
+            borderTopLeftRadius: isUser ? 4 : 1,
+            borderTopRightRadius: isUser ? 1 : 4,
+            borderBottomLeftRadius: isUser ? 4 : 4,
+            borderBottomRightRadius: isUser ? 4 : 4,
             position: 'relative',
+            maxWidth: '100%',
+            boxShadow: isUser
+              ? '0 2px 8px rgba(0,0,0,0.1)'
+              : '0 1px 4px rgba(0,0,0,0.05)',
+            border: isUser ? 'none' : '1px solid',
+            borderColor: isUser ? 'transparent' : alpha(theme.palette.divider, 0.3),
             '&:hover .message-actions': {
               opacity: 1
             }
@@ -224,7 +251,15 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         >
           {/* Message Content */}
           <Box sx={{ mb: message.error ? 1 : 0 }}>
-            {formatContent(message.content)}
+            {isAssistant && enableAnimation && isLatestMessage ? (
+              <AnimatedText
+                text={message.content}
+                speed={Math.min(50, Math.max(20, message.content.length / 10))}
+                isAnimating={message.status === 'received'}
+              />
+            ) : (
+              formatContent(message.content)
+            )}
           </Box>
 
           {/* Error Message */}

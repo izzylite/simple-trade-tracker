@@ -12,7 +12,6 @@ import {
   Typography,
   Alert,
   CircularProgress,
-  Chip,
   Tooltip,
   Divider,
   useTheme,
@@ -22,8 +21,7 @@ import {
   Send as SendIcon,
   Settings as SettingsIcon,
   SmartToy as AIIcon,
-  Refresh as RefreshIcon,
-  Search as SearchIcon
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { v4 as uuidv4 } from 'uuid';
 import UnifiedDrawer from '../common/UnifiedDrawer';
@@ -41,8 +39,8 @@ import { Calendar } from '../../types/calendar';
 import { firebaseAIChatService } from '../../services/firebaseAIChatService';
 import { OptimizedTradingContext } from '../../services/optimizedAIContextService';
 import { aiChatConfigService } from '../../services/aiChatConfigService';
-import { TradeSearchResult } from '../../services/vectorSearchService';
-import { VectorSearchResults } from './VectorSearchResults';
+
+
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
 import { useAuth } from '../../contexts/AuthContext';
@@ -76,7 +74,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [isGeneratingContext, setIsGeneratingContext] = useState(false);
   const [isSearchingVectors, setIsSearchingVectors] = useState(false);
-  const [lastVectorSearchResults, setLastVectorSearchResults] = useState<TradeSearchResult[]>([]);
   const [chatConfig, setChatConfig] = useState(aiChatConfigService.getConfig());
   const [modelSettings, setModelSettings] = useState<AIModelSettings>({
     model: chatConfig.defaultModel,
@@ -154,7 +151,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       );
 
       const relevantTrades = response.relevantTrades || [];
-      setLastVectorSearchResults(relevantTrades);
 
       setIsSearchingVectors(false);
       setIsGeneratingContext(false);
@@ -263,7 +259,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         modelSettings,
         chatConfig
       );
-      setLastVectorSearchResults(response.relevantTrades || []);
+
 
       // Add the new response
       const newAssistantMessage: ChatMessageType = {
@@ -299,21 +295,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   }, [messages, currentProvider, trades, calendar, chatConfig]);
 
   const handleConfigChange = useCallback((newConfig: AIChatConfig, newModelSettings?: AIModelSettings) => {
-    const oldConfig = chatConfig; // Capture current state before update
+     
     aiChatConfigService.saveConfig(newConfig);
-
-    // Check if context-affecting settings changed
-    const contextAffectingSettings = [
-      'includeDetailedTrades',
-      'includeTagAnalysis',
-      'includeEconomicEvents',
-      'includeRecentTrades',
-      'maxContextTrades'
-    ] as const;
-
-    const shouldRegenerateContext = contextAffectingSettings.some(
-      setting => newConfig[setting] !== oldConfig[setting]
-    );
+    logger.log('Configuration updated - context will be regenerated on next message');
 
     // Update state
     setChatConfig(newConfig);
@@ -322,11 +306,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     if (newModelSettings) {
       setModelSettings(newModelSettings);
     }
-
-    // Context will be regenerated on next message with new settings
-    if (shouldRegenerateContext) {
-      logger.log('Configuration updated - context will be regenerated on next message');
-    }
+ 
   }, [chatConfig, trades, calendar]);
 
 
@@ -341,7 +321,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     return {
       id: 'welcome',
       role: 'assistant',
-      content: `👋 Hello! I'm your AI trading analyst with 🔍 **Vector Search** capabilities. ${contextSummary}I can help you analyze your trading performance, identify patterns, and provide insights to improve your trading.
+      content: `👋 Hello! I'm your AI trading analyst. ${contextSummary}I can help you analyze your trading performance, identify patterns, and provide insights to improve your trading.
 
 Here are some things you can ask me:
 • "What are my strongest trading sessions?"
@@ -352,7 +332,7 @@ Here are some things you can ask me:
 • "Find trades similar to my best EUR/USD wins"
 • "Show me high risk-reward ratio trades"
 
-💡 **Vector Search** finds the most relevant trades for each question, giving you more focused and accurate insights!
+💡 I'll analyze your trading data to give you focused and accurate insights!
 
 What would you like to know about your trading?`,
       timestamp: new Date(),
@@ -372,41 +352,22 @@ What would you like to know about your trading?`,
         title="AI Trading Assistant"
         subtitle={
           optimizedContext
-            ? `${optimizedContext.summary.totalTrades} trades analyzed • Vector Search • ${chatConfig.defaultProvider.toUpperCase()} ${chatConfig.defaultModel}`
+            ? `${optimizedContext.summary.totalTrades} trades analyzed`
             : trades.length > 0
-              ? `${trades.length} trades ready • Vector Search • ${chatConfig.defaultProvider.toUpperCase()} ${chatConfig.defaultModel}`
+              ? `${trades.length} trades ready`
               : 'Ready for trading analysis...'
         }
         icon={<AIIcon />}
         headerActions={
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Tooltip title="Vector Search: ON - Using semantic search for better context">
-              <Chip
-                icon={<SearchIcon sx={{ fontSize: '0.7rem' }} />}
-                label="Vector"
-                size="small"
-                variant="filled"
-                color="primary"
-                sx={{ fontSize: '0.7rem' }}
-              />
-            </Tooltip>
-
-            <Chip
-              label={currentProvider.toUpperCase()}
+          <Tooltip title="Settings">
+            <IconButton
               size="small"
-              variant="outlined"
-              sx={{ fontSize: '0.7rem' }}
-            />
-            <Tooltip title="Settings">
-              <IconButton
-                size="small"
-                onClick={() => setShowSettingsDialog(true)}
-                sx={{ color: 'text.secondary' }}
-              >
-                <SettingsIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
+              onClick={() => setShowSettingsDialog(true)}
+              sx={{ color: 'text.secondary' }}
+            >
+              <SettingsIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         }
         width={{ xs: '100%', sm: 500 }}
         headerVariant="enhanced"
@@ -415,13 +376,21 @@ What would you like to know about your trading?`,
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          backgroundColor: 'background.default'
         }}>
           {/* Error Alert */}
           {error && (
             <Alert
               severity="error"
-              sx={{ m: 2, mb: 1 }}
+              sx={{
+                m: 2,
+                mb: 1,
+                borderRadius: 2,
+                '& .MuiAlert-message': {
+                  width: '100%'
+                }
+              }}
               action={
                 error.retryable ? (
                   <Button
@@ -445,39 +414,37 @@ What would you like to know about your trading?`,
             </Alert>
           )}
 
-          {/* Vector Search Results */}
-          {lastVectorSearchResults.length > 0 && !isLoading && (
-            <VectorSearchResults
-              results={lastVectorSearchResults}
-              query={messages.length > 0 ? messages[messages.length - 2]?.content : undefined}
-            />
-          )}
+
 
           {/* Loading Context */}
           {(isGeneratingContext || isSearchingVectors) && (
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1,
+              gap: 2,
               p: 2,
-              backgroundColor: alpha(theme.palette.primary.main, 0.1)
+              mx: 2,
+              mb: 1,
+              backgroundColor: alpha(theme.palette.primary.main, 0.08),
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: alpha(theme.palette.primary.main, 0.2)
             }}>
-              <CircularProgress size={16} />
-              <Typography variant="body2" color="text.secondary">
+              <CircularProgress
+                size={18}
+                thickness={4}
+                sx={{ color: 'primary.main' }}
+              />
+              <Typography
+                variant="body2"
+                color="primary.main"
+                sx={{ fontWeight: 500 }}
+              >
                 {isSearchingVectors
-                  ? 'Finding relevant trades with vector search...'
-                  : 'Generating context for your query...'
+                  ? 'Finding relevant trades...'
+                  : 'Analyzing your trading data...'
                 }
               </Typography>
-              {lastVectorSearchResults.length > 0 && !isLoading && (
-                <Chip
-                  label={`${lastVectorSearchResults.length} relevant trades`}
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  sx={{ fontSize: '0.7rem', ml: 1 }}
-                />
-              )}
             </Box>
           )}
 
@@ -487,17 +454,23 @@ What would you like to know about your trading?`,
             sx={{
               flex: 1,
               overflow: 'auto',
-              p: 2,
+              p: 3,
+              pb: 1,
+              backgroundColor: alpha(theme.palette.background.default, 0.3),
+              backgroundImage: `radial-gradient(circle at 20% 80%, ${alpha(theme.palette.primary.main, 0.03)} 0%, transparent 50%),
+                               radial-gradient(circle at 80% 20%, ${alpha(theme.palette.secondary.main, 0.03)} 0%, transparent 50%)`,
               ...scrollbarStyles(theme)
             }}
           >
-            {displayMessages.map((message) => (
+            {displayMessages.map((message, index) => (
               <ChatMessage
                 key={message.id}
                 message={message}
                 showTimestamp={true}
                 showTokenCount={chatConfig.showTokenCount}
                 onRetry={handleMessageRetry}
+                isLatestMessage={index === displayMessages.length - 1}
+                enableAnimation={true}
               />
             ))}
 
@@ -506,25 +479,60 @@ What would you like to know about your trading?`,
               <Box sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 1,
+                gap: 2,
                 p: 2,
-                color: 'text.secondary'
+                mb: 2
               }}>
-                <CircularProgress size={16} />
-                <Typography variant="body2">
-                  AI is thinking...
-                </Typography>
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  backgroundColor: alpha(theme.palette.grey[500], 0.1),
+                  borderRadius: 2,
+                  px: 2,
+                  py: 1
+                }}>
+                  <CircularProgress
+                    size={16}
+                    thickness={4}
+                    sx={{ color: 'text.secondary' }}
+                  />
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ fontStyle: 'italic' }}
+                  >
+                    AI is thinking...
+                  </Typography>
+                </Box>
               </Box>
             )}
 
             <div ref={messagesEndRef} />
           </Box>
 
-          <Divider />
+          <Divider sx={{ borderColor: alpha(theme.palette.divider, 0.5) }} />
 
           {/* Input Area */}
-          <Box sx={{ p: 2 }}>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+          <Box sx={{
+            p: 2,
+            backgroundColor: alpha(theme.palette.background.paper, 0.8),
+            backdropFilter: 'blur(10px)'
+          }}>
+            <Box sx={{
+              display: 'flex',
+              gap: 1,
+              alignItems: 'flex-end',
+              backgroundColor: 'background.paper',
+              borderRadius: 3,
+              p: 1,
+              border: '1px solid',
+              borderColor: 'divider',
+              '&:focus-within': {
+                borderColor: 'primary.main',
+                boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}`
+              }
+            }}>
               <TextField
                 ref={inputRef}
                 fullWidth
@@ -535,40 +543,60 @@ What would you like to know about your trading?`,
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={handleKeyPress}
                 disabled={isLoading}
-                variant="outlined"
-                size="small"
+                variant="standard"
+                InputProps={{
+                  disableUnderline: true,
+                  sx: {
+                    fontSize: '0.95rem',
+                    lineHeight: 1.4
+                  }
+                }}
                 sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2
+                  '& .MuiInputBase-input': {
+                    padding: '8px 0'
                   }
                 }}
               />
               <IconButton
                 onClick={handleSendMessage}
                 disabled={!inputMessage.trim() || isLoading}
-                color="primary"
+                size="small"
                 sx={{
-                  backgroundColor: 'primary.main',
-                  color: 'primary.contrastText',
+                  backgroundColor: inputMessage.trim() && !isLoading ? 'primary.main' : 'action.disabledBackground',
+                  color: inputMessage.trim() && !isLoading ? 'primary.contrastText' : 'action.disabled',
+                  width: 36,
+                  height: 36,
+                  transition: 'all 0.2s ease-in-out',
                   '&:hover': {
-                    backgroundColor: 'primary.dark'
+                    backgroundColor: inputMessage.trim() && !isLoading ? 'primary.dark' : 'action.disabledBackground',
+                    transform: inputMessage.trim() && !isLoading ? 'scale(1.05)' : 'none'
                   },
                   '&:disabled': {
-                    backgroundColor: 'action.disabledBackground'
+                    backgroundColor: 'action.disabledBackground',
+                    color: 'action.disabled'
                   }
                 }}
               >
                 {isLoading ? (
-                  <CircularProgress size={20} color="inherit" />
+                  <CircularProgress size={18} color="inherit" />
                 ) : (
-                  <SendIcon />
+                  <SendIcon sx={{ fontSize: 18 }} />
                 )}
               </IconButton>
             </Box>
 
             {/* Helper Text */}
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Press Enter to send, Shift+Enter for new line
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                mt: 1,
+                display: 'block',
+                textAlign: 'center',
+                opacity: 0.7
+              }}
+            >
+              Press Enter to send • Shift+Enter for new line
             </Typography>
           </Box>
         </Box>
@@ -581,7 +609,6 @@ What would you like to know about your trading?`,
         config={chatConfig}
         modelSettings={modelSettings}
         onConfigChange={handleConfigChange}
-        calendar={calendar}
       />
        
     </>
