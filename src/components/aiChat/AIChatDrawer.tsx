@@ -50,13 +50,15 @@ interface AIChatDrawerProps {
   onClose: () => void;
   trades: Trade[];
   calendar: Calendar;
+  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
 }
 
 const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   open,
   onClose,
   trades,
-  calendar
+  calendar,
+  onOpenGalleryMode
 }) => {
   const theme = useTheme();
   const { user } = useAuth();
@@ -473,9 +475,17 @@ What would you like to know about your trading?`,
                 isLatestMessage={index === displayMessages.length - 1}
                 enableAnimation={true}
                 functionCalls={message.functionCalls}
-                onTradeClick={(tradeId) => {
-                  // TODO: Implement trade click handler - could open trade details or navigate to trade
-                  logger.log('Trade clicked:', tradeId);
+                onTradeClick={(tradeId, contextTrades) => {
+                  if (onOpenGalleryMode) {
+                    // Find the clicked trade in the context trades
+                    const clickedTrade = contextTrades.find(t => t.id === tradeId);
+                    if (clickedTrade) {
+                      // Open gallery mode with only the context trades from this AI response
+                      onOpenGalleryMode(contextTrades, tradeId, 'AI Chat - Trade Gallery');
+                    }
+                  } else {
+                    logger.log('Trade clicked but gallery mode not available:', tradeId);
+                  }
                 }}
               />
             ))}

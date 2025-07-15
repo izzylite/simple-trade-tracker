@@ -1790,6 +1790,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         onClose={() => setIsAIChatOpen(false)}
         trades={trades}
         calendar={calendar!}
+        onOpenGalleryMode={openGalleryMode}
       />
 
 

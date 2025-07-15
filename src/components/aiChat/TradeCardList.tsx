@@ -48,7 +48,7 @@ const TradeCardList: React.FC<TradeCardListProps> = ({
     return null;
   }
 
-  const displayedTrades = expanded ? trades : trades.slice(0, maxInitialDisplay);
+  const displayedTrades = trades.slice(0, maxInitialDisplay);
   const hasMoreTrades = trades.length > maxInitialDisplay;
 
   // Calculate summary statistics

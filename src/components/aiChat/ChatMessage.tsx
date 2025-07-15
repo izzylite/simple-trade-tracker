@@ -28,6 +28,7 @@ import {
   Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { ChatMessage as ChatMessageType, MessageStatus } from '../../types/aiChat';
+import { Trade } from '../../types/trade';
 import { format } from 'date-fns';
 import { logger } from '../../utils/logger';
 import { parseAIResponse } from '../../utils/aiResponseParser';
@@ -40,7 +41,7 @@ interface ChatMessageProps {
   isLatestMessage?: boolean;
   enableAnimation?: boolean;
   functionCalls?: any[]; // Function calls data for trade card display
-  onTradeClick?: (tradeId: string) => void; // Callback for trade card clicks
+  onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void; // Callback for trade card clicks with context trades
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -289,7 +290,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 showSummary={true}
                 compact={true}
                 maxInitialDisplay={3}
-                onTradeClick={onTradeClick ? (trade) => onTradeClick(trade.id) : undefined}
+                onTradeClick={onTradeClick && parsedResponse.tradeData ? (trade) => onTradeClick(trade.id, parsedResponse.tradeData!.trades) : undefined}
               />
             </Box>
           )}
