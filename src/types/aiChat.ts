@@ -24,6 +24,8 @@ export interface ChatMessage {
     charts?: ChartData[];
     recommendations?: string[];
   };
+  // Function calls data for trade card display
+  functionCalls?: any[];
 }
 
 export interface TradingInsight {

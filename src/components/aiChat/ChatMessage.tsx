@@ -3,7 +3,7 @@
  * Displays user and AI messages with proper formatting
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -17,6 +17,7 @@ import {
   alpha
 } from '@mui/material';
 import AnimatedText from './AnimatedText';
+import TradeCardList from './TradeCardList';
 import {
   Person as PersonIcon,
   SmartToy as AIIcon,
@@ -29,6 +30,7 @@ import {
 import { ChatMessage as ChatMessageType, MessageStatus } from '../../types/aiChat';
 import { format } from 'date-fns';
 import { logger } from '../../utils/logger';
+import { parseAIResponse } from '../../utils/aiResponseParser';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -37,6 +39,8 @@ interface ChatMessageProps {
   onRetry?: (messageId: string) => void;
   isLatestMessage?: boolean;
   enableAnimation?: boolean;
+  functionCalls?: any[]; // Function calls data for trade card display
+  onTradeClick?: (tradeId: string) => void; // Callback for trade card clicks
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -45,12 +49,26 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   showTokenCount = false,
   onRetry,
   isLatestMessage = false,
-  enableAnimation = true
+  enableAnimation = true,
+  functionCalls,
+  onTradeClick
 }) => {
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
+
+  // Parse AI response for trade data
+  const parsedResponse = useMemo(() => {
+    if (isAssistant && functionCalls) {
+      return parseAIResponse(message.content, functionCalls);
+    }
+    return {
+      textContent: message.content,
+      tradeData: undefined,
+      hasStructuredData: false
+    };
+  }, [message.content, functionCalls, isAssistant]);
 
   const handleCopy = async () => {
     try {
@@ -253,14 +271,28 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           <Box sx={{ mb: message.error ? 1 : 0 }}>
             {isAssistant && enableAnimation && isLatestMessage ? (
               <AnimatedText
-                text={message.content}
-                speed={Math.min(50, Math.max(20, message.content.length / 10))}
+                text={parsedResponse.textContent}
+                speed={200} // Much faster: 200 characters per second
                 isAnimating={message.status === 'received'}
               />
             ) : (
-              formatContent(message.content)
+              formatContent(parsedResponse.textContent)
             )}
           </Box>
+
+          {/* Trade Cards */}
+          {isAssistant && parsedResponse.tradeData && parsedResponse.tradeData.trades.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <TradeCardList
+                trades={parsedResponse.tradeData.trades}
+                title={parsedResponse.tradeData.title}
+                showSummary={true}
+                compact={true}
+                maxInitialDisplay={3}
+                onTradeClick={onTradeClick ? (trade) => onTradeClick(trade.id) : undefined}
+              />
+            </Box>
+          )}
 
           {/* Error Message */}
           {message.error && (

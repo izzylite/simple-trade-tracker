@@ -17,7 +17,7 @@ interface AnimatedTextProps {
 
 const AnimatedText: React.FC<AnimatedTextProps> = ({
   text,
-  speed = 50, // Default 50 characters per second
+  speed = 150, // Default 150 characters per second (much faster)
   onComplete,
   isAnimating = true,
   component = 'span',
@@ -152,23 +152,6 @@ const AnimatedText: React.FC<AnimatedTextProps> = ({
       }}
     >
       {formatContent(displayedText)}
-      {isAnimating && currentIndex < text.length && (
-        <Box
-          component="span"
-          sx={{
-            display: 'inline-block',
-            width: '2px',
-            height: '1em',
-            backgroundColor: 'currentColor',
-            ml: 0.5,
-            animation: 'blink 1s infinite',
-            '@keyframes blink': {
-              '0%, 50%': { opacity: 1 },
-              '51%, 100%': { opacity: 0 }
-            }
-          }}
-        />
-      )}
     </Typography>
   );
 };

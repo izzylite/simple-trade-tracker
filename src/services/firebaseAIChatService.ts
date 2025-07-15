@@ -35,14 +35,15 @@ Key capabilities:
 Available Functions:
 You have access to the following functions to dynamically fetch and analyze trading data:
 
-1. searchTrades(params) - Search for trades based on criteria:
-   - dateRange: "last 30 days", "last 6 months", "2024-01", etc.
+1. searchTrades(params) - Search for trades based on criteria (USE THIS FOR MOST TRADE QUERIES):
+   - dateRange: "last 30 days", "last 6 months", "2024-01", "current month", etc.
    - tradeType: "win", "loss", "breakeven", "all"
    - minAmount/maxAmount: filter by P&L amount
    - tags: array of tag names to filter by
    - session: "london", "new-york", "tokyo", "sydney"
    - dayOfWeek: "monday", "tuesday", etc.
    - limit: maximum number of trades to return
+   - NOTE: Results are automatically sorted by amount (highest first) for "win" trades
 
 2. getTradeStatistics(params) - Get statistical analysis:
    - period: time period for analysis
@@ -53,11 +54,30 @@ You have access to the following functions to dynamically fetch and analyze trad
    - query: natural language description of what to find
    - limit: maximum number of results
 
-4. queryDatabase(params) - Execute SQL queries against the database:
+4. queryDatabase(params) - Execute SQL queries against the database (ADVANCED USE ONLY):
    - query: SQL SELECT statement to execute
    - description: optional description of what the query does
    - Note: Only SELECT queries are allowed for security
    - Note: Queries are automatically filtered by user_id and calendar_id for data isolation
+   - WARNING: This function is currently not fully implemented. Use searchTrades, getTradeStatistics, or findSimilarTrades instead for most queries.
+
+CRITICAL INSTRUCTION - TRADE DISPLAY:
+When you call functions that return trade data (searchTrades, getTradeStatistics, findSimilarTrades), the individual trades will be AUTOMATICALLY displayed as interactive cards below your response.
+
+DO NOT include individual trade details in your text response such as:
+- Trade dates, amounts, or IDs
+- Entry/exit prices
+- Individual trade sessions or tags
+- Lists of trades with their details
+
+Instead, your response should ONLY contain:
+- High-level analysis and insights
+- Patterns and trends you observe
+- Actionable recommendations
+- Summary statistics (total P&L, win rate, trade count)
+- Strategic advice based on the data
+
+This saves tokens and provides a better user experience with your analysis + visual trade cards.
 
 Available Database Tables and Views:
 - trade_embeddings: Raw trade data with embeddings
@@ -163,13 +183,39 @@ Current date and time: ${new Date().toISOString()}`;
           ]
         });
 
-        // Send function responses
-        const functionResponseParts = functionCalls.map((call, index) => ({
-          functionResponse: {
-            name: call.name,
-            response: functionResults[index]
+        // Send function responses with explicit instruction about trade cards
+        const hasTradeData = functionResults.some(result =>
+          result.success && result.data && (result.data.trades || result.data.bestTrade || result.data.worstTrade)
+        );
+
+        // Modify function results to include trade card reminder if needed
+        const functionResponseParts = functionCalls.map((call, index) => {
+          const originalResult = functionResults[index];
+
+          // Add reminder to the first function result that contains trade data
+          if (hasTradeData && index === 0 && originalResult.success && originalResult.data) {
+            const modifiedResult = {
+              ...originalResult,
+              data: {
+                ...originalResult.data,
+                _reminder: "IMPORTANT: The trades from this function call will be displayed as interactive cards below your response. Do not list individual trade details in your text - focus only on analysis, insights, and recommendations."
+              }
+            };
+            return {
+              functionResponse: {
+                name: call.name,
+                response: modifiedResult
+              }
+            };
           }
-        }));
+
+          return {
+            functionResponse: {
+              name: call.name,
+              response: originalResult
+            }
+          };
+        });
 
         const followUpResult = await chat.sendMessage(functionResponseParts);
 

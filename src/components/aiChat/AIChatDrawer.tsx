@@ -164,7 +164,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         timestamp: new Date(),
         status: 'received',
         provider: currentProvider,
-        tokenCount: response.tokenCount
+        tokenCount: response.tokenCount,
+        functionCalls: functionCalls
       };
 
       setMessages(prev => [...prev, aiMessage]);
@@ -234,15 +235,16 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     const userMessage = messages[userMessageIndex];
 
     try {
-      // Remove the assistant message being retried
-      const updatedMessages = messages.filter(msg => msg.id !== messageId);
+      // Remove all messages after the user message that prompted the retried response
+      // This includes the AI message being retried and any subsequent messages
+      const updatedMessages = messages.slice(0, userMessageIndex + 1);
       setMessages(updatedMessages);
 
       // Set loading state
       setIsLoading(true);
 
       // Create conversation history up to the user message
-      const conversationHistory = updatedMessages.slice(0, userMessageIndex + 1);
+      const conversationHistory = updatedMessages;
 
       if (!user) {
         throw new Error('User not authenticated');
@@ -267,7 +269,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         timestamp: new Date(),
         status: 'received',
         provider: currentProvider,
-        tokenCount: response.tokenCount
+        tokenCount: response.tokenCount,
+        functionCalls: response.functionCalls || []
       };
 
       setMessages(prev => [...prev, newAssistantMessage]);
@@ -469,6 +472,11 @@ What would you like to know about your trading?`,
                 onRetry={handleMessageRetry}
                 isLatestMessage={index === displayMessages.length - 1}
                 enableAnimation={true}
+                functionCalls={message.functionCalls}
+                onTradeClick={(tradeId) => {
+                  // TODO: Implement trade click handler - could open trade details or navigate to trade
+                  logger.log('Trade clicked:', tradeId);
+                }}
               />
             ))}
 
