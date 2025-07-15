@@ -23,6 +23,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { Trade } from '../../types/trade';
 import TradeCard from './TradeCard';
+import { scrollbarStyles } from '../../styles/scrollbarStyles';
 
 interface TradeCardListProps {
   trades: Trade[];
@@ -146,17 +147,45 @@ const TradeCardList: React.FC<TradeCardListProps> = ({
       </Box>
 
       {/* Trade Cards */}
-      <Stack spacing={1.5}>
-        {displayedTrades.map((trade) => (
-          <TradeCard
-            key={trade.id}
-            trade={trade}
-            compact={compact}
-            onClick={onTradeClick ? () => onTradeClick(trade) : undefined}
-            showImages={true}
-          />
-        ))}
-      </Stack>
+      <Box sx={{ 
+        maxHeight: '500px', 
+        overflowY: 'auto',
+        px: 0.3,
+        py: 1,
+        ...(expanded && {
+          borderTop: '1px solid',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+        }),
+         ...scrollbarStyles(theme)
+      }}>
+        <Stack spacing={1.5}>
+          {displayedTrades.map((trade) => (
+            <TradeCard
+              key={trade.id}
+              trade={trade}
+              compact={compact}
+              onClick={onTradeClick ? () => onTradeClick(trade) : undefined}
+              showImages={true}
+            />
+          ))}
+        </Stack>
+   
+        {/* Additional trades in collapsed state */}
+        <Collapse in={expanded}>
+          <Stack spacing={1.5} sx={{ mt: 1.5 }}>
+            {trades.slice(maxInitialDisplay).map((trade) => (
+              <TradeCard
+                key={trade.id}
+                trade={trade}
+                compact={compact}
+                onClick={onTradeClick ? () => onTradeClick(trade) : undefined}
+                showImages={true}
+              />
+            ))}
+          </Stack>
+        </Collapse>
+      </Box>
 
       {/* Expand/Collapse Button */}
       {hasMoreTrades && (
@@ -175,21 +204,6 @@ const TradeCardList: React.FC<TradeCardListProps> = ({
           </Button>
         </Box>
       )}
-
-      {/* Additional trades in collapsed state */}
-      <Collapse in={expanded}>
-        <Stack spacing={1.5} sx={{ mt: 1.5 }}>
-          {trades.slice(maxInitialDisplay).map((trade) => (
-            <TradeCard
-              key={trade.id}
-              trade={trade}
-              compact={compact}
-              onClick={onTradeClick ? () => onTradeClick(trade) : undefined}
-              showImages={true}
-            />
-          ))}
-        </Stack>
-      </Collapse>
     </Box>
   );
 };

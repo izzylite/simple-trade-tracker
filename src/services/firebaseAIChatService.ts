@@ -124,8 +124,8 @@ class FirebaseAIChatService {
           if (hasTradeData && index === 0 && originalResult.success && originalResult.data) {
             let reminder: string;
 
-            if (call.name === 'findSimilarTrades') {
-              // For findSimilarTrades, AI should analyze the trades to answer the user's question
+            if (call.name === 'findSimilarTrades' || (call.name === 'queryDatabase' && originalResult.data?.fallbackUsed)) {
+              // For findSimilarTrades or queryDatabase with fallback, AI should analyze the trades to answer the user's question
               reminder = "CRITICAL: These trades are for CONTEXT only - they are NOT the final answer. You must ANALYZE these trades to answer the user's specific question. Do not just list or describe the trades. Instead, examine them for patterns, insights, and conclusions that directly address what the user asked. Focus on answering their question using these trades as evidence. Include JSON with trade IDs for specific trades you want to highlight as examples.";
             } else {
               // For other functions, trades are the direct answer

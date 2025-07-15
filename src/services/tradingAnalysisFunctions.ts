@@ -41,6 +41,7 @@ export interface FindSimilarTradesParams {
 export interface QueryDatabaseParams {
   query: string;
   description?: string;
+  fallbackQuery?: string; // Natural language query for findSimilarTrades fallback
 }
 
 class TradingAnalysisFunctions {
@@ -394,6 +395,42 @@ class TradingAnalysisFunctions {
         const tradeIds = this.extractTradeIdsFromResults(results);
         if (tradeIds.length > 0) {
           trades = this.trades.filter(trade => tradeIds.includes(trade.id));
+        }
+      }
+
+      // Check if we found any trades and implement fallback if needed
+      if (trades.length === 0 && params.fallbackQuery) {
+        logger.log('No trades found from queryDatabase, attempting fallback with findSimilarTrades');
+
+        try {
+          const fallbackResult = await this.findSimilarTrades({
+            query: params.fallbackQuery,
+            limit: 50
+          });
+
+          if (fallbackResult.success && fallbackResult.data?.trades && fallbackResult.data.trades.length > 0) {
+            logger.log(`Fallback successful: found ${fallbackResult.data.trades.length} trades via semantic search`);
+
+            return {
+              success: true,
+              data: {
+                results: results,
+                query: finalQuery,
+                description: params.description,
+                rowCount: rowCount,
+                trades: fallbackResult.data.trades,
+                count: fallbackResult.data.trades.length,
+                totalPnl: fallbackResult.data.trades.reduce((sum: number, trade: Trade) => sum + trade.amount, 0),
+                winRate: this.calculateWinRate(fallbackResult.data.trades),
+                fallbackUsed: true,
+                fallbackQuery: params.fallbackQuery,
+                originalQuery: finalQuery
+              }
+            };
+          }
+        } catch (fallbackError) {
+          logger.error('Fallback to findSimilarTrades failed:', fallbackError);
+          // Continue with original empty results
         }
       }
 

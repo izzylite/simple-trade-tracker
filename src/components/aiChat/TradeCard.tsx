@@ -128,92 +128,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
                   {trade.name}
                 </Typography>
               )}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <DateIcon sx={{ fontSize: '0.875rem', color: 'text.secondary' }} />
-                <Typography variant="caption" color="text.secondary">
-                  {format(new Date(trade.date), 'MMM dd, yyyy')}
-                </Typography>
-                {trade.session && (
-                  <>
-                    <SessionIcon sx={{ fontSize: '0.875rem', color: 'text.secondary' }} />
-                    <Typography variant="caption" color="text.secondary">
-                      {trade.session}
-                    </Typography>
-                  </>
-                )}
-              </Box>
-            </Box>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {getTradeTypeIcon()}
-              <Typography
-                variant="h6"
-                fontWeight="bold"
-                color={`${getTradeTypeColorName()}.main`}
-                sx={{ fontSize: compact ? '1rem' : '1.25rem' }}
-              >
-                {formatAmount(trade.amount)}
-              </Typography>
-            </Box>
-          </Box>
-
-          {/* Trade Details */}
-          {!compact && (
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              {trade.entry && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary">Entry</Typography>
-                  <Typography variant="body2" fontWeight="medium">{trade.entry}</Typography>
-                </Box>
-              )}
-              {trade.exit && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary">Exit</Typography>
-                  <Typography variant="body2" fontWeight="medium">{trade.exit}</Typography>
-                </Box>
-              )}
-              {trade.riskToReward && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary">R:R</Typography>
-                  <Typography variant="body2" fontWeight="medium">{trade.riskToReward.toFixed(2)}</Typography>
-                </Box>
-              )}
-            </Box>
-          )}
-
-          {/* Tags */}
-          {trade.tags && trade.tags.length > 0 && (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {Object.entries(groupedTags).map(([group, groupTags]) => (
-                <Tooltip
-                  key={group}
-                  title={
-                    <Box sx={{ p: 0.5 }}>
-                      {groupTags.map(tag => (
-                        <Typography key={tag} variant="body2">
-                          {formatTagForDisplay(tag, true)}
-                        </Typography>
-                      ))}
-                    </Box>
-                  }
-                  arrow
-                >
-                  <Chip
-                    label={`${group}${groupTags.length > 1 ? ` (${groupTags.length})` : ''}`}
-                    size="small"
-                    sx={{
-                      ...getTagChipStyles(groupTags[0], theme),
-                      height: '20px',
-                      fontSize: '0.7rem',
-                      '& .MuiChip-label': { px: 1 }
-                    }}
-                  />
-                </Tooltip>
-              ))}
-            </Box>
-          )}
-
-          {/* Additional Info Icons */}
+                     {/* Additional Info Icons */}
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
             {trade.notes && (
               <Tooltip title="Has notes">
@@ -255,6 +170,94 @@ const TradeCard: React.FC<TradeCardProps> = ({
               </Tooltip>
             )}
           </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <DateIcon sx={{ fontSize: '0.875rem', color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary">
+                  {format(new Date(trade.date), 'MMM dd, yyyy')}
+                </Typography>
+                {trade.session && (
+                  <>
+                    <SessionIcon sx={{ fontSize: '0.875rem', color: 'text.secondary' }} />
+                    <Typography variant="caption" color="text.secondary">
+                      {trade.session}
+                    </Typography>
+                  </>
+                )}
+              </Box>
+
+        
+            </Box>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {getTradeTypeIcon()}
+              <Typography
+                variant="h6"
+                fontWeight="bold"
+                color={`${getTradeTypeColorName()}.main`}
+                sx={{ fontSize: compact ? '1rem' : '1.25rem' }}
+              >
+                {formatAmount(trade.amount)}
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Trade Details */}
+          {!compact && (
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              {trade.entry && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Entry</Typography>
+                  <Typography variant="body2" fontWeight="medium">{trade.entry}</Typography>
+                </Box>
+              )}
+              {trade.exit && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Exit</Typography>
+                  <Typography variant="body2" fontWeight="medium">{trade.exit}</Typography>
+                </Box>
+              )}
+              {trade.riskToReward && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">R:R</Typography>
+                  <Typography variant="body2" fontWeight="medium">{trade.riskToReward.toFixed(2)}</Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+
+          {/* Tags */}
+          {/* {trade.tags && trade.tags.length > 0 && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {Object.entries(groupedTags).map(([group, groupTags]) => (
+                <Tooltip
+                  key={group}
+                  title={
+                    <Box sx={{ p: 0.5 }}>
+                      {groupTags.map(tag => (
+                        <Typography key={tag} variant="body2">
+                          {formatTagForDisplay(tag, true)}
+                        </Typography>
+                      ))}
+                    </Box>
+                  }
+                  arrow
+                >
+                  <Chip
+                    label={`${group}${groupTags.length > 1 ? ` (${groupTags.length})` : ''}`}
+                    size="small"
+                    sx={{
+                      ...getTagChipStyles(groupTags[0], theme),
+                      height: '20px',
+                      fontSize: '0.7rem',
+                      '& .MuiChip-label': { px: 1 }
+                    }}
+                  />
+                </Tooltip>
+              ))}
+            </Box>
+          )} */}
+
+         
         </Stack>
       </CardContent>
     </Card>

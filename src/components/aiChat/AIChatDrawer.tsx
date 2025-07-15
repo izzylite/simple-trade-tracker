@@ -473,14 +473,14 @@ What would you like to know about your trading?`,
                 showTokenCount={chatConfig.showTokenCount}
                 onRetry={handleMessageRetry}
                 isLatestMessage={index === displayMessages.length - 1}
-                enableAnimation={true}
+                enableAnimation={index > 0}
                 functionCalls={message.functionCalls}
-                onTradeClick={(tradeId, contextTrades) => {
+                onTradeClick={(tradeId,contextTrades) => {
                   if (onOpenGalleryMode) {
-                    // Find the clicked trade in the context trades
+                    // Find the clicked trade
                     const clickedTrade = contextTrades.find(t => t.id === tradeId);
                     if (clickedTrade) {
-                      // Open gallery mode with only the context trades from this AI response
+                      // Open gallery mode with all trades, starting from the clicked trade
                       onOpenGalleryMode(contextTrades, tradeId, 'AI Chat - Trade Gallery');
                     }
                   } else {
