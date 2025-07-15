@@ -79,9 +79,9 @@ SELECT
 FROM trade_embeddings
 GROUP BY user_id, calendar_id;
 
--- View: Trade embeddings by session
+-- View: Trade embeddings by session (aggregated)
 CREATE OR REPLACE VIEW trade_embeddings_by_session AS
-SELECT 
+SELECT
     user_id,
     calendar_id,
     trade_session,
@@ -90,16 +90,30 @@ SELECT
     SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END) as wins,
     SUM(CASE WHEN trade_type = 'loss' THEN 1 ELSE 0 END) as losses,
     ROUND(
-        (SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END)::DECIMAL / COUNT(*)) * 100, 
+        (SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END)::DECIMAL / COUNT(*)) * 100,
         2
     ) as win_rate
 FROM trade_embeddings
 WHERE trade_session IS NOT NULL
 GROUP BY user_id, calendar_id, trade_session;
 
--- View: Trade embeddings by day of week
+-- View: Individual trades by session (for trade card display)
+CREATE OR REPLACE VIEW trade_embeddings_session_details AS
+SELECT
+    user_id,
+    calendar_id,
+    trade_id,
+    trade_session,
+    trade_type,
+    trade_amount,
+    trade_date,
+    tags
+FROM trade_embeddings
+WHERE trade_session IS NOT NULL;
+
+-- View: Trade embeddings by day of week (aggregated)
 CREATE OR REPLACE VIEW trade_embeddings_by_day AS
-SELECT 
+SELECT
     user_id,
     calendar_id,
     EXTRACT(DOW FROM trade_date) as day_of_week,
@@ -112,9 +126,24 @@ FROM trade_embeddings
 GROUP BY user_id, calendar_id, EXTRACT(DOW FROM trade_date), TO_CHAR(trade_date, 'Day')
 ORDER BY day_of_week;
 
--- View: Trade embeddings by month
+-- View: Individual trades by day of week (for trade card display)
+CREATE OR REPLACE VIEW trade_embeddings_day_details AS
+SELECT
+    user_id,
+    calendar_id,
+    trade_id,
+    EXTRACT(DOW FROM trade_date) as day_of_week,
+    TO_CHAR(trade_date, 'Day') as day_name,
+    trade_type,
+    trade_amount,
+    trade_date,
+    trade_session,
+    tags
+FROM trade_embeddings;
+
+-- View: Trade embeddings by month (aggregated)
 CREATE OR REPLACE VIEW trade_embeddings_by_month AS
-SELECT 
+SELECT
     user_id,
     calendar_id,
     DATE_TRUNC('month', trade_date) as month,
@@ -128,9 +157,24 @@ FROM trade_embeddings
 GROUP BY user_id, calendar_id, DATE_TRUNC('month', trade_date), TO_CHAR(trade_date, 'YYYY-MM')
 ORDER BY month;
 
--- View: Most common tags
+-- View: Individual trades by month (for trade card display)
+CREATE OR REPLACE VIEW trade_embeddings_month_details AS
+SELECT
+    user_id,
+    calendar_id,
+    trade_id,
+    DATE_TRUNC('month', trade_date) as month,
+    TO_CHAR(trade_date, 'YYYY-MM') as month_label,
+    trade_type,
+    trade_amount,
+    trade_date,
+    trade_session,
+    tags
+FROM trade_embeddings;
+
+-- View: Most common tags (aggregated)
 CREATE OR REPLACE VIEW trade_embeddings_tag_analysis AS
-SELECT 
+SELECT
     user_id,
     calendar_id,
     unnest(tags) as tag,
@@ -143,12 +187,31 @@ WHERE tags IS NOT NULL AND array_length(tags, 1) > 0
 GROUP BY user_id, calendar_id, unnest(tags)
 ORDER BY tag_count DESC;
 
+-- View: Individual trades by tag (for trade card display)
+CREATE OR REPLACE VIEW trade_embeddings_tag_details AS
+SELECT
+    user_id,
+    calendar_id,
+    trade_id,
+    unnest(tags) as tag,
+    trade_type,
+    trade_amount,
+    trade_date,
+    trade_session,
+    tags
+FROM trade_embeddings
+WHERE tags IS NOT NULL AND array_length(tags, 1) > 0;
+
 -- Set ownership of views to postgres (optional, for better management)
 ALTER VIEW user_trade_embeddings_summary OWNER TO postgres;
 ALTER VIEW trade_embeddings_by_session OWNER TO postgres;
+ALTER VIEW trade_embeddings_session_details OWNER TO postgres;
 ALTER VIEW trade_embeddings_by_day OWNER TO postgres;
+ALTER VIEW trade_embeddings_day_details OWNER TO postgres;
 ALTER VIEW trade_embeddings_by_month OWNER TO postgres;
+ALTER VIEW trade_embeddings_month_details OWNER TO postgres;
 ALTER VIEW trade_embeddings_tag_analysis OWNER TO postgres;
+ALTER VIEW trade_embeddings_tag_details OWNER TO postgres;
 
 -- Note: Views automatically inherit RLS from their base tables.
 -- Since trade_embeddings already has RLS policies that filter by user_id,

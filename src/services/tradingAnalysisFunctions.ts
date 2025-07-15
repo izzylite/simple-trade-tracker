@@ -386,13 +386,26 @@ class TradingAnalysisFunctions {
       const results = data && data.data ? data.data : data;
       const rowCount = data && data.row_count ? data.row_count : (Array.isArray(results) ? results.length : 0);
 
+      // Try to extract trade IDs from results and fetch corresponding trades
+      let trades: Trade[] = [];
+      if (Array.isArray(results) && results.length > 0) {
+        const tradeIds = this.extractTradeIdsFromResults(results);
+        if (tradeIds.length > 0) {
+          trades = this.trades.filter(trade => tradeIds.includes(trade.id));
+        }
+      }
+
       return {
         success: true,
         data: {
           results: results,
           query: finalQuery,
           description: params.description,
-          rowCount: rowCount
+          rowCount: rowCount,
+          trades: trades.length > 0 ? trades : undefined,
+          count: trades.length,
+          totalPnl: trades.reduce((sum, trade) => sum + trade.amount, 0),
+          winRate: this.calculateWinRate(trades)
         }
       };
 
@@ -406,6 +419,37 @@ class TradingAnalysisFunctions {
   }
 
   // Helper methods
+  private extractTradeIdsFromResults(results: any[]): string[] {
+    const tradeIds: string[] = [];
+
+    // If no results, return empty array
+    if (!results || results.length === 0) {
+      return [];
+    }
+
+    // Check if we're dealing with aggregated data from views
+    const firstResult = results[0];
+    const isAggregatedData =
+      'trade_count' in firstResult ||
+      'win_count' in firstResult ||
+      'tag_count' in firstResult;
+
+    // If this is aggregated data from views, we can't extract trade IDs
+    if (isAggregatedData) {
+      return [];
+    }
+
+    // Extract trade_id from results
+    for (const result of results) {
+      if (result.trade_id && typeof result.trade_id === 'string') {
+        tradeIds.push(result.trade_id);
+      }
+    }
+
+    // Remove duplicates
+    return Array.from(new Set(tradeIds));
+  }
+
   private calculateWinRate(trades: Trade[]): number {
     if (trades.length === 0) return 0;
     const wins = trades.filter(trade => trade.type === 'win').length;
