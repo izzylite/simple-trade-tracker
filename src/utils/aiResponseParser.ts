@@ -62,12 +62,29 @@ export function trimmedTradeToTrade(trimmedTrade: TrimmedTrade): Trade {
 /**
  * Parse AI response to extract trade data and clean text content
  */
-export function parseAIResponse(response: string, functionCalls?: any[]): ParsedAIResponse {
+export function parseAIResponse(response: string, functionCalls?: any[], allTrades?: Trade[]): ParsedAIResponse {
   let textContent = response;
   let tradeData: ParsedAIResponse['tradeData'] = undefined;
   let hasStructuredData = false;
 
-  // Check if function calls contain trade data
+  // First, try to extract trade cards from JSON in the response text
+  if (allTrades && allTrades.length > 0) {
+    const jsonTradeCards = extractTradeCardsFromJSON(response, allTrades);
+    if (jsonTradeCards) {
+      tradeData = jsonTradeCards;
+      hasStructuredData = true;
+      // Clean the JSON from the text content
+      textContent = cleanJsonFromResponse(response);
+
+      return {
+        textContent,
+        tradeData,
+        hasStructuredData
+      };
+    }
+  }
+
+  // Fallback: Check if function calls contain trade data (legacy support)
   if (functionCalls && functionCalls.length > 0) {
     for (const call of functionCalls) {
       if (call.result?.success && call.result?.data) {
@@ -361,4 +378,198 @@ export function extractTradeDataFromFunctionCalls(functionCalls: any[]): Trade[]
   );
 
   return uniqueTrades;
+}
+
+/**
+ * Extract trade cards from JSON format in AI response
+ */
+function extractTradeCardsFromJSON(response: string, allTrades?: Trade[]): ParsedAIResponse['tradeData'] | null {
+  if (!allTrades || allTrades.length === 0) {
+    return null;
+  }
+
+  // Look for JSON code blocks with tradeCards (complete or incomplete)
+  // More flexible pattern that captures everything after ```json until ``` or end of string
+  const jsonCodeBlockPattern = /```json\s*\n?\s*([\s\S]*?)(?:\s*\n?\s*```|$)/gi;
+  const codeBlockMatch = response.match(jsonCodeBlockPattern);
+
+  if (codeBlockMatch) {
+      // Extract the JSON content from the code block
+      let jsonContent = codeBlockMatch[0].replace(/```json\s*\n?\s*/, '').replace(/\s*\n?\s*```/, '').trim();
+
+      // Check if this contains tradeCards
+      if (jsonContent.includes('"tradeCards"')) {
+        // Try to fix incomplete JSON by adding missing closing brackets
+        jsonContent = fixIncompleteJSON(jsonContent);
+
+        try {
+          const jsonData = JSON.parse(jsonContent);
+
+          if (jsonData.tradeCards && Array.isArray(jsonData.tradeCards)) {
+          // Find trades by ID from the allTrades array
+          const trades = jsonData.tradeCards
+            .map((tradeId: string) => allTrades.find((trade: Trade) => trade.id === tradeId))
+            .filter((trade: Trade | undefined): trade is Trade => trade !== undefined);
+
+          if (trades.length > 0) {
+            return {
+              trades,
+              title: jsonData.title || 'Trade Cards',
+              summary: {
+                totalTrades: trades.length,
+                totalPnL: trades.reduce((sum: number, t: Trade) => sum + t.amount, 0),
+                winRate: calculateWinRate(trades)
+              }
+            };
+          }
+        }
+      } catch (parseError) {
+        // If JSON parsing fails, try to extract trade IDs manually
+        const tradeIds = extractTradeIdsFromIncompleteJSON(jsonContent);
+        if (tradeIds.length > 0) {
+          const trades = tradeIds
+            .map((tradeId: string) => allTrades.find((trade: Trade) => trade.id === tradeId))
+            .filter((trade: Trade | undefined): trade is Trade => trade !== undefined);
+
+          if (trades.length > 0) {
+            return {
+              trades,
+              title: 'Trade Cards',
+              summary: {
+                totalTrades: trades.length,
+                totalPnL: trades.reduce((sum: number, t: Trade) => sum + t.amount, 0),
+                winRate: calculateWinRate(trades)
+              }
+            };
+          }
+        }
+      }
+    }
+
+    // Fallback: look for simpler JSON pattern without code blocks (complete or incomplete)
+    const simpleJsonPattern = /\{"tradeCards":\s*\[[\s\S]*?(?:\][\s\S]*?\}|$)/i;
+    const simpleMatch = response.match(simpleJsonPattern);
+
+    if (simpleMatch) {
+      let jsonContent = simpleMatch[0];
+
+      // Try to fix incomplete JSON
+      jsonContent = fixIncompleteJSON(jsonContent);
+
+      try {
+        const jsonData = JSON.parse(jsonContent);
+        if (jsonData.tradeCards && Array.isArray(jsonData.tradeCards)) {
+          // Find trades by ID from the allTrades array
+          const trades = jsonData.tradeCards
+            .map((tradeId: string) => allTrades.find((trade: Trade) => trade.id === tradeId))
+            .filter((trade: Trade | undefined): trade is Trade => trade !== undefined);
+
+          if (trades.length > 0) {
+            return {
+              trades,
+              title: jsonData.title || 'Trade Cards',
+              summary: {
+                totalTrades: trades.length,
+                totalPnL: trades.reduce((sum: number, t: Trade) => sum + t.amount, 0),
+                winRate: calculateWinRate(trades)
+              }
+            };
+          }
+        }
+      } catch (parseError) {
+        // If JSON parsing fails, try to extract trade IDs manually
+        const tradeIds = extractTradeIdsFromIncompleteJSON(jsonContent);
+        if (tradeIds.length > 0) {
+          const trades = tradeIds
+            .map((tradeId: string) => allTrades.find((trade: Trade) => trade.id === tradeId))
+            .filter((trade: Trade | undefined): trade is Trade => trade !== undefined);
+
+          if (trades.length > 0) {
+            return {
+              trades,
+              title: 'Trade Cards',
+              summary: {
+                totalTrades: trades.length,
+                totalPnL: trades.reduce((sum: number, t: Trade) => sum + t.amount, 0),
+                winRate: calculateWinRate(trades)
+              }
+            };
+          }
+        }
+      }
+    }
+
+  return null;
+}
+
+
+
+/**
+ * Fix incomplete JSON by adding missing closing brackets
+ */
+function fixIncompleteJSON(jsonContent: string): string {
+  try {
+    // First try to parse as-is
+    JSON.parse(jsonContent);
+    return jsonContent;
+  } catch (error) {
+    // Try to fix common issues with incomplete JSON
+    let fixed = jsonContent.trim();
+
+    // Count opening and closing braces
+    const openBraces = (fixed.match(/\{/g) || []).length;
+    const closeBraces = (fixed.match(/\}/g) || []).length;
+
+    // Count opening and closing brackets
+    const openBrackets = (fixed.match(/\[/g) || []).length;
+    const closeBrackets = (fixed.match(/\]/g) || []).length;
+
+    // Add missing closing brackets for arrays
+    for (let i = 0; i < openBrackets - closeBrackets; i++) {
+      fixed += ']';
+    }
+
+    // Add missing closing braces for objects
+    for (let i = 0; i < openBraces - closeBraces; i++) {
+      fixed += '}';
+    }
+
+    return fixed;
+  }
+}
+
+/**
+ * Extract trade IDs from incomplete JSON manually
+ */
+function extractTradeIdsFromIncompleteJSON(jsonContent: string): string[] {
+  const tradeIds: string[] = [];
+
+  // Look for tradeCards array content
+  const tradeCardsMatch = jsonContent.match(/"tradeCards":\s*\[([\s\S]*?)(?:\]|$)/i);
+  if (tradeCardsMatch) {
+    const arrayContent = tradeCardsMatch[1];
+
+    // Extract all quoted strings that look like trade IDs (UUID format)
+    // This handles both complete UUIDs and partial ones at the end
+    const uuidPattern = /"([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"/gi;
+    let match;
+
+    while ((match = uuidPattern.exec(arrayContent)) !== null) {
+      tradeIds.push(match[1]);
+    }
+
+    // Also look for partial UUIDs at the end (incomplete due to truncation)
+    const partialUuidMatch = arrayContent.match(/"([a-f0-9]{5,})$/i);
+    if (partialUuidMatch) {
+      const partialId = partialUuidMatch[1];
+      // Only consider it if it's at least 8 characters (could be start of UUID)
+      if (partialId.length >= 8) {
+        // Try to find a matching trade ID that starts with this partial ID
+        // This will be handled by the calling function with access to allTrades
+      }
+    }
+  }
+
+  return tradeIds;
+}
 }

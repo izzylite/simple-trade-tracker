@@ -3,12 +3,12 @@
  * Functions that the AI can call to dynamically fetch and analyze trading data
  */
 
-import { Trade } from '../types/trade';
-import { Calendar } from '../types/calendar';
+import { Trade } from '../../types/trade';
+import { Calendar } from '../../types/calendar';
 import { vectorSearchService } from './vectorSearchService';
-import { supabase } from '../config/supabase';
-import { logger } from '../utils/logger';
-import { isTradeInSession, getSessionMappings } from '../utils/sessionTimeUtils';
+import { supabase } from '../../config/supabase';
+import { logger } from '../../utils/logger';
+import { isTradeInSession, getSessionMappings } from '../../utils/sessionTimeUtils';
 
 export interface TradingAnalysisResult {
   success: boolean;
@@ -48,14 +48,16 @@ class TradingAnalysisFunctions {
   private trades: Trade[] = [];
   private calendar: Calendar | null = null;
   private userId: string = '';
+  private maxContextTrades = 100;
 
   /**
    * Initialize with current trading data
    */
-  initialize(trades: Trade[], calendar: Calendar) {
+  initialize(trades: Trade[], calendar: Calendar, maxContextTrades = 100) {
     this.trades = trades;
     this.calendar = calendar;
     this.userId = calendar.userId;
+    this.maxContextTrades = maxContextTrades;
   }
 
   /**
@@ -165,6 +167,8 @@ class TradingAnalysisFunctions {
         filteredTrades = filteredTrades.slice(0, params.limit);
       }
 
+      
+
       return {
         success: true,
         data: {
@@ -247,7 +251,7 @@ class TradingAnalysisFunctions {
         this.userId,
         this.calendar.id,
         {
-          maxResults: params.limit || 100,
+          maxResults: params.limit || this.maxContextTrades,
           similarityThreshold: 0.3
         }
       );
@@ -255,6 +259,7 @@ class TradingAnalysisFunctions {
       // Get the actual trade objects
       const tradeIds = similarTrades.map(st => st.tradeId);
       const actualTrades = this.trades.filter(trade => tradeIds.includes(trade.id));
+ 
       logger.log(`Found ${actualTrades.length} actual trades from vector search results`);
 
       return {
@@ -394,7 +399,15 @@ class TradingAnalysisFunctions {
         logger.log(`Found ${results.length} results from query, attempting to extract trade IDs`);
         const tradeIds = this.extractTradeIdsFromResults(results);
         if (tradeIds.length > 0) {
-          trades = this.trades.filter(trade => tradeIds.includes(trade.id));
+          const foundTrades = this.trades.filter(trade => tradeIds.includes(trade.id));
+
+          // Only create lightweight versions if there are more than 20 trades
+          trades = foundTrades.length > 20
+            ? foundTrades.map(trade => ({
+                ...trade,
+                images: [] // Remove images to avoid serialization issues
+              }))
+            : foundTrades; // Keep full data for 20 or fewer trades
         }
       }
 
@@ -403,9 +416,10 @@ class TradingAnalysisFunctions {
         logger.log('No trades found from queryDatabase, attempting fallback with findSimilarTrades');
 
         try {
+          
           const fallbackResult = await this.findSimilarTrades({
             query: params.fallbackQuery,
-            limit: 50
+            limit: this.maxContextTrades
           });
 
           if (fallbackResult.success && fallbackResult.data?.trades && fallbackResult.data.trades.length > 0) {

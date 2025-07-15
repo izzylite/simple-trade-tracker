@@ -42,6 +42,7 @@ interface ChatMessageProps {
   enableAnimation?: boolean;
   functionCalls?: any[]; // Function calls data for trade card display
   onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void; // Callback for trade card clicks with context trades
+  allTrades?: Trade[]; // All trades for JSON trade card lookup
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -52,7 +53,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   isLatestMessage = false,
   enableAnimation = true,
   functionCalls,
-  onTradeClick
+  onTradeClick,
+  allTrades
 }) => {
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
@@ -61,15 +63,16 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
   // Parse AI response for trade data
   const parsedResponse = useMemo(() => {
-    if (isAssistant && functionCalls) {
-      return parseAIResponse(message.content, functionCalls);
+    if (isAssistant) {
+      // Parse response for both JSON trade cards and function call results
+      return parseAIResponse(message.content, functionCalls, allTrades);
     }
     return {
       textContent: message.content,
       tradeData: undefined,
       hasStructuredData: false
     };
-  }, [message.content, functionCalls, isAssistant]);
+  }, [message.content, functionCalls, isAssistant, allTrades]);
 
   const handleCopy = async () => {
     try {
@@ -289,7 +292,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 title={parsedResponse.tradeData.title}
                 showSummary={true}
                 compact={true}
-                maxInitialDisplay={3}
+                maxInitialDisplay={2}
                 onTradeClick={onTradeClick && parsedResponse.tradeData ? (trade) => onTradeClick(trade.id, parsedResponse.tradeData!.trades) : undefined}
               />
             </Box>

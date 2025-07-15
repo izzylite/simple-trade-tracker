@@ -119,62 +119,77 @@ const TradeCard: React.FC<TradeCardProps> = ({
       onClick={onClick}
     >
       <CardContent sx={{ p: compact ? 2 : 3, '&:last-child': { pb: compact ? 2 : 3 } }}>
-        <Stack spacing={compact ? 1 : 1.5}>
+        <Stack spacing={compact ? 1.5 : 1.5}>
           {/* Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <Box sx={{ flex: 1 }}>
-              {trade.name && (
-                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 0.5 }}>
-                  {trade.name}
-                </Typography>
-              )}
-                     {/* Additional Info Icons */}
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            {trade.notes && (
-              <Tooltip title="Has notes">
-                <NoteIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-              </Tooltip>
-            )}
-            {trade.images && trade.images.length > 0 && showImages && (
-              <Tooltip title={`${trade.images.length} image(s)`}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <ImageIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-                  <Typography variant="caption" color="text.secondary">
-                    {trade.images.length}
-                  </Typography>
-                </Box>
-              </Tooltip>
-            )}
-            {trade.riskToReward && compact && (
-              <Tooltip title={`Risk to Reward: ${trade.riskToReward.toFixed(2)}`}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <RiskIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-                  <Typography variant="caption" color="text.secondary">
-                    {trade.riskToReward.toFixed(2)}
-                  </Typography>
-                </Box>
-              </Tooltip>
-            )}
-            {trade.partialsTaken && (
-              <Tooltip title="Partials taken">
-                <Chip
-                  label="Partials"
-                  size="small"
-                  variant="outlined"
-                  sx={{ 
-                    height: '18px', 
-                    fontSize: '0.65rem',
-                    '& .MuiChip-label': { px: 0.5 }
-                  }}
-                />
-              </Tooltip>
-            )}
-          </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <DateIcon sx={{ fontSize: '0.875rem', color: 'text.secondary' }} />
-                <Typography variant="caption" color="text.secondary">
-                  {format(new Date(trade.date), 'MMM dd, yyyy')}
-                </Typography>
+                <Box sx={{ flex: 1 }}>
+                  {trade.name && (
+                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                      {trade.name}
+                    </Typography>
+                  )}
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {getTradeTypeIcon()}
+                  <Typography
+                    variant="h6"
+                    fontWeight="bold"
+                    color={`${getTradeTypeColorName()}.main`}
+                    sx={{ fontSize: compact ? '1rem' : '1.25rem' }}
+                  >
+                    {formatAmount(trade.amount)}
+                  </Typography>
+                </Box>
+              </Box>
+              {/* Additional Info Icons */}
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                {trade.notes && (
+                  <Tooltip title="Has notes">
+                    <NoteIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+                  </Tooltip>
+                )}
+                {trade.images && trade.images.length > 0 && showImages && (
+                  <Tooltip title={`${trade.images.length} image(s)`}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <ImageIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+                      <Typography variant="caption" color="text.secondary">
+                        {trade.images.length}
+                      </Typography>
+                    </Box>
+                  </Tooltip>
+                )}
+                {trade.riskToReward && compact && (
+                  <Tooltip title={`Risk to Reward: ${trade.riskToReward.toFixed(2)}`}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <RiskIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+                      <Typography variant="caption" color="text.secondary">
+                        {trade.riskToReward.toFixed(2)}
+                      </Typography>
+                    </Box>
+                  </Tooltip>
+                )}
+                {trade.partialsTaken && (
+                  <Tooltip title="Partials taken">
+                    <Chip
+                      label="Partials"
+                      size="small"
+                      variant="outlined"
+                      sx={{
+                        height: '18px',
+                        fontSize: '0.65rem',
+                        '& .MuiChip-label': { px: 0.5 }
+                      }}
+                    />
+                  </Tooltip>
+                )}
+
+                <>
+                  <DateIcon sx={{ fontSize: '0.875rem', color: 'text.secondary' }} />
+                  <Typography variant="caption" color="text.secondary" noWrap>{format(new Date(trade.date), 'MMM dd, yyyy')}</Typography>
+                </>
+
                 {trade.session && (
                   <>
                     <SessionIcon sx={{ fontSize: '0.875rem', color: 'text.secondary' }} />
@@ -185,22 +200,11 @@ const TradeCard: React.FC<TradeCardProps> = ({
                 )}
               </Box>
 
-        
-            </Box>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {getTradeTypeIcon()}
-              <Typography
-                variant="h6"
-                fontWeight="bold"
-                color={`${getTradeTypeColorName()}.main`}
-                sx={{ fontSize: compact ? '1rem' : '1.25rem' }}
-              >
-                {formatAmount(trade.amount)}
-              </Typography>
+
+
+
             </Box>
           </Box>
-
           {/* Trade Details */}
           {!compact && (
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -257,7 +261,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
             </Box>
           )} */}
 
-         
+
         </Stack>
       </CardContent>
     </Card>

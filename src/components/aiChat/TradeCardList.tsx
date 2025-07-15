@@ -37,7 +37,7 @@ interface TradeCardListProps {
 const TradeCardList: React.FC<TradeCardListProps> = ({
   trades,
   title,
-  maxInitialDisplay = 3,
+  maxInitialDisplay = 2,
   onTradeClick,
   showSummary = true,
   compact = true

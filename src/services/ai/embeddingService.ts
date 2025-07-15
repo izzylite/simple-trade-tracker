@@ -4,8 +4,8 @@
  */
 
 import { pipeline, FeatureExtractionPipeline } from '@xenova/transformers';
-import { Trade } from '../types/trade';
-import { logger } from '../utils/logger';
+import { Trade } from '../../types/trade';
+import { logger } from '../../utils/logger';
 
 // Embedding model configuration
 const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';

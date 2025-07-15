@@ -3,8 +3,8 @@
  * Manages AI chat settings persistence and validation
  */
 
-import { AIChatConfig, DEFAULT_AI_CHAT_CONFIG } from '../types/aiChat';
-import { logger } from '../utils/logger';
+import { AIChatConfig, DEFAULT_AI_CHAT_CONFIG } from '../../types/aiChat';
+import { logger } from '../../utils/logger';
 
 class AIChatConfigService {
   private readonly STORAGE_KEY = 'ai-chat-config';

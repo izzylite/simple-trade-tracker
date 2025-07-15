@@ -36,9 +36,8 @@ import {
 } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
-import { firebaseAIChatService } from '../../services/firebaseAIChatService';
-import { OptimizedTradingContext } from '../../services/optimizedAIContextService';
-import { aiChatConfigService } from '../../services/aiChatConfigService';
+import { firebaseAIChatService } from '../../services/ai/firebaseAIChatService';
+import { aiChatConfigService } from '../../services/ai/aiChatConfigService';
 
 
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
@@ -71,7 +70,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [currentProvider] = useState<AIProvider>('firebase-ai');
-  const [optimizedContext, setOptimizedContext] = useState<OptimizedTradingContext | null>(null);
+
   const [error, setError] = useState<ChatError | null>(null);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [isGeneratingContext, setIsGeneratingContext] = useState(false);
@@ -315,11 +314,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
 
   const getWelcomeMessage = (): ChatMessageType => {
-    const contextSummary = optimizedContext
-      ? `I can see you have ${optimizedContext.summary.totalTrades} trades with a ${optimizedContext.summary.winRate.toFixed(1)}% win rate. `
-      : trades.length > 0
-        ? `I can see you have ${trades.length} trades. `
-        : '';
+    const contextSummary = trades.length > 0
+      ? `I can see you have ${trades.length} trades. `
+      : '';
 
     return {
       id: 'welcome',
@@ -354,11 +351,9 @@ What would you like to know about your trading?`,
         onClose={onClose}
         title="AI Trading Assistant"
         subtitle={
-          optimizedContext
-            ? `${optimizedContext.summary.totalTrades} trades analyzed`
-            : trades.length > 0
-              ? `${trades.length} trades ready`
-              : 'Ready for trading analysis...'
+          trades.length > 0
+            ? `${trades.length} trades ready`
+            : 'Ready for trading analysis...'
         }
         icon={<AIIcon />}
         headerActions={
@@ -475,6 +470,7 @@ What would you like to know about your trading?`,
                 isLatestMessage={index === displayMessages.length - 1}
                 enableAnimation={index > 0}
                 functionCalls={message.functionCalls}
+                allTrades={trades}
                 onTradeClick={(tradeId,contextTrades) => {
                   if (onOpenGalleryMode) {
                     // Find the clicked trade

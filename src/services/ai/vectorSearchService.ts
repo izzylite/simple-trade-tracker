@@ -3,10 +3,10 @@
  * Handles semantic search using Supabase pgvector
  */
 
-import { supabase, SUPABASE_TABLES, VECTOR_CONFIG } from '../config/supabase';
+import { supabase, SUPABASE_TABLES, VECTOR_CONFIG } from '../../config/supabase';
 import { embeddingService } from './embeddingService';
-import { Trade } from '../types/trade';
-import { logger } from '../utils/logger';
+import { Trade } from '../../types/trade';
+import { logger } from '../../utils/logger';
 
 export interface TradeSearchResult {
   tradeId: string;

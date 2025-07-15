@@ -8,16 +8,14 @@ import {
   AIModelSettings,
   ChatError,
   AIChatConfig
-} from '../types/aiChat';
-import { ai } from '../firebase/config';
+} from '../../types/aiChat';
+import { ai } from '../../firebase/config';
 import { getGenerativeModel, SchemaType, FunctionDeclaration } from 'firebase/ai';
-import { logger } from '../utils/logger';
-import { optimizedAIContextService, OptimizedTradingContext } from './optimizedAIContextService';
-import { vectorSearchService, TradeSearchResult } from './vectorSearchService';
-import { aiChatConfigService } from './aiChatConfigService';
+import { logger } from '../../utils/logger';
+
 import { tradingAnalysisFunctions, TradingAnalysisResult } from './tradingAnalysisFunctions';
-import { Trade } from '../types/trade';
-import { Calendar } from '../types/calendar';
+import { Trade } from '../../types/trade';
+import { Calendar } from '../../types/calendar';
 import { getSystemPrompt } from './aiSystemPrompt';
 
 
@@ -40,10 +38,7 @@ class FirebaseAIChatService {
       logger.log('Sending message with AI-driven function calling...');
 
       // Initialize trading analysis functions with current data
-      tradingAnalysisFunctions.initialize(trades, calendar);
-
-      // Get the current config (for potential future use)
-      // const currentConfig = config || aiChatConfigService.getConfig();
+      tradingAnalysisFunctions.initialize(trades, calendar, config?.maxContextTrades || 100);
 
       // Prepare messages for function calling
       const messages = this.prepareFunctionCallingMessages(message, conversationHistory);
@@ -56,7 +51,7 @@ class FirebaseAIChatService {
         model: modelName,
         generationConfig: {
           temperature: modelSettings?.settings?.temperature || 0.7,
-          maxOutputTokens: modelSettings?.settings?.maxTokens || 2000,
+          maxOutputTokens: modelSettings?.settings?.maxTokens || 8000,
           topP: modelSettings?.settings?.topP || 1
         },
         tools: [{
@@ -71,24 +66,40 @@ class FirebaseAIChatService {
       const result = await model.generateContent([{ text: prompt }]);
       const response = result.response;
 
+      // Validate response
+      if (!response) {
+        throw new Error('No response received from AI model');
+      }
+
       // Check if the AI wants to call functions
-      const functionCalls = response.functionCalls();
+      let functionCalls: any[] = [];
+      try {
+        functionCalls = response.functionCalls() || [];
+      } catch (error) {
+        logger.warn('Error extracting function calls from response:', error);
+        functionCalls = [];
+      }
+
       let finalResponse = '';
       const executedFunctions: any[] = [];
 
-      if (functionCalls && functionCalls.length > 0) {
+      if (functionCalls && Array.isArray(functionCalls) && functionCalls.length > 0) {
         logger.log(`AI requested ${functionCalls.length} function calls`);
 
         // Execute function calls
         const functionResults: TradingAnalysisResult[] = [];
         for (const call of functionCalls) {
-          const result = await this.executeFunctionCall(call);
-          functionResults.push(result);
-          executedFunctions.push({
-            name: call.name,
-            args: call.args,
-            result: result
-          });
+          if (call && call.name) {
+            const result = await this.executeFunctionCall(call);
+            functionResults.push(result);
+            executedFunctions.push({
+              name: call.name,
+              args: call.args,
+              result: result
+            });
+          } else {
+            logger.warn('Invalid function call received:', call);
+          }
         }
 
         // Send function results back to AI for final response
@@ -101,24 +112,27 @@ class FirebaseAIChatService {
             },
             {
               role: 'model',
-              parts: functionCalls.map(call => ({
-                functionCall: {
-                  name: call.name,
-                  args: call.args
-                }
-              }))
+              parts: functionCalls
+                .filter(call => call && call.name)
+                .map(call => ({
+                  functionCall: {
+                    name: call.name,
+                    args: call.args || {}
+                  }
+                }))
             }
           ]
         });
 
         // Send function responses with explicit instruction about trade cards
-        const hasTradeData = functionResults.some(result =>
-          result.success && result.data && (result.data.trades || result.data.bestTrade || result.data.worstTrade)
+        const hasTradeData = Array.isArray(functionResults) && functionResults.some(result =>
+          result && result.success && result.data && (result.data.trades || result.data.bestTrade || result.data.worstTrade)
         );
 
         // Modify function results to include appropriate reminders based on function type
         const functionResponseParts = functionCalls.map((call, index) => {
           const originalResult = functionResults[index];
+ 
 
           // Add reminder to the first function result that contains trade data
           if (hasTradeData && index === 0 && originalResult.success && originalResult.data) {
@@ -126,10 +140,10 @@ class FirebaseAIChatService {
 
             if (call.name === 'findSimilarTrades' || (call.name === 'queryDatabase' && originalResult.data?.fallbackUsed)) {
               // For findSimilarTrades or queryDatabase with fallback, AI should analyze the trades to answer the user's question
-              reminder = "CRITICAL: These trades are for CONTEXT only - they are NOT the final answer. You must ANALYZE these trades to answer the user's specific question. Do not just list or describe the trades. Instead, examine them for patterns, insights, and conclusions that directly address what the user asked. Focus on answering their question using these trades as evidence. Include JSON with trade IDs for specific trades you want to highlight as examples.";
+              reminder = "CRITICAL: These trades are for CONTEXT only - they are NOT the final answer. You must ANALYZE these trades to answer the user's specific question. Do not just list or describe the trades. Instead, examine them for patterns, insights, and conclusions that directly address what the user asked. Focus on answering their question using these trades as evidence. If you want to highlight specific trades as examples, include their IDs in JSON format: {\"tradeCards\": [\"trade-id-1\", \"trade-id-2\"], \"title\": \"Example Title\"}.";
             } else {
               // For other functions, trades are the direct answer
-              reminder = "IMPORTANT: The trades from this function call will be displayed as interactive cards below your response. Do not list individual trade details in your text - focus only on analysis, insights, and recommendations.";
+              reminder = "IMPORTANT: If you want to display specific trades as cards, include their IDs in JSON format: {\"tradeCards\": [\"trade-id-1\", \"trade-id-2\"], \"title\": \"Example Title\"}. Do not list individual trade details in your text - focus only on analysis, insights, and recommendations.";
             }
 
             const modifiedResult = {
@@ -155,9 +169,44 @@ class FirebaseAIChatService {
           };
         });
 
-        const followUpResult = await chat.sendMessage(functionResponseParts);
+        try {
+          logger.log(`Sending ${functionResponseParts.length} function responses to AI for final processing`);
+          const followUpResult = await chat.sendMessage(functionResponseParts);
 
-        finalResponse = followUpResult.response.text() || 'No response received';
+          // Safely extract response text
+          try {
+            finalResponse = followUpResult.response.text() || 'No response received';
+          } catch (textError) {
+            logger.warn('Error extracting text from follow-up response:', textError);
+            finalResponse = 'Response received but text extraction failed';
+          }
+        } catch (sendError) {
+          logger.error('Error sending function responses to AI:', sendError);
+          logger.error('Function response parts that caused error:', JSON.stringify(functionResponseParts, null, 2));
+
+          // Fallback: try with minimal data
+          const minimalParts = functionCalls.map((call, index) => ({
+            functionResponse: {
+              name: call.name,
+              response: {
+                success: functionResults[index].success,
+                data: {
+                  count: functionResults[index].data?.count || 0,
+                  message: 'Function executed successfully but data was simplified for processing'
+                }
+              }
+            }
+          }));
+
+          try {
+            logger.log('Attempting fallback with minimal function response data');
+            const fallbackResult = await chat.sendMessage(minimalParts);
+            finalResponse = fallbackResult.response.text() || 'Function executed but response processing failed';
+          } catch (fallbackError) {
+            logger.error('Fallback also failed:', fallbackError);
+            finalResponse = 'Function executed successfully but response processing encountered technical difficulties. Please try rephrasing your question.';
+          }
+        }
       } else {
         finalResponse = response.text() || 'No response received';
       }
@@ -172,260 +221,17 @@ class FirebaseAIChatService {
 
     } catch (error) {
       logger.error('Error in sendMessageWithFunctionCalling:', error);
-
-      // Fallback to basic response without function calling
-      logger.log('Falling back to basic response');
-      const basicContext = await optimizedAIContextService.generateOptimizedContext(
-        message,
-        trades.slice(0, 50), // Limit for fallback
-        calendar,
-        config || aiChatConfigService.getConfig()
-      );
-
-      return await this.sendMessageOptimized(
-        message,
-        basicContext,
-        conversationHistory,
-        modelSettings
-      );
-    }
-  }
-
-  /**
-   * Send a chat message with vector search enhanced context
-   */
-  async sendMessageWithVectorSearch(
-    message: string,
-    trades: Trade[],
-    calendar: Calendar,
-    userId: string,
-    conversationHistory: ChatMessage[] = [],
-    modelSettings?: AIModelSettings,
-    config?: AIChatConfig
-  ): Promise<{ response: string; tokenCount?: number; relevantTrades?: TradeSearchResult[] }> {
-    try {
-      logger.log('Sending message with vector search enhancement...');
-
-      // Get the current config or use the provided one
-      const currentConfig = config || aiChatConfigService.getConfig();
-
-      // Use vector search to find relevant trades
-      const relevantTrades = await vectorSearchService.searchSimilarTrades(
-        message,
-        userId,
-        calendar.id,
-        {
-          maxResults: currentConfig.maxContextTrades, // Use configured max context trades
-          similarityThreshold: 0.3 // Lower threshold for broader search (updated after migration testing)
-        }
-      );
-
-      logger.log(`Found ${relevantTrades.length} relevant trades via vector search`);
-
-      // If we have relevant trades, create focused context
-      let contextToUse: OptimizedTradingContext;
-
-      if (relevantTrades.length > 0) {
-        // Get the actual trade objects for the relevant trades
-        const relevantTradeIds = relevantTrades.map(rt => rt.tradeId);
-        const relevantTradeObjects = trades.filter(trade => relevantTradeIds.includes(trade.id));
-
-        // Create focused context with only relevant trades
-        const vectorSearchConfig: AIChatConfig = {
-          ...currentConfig,
-          maxContextTrades: Math.min(currentConfig.maxContextTrades, relevantTrades.length)
-        };
-
-        contextToUse = await optimizedAIContextService.generateOptimizedContext(
-          message,
-          relevantTradeObjects,
-          calendar,
-          vectorSearchConfig
-        );
-
-        // Add vector search info to context
-        contextToUse.contextInfo.queryUsed = message;
-        contextToUse.contextInfo.optimizationMethod = 'trimmed-full-dataset';
-      } else {
-        // Fallback to regular optimized context if no relevant trades found
-        logger.log('No relevant trades found via vector search, using regular context');
-        const fallbackConfig: AIChatConfig = {
-          ...currentConfig,
-          maxContextTrades: Math.min(currentConfig.maxContextTrades, 20)
-        };
-
-        contextToUse = await optimizedAIContextService.generateOptimizedContext(
-          message,
-          trades,
-          calendar,
-          fallbackConfig
-        );
-      }
-
-      // Send message with the enhanced context
-      const result = await this.sendMessageOptimized(
-        message,
-        contextToUse,
-        conversationHistory,
-        modelSettings
-      );
-
-      return {
-        ...result,
-        relevantTrades
-      };
-
-    } catch (error) {
-      logger.error('Error in sendMessageWithVectorSearch:', error);
-
-      // Get the current config for error fallback
-      const currentConfig = config || aiChatConfigService.getConfig();
-
-      // Fallback to regular optimized context
-      logger.log('Falling back to regular optimized context');
-      const errorFallbackConfig: AIChatConfig = {
-        ...currentConfig,
-        maxContextTrades: Math.min(currentConfig.maxContextTrades, 20)
-      };
-
-      const fallbackContext = await optimizedAIContextService.generateOptimizedContext(
-        message,
-        trades,
-        calendar,
-        errorFallbackConfig
-      );
-
-      return await this.sendMessageOptimized(
-        message,
-        fallbackContext,
-        conversationHistory,
-        modelSettings
-      );
-    }
-  }
-
-  /**
-   * Send a chat message and get AI response using Firebase AI Logic with optimized context
-   */
-  async sendMessageOptimized(
-    message: string,
-    optimizedContext: OptimizedTradingContext,
-    conversationHistory: ChatMessage[] = [],
-    modelSettings?: AIModelSettings
-  ): Promise<{ response: string; tokenCount?: number }> {
-    try {
-      logger.log('Sending message to Firebase AI Logic with optimized context...');
-
-      // Prepare messages with optimized context
-      const messages = this.prepareOptimizedMessages(message, optimizedContext, conversationHistory);
-
-      // Get the model to use
-      const modelName = modelSettings?.model || 'gemini-2.5-flash';
-
-      // Create generative model instance
-      const model = getGenerativeModel(ai, {
-        model: modelName,
-        generationConfig: {
-          temperature: modelSettings?.settings?.temperature || 0.7,
-          maxOutputTokens: modelSettings?.settings?.maxTokens || 2000,
-          topP: modelSettings?.settings?.topP || 1
-        }
-      });
-
-      // Convert messages to Firebase AI Logic format
-      const prompt = this.formatMessagesForFirebaseAI(messages);
-
-      // Generate response
-      const result = await model.generateContent(prompt);
-      const response = result.response;
-      const text = response.text();
-
-      logger.log('Received response from Firebase AI Logic (optimized)');
-
-      return {
-        response: text || 'No response received',
-        tokenCount: response.usageMetadata?.totalTokenCount
-      };
-
-    } catch (error) {
-      logger.error('Error sending message to Firebase AI Logic (optimized):', error);
       throw this.createNetworkError(error);
     }
   }
 
 
 
-  /**
-   * Prepare messages with optimized trading context and conversation history
-   */
-  private prepareOptimizedMessages(
-    message: string,
-    optimizedContext: OptimizedTradingContext,
-    conversationHistory: ChatMessage[]
-  ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
-    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
-
-    // Add system prompt with optimized trading context
-    const contextualSystemPrompt = this.buildOptimizedContextualSystemPrompt(optimizedContext);
-    // logger.log('Optimized contextual system prompt:', contextualSystemPrompt);
-    messages.push({
-      role: 'system',
-      content: contextualSystemPrompt
-    });
-
-    // Add conversation history
-    for (const historyMessage of conversationHistory) {
-      if (historyMessage.role !== 'system') {
-        messages.push({
-          role: historyMessage.role as 'user' | 'assistant',
-          content: historyMessage.content
-        });
-      }
-    }
-
-    // Add current user message
-    messages.push({
-      role: 'user',
-      content: message
-    });
-
-    return messages;
-  }
 
 
 
-  /**
-   * Build system prompt with optimized trading context
-   */
-  private buildOptimizedContextualSystemPrompt(optimizedContext: OptimizedTradingContext): string {
-    const contextSummary = optimizedAIContextService.generateContextSummary(optimizedContext);
-    return this.SYSTEM_PROMPT + '\n\n' + contextSummary;
-  }
 
 
-
-  /**
-   * Format messages for Firebase AI Logic
-   */
-  private formatMessagesForFirebaseAI(
-    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
-  ): string {
-    // Firebase AI Logic expects a single prompt string
-    // We'll combine system message with conversation
-    let prompt = '';
-
-    for (const message of messages) {
-      if (message.role === 'system') {
-        prompt += message.content + '\n\n';
-      } else if (message.role === 'user') {
-        prompt += `User: ${message.content}\n\n`;
-      } else if (message.role === 'assistant') {
-        prompt += `Assistant: ${message.content}\n\n`;
-      }
-    }
-
-    return prompt.trim();
-  }
 
   /**
    * Prepare messages for function calling
@@ -571,6 +377,8 @@ class FirebaseAIChatService {
       }
     ];
   }
+
+   
 
   /**
    * Execute a function call requested by the AI

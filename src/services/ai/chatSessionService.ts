@@ -3,8 +3,8 @@
  * Handles saving, loading, and managing AI chat sessions
  */
 
-import { ChatSession, ChatMessage, TradingDataContext, DEFAULT_AI_CHAT_CONFIG } from '../types/aiChat';
-import { logger } from '../utils/logger';
+import { ChatSession, ChatMessage, TradingDataContext, DEFAULT_AI_CHAT_CONFIG } from '../../types/aiChat';
+import { logger } from '../../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 
 class ChatSessionService {

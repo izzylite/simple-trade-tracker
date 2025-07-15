@@ -22,8 +22,8 @@ import {
   ListItemText,
 } from '@mui/material';
 import { createClient } from '@supabase/supabase-js';
-import { embeddingService } from '../services/embeddingService';
-import { vectorSearchService } from '../services/vectorSearchService';
+import { embeddingService } from '../services/ai/embeddingService';
+import { vectorSearchService } from '../services/ai/vectorSearchService';
 import { getAllTrades } from '../services/calendarService';
 import { useAuth } from '../contexts/AuthContext';
 import { Trade } from '../types/trade';
