@@ -126,7 +126,7 @@ class FirebaseAIChatService {
 
             if (call.name === 'findSimilarTrades') {
               // For findSimilarTrades, AI should analyze the trades to answer the user's question
-              reminder = "IMPORTANT: These are relevant trades found through semantic search to help answer the user's question. Analyze these trades to provide insights and answer the user's specific question. The trades will also be displayed as cards below your response for reference.";
+              reminder = "CRITICAL: These trades are for CONTEXT only - they are NOT the final answer. You must ANALYZE these trades to answer the user's specific question. Do not just list or describe the trades. Instead, examine them for patterns, insights, and conclusions that directly address what the user asked. Focus on answering their question using these trades as evidence. Include JSON with trade IDs for specific trades you want to highlight as examples.";
             } else {
               // For other functions, trades are the direct answer
               reminder = "IMPORTANT: The trades from this function call will be displayed as interactive cards below your response. Do not list individual trade details in your text - focus only on analysis, insights, and recommendations.";
