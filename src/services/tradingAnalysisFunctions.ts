@@ -351,12 +351,23 @@ class TradingAnalysisFunctions {
       }
 
       // Execute the query
+      logger.log('Executing final query:', finalQuery);
       const { data, error } = await supabase.rpc('execute_sql', {
         sql_query: finalQuery
       });
 
       if (error) {
         logger.error('Database query error:', error);
+        logger.error('Query that failed:', finalQuery);
+
+        // Check if the function doesn't exist
+        if (error.message?.includes('function execute_sql') || error.code === '42883') {
+          return {
+            success: false,
+            error: 'The execute_sql function is not deployed to Supabase. Please run the SQL functions from src/database/supabase-sql-functions-fixed.sql in your Supabase SQL Editor.'
+          };
+        }
+
         return {
           success: false,
           error: `Database query failed: ${error.message}`
