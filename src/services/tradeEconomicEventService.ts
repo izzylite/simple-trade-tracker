@@ -4,6 +4,7 @@ import { TradeEconomicEvent } from '../types/trade';
 import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
 import { logger } from '../utils/logger';
 import { DEFAULT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
+import { getSessionTimeRange, type TradingSession } from '../utils/sessionTimeUtils';
  
 
 // Currency pair mapping interface
@@ -111,50 +112,10 @@ export class TradeEconomicEventService {
   
   /**
    * Get session time ranges in UTC for a given trade date
+   * Uses the shared session time utility for consistent DST handling
    */
   getSessionTimeRange(session: string, tradeDate: Date): { start: Date; end: Date } {
-    const year = tradeDate.getFullYear();
-    const month = tradeDate.getMonth();
-    const day = tradeDate.getDate();
-
-    // Determine if it's daylight saving time (approximate: March-October)
-    const isDST = month >= 2 && month <= 9;
-
-    let startHour: number, endHour: number;
-
-    switch (session) {
-      case 'London':
-        startHour = isDST ? 7 : 8;  // 7:00 AM UTC (summer) / 8:00 AM UTC (winter)
-        endHour = isDST ? 12 : 13; // 12:00 PM UTC (summer) / 1:00 PM UTC (winter)
-     // endHour = isDST ? 16 : 17;  // 4:00 PM UTC (summer) / 5:00 PM UTC (winter)  // Right session range but overlaps with NY PM
-        break;
-      case 'NY AM':
-        startHour = isDST ? 12 : 13; // 12:00 PM UTC (summer) / 1:00 PM UTC (winter)
-        endHour = isDST ? 17 : 18;   // 5:00 PM UTC (summer) / 6:00 PM UTC (winter)
-        break;
-      case 'NY PM':
-        startHour = isDST ? 17 : 18; // 5:00 PM UTC (summer) / 6:00 PM UTC (winter)
-        endHour = isDST ? 21 : 22;   // 9:00 PM UTC (summer) / 10:00 PM UTC (winter)
-        break;
-      case 'Asia':
-        // Asia session spans midnight, so we need to handle day boundaries
-        const asiaStartHour = isDST ? 22 : 23; // 10:00 PM UTC (summer) / 11:00 PM UTC (winter)
-        const asiaEndHour = isDST ? 7 : 8;     // 7:00 AM UTC (summer) / 8:00 AM UTC (winter)
-
-        // Start time is on the previous day
-        const startDate = new Date(year, month, day - 1, asiaStartHour, 0, 0);
-        const endDate = new Date(year, month, day, asiaEndHour, 0, 0);
-        return { start: startDate, end: endDate };
-      default:
-        // Default to full day range if session is unknown
-        startHour = 0;
-        endHour = 23;
-    }
-
-    const start = new Date(year, month, day, startHour, 0, 0);
-    const end = new Date(year, month, day, endHour, 59, 59);
-
-    return { start, end };
+    return getSessionTimeRange(session as TradingSession, tradeDate);
   }
 
   /**

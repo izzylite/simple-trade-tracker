@@ -83,8 +83,7 @@ Current date and time: ${new Date().toISOString()}`;
   async sendMessageWithFunctionCalling(
     message: string,
     trades: Trade[],
-    calendar: Calendar,
-    userId: string,
+    calendar: Calendar, 
     conversationHistory: ChatMessage[] = [],
     modelSettings?: AIModelSettings,
     config?: AIChatConfig
@@ -93,7 +92,7 @@ Current date and time: ${new Date().toISOString()}`;
       logger.log('Sending message with AI-driven function calling...');
 
       // Initialize trading analysis functions with current data
-      tradingAnalysisFunctions.initialize(trades, calendar, userId);
+      tradingAnalysisFunctions.initialize(trades, calendar);
 
       // Get the current config (for potential future use)
       // const currentConfig = config || aiChatConfigService.getConfig();

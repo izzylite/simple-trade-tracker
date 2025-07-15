@@ -144,7 +144,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         messageText,
         trades,
         calendar,
-        user.uid,
         messages,
         modelSettings,
         chatConfig
@@ -254,7 +253,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         userMessage.content,
         trades,
         calendar,
-        user.uid,
         conversationHistory,
         modelSettings,
         chatConfig

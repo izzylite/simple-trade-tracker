@@ -45,16 +45,54 @@ const functions = getFunctions(app);
 const DEFAULT_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY'];
 
 /**
+ * Determine if a given date falls within daylight saving time
+ * Uses actual DST transition rules for better accuracy
+ */
+function isDaylightSavingTime(date) {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+
+  // Before March or after October - definitely not DST
+  if (month < 2 || month > 9) {
+    return false;
+  }
+
+  // April through September - definitely DST
+  if (month > 2 && month < 9) {
+    return true;
+  }
+
+  // March - check if after last Sunday
+  if (month === 2) {
+    // Find last Sunday of March
+    const lastSunday = new Date(year, 3, 0); // Last day of March
+    lastSunday.setDate(lastSunday.getDate() - lastSunday.getDay());
+    return day >= lastSunday.getDate();
+  }
+
+  // October - check if before last Sunday
+  if (month === 9) {
+    // Find last Sunday of October
+    const lastSunday = new Date(year, 10, 0); // Last day of October
+    lastSunday.setDate(lastSunday.getDate() - lastSunday.getDay());
+    return day < lastSunday.getDate();
+  }
+
+  return false;
+}
+
+/**
  * Get session time range for a specific date and session
- * This matches the exact logic from TradeEconomicEventService.ts
+ * Uses improved DST detection logic for better accuracy
  */
 function getSessionTimeRange(session, tradeDate) {
   const year = tradeDate.getFullYear();
   const month = tradeDate.getMonth();
   const day = tradeDate.getDate();
 
-  // Determine if it's daylight saving time (approximate: March-October)
-  const isDST = month >= 2 && month <= 9;
+  // Improved DST detection logic
+  const isDST = isDaylightSavingTime(tradeDate);
 
   let startHour, endHour;
 

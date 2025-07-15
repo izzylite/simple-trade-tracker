@@ -8,6 +8,7 @@ import { Calendar } from '../types/calendar';
 import { vectorSearchService } from './vectorSearchService';
 import { supabase } from '../config/supabase';
 import { logger } from '../utils/logger';
+import { isTradeInSession, getSessionMappings } from '../utils/sessionTimeUtils';
 
 export interface TradingAnalysisResult {
   success: boolean;
@@ -21,7 +22,7 @@ export interface SearchTradesParams {
   minAmount?: number;
   maxAmount?: number;
   tags?: string[];
-  session?: 'london' | 'new-york' | 'tokyo' | 'sydney';
+  session?: 'Asia' | 'London' | 'NY AM' | 'NY PM' | 'london' | 'new-york' | 'tokyo' | 'sydney';
   dayOfWeek?: string;
   limit?: number;
 }
@@ -50,10 +51,10 @@ class TradingAnalysisFunctions {
   /**
    * Initialize with current trading data
    */
-  initialize(trades: Trade[], calendar: Calendar, userId: string) {
+  initialize(trades: Trade[], calendar: Calendar) {
     this.trades = trades;
     this.calendar = calendar;
-    this.userId = userId;
+    this.userId = calendar.userId;
   }
 
   /**
@@ -93,16 +94,23 @@ class TradingAnalysisFunctions {
       // Filter by session
       if (params.session) {
         filteredTrades = filteredTrades.filter(trade => {
-          const tradeDate = new Date(trade.date);
-          const hour = tradeDate.getUTCHours();
+          // First check if trade has explicit session field that matches
+          if (trade.session) {
+            // Handle direct session name matches
+            if (trade.session === params.session) {
+              return true;
+            }
 
-          switch (params.session) {
-            case 'london': return hour >= 8 && hour < 16;
-            case 'new-york': return hour >= 13 && hour < 21;
-            case 'tokyo': return hour >= 23 || hour < 8;
-            case 'sydney': return hour >= 21 && hour < 5;
-            default: return true;
+            // Handle legacy session name mappings
+            const mappedSessions = getSessionMappings(params.session!);
+            if (mappedSessions.includes(trade.session)) {
+              return true;
+            }
           }
+
+          // Fallback to DST-aware time-based filtering for trades without session field
+          const tradeDate = new Date(trade.date);
+          return isTradeInSession(tradeDate, params.session!);
         });
       }
 
@@ -427,11 +435,28 @@ class TradingAnalysisFunctions {
           key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
           break;
         case 'session':
-          const hour = date.getUTCHours();
-          if (hour >= 8 && hour < 16) key = 'london';
-          else if (hour >= 13 && hour < 21) key = 'new-york';
-          else if (hour >= 23 || hour < 8) key = 'tokyo';
-          else key = 'sydney';
+          // Use explicit session field if available, otherwise fall back to DST-aware time detection
+          if (trade.session) {
+            // Map session names to grouping keys
+            switch (trade.session) {
+              case 'London':
+                key = 'london';
+                break;
+              case 'NY AM':
+              case 'NY PM':
+                key = 'new-york';
+                break;
+              case 'Asia':
+                key = 'tokyo';
+                break;
+            }
+          } else {
+            // Fallback to DST-aware session detection for trades without session field
+            if (isTradeInSession(date, 'London')) key = 'london';
+            else if (isTradeInSession(date, 'NY AM') || isTradeInSession(date, 'NY PM')) key = 'new-york';
+            else if (isTradeInSession(date, 'Asia')) key = 'tokyo';
+            else key = 'sydney'; // Fallback for any remaining times
+          }
           break;
         case 'dayOfWeek':
           key = date.toLocaleDateString('en-US', { weekday: 'long' });
