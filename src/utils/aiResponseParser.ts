@@ -73,7 +73,42 @@ export function parseAIResponse(response: string, functionCalls?: any[]): Parsed
       if (call.result?.success && call.result?.data) {
         const data = call.result.data;
         
-        // Check for trade search results
+        // Handle findSimilarTrades differently - look for JSON trade IDs in response
+        if (call.name === 'findSimilarTrades' && data.trades && Array.isArray(data.trades)) {
+          const displayTradeIds = extractDisplayTradeIds(response);
+          if (displayTradeIds.length > 0) {
+            // Filter trades to only include those specified by the AI
+            const allTrades = data.trades.map((trade: any) => {
+              if (trade.date && typeof trade.date === 'number') {
+                return trimmedTradeToTrade(trade as TrimmedTrade);
+              }
+              return trade as Trade;
+            });
+
+            const displayTrades = allTrades.filter((trade: Trade) => displayTradeIds.includes(trade.id));
+
+            if (displayTrades.length > 0) {
+              tradeData = {
+                trades: displayTrades,
+                title: 'Analyzed Trades',
+                summary: {
+                  totalTrades: displayTrades.length,
+                  totalPnL: displayTrades.reduce((sum: number, t: Trade) => sum + t.amount, 0),
+                  winRate: calculateWinRate(displayTrades)
+                }
+              };
+              hasStructuredData = true;
+
+              // Clean the JSON from the text content
+              textContent = cleanJsonFromResponse(response);
+              break;
+            }
+          }
+          // If no JSON found, don't display any cards for findSimilarTrades
+          continue;
+        }
+
+        // Check for trade search results (other functions)
         if (data.trades && Array.isArray(data.trades) && data.trades.length > 0) {
           const trades = data.trades.map((trade: any) => {
             // Handle both full Trade objects and TrimmedTrade objects
@@ -242,6 +277,55 @@ export function shouldDisplayTradeCards(response: string, functionCalls?: any[])
   ];
 
   return tradePatterns.some(pattern => pattern.test(response));
+}
+
+/**
+ * Extract trade IDs from JSON format in AI response
+ */
+function extractDisplayTradeIds(response: string): string[] {
+  try {
+    // Look for JSON pattern in the response
+    const jsonPattern = /```json\s*\n?\s*(\{[^}]*"displayTrades"[^}]*\})\s*\n?\s*```/i;
+    const match = response.match(jsonPattern);
+
+    if (match && match[1]) {
+      const jsonData = JSON.parse(match[1]);
+      if (jsonData.displayTrades && Array.isArray(jsonData.displayTrades)) {
+        return jsonData.displayTrades.filter((id: any) => typeof id === 'string');
+      }
+    }
+
+    // Fallback: look for simpler JSON pattern without code blocks
+    const simpleJsonPattern = /\{"displayTrades":\s*\[[^\]]*\]\}/i;
+    const simpleMatch = response.match(simpleJsonPattern);
+
+    if (simpleMatch) {
+      const jsonData = JSON.parse(simpleMatch[0]);
+      if (jsonData.displayTrades && Array.isArray(jsonData.displayTrades)) {
+        return jsonData.displayTrades.filter((id: any) => typeof id === 'string');
+      }
+    }
+  } catch (error) {
+    // JSON parsing failed, return empty array
+  }
+
+  return [];
+}
+
+/**
+ * Remove JSON trade IDs from response text
+ */
+function cleanJsonFromResponse(response: string): string {
+  // Remove JSON code blocks
+  let cleaned = response.replace(/```json\s*\n?\s*\{[^}]*"displayTrades"[^}]*\}\s*\n?\s*```/gi, '');
+
+  // Remove simple JSON patterns
+  cleaned = cleaned.replace(/\{"displayTrades":\s*\[[^\]]*\]\}/gi, '');
+
+  // Clean up extra whitespace
+  cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+
+  return cleaned;
 }
 
 /**

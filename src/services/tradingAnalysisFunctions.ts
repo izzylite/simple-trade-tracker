@@ -246,7 +246,7 @@ class TradingAnalysisFunctions {
         this.userId,
         this.calendar.id,
         {
-          maxResults: params.limit || 10,
+          maxResults: params.limit || 100,
           similarityThreshold: 0.3
         }
       );
@@ -254,6 +254,7 @@ class TradingAnalysisFunctions {
       // Get the actual trade objects
       const tradeIds = similarTrades.map(st => st.tradeId);
       const actualTrades = this.trades.filter(trade => tradeIds.includes(trade.id));
+      logger.log(`Found ${actualTrades.length} actual trades from vector search results`);
 
       return {
         success: true,
@@ -389,6 +390,7 @@ class TradingAnalysisFunctions {
       // Try to extract trade IDs from results and fetch corresponding trades
       let trades: Trade[] = [];
       if (Array.isArray(results) && results.length > 0) {
+        logger.log(`Found ${results.length} results from query, attempting to extract trade IDs`);
         const tradeIds = this.extractTradeIdsFromResults(results);
         if (tradeIds.length > 0) {
           trades = this.trades.filter(trade => tradeIds.includes(trade.id));

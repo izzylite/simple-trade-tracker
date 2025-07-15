@@ -31,7 +31,7 @@ class FirebaseAIChatService {
   async sendMessageWithFunctionCalling(
     message: string,
     trades: Trade[],
-    calendar: Calendar, 
+    calendar: Calendar,
     conversationHistory: ChatMessage[] = [],
     modelSettings?: AIModelSettings,
     config?: AIChatConfig
@@ -116,17 +116,27 @@ class FirebaseAIChatService {
           result.success && result.data && (result.data.trades || result.data.bestTrade || result.data.worstTrade)
         );
 
-        // Modify function results to include trade card reminder if needed
+        // Modify function results to include appropriate reminders based on function type
         const functionResponseParts = functionCalls.map((call, index) => {
           const originalResult = functionResults[index];
 
           // Add reminder to the first function result that contains trade data
           if (hasTradeData && index === 0 && originalResult.success && originalResult.data) {
+            let reminder: string;
+
+            if (call.name === 'findSimilarTrades') {
+              // For findSimilarTrades, AI should analyze the trades to answer the user's question
+              reminder = "IMPORTANT: These are relevant trades found through semantic search to help answer the user's question. Analyze these trades to provide insights and answer the user's specific question. The trades will also be displayed as cards below your response for reference.";
+            } else {
+              // For other functions, trades are the direct answer
+              reminder = "IMPORTANT: The trades from this function call will be displayed as interactive cards below your response. Do not list individual trade details in your text - focus only on analysis, insights, and recommendations.";
+            }
+
             const modifiedResult = {
               ...originalResult,
               data: {
                 ...originalResult.data,
-                _reminder: "IMPORTANT: The trades from this function call will be displayed as interactive cards below your response. Do not list individual trade details in your text - focus only on analysis, insights, and recommendations."
+                _reminder: reminder
               }
             };
             return {
