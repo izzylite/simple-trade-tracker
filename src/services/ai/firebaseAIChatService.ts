@@ -66,40 +66,24 @@ class FirebaseAIChatService {
       const result = await model.generateContent([{ text: prompt }]);
       const response = result.response;
 
-      // Validate response
-      if (!response) {
-        throw new Error('No response received from AI model');
-      }
-
       // Check if the AI wants to call functions
-      let functionCalls: any[] = [];
-      try {
-        functionCalls = response.functionCalls() || [];
-      } catch (error) {
-        logger.warn('Error extracting function calls from response:', error);
-        functionCalls = [];
-      }
-
+      const functionCalls = response.functionCalls();
       let finalResponse = '';
       const executedFunctions: any[] = [];
 
-      if (functionCalls && Array.isArray(functionCalls) && functionCalls.length > 0) {
+      if (functionCalls && functionCalls.length > 0) {
         logger.log(`AI requested ${functionCalls.length} function calls`);
 
         // Execute function calls
         const functionResults: TradingAnalysisResult[] = [];
         for (const call of functionCalls) {
-          if (call && call.name) {
-            const result = await this.executeFunctionCall(call);
-            functionResults.push(result);
-            executedFunctions.push({
-              name: call.name,
-              args: call.args,
-              result: result
-            });
-          } else {
-            logger.warn('Invalid function call received:', call);
-          }
+          const result = await this.executeFunctionCall(call);
+          functionResults.push(result);
+          executedFunctions.push({
+            name: call.name,
+            args: call.args,
+            result: result
+          });
         }
 
         // Send function results back to AI for final response
@@ -112,21 +96,19 @@ class FirebaseAIChatService {
             },
             {
               role: 'model',
-              parts: functionCalls
-                .filter(call => call && call.name)
-                .map(call => ({
-                  functionCall: {
-                    name: call.name,
-                    args: call.args || {}
-                  }
-                }))
+              parts: functionCalls.map(call => ({
+                functionCall: {
+                  name: call.name,
+                  args: call.args
+                }
+              }))
             }
           ]
         });
 
         // Send function responses with explicit instruction about trade cards
-        const hasTradeData = Array.isArray(functionResults) && functionResults.some(result =>
-          result && result.success && result.data && (result.data.trades || result.data.bestTrade || result.data.worstTrade)
+        const hasTradeData = functionResults.some(result =>
+          result.success && result.data && (result.data.trades || result.data.bestTrade || result.data.worstTrade)
         );
 
         // Modify function results to include appropriate reminders based on function type
@@ -172,14 +154,7 @@ class FirebaseAIChatService {
         try {
           logger.log(`Sending ${functionResponseParts.length} function responses to AI for final processing`);
           const followUpResult = await chat.sendMessage(functionResponseParts);
-
-          // Safely extract response text
-          try {
-            finalResponse = followUpResult.response.text() || 'No response received';
-          } catch (textError) {
-            logger.warn('Error extracting text from follow-up response:', textError);
-            finalResponse = 'Response received but text extraction failed';
-          }
+          finalResponse = followUpResult.response.text() || 'No response received';
         } catch (sendError) {
           logger.error('Error sending function responses to AI:', sendError);
           logger.error('Function response parts that caused error:', JSON.stringify(functionResponseParts, null, 2));
