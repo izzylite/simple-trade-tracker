@@ -144,7 +144,6 @@ describe('AI Economic Events Analysis', () => {
 
       expect(result.success).toBe(true);
       expect(result.data?.tradesWithEvents).toBeDefined();
-      expect(result.data?.tradesWithoutEvents).toBeDefined();
       expect(result.data?.economicEventStats).toBeDefined();
     });
 
@@ -165,11 +164,57 @@ describe('AI Economic Events Analysis', () => {
       expect(result.success).toBe(true);
       expect(result.data?.tradesWithEvents.count).toBe(1); // 1 trade with ECB event
     });
+
+    test('should include comparison when compareWithoutEvents is true', async () => {
+      const result = await tradingAnalysisFunctions.analyzeEconomicEvents({
+        compareWithoutEvents: true
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.tradesWithEvents).toBeDefined();
+      expect(result.data?.tradesWithoutEvents).toBeDefined();
+      expect(result.data?.comparison).toBeDefined();
+      expect(result.data?.comparison.winRateDifference).toBeDefined();
+    });
+  });
+
+  describe('fetchEconomicEvents', () => {
+    test('should handle date range parsing', async () => {
+      const result = await tradingAnalysisFunctions.fetchEconomicEvents({
+        dateRange: 'next 7 days',
+        impact: 'High'
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.dateRange).toBeDefined();
+      expect(result.data?.filters).toBeDefined();
+    });
+
+    test('should filter by currency', async () => {
+      const result = await tradingAnalysisFunctions.fetchEconomicEvents({
+        currency: 'USD',
+        dateRange: 'next week'
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.filters.currency).toBe('USD');
+    });
+
+    test('should only fetch High and Medium impact events by default', async () => {
+      const result = await tradingAnalysisFunctions.fetchEconomicEvents({
+        dateRange: 'next week'
+      });
+
+      expect(result.success).toBe(true);
+      // Should default to High and Medium impact only
+      expect(result.data?.filters.impact).toBe('all');
+    });
   });
 });
 
 // Example AI queries that are now possible:
 /*
+TRADING ANALYSIS:
 1. "Show me all my trades during high-impact USD economic events"
    -> searchTrades({ economicEventCurrency: 'USD', economicEventImpact: 'High' })
 
@@ -184,4 +229,20 @@ describe('AI Economic Events Analysis', () => {
 
 5. "Analyze my performance during high-impact EUR events in the last 3 months"
    -> analyzeEconomicEvents({ currency: 'EUR', impactLevel: 'High', dateRange: 'last 3 months' })
+
+ECONOMIC EVENTS FETCHING:
+6. "What are the high-impact events for next week?"
+   -> fetchEconomicEvents({ dateRange: 'next week', impact: 'High' })
+
+7. "Show me all USD events for the next 3 days"
+   -> fetchEconomicEvents({ currency: 'USD', dateRange: 'next 3 days' })
+
+8. "What economic events are happening tomorrow?"
+   -> fetchEconomicEvents({ dateRange: 'tomorrow' })
+
+9. "Find all EUR events with high impact in the next 2 weeks"
+   -> fetchEconomicEvents({ currency: 'EUR', impact: 'High', dateRange: 'next 2 weeks' })
+
+10. "What's coming up this week that might affect my trading?"
+    -> fetchEconomicEvents({ dateRange: 'this week', impact: 'High' })
 */

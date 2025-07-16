@@ -85,7 +85,7 @@ class EconomicCalendarServiceImpl {
       throw error;
     }
   }
-convertToEconomicEvent(data: DocumentData): EconomicEvent {
+  convertToEconomicEvent(data: DocumentData): EconomicEvent {
     return {
       id: data.id,
       currency: data.currency as Currency,
@@ -121,15 +121,32 @@ convertToEconomicEvent(data: DocumentData): EconomicEvent {
 
     // Add currency filter if specified
     if (filters?.currencies && filters.currencies.length > 0) {
-      queryConstraints.push(where('currency', 'in', filters.currencies));
+      if (filters.currencies.length === 1) {
+        queryConstraints.push(where('currency', '==', filters.currencies[0]));
+      }
+      else {
+        queryConstraints.push(where('currency', 'in', filters.currencies));
+      }
     }
+     // Add impact filter if specified
+    if ((filters?.impacts && filters.impacts.length > 0)) {
+      if (filters.impacts.length === 1) {
+        queryConstraints.push(where('impact', '==', filters.impacts[0]));
+      }
+      else if(!filters?.currencies || filters?.currencies.length <= 1) {
+        // Only apply impact filter if no currency filter is specified
+        // firebase limitation
+        queryConstraints.push(where('impact', 'in', filters.impacts));
+      }
+    }
+
 
     // Add upcoming events filter - only show events with future dates/times
     if (filters?.onlyUpcoming) {
       const now = new Date();
       queryConstraints.push(where('time', '>=', now));
     }
- 
+
 
     // Compose and return the query
     return query(baseCollection, ...queryConstraints);
@@ -154,7 +171,7 @@ convertToEconomicEvent(data: DocumentData): EconomicEvent {
 
 
       let baseQuery = this.buildBaseQuery(dateRange, filters);
-     
+
       // Add pagination
       let paginatedQuery = query(baseQuery, limit(pageSize + 1)); // +1 to check if there are more
 

@@ -1,5 +1,10 @@
 # Example SQL Queries for Trade Database
 
+How does my trading performance vary across different sessions (London, New York, Tokyo), and how do high-impact economic events occurring during those sessions affect my profitability and win rate?
+
+I've been struggling with my breakout strategy on Tuesdays. Can you show me all my losing trades tagged 'breakout' that occurred on a Tuesday in the last 6 months, and analyze if there were any specific economic events or market conditions that contributed to these losses?
+
+
 These example queries work with your Supabase database schema and can be used to test the `queryDatabase` function in the AI chat.
 
 ## Basic Queries
@@ -201,36 +206,71 @@ GROUP BY unnest(tags), trade_session
 ORDER BY tag, total_pnl DESC
 ```
 
-## Using Views
+## Direct Aggregations on Main Table
 
 ### User Summary
 ```sql
-SELECT * FROM user_trade_embeddings_summary
+SELECT
+    user_id,
+    calendar_id,
+    COUNT(*) as total_trades,
+    AVG(trade_amount) as avg_trade_amount,
+    SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END) as win_count,
+    SUM(CASE WHEN trade_type = 'loss' THEN 1 ELSE 0 END) as loss_count,
+    ROUND((SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END)::DECIMAL / COUNT(*)) * 100, 2) as win_rate
+FROM trade_embeddings
+GROUP BY user_id, calendar_id
 ```
 
 ### Session Analysis
 ```sql
-SELECT * FROM trade_embeddings_by_session
+SELECT
+    trade_session,
+    COUNT(*) as trade_count,
+    AVG(trade_amount) as avg_amount,
+    ROUND((SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END)::DECIMAL / COUNT(*)) * 100, 2) as win_rate
+FROM trade_embeddings
+WHERE trade_session IS NOT NULL
+GROUP BY trade_session
 ORDER BY win_rate DESC
 ```
 
 ### Day of Week Analysis
 ```sql
-SELECT * FROM trade_embeddings_by_day
+SELECT
+    EXTRACT(DOW FROM to_timestamp(trade_date / 1000)) as day_of_week,
+    TO_CHAR(to_timestamp(trade_date / 1000), 'Day') as day_name,
+    COUNT(*) as trade_count,
+    AVG(trade_amount) as avg_amount
+FROM trade_embeddings
+GROUP BY EXTRACT(DOW FROM to_timestamp(trade_date / 1000)), TO_CHAR(to_timestamp(trade_date / 1000), 'Day')
 ORDER BY avg_amount DESC
 ```
 
 ### Monthly Analysis
 ```sql
-SELECT * FROM trade_embeddings_by_month
-WHERE month >= NOW() - INTERVAL '6 months'
-ORDER BY month
+SELECT
+    TO_CHAR(to_timestamp(trade_date / 1000), 'YYYY-MM') as month_label,
+    COUNT(*) as trade_count,
+    SUM(trade_amount) as total_amount,
+    AVG(trade_amount) as avg_amount
+FROM trade_embeddings
+WHERE trade_date >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '6 months')) * 1000
+GROUP BY TO_CHAR(to_timestamp(trade_date / 1000), 'YYYY-MM')
+ORDER BY month_label
 ```
 
 ### Tag Analysis
 ```sql
-SELECT * FROM trade_embeddings_tag_analysis
-WHERE tag_count > 5
+SELECT
+    unnest(tags) as tag,
+    COUNT(*) as tag_count,
+    SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END) as wins_with_tag,
+    SUM(CASE WHEN trade_type = 'loss' THEN 1 ELSE 0 END) as losses_with_tag
+FROM trade_embeddings
+WHERE tags IS NOT NULL AND array_length(tags, 1) > 0
+GROUP BY unnest(tags)
+HAVING COUNT(*) > 5
 ORDER BY wins_with_tag DESC
 LIMIT 10
 ```

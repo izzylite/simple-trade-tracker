@@ -3,7 +3,7 @@ import { economicCalendarService } from './economicCalendarService';
 import { TradeEconomicEvent } from '../types/trade';
 import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
 import { logger } from '../utils/logger';
-import { DEFAULT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
+import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
 import { getSessionTimeRange, type TradingSession } from '../utils/sessionTimeUtils';
  
 
@@ -170,7 +170,7 @@ export class TradeEconomicEventService {
         targetCurrencies = currencies;
       }   else {
         // Fallback to default currencies
-        targetCurrencies = DEFAULT_FILTER_SETTINGS.currencies;
+        targetCurrencies = DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS.currencies;
       }
 
       // Calculate date range based on session

@@ -80,7 +80,7 @@ export interface EconomicCalendarFilterSettings {
 }
 
 // Default filter settings
-export const DEFAULT_FILTER_SETTINGS: EconomicCalendarFilterSettings = {
+export const DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS: EconomicCalendarFilterSettings = {
   currencies: ['USD', 'EUR', 'GBP'],
   impacts: ['High', 'Medium', 'Low'],
   viewType: 'day',
@@ -195,7 +195,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const theme = useTheme();
 
   // Get current calendar and its settings
-  const savedSettings: EconomicCalendarFilterSettings = calendar?.economicCalendarFilters || DEFAULT_FILTER_SETTINGS;
+  const savedSettings: EconomicCalendarFilterSettings = calendar?.economicCalendarFilters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS;
 
   // State management
   const [viewType, setViewType] = useState<ViewType>(savedSettings.viewType);

@@ -17,12 +17,9 @@ After running the SQL, you can verify that the functions were deployed correctly
 
 1. In the Supabase dashboard, go to "Database" → "Functions"
 2. You should see the `execute_sql` function listed
-3. You can also check the views by going to "Database" → "Tables" and looking for the views:
-   - `user_trade_embeddings_summary`
-   - `trade_embeddings_by_session`
-   - `trade_embeddings_by_day`
-   - `trade_embeddings_by_month`
-   - `trade_embeddings_tag_analysis`
+3. Check that the main tables exist:
+   - `trade_embeddings` - Main table with all trade data and embeddings
+   - `embedding_metadata` - Metadata for tracking embedding sync status
 
 ## Testing with Example Queries
 

@@ -46,27 +46,14 @@ The implementation includes several security measures:
    - `user_id`, `calendar_id`
    - `model_name`, `total_trades`, `last_sync_at`
 
-### Pre-built Views
+### Database Tables
 
-1. **user_trade_embeddings_summary**
-   - Aggregated statistics per user/calendar
-   - Win rates, trade counts, date ranges
+The AI performs all aggregations directly on the main table:
 
-2. **trade_embeddings_by_session**
-   - Performance breakdown by trading session
-   - London, New York, Tokyo, Sydney
-
-3. **trade_embeddings_by_day**
-   - Performance by day of week
-   - Monday through Sunday analysis
-
-4. **trade_embeddings_by_month**
-   - Monthly performance trends
-   - Total amounts, averages, win/loss counts
-
-5. **trade_embeddings_tag_analysis**
-   - Tag usage and performance
-   - Most common tags, success rates per tag
+1. **trade_embeddings** - Main table containing all trade data
+   - All trade information with vector embeddings
+   - Use this table for all queries and aggregations
+   - No need for pre-built views - AI can create any aggregation on demand
 
 ## 💡 Example AI Queries
 
@@ -91,37 +78,40 @@ The AI can now handle queries like:
 
 ```sql
 -- Monthly performance summary
-SELECT 
-    month_label,
-    trade_count,
-    total_amount,
-    wins,
-    losses,
-    ROUND((wins::DECIMAL / trade_count) * 100, 2) as win_rate
-FROM trade_embeddings_by_month 
+SELECT
+    TO_CHAR(to_timestamp(trade_date / 1000), 'YYYY-MM') as month_label,
+    COUNT(*) as trade_count,
+    SUM(trade_amount) as total_amount,
+    SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END) as wins,
+    SUM(CASE WHEN trade_type = 'loss' THEN 1 ELSE 0 END) as losses,
+    ROUND((SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END)::DECIMAL / COUNT(*)) * 100, 2) as win_rate
+FROM trade_embeddings
 WHERE user_id = 'user123'
-ORDER BY month;
+GROUP BY TO_CHAR(to_timestamp(trade_date / 1000), 'YYYY-MM')
+ORDER BY month_label;
 
 -- Best performing tags
-SELECT 
-    tag,
-    tag_count,
-    wins_with_tag,
-    losses_with_tag,
-    ROUND((wins_with_tag::DECIMAL / tag_count) * 100, 2) as tag_win_rate
-FROM trade_embeddings_tag_analysis 
-WHERE user_id = 'user123'
+SELECT
+    unnest(tags) as tag,
+    COUNT(*) as tag_count,
+    SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END) as wins_with_tag,
+    SUM(CASE WHEN trade_type = 'loss' THEN 1 ELSE 0 END) as losses_with_tag,
+    ROUND((SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END)::DECIMAL / COUNT(*)) * 100, 2) as tag_win_rate
+FROM trade_embeddings
+WHERE user_id = 'user123' AND tags IS NOT NULL AND array_length(tags, 1) > 0
+GROUP BY unnest(tags)
 ORDER BY tag_win_rate DESC
 LIMIT 10;
 
 -- Session performance comparison
-SELECT 
+SELECT
     trade_session,
-    trade_count,
-    avg_amount,
-    win_rate
-FROM trade_embeddings_by_session 
-WHERE user_id = 'user123'
+    COUNT(*) as trade_count,
+    AVG(trade_amount) as avg_amount,
+    ROUND((SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END)::DECIMAL / COUNT(*)) * 100, 2) as win_rate
+FROM trade_embeddings
+WHERE user_id = 'user123' AND trade_session IS NOT NULL
+GROUP BY trade_session
 ORDER BY win_rate DESC;
 ```
 

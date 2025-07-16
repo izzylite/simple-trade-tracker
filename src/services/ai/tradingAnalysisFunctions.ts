@@ -9,6 +9,9 @@ import { vectorSearchService } from './vectorSearchService';
 import { supabase } from '../../config/supabase';
 import { logger } from '../../utils/logger';
 import { isTradeInSession, getSessionMappings } from '../../utils/sessionTimeUtils';
+import { economicCalendarService } from '../economicCalendarService';
+import { EconomicEvent, Currency, ImpactLevel } from '../../types/economicCalendar';
+import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../../components/economicCalendar/EconomicCalendarDrawer';
 
 export interface TradingAnalysisResult {
   success: boolean;
@@ -59,6 +62,15 @@ export interface AnalyzeEconomicEventsParams {
   compareWithoutEvents?: boolean;
 }
 
+export interface FetchEconomicEventsParams {
+  startDate?: string; // Unix timestamp in milliseconds or date string
+  endDate?: string; // Unix timestamp in milliseconds or date string
+  currency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'all';
+  impact?: 'High' | 'Medium' | 'all'; // Low impact events excluded for cost efficiency
+  dateRange?: string; // "next 7 days", "this week", "next week", etc.
+  limit?: number;
+}
+
 class TradingAnalysisFunctions {
   private trades: Trade[] = [];
   private calendar: Calendar | null = null;
@@ -71,7 +83,7 @@ class TradingAnalysisFunctions {
   initialize(trades: Trade[], calendar: Calendar, maxContextTrades = 100) {
     this.trades = trades;
     this.calendar = calendar;
-    this.userId = calendar.userId;
+    this.userId = calendar.userId; 
     this.maxContextTrades = maxContextTrades;
   }
 
@@ -409,7 +421,7 @@ class TradingAnalysisFunctions {
             tradesWithEvents.reduce((sum, trade) => sum + trade.amount, 0) / tradesWithEvents.length : 0
         },
         economicEventStats: this.calculateEconomicEventStats(tradesWithEvents, params.impactLevel),
-        trades: tradesWithEvents.slice(0, 50) // Limit to 50 trades for performance
+        trades: tradesWithEvents
       };
 
       // Include comparison with trades without events if requested
@@ -437,6 +449,124 @@ class TradingAnalysisFunctions {
 
     } catch (error) {
       logger.error('Error in analyzeEconomicEvents:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Fetch economic events from Firebase
+   */
+  async fetchEconomicEvents(params: FetchEconomicEventsParams): Promise<TradingAnalysisResult> {
+    try {
+      logger.log('AI requested economic events fetch with params:', params);
+
+      // Parse date range or use specific dates
+      let startDate: Date;
+      let endDate: Date;
+
+      if (params.dateRange) {
+        const dateRange = this.parseDateRangeForEvents(params.dateRange);
+        if (!dateRange) {
+          return {
+            success: false,
+            error: 'Invalid date range format'
+          };
+        }
+        startDate = dateRange.start;
+        endDate = dateRange.end;
+      } else {
+        // Use provided dates or default to next 7 days
+        if (params.startDate) {
+          // Check if it's a Unix timestamp (number) or date string
+          const startTimestamp = parseInt(params.startDate);
+          startDate = isNaN(startTimestamp) ? new Date(params.startDate) : new Date(startTimestamp);
+        } else {
+          startDate = new Date(); // Today
+        }
+
+        if (params.endDate) {
+          const endTimestamp = parseInt(params.endDate);
+          endDate = isNaN(endTimestamp) ? new Date(params.endDate) : new Date(endTimestamp);
+        } else {
+          endDate = new Date();
+          endDate.setDate(endDate.getDate() + 7); // Next 7 days
+        }
+      }
+
+      // Build filters
+      const filters: {
+        currencies?: Currency[];
+        impacts?: ImpactLevel[];
+        onlyUpcoming?: boolean;
+      } = {};
+
+      if (params.currency && params.currency !== 'all') {
+        filters.currencies = [params.currency as Currency];
+      }
+      else {
+        filters.currencies = this.calendar!.economicCalendarFilters?.currencies || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS.currencies;
+      }
+
+      // Only fetch High and Medium impact events to reduce costs and focus on relevant events
+      if (params.impact && params.impact !== 'all') {
+        filters.impacts = [params.impact as ImpactLevel];
+      } else {
+        // Default to High and Medium impact only
+        filters.impacts = ['High', 'Medium'] as ImpactLevel[];
+      }
+
+      // For future events, set onlyUpcoming to true
+      if (startDate > new Date()) {
+        filters.onlyUpcoming = true;
+      }
+
+      // Set default limit to prevent expensive Firebase reads
+      const defaultLimit = 50; // Reasonable default for chat responses
+      const maxLimit = 300; // Maximum allowed limit
+      const effectiveLimit = params.limit
+        ? Math.min(params.limit, maxLimit)
+        : defaultLimit;
+
+      // Use pagination to limit Firebase reads
+      const paginatedResult = await economicCalendarService.fetchEventsPaginated(
+        { start: startDate, end: endDate },
+        { pageSize: effectiveLimit },
+        filters
+      );
+
+      const limitedEvents = paginatedResult.events;
+      logger.log(`Fetched ${limitedEvents.length} economic events from Firebase`);
+
+      // Sort by unixTimestamp if available, otherwise by time
+      limitedEvents.sort((a, b) => {
+        const timeA = a.unixTimestamp || new Date(a.timeUtc).getTime();
+        const timeB = b.unixTimestamp || new Date(b.timeUtc).getTime();
+        return timeA - timeB;
+      });
+
+      return {
+        success: true,
+        data: {
+          events: limitedEvents,
+          count: limitedEvents.length,
+          hasMore: paginatedResult.hasMore,
+          limitApplied: effectiveLimit,
+          dateRange: {
+            start: startDate.toISOString(),
+            end: endDate.toISOString()
+          },
+          filters: {
+            currency: params.currency || 'all',
+            impact: params.impact || 'all'
+          }
+        }
+      };
+
+    } catch (error) {
+      logger.error('Error in fetchEconomicEvents:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -495,30 +625,9 @@ class TradingAnalysisFunctions {
         }
       }
 
-      // Also handle views that might reference trade_embeddings data
-      const viewNames = [
-        'user_trade_embeddings_summary',
-        'trade_embeddings_by_session',
-        'trade_embeddings_by_day',
-        'trade_embeddings_by_month',
-        'trade_embeddings_tag_analysis'
-      ];
-
-      for (const viewName of viewNames) {
-        if (queryLower.includes(viewName) && !queryLower.includes('user_id')) {
-          const userFilter = `user_id = '${this.userId}'`;
-          const calendarFilter = `calendar_id = '${this.calendar?.id}'`;
-          const combinedFilter = `${userFilter} AND ${calendarFilter}`;
-
-          if (queryLower.includes('where')) {
-            finalQuery = finalQuery.replace(/where/i, `WHERE ${combinedFilter} AND`);
-          } else {
-            const regex = new RegExp(`from\\s+${viewName}`, 'i');
-            finalQuery = finalQuery.replace(regex, `FROM ${viewName} WHERE ${combinedFilter}`);
-          }
-          break; // Only apply filter once
-        }
-      }
+      // Note: Database views have been removed as they are redundant.
+      // The AI performs all aggregations directly on the trade_embeddings table.
+      // All queries should use the main trade_embeddings table with proper user/calendar filtering.
 
       // Execute the query
       logger.log('Executing final query:', finalQuery);
@@ -736,6 +845,65 @@ class TradingAnalysisFunctions {
     }
 
     return null;
+  }
+
+  private parseDateRangeForEvents(dateRange: string): { start: Date; end: Date } | null {
+    const now = new Date();
+
+    // Handle future date ranges
+    if (dateRange.includes('next')) {
+      const match = dateRange.match(/next (\d+) (day|week|month)s?/i);
+      if (match) {
+        const amount = parseInt(match[1]);
+        const unit = match[2].toLowerCase();
+        const endDate = new Date(now);
+
+        if (unit === 'day') endDate.setDate(now.getDate() + amount);
+        else if (unit === 'week') endDate.setDate(now.getDate() + (amount * 7));
+        else if (unit === 'month') endDate.setMonth(now.getMonth() + amount);
+
+        return { start: now, end: endDate };
+      }
+    }
+
+    // Handle "this week", "next week", etc.
+    if (dateRange.toLowerCase().includes('this week')) {
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay()); // Start of this week (Sunday)
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6); // End of this week (Saturday)
+      return { start: startOfWeek, end: endOfWeek };
+    }
+
+    if (dateRange.toLowerCase().includes('next week')) {
+      const startOfNextWeek = new Date(now);
+      startOfNextWeek.setDate(now.getDate() + (7 - now.getDay())); // Start of next week
+      const endOfNextWeek = new Date(startOfNextWeek);
+      endOfNextWeek.setDate(startOfNextWeek.getDate() + 6); // End of next week
+      return { start: startOfNextWeek, end: endOfNextWeek };
+    }
+
+    // Handle "today", "tomorrow"
+    if (dateRange.toLowerCase() === 'today') {
+      const startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+      return { start: startOfDay, end: endOfDay };
+    }
+
+    if (dateRange.toLowerCase() === 'tomorrow') {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      const startOfDay = new Date(tomorrow);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(tomorrow);
+      endOfDay.setHours(23, 59, 59, 999);
+      return { start: startOfDay, end: endOfDay };
+    }
+
+    // Fall back to the regular parseDateRange for past dates
+    return this.parseDateRange(dateRange);
   }
 
   private calculateEconomicEventStats(trades: Trade[], impactFilter?: string): any {

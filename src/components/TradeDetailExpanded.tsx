@@ -48,7 +48,7 @@ import RichTextEditor from './common/RichTextEditor';
 import EconomicEventListItem from './economicCalendar/EconomicEventListItem';
 import { economicCalendarService } from '../services/economicCalendarService';
 import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
-import { DEFAULT_FILTER_SETTINGS } from './economicCalendar/EconomicCalendarDrawer';
+import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from './economicCalendar/EconomicCalendarDrawer';
 import { logger } from '../utils/logger';
 import { tradeEconomicEventService } from '../services/tradeEconomicEventService';
 import ShareButton from './sharing/ShareButton';
@@ -230,7 +230,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
 
       const sessionRange = tradeEconomicEventService.getSessionTimeRange(trade.session!, trade.date);
-      const filterSetting = calendar?.economicCalendarFilters || DEFAULT_FILTER_SETTINGS
+      const filterSetting = calendar?.economicCalendarFilters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
       const events = await economicCalendarService.fetchEvents(
         { start: sessionRange.start, end: sessionRange.end },
         {

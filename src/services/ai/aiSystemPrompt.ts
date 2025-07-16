@@ -11,6 +11,7 @@ export function getSystemPrompt(): string {
 - Pattern recognition in trading behavior and market conditions
 - Risk management assessment and optimization
 - Economic event correlation analysis and impact assessment on trading outcomes
+- Real-time economic calendar analysis and upcoming events forecasting
 - Session-based and temporal trading pattern analysis
 - News trading and market volatility analysis during economic events
 - Actionable strategy recommendations based on historical data

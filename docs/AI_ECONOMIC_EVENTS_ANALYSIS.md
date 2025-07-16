@@ -6,7 +6,35 @@ The AI system now has comprehensive economic events analysis capabilities, allow
 
 ## New AI Functions
 
-### 1. Enhanced `searchTrades` Function
+### 1. New `fetchEconomicEvents` Function
+
+Fetch upcoming or historical economic events directly from Firebase database with cost-efficient pagination.
+
+**Parameters:**
+- `startDate`: Unix timestamp or ISO date string (optional)
+- `endDate`: Unix timestamp or ISO date string (optional)
+- `currency`: Filter by specific currency (USD, EUR, GBP, etc.)
+- `impact`: Filter by impact level (High, Medium, or all)
+- `dateRange`: Natural language date range ("next 7 days", "this week", etc.)
+- `limit`: Maximum number of events to return (default: 50, max: 100)
+
+**Cost Optimization:**
+- **Only fetches High and Medium impact events** - Low impact events are excluded
+- Uses Firebase pagination to limit document reads
+- Default limit of 50 events per query
+- Maximum limit of 100 events to control costs
+- Returns `hasMore` flag to indicate if more events are available
+- Focuses on market-relevant events that actually affect trading
+
+**Example Queries:**
+```
+"What are the high-impact events for next week?"
+"Show me all USD events for the next 3 days"
+"What economic events are happening tomorrow?"
+"Find all EUR events with high impact in the next 2 weeks"
+```
+
+### 2. Enhanced `searchTrades` Function
 
 The `searchTrades` function now supports economic events filtering:
 
@@ -113,6 +141,8 @@ Economic events are stored in the `trade_embeddings` table as JSONB:
 - Economic events filtering is optimized for large datasets
 - Vector search includes economic events context
 - Results are limited to prevent overwhelming responses
+- Firebase queries use pagination to control document read costs
+- Default 50-event limit with 100-event maximum for cost efficiency
 
 ## Benefits for Traders
 
