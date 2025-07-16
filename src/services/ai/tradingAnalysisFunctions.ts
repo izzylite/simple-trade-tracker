@@ -355,7 +355,7 @@ class TradingAnalysisFunctions {
   async analyzeEconomicEvents(params: AnalyzeEconomicEventsParams): Promise<TradingAnalysisResult> {
     try {
       logger.log('AI requested economic events analysis with params:', params);
-
+      
       let tradesWithEvents = this.trades.filter(trade =>
         trade.economicEvents && trade.economicEvents.length > 0
       );
@@ -400,7 +400,7 @@ class TradingAnalysisFunctions {
       }
 
       // Calculate detailed analysis
-      const analysis = {
+      const analysis: any = {
         tradesWithEvents: {
           count: tradesWithEvents.length,
           totalPnl: tradesWithEvents.reduce((sum, trade) => sum + trade.amount, 0),
@@ -408,16 +408,27 @@ class TradingAnalysisFunctions {
           avgPnl: tradesWithEvents.length > 0 ?
             tradesWithEvents.reduce((sum, trade) => sum + trade.amount, 0) / tradesWithEvents.length : 0
         },
-        tradesWithoutEvents: {
+        economicEventStats: this.calculateEconomicEventStats(tradesWithEvents, params.impactLevel),
+        trades: tradesWithEvents.slice(0, 50) // Limit to 50 trades for performance
+      };
+
+      // Include comparison with trades without events if requested
+      if (params.compareWithoutEvents) {
+        analysis.tradesWithoutEvents = {
           count: tradesWithoutEvents.length,
           totalPnl: tradesWithoutEvents.reduce((sum, trade) => sum + trade.amount, 0),
           winRate: this.calculateWinRate(tradesWithoutEvents),
           avgPnl: tradesWithoutEvents.length > 0 ?
             tradesWithoutEvents.reduce((sum, trade) => sum + trade.amount, 0) / tradesWithoutEvents.length : 0
-        },
-        economicEventStats: this.calculateEconomicEventStats(tradesWithEvents, params.impactLevel),
-        trades: tradesWithEvents.slice(0, 50) // Limit to 50 trades for performance
-      };
+        };
+
+        // Add comparison metrics
+        analysis.comparison = {
+          winRateDifference: analysis.tradesWithEvents.winRate - analysis.tradesWithoutEvents.winRate,
+          avgPnlDifference: analysis.tradesWithEvents.avgPnl - analysis.tradesWithoutEvents.avgPnl,
+          totalPnlDifference: analysis.tradesWithEvents.totalPnl - analysis.tradesWithoutEvents.totalPnl
+        };
+      }
 
       return {
         success: true,
@@ -551,15 +562,7 @@ class TradingAnalysisFunctions {
         logger.log(`Found ${results.length} results from query, attempting to extract trade IDs`);
         const tradeIds = this.extractTradeIdsFromResults(results);
         if (tradeIds.length > 0) {
-          const foundTrades = this.trades.filter(trade => tradeIds.includes(trade.id));
-
-          // Only create lightweight versions if there are more than 20 trades
-          trades = foundTrades.length > 20
-            ? foundTrades.map(trade => ({
-                ...trade,
-                images: [] // Remove images to avoid serialization issues
-              }))
-            : foundTrades; // Keep full data for 20 or fewer trades
+          trades = this.trades.filter(trade => tradeIds.includes(trade.id)); 
         }
       }
 
