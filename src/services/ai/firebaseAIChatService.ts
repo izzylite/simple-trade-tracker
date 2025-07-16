@@ -18,6 +18,7 @@ import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
 import { getSystemPrompt } from './aiSystemPrompt';
 import { getFunctionDeclarations } from './aiFunctionDeclarations';
+import { multiFunctionCallingCachingService } from './multiFunctionCallingCaching';
 
 
 
@@ -47,7 +48,7 @@ class FirebaseAIChatService {
       const messages = this.prepareFunctionCallingMessages(message, conversationHistory);
 
       // Get the model to use - gemini-2.5-flash is recommended for function calling
-      const modelName ='gemini-2.0-flash-exp';
+      const modelName = modelSettings?.model || 'gemini-2.5-flash';
       logger.log(`Using model ${modelName} for function calling`);
 
       // Create generative model instance with function declarations
@@ -102,38 +103,50 @@ class FirebaseAIChatService {
         logger.log(`AI requested ${functionCalls.length} function calls (round ${currentRound}):`,
           functionCalls.map(fc => `${fc.name}(${Object.keys(fc.args || {}).join(', ')})`));
 
-        // Execute all function calls for this round
-        const functionResponseParts: any[] = [];
-
-        for (const functionCall of functionCalls) {
-          try {
-            const result = await this.executeFunctionCall({
-              name: functionCall.name,
-              args: functionCall.args
-            });
-
-            executedFunctions.push({
-              name: functionCall.name,
-              args: functionCall.args,
-              result: result,
-              round: currentRound
-            });
-
-            // Add trade card reminder for findSimilarTrades
-            let processedResult = result;
-            if (functionCall.name === 'findSimilarTrades' && result?.success && result?.data?.trades) {
-              processedResult = {
-                ...result,
-                data: {
-                  ...result.data,
-                  _reminder: "IMPORTANT: Focus on analysis and insights rather than listing individual trade details."
-                }
-              };
-            }
-
-            // Ensure we have a valid result before adding to response parts
-            const validResult = processedResult || { success: false, error: 'Function returned undefined' };
-
+         // Execute all function calls for this round
+         const functionResponseParts: any[] = [];
+         const totalFunctionsInRound = functionCalls.length;
+ 
+         for (let i = 0; i < functionCalls.length; i++) {
+           const functionCall = functionCalls[i];
+           const isLastFunction = i === functionCalls.length - 1;
+ 
+           try {
+             const result = await multiFunctionCallingCachingService.executeFunctionCall({
+               name: functionCall.name,
+               args: functionCall.args
+             });
+ 
+             executedFunctions.push({
+               name: functionCall.name,
+               args: functionCall.args,
+               result: result,
+               round: currentRound
+             });
+ 
+             // Add trade card reminder for findSimilarTrades
+             let processedResult = result;
+             if (functionCall.name === 'findSimilarTrades' && result?.success && result?.data?.trades) {
+               processedResult = {
+                 ...result,
+                 data: {
+                   ...result.data,
+                   _reminder: "IMPORTANT: Focus on analysis and insights rather than listing individual trade details."
+                 }
+               };
+             }
+ 
+             // Process large results using caching system
+             const finalResult =  multiFunctionCallingCachingService.processLargeResult(
+               functionCall.name,
+               processedResult,
+               isLastFunction,
+               totalFunctionsInRound
+             );
+ 
+             // Ensure we have a valid result before adding to response parts
+             const validResult = finalResult || { success: false, error: 'Function returned undefined' };
+ 
             functionResponseParts.push({
               functionResponse: {
                 name: functionCall.name,
@@ -270,54 +283,7 @@ If you want to display specific trades as cards, Use convertTradeIdsToCards func
 
 
 
-
-  /**
-   * Execute a function call requested by the AI
-   */
-  private async executeFunctionCall(call: any): Promise<TradingAnalysisResult> {
-    try {
-      logger.log(`Executing function call: ${call.name}`, call.args);
-
-      switch (call.name) {
-        case 'searchTrades':
-          return await tradingAnalysisFunctions.searchTrades(call.args);
-
-        case 'getTradeStatistics':
-          return await tradingAnalysisFunctions.getTradeStatistics(call.args);
-
-        case 'findSimilarTrades':
-          return await tradingAnalysisFunctions.findSimilarTrades(call.args);
-
-        case 'queryDatabase':
-          return await tradingAnalysisFunctions.queryDatabase(call.args);
-
-        case 'analyzeEconomicEvents':
-          return await tradingAnalysisFunctions.analyzeEconomicEvents(call.args);
-
-        case 'fetchEconomicEvents':
-          return await tradingAnalysisFunctions.fetchEconomicEvents(call.args);
-
-        case 'extractTradeIds':
-          return await tradingAnalysisFunctions.extractTradeIds(call.args);
-
-        case 'convertTradeIdsToCards':
-          return await tradingAnalysisFunctions.convertTradeIdsToCards(call.args);
-
-        default:
-          return {
-            success: false,
-            error: `Unknown function: ${call.name}`
-          };
-      }
-    } catch (error) {
-      logger.error(`Error executing function ${call.name}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
-
+ 
   /**
    * Create network error
    */

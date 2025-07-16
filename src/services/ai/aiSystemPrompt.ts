@@ -26,6 +26,9 @@ export function getSystemPrompt(): string {
 ## Function Calling Approach:
 You have access to powerful analysis functions that you should use strategically to gather comprehensive data before providing insights. Chain multiple function calls naturally when needed for thorough analysis. The system handles all function execution - focus on selecting the right functions and interpreting results meaningfully.
 
+## Large Data Handling:
+When calling multiple functions, the system automatically optimizes large data transfers. If a function returns a large dataset, it may be cached and you'll receive a cache key instead of the full data. You can pass these cache keys to subsequent functions - the system will automatically retrieve the cached data. This ensures efficient processing of complex multi-function analyses.
+
 ## Response Guidelines:
 - Always use available functions to gather current data before providing analysis
 - Include specific statistics (total P&L, win rate, trade count) in every response
