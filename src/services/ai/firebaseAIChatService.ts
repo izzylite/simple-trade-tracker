@@ -128,10 +128,13 @@ class FirebaseAIChatService {
               };
             }
 
+            // Ensure we have a valid result before adding to response parts
+            const validResult = processedResult || { success: false, error: 'Function returned undefined' };
+
             functionResponseParts.push({
               functionResponse: {
                 name: functionCall.name,
-                response: processedResult || { success: false, error: 'Function returned undefined' }
+                response: validResult
               }
             });
 
@@ -149,10 +152,13 @@ class FirebaseAIChatService {
               round: currentRound
             });
 
+            // Ensure we have a valid error result
+            const validErrorResult = errorResult || { success: false, error: 'Unknown function execution error' };
+
             functionResponseParts.push({
               functionResponse: {
                 name: functionCall.name,
-                response: errorResult
+                response: validErrorResult
               }
             });
           }
@@ -160,8 +166,29 @@ class FirebaseAIChatService {
 
         try {
           // Send function responses back to model
+          // According to Firebase AI docs, function responses should be sent directly as parts array
           logger.log(`Sending ${functionResponseParts.length} function responses to AI`);
-          currentResponse = await chat.sendMessage(functionResponseParts);
+
+          // Defensive programming: ensure we have valid function response parts
+          if (!functionResponseParts || functionResponseParts.length === 0) {
+            logger.error('No function response parts to send to AI');
+            finalResponse = 'I encountered an error processing the function results. Please try rephrasing your question.';
+            break;
+          }
+
+          // Validate each function response part
+          const validResponseParts = functionResponseParts.filter(part =>
+            part && part.functionResponse && part.functionResponse.name && part.functionResponse.response
+          );
+
+          if (validResponseParts.length === 0) {
+            logger.error('No valid function response parts found');
+            finalResponse = 'I encountered an error processing the function results. Please try rephrasing your question.';
+            break;
+          }
+
+          logger.log('Sending valid function response parts:', validResponseParts.map(p => p.functionResponse.name));
+          currentResponse = await chat.sendMessage(validResponseParts);
 
         } catch (sendError) {
           logger.error('Error sending function responses to AI:', sendError);
@@ -230,33 +257,11 @@ class FirebaseAIChatService {
    * Add technical context to user message when needed
    */
   private addTechnicalContext(message: string): string {
-
-
     return `${message}
 
-If you want to display specific trades as cards, include their IDs in JSON format: {\"tradeCards\": [\"trade-id-1\", \"trade-id-2\"], \"title\": \"Example Title\"}. 
-## TRADE CARD DISPLAY:
-When you want to display specific trades as interactive cards, include trade IDs in JSON format:
-
-\`\`\`json
-{
-  "tradeCards": ["trade-id-1", "trade-id-2", "trade-id-3"],
-  "title": "Analyzed Trades"
-}
-\`\`\`
-## TRADE DISPLAY RULES:
-- Use functions to get trade data, then include relevant trade IDs in JSON format
-- Only include trade IDs for trades you specifically want to highlight as examples
-- DO NOT describe individual trade details in text when cards will be shown - avoid redundancy
-- Focus your text on high-level analysis, patterns, and recommendations
-- Trade cards will automatically display below your response using the provided IDs
-
-Your response should always contain:
-- High-level analysis and insights
-- Patterns and trends you observe
-- Actionable recommendations
-- Summary statistics (total P&L, win rate, trade count)
-- Strategic advice based on the data`;
+## NOTE
+If you want to display specific trades as cards, Use convertTradeIdsToCards function to generate JSON 
+`;
   }
 
 
@@ -288,6 +293,12 @@ Your response should always contain:
 
         case 'fetchEconomicEvents':
           return await tradingAnalysisFunctions.fetchEconomicEvents(call.args);
+
+        case 'extractTradeIds':
+          return await tradingAnalysisFunctions.extractTradeIds(call.args);
+
+        case 'convertTradeIdsToCards':
+          return await tradingAnalysisFunctions.convertTradeIdsToCards(call.args);
 
         default:
           return {

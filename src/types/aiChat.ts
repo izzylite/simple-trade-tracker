@@ -2,6 +2,7 @@
  * AI Chat Types and Interfaces
  * Defines all TypeScript interfaces for the AI chat feature using Firebase AI Logic
  */
+ 
 
 export type AIProvider = 'firebase-ai';
 
@@ -54,116 +55,8 @@ export interface AIModelSettings {
     topP?: number;
   };
 }
-
-export interface ChatSession {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  createdAt: Date;
-  updatedAt: Date;
-  provider: AIProvider;
-  model?: string;
-  // Trading context when session was created
-  tradingContext: TradingDataContext;
-  // Session metadata
-  metadata: {
-    totalMessages: number;
-    totalTokens?: number;
-    calendarId: string;
-    dateRange: {
-      start: Date;
-      end: Date;
-    };
-  };
-}
-
-// Trimmed trade interface - excludes heavy fields like images
-export interface TrimmedTrade {
-  id: string;
-  name?: string;
-  date: number; // Unix timestamp
-  session?: string;
-  type: 'win' | 'loss' | 'breakeven';
-  amount: number;
-  tags?: string[];
-  notes?: string;
-  entry?: string;
-  exit?: string;
-  riskToReward?: number;
-  partialsTaken?: boolean;
-  createdAt: number; // Unix timestamp
-  updatedAt?: number; // Unix timestamp
-  economicEvents?: Array<{
-    name: string;
-    impact: string;
-    currency: string;
-    time: string;
-  }>;
-  // Excluded: images, isDeleted, isTemporary, and other heavy fields
-}
-
-
-export interface TradingDataContext {
-  // Basic statistics
-  totalTrades: number;
-  winRate: number;
-  profitFactor: number;
-  totalPnL: number;
-  avgWin: number;
-  avgLoss: number;
-  maxDrawdown: number;
-
-  // Time-based analysis
-  dateRange: {
-    start: Date;
-    end: Date;
-  };
-  tradingDays: number;
-  avgTradesPerDay: number;
-
-  // Performance by session
-  sessionStats: {
-    session: string;
-    trades: number;
-    winRate: number;
-    pnl: number;
-  }[];
-
-  // Tag analysis
-  topTags: {
-    tag: string;
-    count: number;
-    winRate: number;
-    avgPnL: number;
-  }[];
-
-  // Recent performance
-  recentTrends: {
-    period: string;
-    winRate: number;
-    pnl: number;
-    tradeCount: number;
-  }[];
-
-  // Risk metrics
-  riskMetrics: {
-    avgRiskReward: number;
-    maxConsecutiveLosses: number;
-    maxConsecutiveWins: number;
-    largestWin: number;
-    largestLoss: number;
-  };
-
-  // Economic events correlation
-  economicEventsImpact?: {
-    highImpactTrades: number;
-    highImpactWinRate: number;
-    commonEvents: string[];
-  };
-
-  // Detailed trade information
-  trades: TrimmedTrade[];
-}
+ 
+  
 
 export interface AIChatConfig {
   // Default provider settings
@@ -218,16 +111,7 @@ export interface ChatError {
   retryAfter?: number; // seconds
 }
 
-export interface ChatState {
-  isOpen: boolean;
-  isLoading: boolean;
-  isTyping: boolean;
-  currentSession: ChatSession | null;
-  sessions: ChatSession[];
-  modelSettings: AIModelSettings;
-  config: AIChatConfig;
-  error: ChatError | null;
-}
+ 
 
 // Default configurations for supported AI providers
 export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {

@@ -31,7 +31,7 @@ export interface SearchTradesParams {
   // Economic events filtering
   hasEconomicEvents?: boolean;
   economicEventImpact?: 'High' | 'Medium' | 'Low' | 'all';
-  economicEventCurrency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'all';
+  economicEventCurrency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'NZD' | 'all';
   economicEventName?: string;
 }
 
@@ -39,6 +39,7 @@ export interface GetStatisticsParams {
   period?: string;
   groupBy?: 'day' | 'week' | 'month' | 'session' | 'tag' | 'dayOfWeek' | 'economicEvent';
   tradeType?: 'win' | 'loss' | 'breakeven' | 'all';
+  tradeIds?: string[]; // Filter statistics to specific trade IDs
   // Economic events analysis
   includeEconomicEventStats?: boolean;
   economicEventImpact?: 'High' | 'Medium' | 'Low' | 'all';
@@ -56,7 +57,7 @@ export interface QueryDatabaseParams {
 
 export interface AnalyzeEconomicEventsParams {
   impactLevel?: 'High' | 'Medium' | 'Low' | 'all';
-  currency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'all';
+  currency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'NZD' | 'all';
   eventName?: string;
   dateRange?: string;
   compareWithoutEvents?: boolean;
@@ -65,10 +66,20 @@ export interface AnalyzeEconomicEventsParams {
 export interface FetchEconomicEventsParams {
   startDate?: string; // Unix timestamp in milliseconds or date string
   endDate?: string; // Unix timestamp in milliseconds or date string
-  currency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'all';
+  currency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'NZD' | 'all';
   impact?: 'High' | 'Medium' | 'all'; // Low impact events excluded for cost efficiency
   dateRange?: string; // "next 7 days", "this week", "next week", etc.
   limit?: number;
+}
+
+export interface ExtractTradeIdsParams {
+  trades: any[]; // Array of trade objects or trade data
+}
+
+export interface ConvertTradeIdsToCardsParams {
+  tradeIds: string[]; // Array of trade IDs to convert to card format
+  sortBy?: 'date' | 'amount' | 'name'; // Sort order for the cards
+  sortOrder?: 'asc' | 'desc'; // Sort direction
 }
 
 class TradingAnalysisFunctions {
@@ -85,6 +96,24 @@ class TradingAnalysisFunctions {
     this.calendar = calendar;
     this.userId = calendar.userId; 
     this.maxContextTrades = maxContextTrades;
+  }
+
+
+  simpleTradeData(trades: Trade[]): Omit<Trade, 'images' | 'isDeleted' | 'isTemporary' | 'isPinned' | 'shareLink' | 'isShared' | 'sharedAt' | 'shareId'>[] {
+    return trades.map(trade => ({
+      id: trade.id,
+      name: trade.name,
+      date: trade.date,
+      session: trade.session,
+      type: trade.type,
+      amount: trade.amount,
+      tags: trade.tags, 
+      entry: trade.entry,
+      exit: trade.exit,
+      riskToReward: trade.riskToReward,
+      partialsTaken: trade.partialsTaken,
+      economicEvents: trade.economicEvents
+    }));
   }
 
   /**
@@ -249,7 +278,7 @@ class TradingAnalysisFunctions {
       return {
         success: true,
         data: {
-          trades: filteredTrades,
+          trades: this.simpleTradeData(filteredTrades),
           count: filteredTrades.length,
           totalPnl: filteredTrades.reduce((sum, trade) => sum + trade.amount, 0),
           winRate: this.calculateWinRate(filteredTrades)
@@ -273,6 +302,14 @@ class TradingAnalysisFunctions {
       logger.log('AI requested trade statistics with params:', params);
 
       let tradesToAnalyze = [...this.trades];
+
+      // Filter by specific trade IDs if provided
+      if (params.tradeIds && params.tradeIds.length > 0) {
+        tradesToAnalyze = tradesToAnalyze.filter(trade =>
+          params.tradeIds!.includes(trade.id)
+        );
+        logger.log(`Filtered to ${tradesToAnalyze.length} trades by trade IDs:`, params.tradeIds);
+      }
 
       // Filter by trade type if specified
       if (params.tradeType && params.tradeType !== 'all') {
@@ -345,7 +382,7 @@ class TradingAnalysisFunctions {
       return {
         success: true,
         data: {
-          trades: actualTrades,
+          trades: this.simpleTradeData(actualTrades),
           searchResults: similarTrades,
           count: actualTrades.length,
           query: params.query
@@ -421,7 +458,7 @@ class TradingAnalysisFunctions {
             tradesWithEvents.reduce((sum, trade) => sum + trade.amount, 0) / tradesWithEvents.length : 0
         },
         economicEventStats: this.calculateEconomicEventStats(tradesWithEvents, params.impactLevel),
-        trades: tradesWithEvents
+        trades: this.simpleTradeData(tradesWithEvents)
       };
 
       // Include comparison with trades without events if requested
@@ -449,6 +486,213 @@ class TradingAnalysisFunctions {
 
     } catch (error) {
       logger.error('Error in analyzeEconomicEvents:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Extract trade IDs from trade objects or trade data
+   */
+  async extractTradeIds(params: ExtractTradeIdsParams): Promise<TradingAnalysisResult> {
+    try {
+      logger.log('AI requested trade ID extraction from trades:', params.trades?.length || 0);
+
+      if (!params.trades || !Array.isArray(params.trades)) {
+        return {
+          success: false,
+          error: 'Invalid trades parameter. Expected an array of trade objects.'
+        };
+      }
+
+      if (params.trades.length === 0) {
+        return {
+          success: true,
+          data: {
+            tradeIds: [],
+            count: 0,
+            message: 'No trades provided to extract IDs from.'
+          }
+        };
+      }
+
+      // Extract trade IDs from various possible formats
+      const tradeIds: string[] = [];
+      const invalidTrades: any[] = [];
+
+      params.trades.forEach((trade, index) => {
+        let tradeId: string | null = null;
+
+        // Try different possible ID field names
+        if (typeof trade === 'object' && trade !== null) {
+          // Standard trade object with 'id' field
+          if (trade.id && typeof trade.id === 'string') {
+            tradeId = trade.id;
+          }
+          // Alternative field names
+          else if (trade.tradeId && typeof trade.tradeId === 'string') {
+            tradeId = trade.tradeId;
+          }
+          else if (trade.trade_id && typeof trade.trade_id === 'string') {
+            tradeId = trade.trade_id;
+          }
+          // If it's just a string, assume it's the ID
+          else if (typeof trade === 'string') {
+            tradeId = trade;
+          }
+        }
+        // If the trade itself is a string, assume it's the ID
+        else if (typeof trade === 'string') {
+          tradeId = trade;
+        }
+
+        if (tradeId) {
+          tradeIds.push(tradeId);
+        } else {
+          invalidTrades.push({ index, trade });
+        }
+      });
+
+      // Remove duplicates
+      const uniqueTradeIds = Array.from(new Set(tradeIds));
+
+      logger.log(`Extracted ${uniqueTradeIds.length} unique trade IDs from ${params.trades.length} trades`);
+
+      return {
+        success: true,
+        data: {
+          tradeIds: uniqueTradeIds,
+          count: uniqueTradeIds.length,
+          totalProcessed: params.trades.length,
+          duplicatesRemoved: tradeIds.length - uniqueTradeIds.length,
+          invalidTrades: invalidTrades.length,
+          ...(invalidTrades.length > 0 && {
+            invalidTradesDetails: invalidTrades.slice(0, 5) // Show first 5 invalid trades for debugging
+          })
+        }
+      };
+
+    } catch (error) {
+      logger.error('Error in extractTradeIds:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Convert trade IDs to simple JSON format for aiResponseParser.ts to handle
+   */
+  async convertTradeIdsToCards(params: ConvertTradeIdsToCardsParams): Promise<TradingAnalysisResult> {
+    try {
+      logger.log('AI requested trade IDs to cards conversion:', params.tradeIds?.length || 0);
+
+      if (!params.tradeIds || !Array.isArray(params.tradeIds)) {
+        return {
+          success: false,
+          error: 'Invalid tradeIds parameter. Expected an array of trade ID strings.'
+        };
+      }
+
+      if (params.tradeIds.length === 0) {
+        return {
+          success: true,
+          data: {
+            tradeCards: [],
+            title: 'No Trades',
+            message: 'No trade IDs provided to convert to cards.'
+          }
+        };
+      }
+
+      // Find trades matching the provided IDs to validate they exist
+      const matchingTrades = this.trades.filter(trade =>
+        params.tradeIds.includes(trade.id)
+      );
+
+      if (matchingTrades.length === 0) {
+        return {
+          success: true,
+          data: {
+            tradeCards: [],
+            title: 'No Matching Trades',
+            message: 'No trades found matching the provided trade IDs.',
+            requestedIds: params.tradeIds.length
+          }
+        };
+      }
+
+      // Sort trade IDs if requested (based on the actual trade data)
+      let sortedTradeIds = [...params.tradeIds];
+      if (params.sortBy && matchingTrades.length > 0) {
+        // Create a map of trade ID to trade for sorting
+        const tradeMap = new Map(matchingTrades.map(trade => [trade.id, trade]));
+
+        sortedTradeIds = params.tradeIds
+          .filter(id => tradeMap.has(id)) // Only include IDs that have matching trades
+          .sort((idA, idB) => {
+            const tradeA = tradeMap.get(idA)!;
+            const tradeB = tradeMap.get(idB)!;
+            let comparison = 0;
+
+            switch (params.sortBy) {
+              case 'date':
+                comparison = new Date(tradeA.date).getTime() - new Date(tradeB.date).getTime();
+                break;
+              case 'amount':
+                comparison = tradeA.amount - tradeB.amount;
+                break;
+              case 'name':
+                comparison = (tradeA.name || '').localeCompare(tradeB.name || '');
+                break;
+              default:
+                comparison = 0;
+            }
+
+            return params.sortOrder === 'desc' ? -comparison : comparison;
+          });
+      } else {
+        // Filter to only include IDs that have matching trades
+        sortedTradeIds = params.tradeIds.filter(id =>
+          matchingTrades.some(trade => trade.id === id)
+        );
+      }
+
+      // Generate title based on parameters
+      let title = 'Trade Cards';
+      if (params.sortBy) {
+        const sortLabel = params.sortBy === 'date' ? 'Date' :
+                         params.sortBy === 'amount' ? 'P&L' : 'Name';
+        const orderLabel = params.sortOrder === 'desc' ? 'Descending' : 'Ascending';
+        title = `Trades (${sortLabel} ${orderLabel})`;
+      }
+
+      logger.log(`Prepared ${sortedTradeIds.length} trade IDs for card display`);
+
+      // Return simple JSON format that aiResponseParser.ts expects
+      return {
+        success: true,
+        data: {
+          tradeCards: sortedTradeIds,
+          title: title,
+          count: sortedTradeIds.length,
+          requestedIds: params.tradeIds.length,
+          foundTrades: matchingTrades.length,
+          notFoundIds: params.tradeIds.filter(id =>
+            !matchingTrades.some(trade => trade.id === id)
+          ),
+          sorting: {
+            sortBy: params.sortBy || 'none',
+            sortOrder: params.sortOrder || 'asc'
+          }
+        }
+      };
+
+    } catch (error) {
+      logger.error('Error in convertTradeIdsToCards:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -684,7 +928,7 @@ class TradingAnalysisFunctions {
           query: finalQuery,
           description: params.description,
           rowCount: rowCount,
-          trades: trades.length > 0 ? trades : undefined,
+          trades: this.simpleTradeData(trades),
           count: trades.length,
           totalPnl: trades.reduce((sum, trade) => sum + trade.amount, 0),
           winRate: this.calculateWinRate(trades)
@@ -702,25 +946,7 @@ class TradingAnalysisFunctions {
 
   // Helper methods
   private extractTradeIdsFromResults(results: any[]): string[] {
-    const tradeIds: string[] = [];
-
-    // If no results, return empty array
-    if (!results || results.length === 0) {
-      return [];
-    }
-
-    // Check if we're dealing with aggregated data from views
-    const firstResult = results[0];
-    const isAggregatedData =
-      'trade_count' in firstResult ||
-      'win_count' in firstResult ||
-      'tag_count' in firstResult;
-
-    // If this is aggregated data from views, we can't extract trade IDs
-    if (isAggregatedData) {
-      return [];
-    }
-
+    const tradeIds: string[] = []; 
     // Extract trade_id from results
     for (const result of results) {
       if (result.trade_id && typeof result.trade_id === 'string') {

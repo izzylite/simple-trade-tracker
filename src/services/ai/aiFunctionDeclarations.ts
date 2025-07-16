@@ -73,7 +73,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     },
     {
       name: 'getTradeStatistics',
-      description: 'Calculate comprehensive statistical analysis and performance metrics for trades including total P&L, win rate, average trade size, best/worst trades, grouped performance data, and economic events correlation analysis. Can analyze how economic events impact trading performance by event impact level, currency, and frequency.',
+      description: 'Calculate comprehensive statistical analysis and performance metrics for trades including total P&L, win rate, average trade size, best/worst trades, grouped performance data, and economic events correlation analysis. Can analyze how economic events impact trading performance by event impact level, currency, and frequency. Can also analyze statistics for specific trade IDs.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
@@ -90,6 +90,13 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
             type: SchemaType.STRING,
             enum: ['win', 'loss', 'breakeven', 'all'],
             description: 'Filter statistics by trade outcome: "win" for winning trades only, "loss" for losing trades only, "breakeven" for neutral trades, "all" for comprehensive statistics.'
+          },
+          tradeIds: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.STRING
+            },
+            description: 'Array of specific trade IDs to analyze. When provided, statistics will be calculated only for these trades. Useful for analyzing performance of a specific subset of trades returned from other functions like searchTrades or findSimilarTrades.'
           },
           includeEconomicEventStats: {
             type: SchemaType.BOOLEAN,
@@ -185,6 +192,50 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
             description: 'Maximum number of events to return. Defaults to 50 events if not specified, maximum allowed is 300 to control Firebase costs.'
           }
         }
+      }
+    },
+    {
+      name: 'extractTradeIds',
+      description: 'Extract trade IDs from an array of trade objects or trade data. Useful for converting trade results from other functions (like searchTrades or findSimilarTrades) into a list of trade IDs that can be used with other functions like getTradeStatistics. Handles various trade object formats and removes duplicates.',
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          trades: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.OBJECT
+            },
+            description: 'Array of trade objects or trade data from which to extract trade IDs. Can handle objects with "id", "tradeId", or "trade_id" fields, or arrays of strings representing trade IDs directly.'
+          }
+        },
+        required: ['trades']
+      }
+    },
+    {
+      name: 'convertTradeIdsToCards',
+      description: 'Convert a list of trade IDs to simple JSON format for card display. Returns a JSON object with "tradeCards" array containing the trade IDs, which the UI will use to display trade cards. Use this when you want to show specific trades as cards to the user.',
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          tradeIds: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.STRING
+            },
+            description: 'Array of trade IDs to convert to card format. These IDs should correspond to existing trades in the system.'
+          },
+          sortBy: {
+            type: SchemaType.STRING,
+            enum: ['date', 'amount', 'name'],
+            description: 'Field to sort the cards by: "date" for chronological order, "amount" for profit/loss order, "name" for alphabetical order.'
+          },
+          sortOrder: {
+            type: SchemaType.STRING,
+            enum: ['asc', 'desc'],
+            description: 'Sort direction: "asc" for ascending order, "desc" for descending order. Default is "asc".'
+          }
+        },
+        required: ['tradeIds']
       }
     },
     {
