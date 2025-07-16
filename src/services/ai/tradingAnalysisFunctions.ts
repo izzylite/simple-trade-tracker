@@ -94,8 +94,17 @@ class TradingAnalysisFunctions {
   initialize(trades: Trade[], calendar: Calendar, maxContextTrades = 100) {
     this.trades = trades;
     this.calendar = calendar;
-    this.userId = calendar.userId; 
+    this.userId = calendar.userId;
     this.maxContextTrades = maxContextTrades;
+  }
+
+  /**
+   * Check if reinitialization is needed
+   */
+  needsReinitialization(trades: Trade[], calendar: Calendar): boolean {
+    return this.calendar?.id !== calendar.id ||
+           this.trades.length !== trades.length ||
+           this.userId !== calendar.userId;
   }
 
 

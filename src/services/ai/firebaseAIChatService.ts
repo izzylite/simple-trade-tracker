@@ -23,6 +23,8 @@ import { getFunctionDeclarations } from './aiFunctionDeclarations';
 
 class FirebaseAIChatService {
   private readonly SYSTEM_PROMPT = getSystemPrompt();
+  private lastInitializedCalendarId: string | null = null;
+  private lastInitializedTradesCount: number = 0;
 
   /**
    * Send a chat message with AI-driven function calling
@@ -45,7 +47,8 @@ class FirebaseAIChatService {
       const messages = this.prepareFunctionCallingMessages(message, conversationHistory);
 
       // Get the model to use - gemini-2.5-flash is recommended for function calling
-      const modelName = modelSettings?.model || 'gemini-2.5-flash';
+      const modelName ='gemini-2.0-flash-exp';
+      logger.log(`Using model ${modelName} for function calling`);
 
       // Create generative model instance with function declarations
       const model = getGenerativeModel(ai, {
@@ -260,7 +263,7 @@ class FirebaseAIChatService {
     return `${message}
 
 ## NOTE
-If you want to display specific trades as cards, Use convertTradeIdsToCards function to generate JSON 
+If you want to display specific trades as cards, Use convertTradeIdsToCards function to generate JSON. the system will parse the JSON and display the cards automatically. 
 `;
   }
 
