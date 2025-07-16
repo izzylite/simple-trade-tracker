@@ -165,9 +165,11 @@ const VectorMigrationDialog: React.FC<VectorMigrationDialogProps> = ({
           user_id: user.uid,
           trade_type: trade.type,
           trade_amount: trade.amount,
-          trade_date: trade.date.toISOString(),
+          trade_date: trade.date.getTime(), // Unix timestamp in milliseconds
+          trade_updated_at: trade.updatedAt ? trade.updatedAt.getTime() : null,
           trade_session: trade.session || null,
           tags: trade.tags || [],
+          economic_events: trade.economicEvents || [],
           embedding: `[${embedding.join(',')}]`,
           embedded_content: content
         }, {
@@ -427,13 +429,19 @@ const VectorMigrationDialog: React.FC<VectorMigrationDialogProps> = ({
       disableEscapeKeyDown={isRunning}
     >
       <DialogTitle>
-        Vector Embeddings Migration
+        Vector Embeddings Migration (Economic Events)
       </DialogTitle>
       
       <DialogContent>
+        <Alert severity="info" sx={{ mb: 2 }}>
+          This migration regenerates all trade embeddings to include economic events data.
+          Economic events are now stored in both the embedded content and as structured data in Supabase.
+          This improves AI search capabilities for economic event correlation analysis.
+        </Alert>
+
         <Alert severity="warning" sx={{ mb: 2 }}>
-          This tool fixes the embedding mismatch that prevents time-based queries from working.
-          It will regenerate all trade embeddings using the correct transformer model.
+          <strong>Prerequisites:</strong> Make sure you have run the database migration script
+          (migration-add-economic-events.sql) in your Supabase SQL Editor before running this migration.
         </Alert>
 
         {!isRunning && !isComplete && (

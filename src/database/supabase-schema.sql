@@ -16,15 +16,19 @@ CREATE TABLE IF NOT EXISTS trade_embeddings (
   -- Trade metadata for quick filtering
   trade_type TEXT NOT NULL CHECK (trade_type IN ('win', 'loss', 'breakeven')),
   trade_amount DECIMAL NOT NULL,
-  trade_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  trade_date BIGINT NOT NULL, -- Unix timestamp in milliseconds
+  trade_updated_at BIGINT, -- Unix timestamp in milliseconds
   trade_session TEXT,
   
   -- Tags for filtering
   tags TEXT[] DEFAULT '{}',
-  
+
+  -- Economic events data (JSON array of simplified economic events)
+  economic_events JSONB DEFAULT '[]',
+
   -- Vector embedding (384 dimensions for all-MiniLM-L6-v2)
   embedding vector(384) NOT NULL,
-  
+
   -- Content that was embedded
   embedded_content TEXT NOT NULL,
   
@@ -68,15 +72,27 @@ CREATE INDEX IF NOT EXISTS idx_trade_embeddings_user_calendar
 CREATE INDEX IF NOT EXISTS idx_trade_embeddings_trade_type 
   ON trade_embeddings(trade_type);
 
-CREATE INDEX IF NOT EXISTS idx_trade_embeddings_trade_date 
+CREATE INDEX IF NOT EXISTS idx_trade_embeddings_trade_date
   ON trade_embeddings(trade_date);
 
-CREATE INDEX IF NOT EXISTS idx_trade_embeddings_tags 
+CREATE INDEX IF NOT EXISTS idx_trade_embeddings_trade_updated_at
+  ON trade_embeddings(trade_updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_trade_embeddings_tags
   ON trade_embeddings USING GIN(tags);
 
+CREATE INDEX IF NOT EXISTS idx_trade_embeddings_economic_events
+  ON trade_embeddings USING GIN(economic_events);
+
 -- Create vector similarity search index (HNSW for fast approximate search)
-CREATE INDEX IF NOT EXISTS idx_trade_embeddings_vector 
+CREATE INDEX IF NOT EXISTS idx_trade_embeddings_vector
   ON trade_embeddings USING hnsw (embedding vector_cosine_ops);
+
+-- Drop any existing search_similar_trades function first
+DROP FUNCTION IF EXISTS search_similar_trades(vector, text, text, double precision, integer);
+DROP FUNCTION IF EXISTS search_similar_trades(vector(384), text, text, double precision, integer);
+DROP FUNCTION IF EXISTS search_similar_trades(vector, text, text, float, integer);
+DROP FUNCTION IF EXISTS search_similar_trades(vector(384), text, text, float, integer);
 
 -- Create function for vector similarity search
 CREATE OR REPLACE FUNCTION search_similar_trades(
@@ -91,21 +107,25 @@ RETURNS TABLE (
   similarity FLOAT,
   trade_type TEXT,
   trade_amount DECIMAL,
-  trade_date TIMESTAMP WITH TIME ZONE,
+  trade_date BIGINT,
+  trade_updated_at BIGINT,
   trade_session TEXT,
   tags TEXT[],
+  economic_events JSONB,
   embedded_content TEXT
-) 
+)
 LANGUAGE sql STABLE
 AS $$
-  SELECT 
+  SELECT
     te.trade_id,
     1 - (te.embedding <=> query_embedding) as similarity,
     te.trade_type,
     te.trade_amount,
     te.trade_date,
+    te.trade_updated_at,
     te.trade_session,
     te.tags,
+    te.economic_events,
     te.embedded_content
   FROM trade_embeddings te
   WHERE 
@@ -134,29 +154,28 @@ CREATE TRIGGER update_embedding_metadata_updated_at
   BEFORE UPDATE ON embedding_metadata 
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Grant necessary permissions (adjust as needed for your security requirements)
--- These are for the authenticated role that Supabase uses
-ALTER TABLE trade_embeddings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE embedding_metadata ENABLE ROW LEVEL SECURITY;
+-- Grant necessary permissions for authenticated users
+GRANT ALL ON trade_embeddings TO authenticated;
+GRANT ALL ON embedding_metadata TO authenticated;
+GRANT USAGE ON SCHEMA public TO authenticated;
 
--- Create RLS policies (users can only access their own data)
-CREATE POLICY "Users can view their own trade embeddings" ON trade_embeddings
-  FOR SELECT USING (auth.uid()::text = user_id);
+-- SECURITY OPTIONS:
+-- Option 1: Application-level security (current setup)
+-- - Firebase handles authentication
+-- - Application code enforces user_id filtering
+-- - Simpler to manage, works well for most use cases
 
-CREATE POLICY "Users can insert their own trade embeddings" ON trade_embeddings
-  FOR INSERT WITH CHECK (auth.uid()::text = user_id);
-
-CREATE POLICY "Users can update their own trade embeddings" ON trade_embeddings
-  FOR UPDATE USING (auth.uid()::text = user_id);
-
-CREATE POLICY "Users can delete their own trade embeddings" ON trade_embeddings
-  FOR DELETE USING (auth.uid()::text = user_id);
-
-CREATE POLICY "Users can view their own embedding metadata" ON embedding_metadata
-  FOR SELECT USING (auth.uid()::text = user_id);
-
-CREATE POLICY "Users can insert their own embedding metadata" ON embedding_metadata
-  FOR INSERT WITH CHECK (auth.uid()::text = user_id);
-
-CREATE POLICY "Users can update their own embedding metadata" ON embedding_metadata
-  FOR UPDATE USING (auth.uid()::text = user_id);
+-- Option 2: Database-level security with RLS (uncomment below for maximum security)
+-- This would require passing Firebase JWT tokens to Supabase
+-- ALTER TABLE trade_embeddings ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE embedding_metadata ENABLE ROW LEVEL SECURITY;
+--
+-- CREATE POLICY "Users can only access their own embeddings" ON trade_embeddings
+--   FOR ALL USING (
+--     user_id = current_setting('request.jwt.claims', true)::json->>'sub'
+--   );
+--
+-- CREATE POLICY "Users can only access their own metadata" ON embedding_metadata
+--   FOR ALL USING (
+--     user_id = current_setting('request.jwt.claims', true)::json->>'sub'
+--   );

@@ -61,19 +61,19 @@ GRANT EXECUTE ON FUNCTION execute_sql(TEXT) TO authenticated;
 
 -- View: Trade embeddings summary by user
 CREATE OR REPLACE VIEW user_trade_embeddings_summary AS
-SELECT 
+SELECT
     user_id,
     calendar_id,
     COUNT(*) as total_embeddings,
     COUNT(DISTINCT trade_type) as unique_trade_types,
-    MIN(trade_date) as earliest_trade,
-    MAX(trade_date) as latest_trade,
+    MIN(trade_date) as earliest_trade, -- Unix timestamp
+    MAX(trade_date) as latest_trade, -- Unix timestamp
     AVG(trade_amount) as avg_trade_amount,
     SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END) as win_count,
     SUM(CASE WHEN trade_type = 'loss' THEN 1 ELSE 0 END) as loss_count,
     SUM(CASE WHEN trade_type = 'breakeven' THEN 1 ELSE 0 END) as breakeven_count,
     ROUND(
-        (SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END)::DECIMAL / COUNT(*)) * 100, 
+        (SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END)::DECIMAL / COUNT(*)) * 100,
         2
     ) as win_rate_percentage
 FROM trade_embeddings
@@ -106,8 +106,10 @@ SELECT
     trade_session,
     trade_type,
     trade_amount,
-    trade_date,
-    tags
+    trade_date, -- Unix timestamp
+    trade_updated_at, -- Unix timestamp
+    tags,
+    economic_events
 FROM trade_embeddings
 WHERE trade_session IS NOT NULL;
 
@@ -116,14 +118,14 @@ CREATE OR REPLACE VIEW trade_embeddings_by_day AS
 SELECT
     user_id,
     calendar_id,
-    EXTRACT(DOW FROM trade_date) as day_of_week,
-    TO_CHAR(trade_date, 'Day') as day_name,
+    EXTRACT(DOW FROM to_timestamp(trade_date / 1000)) as day_of_week,
+    TO_CHAR(to_timestamp(trade_date / 1000), 'Day') as day_name,
     COUNT(*) as trade_count,
     AVG(trade_amount) as avg_amount,
     SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END) as wins,
     SUM(CASE WHEN trade_type = 'loss' THEN 1 ELSE 0 END) as losses
 FROM trade_embeddings
-GROUP BY user_id, calendar_id, EXTRACT(DOW FROM trade_date), TO_CHAR(trade_date, 'Day')
+GROUP BY user_id, calendar_id, EXTRACT(DOW FROM to_timestamp(trade_date / 1000)), TO_CHAR(to_timestamp(trade_date / 1000), 'Day')
 ORDER BY day_of_week;
 
 -- View: Individual trades by day of week (for trade card display)
@@ -132,13 +134,15 @@ SELECT
     user_id,
     calendar_id,
     trade_id,
-    EXTRACT(DOW FROM trade_date) as day_of_week,
-    TO_CHAR(trade_date, 'Day') as day_name,
+    EXTRACT(DOW FROM to_timestamp(trade_date / 1000)) as day_of_week,
+    TO_CHAR(to_timestamp(trade_date / 1000), 'Day') as day_name,
     trade_type,
     trade_amount,
-    trade_date,
+    trade_date, -- Unix timestamp
+    trade_updated_at, -- Unix timestamp
     trade_session,
-    tags
+    tags,
+    economic_events
 FROM trade_embeddings;
 
 -- View: Trade embeddings by month (aggregated)
@@ -146,15 +150,15 @@ CREATE OR REPLACE VIEW trade_embeddings_by_month AS
 SELECT
     user_id,
     calendar_id,
-    DATE_TRUNC('month', trade_date) as month,
-    TO_CHAR(trade_date, 'YYYY-MM') as month_label,
+    DATE_TRUNC('month', to_timestamp(trade_date / 1000)) as month,
+    TO_CHAR(to_timestamp(trade_date / 1000), 'YYYY-MM') as month_label,
     COUNT(*) as trade_count,
     SUM(trade_amount) as total_amount,
     AVG(trade_amount) as avg_amount,
     SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END) as wins,
     SUM(CASE WHEN trade_type = 'loss' THEN 1 ELSE 0 END) as losses
 FROM trade_embeddings
-GROUP BY user_id, calendar_id, DATE_TRUNC('month', trade_date), TO_CHAR(trade_date, 'YYYY-MM')
+GROUP BY user_id, calendar_id, DATE_TRUNC('month', to_timestamp(trade_date / 1000)), TO_CHAR(to_timestamp(trade_date / 1000), 'YYYY-MM')
 ORDER BY month;
 
 -- View: Individual trades by month (for trade card display)
@@ -163,13 +167,15 @@ SELECT
     user_id,
     calendar_id,
     trade_id,
-    DATE_TRUNC('month', trade_date) as month,
-    TO_CHAR(trade_date, 'YYYY-MM') as month_label,
+    DATE_TRUNC('month', to_timestamp(trade_date / 1000)) as month,
+    TO_CHAR(to_timestamp(trade_date / 1000), 'YYYY-MM') as month_label,
     trade_type,
     trade_amount,
-    trade_date,
+    trade_date, -- Unix timestamp
+    trade_updated_at, -- Unix timestamp
     trade_session,
-    tags
+    tags,
+    economic_events
 FROM trade_embeddings;
 
 -- View: Most common tags (aggregated)
@@ -196,9 +202,11 @@ SELECT
     unnest(tags) as tag,
     trade_type,
     trade_amount,
-    trade_date,
+    trade_date, -- Unix timestamp
+    trade_updated_at, -- Unix timestamp
     trade_session,
-    tags
+    tags,
+    economic_events
 FROM trade_embeddings
 WHERE tags IS NOT NULL AND array_length(tags, 1) > 0;
 

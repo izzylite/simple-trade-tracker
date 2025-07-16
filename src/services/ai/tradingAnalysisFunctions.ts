@@ -25,12 +25,20 @@ export interface SearchTradesParams {
   session?: 'Asia' | 'London' | 'NY AM' | 'NY PM' | 'london' | 'new-york' | 'tokyo' | 'sydney';
   dayOfWeek?: string;
   limit?: number;
+  // Economic events filtering
+  hasEconomicEvents?: boolean;
+  economicEventImpact?: 'High' | 'Medium' | 'Low' | 'all';
+  economicEventCurrency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'all';
+  economicEventName?: string;
 }
 
 export interface GetStatisticsParams {
   period?: string;
-  groupBy?: 'day' | 'week' | 'month' | 'session' | 'tag' | 'dayOfWeek';
+  groupBy?: 'day' | 'week' | 'month' | 'session' | 'tag' | 'dayOfWeek' | 'economicEvent';
   tradeType?: 'win' | 'loss' | 'breakeven' | 'all';
+  // Economic events analysis
+  includeEconomicEventStats?: boolean;
+  economicEventImpact?: 'High' | 'Medium' | 'Low' | 'all';
 }
 
 export interface FindSimilarTradesParams {
@@ -41,7 +49,14 @@ export interface FindSimilarTradesParams {
 export interface QueryDatabaseParams {
   query: string;
   description?: string;
-  fallbackQuery?: string; // Natural language query for findSimilarTrades fallback
+}
+
+export interface AnalyzeEconomicEventsParams {
+  impactLevel?: 'High' | 'Medium' | 'Low' | 'all';
+  currency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'all';
+  eventName?: string;
+  dateRange?: string;
+  compareWithoutEvents?: boolean;
 }
 
 class TradingAnalysisFunctions {
@@ -66,7 +81,22 @@ class TradingAnalysisFunctions {
   async searchTrades(params: SearchTradesParams): Promise<TradingAnalysisResult> {
     try {
       logger.log('AI requested trade search with params:', params);
-      
+
+      // Validate parameters
+      if (params.limit && (params.limit < 1 || params.limit > 1000)) {
+        return {
+          success: false,
+          error: 'Limit must be between 1 and 1000'
+        };
+      }
+
+      if (params.minAmount !== undefined && params.maxAmount !== undefined && params.minAmount > params.maxAmount) {
+        return {
+          success: false,
+          error: 'Minimum amount cannot be greater than maximum amount'
+        };
+      }
+
       let filteredTrades = [...this.trades];
 
       // Filter by trade type
@@ -89,9 +119,44 @@ class TradingAnalysisFunctions {
 
       // Filter by tags
       if (params.tags && params.tags.length > 0) {
-        filteredTrades = filteredTrades.filter(trade => 
+        filteredTrades = filteredTrades.filter(trade =>
           params.tags!.some(tag => trade.tags?.includes(tag))
         );
+      }
+
+      // Filter by economic events presence
+      if (params.hasEconomicEvents !== undefined) {
+        filteredTrades = filteredTrades.filter(trade => {
+          const hasEvents = trade.economicEvents && trade.economicEvents.length > 0;
+          return params.hasEconomicEvents ? hasEvents : !hasEvents;
+        });
+      }
+
+      // Filter by economic event impact
+      if (params.economicEventImpact && params.economicEventImpact !== 'all') {
+        filteredTrades = filteredTrades.filter(trade => {
+          if (!trade.economicEvents || trade.economicEvents.length === 0) return false;
+          return trade.economicEvents.some(event => event.impact === params.economicEventImpact);
+        });
+      }
+
+      // Filter by economic event currency
+      if (params.economicEventCurrency && params.economicEventCurrency !== 'all') {
+        filteredTrades = filteredTrades.filter(trade => {
+          if (!trade.economicEvents || trade.economicEvents.length === 0) return false;
+          return trade.economicEvents.some(event => event.currency === params.economicEventCurrency);
+        });
+      }
+
+      // Filter by economic event name (partial match)
+      if (params.economicEventName) {
+        const searchTerm = params.economicEventName.toLowerCase();
+        filteredTrades = filteredTrades.filter(trade => {
+          if (!trade.economicEvents || trade.economicEvents.length === 0) return false;
+          return trade.economicEvents.some(event =>
+            event.name.toLowerCase().includes(searchTerm)
+          );
+        });
       }
 
       // Filter by session
@@ -215,7 +280,10 @@ class TradingAnalysisFunctions {
           tradesToAnalyze.reduce((sum, trade) => sum + trade.amount, 0) / tradesToAnalyze.length : 0,
         bestTrade: this.getBestTrade(tradesToAnalyze),
         worstTrade: this.getWorstTrade(tradesToAnalyze),
-        groupedData: this.groupTradesByPeriod(tradesToAnalyze, params.groupBy || 'month')
+        groupedData: this.groupTradesByPeriod(tradesToAnalyze, params.groupBy || 'month'),
+        ...(params.includeEconomicEventStats && {
+          economicEventStats: this.calculateEconomicEventStats(tradesToAnalyze, params.economicEventImpact)
+        })
       };
 
       return {
@@ -274,6 +342,90 @@ class TradingAnalysisFunctions {
 
     } catch (error) {
       logger.error('Error in findSimilarTrades:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Analyze economic events correlation with trading performance
+   */
+  async analyzeEconomicEvents(params: AnalyzeEconomicEventsParams): Promise<TradingAnalysisResult> {
+    try {
+      logger.log('AI requested economic events analysis with params:', params);
+
+      let tradesWithEvents = this.trades.filter(trade =>
+        trade.economicEvents && trade.economicEvents.length > 0
+      );
+
+      let tradesWithoutEvents = this.trades.filter(trade =>
+        !trade.economicEvents || trade.economicEvents.length === 0
+      );
+
+      // Apply filters
+      if (params.impactLevel && params.impactLevel !== 'all') {
+        tradesWithEvents = tradesWithEvents.filter(trade =>
+          trade.economicEvents!.some(event => event.impact === params.impactLevel)
+        );
+      }
+
+      if (params.currency && params.currency !== 'all') {
+        tradesWithEvents = tradesWithEvents.filter(trade =>
+          trade.economicEvents!.some(event => event.currency === params.currency)
+        );
+      }
+
+      if (params.eventName) {
+        const searchTerm = params.eventName.toLowerCase();
+        tradesWithEvents = tradesWithEvents.filter(trade =>
+          trade.economicEvents!.some(event =>
+            event.name.toLowerCase().includes(searchTerm)
+          )
+        );
+      }
+
+      // Apply date range filter
+      if (params.dateRange) {
+        const dateFilter = this.parseDateRange(params.dateRange);
+        if (dateFilter) {
+          tradesWithEvents = tradesWithEvents.filter(trade =>
+            trade.date >= dateFilter.start && trade.date <= dateFilter.end
+          );
+          tradesWithoutEvents = tradesWithoutEvents.filter(trade =>
+            trade.date >= dateFilter.start && trade.date <= dateFilter.end
+          );
+        }
+      }
+
+      // Calculate detailed analysis
+      const analysis = {
+        tradesWithEvents: {
+          count: tradesWithEvents.length,
+          totalPnl: tradesWithEvents.reduce((sum, trade) => sum + trade.amount, 0),
+          winRate: this.calculateWinRate(tradesWithEvents),
+          avgPnl: tradesWithEvents.length > 0 ?
+            tradesWithEvents.reduce((sum, trade) => sum + trade.amount, 0) / tradesWithEvents.length : 0
+        },
+        tradesWithoutEvents: {
+          count: tradesWithoutEvents.length,
+          totalPnl: tradesWithoutEvents.reduce((sum, trade) => sum + trade.amount, 0),
+          winRate: this.calculateWinRate(tradesWithoutEvents),
+          avgPnl: tradesWithoutEvents.length > 0 ?
+            tradesWithoutEvents.reduce((sum, trade) => sum + trade.amount, 0) / tradesWithoutEvents.length : 0
+        },
+        economicEventStats: this.calculateEconomicEventStats(tradesWithEvents, params.impactLevel),
+        trades: tradesWithEvents.slice(0, 50) // Limit to 50 trades for performance
+      };
+
+      return {
+        success: true,
+        data: analysis
+      };
+
+    } catch (error) {
+      logger.error('Error in analyzeEconomicEvents:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -411,42 +563,7 @@ class TradingAnalysisFunctions {
         }
       }
 
-      // Check if we found any trades and implement fallback if needed
-      if (trades.length === 0 && params.fallbackQuery) {
-        logger.log('No trades found from queryDatabase, attempting fallback with findSimilarTrades');
-
-        try {
-          
-          const fallbackResult = await this.findSimilarTrades({
-            query: params.fallbackQuery,
-            limit: this.maxContextTrades
-          });
-
-          if (fallbackResult.success && fallbackResult.data?.trades && fallbackResult.data.trades.length > 0) {
-            logger.log(`Fallback successful: found ${fallbackResult.data.trades.length} trades via semantic search`);
-
-            return {
-              success: true,
-              data: {
-                results: results,
-                query: finalQuery,
-                description: params.description,
-                rowCount: rowCount,
-                trades: fallbackResult.data.trades,
-                count: fallbackResult.data.trades.length,
-                totalPnl: fallbackResult.data.trades.reduce((sum: number, trade: Trade) => sum + trade.amount, 0),
-                winRate: this.calculateWinRate(fallbackResult.data.trades),
-                fallbackUsed: true,
-                fallbackQuery: params.fallbackQuery,
-                originalQuery: finalQuery
-              }
-            };
-          }
-        } catch (fallbackError) {
-          logger.error('Fallback to findSimilarTrades failed:', fallbackError);
-          // Continue with original empty results
-        }
-      }
+      // No fallback needed - multi-step function calling handles this intelligently
 
       return {
         success: true,
@@ -589,6 +706,116 @@ class TradingAnalysisFunctions {
     });
 
     return summary;
+  }
+
+  private parseDateRange(dateRange: string): { start: Date; end: Date } | null {
+    const now = new Date();
+
+    if (dateRange.includes('last')) {
+      const match = dateRange.match(/last (\d+) (day|week|month)s?/i);
+      if (match) {
+        const amount = parseInt(match[1]);
+        const unit = match[2].toLowerCase();
+        const startDate = new Date(now);
+
+        if (unit === 'day') startDate.setDate(now.getDate() - amount);
+        else if (unit === 'week') startDate.setDate(now.getDate() - (amount * 7));
+        else if (unit === 'month') startDate.setMonth(now.getMonth() - amount);
+
+        return { start: startDate, end: now };
+      }
+    } else if (dateRange.match(/^\d{4}-\d{2}$/)) {
+      // Format: 2024-01
+      const [year, month] = dateRange.split('-').map(Number);
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      return { start: startDate, end: endDate };
+    }
+
+    return null;
+  }
+
+  private calculateEconomicEventStats(trades: Trade[], impactFilter?: string): any {
+    const tradesWithEvents = trades.filter(trade =>
+      trade.economicEvents && trade.economicEvents.length > 0
+    );
+
+    if (tradesWithEvents.length === 0) {
+      return {
+        totalTradesWithEvents: 0,
+        percentageWithEvents: 0,
+        eventImpactBreakdown: {},
+        eventCurrencyBreakdown: {},
+        mostCommonEvents: []
+      };
+    }
+
+    // Filter by impact if specified
+    let eventsToAnalyze = tradesWithEvents;
+    if (impactFilter && impactFilter !== 'all') {
+      eventsToAnalyze = tradesWithEvents.filter(trade =>
+        trade.economicEvents!.some(event => event.impact === impactFilter)
+      );
+    }
+
+    // Calculate impact breakdown
+    const impactBreakdown: { [key: string]: { count: number; winRate: number; avgPnl: number } } = {};
+    const currencyBreakdown: { [key: string]: { count: number; winRate: number; avgPnl: number } } = {};
+    const eventNameCounts: { [key: string]: number } = {};
+
+    eventsToAnalyze.forEach(trade => {
+      trade.economicEvents!.forEach(event => {
+        // Impact breakdown
+        if (!impactBreakdown[event.impact]) {
+          impactBreakdown[event.impact] = { count: 0, winRate: 0, avgPnl: 0 };
+        }
+        impactBreakdown[event.impact].count++;
+
+        // Currency breakdown
+        if (!currencyBreakdown[event.currency]) {
+          currencyBreakdown[event.currency] = { count: 0, winRate: 0, avgPnl: 0 };
+        }
+        currencyBreakdown[event.currency].count++;
+
+        // Event name counts
+        eventNameCounts[event.name] = (eventNameCounts[event.name] || 0) + 1;
+      });
+    });
+
+    // Calculate win rates and average P&L for each category
+    Object.keys(impactBreakdown).forEach(impact => {
+      const tradesForImpact = eventsToAnalyze.filter(trade =>
+        trade.economicEvents!.some(event => event.impact === impact)
+      );
+      impactBreakdown[impact].winRate = this.calculateWinRate(tradesForImpact);
+      impactBreakdown[impact].avgPnl = tradesForImpact.reduce((sum, trade) => sum + trade.amount, 0) / tradesForImpact.length;
+    });
+
+    Object.keys(currencyBreakdown).forEach(currency => {
+      const tradesForCurrency = eventsToAnalyze.filter(trade =>
+        trade.economicEvents!.some(event => event.currency === currency)
+      );
+      currencyBreakdown[currency].winRate = this.calculateWinRate(tradesForCurrency);
+      currencyBreakdown[currency].avgPnl = tradesForCurrency.reduce((sum, trade) => sum + trade.amount, 0) / tradesForCurrency.length;
+    });
+
+    // Get most common events
+    const mostCommonEvents = Object.entries(eventNameCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([name, count]) => ({ name, count }));
+
+    return {
+      totalTradesWithEvents: tradesWithEvents.length,
+      percentageWithEvents: (tradesWithEvents.length / trades.length) * 100,
+      eventImpactBreakdown: impactBreakdown,
+      eventCurrencyBreakdown: currencyBreakdown,
+      mostCommonEvents,
+      winRateWithEvents: this.calculateWinRate(tradesWithEvents),
+      winRateWithoutEvents: this.calculateWinRate(trades.filter(trade =>
+        !trade.economicEvents || trade.economicEvents.length === 0
+      ))
+    };
   }
 }
 

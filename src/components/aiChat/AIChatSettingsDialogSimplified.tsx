@@ -19,7 +19,6 @@ import {
   MenuItem,
   Box,
   Typography,
-  Divider,
   Card,
   CardContent,
   Slider,
@@ -41,6 +40,8 @@ import {
   AI_PROVIDERS,
   DEFAULT_AI_CHAT_CONFIG
 } from '../../types/aiChat';
+import VectorMigrationDialog from '../VectorMigrationDialog';
+import { Calendar } from '../../types/calendar';
 
 
 interface AIChatSettingsDialogProps {
@@ -49,6 +50,7 @@ interface AIChatSettingsDialogProps {
   config: AIChatConfig;
   modelSettings?: AIModelSettings;
   onConfigChange: (config: AIChatConfig, modelSettings?: AIModelSettings) => void;
+  calendar?: Calendar;
 }
 
 interface TabPanelProps {
@@ -82,7 +84,8 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
   onClose,
   config,
   modelSettings,
-  onConfigChange
+  onConfigChange,
+  calendar
 }) => {
   const [tabValue, setTabValue] = useState(0);
   const [localConfig, setLocalConfig] = useState<AIChatConfig>(config);
@@ -96,6 +99,7 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
       }
     }
   );
+  const [showVectorMigration, setShowVectorMigration] = useState(false);
 
   useEffect(() => {
     setLocalConfig(config);
@@ -156,6 +160,7 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
             <Tab label="Model Settings" />
             <Tab label="Chat Preferences" />
             <Tab label="Context Settings" />
+            <Tab label="Vector Migration" />
           </Tabs>
         </Box>
 
@@ -429,6 +434,40 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
           </Card>
         </TabPanel>
 
+        {/* Vector Migration Tab */}
+        <TabPanel value={tabValue} index={3}>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Economic Events Vector Migration
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Regenerate vector embeddings to include economic events data in both embedded content and structured database fields.
+              </Typography>
+
+              <Alert severity="info" sx={{ mb: 2 }}>
+                This migration adds economic events to the Supabase database and regenerates all embeddings.
+                Economic events will be stored as structured JSONB data and included in searchable content,
+                enabling better AI analysis of trades correlated with economic news.
+              </Alert>
+
+              <Button
+                variant="contained"
+                onClick={() => setShowVectorMigration(true)}
+                disabled={!calendar}
+                fullWidth
+              >
+                Run Vector Migration
+              </Button>
+
+              {!calendar && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  Calendar is required to run migration
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+        </TabPanel>
 
       </DialogContent>
 
@@ -450,7 +489,12 @@ const AIChatSettingsDialog: React.FC<AIChatSettingsDialogProps> = ({
       </DialogActions>
     </Dialog>
 
-
+    {/* Vector Migration Dialog */}
+    <VectorMigrationDialog
+      open={showVectorMigration}
+      onClose={() => setShowVectorMigration(false)}
+      calendar={calendar}
+    />
     </>
   );
 };

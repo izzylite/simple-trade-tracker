@@ -24,10 +24,9 @@ import { YearlyTrades, yearlyTradesConverter } from '../types/yearlyTrades';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase/config';
 import { TradeImage } from '../components/trades/TradeForm';
-import { logger } from '../utils/logger';
-import { cleanEventNameForPinning } from '../utils/eventNameUtils';
-import { vectorSearchService } from './vectorSearchService';
-import { embeddingService } from './embeddingService';
+import { logger } from '../utils/logger'; 
+import { vectorSearchService } from './ai/vectorSearchService';
+import { embeddingService } from './ai/embeddingService';
 import { getAuth } from '@firebase/auth';
 
 const CALENDARS_COLLECTION = 'calendars';

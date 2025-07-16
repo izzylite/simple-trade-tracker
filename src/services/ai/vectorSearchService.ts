@@ -13,9 +13,11 @@ export interface TradeSearchResult {
   similarity: number;
   tradeType: 'win' | 'loss' | 'breakeven';
   tradeAmount: number;
-  tradeDate: string;
+  tradeDate: number; // Unix timestamp in milliseconds
+  tradeUpdatedAt?: number; // Unix timestamp in milliseconds
   tradeSession?: string;
   tags: string[];
+  economicEvents?: any[];
   embeddedContent: string;
 }
 
@@ -73,9 +75,11 @@ class VectorSearchService {
         similarity: parseFloat(row.similarity),
         tradeType: row.trade_type,
         tradeAmount: parseFloat(row.trade_amount),
-        tradeDate: row.trade_date,
+        tradeDate: parseInt(row.trade_date), // Unix timestamp
+        tradeUpdatedAt: row.trade_updated_at ? parseInt(row.trade_updated_at) : undefined,
         tradeSession: row.trade_session,
         tags: row.tags || [],
+        economicEvents: row.economic_events || [],
         embeddedContent: row.embedded_content
       }));
 
@@ -104,9 +108,11 @@ class VectorSearchService {
           user_id: userId,
           trade_type: trade.type,
           trade_amount: trade.amount,
-          trade_date: trade.date.toISOString(),
+          trade_date: trade.date.getTime(), // Unix timestamp in milliseconds
+          trade_updated_at: trade.updatedAt ? trade.updatedAt.getTime() : null,
           trade_session: trade.session,
           tags: trade.tags || [],
+          economic_events: trade.economicEvents || [],
           embedding: `[${embedding.join(',')}]`,
           embedded_content: content
         }, {
@@ -144,9 +150,11 @@ class VectorSearchService {
         user_id: userId,
         trade_type: trade.type,
         trade_amount: trade.amount,
-        trade_date: trade.date.toISOString(),
+        trade_date: trade.date.getTime(), // Unix timestamp in milliseconds
+        trade_updated_at: trade.updatedAt ? trade.updatedAt.getTime() : null,
         trade_session: trade.session,
         tags: trade.tags || [],
+        economic_events: trade.economicEvents || [],
         embedding: `[${embedding.join(',')}]`,
         embedded_content: content
       }));

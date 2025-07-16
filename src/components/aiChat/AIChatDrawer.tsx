@@ -621,6 +621,7 @@ What would you like to know about your trading?`,
         config={chatConfig}
         modelSettings={modelSettings}
         onConfigChange={handleConfigChange}
+        calendar={calendar}
       />
        
     </>
