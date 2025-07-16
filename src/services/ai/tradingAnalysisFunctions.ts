@@ -36,6 +36,16 @@ export interface SearchTradesParams {
   economicEventName?: string;
 }
 
+export interface FunctionCall {
+  name: string;
+  args: any;
+}
+
+export interface ExecuteMultipleFunctionsParams {
+  functions: FunctionCall[];
+  description?: string;
+}
+
 export interface GetStatisticsParams {
   returnCacheKey?: boolean;
   period?: string;
@@ -1300,6 +1310,153 @@ class TradingAnalysisFunctions {
         !trade.economicEvents || trade.economicEvents.length === 0
       ))
     };
+  }
+
+  /**
+   * Execute multiple functions in sequence and return the final result
+   * This allows the AI to combine multiple function calls into a single request
+   */
+  async executeMultipleFunctions(params: ExecuteMultipleFunctionsParams): Promise<TradingAnalysisResult> {
+    try {
+      logger.log('Executing multiple functions:', params.functions.map(f => f.name));
+
+      if (!params.functions || params.functions.length === 0) {
+        return {
+          success: false,
+          error: 'No functions provided to execute'
+        };
+      }
+
+      const results: any[] = [];
+      let lastResult: any = null;
+
+      // Execute functions sequentially
+      for (let i = 0; i < params.functions.length; i++) {
+        const functionCall = params.functions[i];
+        logger.log(`Executing function ${i + 1}/${params.functions.length}: ${functionCall.name}`);
+
+        // Process arguments to handle references to previous results
+        const processedArgs = this.processMultiFunctionArgs(functionCall.args, results, lastResult);
+
+        // Execute the function
+        const result = await this.executeSingleFunction(functionCall.name, processedArgs);
+
+        if (!result.success) {
+          logger.error(`Function ${functionCall.name} failed:`, result.error);
+          return {
+            success: false,
+            error: `Function ${functionCall.name} failed: ${result.error}`,
+            data: {
+              completedFunctions: results,
+              failedFunction: functionCall.name,
+              failedAt: i + 1
+            }
+          };
+        }
+
+        results.push({
+          functionName: functionCall.name,
+          args: processedArgs,
+          result: result.data
+        });
+
+        lastResult = result.data;
+      }
+
+      logger.log('All functions executed successfully');
+
+      return {
+        success: true,
+        data: {
+          description: params.description || 'Multiple functions executed successfully',
+          functions: results,
+          finalResult: lastResult,
+          totalFunctions: params.functions.length
+        }
+      };
+
+    } catch (error) {
+      logger.error('Error executing multiple functions:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error executing multiple functions'
+      };
+    }
+  }
+
+  /**
+   * Process arguments for multi-function calls, handling references to previous results
+   */
+  private processMultiFunctionArgs(args: any, previousResults: any[], lastResult: any): any {
+    if (!args || typeof args !== 'object') {
+      return args;
+    }
+
+    const processedArgs = { ...args };
+
+    // Handle special placeholders that reference previous results
+    for (const [key, value] of Object.entries(processedArgs)) {
+      if (typeof value === 'string') {
+        // Handle reference to last result
+        if (value === 'LAST_RESULT') {
+          processedArgs[key] = lastResult;
+        }
+        // Handle reference to specific function result by index
+        else if (value.startsWith('RESULT_')) {
+          const index = parseInt(value.replace('RESULT_', ''));
+          if (index >= 0 && index < previousResults.length) {
+            processedArgs[key] = previousResults[index].result;
+          }
+        }
+        // Handle reference to trade IDs from previous result
+        else if (value === 'EXTRACT_TRADE_IDS' && lastResult) {
+          if (lastResult.trades && Array.isArray(lastResult.trades)) {
+            processedArgs[key] = lastResult.trades.map((trade: any) =>
+              trade.id || trade.tradeId || trade.trade_id
+            ).filter(Boolean);
+          } else if (lastResult.tradeIds && Array.isArray(lastResult.tradeIds)) {
+            processedArgs[key] = lastResult.tradeIds;
+          }
+        }
+        // Handle reference to trades array from previous result
+        else if (value === 'EXTRACT_TRADES' && lastResult) {
+          if (lastResult.trades && Array.isArray(lastResult.trades)) {
+            processedArgs[key] = lastResult.trades;
+          }
+        }
+      }
+    }
+
+    return processedArgs;
+  }
+
+  /**
+   * Execute a single function by name
+   */
+  private async executeSingleFunction(functionName: string, args: any): Promise<TradingAnalysisResult> {
+    switch (functionName) {
+      case 'searchTrades':
+        return await this.searchTrades(args);
+      case 'getTradeStatistics':
+        return await this.getTradeStatistics(args);
+      case 'findSimilarTrades':
+        return await this.findSimilarTrades(args);
+      case 'queryDatabase':
+        return await this.queryDatabase(args);
+      case 'analyzeEconomicEvents':
+        return await this.analyzeEconomicEvents(args);
+      case 'fetchEconomicEvents':
+        return await this.fetchEconomicEvents(args);
+      case 'extractTradeIds':
+        return await this.extractTradeIds(args);
+      case 'convertTradeIdsToCards':
+        return await this.convertTradeIdsToCards(args);
+      default:
+        return {
+          success: false,
+          error: `Unknown function: ${functionName}`
+        };
+    }
   }
 }
 

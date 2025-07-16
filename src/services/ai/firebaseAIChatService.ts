@@ -18,7 +18,7 @@ import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
 import { getSystemPrompt } from './aiSystemPrompt';
 import { getFunctionDeclarations } from './aiFunctionDeclarations';
-import { multiFunctionCallingCachingService } from './multiFunctionCallingCaching';
+
 
 
 
@@ -26,6 +26,114 @@ class FirebaseAIChatService {
   private readonly SYSTEM_PROMPT = getSystemPrompt();
   private lastInitializedCalendarId: string | null = null;
   private lastInitializedTradesCount: number = 0;
+
+  /**
+   * Execute a function call requested by the AI
+   */
+  private async executeFunctionCall(functionName: string, args: any): Promise<TradingAnalysisResult> {
+    try {
+      logger.log(`Executing function call: ${functionName}`, args);
+
+      // Process arguments to handle cache keys (if needed)
+      const processedArgs = this.processFunctionArgs(args);
+
+      switch (functionName) {
+        case 'searchTrades':
+          return await tradingAnalysisFunctions.searchTrades(processedArgs);
+
+        case 'getTradeStatistics':
+          return await tradingAnalysisFunctions.getTradeStatistics(processedArgs);
+
+        case 'findSimilarTrades':
+          return await tradingAnalysisFunctions.findSimilarTrades(processedArgs);
+
+        case 'queryDatabase':
+          return await tradingAnalysisFunctions.queryDatabase(processedArgs);
+
+        case 'analyzeEconomicEvents':
+          return await tradingAnalysisFunctions.analyzeEconomicEvents(processedArgs);
+
+        case 'fetchEconomicEvents':
+          return await tradingAnalysisFunctions.fetchEconomicEvents(processedArgs);
+
+        case 'extractTradeIds':
+          return await tradingAnalysisFunctions.extractTradeIds(processedArgs);
+
+        case 'convertTradeIdsToCards':
+          return await tradingAnalysisFunctions.convertTradeIdsToCards(processedArgs);
+
+        default:
+          return {
+            success: false,
+            error: `Unknown function: ${functionName}`
+          };
+      }
+    } catch (error) {
+      logger.error(`Error executing function ${functionName}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Process function arguments to handle cache keys
+   */
+  private processFunctionArgs(args: any): any {
+    if (!args || typeof args !== 'object') {
+      return args;
+    }
+
+    const processedArgs = { ...args };
+    logger.log('Processing function arguments:', processedArgs);
+
+    // Look for cache keys in arguments and replace with actual data
+    for (const [key, value] of Object.entries(processedArgs)) {
+      if (typeof value === 'string' && value.startsWith('ai_function_result_')) {
+        logger.log(`Found cache key in argument ${key}: ${value}`);
+        try {
+          const cachedItem = localStorage.getItem(value);
+          if (cachedItem) {
+            const cachedResult = JSON.parse(cachedItem);
+            let actualData = cachedResult.data;
+
+            // For extractTradeIds function, we need the trades array specifically
+            if (key === 'trades' && actualData && typeof actualData === 'object') {
+              if (actualData.trades && Array.isArray(actualData.trades)) {
+                processedArgs[key] = actualData.trades;
+              } else if (Array.isArray(actualData)) {
+                processedArgs[key] = actualData;
+              } else {
+                logger.warn(`Cached data for ${key} doesn't contain expected trades array:`, actualData);
+                processedArgs[key] = [];
+              }
+            } else {
+              processedArgs[key] = actualData;
+            }
+
+            // Clear the cache after retrieval to free up space
+            localStorage.removeItem(value);
+            logger.log(`Retrieved and cleared cached data for argument ${key}`);
+          } else {
+            logger.warn(`Failed to retrieve cached data for key: ${value}`);
+            // For critical parameters like 'trades', provide an empty array as fallback
+            if (key === 'trades') {
+              logger.warn(`Setting empty array for missing trades cache key`);
+              processedArgs[key] = [];
+            }
+          }
+        } catch (error) {
+          logger.error('Error processing cache key:', error);
+          if (key === 'trades') {
+            processedArgs[key] = [];
+          }
+        }
+      }
+    }
+
+    return processedArgs;
+  }
 
   /**
    * Send a chat message with AI-driven function calling
@@ -105,17 +213,12 @@ class FirebaseAIChatService {
 
          // Execute all function calls for this round
          const functionResponseParts: any[] = [];
-         const totalFunctionsInRound = functionCalls.length;
- 
+
          for (let i = 0; i < functionCalls.length; i++) {
            const functionCall = functionCalls[i];
-           const isLastFunction = i === functionCalls.length - 1;
  
            try {
-             const result = await multiFunctionCallingCachingService.executeFunctionCall({
-               name: functionCall.name,
-               args: functionCall.args
-             });
+             const result = await this.executeFunctionCall(functionCall.name, functionCall.args);
  
              executedFunctions.push({
                name: functionCall.name,
@@ -136,16 +239,8 @@ class FirebaseAIChatService {
                };
              }
  
-             // Process large results using caching system
-             const finalResult =  multiFunctionCallingCachingService.processLargeResult(
-               functionCall.name,
-               processedResult,
-               isLastFunction,
-               totalFunctionsInRound
-             );
- 
              // Ensure we have a valid result before adding to response parts
-             const validResult = finalResult || { success: false, error: 'Function returned undefined' };
+             const validResult = processedResult || { success: false, error: 'Function returned undefined' };
  
             functionResponseParts.push({
               functionResponse: {
