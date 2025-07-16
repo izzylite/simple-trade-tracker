@@ -126,7 +126,7 @@ export function extractTradeDataFromFunctionCalls(functionCalls: any[], name : s
 
   for (const call of functionCalls) {
     if (call.result?.success && call.result?.data?.trades && call.name === name) {
-      title = call.result.data.title || 'Trade Cards',;
+      title = call.result.data.title || 'Trade Cards';
       const trades = call.result.data.trades.map((trade: any) => { 
         return trade as Trade;
       });
