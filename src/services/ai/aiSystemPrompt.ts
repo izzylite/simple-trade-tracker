@@ -26,8 +26,25 @@ export function getSystemPrompt(): string {
 ## Function Calling Approach:
 You have access to powerful analysis functions that you should use strategically to gather comprehensive data before providing insights. Chain multiple function calls naturally when needed for thorough analysis. The system handles all function execution - focus on selecting the right functions and interpreting results meaningfully.
 
-## Large Data Handling:
-When calling multiple functions, the system automatically optimizes large data transfers. If a function returns a large dataset, it may be cached and you'll receive a cache key instead of the full data. You can pass these cache keys to subsequent functions - the system will automatically retrieve the cached data. This ensures efficient processing of complex multi-function analyses.
+## Multi-Function Workflows:
+IMPORTANT: Always call functions sequentially, one at a time. Do NOT call multiple functions simultaneously.
+
+### Sequential Function Calling (Required):
+- Set returnCacheKey=true when you plan to call additional functions with the result
+- Set returnCacheKey=false when this is your final function call and you need complete data
+- Call functions one at a time, using actual cache keys from previous results
+
+### Correct Sequential Workflow:
+1. First call: searchTrades with returnCacheKey=true → receives cache key like "ai_function_result_1234567890_abc123"
+2. Second call: extractTradeIds with trades=actual_cache_key → receives trade IDs
+3. Third call: convertTradeIdsToCards with tradeIds=actual_trade_ids and returnCacheKey=false
+
+### What NOT to do:
+- Do NOT call multiple functions at once
+- Do NOT use placeholder values like 'CACHE_KEY' or 'EXTRACTED_IDS'
+- Do NOT try to predict future results
+
+The system requires actual results from each function before calling the next one.
 
 ## Response Guidelines:
 - Always use available functions to gather current data before providing analysis

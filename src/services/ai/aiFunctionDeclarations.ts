@@ -17,6 +17,10 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
+          returnCacheKey: {
+            type: SchemaType.BOOLEAN,
+            description: 'Set to true if you plan to call additional functions with this result (like extractTradeIds, getTradeStatistics). When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
           dateRange: {
             type: SchemaType.STRING,
             description: 'Date range filter. Supports formats like "last 30 days", "last 6 months", "last 1 week", or specific months like "2024-01" for January 2024. Use "last X days/weeks/months" for relative periods.'
@@ -77,6 +81,10 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
+          returnCacheKey: {
+            type: SchemaType.BOOLEAN,
+            description: 'Set to true if you plan to call additional functions with this result. When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
           period: {
             type: SchemaType.STRING,
             description: 'Time period for analysis. Can be relative periods like "last 30 days", "last 3 months", or specific periods like "2024-01" for January 2024.'
@@ -116,6 +124,10 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
+          returnCacheKey: {
+            type: SchemaType.BOOLEAN,
+            description: 'Set to true if you plan to call additional functions with this result (like extractTradeIds, getTradeStatistics). When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
           query: {
             type: SchemaType.STRING,
             description: 'Natural language description of what trades to find. Examples: "trades during high volatility", "breakout trades that failed", "trades with good risk management", "similar market conditions to today", "trades with specific patterns or setups".'
@@ -134,6 +146,10 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
+          returnCacheKey: {
+            type: SchemaType.BOOLEAN,
+            description: 'Set to true if you plan to call additional functions with this result. When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
           impactLevel: {
             type: SchemaType.STRING,
             enum: ['High', 'Medium', 'Low', 'all'],
@@ -165,6 +181,10 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
+          returnCacheKey: {
+            type: SchemaType.BOOLEAN,
+            description: 'Set to true if you plan to call additional functions with this result. When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
           startDate: {
             type: SchemaType.STRING,
             description: 'Start date as Unix timestamp in milliseconds or ISO date string. If not provided, defaults to current date.'
@@ -217,6 +237,10 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
+          returnCacheKey: {
+            type: SchemaType.BOOLEAN,
+            description: 'Set to true if you plan to call additional functions with this result. When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
           tradeIds: {
             type: SchemaType.ARRAY,
             items: {
@@ -276,6 +300,10 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
+          returnCacheKey: {
+            type: SchemaType.BOOLEAN,
+            description: 'Set to true if you plan to call additional functions with this result. When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
           query: {
             type: SchemaType.STRING,
             description: `SQL SELECT statement to execute. Only SELECT queries are allowed for security. The query will be automatically filtered to include only the current user\'s data.`

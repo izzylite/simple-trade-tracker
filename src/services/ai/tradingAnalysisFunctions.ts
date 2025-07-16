@@ -20,6 +20,7 @@ export interface TradingAnalysisResult {
 }
 
 export interface SearchTradesParams {
+  returnCacheKey?: boolean;
   dateRange?: string;
   tradeType?: 'win' | 'loss' | 'breakeven' | 'all';
   minAmount?: number;
@@ -36,6 +37,7 @@ export interface SearchTradesParams {
 }
 
 export interface GetStatisticsParams {
+  returnCacheKey?: boolean;
   period?: string;
   groupBy?: 'day' | 'week' | 'month' | 'session' | 'tag' | 'dayOfWeek' | 'economicEvent';
   tradeType?: 'win' | 'loss' | 'breakeven' | 'all';
@@ -46,16 +48,19 @@ export interface GetStatisticsParams {
 }
 
 export interface FindSimilarTradesParams {
+  returnCacheKey?: boolean;
   query: string;
   limit?: number;
 }
 
 export interface QueryDatabaseParams {
+  returnCacheKey?: boolean;
   query: string;
   description?: string;
 }
 
 export interface AnalyzeEconomicEventsParams {
+  returnCacheKey?: boolean;
   impactLevel?: 'High' | 'Medium' | 'Low' | 'all';
   currency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'NZD' | 'all';
   eventName?: string;
@@ -64,6 +69,7 @@ export interface AnalyzeEconomicEventsParams {
 }
 
 export interface FetchEconomicEventsParams {
+  returnCacheKey?: boolean;
   startDate?: string; // Unix timestamp in milliseconds or date string
   endDate?: string; // Unix timestamp in milliseconds or date string
   currency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'NZD' | 'all';
@@ -77,6 +83,7 @@ export interface ExtractTradeIdsParams {
 }
 
 export interface ConvertTradeIdsToCardsParams {
+  returnCacheKey?: boolean;
   tradeIds: string[]; // Array of trade IDs to convert to card format
   sortBy?: 'date' | 'amount' | 'name'; // Sort order for the cards
   sortOrder?: 'asc' | 'desc'; // Sort direction
@@ -107,6 +114,73 @@ class TradingAnalysisFunctions {
            this.userId !== calendar.userId;
   }
 
+  /**
+   * Handle cache key logic for function results
+   */
+  private handleCacheKeyResult(
+    functionName: string,
+    data: any,
+    returnCacheKey?: boolean,
+    exampleTradeIds?: string[]
+  ): TradingAnalysisResult {
+    if (returnCacheKey === true) {
+      // Store data in localStorage and return cache key with summary
+      const cacheKey = `ai_function_result_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({
+          data: data,
+          timestamp: Date.now(),
+          functionName
+        }));
+
+        logger.log(`Cached result for ${functionName} with key: ${cacheKey}`);
+
+        // Create summary based on data type
+        let summary = `Result cached for ${functionName}.`;
+        let count = 0;
+
+        if (data && typeof data === 'object') {
+          if (data.trades && Array.isArray(data.trades)) {
+            count = data.trades.length;
+            summary += ` Contains ${count} trades.`;
+          } else if (Array.isArray(data)) {
+            count = data.length;
+            summary += ` Contains ${count} items.`;
+          } else if (data.totalTrades !== undefined) {
+            count = data.totalTrades;
+            summary += ` Statistics for ${count} trades.`;
+          }
+        }
+
+        return {
+          success: true,
+          data: {
+            cached: true,
+            cacheKey: cacheKey,
+            summary: summary,
+            count: count,
+            ...(exampleTradeIds && exampleTradeIds.length > 0 && {
+              exampleTradeIds: exampleTradeIds.slice(0, 5) // Return first 5 as examples
+            })
+          }
+        };
+      } catch (error) {
+        logger.error('Failed to cache function result:', error);
+        // Fall back to returning full data
+        return {
+          success: true,
+          data: data
+        };
+      }
+    } else {
+      // Return full data
+      return {
+        success: true,
+        data: data
+      };
+    }
+  }
 
   simpleTradeData(trades: Trade[]): Omit<Trade, 'images' | 'isDeleted' | 'isTemporary' | 'isPinned' | 'shareLink' | 'isShared' | 'sharedAt' | 'shareId'>[] {
     return trades.map(trade => ({
@@ -282,17 +356,17 @@ class TradingAnalysisFunctions {
         filteredTrades = filteredTrades.slice(0, params.limit);
       }
 
-      
-
-      return {
-        success: true,
-        data: {
-          trades: this.simpleTradeData(filteredTrades),
-          count: filteredTrades.length,
-          totalPnl: filteredTrades.reduce((sum, trade) => sum + trade.amount, 0),
-          winRate: this.calculateWinRate(filteredTrades)
-        }
+      const resultData = {
+        trades: this.simpleTradeData(filteredTrades),
+        count: filteredTrades.length,
+        totalPnl: filteredTrades.reduce((sum, trade) => sum + trade.amount, 0),
+        winRate: this.calculateWinRate(filteredTrades)
       };
+
+      // Extract trade IDs for examples
+      const exampleTradeIds = filteredTrades.slice(0, 5).map(trade => trade.id);
+
+      return this.handleCacheKeyResult('searchTrades', resultData, params.returnCacheKey, exampleTradeIds);
 
     } catch (error) {
       logger.error('Error in searchTrades:', error);
@@ -344,10 +418,10 @@ class TradingAnalysisFunctions {
         })
       };
 
-      return {
-        success: true,
-        data: stats
-      };
+      // Extract trade IDs for examples
+      const exampleTradeIds = tradesToAnalyze.slice(0, 5).map(trade => trade.id);
+
+      return this.handleCacheKeyResult('getTradeStatistics', stats, params.returnCacheKey, exampleTradeIds);
 
     } catch (error) {
       logger.error('Error in getTradeStatistics:', error);
@@ -388,15 +462,17 @@ class TradingAnalysisFunctions {
  
       logger.log(`Found ${actualTrades.length} actual trades from vector search results`);
 
-      return {
-        success: true,
-        data: {
-          trades: this.simpleTradeData(actualTrades),
-          searchResults: similarTrades,
-          count: actualTrades.length,
-          query: params.query
-        }
+      const resultData = {
+        trades: this.simpleTradeData(actualTrades),
+        searchResults: similarTrades,
+        count: actualTrades.length,
+        query: params.query
       };
+
+      // Extract trade IDs for examples
+      const exampleTradeIds = actualTrades.slice(0, 5).map(trade => trade.id);
+
+      return this.handleCacheKeyResult('findSimilarTrades', resultData, params.returnCacheKey, exampleTradeIds);
 
     } catch (error) {
       logger.error('Error in findSimilarTrades:', error);
@@ -488,10 +564,10 @@ class TradingAnalysisFunctions {
         };
       }
 
-      return {
-        success: true,
-        data: analysis
-      };
+      // Extract trade IDs for examples
+      const exampleTradeIds = tradesWithEvents.slice(0, 5).map(trade => trade.id);
+
+      return this.handleCacheKeyResult('analyzeEconomicEvents', analysis, params.returnCacheKey, exampleTradeIds);
 
     } catch (error) {
       logger.error('Error in analyzeEconomicEvents:', error);
@@ -682,23 +758,23 @@ class TradingAnalysisFunctions {
       logger.log(`Prepared ${sortedTradeIds.length} trade IDs for card display`);
 
       // Return simple JSON format that aiResponseParser.ts expects
-      return {
-        success: true,
-        data: {
-          tradeCards: sortedTradeIds,
-          title: title,
-          count: sortedTradeIds.length,
-          requestedIds: params.tradeIds.length,
-          foundTrades: matchingTrades.length,
-          notFoundIds: params.tradeIds.filter(id =>
-            !matchingTrades.some(trade => trade.id === id)
-          ),
-          sorting: {
-            sortBy: params.sortBy || 'none',
-            sortOrder: params.sortOrder || 'asc'
-          }
+      const resultData = {
+        tradeCards: sortedTradeIds,
+        title: title,
+        count: sortedTradeIds.length,
+        requestedIds: params.tradeIds.length,
+        foundTrades: matchingTrades.length,
+        notFoundIds: params.tradeIds.filter(id =>
+          !matchingTrades.some(trade => trade.id === id)
+        ),
+        sorting: {
+          sortBy: params.sortBy || 'none',
+          sortOrder: params.sortOrder || 'asc'
         }
       };
+
+      // Use the sorted trade IDs as examples
+      return this.handleCacheKeyResult('convertTradeIdsToCards', resultData, params.returnCacheKey, sortedTradeIds.slice(0, 5));
 
     } catch (error) {
       logger.error('Error in convertTradeIdsToCards:', error);
@@ -800,23 +876,23 @@ class TradingAnalysisFunctions {
         return timeA - timeB;
       });
 
-      return {
-        success: true,
-        data: {
-          events: limitedEvents,
-          count: limitedEvents.length,
-          hasMore: paginatedResult.hasMore,
-          limitApplied: effectiveLimit,
-          dateRange: {
-            start: startDate.toISOString(),
-            end: endDate.toISOString()
-          },
-          filters: {
-            currency: params.currency || 'all',
-            impact: params.impact || 'all'
-          }
+      const resultData = {
+        events: limitedEvents,
+        count: limitedEvents.length,
+        hasMore: paginatedResult.hasMore,
+        limitApplied: effectiveLimit,
+        dateRange: {
+          start: startDate.toISOString(),
+          end: endDate.toISOString()
+        },
+        filters: {
+          currency: params.currency || 'all',
+          impact: params.impact || 'all'
         }
       };
+
+      // No trade IDs for economic events
+      return this.handleCacheKeyResult('fetchEconomicEvents', resultData, params.returnCacheKey);
 
     } catch (error) {
       logger.error('Error in fetchEconomicEvents:', error);
@@ -930,19 +1006,21 @@ class TradingAnalysisFunctions {
 
       // No fallback needed - multi-step function calling handles this intelligently
 
-      return {
-        success: true,
-        data: {
-          results: results,
-          query: finalQuery,
-          description: params.description,
-          rowCount: rowCount,
-          trades: this.simpleTradeData(trades),
-          count: trades.length,
-          totalPnl: trades.reduce((sum, trade) => sum + trade.amount, 0),
-          winRate: this.calculateWinRate(trades)
-        }
+      const resultData = {
+        results: results,
+        query: finalQuery,
+        description: params.description,
+        rowCount: rowCount,
+        trades: this.simpleTradeData(trades),
+        count: trades.length,
+        totalPnl: trades.reduce((sum, trade) => sum + trade.amount, 0),
+        winRate: this.calculateWinRate(trades)
       };
+
+      // Extract trade IDs for examples
+      const exampleTradeIds = trades.slice(0, 5).map(trade => trade.id);
+
+      return this.handleCacheKeyResult('queryDatabase', resultData, params.returnCacheKey, exampleTradeIds);
 
     } catch (error) {
       logger.error('Error in queryDatabase:', error);
