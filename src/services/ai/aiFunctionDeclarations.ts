@@ -267,6 +267,39 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
       }
     },
     {
+      name: 'convertTradeIdsToData',
+      description: 'Convert a list of trade IDs to full trade data objects for detailed analysis. Returns complete trade information including all fields needed for comprehensive analysis. Use this when you need to analyze the actual trade data from a single trade or after function chaining operations.',
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          returnCacheKey: {
+            type: SchemaType.BOOLEAN,
+            description: 'Set to true if you plan to call additional functions with this result. When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
+          tradeIds: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.STRING
+            },
+            description: 'Array of trade IDs to convert to full trade data objects. These IDs are typically obtained from other functions like extractTradeIds or from cached results.'
+          },
+          includeImages: {
+            type: SchemaType.BOOLEAN,
+            description: 'Whether to include image data in the trade objects. Set to false (default) for better performance when images are not needed for analysis.'
+          },
+          fields: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.STRING,
+              enum: ['id', 'name', 'date', 'type', 'amount', 'entry', 'exit', 'riskToReward', 'session', 'tags', 'notes', 'partialsTaken', 'economicEvents', 'images', 'all']
+            },
+            description: 'Specific fields to include in the returned trade data. Use "all" to include all fields, or specify individual fields like ["id", "name", "amount", "type"] to reduce token usage. Common combinations: ["id", "amount", "type"] for basic analysis, ["id", "name", "date", "amount", "riskToReward"] for performance analysis, ["id", "tags", "session", "economicEvents"] for pattern analysis. Ony use "all" when necessary.'
+          }
+        },
+        required: ['tradeIds']
+      }
+    },
+    {
       name: 'queryDatabase',
       description: `
       Execute a SQL SELECT query against the Supabase database to retrieve specific trading data, perform complex aggregations, or access database views. Automatically filters results to user\'s data for security. Use this for complex queries that cannot be handled by other functions.
@@ -355,3 +388,5 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     }
   ];
 }
+
+

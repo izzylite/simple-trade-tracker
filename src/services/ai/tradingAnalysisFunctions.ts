@@ -101,6 +101,13 @@ export interface ConvertTradeIdsToCardsParams {
   sortOrder?: 'asc' | 'desc'; // Sort direction
 }
 
+export interface ConvertTradeIdsToDataParams {
+  returnCacheKey?: boolean;
+  tradeIds: string[]; // Array of trade IDs to convert to full trade data
+  includeImages?: boolean; // Whether to include image data (default: false for performance)
+  fields?: string[]; // Specific fields to include in the response
+}
+
 class TradingAnalysisFunctions {
   private trades: Trade[] = [];
   private calendar: Calendar | null = null;
@@ -1437,9 +1444,156 @@ class TradingAnalysisFunctions {
     return processedArgs;
   }
 
+  /**
+   * Convert trade IDs to full trade data for analysis
+   */
+  async convertTradeIdsToData(params: ConvertTradeIdsToDataParams): Promise<TradingAnalysisResult> {
+    try {
+      logger.log('AI requested trade IDs to data conversion:', params.tradeIds?.length || 0, 'fields:', params.fields);
 
+      if (!params.tradeIds || !Array.isArray(params.tradeIds)) {
+        return {
+          success: false,
+          error: 'Invalid tradeIds parameter. Expected an array of trade ID strings.'
+        };
+      }
 
+      if (params.tradeIds.length === 0) {
+        return {
+          success: true,
+          data: {
+            trades: [],
+            count: 0,
+            message: 'No trade IDs provided to convert to data.'
+          }
+        };
+      }
+
+      // Find trades matching the provided IDs
+      const matchingTrades = this.trades.filter(trade =>
+        params.tradeIds.includes(trade.id)
+      );
+
+      if (matchingTrades.length === 0) {
+        return {
+          success: true,
+          data: {
+            trades: [],
+            count: 0,
+            message: 'No trades found matching the provided trade IDs.',
+            requestedIds: params.tradeIds.length,
+            notFoundIds: params.tradeIds
+          }
+        };
+      }
+
+      // Filter fields based on request
+      const tradesData = this.filterTradeFields(matchingTrades, params.fields, params.includeImages);
+
+      const notFoundIds = params.tradeIds.filter(id =>
+        !matchingTrades.some(trade => trade.id === id)
+      );
+
+      logger.log(`Converted ${matchingTrades.length} trade IDs to filtered trade data`);
+
+      const resultData = {
+        trades: tradesData,
+        count: matchingTrades.length,
+        requestedIds: params.tradeIds.length,
+        foundTrades: matchingTrades.length,
+        notFoundIds: notFoundIds,
+        totalPnl: matchingTrades.reduce((sum, trade) => sum + trade.amount, 0),
+        winRate: this.calculateWinRate(matchingTrades),
+        includedFields: params.fields || ['all'],
+        includesImages: params.includeImages || false
+      };
+
+      return this.handleCacheKeyResult('convertTradeIdsToData', resultData, params.returnCacheKey, tradesData);
+
+    } catch (error) {
+      logger.error('Error in convertTradeIdsToData:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Filter trade fields based on requested fields
+   */
+  private filterTradeFields(trades: Trade[], fields?: string[], includeImages?: boolean): any[] {
+    if (!fields || fields.includes('all')) {
+      return includeImages ? trades : this.simpleTradeData(trades);
+    }
+
+    return trades.map(trade => {
+      const filteredTrade: any = {};
+      
+      fields.forEach(field => {
+        switch (field) {
+          case 'id':
+            filteredTrade.id = trade.id;
+            break;
+          case 'name':
+            filteredTrade.name = trade.name;
+            break;
+          case 'date':
+            filteredTrade.date = trade.date;
+            break;
+          case 'type':
+            filteredTrade.type = trade.type;
+            break;
+          case 'amount':
+            filteredTrade.amount = trade.amount;
+            break;
+          case 'entry':
+            filteredTrade.entry = trade.entry;
+            break;
+          case 'exit':
+            filteredTrade.exit = trade.exit;
+            break;
+          case 'riskToReward':
+            filteredTrade.riskToReward = trade.riskToReward;
+            break;
+          case 'session':
+            filteredTrade.session = trade.session;
+            break;
+          case 'tags':
+            filteredTrade.tags = trade.tags;
+            break;
+          case 'notes':
+            filteredTrade.notes = trade.notes;
+            break;
+          case 'partialsTaken':
+            filteredTrade.partialsTaken = trade.partialsTaken;
+            break;
+          case 'economicEvents':
+            filteredTrade.economicEvents = trade.economicEvents;
+            break;
+          case 'images':
+            if (includeImages) {
+              filteredTrade.images = trade.images;
+            }
+            break;
+        }
+      });
+
+      return filteredTrade;
+    });
+  }
+ 
 
 }
 
 export const tradingAnalysisFunctions = new TradingAnalysisFunctions();
+
+
+
+
+
+
+
+
+
+

@@ -39,6 +39,9 @@ class AIFunctionExecution {
         case 'convertTradeIdsToCards':
           return await tradingAnalysisFunctions.convertTradeIdsToCards(processedArgs);
 
+        case 'convertTradeIdsToData':
+          return await tradingAnalysisFunctions.convertTradeIdsToData(processedArgs);
+
         case 'executeMultipleFunctions':
           return await tradingAnalysisFunctions.executeMultipleFunctions(processedArgs);
 
