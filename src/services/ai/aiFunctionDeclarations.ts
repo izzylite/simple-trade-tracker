@@ -372,6 +372,16 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
                 args: {
                   type: SchemaType.OBJECT,
                   description: 'Arguments to pass to the function. Supports advanced placeholders: "LAST_RESULT" (previous function result), "RESULT_0", "RESULT_1" (specific function by index), "EXTRACT_TRADE_IDS", "EXTRACT_TRADE_IDS_0" (trade IDs from specific result), "EXTRACT_TRADES", "EXTRACT_TRADES_1" (trades array from specific result), "EXTRACT_0.trades.id" (field-specific extraction), "MERGE_TRADE_IDS_0_2" (merge trade IDs from multiple results), "UNIQUE_TRADE_IDS_0_1_2" (unique trade IDs across results), "INTERSECT_TRADE_IDS_0_1" (common trade IDs between results), "MERGE_TRADES_0_1" (merge trade objects), "UNIQUE_TRADES_0_1" (unique trades by ID), "INTERSECT_TRADES_0_1" (common trades), "SLICE_0.trades.0.5" (take first 5 trades), "FILTER_1.trades.type.win" (filter winning trades), "SORT_0.trades.amount.desc" (sort by amount descending).'
+                },
+                condition: {
+                  type: SchemaType.STRING,
+                  description: 'Optional condition to execute this function. Examples: "RESULT_0.count > 10", "LAST_RESULT.trades.length >= 5", "RESULT_1.winRate > 0.6". Function only executes if condition is true.',
+                  required: false
+                },
+                validate: {
+                  type: SchemaType.OBJECT,
+                  description: 'Validation rules for function result. Examples: {"minCount": 5}, {"maxCount": 100}, {"hasField": "trades"}, {"fieldValue": {"field": "winRate", "value": 0.5}}.',
+                  required: false
                 }
               },
               required: ['name', 'args']
@@ -388,6 +398,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     }
   ];
 }
+
 
 
 
