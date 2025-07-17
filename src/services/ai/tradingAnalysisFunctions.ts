@@ -122,8 +122,8 @@ class TradingAnalysisFunctions {
    */
   needsReinitialization(trades: Trade[], calendar: Calendar): boolean {
     return this.calendar?.id !== calendar.id ||
-           this.trades.length !== trades.length ||
-           this.userId !== calendar.userId;
+      this.trades.length !== trades.length ||
+      this.userId !== calendar.userId;
   }
 
   /**
@@ -132,8 +132,9 @@ class TradingAnalysisFunctions {
   private handleCacheKeyResult(
     functionName: string,
     data: any,
+    
     returnCacheKey?: boolean,
-    exampleTradeIds?: string[]
+    items?: any[]
   ): TradingAnalysisResult {
     if (returnCacheKey === true) {
       // Store data in localStorage and return cache key with summary
@@ -149,36 +150,22 @@ class TradingAnalysisFunctions {
         logger.log(`Cached result for ${functionName} with key: ${cacheKey}`);
 
         // Create summary based on data type
-        let summary = `Result cached for ${functionName}.`;
-        let count = 0;
+        let count = items?.length || 0;
+        let summary = `Result cached for ${functionName}. Contains ${count} result${count > 1 ? "s" : ""}`;
 
-        if (data && typeof data === 'object') {
-          if (data.trades && Array.isArray(data.trades)) {
-            count = data.trades.length;
-            summary += ` Contains ${count} trades.`;
-          }
-          if (data.tradeIds && Array.isArray(data.tradeIds)) {
-            count = data.tradeIds.length;
-            summary += ` Contains ${count} tradeIds.`;
-          } else if (Array.isArray(data)) {
-            count = data.length;
-            summary += ` Contains ${count} items.`;
-          } else if (data.totalTrades !== undefined) {
-            count = data.totalTrades;
-            summary += ` Statistics for ${count} trades.`;
-          }
-        }
 
         return {
           success: true,
           data: {
             cached: true,
             cacheKey: cacheKey,
-            summary: summary,
-            count: count,
-            ...(exampleTradeIds && exampleTradeIds.length > 0 && {
-              exampleTradeIds: exampleTradeIds.slice(0, 5) // Return first 5 as examples
-            })
+            summary: {
+              info: summary,
+              count: count,
+              ...(items && items.length > 0 && {
+                snippet: items.slice(0, 2) // Return first 3 as examples
+              })
+            },
           }
         };
       } catch (error) {
@@ -206,7 +193,7 @@ class TradingAnalysisFunctions {
       session: trade.session,
       type: trade.type,
       amount: trade.amount,
-      tags: trade.tags, 
+      tags: trade.tags,
       entry: trade.entry,
       exit: trade.exit,
       riskToReward: trade.riskToReward,
@@ -343,7 +330,7 @@ class TradingAnalysisFunctions {
             const amount = parseInt(match[1]);
             const unit = match[2].toLowerCase();
             startDate = new Date(now);
-            
+
             if (unit === 'day') startDate.setDate(now.getDate() - amount);
             else if (unit === 'week') startDate.setDate(now.getDate() - (amount * 7));
             else if (unit === 'month') startDate.setMonth(now.getMonth() - amount);
@@ -353,7 +340,7 @@ class TradingAnalysisFunctions {
           const [year, month] = params.dateRange.split('-').map(Number);
           startDate = new Date(year, month - 1, 1);
           const endDate = new Date(year, month, 0);
-          
+
           filteredTrades = filteredTrades.filter(trade => {
             const tradeDate = new Date(trade.date);
             return tradeDate >= startDate! && tradeDate <= endDate;
@@ -379,10 +366,9 @@ class TradingAnalysisFunctions {
         winRate: this.calculateWinRate(filteredTrades)
       };
 
-      // Extract trade IDs for examples
-      const exampleTradeIds = filteredTrades.slice(0, 5).map(trade => trade.id);
 
-      return this.handleCacheKeyResult('searchTrades', resultData, params.returnCacheKey, exampleTradeIds);
+
+      return this.handleCacheKeyResult('searchTrades', resultData, params.returnCacheKey, resultData.trades);
 
     } catch (error) {
       logger.error('Error in searchTrades:', error);
@@ -401,7 +387,7 @@ class TradingAnalysisFunctions {
       logger.log('AI requested trade statistics with params:', params);
 
       let tradesToAnalyze = [...this.trades];
-      
+
 
       // Filter by specific trade IDs if provided
       if (params.tradeIds && params.tradeIds.length > 0) {
@@ -435,10 +421,8 @@ class TradingAnalysisFunctions {
         })
       };
 
-      // Extract trade IDs for examples
-      const exampleTradeIds = tradesToAnalyze.slice(0, 5).map(trade => trade.id);
 
-      return this.handleCacheKeyResult('getTradeStatistics', stats, params.returnCacheKey, exampleTradeIds);
+      return this.handleCacheKeyResult('getTradeStatistics', stats, params.returnCacheKey, this.simpleTradeData(tradesToAnalyze));
 
     } catch (error) {
       logger.error('Error in getTradeStatistics:', error);
@@ -476,7 +460,7 @@ class TradingAnalysisFunctions {
       // Get the actual trade objects
       const tradeIds = similarTrades.map(st => st.tradeId);
       const actualTrades = this.trades.filter(trade => tradeIds.includes(trade.id));
- 
+
       logger.log(`Found ${actualTrades.length} actual trades from vector search results`);
 
       const resultData = {
@@ -486,10 +470,8 @@ class TradingAnalysisFunctions {
         query: params.query
       };
 
-      // Extract trade IDs for examples
-      const exampleTradeIds = actualTrades.slice(0, 5).map(trade => trade.id);
 
-      return this.handleCacheKeyResult('findSimilarTrades', resultData, params.returnCacheKey, exampleTradeIds);
+      return this.handleCacheKeyResult('findSimilarTrades', resultData, params.returnCacheKey, resultData.trades);
 
     } catch (error) {
       logger.error('Error in findSimilarTrades:', error);
@@ -506,7 +488,7 @@ class TradingAnalysisFunctions {
   async analyzeEconomicEvents(params: AnalyzeEconomicEventsParams): Promise<TradingAnalysisResult> {
     try {
       logger.log('AI requested economic events analysis with params:', params);
-      
+
       let tradesWithEvents = this.trades.filter(trade =>
         trade.economicEvents && trade.economicEvents.length > 0
       );
@@ -581,10 +563,8 @@ class TradingAnalysisFunctions {
         };
       }
 
-      // Extract trade IDs for examples
-      const exampleTradeIds = tradesWithEvents.slice(0, 5).map(trade => trade.id);
 
-      return this.handleCacheKeyResult('analyzeEconomicEvents', analysis, params.returnCacheKey, exampleTradeIds);
+      return this.handleCacheKeyResult('analyzeEconomicEvents', analysis, params.returnCacheKey, this.simpleTradeData(tradesWithEvents));
 
     } catch (error) {
       logger.error('Error in analyzeEconomicEvents:', error);
@@ -767,7 +747,7 @@ class TradingAnalysisFunctions {
       let title = 'Trade Cards';
       if (params.sortBy) {
         const sortLabel = params.sortBy === 'date' ? 'Date' :
-                         params.sortBy === 'amount' ? 'P&L' : 'Name';
+          params.sortBy === 'amount' ? 'P&L' : 'Name';
         const orderLabel = params.sortOrder === 'desc' ? 'Descending' : 'Ascending';
         title = `Trades (${sortLabel} ${orderLabel})`;
       }
@@ -791,7 +771,7 @@ class TradingAnalysisFunctions {
       };
 
       // Use the sorted trade IDs as examples
-      return this.handleCacheKeyResult('convertTradeIdsToCards', resultData, params.returnCacheKey, sortedTradeIds.slice(0, 5));
+      return this.handleCacheKeyResult('convertTradeIdsToCards', resultData, params.returnCacheKey, sortedTradeIds);
 
     } catch (error) {
       logger.error('Error in convertTradeIdsToCards:', error);
@@ -909,7 +889,7 @@ class TradingAnalysisFunctions {
       };
 
       // No trade IDs for economic events
-      return this.handleCacheKeyResult('fetchEconomicEvents', resultData, params.returnCacheKey);
+      return this.handleCacheKeyResult('fetchEconomicEvents', resultData, params.returnCacheKey, limitedEvents);
 
     } catch (error) {
       logger.error('Error in fetchEconomicEvents:', error);
@@ -1017,7 +997,7 @@ class TradingAnalysisFunctions {
         logger.log(`Found ${results.length} results from query, attempting to extract trade IDs`);
         const tradeIds = this.extractTradeIdsFromResults(results);
         if (tradeIds.length > 0) {
-          trades = this.trades.filter(trade => tradeIds.includes(trade.id)); 
+          trades = this.trades.filter(trade => tradeIds.includes(trade.id));
         }
       }
 
@@ -1034,10 +1014,8 @@ class TradingAnalysisFunctions {
         winRate: this.calculateWinRate(trades)
       };
 
-      // Extract trade IDs for examples
-      const exampleTradeIds = trades.slice(0, 5).map(trade => trade.id);
 
-      return this.handleCacheKeyResult('queryDatabase', resultData, params.returnCacheKey, exampleTradeIds);
+      return this.handleCacheKeyResult('queryDatabase', resultData, params.returnCacheKey, trades);
 
     } catch (error) {
       logger.error('Error in queryDatabase:', error);
@@ -1050,7 +1028,7 @@ class TradingAnalysisFunctions {
 
   // Helper methods
   private extractTradeIdsFromResults(results: any[]): string[] {
-    const tradeIds: string[] = []; 
+    const tradeIds: string[] = [];
     // Extract trade_id from results
     for (const result of results) {
       if (result.trade_id && typeof result.trade_id === 'string') {
@@ -1337,13 +1315,29 @@ class TradingAnalysisFunctions {
       const results: any[] = [];
       let lastResult: any = null;
 
+      // Validate that functions don't use returnCacheKey (placeholders need actual data)
+      for (const functionCall of params.functions) {
+        if (functionCall.args && functionCall.args.returnCacheKey === true) {
+          logger.error(`❌ CRITICAL ERROR: Function ${functionCall.name} in executeMultipleFunctions uses returnCacheKey=true. This breaks placeholder functionality!`);
+          logger.error(`Remove returnCacheKey from function arguments in executeMultipleFunctions - placeholders need actual data, not cache keys.`);
+          return {
+            success: false,
+            error: `Function ${functionCall.name} incorrectly uses returnCacheKey=true in executeMultipleFunctions. Placeholders need actual data, not cache keys. Remove returnCacheKey from the function arguments.`
+          };
+        }
+      }
+
       // Execute functions sequentially
       for (let i = 0; i < params.functions.length; i++) {
         const functionCall = params.functions[i];
         logger.log(`Executing function ${i + 1}/${params.functions.length}: ${functionCall.name}`);
-        const processedArgs = { ...functionCall.args };
-        // Execute the function
-        const result = await aiFunctionExecution.executeFunctionCall(functionCall.name, processedArgs);
+
+        // Process arguments to handle references to previous results
+        const processedArgs = this.processMultiFunctionArgs(functionCall.args, results, lastResult);
+
+        // Execute the function (preserve cache for all but the last function)
+        const preserveCache = i < params.functions.length - 1;
+        const result = await aiFunctionExecution.executeFunctionCall(functionCall.name, processedArgs, preserveCache);
 
         if (!result.success) {
           logger.error(`Function ${functionCall.name} failed:`, result.error);
@@ -1369,6 +1363,9 @@ class TradingAnalysisFunctions {
 
       logger.log('All functions executed successfully');
 
+      // Clean up any remaining cache keys from this multi-function execution
+      aiFunctionExecution.cleanupCacheKeys(results);
+
       return {
         success: true,
         data: {
@@ -1387,8 +1384,62 @@ class TradingAnalysisFunctions {
       };
     }
   }
- 
- 
+
+  /**
+   * Process arguments for multi-function calls, handling references to previous results
+   */
+  private processMultiFunctionArgs(args: any, previousResults: any[], lastResult: any): any {
+    if (!args || typeof args !== 'object') {
+      return args;
+    }
+
+    const processedArgs = { ...args };
+
+    // Handle special placeholders that reference previous results
+    for (const [key, value] of Object.entries(processedArgs)) {
+      if (typeof value === 'string') {
+        // Handle reference to last result
+        if (value === 'LAST_RESULT') {
+          processedArgs[key] = lastResult;
+        }
+        // Handle reference to specific function result by index
+        else if (value.startsWith('RESULT_')) {
+          const index = parseInt(value.replace('RESULT_', ''));
+          if (index >= 0 && index < previousResults.length) {
+            processedArgs[key] = previousResults[index].result;
+          }
+        }
+        // Handle reference to trade IDs from previous result
+        else if (value === 'EXTRACT_TRADE_IDS' && lastResult) {
+          if (lastResult.trades && Array.isArray(lastResult.trades)) {
+            processedArgs[key] = lastResult.trades.map((trade: any) =>
+              trade.id || trade.tradeId || trade.trade_id
+            ).filter(Boolean);
+          } else if (lastResult.tradeIds && Array.isArray(lastResult.tradeIds)) {
+            processedArgs[key] = lastResult.tradeIds;
+          }
+        }
+        // Handle reference to trades array from previous result
+        else if (value === 'EXTRACT_TRADES' && lastResult) {
+          if (lastResult.trades && Array.isArray(lastResult.trades)) {
+            processedArgs[key] = lastResult.trades;
+          }
+        }
+        // Handle cache keys from different functions
+        else if (value.startsWith('ai_function_result_')) {
+          // Let the aiFunctionExecution.processFunctionArgs handle cache keys
+          // This will be processed when the function is actually executed
+          processedArgs[key] = value;
+        }
+      }
+    }
+
+    return processedArgs;
+  }
+
+
+
+
 }
 
 export const tradingAnalysisFunctions = new TradingAnalysisFunctions();
