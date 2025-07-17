@@ -1034,6 +1034,114 @@ class TradingAnalysisFunctions {
   }
 
   // Helper methods
+
+  /**
+   * Extract trades array from function result data
+   */
+  private extractTrades(result: any): any[] {
+    if (!result) return [];
+
+    // Handle different result formats
+    if (Array.isArray(result)) {
+      return result;
+    }
+
+    if (result.trades && Array.isArray(result.trades)) {
+      return result.trades;
+    }
+
+    if (result.data && Array.isArray(result.data)) {
+      return result.data;
+    }
+
+    if (result.data && result.data.trades && Array.isArray(result.data.trades)) {
+      return result.data.trades;
+    }
+
+    return [];
+  }
+
+  /**
+   * Parse indices from placeholder string (e.g., "MERGE_TRADE_IDS_0_1_2" -> [0, 1, 2])
+   */
+  private parseIndices(value: string, prefix: string): number[] {
+    const indexPart = value.replace(prefix, '');
+    if (!indexPart) return [];
+
+    return indexPart.split('_')
+      .map(str => parseInt(str))
+      .filter(num => !isNaN(num));
+  }
+
+  /**
+   * Merge trade IDs from multiple results
+   */
+  private mergeTradeIds(previousResults: any[], indices: number[]): string[] {
+    const allTradeIds: string[] = [];
+
+    for (const index of indices) {
+      if (index >= 0 && index < previousResults.length) {
+        const result = previousResults[index].result;
+        const tradeIds = this.extractTradeIdsFromResult(result);
+        allTradeIds.push(...tradeIds);
+      }
+    }
+
+    return allTradeIds;
+  }
+
+  /**
+   * Find intersection of trade IDs from multiple results
+   */
+  private intersectTradeIds(previousResults: any[], indices: number[]): string[] {
+    if (indices.length === 0) return [];
+
+    const tradeSets = indices.map(index => {
+      if (index >= 0 && index < previousResults.length) {
+        const result = previousResults[index].result;
+        const tradeIds = this.extractTradeIdsFromResult(result);
+        return new Set(tradeIds);
+      }
+      return new Set<string>();
+    }).filter(set => set.size > 0);
+
+    if (tradeSets.length === 0) return [];
+
+    // Find intersection of all sets
+    let intersection = tradeSets[0];
+    for (let i = 1; i < tradeSets.length; i++) {
+      intersection = new Set(Array.from(intersection).filter(id => tradeSets[i].has(id)));
+    }
+
+    return Array.from(intersection);
+  }
+
+  /**
+   * Extract trade IDs from various result formats
+   */
+  private extractTradeIdsFromResult(result: any): string[] {
+    if (!result) return [];
+
+    // Handle array of trade IDs
+    if (Array.isArray(result)) {
+      return result.filter(item => typeof item === 'string');
+    }
+
+    // Handle result with tradeIds property
+    if (result.tradeIds && Array.isArray(result.tradeIds)) {
+      return result.tradeIds;
+    }
+
+    // Handle result with data.tradeIds
+    if (result.data && result.data.tradeIds && Array.isArray(result.data.tradeIds)) {
+      return result.data.tradeIds;
+    }
+
+    // Handle result with trades array - extract IDs
+    const trades = this.extractTrades(result);
+    return trades.map(trade => trade.id || trade.tradeId || trade.trade_id).filter(Boolean);
+  }
+
   private extractTradeIdsFromResults(results: any[]): string[] {
     const tradeIds: string[] = [];
     // Extract trade_id from results
@@ -1415,7 +1523,7 @@ class TradingAnalysisFunctions {
   /**
    * Process individual placeholder values
    */
-  private processPlaceholder(value: string, previousResults: any[], lastResult: any, key: string): any {
+  private processPlaceholder(value: string, previousResults: any[], lastResult: any, _key: string): any {
     // Handle field-specific extraction (e.g., EXTRACT_0.trades.id, EXTRACT_LAST.statistics.winRate)
     if (value.startsWith('EXTRACT_') && value.includes('.')) {
       return this.processFieldExtraction(value, previousResults, lastResult);
@@ -1424,6 +1532,11 @@ class TradingAnalysisFunctions {
     // Handle array operations (e.g., MERGE_TRADE_IDS_0_2, UNIQUE_TRADE_IDS_0_1_2)
     if (value.startsWith('MERGE_') || value.startsWith('UNIQUE_') || value.startsWith('INTERSECT_')) {
       return this.processArrayOperation(value, previousResults);
+    }
+
+    // Handle transformations (e.g., SLICE_0.trades.0.5, FILTER_1.trades.type.win)
+    if (value.startsWith('SLICE_') || value.startsWith('FILTER_') || value.startsWith('SORT_')) {
+      return this.processTransformation(value, previousResults, lastResult);
     }
 
     // Handle reference to last result
@@ -1441,14 +1554,14 @@ class TradingAnalysisFunctions {
 
     // Handle reference to trade IDs from previous result
     if (value === 'EXTRACT_TRADE_IDS' && lastResult) {
-      return this._extractTradeIds(lastResult);
+      return this.extractTradeIds(lastResult);
     }
 
     // Handle indexed trade ID extraction (e.g., EXTRACT_TRADE_IDS_0)
     if (value.startsWith('EXTRACT_TRADE_IDS_')) {
       const index = parseInt(value.replace('EXTRACT_TRADE_IDS_', ''));
       if (index >= 0 && index < previousResults.length) {
-        return this._extractTradeIds(previousResults[index].result);
+        return this.extractTradeIds(previousResults[index].result);
       }
     }
 
@@ -1540,114 +1653,271 @@ class TradingAnalysisFunctions {
       const indices = this.parseIndices(value, 'INTERSECT_TRADE_IDS_');
       return this.intersectTradeIds(previousResults, indices);
     }
+
+    if (value.startsWith('MERGE_TRADES_')) {
+      const indices = this.parseIndices(value, 'MERGE_TRADES_');
+      return this.mergeTrades(previousResults, indices);
+    }
+
+    if (value.startsWith('UNIQUE_TRADES_')) {
+      const indices = this.parseIndices(value, 'UNIQUE_TRADES_');
+      const merged = this.mergeTrades(previousResults, indices);
+      return this.uniqueTradesById(merged);
+    }
+
+    if (value.startsWith('INTERSECT_TRADES_')) {
+      const indices = this.parseIndices(value, 'INTERSECT_TRADES_');
+      return this.intersectTrades(previousResults, indices);
+    }
     
     logger.warn(`Unknown array operation: ${value}`);
     return [];
   }
 
   /**
-   * Parse indices from operation string (e.g., "0_2_3" -> [0, 2, 3])
+   * Process transformations (SLICE, FILTER, SORT)
    */
-  private parseIndices(value: string, prefix: string): number[] {
-    return value.replace(prefix, '').split('_').map(Number).filter(n => !isNaN(n));
-  }
-
-  /**
-   * Smart extraction of trade IDs with type detection
-   */
-  private _extractTradeIds(result: any): string[] {
-    if (!result) {
-      logger.warn('Cannot extract trade IDs: result is null/undefined');
-      return [];
+  private processTransformation(value: string, previousResults: any[], lastResult: any): any {
+    // SLICE_0.trades.0.5 - Take first 5 trades from result 0
+    if (value.startsWith('SLICE_')) {
+      return this.processSliceTransformation(value, previousResults, lastResult);
     }
 
-    // Direct trade IDs array
-    if (result.tradeIds && Array.isArray(result.tradeIds)) {
-      return result.tradeIds;
+    // FILTER_1.trades.type.win - Filter to only winning trades from result 1
+    if (value.startsWith('FILTER_')) {
+      return this.processFilterTransformation(value, previousResults, lastResult);
     }
 
-    // Extract from trades array
-    if (result.trades && Array.isArray(result.trades)) {
-      return result.trades.map((trade: any) => trade.id || trade.tradeId || trade.trade_id).filter(Boolean);
+    // SORT_0.trades.amount.desc - Sort trades by amount descending from result 0
+    if (value.startsWith('SORT_')) {
+      return this.processSortTransformation(value, previousResults, lastResult);
     }
 
-    // Extract from nested data
-    if (result.data?.trades && Array.isArray(result.data.trades)) {
-      return result.data.trades.map((trade: any) => trade.id || trade.tradeId || trade.trade_id).filter(Boolean);
-    }
-
-    // Suggest available fields
-    const availableFields = typeof result === 'object' ? Object.keys(result) : [];
-    logger.warn(`Cannot extract trade IDs from result. Available fields: ${availableFields.join(', ')}`);
+    logger.warn(`Unknown transformation: ${value}`);
     return [];
   }
 
   /**
-   * Smart extraction of trades with type detection
+   * Process slice transformation (e.g., SLICE_0.trades.0.5, SLICE_LAST.trades.10.20)
    */
-  private extractTrades(result: any): any[] {
-    if (!result) {
-      logger.warn('Cannot extract trades: result is null/undefined');
+  private processSliceTransformation(value: string, previousResults: any[], lastResult: any): any {
+    const match = value.match(/^SLICE_(\d+|LAST)\.(.+)\.(\d+)\.(\d+)$/);
+    if (!match) {
+      logger.warn(`Invalid slice format: ${value}. Expected: SLICE_0.trades.0.5`);
       return [];
     }
 
-    // Direct trades array
-    if (result.trades && Array.isArray(result.trades)) {
-      return result.trades;
+    const [, indexStr, fieldPath, startStr, endStr] = match;
+    const targetResult = indexStr === 'LAST' ? lastResult : previousResults[parseInt(indexStr)]?.result;
+    
+    if (!targetResult) {
+      logger.warn(`Cannot slice from ${indexStr}: result not found`);
+      return [];
     }
 
-    // Extract from nested data
-    if (result.data?.trades && Array.isArray(result.data.trades)) {
-      return result.data.trades;
+    const data = this.extractNestedField(targetResult, fieldPath, `SLICE_${indexStr}`);
+    if (!Array.isArray(data)) {
+      logger.warn(`Cannot slice non-array data from ${indexStr}.${fieldPath}`);
+      return [];
     }
 
-    // Suggest available fields
-    const availableFields = typeof result === 'object' ? Object.keys(result) : [];
-    logger.warn(`Cannot extract trades from result. Available fields: ${availableFields.join(', ')}`);
-    return [];
+    const start = parseInt(startStr);
+    const end = parseInt(endStr);
+    
+    return data.slice(start, end);
   }
 
   /**
-   * Merge trade IDs from multiple results
+   * Process filter transformation (e.g., FILTER_0.trades.type.win, FILTER_1.trades.amount.>100)
    */
-  private mergeTradeIds(previousResults: any[], indices: number[]): string[] {
-    const allIds: string[] = [];
+  private processFilterTransformation(value: string, previousResults: any[], lastResult: any): any {
+    const match = value.match(/^FILTER_(\d+|LAST)\.(.+)\.(.+)\.(.+)$/);
+    if (!match) {
+      logger.warn(`Invalid filter format: ${value}. Expected: FILTER_0.trades.type.win`);
+      return [];
+    }
+
+    const [, indexStr, fieldPath, filterField, filterValue] = match;
+    const targetResult = indexStr === 'LAST' ? lastResult : previousResults[parseInt(indexStr)]?.result;
+    
+    if (!targetResult) {
+      logger.warn(`Cannot filter from ${indexStr}: result not found`);
+      return [];
+    }
+
+    const data = this.extractNestedField(targetResult, fieldPath, `FILTER_${indexStr}`);
+    if (!Array.isArray(data)) {
+      logger.warn(`Cannot filter non-array data from ${indexStr}.${fieldPath}`);
+      return [];
+    }
+
+    return this.applyFilter(data, filterField, filterValue);
+  }
+
+  /**
+   * Process sort transformation (e.g., SORT_0.trades.amount.desc, SORT_1.trades.date.asc)
+   */
+  private processSortTransformation(value: string, previousResults: any[], lastResult: any): any {
+    const match = value.match(/^SORT_(\d+|LAST)\.(.+)\.(.+)\.(asc|desc)$/);
+    if (!match) {
+      logger.warn(`Invalid sort format: ${value}. Expected: SORT_0.trades.amount.desc`);
+      return [];
+    }
+
+    const [, indexStr, fieldPath, sortField, direction] = match;
+    const targetResult = indexStr === 'LAST' ? lastResult : previousResults[parseInt(indexStr)]?.result;
+    
+    if (!targetResult) {
+      logger.warn(`Cannot sort from ${indexStr}: result not found`);
+      return [];
+    }
+
+    const data = this.extractNestedField(targetResult, fieldPath, `SORT_${indexStr}`);
+    if (!Array.isArray(data)) {
+      logger.warn(`Cannot sort non-array data from ${indexStr}.${fieldPath}`);
+      return [];
+    }
+
+    return this.applySort(data, sortField, direction as 'asc' | 'desc');
+  }
+
+  /**
+   * Apply filter to array based on field and value
+   */
+  private applyFilter(data: any[], filterField: string, filterValue: string): any[] {
+    return data.filter(item => {
+      const fieldValue = item[filterField];
+      
+      // Handle comparison operators
+      if (filterValue.startsWith('>')) {
+        const compareValue = parseFloat(filterValue.substring(1));
+        return !isNaN(compareValue) && parseFloat(fieldValue) > compareValue;
+      }
+      
+      if (filterValue.startsWith('<')) {
+        const compareValue = parseFloat(filterValue.substring(1));
+        return !isNaN(compareValue) && parseFloat(fieldValue) < compareValue;
+      }
+      
+      if (filterValue.startsWith('>=')) {
+        const compareValue = parseFloat(filterValue.substring(2));
+        return !isNaN(compareValue) && parseFloat(fieldValue) >= compareValue;
+      }
+      
+      if (filterValue.startsWith('<=')) {
+        const compareValue = parseFloat(filterValue.substring(2));
+        return !isNaN(compareValue) && parseFloat(fieldValue) <= compareValue;
+      }
+      
+      // Handle special values
+      if (filterValue === 'win') {
+        return fieldValue === 'win' || (typeof fieldValue === 'number' && fieldValue > 0);
+      }
+      
+      if (filterValue === 'loss') {
+        return fieldValue === 'loss' || (typeof fieldValue === 'number' && fieldValue < 0);
+      }
+      
+      // Exact match
+      return fieldValue === filterValue || fieldValue?.toString() === filterValue;
+    });
+  }
+
+  /**
+   * Apply sort to array based on field and direction
+   */
+  private applySort(data: any[], sortField: string, direction: 'asc' | 'desc'): any[] {
+    return [...data].sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      
+      // Handle different data types
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return direction === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+      
+      if (aValue instanceof Date && bValue instanceof Date) {
+        return direction === 'asc' ? aValue.getTime() - bValue.getTime() : bValue.getTime() - aValue.getTime();
+      }
+      
+      // String comparison
+      const aStr = aValue?.toString() || '';
+      const bStr = bValue?.toString() || '';
+      
+      if (direction === 'asc') {
+        return aStr.localeCompare(bStr);
+      } else {
+        return bStr.localeCompare(aStr);
+      }
+    });
+  }
+
+  /**
+   * Merge trades from multiple results
+   */
+  private mergeTrades(previousResults: any[], indices: number[]): any[] {
+    const allTrades: any[] = [];
     
     for (const index of indices) {
       if (index >= 0 && index < previousResults.length) {
         const result = previousResults[index].result;
-        const tradeIds = this._extractTradeIds(result);
-        allIds.push(...tradeIds);
+        const trades = this.extractTrades(result);
+        allTrades.push(...trades);
       } else {
-        logger.warn(`Invalid index ${index} for merging trade IDs. Available: 0-${previousResults.length - 1}`);
+        logger.warn(`Invalid index ${index} for merging trades. Available: 0-${previousResults.length - 1}`);
       }
     }
     
-    return allIds;
+    return allTrades;
   }
 
   /**
-   * Find intersection of trade IDs from multiple results
+   * Get unique trades by ID
    */
-  private intersectTradeIds(previousResults: any[], indices: number[]): string[] {
+  private uniqueTradesById(trades: any[]): any[] {
+    const seen = new Set<string>();
+    return trades.filter(trade => {
+      const id = trade.id || trade.tradeId || trade.trade_id;
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        return true;
+      }
+      return false;
+    });
+  }
+
+  /**
+   * Find intersection of trades from multiple results
+   */
+  private intersectTrades(previousResults: any[], indices: number[]): any[] {
     if (indices.length === 0) return [];
     
     const tradeSets = indices.map(index => {
       if (index >= 0 && index < previousResults.length) {
-        return new Set(this._extractTradeIds(previousResults[index].result));
+        const trades = this.extractTrades(previousResults[index].result);
+        const tradeMap = new Map();
+        trades.forEach((trade: any) => {
+          const id = trade.id || trade.tradeId || trade.trade_id;
+          if (id) tradeMap.set(id, trade);
+        });
+        return tradeMap;
       }
-      return new Set<string>();
-    }).filter(set => set.size > 0);
+      return new Map();
+    }).filter(map => map.size > 0);
 
     if (tradeSets.length === 0) return [];
     
     // Find intersection of all sets
-    let intersection = tradeSets[0];
-    for (let i = 1; i < tradeSets.length; i++) {
-      intersection = new Set(Array.from(intersection).filter(id => tradeSets[i].has(id)));
-    }
+    const firstSet = tradeSets[0];
+    const intersectionTrades: any[] = [];
     
-    return Array.from(intersection);
+    Array.from(firstSet.entries()).forEach(([id, trade]) => {
+      if (tradeSets.every(set => set.has(id))) {
+        intersectionTrades.push(trade);
+      }
+    });
+    
+    return intersectionTrades;
   }
 
   /**
@@ -1793,6 +2063,7 @@ class TradingAnalysisFunctions {
 }
 
 export const tradingAnalysisFunctions = new TradingAnalysisFunctions();
+
 
 
 

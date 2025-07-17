@@ -371,7 +371,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
                 },
                 args: {
                   type: SchemaType.OBJECT,
-                  description: 'Arguments to pass to the function. Supports advanced placeholders: "LAST_RESULT" (previous function result), "RESULT_0", "RESULT_1" (specific function by index), "EXTRACT_TRADE_IDS", "EXTRACT_TRADE_IDS_0" (trade IDs from specific result), "EXTRACT_TRADES", "EXTRACT_TRADES_1" (trades array from specific result), "EXTRACT_0.trades.id" (field-specific extraction), "MERGE_TRADE_IDS_0_2" (merge trade IDs from multiple results), "UNIQUE_TRADE_IDS_0_1_2" (unique trade IDs across results), "INTERSECT_TRADE_IDS_0_1" (common trade IDs between results).'
+                  description: 'Arguments to pass to the function. Supports advanced placeholders: "LAST_RESULT" (previous function result), "RESULT_0", "RESULT_1" (specific function by index), "EXTRACT_TRADE_IDS", "EXTRACT_TRADE_IDS_0" (trade IDs from specific result), "EXTRACT_TRADES", "EXTRACT_TRADES_1" (trades array from specific result), "EXTRACT_0.trades.id" (field-specific extraction), "MERGE_TRADE_IDS_0_2" (merge trade IDs from multiple results), "UNIQUE_TRADE_IDS_0_1_2" (unique trade IDs across results), "INTERSECT_TRADE_IDS_0_1" (common trade IDs between results), "MERGE_TRADES_0_1" (merge trade objects), "UNIQUE_TRADES_0_1" (unique trades by ID), "INTERSECT_TRADES_0_1" (common trades), "SLICE_0.trades.0.5" (take first 5 trades), "FILTER_1.trades.type.win" (filter winning trades), "SORT_0.trades.amount.desc" (sort by amount descending).'
                 }
               },
               required: ['name', 'args']
@@ -388,6 +388,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     }
   ];
 }
+
 
 
 
