@@ -322,7 +322,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     },
     {
       name: 'executeMultipleFunctions',
-      description: 'Execute multiple trading analysis functions in sequence and return the final combined result. This allows combining multiple function calls into a single request instead of calling functions sequentially or concurrently. Functions are executed in the order provided, and later functions can reference results from earlier functions using special placeholders like "LAST_RESULT", "EXTRACT_TRADE_IDS", or "EXTRACT_TRADES". Use this when you need to perform complex multi-step analysis that involves multiple functions.',
+      description: 'Execute multiple trading analysis functions in sequence and return the final combined result. This allows combining multiple function calls into a single request instead of calling functions sequentially or concurrently. Functions are executed in the order provided. Use this when you need to perform complex multi-step analysis that involves multiple functions.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
@@ -336,14 +336,11 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
                   enum: ['searchTrades', 'getTradeStatistics', 'findSimilarTrades', 'queryDatabase', 'analyzeEconomicEvents', 'fetchEconomicEvents', 'extractTradeIds', 'convertTradeIdsToCards'],
                   description: 'Name of the function to execute. Must be one of the available trading analysis functions.'
                 },
-                args: {
-                  type: SchemaType.OBJECT,
-                  description: 'Arguments to pass to the function. Can use special placeholders: "LAST_RESULT" (result from previous function), "EXTRACT_TRADE_IDS" (extract trade IDs from previous result), "EXTRACT_TRADES" (extract trades array from previous result), "RESULT_0", "RESULT_1", etc. (result from specific function by index).'
-                }
+                
               },
-              required: ['name', 'args']
+              required: ['name']
             },
-            description: 'Array of functions to execute in sequence. Each function can reference results from previous functions using special placeholders in the arguments.'
+            description: 'Array of functions to execute in sequence.'
           },
           description: {
             type: SchemaType.STRING,

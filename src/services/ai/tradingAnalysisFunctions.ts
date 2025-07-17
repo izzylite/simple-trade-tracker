@@ -12,6 +12,7 @@ import { isTradeInSession, getSessionMappings } from '../../utils/sessionTimeUti
 import { economicCalendarService } from '../economicCalendarService';
 import { EconomicEvent, Currency, ImpactLevel } from '../../types/economicCalendar';
 import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../../components/economicCalendar/EconomicCalendarDrawer';
+import { aiFunctionExecution } from './aiFunctionExecutionCall';
 
 export interface TradingAnalysisResult {
   success: boolean;
@@ -1340,12 +1341,9 @@ class TradingAnalysisFunctions {
       for (let i = 0; i < params.functions.length; i++) {
         const functionCall = params.functions[i];
         logger.log(`Executing function ${i + 1}/${params.functions.length}: ${functionCall.name}`);
-
-        // Process arguments to handle references to previous results
-        const processedArgs = this.processMultiFunctionArgs(functionCall.args, results, lastResult);
-
+        const processedArgs = { ...functionCall.args };
         // Execute the function
-        const result = await this.executeSingleFunction(functionCall.name, processedArgs);
+        const result = await aiFunctionExecution.executeFunctionCall(functionCall.name, processedArgs);
 
         if (!result.success) {
           logger.error(`Function ${functionCall.name} failed:`, result.error);
@@ -1389,81 +1387,8 @@ class TradingAnalysisFunctions {
       };
     }
   }
-
-  /**
-   * Process arguments for multi-function calls, handling references to previous results
-   */
-  private processMultiFunctionArgs(args: any, previousResults: any[], lastResult: any): any {
-    if (!args || typeof args !== 'object') {
-      return args;
-    }
-
-    const processedArgs = { ...args };
-
-    // Handle special placeholders that reference previous results
-    for (const [key, value] of Object.entries(processedArgs)) {
-      if (typeof value === 'string') {
-        // Handle reference to last result
-        if (value === 'LAST_RESULT') {
-          processedArgs[key] = lastResult;
-        }
-        // Handle reference to specific function result by index
-        else if (value.startsWith('RESULT_')) {
-          const index = parseInt(value.replace('RESULT_', ''));
-          if (index >= 0 && index < previousResults.length) {
-            processedArgs[key] = previousResults[index].result;
-          }
-        }
-        // Handle reference to trade IDs from previous result
-        else if (value === 'EXTRACT_TRADE_IDS' && lastResult) {
-          if (lastResult.trades && Array.isArray(lastResult.trades)) {
-            processedArgs[key] = lastResult.trades.map((trade: any) =>
-              trade.id || trade.tradeId || trade.trade_id
-            ).filter(Boolean);
-          } else if (lastResult.tradeIds && Array.isArray(lastResult.tradeIds)) {
-            processedArgs[key] = lastResult.tradeIds;
-          }
-        }
-        // Handle reference to trades array from previous result
-        else if (value === 'EXTRACT_TRADES' && lastResult) {
-          if (lastResult.trades && Array.isArray(lastResult.trades)) {
-            processedArgs[key] = lastResult.trades;
-          }
-        }
-      }
-    }
-
-    return processedArgs;
-  }
-
-  /**
-   * Execute a single function by name
-   */
-  private async executeSingleFunction(functionName: string, args: any): Promise<TradingAnalysisResult> {
-    switch (functionName) {
-      case 'searchTrades':
-        return await this.searchTrades(args);
-      case 'getTradeStatistics':
-        return await this.getTradeStatistics(args);
-      case 'findSimilarTrades':
-        return await this.findSimilarTrades(args);
-      case 'queryDatabase':
-        return await this.queryDatabase(args);
-      case 'analyzeEconomicEvents':
-        return await this.analyzeEconomicEvents(args);
-      case 'fetchEconomicEvents':
-        return await this.fetchEconomicEvents(args);
-      case 'extractTradeIds':
-        return await this.extractTradeIds(args);
-      case 'convertTradeIdsToCards':
-        return await this.convertTradeIdsToCards(args);
-      default:
-        return {
-          success: false,
-          error: `Unknown function: ${functionName}`
-        };
-    }
-  }
+ 
+ 
 }
 
 export const tradingAnalysisFunctions = new TradingAnalysisFunctions();
