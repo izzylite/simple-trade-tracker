@@ -1426,10 +1426,34 @@ class TradingAnalysisFunctions {
             processedArgs[key] = lastResult.tradeIds;
           }
         }
+        // Handle indexed trade ID extraction (e.g., EXTRACT_TRADE_IDS_0)
+        else if (value.startsWith('EXTRACT_TRADE_IDS_')) {
+          const index = parseInt(value.replace('EXTRACT_TRADE_IDS_', ''));
+          if (index >= 0 && index < previousResults.length) {
+            const targetResult = previousResults[index].result;
+            if (targetResult.trades && Array.isArray(targetResult.trades)) {
+              processedArgs[key] = targetResult.trades.map((trade: any) =>
+                trade.id || trade.tradeId || trade.trade_id
+              ).filter(Boolean);
+            } else if (targetResult.tradeIds && Array.isArray(targetResult.tradeIds)) {
+              processedArgs[key] = targetResult.tradeIds;
+            }
+          }
+        }
         // Handle reference to trades array from previous result
         else if (value === 'EXTRACT_TRADES' && lastResult) {
           if (lastResult.trades && Array.isArray(lastResult.trades)) {
             processedArgs[key] = lastResult.trades;
+          }
+        }
+        // Handle indexed trades extraction (e.g., EXTRACT_TRADES_1)
+        else if (value.startsWith('EXTRACT_TRADES_')) {
+          const index = parseInt(value.replace('EXTRACT_TRADES_', ''));
+          if (index >= 0 && index < previousResults.length) {
+            const targetResult = previousResults[index].result;
+            if (targetResult.trades && Array.isArray(targetResult.trades)) {
+              processedArgs[key] = targetResult.trades;
+            }
           }
         }
         // Handle cache keys from different functions
@@ -1587,6 +1611,7 @@ class TradingAnalysisFunctions {
 }
 
 export const tradingAnalysisFunctions = new TradingAnalysisFunctions();
+
 
 
 
