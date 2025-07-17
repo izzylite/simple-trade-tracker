@@ -371,7 +371,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
                 },
                 args: {
                   type: SchemaType.OBJECT,
-                  description: 'Arguments to pass to the function. Can use special placeholders: "LAST_RESULT" (result from previous function), "EXTRACT_TRADE_IDS" (extract trade IDs from previous result), "EXTRACT_TRADES" (extract trades array from previous result), "RESULT_0", "RESULT_1", etc. (result from specific function by index), "EXTRACT_TRADE_IDS_0", "EXTRACT_TRADES_1", etc. (extract from specific function by index).'
+                  description: 'Arguments to pass to the function. Supports advanced placeholders: "LAST_RESULT" (previous function result), "RESULT_0", "RESULT_1" (specific function by index), "EXTRACT_TRADE_IDS", "EXTRACT_TRADE_IDS_0" (trade IDs from specific result), "EXTRACT_TRADES", "EXTRACT_TRADES_1" (trades array from specific result), "EXTRACT_0.trades.id" (field-specific extraction), "MERGE_TRADE_IDS_0_2" (merge trade IDs from multiple results), "UNIQUE_TRADE_IDS_0_1_2" (unique trade IDs across results), "INTERSECT_TRADE_IDS_0_1" (common trade IDs between results).'
                 }
               },
               required: ['name', 'args']
@@ -388,6 +388,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     }
   ];
 }
+
 
 
 

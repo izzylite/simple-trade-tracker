@@ -1405,67 +1405,249 @@ class TradingAnalysisFunctions {
     // Handle special placeholders that reference previous results
     for (const [key, value] of Object.entries(processedArgs)) {
       if (typeof value === 'string') {
-        // Handle reference to last result
-        if (value === 'LAST_RESULT') {
-          processedArgs[key] = lastResult;
-        }
-        // Handle reference to specific function result by index
-        else if (value.startsWith('RESULT_')) {
-          const index = parseInt(value.replace('RESULT_', ''));
-          if (index >= 0 && index < previousResults.length) {
-            processedArgs[key] = previousResults[index].result;
-          }
-        }
-        // Handle reference to trade IDs from previous result
-        else if (value === 'EXTRACT_TRADE_IDS' && lastResult) {
-          if (lastResult.trades && Array.isArray(lastResult.trades)) {
-            processedArgs[key] = lastResult.trades.map((trade: any) =>
-              trade.id || trade.tradeId || trade.trade_id
-            ).filter(Boolean);
-          } else if (lastResult.tradeIds && Array.isArray(lastResult.tradeIds)) {
-            processedArgs[key] = lastResult.tradeIds;
-          }
-        }
-        // Handle indexed trade ID extraction (e.g., EXTRACT_TRADE_IDS_0)
-        else if (value.startsWith('EXTRACT_TRADE_IDS_')) {
-          const index = parseInt(value.replace('EXTRACT_TRADE_IDS_', ''));
-          if (index >= 0 && index < previousResults.length) {
-            const targetResult = previousResults[index].result;
-            if (targetResult.trades && Array.isArray(targetResult.trades)) {
-              processedArgs[key] = targetResult.trades.map((trade: any) =>
-                trade.id || trade.tradeId || trade.trade_id
-              ).filter(Boolean);
-            } else if (targetResult.tradeIds && Array.isArray(targetResult.tradeIds)) {
-              processedArgs[key] = targetResult.tradeIds;
-            }
-          }
-        }
-        // Handle reference to trades array from previous result
-        else if (value === 'EXTRACT_TRADES' && lastResult) {
-          if (lastResult.trades && Array.isArray(lastResult.trades)) {
-            processedArgs[key] = lastResult.trades;
-          }
-        }
-        // Handle indexed trades extraction (e.g., EXTRACT_TRADES_1)
-        else if (value.startsWith('EXTRACT_TRADES_')) {
-          const index = parseInt(value.replace('EXTRACT_TRADES_', ''));
-          if (index >= 0 && index < previousResults.length) {
-            const targetResult = previousResults[index].result;
-            if (targetResult.trades && Array.isArray(targetResult.trades)) {
-              processedArgs[key] = targetResult.trades;
-            }
-          }
-        }
-        // Handle cache keys from different functions
-        else if (value.startsWith('ai_function_result_')) {
-          // Let the aiFunctionExecution.processFunctionArgs handle cache keys
-          // This will be processed when the function is actually executed
-          processedArgs[key] = value;
-        }
+        processedArgs[key] = this.processPlaceholder(value, previousResults, lastResult, key);
       }
     }
 
     return processedArgs;
+  }
+
+  /**
+   * Process individual placeholder values
+   */
+  private processPlaceholder(value: string, previousResults: any[], lastResult: any, key: string): any {
+    // Handle field-specific extraction (e.g., EXTRACT_0.trades.id, EXTRACT_LAST.statistics.winRate)
+    if (value.startsWith('EXTRACT_') && value.includes('.')) {
+      return this.processFieldExtraction(value, previousResults, lastResult);
+    }
+
+    // Handle array operations (e.g., MERGE_TRADE_IDS_0_2, UNIQUE_TRADE_IDS_0_1_2)
+    if (value.startsWith('MERGE_') || value.startsWith('UNIQUE_') || value.startsWith('INTERSECT_')) {
+      return this.processArrayOperation(value, previousResults);
+    }
+
+    // Handle reference to last result
+    if (value === 'LAST_RESULT') {
+      return lastResult;
+    }
+
+    // Handle reference to specific function result by index
+    if (value.startsWith('RESULT_')) {
+      const index = parseInt(value.replace('RESULT_', ''));
+      if (index >= 0 && index < previousResults.length) {
+        return previousResults[index].result;
+      }
+    }
+
+    // Handle reference to trade IDs from previous result
+    if (value === 'EXTRACT_TRADE_IDS' && lastResult) {
+      return this._extractTradeIds(lastResult);
+    }
+
+    // Handle indexed trade ID extraction (e.g., EXTRACT_TRADE_IDS_0)
+    if (value.startsWith('EXTRACT_TRADE_IDS_')) {
+      const index = parseInt(value.replace('EXTRACT_TRADE_IDS_', ''));
+      if (index >= 0 && index < previousResults.length) {
+        return this._extractTradeIds(previousResults[index].result);
+      }
+    }
+
+    // Handle reference to trades array from previous result
+    if (value === 'EXTRACT_TRADES' && lastResult) {
+      return this.extractTrades(lastResult);
+    }
+
+    // Handle indexed trades extraction (e.g., EXTRACT_TRADES_1)
+    if (value.startsWith('EXTRACT_TRADES_')) {
+      const index = parseInt(value.replace('EXTRACT_TRADES_', ''));
+      if (index >= 0 && index < previousResults.length) {
+        return this.extractTrades(previousResults[index].result);
+      }
+    }
+
+    // Handle cache keys from different functions
+    if (value.startsWith('ai_function_result_')) {
+      return value;
+    }
+
+    return value;
+  }
+
+  /**
+   * Process field-specific extraction (e.g., EXTRACT_0.trades.id, EXTRACT_LAST.statistics.winRate)
+   */
+  private processFieldExtraction(value: string, previousResults: any[], lastResult: any): any {
+    const match = value.match(/^EXTRACT_(\d+|LAST)\.(.+)$/);
+    if (!match) {
+      logger.warn(`Invalid field extraction format: ${value}. Expected format: EXTRACT_0.field.path or EXTRACT_LAST.field.path`);
+      return [];
+    }
+
+    const [, indexStr, fieldPath] = match;
+    const targetResult = indexStr === 'LAST' ? lastResult : previousResults[parseInt(indexStr)]?.result;
+    
+    if (!targetResult) {
+      logger.warn(`Cannot extract from ${indexStr}: result not found. Available results: 0-${previousResults.length - 1}`);
+      return [];
+    }
+
+    return this.extractNestedField(targetResult, fieldPath, `EXTRACT_${indexStr}`);
+  }
+
+  /**
+   * Extract nested field from object using dot notation
+   */
+  private extractNestedField(obj: any, path: string, context: string): any {
+    const parts = path.split('.');
+    let current = obj;
+    
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      
+      if (current && typeof current === 'object') {
+        // Handle array access with special processing for trades
+        if (part === 'id' && Array.isArray(current)) {
+          return current.map((item: any) => item.id || item.tradeId || item.trade_id).filter(Boolean);
+        }
+        
+        current = current[part];
+      } else {
+        const availableFields = current && typeof current === 'object' ? Object.keys(current) : [];
+        logger.warn(`Cannot access field '${part}' in ${context}.${parts.slice(0, i).join('.')}. Available fields: ${availableFields.join(', ')}`);
+        return [];
+      }
+    }
+    
+    return current || [];
+  }
+
+  /**
+   * Process array operations (MERGE, UNIQUE, INTERSECT)
+   */
+  private processArrayOperation(value: string, previousResults: any[]): any {
+    if (value.startsWith('MERGE_TRADE_IDS_')) {
+      const indices = this.parseIndices(value, 'MERGE_TRADE_IDS_');
+      return this.mergeTradeIds(previousResults, indices);
+    }
+    
+    if (value.startsWith('UNIQUE_TRADE_IDS_')) {
+      const indices = this.parseIndices(value, 'UNIQUE_TRADE_IDS_');
+      const merged = this.mergeTradeIds(previousResults, indices);
+      return Array.from(new Set(merged));
+    }
+
+    if (value.startsWith('INTERSECT_TRADE_IDS_')) {
+      const indices = this.parseIndices(value, 'INTERSECT_TRADE_IDS_');
+      return this.intersectTradeIds(previousResults, indices);
+    }
+    
+    logger.warn(`Unknown array operation: ${value}`);
+    return [];
+  }
+
+  /**
+   * Parse indices from operation string (e.g., "0_2_3" -> [0, 2, 3])
+   */
+  private parseIndices(value: string, prefix: string): number[] {
+    return value.replace(prefix, '').split('_').map(Number).filter(n => !isNaN(n));
+  }
+
+  /**
+   * Smart extraction of trade IDs with type detection
+   */
+  private _extractTradeIds(result: any): string[] {
+    if (!result) {
+      logger.warn('Cannot extract trade IDs: result is null/undefined');
+      return [];
+    }
+
+    // Direct trade IDs array
+    if (result.tradeIds && Array.isArray(result.tradeIds)) {
+      return result.tradeIds;
+    }
+
+    // Extract from trades array
+    if (result.trades && Array.isArray(result.trades)) {
+      return result.trades.map((trade: any) => trade.id || trade.tradeId || trade.trade_id).filter(Boolean);
+    }
+
+    // Extract from nested data
+    if (result.data?.trades && Array.isArray(result.data.trades)) {
+      return result.data.trades.map((trade: any) => trade.id || trade.tradeId || trade.trade_id).filter(Boolean);
+    }
+
+    // Suggest available fields
+    const availableFields = typeof result === 'object' ? Object.keys(result) : [];
+    logger.warn(`Cannot extract trade IDs from result. Available fields: ${availableFields.join(', ')}`);
+    return [];
+  }
+
+  /**
+   * Smart extraction of trades with type detection
+   */
+  private extractTrades(result: any): any[] {
+    if (!result) {
+      logger.warn('Cannot extract trades: result is null/undefined');
+      return [];
+    }
+
+    // Direct trades array
+    if (result.trades && Array.isArray(result.trades)) {
+      return result.trades;
+    }
+
+    // Extract from nested data
+    if (result.data?.trades && Array.isArray(result.data.trades)) {
+      return result.data.trades;
+    }
+
+    // Suggest available fields
+    const availableFields = typeof result === 'object' ? Object.keys(result) : [];
+    logger.warn(`Cannot extract trades from result. Available fields: ${availableFields.join(', ')}`);
+    return [];
+  }
+
+  /**
+   * Merge trade IDs from multiple results
+   */
+  private mergeTradeIds(previousResults: any[], indices: number[]): string[] {
+    const allIds: string[] = [];
+    
+    for (const index of indices) {
+      if (index >= 0 && index < previousResults.length) {
+        const result = previousResults[index].result;
+        const tradeIds = this._extractTradeIds(result);
+        allIds.push(...tradeIds);
+      } else {
+        logger.warn(`Invalid index ${index} for merging trade IDs. Available: 0-${previousResults.length - 1}`);
+      }
+    }
+    
+    return allIds;
+  }
+
+  /**
+   * Find intersection of trade IDs from multiple results
+   */
+  private intersectTradeIds(previousResults: any[], indices: number[]): string[] {
+    if (indices.length === 0) return [];
+    
+    const tradeSets = indices.map(index => {
+      if (index >= 0 && index < previousResults.length) {
+        return new Set(this._extractTradeIds(previousResults[index].result));
+      }
+      return new Set<string>();
+    }).filter(set => set.size > 0);
+
+    if (tradeSets.length === 0) return [];
+    
+    // Find intersection of all sets
+    let intersection = tradeSets[0];
+    for (let i = 1; i < tradeSets.length; i++) {
+      intersection = new Set(Array.from(intersection).filter(id => tradeSets[i].has(id)));
+    }
+    
+    return Array.from(intersection);
   }
 
   /**
@@ -1611,6 +1793,7 @@ class TradingAnalysisFunctions {
 }
 
 export const tradingAnalysisFunctions = new TradingAnalysisFunctions();
+
 
 
 
