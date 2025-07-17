@@ -54,7 +54,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
           },
           limit: {
             type: SchemaType.NUMBER,
-            description: 'Maximum number of trades to return. Defaults to all matching trades if not specified. Use reasonable limits (e.g., 50-100) for large datasets.'
+            description: 'Maximum number of trades to return. Defaults to all matching trades if not specified. Use reasonable limits (e.g., 50-300) for large datasets.'
           },
           hasEconomicEvents: {
             type: SchemaType.BOOLEAN,
@@ -220,6 +220,10 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
+          returnCacheKey: {
+            type: SchemaType.BOOLEAN,
+            description: 'Set to true if you plan to call additional functions with this result (like getTradeStatistics, convertTradeIdsToCards). When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
           trades: {
             type: SchemaType.ARRAY,
             items: {
@@ -314,6 +318,39 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
           }
         },
         required: ['query']
+      }
+    },
+    {
+      name: 'executeMultipleFunctions',
+      description: 'Execute multiple trading analysis functions in sequence and return the final combined result. This allows combining multiple function calls into a single request instead of calling functions sequentially or concurrently. Functions are executed in the order provided, and later functions can reference results from earlier functions using special placeholders like "LAST_RESULT", "EXTRACT_TRADE_IDS", or "EXTRACT_TRADES". Use this when you need to perform complex multi-step analysis that involves multiple functions.',
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          functions: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                name: {
+                  type: SchemaType.STRING,
+                  enum: ['searchTrades', 'getTradeStatistics', 'findSimilarTrades', 'queryDatabase', 'analyzeEconomicEvents', 'fetchEconomicEvents', 'extractTradeIds', 'convertTradeIdsToCards'],
+                  description: 'Name of the function to execute. Must be one of the available trading analysis functions.'
+                },
+                args: {
+                  type: SchemaType.OBJECT,
+                  description: 'Arguments to pass to the function. Can use special placeholders: "LAST_RESULT" (result from previous function), "EXTRACT_TRADE_IDS" (extract trade IDs from previous result), "EXTRACT_TRADES" (extract trades array from previous result), "RESULT_0", "RESULT_1", etc. (result from specific function by index).'
+                }
+              },
+              required: ['name', 'args']
+            },
+            description: 'Array of functions to execute in sequence. Each function can reference results from previous functions using special placeholders in the arguments.'
+          },
+          description: {
+            type: SchemaType.STRING,
+            description: 'Optional description of what this multi-function workflow is intended to accomplish. Helps with understanding the analysis purpose.'
+          }
+        },
+        required: ['functions']
       }
     }
   ];

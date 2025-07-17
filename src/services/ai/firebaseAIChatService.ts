@@ -23,9 +23,7 @@ import { getFunctionDeclarations } from './aiFunctionDeclarations';
 
 
 class FirebaseAIChatService {
-  private readonly SYSTEM_PROMPT = getSystemPrompt();
-  private lastInitializedCalendarId: string | null = null;
-  private lastInitializedTradesCount: number = 0;
+  private readonly SYSTEM_PROMPT = getSystemPrompt(); 
 
   /**
    * Execute a function call requested by the AI
@@ -35,7 +33,7 @@ class FirebaseAIChatService {
       logger.log(`Executing function call: ${functionName}`, args);
 
       // Process arguments to handle cache keys (if needed)
-      const processedArgs = this.processFunctionArgs(args);
+      const processedArgs = this.processFunctionArgs(args, functionName);
 
       switch (functionName) {
         case 'searchTrades':
@@ -62,6 +60,9 @@ class FirebaseAIChatService {
         case 'convertTradeIdsToCards':
           return await tradingAnalysisFunctions.convertTradeIdsToCards(processedArgs);
 
+        case 'executeMultipleFunctions':
+          return await tradingAnalysisFunctions.executeMultipleFunctions(processedArgs);
+
         default:
           return {
             success: false,
@@ -80,7 +81,7 @@ class FirebaseAIChatService {
   /**
    * Process function arguments to handle cache keys
    */
-  private processFunctionArgs(args: any): any {
+  private processFunctionArgs(args: any, functionName: string): any {
     if (!args || typeof args !== 'object') {
       return args;
     }
@@ -97,24 +98,41 @@ class FirebaseAIChatService {
           if (cachedItem) {
             const cachedResult = JSON.parse(cachedItem);
             let actualData = cachedResult.data;
-
+            logger.log(`Cached data for ${key}:`, actualData);
             // For extractTradeIds function, we need the trades array specifically
             if (key === 'trades' && actualData && typeof actualData === 'object') {
               if (actualData.trades && Array.isArray(actualData.trades)) {
-                processedArgs[key] = actualData.trades;
+                // extractTradeIds needs full trade objects, convertTradeIdsToCards needs just IDs
+                processedArgs[key] = functionName === 'convertTradeIdsToCards' ? actualData.trades.map((trade: any) => trade.id) : actualData.trades;
               } else if (Array.isArray(actualData)) {
                 processedArgs[key] = actualData;
               } else {
                 logger.warn(`Cached data for ${key} doesn't contain expected trades array:`, actualData);
                 processedArgs[key] = [];
               }
-            } else {
+            }
+            else if(key === 'tradeIds' && actualData && typeof actualData === 'object'){
+              if(actualData.trades && Array.isArray(actualData.trades)){
+                // For tradeIds parameter, we always want the IDs, not the full objects
+                processedArgs[key] = actualData.trades.map((trade: any) => trade.id);
+              }
+              else if (actualData.tradeIds && Array.isArray(actualData.tradeIds)) {
+                processedArgs[key] = actualData.tradeIds;
+              } else if (Array.isArray(actualData)) {
+                processedArgs[key] = actualData;
+              } else {
+                logger.warn(`Cached data for ${key} doesn't contain expected tradeIds array:`, actualData);
+                processedArgs[key] = [];
+              }
+            }
+            
+            else {
               processedArgs[key] = actualData;
             }
 
             // Clear the cache after retrieval to free up space
             localStorage.removeItem(value);
-            logger.log(`Retrieved and cleared cached data for argument ${key}`);
+            logger.log(`Retrieved and cleared cached data for argument ${key}`, processedArgs[key]);
           } else {
             logger.warn(`Failed to retrieve cached data for key: ${value}`);
             // For critical parameters like 'trades', provide an empty array as fallback
@@ -298,7 +316,7 @@ class FirebaseAIChatService {
             break;
           }
 
-          logger.log('Sending valid function response parts:', validResponseParts.map(p => p.functionResponse.name));
+          
           currentResponse = await chat.sendMessage(validResponseParts);
 
         } catch (sendError) {

@@ -89,6 +89,7 @@ export interface FetchEconomicEventsParams {
 }
 
 export interface ExtractTradeIdsParams {
+  returnCacheKey?: boolean;
   trades: any[]; // Array of trade objects or trade data
 }
 
@@ -154,6 +155,10 @@ class TradingAnalysisFunctions {
           if (data.trades && Array.isArray(data.trades)) {
             count = data.trades.length;
             summary += ` Contains ${count} trades.`;
+          }
+          if (data.tradeIds && Array.isArray(data.tradeIds)) {
+            count = data.tradeIds.length;
+            summary += ` Contains ${count} tradeIds.`;
           } else if (Array.isArray(data)) {
             count = data.length;
             summary += ` Contains ${count} items.`;
@@ -395,6 +400,7 @@ class TradingAnalysisFunctions {
       logger.log('AI requested trade statistics with params:', params);
 
       let tradesToAnalyze = [...this.trades];
+      
 
       // Filter by specific trade IDs if provided
       if (params.tradeIds && params.tradeIds.length > 0) {
@@ -655,19 +661,19 @@ class TradingAnalysisFunctions {
 
       logger.log(`Extracted ${uniqueTradeIds.length} unique trade IDs from ${params.trades.length} trades`);
 
-      return {
-        success: true,
-        data: {
-          tradeIds: uniqueTradeIds,
-          count: uniqueTradeIds.length,
-          totalProcessed: params.trades.length,
-          duplicatesRemoved: tradeIds.length - uniqueTradeIds.length,
-          invalidTrades: invalidTrades.length,
-          ...(invalidTrades.length > 0 && {
-            invalidTradesDetails: invalidTrades.slice(0, 5) // Show first 5 invalid trades for debugging
-          })
-        }
+      const data = {
+        tradeIds: uniqueTradeIds,
+        count: uniqueTradeIds.length,
+        totalProcessed: params.trades.length,
+        duplicatesRemoved: tradeIds.length - uniqueTradeIds.length,
+        invalidTrades: invalidTrades.length,
+        ...(invalidTrades.length > 0 && {
+          invalidTradesDetails: invalidTrades.slice(0, 5) // Show first 5 invalid trades for debugging
+        })
       };
+
+      // Handle cache key logic
+      return this.handleCacheKeyResult('extractTradeIds', data, params.returnCacheKey, uniqueTradeIds);
 
     } catch (error) {
       logger.error('Error in extractTradeIds:', error);
