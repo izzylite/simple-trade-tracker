@@ -154,38 +154,42 @@ class AIFunctionExecution {
    /**
    * Clean up cache keys that were used in multi-function execution
    */
-   public cleanupCacheKeys(results: any[]): void {
-    try {
-      // Look for cache keys in the arguments of executed functions
-      const cacheKeysToClean = new Set<string>();
-
-      for (const result of results) {
-        if (result.args && typeof result.args === 'object') {
-          for (const [, value] of Object.entries(result.args)) {
-            if (typeof value === 'string' && value.startsWith('ai_function_result_')) {
-              cacheKeysToClean.add(value);
-            }
+    /**
+   * Clean up cache keys used in multi-function execution
+   */
+    cleanupCacheKeys(results: any[]): void {
+        const cacheKeysToClean = new Set<string>();
+        
+        // Extract cache keys from function arguments
+        results.forEach(result => {
+          if (result.args) {
+            this.extractCacheKeysFromArgs(result.args, cacheKeysToClean);
           }
+        });
+        
+        // Clean up the cache keys
+        cacheKeysToClean.forEach(cacheKey => {
+            try {
+              localStorage.removeItem(cacheKey);
+              logger.log(`Cleaned up cache key: ${cacheKey}`);
+            } catch (error) {
+              logger.warn(`Failed to clean up cache key ${cacheKey}:`, error);
+            }
+          });
+      }
+    
+      /**
+       * Recursively extract cache keys from function arguments
+       */
+      private extractCacheKeysFromArgs(args: any, cacheKeys: Set<string>): void {
+        if (typeof args === 'string' && args.startsWith('ai_function_result_')) {
+          cacheKeys.add(args);
+        } else if (Array.isArray(args)) {
+          args.forEach(item => this.extractCacheKeysFromArgs(item, cacheKeys));
+        } else if (args && typeof args === 'object') {
+          Object.values(args).forEach(value => this.extractCacheKeysFromArgs(value, cacheKeys));
         }
       }
-
-      // Clean up the cache keys
-      cacheKeysToClean.forEach(cacheKey => {
-        try {
-          localStorage.removeItem(cacheKey);
-          logger.log(`Cleaned up cache key: ${cacheKey}`);
-        } catch (error) {
-          logger.warn(`Failed to clean up cache key ${cacheKey}:`, error);
-        }
-      });
-
-      if (cacheKeysToClean.size > 0) {
-        logger.log(`Cleaned up ${cacheKeysToClean.size} cache keys from multi-function execution`);
-      }
-    } catch (error) {
-      logger.error('Error cleaning up cache keys:', error);
-    }
-  }
 
 }
 

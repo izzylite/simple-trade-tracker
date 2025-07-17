@@ -581,6 +581,7 @@ class TradingAnalysisFunctions {
       };
     }
   }
+  
 
   /**
    * Extract trade IDs from trade objects or trade data
@@ -1035,42 +1036,13 @@ class TradingAnalysisFunctions {
 
   // Helper methods
 
-  /**
-   * Extract trades array from function result data
-   */
-  private extractTrades(result: any): any[] {
-    if (!result) return [];
-
-    // Handle different result formats
-    if (Array.isArray(result)) {
-      return result;
-    }
-
-    if (result.trades && Array.isArray(result.trades)) {
-      return result.trades;
-    }
-
-    if (result.data && Array.isArray(result.data)) {
-      return result.data;
-    }
-
-    if (result.data && result.data.trades && Array.isArray(result.data.trades)) {
-      return result.data.trades;
-    }
-
-    return [];
-  }
-
+  
   /**
    * Parse indices from placeholder string (e.g., "MERGE_TRADE_IDS_0_1_2" -> [0, 1, 2])
    */
   private parseIndices(value: string, prefix: string): number[] {
-    const indexPart = value.replace(prefix, '');
-    if (!indexPart) return [];
-
-    return indexPart.split('_')
-      .map(str => parseInt(str))
-      .filter(num => !isNaN(num));
+    const indicesStr = value.replace(prefix, '');
+    return indicesStr.split('_').map(s => parseInt(s)).filter(n => !isNaN(n));
   }
 
   /**
@@ -1078,15 +1050,17 @@ class TradingAnalysisFunctions {
    */
   private mergeTradeIds(previousResults: any[], indices: number[]): string[] {
     const allTradeIds: string[] = [];
-
+    
     for (const index of indices) {
       if (index >= 0 && index < previousResults.length) {
         const result = previousResults[index].result;
-        const tradeIds = this.extractTradeIdsFromResult(result);
+        const tradeIds = this._extractTradeIds(result);
         allTradeIds.push(...tradeIds);
+      } else {
+        logger.warn(`Invalid index ${index} for merging trade IDs. Available: 0-${previousResults.length - 1}`);
       }
     }
-
+    
     return allTradeIds;
   }
 
@@ -1095,51 +1069,93 @@ class TradingAnalysisFunctions {
    */
   private intersectTradeIds(previousResults: any[], indices: number[]): string[] {
     if (indices.length === 0) return [];
-
+    
     const tradeSets = indices.map(index => {
       if (index >= 0 && index < previousResults.length) {
-        const result = previousResults[index].result;
-        const tradeIds = this.extractTradeIdsFromResult(result);
+        const tradeIds = this._extractTradeIds(previousResults[index].result);
         return new Set(tradeIds);
       }
       return new Set<string>();
     }).filter(set => set.size > 0);
 
     if (tradeSets.length === 0) return [];
-
+    
     // Find intersection of all sets
-    let intersection = tradeSets[0];
-    for (let i = 1; i < tradeSets.length; i++) {
-      intersection = new Set(Array.from(intersection).filter(id => tradeSets[i].has(id)));
+    const firstSet = tradeSets[0];
+    const intersection: string[] = [];
+    
+    for (const id of firstSet) {
+      if (tradeSets.every(set => set.has(id))) {
+        intersection.push(id);
+      }
     }
-
-    return Array.from(intersection);
+    
+    return intersection;
   }
 
   /**
    * Extract trade IDs from various result formats
    */
-  private extractTradeIdsFromResult(result: any): string[] {
+  private _extractTradeIds(result: any): string[] {
     if (!result) return [];
-
-    // Handle array of trade IDs
+    
+    // Direct array of trade IDs
+    if (Array.isArray(result) && result.length > 0 && typeof result[0] === 'string') {
+      return result;
+    }
+    
+    // Array of trade objects
     if (Array.isArray(result)) {
-      return result.filter(item => typeof item === 'string');
+      return result.map(trade => trade.id || trade.tradeId || trade.trade_id).filter(Boolean);
     }
-
-    // Handle result with tradeIds property
-    if (result.tradeIds && Array.isArray(result.tradeIds)) {
-      return result.tradeIds;
+    
+    // Result object with trades array
+    if (result.trades && Array.isArray(result.trades)) {
+      return result.trades.map((trade : Trade) => trade.id).filter(Boolean);
     }
-
-    // Handle result with data.tradeIds
-    if (result.data && result.data.tradeIds && Array.isArray(result.data.tradeIds)) {
-      return result.data.tradeIds;
+    
+    // Result object with data.trades array
+    if (result.data && result.data.trades && Array.isArray(result.data.trades)) {
+      return result.data.trades.map((trade : Trade) => trade.id).filter(Boolean);
     }
+    
+    // Single trade object
+    if (result.id || result.tradeId || result.trade_id) {
+      return [result.id || result.tradeId || result.trade_id];
+    }
+    
+    logger.warn('Could not extract trade IDs from result:', Object.keys(result));
+    return [];
+  }
 
-    // Handle result with trades array - extract IDs
-    const trades = this.extractTrades(result);
-    return trades.map(trade => trade.id || trade.tradeId || trade.trade_id).filter(Boolean);
+  /**
+   * Extract trades array from various result formats
+   */
+  private _extractTrades(result: any): any[] {
+    if (!result) return [];
+    
+    // Direct array of trades
+    if (Array.isArray(result)) {
+      return result;
+    }
+    
+    // Result object with trades array
+    if (result.trades && Array.isArray(result.trades)) {
+      return result.trades;
+    }
+    
+    // Result object with data.trades array
+    if (result.data && result.data.trades && Array.isArray(result.data.trades)) {
+      return result.data.trades;
+    }
+    
+    // Single trade object
+    if (result.id || result.tradeId || result.trade_id) {
+      return [result];
+    }
+    
+    logger.warn('Could not extract trades from result:', Object.keys(result));
+    return [];
   }
 
   private extractTradeIdsFromResults(results: any[]): string[] {
@@ -1554,27 +1570,27 @@ class TradingAnalysisFunctions {
 
     // Handle reference to trade IDs from previous result
     if (value === 'EXTRACT_TRADE_IDS' && lastResult) {
-      return this.extractTradeIds(lastResult);
+      return this._extractTradeIds(lastResult);
     }
 
     // Handle indexed trade ID extraction (e.g., EXTRACT_TRADE_IDS_0)
     if (value.startsWith('EXTRACT_TRADE_IDS_')) {
       const index = parseInt(value.replace('EXTRACT_TRADE_IDS_', ''));
       if (index >= 0 && index < previousResults.length) {
-        return this.extractTradeIds(previousResults[index].result);
+        return this._extractTradeIds(previousResults[index].result);
       }
     }
 
     // Handle reference to trades array from previous result
     if (value === 'EXTRACT_TRADES' && lastResult) {
-      return this.extractTrades(lastResult);
+      return this._extractTrades(lastResult);
     }
 
     // Handle indexed trades extraction (e.g., EXTRACT_TRADES_1)
     if (value.startsWith('EXTRACT_TRADES_')) {
       const index = parseInt(value.replace('EXTRACT_TRADES_', ''));
       if (index >= 0 && index < previousResults.length) {
-        return this.extractTrades(previousResults[index].result);
+        return this._extractTrades(previousResults[index].result);
       }
     }
 
@@ -1861,7 +1877,7 @@ class TradingAnalysisFunctions {
     for (const index of indices) {
       if (index >= 0 && index < previousResults.length) {
         const result = previousResults[index].result;
-        const trades = this.extractTrades(result);
+        const trades = this._extractTrades(result);
         allTrades.push(...trades);
       } else {
         logger.warn(`Invalid index ${index} for merging trades. Available: 0-${previousResults.length - 1}`);
@@ -1894,7 +1910,7 @@ class TradingAnalysisFunctions {
     
     const tradeSets = indices.map(index => {
       if (index >= 0 && index < previousResults.length) {
-        const trades = this.extractTrades(previousResults[index].result);
+        const trades = this._extractTrades(previousResults[index].result);
         const tradeMap = new Map();
         trades.forEach((trade: any) => {
           const id = trade.id || trade.tradeId || trade.trade_id;
@@ -2063,6 +2079,7 @@ class TradingAnalysisFunctions {
 }
 
 export const tradingAnalysisFunctions = new TradingAnalysisFunctions();
+
 
 
 
