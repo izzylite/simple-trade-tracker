@@ -45,6 +45,9 @@ class AIFunctionExecution {
         case 'executeMultipleFunctions':
           return await tradingAnalysisFunctions.executeMultipleFunctions(processedArgs);
 
+        case 'getAvailablePlaceholderPatterns':
+          return await tradingAnalysisFunctions.getAvailablePlaceholderPatterns(processedArgs);
+
         default:
           return {
             success: false,

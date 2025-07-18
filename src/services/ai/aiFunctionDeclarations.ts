@@ -355,7 +355,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     },
     {
       name: 'executeMultipleFunctions',
-      description: 'Execute multiple trading analysis functions in sequence and return the final combined result. This allows combining multiple function calls into a single request instead of calling functions sequentially or concurrently. Functions are executed in the order provided. Use this when you need to perform complex multi-step analysis that involves multiple functions. IMPORTANT: Do NOT use returnCacheKey=true in function arguments - placeholders need actual data, not cache keys.',
+      description: 'Execute multiple trading analysis functions in sequence with automatic result passing between functions. Use this for 2-4 step workflows where each step depends on the previous result. Functions execute in order provided. IMPORTANT: Do NOT use returnCacheKey=true in function arguments - placeholders need actual data, not cache keys.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
@@ -371,7 +371,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
                 },
                 args: {
                   type: SchemaType.OBJECT,
-                  description: 'Arguments to pass to the function. Supports advanced placeholders: "LAST_RESULT" (previous function result), "RESULT_0", "RESULT_1" (specific function by index), "EXTRACT_TRADE_IDS", "EXTRACT_TRADE_IDS_0" (trade IDs from specific result), "EXTRACT_TRADES", "EXTRACT_TRADES_1" (trades array from specific result), "EXTRACT_0.trades.id" (field-specific extraction), "MERGE_TRADE_IDS_0_2" (merge trade IDs from multiple results), "UNIQUE_TRADE_IDS_0_1_2" (unique trade IDs across results), "INTERSECT_TRADE_IDS_0_1" (common trade IDs between results), "MERGE_TRADES_0_1" (merge trade objects), "UNIQUE_TRADES_0_1" (unique trades by ID), "INTERSECT_TRADES_0_1" (common trades), "SLICE_0.trades.0.5" (take first 5 trades), "FILTER_1.trades.type.win" (filter winning trades), "SORT_0.trades.amount.desc" (sort by amount descending).'
+                  description: 'Arguments to pass to the function. Supported placeholder patterns: Core: "LAST_RESULT", "EXTRACT_TRADES", "EXTRACT_TRADE_IDS", "RESULT_{index}". Advanced: "EXTRACT_TRADE_IDS_{index}", "EXTRACT_TRADES_{index}", "EXTRACT_{index}.{field.path}", "MERGE_TRADE_IDS_{index}_{index}", "UNIQUE_TRADE_IDS_{index}_{index}", "INTERSECT_TRADE_IDS_{index}_{index}", "MERGE_TRADES_{index}_{index}", "UNIQUE_TRADES_{index}_{index}", "INTERSECT_TRADES_{index}_{index}", "SLICE_{index}.{field}.{start}.{end}", "FILTER_{index}.{field}.{property}.{value}", "SORT_{index}.{field}.{property}.{asc|desc}". Replace {index} with numbers, {field.path} with dot notation like "trades.id", {property} with field names, {value} with filter values.'
                 },
                 condition: {
                   type: SchemaType.STRING,
@@ -394,6 +394,22 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
           }
         },
         required: ['functions']
+      }
+    },
+    {
+      name: 'getAvailablePlaceholderPatterns',
+      description: 'Get comprehensive documentation of all available placeholder patterns for executeMultipleFunctions. Call this when you need to use advanced placeholders or are unsure about placeholder syntax. This provides complete examples and usage guidance.',
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          category: {
+            type: SchemaType.STRING,
+            enum: ['all', 'core', 'extraction', 'arrays', 'transformations', 'conditions'],
+            description: 'Filter patterns by category. Use "all" to see everything, or specify a category for focused documentation. Categories: core (basic patterns), extraction (field access), arrays (merge/unique/intersect), transformations (slice/filter/sort), conditions (conditional execution).',
+            required: false
+          }
+        },
+        required: []
       }
     }
   ];
