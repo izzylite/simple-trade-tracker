@@ -41,7 +41,7 @@ class FirebaseAIChatService {
       logger.log('Sending message with AI-driven function calling...');
 
       // Initialize trading analysis functions with current data
-      tradingAnalysisFunctions.initialize(trades, calendar, config?.maxContextTrades || 100);
+      tradingAnalysisFunctions.initialize(trades, calendar);
 
       // Prepare messages for function calling
       const messages = this.prepareFunctionCallingMessages(message, conversationHistory);

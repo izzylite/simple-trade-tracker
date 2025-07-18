@@ -16,7 +16,6 @@ export async function findSimilarTrades(
   trades: Trade[],
   calendar: Calendar | null,
   userId: string,
-  maxContextTrades: number,
   params: FindSimilarTradesParams
 ): Promise<TradingAnalysisResult> {
   try {
@@ -34,7 +33,7 @@ export async function findSimilarTrades(
       userId,
       calendar.id,
       {
-        maxResults: params.limit || maxContextTrades,
+        maxResults: params.limit,
         similarityThreshold: 0.3
       }
     );

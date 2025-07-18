@@ -35,16 +35,14 @@ class TradingAnalysisFunctions {
   private trades: Trade[] = [];
   private calendar: Calendar | null = null;
   private userId: string = '';
-  private maxContextTrades = 100;
 
   /**
    * Initialize with current trading data
    */
-  initialize(trades: Trade[], calendar: Calendar, maxContextTrades = 100) {
+  initialize(trades: Trade[], calendar: Calendar) {
     this.trades = trades;
     this.calendar = calendar;
     this.userId = calendar.userId;
-    this.maxContextTrades = maxContextTrades;
   }
 
   /**
@@ -74,7 +72,7 @@ class TradingAnalysisFunctions {
    * Find trades similar to given criteria using vector search
    */
   async findSimilarTrades(params: FindSimilarTradesParams): Promise<TradingAnalysisResult> {
-    return findSimilarTrades(this.trades, this.calendar, this.userId, this.maxContextTrades, params);
+    return findSimilarTrades(this.trades, this.calendar, this.userId, params);
   }
 
   /**

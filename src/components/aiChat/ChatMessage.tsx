@@ -375,7 +375,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           {getStatusIcon()}
 
           {/* Provider Badge */}
-          {isAssistant && message.provider && (
+          {/* {isAssistant && message.provider && (
             <Chip
               label={message.provider.toUpperCase()}
               size="small"
@@ -386,7 +386,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 '& .MuiChip-label': { px: 0.5 }
               }}
             />
-          )}
+          )} */}
 
           {/* Token Count */}
           {showTokenCount && message.tokenCount && (

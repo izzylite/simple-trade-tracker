@@ -68,15 +68,6 @@ export interface AIChatConfig {
   showTokenCount: boolean;
   enableSyntaxHighlighting: boolean;
 
-  // Context settings
-  includeRecentTrades: boolean;
-  includeTagAnalysis: boolean;
-  includeEconomicEvents: boolean;
-  maxContextTrades: number; // Limit for performance
-  includeDetailedTrades: boolean; // Include full trade details
-
-  // Note: Vector search removed - now using keyword-based filtering without limits
-
   // Session settings
   maxSessionHistory: number;
   autoSaveSessions: boolean;
@@ -156,11 +147,6 @@ export const DEFAULT_AI_CHAT_CONFIG: AIChatConfig = {
   autoScroll: true,
   showTokenCount: false,
   enableSyntaxHighlighting: true,
-  includeRecentTrades: true,
-  includeTagAnalysis: true,
-  includeEconomicEvents: true,
-  maxContextTrades: 100,
-  includeDetailedTrades: true,
   maxSessionHistory: 50,
   autoSaveSessions: true,
   sessionRetentionDays: 30

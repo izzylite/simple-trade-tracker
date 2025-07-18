@@ -323,15 +323,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       role: 'assistant',
       content: `👋 Hello! I'm your AI trading analyst. ${contextSummary}I can help you analyze your trading performance, identify patterns, and provide insights to improve your trading.
 
-Here are some things you can ask me:
-• "What are my strongest trading sessions?"
-• "Analyze my recent performance trends"
-• "Which trading strategies work best for me?"
-• "What's my risk management like?"
-• "Show me patterns in my winning trades"
-• "Find trades similar to my best EUR/USD wins"
-• "Show me high risk-reward ratio trades"
-
 💡 I'll analyze your trading data to give you focused and accurate insights!
 
 What would you like to know about your trading?`,
@@ -341,8 +332,51 @@ What would you like to know about your trading?`,
     };
   };
 
-  // Show welcome message if no messages
+  // Question templates for new users
+  const questionTemplates = [
+    {
+      category: "Performance Analysis",
+      questions: [
+        "What's my overall win rate by trading session?",
+        "Show me my monthly performance trends",
+        "Which tags have the highest win rates?"
+      ]
+    },
+    {
+      category: "Pattern Discovery", 
+      questions: [
+        "Find my most profitable trading patterns",
+        "Show me trades similar to my best EUR/USD wins",
+        "Analyze my performance during high-impact news events"
+      ]
+    },
+    {
+      category: "Risk Management",
+      questions: [
+        "What's my average trade size by day of week?",
+        "Show me trades where I violated my risk management rules",
+        "Analyze correlation between trade session and profitability"
+      ]
+    },
+    {
+      category: "Advanced Analysis",
+      questions: [
+        "How does my trading performance vary across different sessions during high-impact economic events?",
+        "Compare my win rate on Mondays vs Fridays for scalping trades",
+        "Show me all my losing breakout trades on Tuesdays in the last 6 months"
+      ]
+    }
+  ];
+
+  const handleTemplateClick = (question: string) => {
+    setInputMessage(question);
+    // Auto-focus the input after setting the question
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  // Show welcome message and templates if no messages
   const displayMessages = messages.length === 0 ? [getWelcomeMessage()] : messages;
+  const showTemplates = messages.length === 0;
 
   return (
     <>
@@ -447,7 +481,6 @@ What would you like to know about your trading?`,
           )}
 
           {/* Messages */}
-
           <Box
             sx={{
               flex: 1,
@@ -485,6 +518,92 @@ What would you like to know about your trading?`,
                 }}
               />
             ))}
+
+            {/* Question Templates - Only show when no conversation started */}
+            {showTemplates && (
+              <Box sx={{ mt: 3 }}>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    mb: 2, 
+                    color: 'text.primary',
+                    fontWeight: 600
+                  }}
+                >
+                  💡 Try these questions:
+                </Typography>
+                
+                {questionTemplates.map((category, categoryIndex) => (
+                  <Box key={categoryIndex} sx={{ mb: 3 }}>
+                    <Typography 
+                      variant="subtitle2" 
+                      sx={{ 
+                        mb: 1.5,
+                        color: 'primary.main',
+                        fontWeight: 600,
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      {category.category}
+                    </Typography>
+                    
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: 1 
+                    }}>
+                      {category.questions.map((question, questionIndex) => (
+                        <Button
+                          key={questionIndex}
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleTemplateClick(question)}
+                          sx={{
+                            justifyContent: 'flex-start',
+                            textAlign: 'left',
+                            py: 1.5,
+                            px: 2,
+                            borderRadius: 2,
+                            textTransform: 'none',
+                            fontSize: '0.875rem',
+                            lineHeight: 1.4,
+                            borderColor: alpha(theme.palette.primary.main, 0.3),
+                            backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                            '&:hover': {
+                              borderColor: 'primary.main',
+                              backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                              transform: 'translateY(-1px)',
+                              boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.2)}`
+                            },
+                            transition: 'all 0.2s ease-in-out'
+                          }}
+                        >
+                          {question}
+                        </Button>
+                      ))}
+                    </Box>
+                  </Box>
+                ))}
+                
+                <Box sx={{ 
+                  mt: 3,
+                  mb: 2, 
+                  p: 2,
+                  backgroundColor: alpha(theme.palette.info.main, 0.08),
+                  borderRadius: 2,
+                  border: '1px solid',
+                  borderColor: alpha(theme.palette.info.main, 0.2)
+                }}>
+                  <Typography 
+                    variant="body2" 
+                    color="info.main"
+                    sx={{ fontWeight: 500 }}
+                  >
+                    💡 Pro Tip: You can ask complex questions like "I've been struggling with my breakout strategy on Tuesdays. Can you show me all my losing trades tagged 'breakout' that occurred on a Tuesday in the last 6 months, and analyze if there were any specific economic events or market conditions that contributed to these losses?" - I'll analyze your data and provide detailed insights!
+                  </Typography>
+                </Box>
+              </Box>
+            )}
 
             {/* Typing Indicator */}
             {isTyping && (

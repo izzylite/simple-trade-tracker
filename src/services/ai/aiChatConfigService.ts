@@ -33,7 +33,6 @@ class AIChatConfigService {
       };
 
       // Validate ranges and constraints
-      config.maxContextTrades = Math.max(10, Math.min(500, config.maxContextTrades));
       config.maxSessionHistory = Math.max(5, Math.min(200, config.maxSessionHistory));
       config.sessionRetentionDays = Math.max(1, Math.min(365, config.sessionRetentionDays));
 
@@ -92,7 +91,6 @@ class AIChatConfigService {
     const validated = { ...config };
 
     // Validate numeric ranges
-    validated.maxContextTrades = Math.max(10, Math.min(500, validated.maxContextTrades));
     validated.maxSessionHistory = Math.max(5, Math.min(200, validated.maxSessionHistory));
     validated.sessionRetentionDays = Math.max(1, Math.min(365, validated.sessionRetentionDays));
 
@@ -100,10 +98,6 @@ class AIChatConfigService {
     validated.autoScroll = Boolean(validated.autoScroll);
     validated.showTokenCount = Boolean(validated.showTokenCount);
     validated.enableSyntaxHighlighting = Boolean(validated.enableSyntaxHighlighting);
-    validated.includeRecentTrades = Boolean(validated.includeRecentTrades);
-    validated.includeTagAnalysis = Boolean(validated.includeTagAnalysis);
-    validated.includeEconomicEvents = Boolean(validated.includeEconomicEvents);
-    validated.includeDetailedTrades = Boolean(validated.includeDetailedTrades);
     validated.autoSaveSessions = Boolean(validated.autoSaveSessions);
 
     return validated;
@@ -118,14 +112,6 @@ class AIChatConfigService {
 
   shouldAutoScroll(): boolean {
     return this.config.autoScroll;
-  }
-
-  shouldIncludeDetailedTrades(): boolean {
-    return this.config.includeDetailedTrades;
-  }
-
-  getMaxContextTrades(): number {
-    return this.config.maxContextTrades;
   }
 
   shouldAutoSaveSessions(): boolean {
@@ -159,21 +145,18 @@ class AIChatConfigService {
   getConfigSummary(): {
     provider: string;
     model: string;
-    maxTrades: number;
     features: string[];
   } {
     const features: string[] = [];
-    
-    if (this.config.includeDetailedTrades) features.push('Detailed Trades');
-    if (this.config.includeTagAnalysis) features.push('Tag Analysis');
-    if (this.config.includeEconomicEvents) features.push('Economic Events');
+
     if (this.config.showTokenCount) features.push('Token Count');
     if (this.config.autoSaveSessions) features.push('Auto-save Sessions');
+    if (this.config.enableSyntaxHighlighting) features.push('Syntax Highlighting');
+    if (this.config.autoScroll) features.push('Auto-scroll');
 
     return {
       provider: this.config.defaultProvider.toUpperCase(),
       model: this.config.defaultModel,
-      maxTrades: this.config.maxContextTrades,
       features
     };
   }
@@ -191,11 +174,6 @@ class AIChatConfigService {
       current.autoScroll !== defaults.autoScroll ||
       current.showTokenCount !== defaults.showTokenCount ||
       current.enableSyntaxHighlighting !== defaults.enableSyntaxHighlighting ||
-      current.includeRecentTrades !== defaults.includeRecentTrades ||
-      current.includeTagAnalysis !== defaults.includeTagAnalysis ||
-      current.includeEconomicEvents !== defaults.includeEconomicEvents ||
-      current.includeDetailedTrades !== defaults.includeDetailedTrades ||
-      current.maxContextTrades !== defaults.maxContextTrades ||
       current.maxSessionHistory !== defaults.maxSessionHistory ||
       current.autoSaveSessions !== defaults.autoSaveSessions ||
       current.sessionRetentionDays !== defaults.sessionRetentionDays
@@ -214,34 +192,23 @@ class AIChatConfigService {
     const recommendations: string[] = [];
     let score = 0;
 
-    if (this.config.includeDetailedTrades) {
-      score += 3;
-      factors.push('Detailed trade information');
-    }
-
-    if (this.config.maxContextTrades > 200) {
-      score += 2;
-      factors.push('High trade count limit');
-      recommendations.push('Consider reducing max trades for better performance');
-    }
-
-    if (this.config.includeEconomicEvents) {
+    if (this.config.maxSessionHistory > 100) {
       score += 1;
-      factors.push('Economic events analysis');
+      factors.push('Large session history');
+      recommendations.push('Consider reducing session history for better performance');
     }
 
-    if (this.config.includeTagAnalysis) {
+    if (this.config.enableSyntaxHighlighting) {
       score += 1;
-      factors.push('Tag analysis');
+      factors.push('Syntax highlighting enabled');
     }
 
     if (score === 0) {
+      factors.push('Minimal configuration');
       recommendations.push('Current settings are optimized for performance');
-    } else if (score > 5) {
-      recommendations.push('Consider disabling some features for faster responses');
     }
 
-    const level = score <= 2 ? 'low' : score <= 5 ? 'medium' : 'high';
+    const level = score <= 1 ? 'low' : score <= 2 ? 'medium' : 'high';
 
     return { level, factors, recommendations };
   }
