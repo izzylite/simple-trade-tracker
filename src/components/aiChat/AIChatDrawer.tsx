@@ -146,8 +146,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         trades,
         calendar,
         messages,
-        modelSettings,
-        chatConfig
+        modelSettings
       );
 
       const functionCalls = response.functionCalls || [];
@@ -257,8 +256,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         trades,
         calendar,
         conversationHistory,
-        modelSettings,
-        chatConfig
+        modelSettings, 
       );
 
 

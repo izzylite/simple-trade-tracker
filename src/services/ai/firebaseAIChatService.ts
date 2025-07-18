@@ -34,8 +34,7 @@ class FirebaseAIChatService {
     trades: Trade[],
     calendar: Calendar,
     conversationHistory: ChatMessage[] = [],
-    modelSettings?: AIModelSettings,
-    config?: AIChatConfig
+    modelSettings?: AIModelSettings, 
   ): Promise<{ response: string; tokenCount?: number; functionCalls?: any[] }> {
     try {
       logger.log('Sending message with AI-driven function calling...');
