@@ -84,8 +84,11 @@ Call functions one at a time using cache keys from previous results.
 
 **IMPORTANT:** Use exact cache key strings, never placeholders like "LAST_RESULT" in sequential calling.
 
-## Advanced Placeholder Discovery:
-If you need to use advanced placeholders or are unsure about placeholder syntax, call getAvailablePlaceholderPatterns() first. This function provides comprehensive documentation with examples and usage guidance for all available placeholder patterns.
+## Data Structure Discovery:
+- **For placeholder patterns**: Call getAvailablePlaceholderPatterns() when you need advanced placeholder syntax for executeMultipleFunctions
+- **For data structures**: Call getDataStructureInfo() when you need to understand trade data fields, database schema, or query structure before calling other functions
+
+These discovery functions help you make informed decisions about data access and reduce token usage by providing information only when needed.
 
 ## Analysis Approach:
 1. Gather relevant data using appropriate functions

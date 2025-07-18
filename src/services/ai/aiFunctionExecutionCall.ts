@@ -48,6 +48,9 @@ class AIFunctionExecution {
         case 'getAvailablePlaceholderPatterns':
           return await tradingAnalysisFunctions.getAvailablePlaceholderPatterns(processedArgs);
 
+        case 'getDataStructureInfo':
+          return await tradingAnalysisFunctions.getDataStructureInfo(processedArgs);
+
         default:
           return {
             success: false,

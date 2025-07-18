@@ -301,39 +301,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     },
     {
       name: 'queryDatabase',
-      description: `
-      Execute a SQL SELECT query against the Supabase database to retrieve specific trading data, perform complex aggregations, or access database views. Automatically filters results to user\'s data for security. Use this for complex queries that cannot be handled by other functions.
-      Main Table: trade_embeddings. Use this table for all queries and aggregations
-
-      DATABASE SCHEMA:
-      - id: UUID (primary key)
-      - trade_id: TEXT (unique trade identifier)
-      - user_id: TEXT (user identifier)
-      - calendar_id: TEXT (calendar identifier)
-      - trade_type: TEXT ('win', 'loss', 'breakeven')
-      - trade_amount: DECIMAL (profit/loss amount)
-      - trade_date: BIGINT (Unix timestamp in milliseconds when trade occurred)
-      - trade_updated_at: BIGINT (Unix timestamp in milliseconds when trade was last modified)
-      - trade_session: TEXT ('Asia', 'London', 'NY AM', 'NY PM' or NULL)
-      - tags: TEXT[] (array of tag strings)
-      - economic_events: JSONB (array of economic events that occurred during the trade)
-      - embedding: vector(384) (vector embedding for similarity search)
-      - embedded_content: TEXT (text content that was embedded which includes additional trade properties such as risk-to-reward, entry/exit prices, partials taken, trade name, notes, and economic events)
-      
-
-      Common SQL Patterns:
-      - Day of week: EXTRACT(DOW FROM trade_date) (0=Sunday, 1=Monday, etc.)
-      - Month grouping: DATE_TRUNC('month', trade_date) or TO_CHAR(trade_date, 'YYYY-MM')
-      - Tag filtering: 'tag_name' = ANY(tags) or tags @> ARRAY['tag_name']
-      - Date ranges: trade_date >= NOW() - INTERVAL '6 months'
-      - Risk-to-reward filtering: embedded_content ILIKE '%risk reward ratio 2%' (for ratio above 2:1)
-      - Entry/exit price search: embedded_content ILIKE '%entry 1.23%' or embedded_content ILIKE '%exit 1.24%'
-      - Partials taken: embedded_content ILIKE '%partials taken%'
-      - Trade name search: embedded_content ILIKE '%name EUR/USD%'
-      - Economic events: embedded_content ILIKE '%economic events%' or embedded_content ILIKE '%Non-Farm Payrolls%'
-      - High impact events: embedded_content ILIKE '%high USD%' or embedded_content ILIKE '%high EUR%'
-      - Specific events: embedded_content ILIKE '%FOMC%' or embedded_content ILIKE '%NFP%'
-`,
+      description: 'Execute a SQL SELECT query against the Supabase database to retrieve specific trading data, perform complex aggregations, or access database views. Automatically filters results to user data for security. Use this for complex queries that cannot be handled by other functions. Call getDataStructureInfo({type: "database", context: "filtering"}) first to understand the database schema and query patterns.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
@@ -406,6 +374,34 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
             type: SchemaType.STRING,
             enum: ['all', 'core', 'extraction', 'arrays', 'transformations', 'conditions'],
             description: 'Filter patterns by category. Use "all" to see everything, or specify a category for focused documentation. Categories: core (basic patterns), extraction (field access), arrays (merge/unique/intersect), transformations (slice/filter/sort), conditions (conditional execution).',
+            required: false
+          }
+        },
+        required: []
+      }
+    },
+    {
+      name: 'getDataStructureInfo',
+      description: 'Get comprehensive documentation of data structures and database schema. Call this when you need to understand trade data fields, database tables, or query structure before calling other functions. Helps with informed decision-making about data access and filtering.',
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          type: {
+            type: SchemaType.STRING,
+            enum: ['trade', 'database', 'economic', 'all'],
+            description: 'Type of data structure to get info about. "trade" for Trade interface fields, "database" for Supabase schema, "economic" for economic calendar data, "all" for everything.',
+            required: false
+          },
+          detail: {
+            type: SchemaType.STRING,
+            enum: ['basic', 'full', 'fields-only'],
+            description: 'Level of detail to return. "basic" for essential info, "full" for comprehensive details, "fields-only" for just field definitions.',
+            required: false
+          },
+          context: {
+            type: SchemaType.STRING,
+            enum: ['filtering', 'aggregation', 'joins', 'performance', 'examples'],
+            description: 'Specific context for the information. Provides relevant examples and patterns for the use case.',
             required: false
           }
         },
