@@ -26,7 +26,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import UnifiedDrawer from '../common/UnifiedDrawer';
 import ChatMessage from './ChatMessage';
-import AIChatSettingsDialog from './AIChatSettingsDialogSimplified';
+import AIChatSettingsDialog from './AIChatSettingsDialog';
 import {
   ChatMessage as ChatMessageType,
   AIProvider,

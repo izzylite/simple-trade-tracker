@@ -7,7 +7,8 @@ import { Calendar } from '../../../types/calendar';
 import { logger } from '../../../utils/logger';
 import { vectorSearchService } from '../vectorSearchService';
 import { FindSimilarTradesParams, TradingAnalysisResult } from './types';
-import { handleCacheKeyResult, simpleTradeData } from './utils';
+import { handleCacheKeyResult } from './utils';
+import { filterTradeFields } from './dataConversion';
 
 /**
  * Find trades similar to given criteria using vector search
@@ -44,11 +45,15 @@ export async function findSimilarTrades(
 
     logger.log(`Found ${actualTrades.length} actual trades from vector search results`);
 
+    // Apply field filtering based on request
+    const tradesData = filterTradeFields(actualTrades, params.fields, false);
+
     const resultData = {
-      trades: simpleTradeData(actualTrades),
+      trades: tradesData,
       searchResults: similarTrades,
       count: actualTrades.length,
-      query: params.query
+      query: params.query,
+      includedFields: params.fields || ['default']
     };
 
     return handleCacheKeyResult('findSimilarTrades', resultData, params.returnCacheKey, resultData.trades);

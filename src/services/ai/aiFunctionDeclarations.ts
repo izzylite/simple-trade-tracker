@@ -13,13 +13,21 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
   return [
     {
       name: 'searchTrades',
-      description: 'Search and filter trades based on specific criteria such as date ranges, trade outcomes, profit/loss amounts, tags, trading sessions, days of the week, or economic events. Can filter by economic event presence, impact level, currency, or event names. Returns matching trades with summary statistics including total P&L and win rate.',
+      description: 'Search and filter trades based on specific criteria such as date ranges, trade outcomes, profit/loss amounts, tags, trading sessions, days of the week, or economic events. Can filter by economic event presence, impact level, currency, or event names. Returns matching trades with summary statistics including total P&L and win rate. Call getDataStructureInfo({type: "trade", detail: "fields-only"}) to see available trade fields for selective data extraction.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
           returnCacheKey: {
             type: SchemaType.BOOLEAN,
             description: 'Set to true if you plan to call additional functions with this result (like extractTradeIds, getTradeStatistics). When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
+          fields: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.STRING,
+              enum: ['id', 'name', 'date', 'type', 'amount', 'entry', 'exit', 'riskToReward', 'session', 'tags', 'notes', 'partialsTaken', 'economicEvents', 'images', 'all']
+            },
+            description: 'Specific trade fields to include in results. Use "all" for complete trade data, or specify individual fields like ["id", "name", "amount", "type"] to reduce token usage and improve performance. Common combinations: ["id", "amount", "type"] for basic analysis, ["id", "name", "date", "amount", "riskToReward"] for performance analysis, ["id", "tags", "session", "economicEvents"] for pattern analysis. Defaults to essential fields if not specified.'
           },
           dateRange: {
             type: SchemaType.STRING,
@@ -120,13 +128,21 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     },
     {
       name: 'findSimilarTrades',
-      description: `Find trades similar to a natural language query using semantic vector search. Searches through trade notes, descriptions, and metadata to find conceptually similar trades based on trading patterns, market conditions, strategies, or outcomes described in natural language. For finding similar trades or contextual analysis: Use findSimilarTrades (analyze results to answer user's question)`,
+      description: `Find trades similar to a natural language query using semantic vector search. Searches through trade notes, descriptions, and metadata to find conceptually similar trades based on trading patterns, market conditions, strategies, or outcomes described in natural language. For finding similar trades or contextual analysis: Use findSimilarTrades (analyze results to answer user's question). Call getDataStructureInfo({type: "trade", detail: "fields-only"}) to see available trade fields for selective data extraction.`,
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
           returnCacheKey: {
             type: SchemaType.BOOLEAN,
             description: 'Set to true if you plan to call additional functions with this result (like extractTradeIds, getTradeStatistics). When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
+          fields: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.STRING,
+              enum: ['id', 'name', 'date', 'type', 'amount', 'entry', 'exit', 'riskToReward', 'session', 'tags', 'notes', 'partialsTaken', 'economicEvents', 'images', 'all']
+            },
+            description: 'Specific trade fields to include in results. Use "all" for complete trade data, or specify individual fields like ["id", "name", "amount", "type"] to reduce token usage and improve performance. Common combinations: ["id", "amount", "type"] for basic analysis, ["id", "name", "date", "amount", "riskToReward"] for performance analysis, ["id", "tags", "session", "economicEvents"] for pattern analysis. Defaults to essential fields if not specified.'
           },
           query: {
             type: SchemaType.STRING,
@@ -177,13 +193,21 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     },
     {
       name: 'fetchEconomicEvents',
-      description: 'Fetch upcoming or historical economic events from Firebase database. Only fetches High and Medium impact events to reduce costs and focus on market-relevant events. Can filter by date range, currency, and impact level. Uses pagination to limit Firebase reads for cost efficiency (default limit: 50, max: 100). Useful for answering questions about upcoming high-impact events, specific currency events, or events in a particular time period.',
+      description: 'Fetch upcoming or historical economic events from Firebase database. Only fetches High and Medium impact events to reduce costs and focus on market-relevant events. Can filter by date range, currency, and impact level. Uses pagination to limit Firebase reads for cost efficiency (default limit: 50, max: 100). Useful for answering questions about upcoming high-impact events, specific currency events, or events in a particular time period. Call getDataStructureInfo({type: "economic", detail: "fields-only"}) to see available economic event fields for selective data extraction.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
           returnCacheKey: {
             type: SchemaType.BOOLEAN,
             description: 'Set to true if you plan to call additional functions with this result. When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
+          fields: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.STRING,
+              enum: ['id', 'currency', 'event', 'impact', 'timeUtc', 'date', 'flagCode', 'time', 'actual', 'forecast', 'previous', 'all']
+            },
+            description: 'Specific economic event fields to include in results. Use "all" for complete event data, or specify individual fields like ["currency", "event", "impact", "timeUtc"] to reduce token usage and improve performance. Common combinations: ["currency", "event", "impact", "timeUtc"] for basic event info, ["currency", "event", "impact", "actual", "forecast", "previous"] for detailed analysis, ["id", "currency", "event", "timeUtc"] for event identification. Defaults to essential fields if not specified.'
           },
           startDate: {
             type: SchemaType.STRING,
@@ -268,7 +292,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     },
     {
       name: 'convertTradeIdsToData',
-      description: 'Convert a list of trade IDs to full trade data objects for detailed analysis. Returns complete trade information including all fields needed for comprehensive analysis. Use this when you need to analyze the actual trade data from a single trade or after function chaining operations.',
+      description: 'Convert a list of trade IDs to full trade data objects for detailed analysis. Returns complete trade information including all fields needed for comprehensive analysis. Use this when you need to analyze the actual trade data from a single trade or after function chaining operations. Call getDataStructureInfo({type: "trade", detail: "fields-only"}) to see available trade fields for selective data extraction.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
@@ -301,13 +325,21 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     },
     {
       name: 'queryDatabase',
-      description: 'Execute a SQL SELECT query against the Supabase database to retrieve specific trading data, perform complex aggregations, or access database views. Automatically filters results to user data for security. Use this for complex queries that cannot be handled by other functions. Call getDataStructureInfo({type: "database", context: "filtering"}) first to understand the database schema and query patterns.',
+      description: 'Execute a SQL SELECT query against the Supabase database to retrieve specific trading data, perform complex aggregations, or access database views. Automatically filters results to user data for security. Use this for complex queries that cannot be handled by other functions. Call getDataStructureInfo({type: "database", context: "filtering"}) first to understand the database schema and query patterns. When trade data is extracted from results, field filtering is applied for efficient data extraction.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
           returnCacheKey: {
             type: SchemaType.BOOLEAN,
             description: 'Set to true if you plan to call additional functions with this result. When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
+          fields: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.STRING,
+              enum: ['id', 'name', 'date', 'type', 'amount', 'entry', 'exit', 'riskToReward', 'session', 'tags', 'notes', 'partialsTaken', 'economicEvents', 'images', 'all']
+            },
+            description: 'Specific trade fields to include when trade data is extracted from query results. Use "all" for complete trade data, or specify individual fields like ["id", "name", "amount", "type"] to reduce token usage. Only applies when the query results contain trade IDs that can be matched to actual trade objects. Common combinations: ["id", "amount", "type"] for basic analysis, ["id", "name", "date", "amount", "riskToReward"] for performance analysis, ["id", "tags", "session", "economicEvents"] for pattern analysis.'
           },
           query: {
             type: SchemaType.STRING,

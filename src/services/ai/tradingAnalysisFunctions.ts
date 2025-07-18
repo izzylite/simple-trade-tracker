@@ -5,7 +5,7 @@
 
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
-import { ExecuteMultipleFunctionsParams } from './multiFunctionExecutor';
+import { ExecuteMultipleFunctionsParams } from './functions/multiFunctionExecutor';
 import {
   TradingAnalysisResult,
   SearchTradesParams,

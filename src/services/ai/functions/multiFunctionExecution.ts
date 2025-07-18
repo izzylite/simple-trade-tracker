@@ -4,7 +4,7 @@
 
 import { Trade } from '../../../types/trade';
 import { logger } from '../../../utils/logger';
-import { ExecuteMultipleFunctionsParams, MultiFunctionExecutor } from '../multiFunctionExecutor';
+import { ExecuteMultipleFunctionsParams, MultiFunctionExecutor } from './multiFunctionExecutor';
 import { TradingAnalysisResult } from './types';
 
 /**

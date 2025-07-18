@@ -9,14 +9,15 @@ import { economicCalendarService } from '../../economicCalendarService';
 import { Currency, ImpactLevel } from '../../../types/economicCalendar';
 import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../../../components/economicCalendar/EconomicCalendarDrawer';
 import { AnalyzeEconomicEventsParams, FetchEconomicEventsParams, TradingAnalysisResult } from './types';
-import { 
-  handleCacheKeyResult, 
-  simpleTradeData, 
-  calculateWinRate, 
-  parseDateRange, 
-  parseDateRangeForEvents 
+import {
+  handleCacheKeyResult,
+  simpleTradeData,
+  calculateWinRate,
+  parseDateRange,
+  parseDateRangeForEvents
 } from './utils';
 import { calculateEconomicEventStats } from './getTradeStatistics';
+import { filterEconomicEventFields } from './dataConversion';
 
 /**
  * Analyze economic events correlation with trading performance
@@ -207,8 +208,11 @@ export async function fetchEconomicEvents(
       return timeA - timeB;
     });
 
+    // Apply field filtering based on request
+    const eventsData = filterEconomicEventFields(limitedEvents, params.fields);
+
     const resultData = {
-      events: limitedEvents,
+      events: eventsData,
       count: limitedEvents.length,
       hasMore: paginatedResult.hasMore,
       limitApplied: effectiveLimit,
@@ -219,11 +223,12 @@ export async function fetchEconomicEvents(
       filters: {
         currency: params.currency || 'all',
         impact: params.impact || 'all'
-      }
+      },
+      includedFields: params.fields || ['all']
     };
 
     // No trade IDs for economic events
-    return handleCacheKeyResult('fetchEconomicEvents', resultData, params.returnCacheKey, limitedEvents);
+    return handleCacheKeyResult('fetchEconomicEvents', resultData, params.returnCacheKey, eventsData);
 
   } catch (error) {
     logger.error('Error in fetchEconomicEvents:', error);

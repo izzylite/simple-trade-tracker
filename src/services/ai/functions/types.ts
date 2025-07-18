@@ -10,6 +10,7 @@ export interface TradingAnalysisResult {
 
 export interface SearchTradesParams {
   returnCacheKey?: boolean;
+  fields?: string[];
   dateRange?: string;
   tradeType?: 'win' | 'loss' | 'breakeven' | 'all';
   minAmount?: number;
@@ -38,12 +39,14 @@ export interface GetStatisticsParams {
 
 export interface FindSimilarTradesParams {
   returnCacheKey?: boolean;
+  fields?: string[];
   query: string;
   limit?: number;
 }
 
 export interface QueryDatabaseParams {
   returnCacheKey?: boolean;
+  fields?: string[];
   query: string;
   description?: string;
 }
@@ -59,6 +62,7 @@ export interface AnalyzeEconomicEventsParams {
 
 export interface FetchEconomicEventsParams {
   returnCacheKey?: boolean;
+  fields?: string[];
   startDate?: string; // Unix timestamp in milliseconds or date string
   endDate?: string; // Unix timestamp in milliseconds or date string
   currency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'NZD' | 'all';

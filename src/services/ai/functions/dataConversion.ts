@@ -15,7 +15,7 @@ import { handleCacheKeyResult, simpleTradeData, calculateWinRate } from './utils
 /**
  * Filter trade fields based on requested fields
  */
-function filterTradeFields(trades: Trade[], fields?: string[], includeImages?: boolean): any[] {
+export function filterTradeFields(trades: Trade[], fields?: string[], includeImages?: boolean): any[] {
   if (!fields || fields.includes('all')) {
     return includeImages ? trades : simpleTradeData(trades);
   }
@@ -73,6 +73,59 @@ function filterTradeFields(trades: Trade[], fields?: string[], includeImages?: b
     });
 
     return filteredTrade;
+  });
+}
+
+/**
+ * Filter economic event fields based on requested fields
+ */
+export function filterEconomicEventFields(events: any[], fields?: string[]): any[] {
+  if (!fields || fields.includes('all')) {
+    return events;
+  }
+
+  return events.map(event => {
+    const filteredEvent: any = {};
+
+    fields.forEach(field => {
+      switch (field) {
+        case 'id':
+          filteredEvent.id = event.id;
+          break;
+        case 'currency':
+          filteredEvent.currency = event.currency;
+          break;
+        case 'event':
+          filteredEvent.event = event.event;
+          break;
+        case 'impact':
+          filteredEvent.impact = event.impact;
+          break;
+        case 'timeUtc':
+          filteredEvent.timeUtc = event.timeUtc;
+          break;
+        case 'date':
+          filteredEvent.date = event.date;
+          break;
+        case 'flagCode':
+          filteredEvent.flagCode = event.flagCode;
+          break;
+        case 'time':
+          filteredEvent.time = event.time;
+          break;
+        case 'actual':
+          filteredEvent.actual = event.actual;
+          break;
+        case 'forecast':
+          filteredEvent.forecast = event.forecast;
+          break;
+        case 'previous':
+          filteredEvent.previous = event.previous;
+          break;
+      }
+    });
+
+    return filteredEvent;
   });
 }
 

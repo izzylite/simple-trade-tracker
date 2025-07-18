@@ -8,6 +8,7 @@ import { logger } from '../../../utils/logger';
 import { supabase } from '../../../config/supabase';
 import { QueryDatabaseParams, TradingAnalysisResult } from './types';
 import { handleCacheKeyResult, simpleTradeData, calculateWinRate, extractTradeIdsFromResults } from './utils';
+import { filterTradeFields } from './dataConversion';
 
 /**
  * Execute a SQL query against the Supabase database
@@ -107,11 +108,14 @@ export async function queryDatabase(
 
     // Try to extract trade IDs from results and fetch corresponding trades
     let tradesData: Trade[] = [];
+    let filteredTradesData: any[] = [];
     if (Array.isArray(results) && results.length > 0) {
       logger.log(`Found ${results.length} results from query, attempting to extract trade IDs`);
       const tradeIds = extractTradeIdsFromResults(results);
       if (tradeIds.length > 0) {
         tradesData = trades.filter(trade => tradeIds.includes(trade.id));
+        // Apply field filtering based on request
+        filteredTradesData = filterTradeFields(tradesData, params.fields, false);
       }
     }
 
@@ -122,13 +126,14 @@ export async function queryDatabase(
       query: finalQuery,
       description: params.description,
       rowCount: rowCount,
-      trades: simpleTradeData(tradesData),
+      trades: filteredTradesData.length > 0 ? filteredTradesData : simpleTradeData(tradesData),
       count: tradesData.length,
       totalPnl: tradesData.reduce((sum, trade) => sum + trade.amount, 0),
-      winRate: calculateWinRate(tradesData)
+      winRate: calculateWinRate(tradesData),
+      includedFields: params.fields || ['default']
     };
 
-    return handleCacheKeyResult('queryDatabase', resultData, params.returnCacheKey, tradesData);
+    return handleCacheKeyResult('queryDatabase', resultData, params.returnCacheKey, filteredTradesData.length > 0 ? filteredTradesData : tradesData);
 
   } catch (error) {
     logger.error('Error in queryDatabase:', error);

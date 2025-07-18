@@ -7,6 +7,7 @@ import { logger } from '../../../utils/logger';
 import { isTradeInSession, getSessionMappings } from '../../../utils/sessionTimeUtils';
 import { SearchTradesParams, TradingAnalysisResult } from './types';
 import { handleCacheKeyResult, simpleTradeData, calculateWinRate, parseDateRange } from './utils';
+import { filterTradeFields } from './dataConversion';
 
 /**
  * Search for trades based on criteria
@@ -168,11 +169,15 @@ export async function searchTrades(
       filteredTrades = filteredTrades.slice(0, params.limit);
     }
 
+    // Apply field filtering based on request
+    const tradesData = filterTradeFields(filteredTrades, params.fields, false);
+
     const resultData = {
-      trades: simpleTradeData(filteredTrades),
+      trades: tradesData,
       count: filteredTrades.length,
       totalPnl: filteredTrades.reduce((sum, trade) => sum + trade.amount, 0),
-      winRate: calculateWinRate(filteredTrades)
+      winRate: calculateWinRate(filteredTrades),
+      includedFields: params.fields || ['default']
     };
 
     return handleCacheKeyResult('searchTrades', resultData, params.returnCacheKey, resultData.trades);
