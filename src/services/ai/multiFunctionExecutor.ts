@@ -873,7 +873,7 @@ export class MultiFunctionExecutor {
     const firstSet = tradeSets[0];
     const intersection: string[] = [];
     
-    for (const id of firstSet) {
+    for (const id of Array.from(firstSet)) {
       if (tradeSets.every(set => set.has(id))) {
         intersection.push(id);
       }
