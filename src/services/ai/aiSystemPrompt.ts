@@ -27,7 +27,20 @@ export function getSystemPrompt(): string {
 - Provide clear recommendations based on data patterns you discover
 
 ## Displaying Trades and Events:
-When you want to show specific trades or economic events to the user, include a simple JSON structure at the end of your response:
+You have two ways to reference trades and economic events in your responses:
+
+### 1. Inline References (Preferred for Natural Conversation):
+Reference trades and events directly within your text using this format:
+- **For trades**: \`trade_id:actual-trade-id-here\`
+- **For events**: \`event_id:actual-event-id-here\`
+
+**Example:**
+"I notice trade_id:abc-123-def-456 had significant impact during the NFP release event_id:xyz-789-ghi-012. This pattern suggests..."
+
+The UI will automatically replace these references with interactive cards inline with your text, creating a more natural conversational experience.
+
+### 2. JSON Structure (For Lists at End of Response):
+When you want to show multiple trades or events as a list at the end of your response:
 
 **For individual trades or events:**
 [{"type": "trade", "id": "trade-id-here"}]
@@ -40,7 +53,11 @@ When you want to show specific trades or economic events to the user, include a 
   {"type": "event", "id": "event-id-1"}
 ]
 
-The UI will automatically detect this JSON and display the corresponding trade cards or event details. Only include this JSON when you specifically want to highlight individual trades or events for the user to examine in detail.
+### When to Use Each Method:
+- **Use inline references** when discussing specific trades/events as part of your analysis narrative
+- **Use JSON lists** when providing a summary list of multiple related items at the end of your response
+
+Both methods will display interactive cards, but inline references create a more natural reading experience.
 
 ## Function Calling Approach:
 You have access to powerful analysis functions that you should use strategically to gather comprehensive data before providing insights. Chain multiple function calls naturally when needed for thorough analysis. The system handles all function execution - focus on selecting the right functions and interpreting results meaningfully.

@@ -18,6 +18,8 @@ import {
 } from '@mui/material';
 import AnimatedText from './AnimatedText';
 import DisplayItemsList from './DisplayItemsList';
+import TradeCard from './TradeCard';
+import EventCard from './EventCard';
 import {
   Person as PersonIcon,
   SmartToy as AIIcon,
@@ -32,7 +34,7 @@ import { Trade } from '../../types/trade';
 import { EconomicEvent } from '../../types/economicCalendar';
 import { format } from 'date-fns';
 import { logger } from '../../utils/logger';
-import { parseAIResponse } from '../../utils/aiResponseParser';
+import { parseAIResponse, InlineReference } from '../../utils/aiResponseParser';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -126,7 +128,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const formatContent = (content: string) => {
     // Split content by code blocks
     const parts = content.split(/(```[\s\S]*?```|`[^`]+`)/);
-    
+
     return parts.map((part, index) => {
       // Code blocks
       if (part.startsWith('```') && part.endsWith('```')) {
@@ -134,7 +136,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         const lines = code.split('\n');
         const language = lines[0]?.match(/^[a-zA-Z]+$/) ? lines.shift() : '';
         const codeContent = lines.join('\n');
-        
+
         return (
           <Paper
             key={index}
@@ -149,10 +151,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             }}
           >
             {language && (
-              <Chip 
-                label={language} 
-                size="small" 
-                sx={{ mb: 1, fontSize: '0.75rem' }} 
+              <Chip
+                label={language}
+                size="small"
+                sx={{ mb: 1, fontSize: '0.75rem' }}
               />
             )}
             <Typography
@@ -169,7 +171,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           </Paper>
         );
       }
-      
+
       // Inline code
       if (part.startsWith('`') && part.endsWith('`')) {
         return (
@@ -188,7 +190,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           </Box>
         );
       }
-      
+
       // Regular text with line breaks
       return (
         <Typography
@@ -203,6 +205,68 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         </Typography>
       );
     });
+  };
+
+  // Format content with inline references replaced by cards
+  const formatContentWithInlineReferences = (content: string, inlineReferences: InlineReference[]) => {
+    if (!inlineReferences || inlineReferences.length === 0) {
+      return formatContent(content);
+    }
+
+    // Sort references by start index in reverse order to replace from end to start
+    const sortedRefs = [...inlineReferences].sort((a, b) => b.startIndex - a.startIndex);
+
+    // Split content into segments and replace inline references with cards
+    const segments: React.ReactNode[] = [];
+    let lastIndex = content.length;
+
+    for (const ref of sortedRefs) {
+      // Add text after this reference
+      if (lastIndex > ref.endIndex) {
+        const textAfter = content.slice(ref.endIndex, lastIndex);
+        if (textAfter) {
+          segments.unshift(...formatContent(textAfter));
+        }
+      }
+
+      // Add the card for this reference
+      if (ref.type === 'trade' && allTrades) {
+        const trade = allTrades.find(t => t.id === ref.id);
+        if (trade) {
+          segments.unshift(
+            <Box key={`trade-${ref.id}-${ref.startIndex}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
+              <TradeCard
+                trade={trade}
+                onClick={() => onTradeClick?.(trade.id, allTrades)}
+                compact={true}
+              />
+            </Box>
+          );
+        }
+      } else if (ref.type === 'event') {
+        segments.unshift(
+          <Box key={`event-${ref.id}-${ref.startIndex}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
+            <EventCard
+              eventId={ref.id}
+              onClick={onEventClick}
+              compact={true}
+            />
+          </Box>
+        );
+      }
+
+      lastIndex = ref.startIndex;
+    }
+
+    // Add text before the first reference
+    if (lastIndex > 0) {
+      const textBefore = content.slice(0, lastIndex);
+      if (textBefore) {
+        segments.unshift(...formatContent(textBefore));
+      }
+    }
+
+    return segments;
   };
 
   return (
@@ -281,7 +345,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 isAnimating={message.status === 'received'}
               />
             ) : (
-              formatContent(parsedResponse.textContent)
+              // Use inline references if available, otherwise use regular formatting
+              parsedResponse.inlineReferences && parsedResponse.inlineReferences.length > 0
+                ? formatContentWithInlineReferences(parsedResponse.textContent, parsedResponse.inlineReferences)
+                : formatContent(parsedResponse.textContent)
             )}
           </Box>
 
