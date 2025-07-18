@@ -300,6 +300,51 @@ class EconomicCalendarServiceImpl {
   }
 
   /**
+   * Get a specific economic event by ID
+   */
+  async getEventById(eventId: string): Promise<EconomicEvent | null> {
+    try {
+      logger.log(`Fetching economic event by ID: ${eventId}`);
+
+      const eventsRef = collection(db, 'economicEvents');
+      const q = query(eventsRef, where('id', '==', eventId));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        logger.log(`No economic event found with ID: ${eventId}`);
+        return null;
+      }
+
+      const doc = querySnapshot.docs[0];
+      const data = doc.data();
+
+      const event: EconomicEvent = {
+        id: data.id,
+        currency: data.currency,
+        event: data.event,
+        impact: data.impact,
+        timeUtc: data.timeUtc,
+        date: data.date,
+        flagCode: data.flagCode,
+        country: data.country,
+        flagUrl: data.flagUrl,
+        time: data.time ? data.time.toDate() : new Date(data.timeUtc),
+        actual: data.actual || '',
+        forecast: data.forecast || '',
+        previous: data.previous || '',
+        unixTimestamp: data.unixTimestamp
+      };
+
+      logger.log(`Successfully fetched economic event: ${event.event}`);
+      return event;
+
+    } catch (err) {
+      error('Error fetching economic event by ID:', err);
+      return null;
+    }
+  }
+
+  /**
    * Notify all subscribers of new events
    */
   private notifySubscribers(events: EconomicEvent[]): void {

@@ -36,8 +36,7 @@ class AIFunctionExecution {
         case 'extractTradeIds':
           return await tradingAnalysisFunctions.extractTradeIds(processedArgs);
 
-        case 'convertTradeIdsToCards':
-          return await tradingAnalysisFunctions.convertTradeIdsToCards(processedArgs);
+
 
         case 'convertTradeIdsToData':
           return await tradingAnalysisFunctions.convertTradeIdsToData(processedArgs);

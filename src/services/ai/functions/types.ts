@@ -76,12 +76,7 @@ export interface ExtractTradeIdsParams {
   trades: any[]; // Array of trade objects or trade data
 }
 
-export interface ConvertTradeIdsToCardsParams {
-  returnCacheKey?: boolean;
-  tradeIds: string[]; // Array of trade IDs to convert to card format
-  sortBy?: 'date' | 'amount' | 'name'; // Sort order for the cards
-  sortOrder?: 'asc' | 'desc'; // Sort direction
-}
+
 
 export interface ConvertTradeIdsToDataParams {
   returnCacheKey?: boolean;

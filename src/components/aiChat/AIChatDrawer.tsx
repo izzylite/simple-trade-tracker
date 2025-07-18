@@ -500,7 +500,6 @@ What would you like to know about your trading?`,
                 onRetry={handleMessageRetry}
                 isLatestMessage={index === displayMessages.length - 1}
                 enableAnimation={index > 0}
-                functionCalls={message.functionCalls}
                 allTrades={trades}
                 onTradeClick={(tradeId,contextTrades) => {
                   if (onOpenGalleryMode) {
@@ -513,6 +512,14 @@ What would you like to know about your trading?`,
                   } else {
                     logger.log('Trade clicked but gallery mode not available:', tradeId);
                   }
+                }}
+                onEventClick={(event) => {
+                  // TODO: Implement event detail view or economic calendar navigation
+                  logger.log('Economic event clicked:', event);
+                  // For now, just log the event. In the future, this could:
+                  // - Open an event detail dialog
+                  // - Navigate to the economic calendar with the event highlighted
+                  // - Show related trades that occurred during this event
                 }}
               />
             ))}

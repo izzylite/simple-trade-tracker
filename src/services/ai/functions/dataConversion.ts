@@ -4,11 +4,10 @@
 
 import { Trade } from '../../../types/trade';
 import { logger } from '../../../utils/logger';
-import { 
-  ExtractTradeIdsParams, 
-  ConvertTradeIdsToCardsParams, 
-  ConvertTradeIdsToDataParams, 
-  TradingAnalysisResult 
+import {
+  ExtractTradeIdsParams,
+  ConvertTradeIdsToDataParams,
+  TradingAnalysisResult
 } from './types';
 import { handleCacheKeyResult, simpleTradeData, calculateWinRate } from './utils';
 
@@ -219,125 +218,6 @@ export async function extractTradeIds(params: ExtractTradeIdsParams): Promise<Tr
   }
 }
 
-/**
- * Convert trade IDs to simple JSON format for aiResponseParser.ts to handle
- */
-export async function convertTradeIdsToCards(
-  trades: Trade[],
-  params: ConvertTradeIdsToCardsParams
-): Promise<TradingAnalysisResult> {
-  try {
-    logger.log('AI requested trade IDs to cards conversion:', params.tradeIds?.length || 0);
-
-    if (!params.tradeIds || !Array.isArray(params.tradeIds)) {
-      return {
-        success: false,
-        error: 'Invalid tradeIds parameter. Expected an array of trade ID strings.'
-      };
-    }
-
-    if (params.tradeIds.length === 0) {
-      return {
-        success: true,
-        data: {
-          tradeCards: [],
-          title: 'No Trades',
-          message: 'No trade IDs provided to convert to cards.'
-        }
-      };
-    }
-
-    // Find trades matching the provided IDs to validate they exist
-    const matchingTrades = trades.filter(trade =>
-      params.tradeIds.includes(trade.id)
-    );
-
-    if (matchingTrades.length === 0) {
-      return {
-        success: true,
-        data: {
-          tradeCards: [],
-          title: 'No Matching Trades',
-          message: 'No trades found matching the provided trade IDs.',
-          requestedIds: params.tradeIds.length
-        }
-      };
-    }
-
-    // Sort trade IDs if requested (based on the actual trade data)
-    let sortedTradeIds = [...params.tradeIds];
-    if (params.sortBy && matchingTrades.length > 0) {
-      // Create a map of trade ID to trade for sorting
-      const tradeMap = new Map(matchingTrades.map(trade => [trade.id, trade]));
-
-      sortedTradeIds = params.tradeIds
-        .filter(id => tradeMap.has(id)) // Only include IDs that have matching trades
-        .sort((idA, idB) => {
-          const tradeA = tradeMap.get(idA)!;
-          const tradeB = tradeMap.get(idB)!;
-          let comparison = 0;
-
-          switch (params.sortBy) {
-            case 'date':
-              comparison = new Date(tradeA.date).getTime() - new Date(tradeB.date).getTime();
-              break;
-            case 'amount':
-              comparison = tradeA.amount - tradeB.amount;
-              break;
-            case 'name':
-              comparison = (tradeA.name || '').localeCompare(tradeB.name || '');
-              break;
-            default:
-              comparison = 0;
-          }
-
-          return params.sortOrder === 'desc' ? -comparison : comparison;
-        });
-    } else {
-      // Filter to only include IDs that have matching trades
-      sortedTradeIds = params.tradeIds.filter(id =>
-        matchingTrades.some(trade => trade.id === id)
-      );
-    }
-
-    // Generate title based on parameters
-    let title = 'Trade Cards';
-    if (params.sortBy) {
-      const sortLabel = params.sortBy === 'date' ? 'Date' :
-        params.sortBy === 'amount' ? 'P&L' : 'Name';
-      const orderLabel = params.sortOrder === 'desc' ? 'Descending' : 'Ascending';
-      title = `Trades (${sortLabel} ${orderLabel})`;
-    }
-
-    logger.log(`Prepared ${sortedTradeIds.length} trade IDs for card display`);
-
-    // Return simple JSON format that aiResponseParser.ts expects
-    const resultData = {
-      tradeCards: sortedTradeIds,
-      title: title,
-      count: sortedTradeIds.length,
-      requestedIds: params.tradeIds.length,
-      foundTrades: matchingTrades.length,
-      notFoundIds: params.tradeIds.filter(id =>
-        !matchingTrades.some(trade => trade.id === id)
-      ),
-      sorting: {
-        sortBy: params.sortBy || 'none',
-        sortOrder: params.sortOrder || 'asc'
-      }
-    };
-
-    // Use the sorted trade IDs as examples
-    return handleCacheKeyResult('convertTradeIdsToCards', resultData, params.returnCacheKey, sortedTradeIds);
-
-  } catch (error) {
-    logger.error('Error in convertTradeIdsToCards:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
-  }
-}
 
 /**
  * Convert trade IDs to full trade data for analysis

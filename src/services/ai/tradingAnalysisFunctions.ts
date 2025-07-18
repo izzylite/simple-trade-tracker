@@ -15,7 +15,6 @@ import {
   AnalyzeEconomicEventsParams,
   FetchEconomicEventsParams,
   ExtractTradeIdsParams,
-  ConvertTradeIdsToCardsParams,
   ConvertTradeIdsToDataParams
 } from './functions/types';
 
@@ -27,7 +26,7 @@ import { searchTrades } from './functions/searchTrades';
 import { getTradeStatistics } from './functions/getTradeStatistics';
 import { findSimilarTrades } from './functions/findSimilarTrades';
 import { analyzeEconomicEvents, fetchEconomicEvents } from './functions/economicEvents';
-import { extractTradeIds, convertTradeIdsToCards, convertTradeIdsToData } from './functions/dataConversion';
+import { extractTradeIds, convertTradeIdsToData } from './functions/dataConversion';
 import { queryDatabase } from './functions/databaseQuery';
 import { executeMultipleFunctions, getAvailablePlaceholderPatterns, getDataStructureInfo } from './functions/multiFunctionExecution';
 
@@ -90,12 +89,7 @@ class TradingAnalysisFunctions {
     return extractTradeIds(params);
   }
 
-  /**
-   * Convert trade IDs to simple JSON format for aiResponseParser.ts to handle
-   */
-  async convertTradeIdsToCards(params: ConvertTradeIdsToCardsParams): Promise<TradingAnalysisResult> {
-    return convertTradeIdsToCards(this.trades, params);
-  }
+
 
   /**
    * Fetch economic events from Firebase
@@ -159,7 +153,6 @@ export type {
   AnalyzeEconomicEventsParams,
   FetchEconomicEventsParams,
   ExtractTradeIdsParams,
-  ConvertTradeIdsToCardsParams,
   ConvertTradeIdsToDataParams
 } from './functions/types';
 

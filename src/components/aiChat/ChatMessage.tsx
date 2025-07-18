@@ -17,7 +17,7 @@ import {
   alpha
 } from '@mui/material';
 import AnimatedText from './AnimatedText';
-import TradeCardList from './TradeCardList';
+import DisplayItemsList from './DisplayItemsList';
 import {
   Person as PersonIcon,
   SmartToy as AIIcon,
@@ -27,8 +27,9 @@ import {
   Schedule as ScheduleIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
-import { ChatMessage as ChatMessageType, MessageStatus } from '../../types/aiChat';
+import { ChatMessage as ChatMessageType } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
+import { EconomicEvent } from '../../types/economicCalendar';
 import { format } from 'date-fns';
 import { logger } from '../../utils/logger';
 import { parseAIResponse } from '../../utils/aiResponseParser';
@@ -40,9 +41,9 @@ interface ChatMessageProps {
   onRetry?: (messageId: string) => void;
   isLatestMessage?: boolean;
   enableAnimation?: boolean;
-  functionCalls?: any[]; // Function calls data for trade card display
   onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void; // Callback for trade card clicks with context trades
-  allTrades?: Trade[]; // All trades for JSON trade card lookup
+  onEventClick?: (event: EconomicEvent) => void; // Callback for event card clicks
+  allTrades?: Trade[]; // All trades for display item lookup
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -52,8 +53,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   onRetry,
   isLatestMessage = false,
   enableAnimation = true,
-  functionCalls,
   onTradeClick,
+  onEventClick,
   allTrades
 }) => {
   const theme = useTheme();
@@ -61,18 +62,18 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
 
-  // Parse AI response for trade data
+  // Parse AI response for display items
   const parsedResponse = useMemo(() => {
     if (isAssistant) {
-      // Parse response for both JSON trade cards and function call results
-      return parseAIResponse(message.content, functionCalls, allTrades);
+      // Parse response for JSON display items
+      return parseAIResponse(message.content, allTrades);
     }
     return {
       textContent: message.content,
-      tradeData: undefined,
+      displayItems: [],
       hasStructuredData: false
     };
-  }, [message.content, functionCalls, isAssistant, allTrades]);
+  }, [message.content, isAssistant, allTrades]);
 
   const handleCopy = async () => {
     try {
@@ -284,16 +285,16 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             )}
           </Box>
 
-          {/* Trade Cards */}
-          {isAssistant && parsedResponse.tradeData && parsedResponse.tradeData.trades.length > 0 && (
+          {/* Display Items */}
+          {isAssistant && parsedResponse.displayItems && parsedResponse.displayItems.length > 0 && (
             <Box sx={{ mt: 2 }}>
-              <TradeCardList
-                trades={parsedResponse.tradeData.trades}
-                title={parsedResponse.tradeData.title}
-                showSummary={true}
+              <DisplayItemsList
+                displayItems={parsedResponse.displayItems}
+                allTrades={allTrades}
+                onTradeClick={onTradeClick}
+                onEventClick={onEventClick}
                 compact={true}
                 maxInitialDisplay={2}
-                onTradeClick={onTradeClick && parsedResponse.tradeData ? (trade) => onTradeClick(trade.id, parsedResponse.tradeData!.trades) : undefined}
               />
             </Box>
           )}

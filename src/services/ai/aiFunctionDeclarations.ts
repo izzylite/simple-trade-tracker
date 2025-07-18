@@ -259,37 +259,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
         required: ['trades']
       }
     },
-    {
-      name: 'convertTradeIdsToCards',
-      description: 'Convert a list of trade IDs to simple JSON format for card display. Returns a JSON object with "tradeCards" array containing the trade IDs, which the UI will use to display trade cards. Use this when you want to show specific trades as cards to the user.',
-      parameters: {
-        type: SchemaType.OBJECT,
-        properties: {
-          returnCacheKey: {
-            type: SchemaType.BOOLEAN,
-            description: 'Set to true if you plan to call additional functions with this result. When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
-          },
-          tradeIds: {
-            type: SchemaType.ARRAY,
-            items: {
-              type: SchemaType.STRING
-            },
-            description: 'Array of trade IDs to convert to card format. These IDs should correspond to existing trades in the system.'
-          },
-          sortBy: {
-            type: SchemaType.STRING,
-            enum: ['date', 'amount', 'name'],
-            description: 'Field to sort the cards by: "date" for chronological order, "amount" for profit/loss order, "name" for alphabetical order.'
-          },
-          sortOrder: {
-            type: SchemaType.STRING,
-            enum: ['asc', 'desc'],
-            description: 'Sort direction: "asc" for ascending order, "desc" for descending order. Default is "asc".'
-          }
-        },
-        required: ['tradeIds']
-      }
-    },
+
     {
       name: 'convertTradeIdsToData',
       description: 'Convert a list of trade IDs to full trade data objects for detailed analysis. Returns complete trade information including all fields needed for comprehensive analysis. Use this when you need to analyze the actual trade data from a single trade or after function chaining operations. Call getDataStructureInfo({type: "trade", detail: "fields-only"}) to see available trade fields for selective data extraction.',
@@ -366,7 +336,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
               properties: {
                 name: {
                   type: SchemaType.STRING,
-                  enum: ['searchTrades', 'getTradeStatistics', 'findSimilarTrades', 'queryDatabase', 'analyzeEconomicEvents', 'fetchEconomicEvents', 'extractTradeIds', 'convertTradeIdsToCards'],
+                  enum: ['searchTrades', 'getTradeStatistics', 'findSimilarTrades', 'queryDatabase', 'analyzeEconomicEvents', 'fetchEconomicEvents', 'extractTradeIds', 'convertTradeIdsToData'],
                   description: 'Name of the function to execute. Must be one of the available trading analysis functions.  CRITICAL: Do NOT use returnCacheKey in function arguments - placeholders need actual data, not cache keys.'
                 },
                 args: {
