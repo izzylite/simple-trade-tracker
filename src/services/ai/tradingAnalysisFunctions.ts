@@ -101,7 +101,7 @@ class TradingAnalysisFunctions {
   }
 
   /**
-   * Get current user calendar information with smart defaults.
+   * Get current user calendar information with smart defaults
    */
   async getUserCalendar(params: GetUserCalendarParams): Promise<TradingAnalysisResult> {
     return getUserCalendar(this.calendar, params);
