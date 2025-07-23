@@ -239,6 +239,47 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
       }
     },
     {
+      name: 'getUserCalendar',
+      description: 'Get comprehensive information about the current user\'s trading calendar including account settings, targets, risk management, statistics, and configuration. Provides complete overview of calendar state, performance metrics, and trading parameters. Call getDataStructureInfo({type: "calendar", detail: "fields-only"}) to understand available calendar fields for selective data extraction.',
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          returnCacheKey: {
+            type: SchemaType.BOOLEAN,
+            description: 'Set to true if you plan to call additional functions with this result. When true, large results return a cache key instead of full data to enable efficient multi-function workflows. Set to false if this is the final function call and you need the complete data immediately.'
+          },
+          fields: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.STRING,
+              enum: ['name', 'accountBalance', 'currentBalance', 'maxDailyDrawdown', 'weeklyTarget', 'monthlyTarget', 'yearlyTarget', 'riskPerTrade', 'dynamicRiskEnabled', 'increasedRiskPercentage', 'profitThresholdPercentage', 'winRate', 'profitFactor', 'maxDrawdown', 'totalTrades', 'totalPnL', 'weeklyPnL', 'monthlyPnL', 'yearlyPnL', 'weeklyProgress', 'monthlyProgress', 'targetProgress', 'avgWin', 'avgLoss', 'winCount', 'lossCount', 'drawdownRecoveryNeeded', 'drawdownDuration', 'note', 'daysNotes', 'all']
+            },
+            description: 'Essential calendar fields for trading analysis. Use "all" for complete calendar data, or specify individual fields to reduce token usage. Common combinations: ["accountBalance", "currentBalance", "totalPnL", "winRate", "totalTrades"] for performance overview, ["weeklyTarget", "monthlyTarget", "yearlyTarget", "weeklyProgress", "monthlyProgress"] for targets analysis, ["riskPerTrade", "maxDailyDrawdown"] for basic risk management, ["riskPerTrade", "dynamicRiskEnabled", "increasedRiskPercentage", "profitThresholdPercentage"] for dynamic risk analysis, ["avgWin", "avgLoss", "winCount", "lossCount"] for detailed statistics, ["note", "daysNotes"] for notes.'
+          },
+          includeStatistics: {
+            type: SchemaType.BOOLEAN,
+            description: 'Include detailed performance statistics like win rate, profit factor, drawdown metrics, average win/loss, etc. When false, only basic calendar information is returned.'
+          },
+          includeTargets: {
+            type: SchemaType.BOOLEAN,
+            description: 'Include target-related information like weekly/monthly/yearly targets and progress towards those targets.'
+          },
+          includeRiskManagement: {
+            type: SchemaType.BOOLEAN,
+            description: 'Include risk management settings like risk per trade, dynamic risk settings, max daily drawdown, etc.'
+          },
+          includeConfiguration: {
+            type: SchemaType.BOOLEAN,
+            description: 'Include configuration settings like tags, required tag groups, score settings, economic calendar filters, pinned events, etc.'
+          },
+          includeNotes: {
+            type: SchemaType.BOOLEAN,
+            description: 'Include notes and text content like calendar note, hero image, daily notes, etc.'
+          }
+        }
+      }
+    },
+    {
       name: 'extractTradeIds',
       description: 'Extract trade IDs from an array of trade objects or trade data. Useful for converting trade results from other functions (like searchTrades or findSimilarTrades) into a list of trade IDs that can be used with other functions like getTradeStatistics. Handles various trade object formats and removes duplicates.',
       parameters: {
@@ -336,7 +377,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
               properties: {
                 name: {
                   type: SchemaType.STRING,
-                  enum: ['searchTrades', 'getTradeStatistics', 'findSimilarTrades', 'queryDatabase', 'analyzeEconomicEvents', 'fetchEconomicEvents', 'extractTradeIds', 'convertTradeIdsToData'],
+                  enum: ['searchTrades', 'getTradeStatistics', 'findSimilarTrades', 'queryDatabase', 'analyzeEconomicEvents', 'fetchEconomicEvents', 'getUserCalendar', 'extractTradeIds', 'convertTradeIdsToData'],
                   description: 'Name of the function to execute. Must be one of the available trading analysis functions.  CRITICAL: Do NOT use returnCacheKey in function arguments - placeholders need actual data, not cache keys.'
                 },
                 args: {
@@ -390,8 +431,8 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
         properties: {
           type: {
             type: SchemaType.STRING,
-            enum: ['trade', 'database', 'economic', 'all'],
-            description: 'Type of data structure to get info about. "trade" for Trade interface fields, "database" for Supabase schema, "economic" for economic calendar data, "all" for everything.',
+            enum: ['trade', 'database', 'economic', 'calendar', 'all'],
+            description: 'Type of data structure to get info about. "trade" for Trade interface fields, "database" for Supabase schema, "economic" for economic calendar data, "calendar" for user calendar structure, "all" for everything.',
             required: false
           },
           detail: {

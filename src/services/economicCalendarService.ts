@@ -305,7 +305,6 @@ class EconomicCalendarServiceImpl {
   async getEventById(eventId: string): Promise<EconomicEvent | null> {
     try {
       logger.log(`Fetching economic event by ID: ${eventId}`);
-
       const eventsRef = collection(db, 'economicEvents');
       const q = query(eventsRef, where('id', '==', eventId));
       const querySnapshot = await getDocs(q);
@@ -318,23 +317,7 @@ class EconomicCalendarServiceImpl {
       const doc = querySnapshot.docs[0];
       const data = doc.data();
 
-      const event: EconomicEvent = {
-        id: data.id,
-        currency: data.currency,
-        event: data.event,
-        impact: data.impact,
-        timeUtc: data.timeUtc,
-        date: data.date,
-        flagCode: data.flagCode,
-        country: data.country,
-        flagUrl: data.flagUrl,
-        time: data.time ? data.time.toDate() : new Date(data.timeUtc),
-        actual: data.actual || '',
-        forecast: data.forecast || '',
-        previous: data.previous || '',
-        unixTimestamp: data.unixTimestamp
-      };
-
+      const event: EconomicEvent = this.convertToEconomicEvent(data);
       logger.log(`Successfully fetched economic event: ${event.event}`);
       return event;
 

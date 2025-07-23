@@ -342,7 +342,7 @@ const TagFilter: React.FC<TagFilterProps> = ({ allTags, selectedTags, onTagsChan
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
         >
-          {selectedTags.length > 0 ? `${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''}` : 'Filter Tags'}
+          {selectedTags.length > 0 ? `${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''}` : 'Search & Filter'}
         </Button>
       </Tooltip>
 
@@ -934,7 +934,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         calendarDayNotes={calendarDayNotes || new Map()}
         setIsDayNotesDialogOpen={isReadOnly ? undefined : setIsDayNotesDialogOpen}
         calendar={calendar}
-        
+
         isReadOnly={isReadOnly}
       />
 
@@ -1347,7 +1347,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                                   right: 4,
                                   width: 8,
                                   height: 8,
-                                  m:1,
+                                  m: 1,
                                   borderRadius: '50%',
                                   bgcolor: 'error.main',
                                   border: `2px solid ${alpha(theme.palette.background.paper, 0.8)}`,
@@ -1489,7 +1489,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onClose={() => {
             setSelectedDate(null);
           }}
-          showAddForm={isReadOnly ? () => {} : (trade) => {
+          showAddForm={isReadOnly ? () => { } : (trade) => {
             if (trade !== null) {
               setNewTrade(() => (createEditTradeData(trade!!)));
             }
@@ -1498,7 +1498,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           date={selectedDate || new Date()}
           trades={selectedDate ? tradesForSelectedDay : []}
           onUpdateTradeProperty={isReadOnly ? undefined : onUpdateTradeProperty}
-          onDeleteTrade={isReadOnly ? () => {} : handleDeleteClick}
+          onDeleteTrade={isReadOnly ? () => { } : handleDeleteClick}
           onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
           calendarId={calendarId!!}
           onDateChange={handleDayChange}
@@ -1670,12 +1670,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         {!isReadOnly && (
           <Tooltip title="AI Trading Assistant" placement="left">
             <Fab
-              color="info"
+              color="secondary"
               aria-label="open ai chat"
               onClick={handleToggleAIChat}
               sx={{
                 position: 'fixed',
-                bottom: 168,
+                bottom: 96,
                 right: 24,
                 zIndex: 1200
               }}
@@ -1689,12 +1689,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         {!isReadOnly && (
           <Tooltip title="Economic Calendar" placement="left">
             <Fab
-              color="secondary"
+              color="primary"
               aria-label="open economic calendar"
               onClick={handleToggleEconomicCalendar}
               sx={{
-                position: 'fixed',
-                bottom: 96,
+                position: 'fixed', 
+                bottom: 24,
                 right: 24,
                 zIndex: 1200
               }}
@@ -1704,20 +1704,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           </Tooltip>
         )}
 
-        {/* Search & Filter FAB */}
-        <Fab
-          color="primary"
-          aria-label="search and filter trades"
-          onClick={() => setIsSearchDrawerOpen(true)}
-          sx={{
-            position: 'fixed',
-            bottom: 24,
-            right: 24,
-            zIndex: 1200
-          }}
-        >
-          <SearchIcon />
-        </Fab>
 
         {/* Search & Filter Drawer */}
         <SearchDrawer
@@ -1740,10 +1726,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onClose={() => setPinnedTradesDrawerOpen(false)}
           trades={trades}
           calendar={calendar}
-          onTradeClick={(trade,allTrades,title) => {
+          onTradeClick={(trade, allTrades, title) => {
             // Close drawer and open the trade in gallery mode
             setPinnedTradesDrawerOpen(false);
-            openGalleryMode(allTrades, trade.id,title);
+            openGalleryMode(allTrades, trade.id, title);
           }}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
           isReadOnly={isReadOnly}

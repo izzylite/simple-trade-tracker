@@ -71,6 +71,16 @@ export interface FetchEconomicEventsParams {
   limit?: number;
 }
 
+export interface GetUserCalendarParams {
+  returnCacheKey?: boolean;
+  fields?: string[];
+  includeStatistics?: boolean; // Include detailed performance statistics
+  includeTargets?: boolean; // Include target-related information
+  includeRiskManagement?: boolean; // Include risk management settings
+  includeConfiguration?: boolean; // Include configuration settings
+  includeNotes?: boolean; // Include notes and text content
+}
+
 export interface ExtractTradeIdsParams {
   returnCacheKey?: boolean;
   trades: any[]; // Array of trade objects or trade data

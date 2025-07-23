@@ -38,7 +38,7 @@ export async function getAvailablePlaceholderPatterns(
  * Call this when you need to understand trade data fields, database tables, or query structure
  */
 export async function getDataStructureInfo(params: {
-  type?: 'trade' | 'database' | 'economic' | 'all',
+  type?: 'trade' | 'database' | 'economic' | 'calendar' | 'all',
   detail?: 'basic' | 'full' | 'fields-only',
   context?: 'filtering' | 'aggregation' | 'joins' | 'performance' | 'examples'
 } = {}): Promise<TradingAnalysisResult> {
@@ -210,6 +210,82 @@ export async function getDataStructureInfo(params: {
           byImpact: "events.filter(e => e.impact === 'High')",
           byDate: "events.filter(e => e.date >= '2024-01-01')",
           byMultipleCurrencies: "events.filter(e => ['USD', 'EUR'].includes(e.currency))"
+        }
+      },
+      calendar: {
+        description: "Trading calendar data structure containing account settings, performance metrics, and configuration",
+        interface: "Calendar",
+        coreFields: {
+          name: { type: "string", required: true, description: "Calendar name" },
+          accountBalance: { type: "number", required: true, description: "Initial account balance" },
+          currentBalance: { type: "number", description: "Current account balance after trades" },
+          maxDailyDrawdown: { type: "number", required: true, description: "Maximum allowed daily drawdown" }
+        },
+        targetFields: {
+          weeklyTarget: { type: "number", description: "Weekly profit target" },
+          monthlyTarget: { type: "number", description: "Monthly profit target" },
+          yearlyTarget: { type: "number", description: "Yearly profit target" },
+          weeklyProgress: { type: "number", description: "Progress towards weekly target (percentage)" },
+          monthlyProgress: { type: "number", description: "Progress towards monthly target (percentage)" },
+          targetProgress: { type: "number", description: "Overall target progress" }
+        },
+        statisticsFields: {
+          winRate: { type: "number", description: "Win rate percentage (0-100)" },
+          profitFactor: { type: "number", description: "Profit factor (gross profit / gross loss)" },
+          maxDrawdown: { type: "number", description: "Maximum drawdown experienced" },
+          totalTrades: { type: "number", description: "Total number of trades" },
+          totalPnL: { type: "number", description: "Total profit and loss" },
+          avgWin: { type: "number", description: "Average winning trade amount" },
+          avgLoss: { type: "number", description: "Average losing trade amount" },
+          winCount: { type: "number", description: "Number of winning trades" },
+          lossCount: { type: "number", description: "Number of losing trades" },
+          drawdownRecoveryNeeded: { type: "number", description: "Amount needed to recover from drawdown" },
+          drawdownDuration: { type: "number", description: "Duration of current drawdown in days" }
+        },
+        pnlFields: {
+          weeklyPnL: { type: "number", description: "Current week P&L" },
+          monthlyPnL: { type: "number", description: "Current month P&L" },
+          yearlyPnL: { type: "number", description: "Current year P&L" }
+        },
+        riskFields: {
+          riskPerTrade: { type: "number", description: "Base risk amount per trade" },
+          dynamicRiskEnabled: { type: "boolean", description: "Whether dynamic risk management is enabled - automatically adjusts risk based on performance" },
+          increasedRiskPercentage: { type: "number", description: "Percentage increase in risk when dynamic risk is triggered (e.g., 50 means 1.5x normal risk)" },
+          profitThresholdPercentage: { type: "number", description: "Profit threshold percentage that triggers increased risk (e.g., 10 means when account is up 10%)" }
+        },
+        dynamicRiskConcept: {
+          description: "Dynamic risk management automatically adjusts position sizing based on account performance. When the account reaches a profit threshold, the system increases risk per trade to compound gains more aggressively.",
+          example: "If riskPerTrade=100, profitThresholdPercentage=10, increasedRiskPercentage=50, then when account is up 10%, risk becomes 150 per trade",
+          benefits: ["Compounds profits during winning streaks", "Maintains conservative risk during drawdowns", "Automated position sizing"],
+          fields: ["dynamicRiskEnabled", "riskPerTrade", "increasedRiskPercentage", "profitThresholdPercentage"]
+        },
+        notesFields: {
+          note: { type: "string", description: "Calendar notes (sanitized for AI)" },
+          daysNotes: { type: "Record<string, string>", description: "Daily notes mapped by date (sanitized for AI)" }
+        },
+        examples: {
+          performanceOverview: {
+            name: "Main Trading Account",
+            accountBalance: 10000,
+            currentBalance: 12500,
+            totalPnL: 2500,
+            winRate: 65.5,
+            totalTrades: 150,
+            profitFactor: 1.8
+          },
+          riskManagement: {
+            maxDailyDrawdown: 200,
+            riskPerTrade: 100,
+            maxDrawdown: 350,
+            drawdownRecoveryNeeded: 0
+          }
+        },
+        fieldSelectionPatterns: {
+          performanceAnalysis: "['accountBalance', 'currentBalance', 'totalPnL', 'winRate', 'totalTrades']",
+          targetTracking: "['weeklyTarget', 'monthlyTarget', 'weeklyProgress', 'monthlyProgress']",
+          riskAssessment: "['riskPerTrade', 'maxDailyDrawdown', 'maxDrawdown']",
+          dynamicRiskAnalysis: "['riskPerTrade', 'dynamicRiskEnabled', 'increasedRiskPercentage', 'profitThresholdPercentage']",
+          detailedStats: "['avgWin', 'avgLoss', 'winCount', 'lossCount', 'profitFactor']"
         }
       }
     };

@@ -14,6 +14,7 @@ import {
   QueryDatabaseParams,
   AnalyzeEconomicEventsParams,
   FetchEconomicEventsParams,
+  GetUserCalendarParams,
   ExtractTradeIdsParams,
   ConvertTradeIdsToDataParams
 } from './functions/types';
@@ -26,6 +27,7 @@ import { searchTrades } from './functions/searchTrades';
 import { getTradeStatistics } from './functions/getTradeStatistics';
 import { findSimilarTrades } from './functions/findSimilarTrades';
 import { analyzeEconomicEvents, fetchEconomicEvents } from './functions/economicEvents';
+import { getUserCalendar } from './functions/calendarInfo';
 import { extractTradeIds, convertTradeIdsToData } from './functions/dataConversion';
 import { queryDatabase } from './functions/databaseQuery';
 import { executeMultipleFunctions, getAvailablePlaceholderPatterns, getDataStructureInfo } from './functions/multiFunctionExecution';
@@ -99,6 +101,13 @@ class TradingAnalysisFunctions {
   }
 
   /**
+   * Get current user calendar information with smart defaults
+   */
+  async getUserCalendar(params: GetUserCalendarParams): Promise<TradingAnalysisResult> {
+    return getUserCalendar(this.calendar, params);
+  }
+
+  /**
    * Execute a SQL query against the Supabase database
    */
   async queryDatabase(params: QueryDatabaseParams): Promise<TradingAnalysisResult> {
@@ -152,6 +161,7 @@ export type {
   QueryDatabaseParams,
   AnalyzeEconomicEventsParams,
   FetchEconomicEventsParams,
+  GetUserCalendarParams,
   ExtractTradeIdsParams,
   ConvertTradeIdsToDataParams
 } from './functions/types';

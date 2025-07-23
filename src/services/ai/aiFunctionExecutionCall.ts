@@ -33,6 +33,9 @@ class AIFunctionExecution {
         case 'fetchEconomicEvents':
           return await tradingAnalysisFunctions.fetchEconomicEvents(processedArgs);
 
+        case 'getUserCalendar':
+          return await tradingAnalysisFunctions.getUserCalendar(processedArgs);
+
         case 'extractTradeIds':
           return await tradingAnalysisFunctions.extractTradeIds(processedArgs);
 
