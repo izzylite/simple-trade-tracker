@@ -386,13 +386,11 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
                 },
                 condition: {
                   type: SchemaType.STRING,
-                  description: 'Optional condition to execute this function. Examples: "RESULT_0.count > 10", "LAST_RESULT.trades.length >= 5", "RESULT_1.winRate > 0.6". Function only executes if condition is true.',
-                  required: false
+                  description: 'Optional condition to execute this function. Examples: "RESULT_0.count > 10", "LAST_RESULT.trades.length >= 5", "RESULT_1.winRate > 0.6". Function only executes if condition is true.'
                 },
                 validate: {
                   type: SchemaType.OBJECT,
-                  description: 'Validation rules for function result. Examples: {"minCount": 5}, {"maxCount": 100}, {"hasField": "trades"}, {"fieldValue": {"field": "winRate", "value": 0.5}}.',
-                  required: false
+                  description: 'Validation rules for function result. Examples: {"minCount": 5}, {"maxCount": 100}, {"hasField": "trades"}, {"fieldValue": {"field": "winRate", "value": 0.5}}.'
                 }
               },
               required: ['name', 'args']
@@ -416,8 +414,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
           category: {
             type: SchemaType.STRING,
             enum: ['all', 'core', 'extraction', 'arrays', 'transformations', 'conditions'],
-            description: 'Filter patterns by category. Use "all" to see everything, or specify a category for focused documentation. Categories: core (basic patterns), extraction (field access), arrays (merge/unique/intersect), transformations (slice/filter/sort), conditions (conditional execution).',
-            required: false
+            description: 'Filter patterns by category. Use "all" to see everything, or specify a category for focused documentation. Categories: core (basic patterns), extraction (field access), arrays (merge/unique/intersect), transformations (slice/filter/sort), conditions (conditional execution).'
           }
         },
         required: []
@@ -432,20 +429,17 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
           type: {
             type: SchemaType.STRING,
             enum: ['trade', 'database', 'economic', 'calendar', 'all'],
-            description: 'Type of data structure to get info about. "trade" for Trade interface fields, "database" for Supabase schema, "economic" for economic calendar data, "calendar" for user calendar structure, "all" for everything.',
-            required: false
+            description: 'Type of data structure to get info about. "trade" for Trade interface fields, "database" for Supabase schema, "economic" for economic calendar data, "calendar" for user calendar structure, "all" for everything.'
           },
           detail: {
             type: SchemaType.STRING,
             enum: ['basic', 'full', 'fields-only'],
-            description: 'Level of detail to return. "basic" for essential info, "full" for comprehensive details, "fields-only" for just field definitions.',
-            required: false
+            description: 'Level of detail to return. "basic" for essential info, "full" for comprehensive details, "fields-only" for just field definitions.'
           },
           context: {
             type: SchemaType.STRING,
             enum: ['filtering', 'aggregation', 'joins', 'performance', 'examples'],
-            description: 'Specific context for the information. Provides relevant examples and patterns for the use case.',
-            required: false
+            description: 'Specific context for the information. Provides relevant examples and patterns for the use case.'
           }
         },
         required: []

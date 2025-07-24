@@ -140,12 +140,12 @@ export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
   }
 };
 
-// Default configuration
+// Default configuration with recommended settings
 export const DEFAULT_AI_CHAT_CONFIG: AIChatConfig = {
   defaultProvider: 'firebase-ai',
-  defaultModel: 'gemini-2.5-flash',
+  defaultModel: 'gemini-1.5-pro',
   autoScroll: true,
-  showTokenCount: false,
+  showTokenCount: true,
   enableSyntaxHighlighting: true,
   maxSessionHistory: 50,
   autoSaveSessions: true,

@@ -1,6 +1,6 @@
 /**
- * AI Chat Drawer Component
- * Main chat interface for AI trading analysis
+ * AI Chat Bottom Sheet Component
+ * Modern bottom sheet interface for AI trading analysis
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -15,29 +15,27 @@ import {
   Tooltip,
   Divider,
   useTheme,
-  alpha
+  alpha,
+  Avatar
 } from '@mui/material';
 import {
   Send as SendIcon,
-  Settings as SettingsIcon,
   SmartToy as AIIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import { v4 as uuidv4 } from 'uuid';
-import UnifiedDrawer from '../common/UnifiedDrawer';
 import ChatMessage from './ChatMessage';
-import AIChatSettingsDialog from './AIChatSettingsDialog';
+// import AIChatSettingsDialog from './AIChatSettingsDialog'; // Commented out - testing only
 import {
   ChatMessage as ChatMessageType,
   AIProvider,
   ChatError,
-  AIChatConfig,
   AIModelSettings
 } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
 import { firebaseAIChatService } from '../../services/ai/firebaseAIChatService';
-import { aiChatConfigService } from '../../services/ai/aiChatConfigService';
 
 
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
@@ -51,6 +49,11 @@ interface AIChatDrawerProps {
   calendar: Calendar;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
 }
+
+// Bottom sheet heights
+const BOTTOM_SHEET_HEIGHTS = {
+  default: 780
+} as const;
 
 const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   open,
@@ -72,18 +75,26 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const [currentProvider] = useState<AIProvider>('firebase-ai');
 
   const [error, setError] = useState<ChatError | null>(null);
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
-  const [isGeneratingContext, setIsGeneratingContext] = useState(false);
-  const [isSearchingVectors, setIsSearchingVectors] = useState(false);
-  const [chatConfig, setChatConfig] = useState(aiChatConfigService.getConfig());
-  const [modelSettings, setModelSettings] = useState<AIModelSettings>({
-    model: chatConfig.defaultModel,
+  // Use recommended settings - Gemini 1.5 Pro with optimized parameters
+  const chatConfig = {
+    autoScroll: true,
+    showTokenCount: true,
+    enableSyntaxHighlighting: true,
+    maxSessionHistory: 50,
+    autoSaveSessions: true,
+    sessionRetentionDays: 30
+  };
+
+  const modelSettings: AIModelSettings = {
+    model: 'gemini-1.5-pro',
     settings: {
-      temperature: 0.7,
-      maxTokens: 2000,
-      topP: 1
+      temperature: 0.3, // Lower temperature for more deterministic function calls
+      maxTokens: 4000,  // Higher token limit for complex analysis
+      topP: 0.8         // Balanced diversity
     }
-  });
+  };
+
+
 
   // Auto-scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -136,10 +147,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         throw new Error('User not authenticated');
       }
 
-      // Use AI-driven function calling for dynamic data fetching
-      setIsSearchingVectors(true);
-      setIsGeneratingContext(true);
-
       // Send message with AI-driven function calling
       const response = await firebaseAIChatService.sendMessageWithFunctionCalling(
         messageText,
@@ -150,9 +157,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       );
 
       const functionCalls = response.functionCalls || [];
-
-      setIsSearchingVectors(false);
-      setIsGeneratingContext(false);
 
       logger.log(`AI executed ${functionCalls.length} function calls`);
 
@@ -294,20 +298,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     }
   }, [messages, currentProvider, trades, calendar, chatConfig]);
 
-  const handleConfigChange = useCallback((newConfig: AIChatConfig, newModelSettings?: AIModelSettings) => {
-     
-    aiChatConfigService.saveConfig(newConfig);
-    logger.log('Configuration updated - context will be regenerated on next message');
 
-    // Update state
-    setChatConfig(newConfig);
-
-    // Update model settings if provided
-    if (newModelSettings) {
-      setModelSettings(newModelSettings);
-    }
- 
-  }, [chatConfig, trades, calendar]);
 
 
 
@@ -376,378 +367,400 @@ What would you like to know about your trading?`,
   const displayMessages = messages.length === 0 ? [getWelcomeMessage()] : messages;
   const showTemplates = messages.length === 0;
 
+
+
   return (
     <>
-      <UnifiedDrawer
-        open={open}
-        onClose={onClose}
-        title="AI Trading Assistant"
-        subtitle={
-          trades.length > 0
-            ? `${trades.length} trades ready`
-            : 'Ready for trading analysis...'
-        }
-        icon={<AIIcon />}
-        headerActions={
-          <Tooltip title="Settings">
-            <IconButton
-              size="small"
-              onClick={() => setShowSettingsDialog(true)}
-              sx={{ color: 'text.secondary' }}
-            >
-              <SettingsIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        }
-        width={{ xs: '100%', sm: 500 }}
-        headerVariant="enhanced"
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: 0,
+          right: { xs: 0, sm: 20 },
+          left: { xs: 0, sm: 'auto' },
+          zIndex: 1400,
+          height: open ? BOTTOM_SHEET_HEIGHTS.default : 0,
+          maxHeight: '85vh',
+          width: '100%',
+          maxWidth: { xs: '100%', sm: '420px', md: '460px', lg: '500px' },
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
+          background: theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, rgba(18, 18, 18, 0.98) 0%, rgba(30, 30, 30, 0.98) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%)',
+          backdropFilter: 'blur(20px)',
+          boxShadow: theme.palette.mode === 'dark'
+            ? '0 -8px 32px rgba(0, 0, 0, 0.6)'
+            : '0 -8px 32px rgba(0, 0, 0, 0.15)',
+          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          borderBottom: 'none',
+          transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          transform: open ? 'translateY(0)' : 'translateY(100%)',
+          overflow: 'hidden',
+          pointerEvents: open ? 'auto' : 'none' // Allow interaction only when open
+        }}
       >
         <Box sx={{
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
-          backgroundColor: 'background.default'
+          overflow: 'hidden'
         }}>
-          {/* Error Alert */}
-          {error && (
-            <Alert
-              severity="error"
-              sx={{
-                m: 2,
-                mb: 1,
-                borderRadius: 2,
-                '& .MuiAlert-message': {
-                  width: '100%'
-                }
-              }}
-              action={
-                error.retryable ? (
-                  <Button
-                    size="small"
-                    startIcon={<RefreshIcon />}
-                    onClick={handleRetry}
-                  >
-                    Retry
-                  </Button>
-                ) : undefined
-              }
-            >
-              <Typography variant="body2" fontWeight="medium">
-                {error.message}
-              </Typography>
-              {error.details && (
-                <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                  {error.details}
-                </Typography>
-              )}
-            </Alert>
-          )}
-
-
-
-          {/* Loading Context */}
-          {(isGeneratingContext || isSearchingVectors) && (
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 2,
-              p: 2,
-              mx: 2,
-              mb: 1,
-              backgroundColor: alpha(theme.palette.primary.main, 0.08),
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: alpha(theme.palette.primary.main, 0.2)
-            }}>
-              <CircularProgress
-                size={18}
-                thickness={4}
-                sx={{ color: 'primary.main' }}
-              />
-              <Typography
-                variant="body2"
-                color="primary.main"
-                sx={{ fontWeight: 500 }}
-              >
-                {isSearchingVectors
-                  ? 'AI is analyzing your request...'
-                  : 'Processing your trading data...'
-                }
-              </Typography>
-            </Box>
-          )}
-
-          {/* Messages */}
-          <Box
-            sx={{
-              flex: 1,
-              overflow: 'auto',
-              p: 3,
-              pb: 1,
-              backgroundColor: alpha(theme.palette.background.default, 0.3),
-              backgroundImage: `radial-gradient(circle at 20% 80%, ${alpha(theme.palette.primary.main, 0.03)} 0%, transparent 50%),
-                               radial-gradient(circle at 80% 20%, ${alpha(theme.palette.secondary.main, 0.03)} 0%, transparent 50%)`,
-              ...scrollbarStyles(theme)
-            }}
+          {/* Header */}
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            p: 2,
+            pb: 1,
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            background: alpha(theme.palette.background.paper, 0.8),
+            backdropFilter: 'blur(10px)'
+          }}
           >
-            {displayMessages.map((message, index) => (
-              <ChatMessage
-                key={message.id}
-                message={message}
-                showTimestamp={true}
-                showTokenCount={chatConfig.showTokenCount}
-                onRetry={handleMessageRetry}
-                isLatestMessage={index === displayMessages.length - 1}
-                enableAnimation={index > 0}
-                allTrades={trades}
-                onTradeClick={(tradeId,contextTrades) => {
-                  if (onOpenGalleryMode) {
-                    // Find the clicked trade
-                    const clickedTrade = contextTrades.find(t => t.id === tradeId);
-                    if (clickedTrade) {
-                      // Open gallery mode with all trades, starting from the clicked trade
-                      onOpenGalleryMode(contextTrades, tradeId, 'AI Chat - Trade Gallery');
-                    }
-                  } else {
-                    logger.log('Trade clicked but gallery mode not available:', tradeId);
-                  }
-                }}
-                onEventClick={(event) => {
-                  // TODO: Implement event detail view or economic calendar navigation
-                  logger.log('Economic event clicked:', event);
-                  // For now, just log the event. In the future, this could:
-                  // - Open an event detail dialog
-                  // - Navigate to the economic calendar with the event highlighted
-                  // - Show related trades that occurred during this event
-                }}
-              />
-            ))}
+            {/* Left side - Logo and Title */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{
+                width: 36,
+                height: 36,
+                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                border: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`
+              }}>
+                <AIIcon sx={{ fontSize: 20, color: 'white' }} />
+              </Avatar>
 
-            {/* Question Templates - Only show when no conversation started */}
-            {showTemplates && (
-              <Box sx={{ mt: 3 }}>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    mb: 2, 
-                    color: 'text.primary',
-                    fontWeight: 600
+              <Box>
+                <Typography variant="h6" sx={{
+                  fontWeight: 700,
+                  fontSize: '1.1rem',
+                  lineHeight: 1.2
+                }}>
+                  AI Trading Assistant
+                </Typography>
+                <Typography variant="caption" sx={{
+                  color: 'text.secondary',
+                  fontSize: '0.75rem'
+                }}>
+                  {trades.length > 0
+                    ? `${trades.length} trades ready`
+                    : 'Ready for trading analysis...'
+                  }
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Right side - Action buttons */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {/* Settings button commented out - Vector Migration is for testing only */}
+              {/* <Tooltip title="Settings">
+                <IconButton
+                  size="small"
+                  onClick={() => setShowSettingsDialog(true)}
+                  sx={{
+                    color: 'text.secondary',
+                    '&:hover': { backgroundColor: alpha(theme.palette.action.hover, 0.5) }
                   }}
                 >
-                  💡 Try these questions:
-                </Typography>
-                
-                {questionTemplates.map((category, categoryIndex) => (
-                  <Box key={categoryIndex} sx={{ mb: 3 }}>
-                    <Typography 
-                      variant="subtitle2" 
-                      sx={{ 
-                        mb: 1.5,
-                        color: 'primary.main',
-                        fontWeight: 600,
-                        fontSize: '0.85rem'
+                  <SettingsIcon fontSize="small" />
+                </IconButton>
+              </Tooltip> */}
+
+              <Tooltip title="Close">
+                <IconButton
+                  size="small"
+                  onClick={onClose}
+                  sx={{
+                    color: 'text.secondary',
+                    '&:hover': { backgroundColor: alpha(theme.palette.action.hover, 0.5) }
+                  }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </Box>
+
+          {/* Content */}
+          <Box sx={{
+            height: '720px',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+ 
+
+
+
+
+              {/* Messages */}
+              <Box
+                sx={{
+                  flex: 1,
+                  overflow: 'auto',
+                  p: 3,
+                  pb: 1,
+                  backgroundColor: alpha(theme.palette.background.default, 0.3),
+                  backgroundImage: `radial-gradient(circle at 20% 80%, ${alpha(theme.palette.primary.main, 0.03)} 0%, transparent 50%),
+                                   radial-gradient(circle at 80% 20%, ${alpha(theme.palette.secondary.main, 0.03)} 0%, transparent 50%)`,
+                  ...scrollbarStyles(theme)
+                }}
+              >
+                {displayMessages.map((message, index) => (
+                  <ChatMessage
+                    key={message.id}
+                    message={message}
+                    showTimestamp={true}
+                    showTokenCount={chatConfig.showTokenCount}
+                    onRetry={handleMessageRetry}
+                    isLatestMessage={index === displayMessages.length - 1}
+                    enableAnimation={index > 0}
+                    allTrades={trades}
+                    onTradeClick={(tradeId,contextTrades) => {
+                      if (onOpenGalleryMode) {
+                        // Find the clicked trade
+                        const clickedTrade = contextTrades.find(t => t.id === tradeId);
+                        if (clickedTrade) {
+                          // Open gallery mode with all trades, starting from the clicked trade
+                          onOpenGalleryMode(contextTrades, tradeId, 'AI Chat - Trade Gallery');
+                        }
+                      } else {
+                        logger.log('Trade clicked but gallery mode not available:', tradeId);
+                      }
+                    }}
+                    onEventClick={(event) => {
+                      // TODO: Implement event detail view or economic calendar navigation
+                      logger.log('Economic event clicked:', event);
+                      // For now, just log the event. In the future, this could:
+                      // - Open an event detail dialog
+                      // - Navigate to the economic calendar with the event highlighted
+                      // - Show related trades that occurred during this event
+                    }}
+                  />
+                ))}
+
+                {/* Question Templates - Only show when no conversation started */}
+                {showTemplates && (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        mb: 2,
+                        color: 'text.primary',
+                        fontWeight: 600
                       }}
                     >
-                      {category.category}
+                      💡 Try these questions:
                     </Typography>
-                    
-                    <Box sx={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      gap: 1 
-                    }}>
-                      {category.questions.map((question, questionIndex) => (
-                        <Button
-                          key={questionIndex}
-                          variant="outlined"
-                          size="small"
-                          onClick={() => handleTemplateClick(question)}
+
+                    {questionTemplates.map((category, categoryIndex) => (
+                      <Box key={categoryIndex} sx={{ mb: 3 }}>
+                        <Typography
+                          variant="subtitle2"
                           sx={{
-                            justifyContent: 'flex-start',
-                            textAlign: 'left',
-                            py: 1.5,
-                            px: 2,
-                            borderRadius: 2,
-                            textTransform: 'none',
-                            fontSize: '0.875rem',
-                            lineHeight: 1.4,
-                            borderColor: alpha(theme.palette.primary.main, 0.3),
-                            backgroundColor: alpha(theme.palette.background.paper, 0.8),
-                            '&:hover': {
-                              borderColor: 'primary.main',
-                              backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                              transform: 'translateY(-1px)',
-                              boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.2)}`
-                            },
-                            transition: 'all 0.2s ease-in-out'
+                            mb: 1.5,
+                            color: 'primary.main',
+                            fontWeight: 600,
+                            fontSize: '0.85rem'
                           }}
                         >
-                          {question}
-                        </Button>
-                      ))}
+                          {category.category}
+                        </Typography>
+
+                        <Box sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 1
+                        }}>
+                          {category.questions.map((question, questionIndex) => (
+                            <Button
+                              key={questionIndex}
+                              variant="outlined"
+                              size="small"
+                              onClick={() => handleTemplateClick(question)}
+                              sx={{
+                                justifyContent: 'flex-start',
+                                textAlign: 'left',
+                                py: 1.5,
+                                px: 2,
+                                borderRadius: 2,
+                                textTransform: 'none',
+                                fontSize: '0.875rem',
+                                lineHeight: 1.4,
+                                borderColor: alpha(theme.palette.primary.main, 0.3),
+                                backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                                '&:hover': {
+                                  borderColor: 'primary.main',
+                                  backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                                  transform: 'translateY(-1px)',
+                                  boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.2)}`
+                                },
+                                transition: 'all 0.2s ease-in-out'
+                              }}
+                            >
+                              {question}
+                            </Button>
+                          ))}
+                        </Box>
+                      </Box>
+                    ))}
+
+                    <Box sx={{
+                      mt: 3,
+                      mb: 2,
+                      p: 2,
+                      backgroundColor: alpha(theme.palette.info.main, 0.08),
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: alpha(theme.palette.info.main, 0.2)
+                    }}>
+                      <Typography
+                        variant="body2"
+                        color="info.main"
+                        sx={{ fontWeight: 500 }}
+                      >
+                        💡 Pro Tip: You can ask complex questions like "I've been struggling with my breakout strategy on Tuesdays. Can you show me all my losing trades tagged 'breakout' that occurred on a Tuesday in the last 6 months, and analyze if there were any specific economic events or market conditions that contributed to these losses?" - I'll analyze your data and provide detailed insights!
+                      </Typography>
                     </Box>
                   </Box>
-                ))}
-                
-                <Box sx={{ 
-                  mt: 3,
-                  mb: 2, 
-                  p: 2,
-                  backgroundColor: alpha(theme.palette.info.main, 0.08),
-                  borderRadius: 2,
-                  border: '1px solid',
-                  borderColor: alpha(theme.palette.info.main, 0.2)
-                }}>
-                  <Typography 
-                    variant="body2" 
-                    color="info.main"
-                    sx={{ fontWeight: 500 }}
-                  >
-                    💡 Pro Tip: You can ask complex questions like "I've been struggling with my breakout strategy on Tuesdays. Can you show me all my losing trades tagged 'breakout' that occurred on a Tuesday in the last 6 months, and analyze if there were any specific economic events or market conditions that contributed to these losses?" - I'll analyze your data and provide detailed insights!
-                  </Typography>
-                </Box>
-              </Box>
-            )}
+                )}
 
-            {/* Typing Indicator */}
-            {isTyping && (
+                {/* Typing Indicator */}
+                {isTyping && (
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    p: 2,
+                    mb: 2
+                  }}>
+                    <Box sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      backgroundColor: alpha(theme.palette.grey[500], 0.1),
+                      borderRadius: 2,
+                      px: 2,
+                      py: 1
+                    }}>
+                      <CircularProgress
+                        size={16}
+                        thickness={4}
+                        sx={{ color: 'text.secondary' }}
+                      />
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontStyle: 'italic' }}
+                      >
+                        AI is thinking...
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+
+                <div ref={messagesEndRef} />
+              </Box>
+
+              <Divider sx={{ borderColor: alpha(theme.palette.divider, 0.5) }} />
+
+              {/* Input Area */}
               <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
                 p: 2,
-                mb: 2
+                backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                backdropFilter: 'blur(10px)'
               }}>
                 <Box sx={{
                   display: 'flex',
-                  alignItems: 'center',
                   gap: 1,
-                  backgroundColor: alpha(theme.palette.grey[500], 0.1),
-                  borderRadius: 2,
-                  px: 2,
-                  py: 1
+                  alignItems: 'flex-end',
+                  backgroundColor: 'background.paper',
+                  borderRadius: 3,
+                  p: 1,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  '&:focus-within': {
+                    borderColor: 'primary.main',
+                    boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}`
+                  }
                 }}>
-                  <CircularProgress
-                    size={16}
-                    thickness={4}
-                    sx={{ color: 'text.secondary' }}
+                  <TextField
+                    ref={inputRef}
+                    fullWidth
+                    multiline
+                    maxRows={4}
+                    placeholder="Ask me about your trading performance..."
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    disabled={isLoading}
+                    variant="standard"
+                    InputProps={{
+                      disableUnderline: true,
+                      sx: {
+                        fontSize: '0.95rem',
+                        lineHeight: 1.4
+                      }
+                    }}
+                    sx={{
+                      '& .MuiInputBase-input': {
+                        padding: '8px 0'
+                      }
+                    }}
                   />
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ fontStyle: 'italic' }}
+                  <IconButton
+                    onClick={handleSendMessage}
+                    disabled={!inputMessage.trim() || isLoading}
+                    size="small"
+                    sx={{
+                      backgroundColor: inputMessage.trim() && !isLoading ? 'primary.main' : 'action.disabledBackground',
+                      color: inputMessage.trim() && !isLoading ? 'primary.contrastText' : 'action.disabled',
+                      width: 36,
+                      height: 36,
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        backgroundColor: inputMessage.trim() && !isLoading ? 'primary.dark' : 'action.disabledBackground',
+                        transform: inputMessage.trim() && !isLoading ? 'scale(1.05)' : 'none'
+                      },
+                      '&:disabled': {
+                        backgroundColor: 'action.disabledBackground',
+                        color: 'action.disabled'
+                      }
+                    }}
                   >
-                    AI is thinking...
-                  </Typography>
+                    {isLoading ? (
+                      <CircularProgress size={18} color="inherit" />
+                    ) : (
+                      <SendIcon sx={{ fontSize: 18 }} />
+                    )}
+                  </IconButton>
                 </Box>
+
+                {/* Helper Text */}
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    mt: 1,
+                    display: 'block',
+                    textAlign: 'center',
+                    opacity: 0.7
+                  }}
+                >
+                  Press Enter to send • Shift+Enter for new line
+                </Typography>
               </Box>
-            )}
-
-            <div ref={messagesEndRef} />
-          </Box>
-
-          <Divider sx={{ borderColor: alpha(theme.palette.divider, 0.5) }} />
-
-          {/* Input Area */}
-          <Box sx={{
-            p: 2,
-            backgroundColor: alpha(theme.palette.background.paper, 0.8),
-            backdropFilter: 'blur(10px)'
-          }}>
-            <Box sx={{
-              display: 'flex',
-              gap: 1,
-              alignItems: 'flex-end',
-              backgroundColor: 'background.paper',
-              borderRadius: 3,
-              p: 1,
-              border: '1px solid',
-              borderColor: 'divider',
-              '&:focus-within': {
-                borderColor: 'primary.main',
-                boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}`
-              }
-            }}>
-              <TextField
-                ref={inputRef}
-                fullWidth
-                multiline
-                maxRows={4}
-                placeholder="Ask me about your trading performance..."
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={handleKeyPress}
-                disabled={isLoading}
-                variant="standard"
-                InputProps={{
-                  disableUnderline: true,
-                  sx: {
-                    fontSize: '0.95rem',
-                    lineHeight: 1.4
-                  }
-                }}
-                sx={{
-                  '& .MuiInputBase-input': {
-                    padding: '8px 0'
-                  }
-                }}
-              />
-              <IconButton
-                onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isLoading}
-                size="small"
-                sx={{
-                  backgroundColor: inputMessage.trim() && !isLoading ? 'primary.main' : 'action.disabledBackground',
-                  color: inputMessage.trim() && !isLoading ? 'primary.contrastText' : 'action.disabled',
-                  width: 36,
-                  height: 36,
-                  transition: 'all 0.2s ease-in-out',
-                  '&:hover': {
-                    backgroundColor: inputMessage.trim() && !isLoading ? 'primary.dark' : 'action.disabledBackground',
-                    transform: inputMessage.trim() && !isLoading ? 'scale(1.05)' : 'none'
-                  },
-                  '&:disabled': {
-                    backgroundColor: 'action.disabledBackground',
-                    color: 'action.disabled'
-                  }
-                }}
-              >
-                {isLoading ? (
-                  <CircularProgress size={18} color="inherit" />
-                ) : (
-                  <SendIcon sx={{ fontSize: 18 }} />
-                )}
-              </IconButton>
             </Box>
 
-            {/* Helper Text */}
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{
-                mt: 1,
-                display: 'block',
-                textAlign: 'center',
-                opacity: 0.7
-              }}
-            >
-              Press Enter to send • Shift+Enter for new line
-            </Typography>
-          </Box>
         </Box>
-      </UnifiedDrawer>
+      </Box>
 
-      {/* AI Chat Settings Dialog */}
-      <AIChatSettingsDialog
+      {/* Vector Migration Dialog - Commented out for testing only */}
+      {/* <AIChatSettingsDialog
         open={showSettingsDialog}
         onClose={() => setShowSettingsDialog(false)}
-        config={chatConfig}
-        modelSettings={modelSettings}
-        onConfigChange={handleConfigChange}
         calendar={calendar}
-      />
-       
+      /> */}
     </>
   );
 };
