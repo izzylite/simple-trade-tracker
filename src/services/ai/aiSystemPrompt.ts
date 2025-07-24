@@ -83,6 +83,7 @@ This executes multiple functions in sequence with automatic result passing.
 - "LAST_RESULT": Complete result from the previous function
 - "EXTRACT_TRADES": Extract trades array from previous result
 - "EXTRACT_TRADE_IDS": Extract trade IDs from previous result
+- "EXTRACT_EVENT_NAMES": Extract economic event names from previous result
 - "RESULT_0", "RESULT_1": Use result from specific function by index
 
 **Simple example:**
@@ -90,14 +91,20 @@ This executes multiple functions in sequence with automatic result passing.
   "functions": [
     {
       "name": "searchTrades",
-      "args": {"dateRange": "last 30 days", "fields": ["id", "name", "amount", "type"]}
+      "args": {
+        "dateRange": {
+          "start": 1672531200000,
+          "end": 1675209599999
+        },
+        "fields": ["id", "name", "amount", "type"]
+      }
     },
     {
       "name": "getTradeStatistics",
       "args": {"trades": "EXTRACT_TRADES"}
     }
   ],
-  "description": "Find recent trades and analyze performance"
+  "description": "Find trades from January 2023 and analyze performance"
 }
 
 **IMPORTANT:** Never use returnCacheKey=true inside executeMultipleFunctions - placeholders need actual data, not cache keys.
@@ -111,6 +118,14 @@ Call functions one at a time using cache keys from previous results.
 3. convertTradeIdsToCards with actual trade IDs and returnCacheKey=false
 
 **IMPORTANT:** Use exact cache key strings, never placeholders like "LAST_RESULT" in sequential calling.
+
+## Working with Unix Timestamps:
+All date ranges use Unix timestamps (milliseconds since epoch) for precision and efficiency. Calculate common date ranges:
+
+- **Last 30 days**: { start: Date.now() - (30 * 24 * 60 * 60 * 1000), end: Date.now() }
+- **Current month**: { start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime(), end: Date.now() }
+- **Next 7 days**: { start: Date.now(), end: Date.now() + (7 * 24 * 60 * 60 * 1000) }
+- **Specific date range**: { start: new Date('2023-01-01').getTime(), end: new Date('2023-01-31').getTime() }
 
 ## Data Structure Discovery:
 - **For placeholder patterns**: Call getAvailablePlaceholderPatterns() when you need advanced placeholder syntax for executeMultipleFunctions
@@ -129,9 +144,9 @@ These discovery functions help you make informed decisions about data access and
 For complex scenarios, executeMultipleFunctions also supports:
 
 **Advanced Placeholder Patterns:**
-- **Indexed extraction**: EXTRACT_TRADE_IDS_{index}, EXTRACT_TRADES_{index} (e.g., EXTRACT_TRADE_IDS_0)
+- **Indexed extraction**: EXTRACT_TRADE_IDS_{index}, EXTRACT_TRADES_{index}, EXTRACT_EVENT_NAMES_{index} (e.g., EXTRACT_TRADE_IDS_0, EXTRACT_EVENT_NAMES_1)
 - **Field extraction**: EXTRACT_{index}.{field.path} (e.g., EXTRACT_0.trades.id, EXTRACT_LAST.statistics.winRate)
-- **Array operations**: MERGE_TRADE_IDS_{index}_{index}, UNIQUE_TRADES_{index}_{index}, INTERSECT_TRADE_IDS_{index}_{index}
+- **Array operations**: MERGE_TRADE_IDS_{index}_{index}, UNIQUE_TRADES_{index}_{index}, MERGE_EVENT_NAMES_{index}_{index}, INTERSECT_TRADE_IDS_{index}_{index}
 - **Transformations**: SLICE_{index}.{field}.{start}.{end}, FILTER_{index}.{field}.{property}.{value}, SORT_{index}.{field}.{property}.{asc|desc}
 
 **Other Advanced Features:**

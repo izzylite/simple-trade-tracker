@@ -82,10 +82,11 @@ class AIFunctionExecution {
     // Check for incorrect placeholder usage in sequential calling
     for (const [, value] of Object.entries(processedArgs)) {
       if (typeof value === 'string' &&
-          (value === 'LAST_RESULT' || value === 'EXTRACT_TRADES' || value === 'EXTRACT_TRADE_IDS' || value.startsWith('RESULT_'))) {
+          (value === 'LAST_RESULT' || value === 'EXTRACT_TRADES' || value === 'EXTRACT_TRADE_IDS' || value === 'EXTRACT_EVENT_NAMES' || value.startsWith('RESULT_') || value.startsWith('EXTRACT_'))) {
         logger.error(`ERROR: Placeholder "${value}" used in sequential function calling for ${functionName}.
-             Placeholders only work inside executeMultipleFunctions!.
-            Use actual cache keys (like "ai_function_result_1234567890_abc123") for sequential calling.`);
+             Placeholders only work inside executeMultipleFunctions!
+             To chain functions, use executeMultipleFunctions instead of sequential calls.
+             Example: executeMultipleFunctions({functions: [{name: "fetchEconomicEvents", args: {impact: "High"}}, {name: "searchTrades", args: {economicNames: "EXTRACT_EVENT_NAMES"}}]})`);
         // Don't process this - let it fail so the AI learns
       }
     }

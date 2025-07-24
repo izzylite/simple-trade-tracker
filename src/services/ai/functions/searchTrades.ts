@@ -6,7 +6,7 @@ import { Trade } from '../../../types/trade';
 import { logger } from '../../../utils/logger';
 import { isTradeInSession, getSessionMappings } from '../../../utils/sessionTimeUtils';
 import { SearchTradesParams, TradingAnalysisResult } from './types';
-import { handleCacheKeyResult, simpleTradeData, calculateWinRate, parseDateRange } from './utils';
+import { handleCacheKeyResult, simpleTradeData, calculateWinRate } from './utils';
 import { filterTradeFields } from './dataConversion';
 
 /**
@@ -96,6 +96,17 @@ export async function searchTrades(
       });
     }
 
+    // Filter by economic event names (exact match for any of the provided names)
+    if (params.economicNames && params.economicNames.length > 0) {
+      const eventNamesLower = params.economicNames.map(name => name.toLowerCase());
+      filteredTrades = filteredTrades.filter(trade => {
+        if (!trade.economicEvents || trade.economicEvents.length === 0) return false;
+        return trade.economicEvents.some(event =>
+          eventNamesLower.includes(event.name.toLowerCase())
+        );
+      });
+    }
+
     // Filter by session
     if (params.session) {
       filteredTrades = filteredTrades.filter(trade => {
@@ -131,37 +142,13 @@ export async function searchTrades(
 
     // Filter by date range
     if (params.dateRange) {
-      const now = new Date();
-      let startDate: Date | null = null;
+      const startDate = new Date(params.dateRange.start);
+      const endDate = new Date(params.dateRange.end);
 
-      if (params.dateRange.includes('last')) {
-        const match = params.dateRange.match(/last (\d+) (day|week|month)s?/i);
-        if (match) {
-          const amount = parseInt(match[1]);
-          const unit = match[2].toLowerCase();
-          startDate = new Date(now);
-
-          if (unit === 'day') startDate.setDate(now.getDate() - amount);
-          else if (unit === 'week') startDate.setDate(now.getDate() - (amount * 7));
-          else if (unit === 'month') startDate.setMonth(now.getMonth() - amount);
-        }
-      } else if (params.dateRange.match(/^\d{4}-\d{2}$/)) {
-        // Format: 2024-01
-        const [year, month] = params.dateRange.split('-').map(Number);
-        startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0);
-
-        filteredTrades = filteredTrades.filter(trade => {
-          const tradeDate = new Date(trade.date);
-          return tradeDate >= startDate! && tradeDate <= endDate;
-        });
-      }
-
-      if (startDate) {
-        filteredTrades = filteredTrades.filter(trade =>
-          new Date(trade.date) >= startDate!
-        );
-      }
+      filteredTrades = filteredTrades.filter(trade => {
+        const tradeDate = new Date(trade.date);
+        return tradeDate >= startDate && tradeDate <= endDate;
+      });
     }
 
     // Apply limit

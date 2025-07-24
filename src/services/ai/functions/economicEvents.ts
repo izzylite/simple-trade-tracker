@@ -12,9 +12,7 @@ import { AnalyzeEconomicEventsParams, FetchEconomicEventsParams, TradingAnalysis
 import {
   handleCacheKeyResult,
   simpleTradeData,
-  calculateWinRate,
-  parseDateRange,
-  parseDateRangeForEvents
+  calculateWinRate
 } from './utils';
 import { calculateEconomicEventStats } from './getTradeStatistics';
 import { filterEconomicEventFields } from './dataConversion';
@@ -61,15 +59,15 @@ export async function analyzeEconomicEvents(
 
     // Apply date range filter
     if (params.dateRange) {
-      const dateFilter = parseDateRange(params.dateRange);
-      if (dateFilter) {
-        tradesWithEvents = tradesWithEvents.filter(trade =>
-          trade.date >= dateFilter.start && trade.date <= dateFilter.end
-        );
-        tradesWithoutEvents = tradesWithoutEvents.filter(trade =>
-          trade.date >= dateFilter.start && trade.date <= dateFilter.end
-        );
-      }
+      const startDate = new Date(params.dateRange.start);
+      const endDate = new Date(params.dateRange.end);
+
+      tradesWithEvents = tradesWithEvents.filter(trade =>
+        trade.date >= startDate && trade.date <= endDate
+      );
+      tradesWithoutEvents = tradesWithoutEvents.filter(trade =>
+        trade.date >= startDate && trade.date <= endDate
+      );
     }
 
     // Calculate detailed analysis
@@ -129,32 +127,13 @@ export async function fetchEconomicEvents(
     let endDate: Date;
 
     if (params.dateRange) {
-      const dateRange = parseDateRangeForEvents(params.dateRange);
-      if (!dateRange) {
-        return {
-          success: false,
-          error: 'Invalid date range format'
-        };
-      }
-      startDate = dateRange.start;
-      endDate = dateRange.end;
+      startDate = new Date(params.dateRange.start);
+      endDate = new Date(params.dateRange.end);
     } else {
-      // Use provided dates or default to next 7 days
-      if (params.startDate) {
-        // Check if it's a Unix timestamp (number) or date string
-        const startTimestamp = parseInt(params.startDate);
-        startDate = isNaN(startTimestamp) ? new Date(params.startDate) : new Date(startTimestamp);
-      } else {
-        startDate = new Date(); // Today
-      }
-
-      if (params.endDate) {
-        const endTimestamp = parseInt(params.endDate);
-        endDate = isNaN(endTimestamp) ? new Date(params.endDate) : new Date(endTimestamp);
-      } else {
-        endDate = new Date();
-        endDate.setDate(endDate.getDate() + 7); // Next 7 days
-      }
+      // Default to next 7 days from now
+      startDate = new Date(); // Today
+      endDate = new Date();
+      endDate.setDate(startDate.getDate() + 7);
     }
 
     // Build filters

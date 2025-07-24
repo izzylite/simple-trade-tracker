@@ -229,6 +229,19 @@ export class MultiFunctionExecutor {
           return this._extractTrades(previousResults[index].result);
         }
       }
+
+      // Handle reference to economic event names from previous result
+      if (value === 'EXTRACT_EVENT_NAMES' && lastResult) {
+        return this._extractEventNames(lastResult);
+      }
+
+      // Handle indexed economic event names extraction (e.g., EXTRACT_EVENT_NAMES_0)
+      if (value.startsWith('EXTRACT_EVENT_NAMES_')) {
+        const index = parseInt(value.replace('EXTRACT_EVENT_NAMES_', ''));
+        if (index >= 0 && index < previousResults.length) {
+          return this._extractEventNames(previousResults[index].result);
+        }
+      }
   
       // Handle cache keys from different functions
       if (value.startsWith('ai_function_result_')) {
@@ -464,7 +477,12 @@ export class MultiFunctionExecutor {
         if (part === 'id' && Array.isArray(current)) {
           return current.map((item: any) => item.id || item.tradeId || item.trade_id).filter(Boolean);
         }
-        
+
+        // Handle array access with special processing for economic events
+        if (part === 'name' && Array.isArray(current)) {
+          return current.map((item: any) => item.name || item.event).filter(Boolean);
+        }
+
         current = current[part];
       } else {
         const availableFields = current && typeof current === 'object' ? Object.keys(current) : [];
@@ -511,7 +529,18 @@ export class MultiFunctionExecutor {
       const indices = this.parseIndices(value, 'INTERSECT_TRADES_');
       return this.intersectTrades(previousResults, indices);
     }
-    
+
+    if (value.startsWith('MERGE_EVENT_NAMES_')) {
+      const indices = this.parseIndices(value, 'MERGE_EVENT_NAMES_');
+      return this.mergeEventNames(previousResults, indices);
+    }
+
+    if (value.startsWith('UNIQUE_EVENT_NAMES_')) {
+      const indices = this.parseIndices(value, 'UNIQUE_EVENT_NAMES_');
+      const merged = this.mergeEventNames(previousResults, indices);
+      return Array.from(new Set(merged));
+    }
+
     logger.warn(`Unknown array operation: ${value}`);
     return [];
   }
@@ -761,6 +790,26 @@ export class MultiFunctionExecutor {
      
      return intersectionTrades;
    }
+
+   /**
+    * Merge event names from multiple function results
+    */
+   private mergeEventNames(previousResults: any[], indices: number[]): string[] {
+     const allEventNames: string[] = [];
+
+     for (const index of indices) {
+       if (index >= 0 && index < previousResults.length) {
+         const result = previousResults[index].result;
+         const eventNames = this._extractEventNames(result);
+         allEventNames.push(...eventNames);
+       } else {
+         logger.warn(`Invalid index ${index} for merging event names. Available: 0-${previousResults.length - 1}`);
+       }
+     }
+
+     return allEventNames;
+   }
+
    /**
    * Extract trade IDs from various result formats
    */
@@ -801,28 +850,63 @@ export class MultiFunctionExecutor {
    */
   private _extractTrades(result: any): any[] {
     if (!result) return [];
-    
+
     // Direct array of trades
     if (Array.isArray(result)) {
       return result;
     }
-    
+
     // Result object with trades array
     if (result.trades && Array.isArray(result.trades)) {
       return result.trades;
     }
-    
+
     // Result object with data.trades array
     if (result.data && result.data.trades && Array.isArray(result.data.trades)) {
       return result.data.trades;
     }
-    
+
     // Single trade object
     if (result.id || result.tradeId || result.trade_id) {
       return [result];
     }
-    
+
     logger.warn('Could not extract trades from result:', Object.keys(result));
+    return [];
+  }
+
+  /**
+   * Extract economic event names from various result formats
+   */
+  private _extractEventNames(result: any): string[] {
+    if (!result) return [];
+
+    // Direct array of event names
+    if (Array.isArray(result) && result.length > 0 && typeof result[0] === 'string') {
+      return result;
+    }
+
+    // Array of event objects
+    if (Array.isArray(result) && result.length > 0 && typeof result[0] === 'object') {
+      return result.map(event => event.name || event.event).filter(Boolean);
+    }
+
+    // Result object with events array
+    if (result.events && Array.isArray(result.events)) {
+      return result.events.map((event: any) => event.name || event.event).filter(Boolean);
+    }
+
+    // Result object with data.events array
+    if (result.data && result.data.events && Array.isArray(result.data.events)) {
+      return result.data.events.map((event: any) => event.name || event.event).filter(Boolean);
+    }
+
+    // Single event object
+    if (result.name || result.event) {
+      return [result.name || result.event];
+    }
+
+    logger.warn('Could not extract event names from result:', Object.keys(result));
     return [];
   }
   
@@ -914,6 +998,12 @@ export class MultiFunctionExecutor {
                 example: "EXTRACT_TRADE_IDS",
                 description: "Extract trade IDs from previous result's trades array",
                 usage: "Use when you need just the trade IDs for the next function"
+              },
+              {
+                pattern: "EXTRACT_EVENT_NAMES",
+                example: "EXTRACT_EVENT_NAMES",
+                description: "Extract economic event names from previous result's events array",
+                usage: "Use when you need event names from fetchEconomicEvents to filter trades by economicNames"
               }
             ]
           },
@@ -931,6 +1021,12 @@ export class MultiFunctionExecutor {
                 example: "EXTRACT_TRADES_1, EXTRACT_TRADES_3",
                 description: "Trades array from specific result by index",
                 usage: "Use when you need trades from a specific function result"
+              },
+              {
+                pattern: "EXTRACT_EVENT_NAMES_{index}",
+                example: "EXTRACT_EVENT_NAMES_0, EXTRACT_EVENT_NAMES_2",
+                description: "Economic event names from specific result by index",
+                usage: "Use when you need event names from a specific fetchEconomicEvents result"
               },
               {
                 pattern: "EXTRACT_{index}.{field.path}",
@@ -984,6 +1080,18 @@ export class MultiFunctionExecutor {
                 example: "INTERSECT_TRADES_0_1, INTERSECT_TRADES_0_2",
                 description: "Find common trade objects between multiple results",
                 usage: "Use when you want to find actual trade objects that appear in multiple result sets"
+              },
+              {
+                pattern: "MERGE_EVENT_NAMES_{index}_{index}",
+                example: "MERGE_EVENT_NAMES_0_1, MERGE_EVENT_NAMES_0_2_3",
+                description: "Merge economic event names from multiple results",
+                usage: "Use when you want to combine event names from different fetchEconomicEvents results"
+              },
+              {
+                pattern: "UNIQUE_EVENT_NAMES_{index}_{index}",
+                example: "UNIQUE_EVENT_NAMES_0_1, UNIQUE_EVENT_NAMES_1_2",
+                description: "Get unique event names across multiple results",
+                usage: "Use when you want to remove duplicate event names from merged results"
               }
             ]
           },

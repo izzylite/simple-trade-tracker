@@ -13,7 +13,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
   return [
     {
       name: 'searchTrades',
-      description: 'Search and filter trades based on specific criteria such as date ranges, trade outcomes, profit/loss amounts, tags, trading sessions, days of the week, or economic events. Can filter by economic event presence, impact level, currency, or event names. Returns matching trades with summary statistics including total P&L and win rate. Call getDataStructureInfo({type: "trade", detail: "fields-only"}) to see available trade fields for selective data extraction.',
+      description: 'Search and filter trades based on specific criteria such as date ranges, trade outcomes, profit/loss amounts, tags, trading sessions, days of the week, or economic events. Can filter by economic event presence, impact level, currency, event names (partial match), or specific event names (exact match). Returns matching trades with summary statistics including total P&L and win rate. Call getDataStructureInfo({type: "trade", detail: "fields-only"}) to see available trade fields for selective data extraction.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
@@ -30,8 +30,18 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
             description: 'Specific trade fields to include in results. Use "all" for complete trade data, or specify individual fields like ["id", "name", "amount", "type"] to reduce token usage and improve performance. Common combinations: ["id", "amount", "type"] for basic analysis, ["id", "name", "date", "amount", "riskToReward"] for performance analysis, ["id", "tags", "session", "economicEvents"] for pattern analysis. Defaults to essential fields if not specified.'
           },
           dateRange: {
-            type: SchemaType.STRING,
-            description: 'Date range filter. Supports formats like "last 30 days", "last 6 months", "last 1 week", or specific months like "2024-01" for January 2024. Use "last X days/weeks/months" for relative periods.'
+            type: SchemaType.OBJECT,
+            properties: {
+              start: {
+                type: SchemaType.NUMBER,
+                description: 'Start date as Unix timestamp in milliseconds'
+              },
+              end: {
+                type: SchemaType.NUMBER,
+                description: 'End date as Unix timestamp in milliseconds'
+              }
+            },
+            description: 'Date range filter using Unix timestamps. Example: {start: 1640995200000, end: 1672531199999} for year 2022. Calculate using Date.now() - (30 * 24 * 60 * 60 * 1000) for 30 days ago.'
           },
           tradeType: {
             type: SchemaType.STRING,
@@ -79,6 +89,11 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
           economicEventName: {
             type: SchemaType.STRING,
             description: 'Filter trades by economic event name (partial match). Examples: "NFP", "FOMC", "GDP", "CPI". Only includes trades that have events containing this text in the event name.'
+          },
+          economicNames: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING },
+            description: 'Filter trades that contain any of these specific economic event names (exact match). Useful for chaining after fetchEconomicEvents to find trades associated with specific events. Example: ["Non-Farm Payrolls", "FOMC Meeting", "GDP"]. Only includes trades that have events with names exactly matching any of the provided names.'
           }
         }
       }
@@ -181,8 +196,18 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
             description: 'Filter by specific economic event name (partial match). Examples: "NFP", "FOMC", "GDP", "CPI", "Interest Rate Decision".'
           },
           dateRange: {
-            type: SchemaType.STRING,
-            description: 'Time period for analysis. Supports formats like "last 30 days", "last 6 months", or specific months like "2024-01".'
+            type: SchemaType.OBJECT,
+            properties: {
+              start: {
+                type: SchemaType.NUMBER,
+                description: 'Start date as Unix timestamp in milliseconds'
+              },
+              end: {
+                type: SchemaType.NUMBER,
+                description: 'End date as Unix timestamp in milliseconds'
+              }
+            },
+            description: 'Time period for analysis using Unix timestamps. Calculate relative dates like Date.now() - (90 * 24 * 60 * 60 * 1000) for 90 days ago.'
           },
           compareWithoutEvents: {
             type: SchemaType.BOOLEAN,
@@ -228,8 +253,18 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
             description: 'Filter events by impact level. "High" for major market-moving events, "Medium" for moderate impact, "all" for High and Medium events. Low impact events are excluded to focus on market-relevant events and reduce costs.'
           },
           dateRange: {
-            type: SchemaType.STRING,
-            description: 'Natural language date range. Examples: "next 7 days", "this week", "next week", "tomorrow", "today", "next 2 weeks". Takes precedence over startDate/endDate if provided.'
+            type: SchemaType.OBJECT,
+            properties: {
+              start: {
+                type: SchemaType.NUMBER,
+                description: 'Start date as Unix timestamp in milliseconds'
+              },
+              end: {
+                type: SchemaType.NUMBER,
+                description: 'End date as Unix timestamp in milliseconds'
+              }
+            },
+            description: 'Date range for fetching events using Unix timestamps. Example: {start: Date.now(), end: Date.now() + (7 * 24 * 60 * 60 * 1000)} for next 7 days.'
           },
           limit: {
             type: SchemaType.NUMBER,
@@ -366,7 +401,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     },
     {
       name: 'executeMultipleFunctions',
-      description: 'Execute multiple trading analysis functions in sequence with automatic result passing between functions. Use this for 2-4 step workflows where each step depends on the previous result. Functions execute in order provided. IMPORTANT: Do NOT use returnCacheKey=true in function arguments - placeholders need actual data, not cache keys.',
+      description: 'Chain 2-4 functions where each uses results from previous ones. Example workflow: [1) fetchEconomicEvents({impact:"High"}) → 2) searchTrades({economicNames:"EXTRACT_EVENT_NAMES"}) → 3) getTradeStatistics({tradeIds:"EXTRACT_TRADE_IDS"})]. Use EXTRACT_TRADE_IDS for trade IDs, EXTRACT_EVENT_NAMES for economic event names, LAST_RESULT for full previous result, RESULT_0/RESULT_1 for specific function results. Do NOT use returnCacheKey=true.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
@@ -382,7 +417,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
                 },
                 args: {
                   type: SchemaType.OBJECT,
-                  description: 'Arguments to pass to the function. Supported placeholder patterns: Core: "LAST_RESULT", "EXTRACT_TRADES", "EXTRACT_TRADE_IDS", "RESULT_{index}". Advanced: "EXTRACT_TRADE_IDS_{index}", "EXTRACT_TRADES_{index}", "EXTRACT_{index}.{field.path}", "MERGE_TRADE_IDS_{index}_{index}", "UNIQUE_TRADE_IDS_{index}_{index}", "INTERSECT_TRADE_IDS_{index}_{index}", "MERGE_TRADES_{index}_{index}", "UNIQUE_TRADES_{index}_{index}", "INTERSECT_TRADES_{index}_{index}", "SLICE_{index}.{field}.{start}.{end}", "FILTER_{index}.{field}.{property}.{value}", "SORT_{index}.{field}.{property}.{asc|desc}". Replace {index} with numbers, {field.path} with dot notation like "trades.id", {property} with field names, {value} with filter values.'
+                  description: 'Function arguments with placeholders for chaining. Examples: {tradeIds: "EXTRACT_TRADE_IDS"}, {economicNames: "EXTRACT_EVENT_NAMES"}, {tradeId: "EXTRACT_TRADES.0.id"}, {tags: "RESULT_0.data.commonTags"}, {dateRange: {start: 1672531200000, end: 1675209599999}}. Use EXTRACT_TRADE_IDS for trade IDs, EXTRACT_EVENT_NAMES for economic event names, EXTRACT_TRADES for trade objects, RESULT_0/RESULT_1 for specific results.'
                 },
                 condition: {
                   type: SchemaType.STRING,
@@ -407,14 +442,14 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     },
     {
       name: 'getAvailablePlaceholderPatterns',
-      description: 'Get comprehensive documentation of all available placeholder patterns for executeMultipleFunctions. Call this when you need to use advanced placeholders or are unsure about placeholder syntax. This provides complete examples and usage guidance.',
+      description: 'Get advanced placeholder patterns for complex executeMultipleFunctions workflows. Use only when you need advanced patterns like MERGE_TRADE_IDS_0_1, FILTER_0.trades.amount.>100, or conditional placeholders beyond the basic examples shown in executeMultipleFunctions.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
           category: {
             type: SchemaType.STRING,
             enum: ['all', 'core', 'extraction', 'arrays', 'transformations', 'conditions'],
-            description: 'Filter patterns by category. Use "all" to see everything, or specify a category for focused documentation. Categories: core (basic patterns), extraction (field access), arrays (merge/unique/intersect), transformations (slice/filter/sort), conditions (conditional execution).'
+            description: 'Use "core" for basic chaining patterns, "extraction" for accessing specific fields, "all" for complete reference.'
           }
         },
         required: []

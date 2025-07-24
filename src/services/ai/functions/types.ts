@@ -8,10 +8,15 @@ export interface TradingAnalysisResult {
   error?: string;
 }
 
+export interface DateRange {
+  start: number; // Unix timestamp in milliseconds
+  end: number;   // Unix timestamp in milliseconds
+}
+
 export interface SearchTradesParams {
   returnCacheKey?: boolean;
   fields?: string[];
-  dateRange?: string;
+  dateRange?: DateRange;
   tradeType?: 'win' | 'loss' | 'breakeven' | 'all';
   minAmount?: number;
   maxAmount?: number;
@@ -24,6 +29,7 @@ export interface SearchTradesParams {
   economicEventImpact?: 'High' | 'Medium' | 'Low' | 'all';
   economicEventCurrency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'NZD' | 'all';
   economicEventName?: string;
+  economicNames?: string[]; // Filter trades that contain any of these economic event names (exact match)
 }
 
 export interface GetStatisticsParams {
@@ -56,18 +62,16 @@ export interface AnalyzeEconomicEventsParams {
   impactLevel?: 'High' | 'Medium' | 'Low' | 'all';
   currency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'NZD' | 'all';
   eventName?: string;
-  dateRange?: string;
+  dateRange?: DateRange;
   compareWithoutEvents?: boolean;
 }
 
 export interface FetchEconomicEventsParams {
   returnCacheKey?: boolean;
   fields?: string[];
-  startDate?: string; // Unix timestamp in milliseconds or date string
-  endDate?: string; // Unix timestamp in milliseconds or date string
+  dateRange?: DateRange;
   currency?: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'NZD' | 'all';
   impact?: 'High' | 'Medium' | 'all'; // Low impact events excluded for cost efficiency
-  dateRange?: string; // "next 7 days", "this week", "next week", etc.
   limit?: number;
 }
 
