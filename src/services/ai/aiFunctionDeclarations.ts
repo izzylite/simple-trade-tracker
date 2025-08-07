@@ -401,7 +401,7 @@ export function getFunctionDeclarations(currencies : Currency[]): FunctionDeclar
     },
     {
       name: 'executeMultipleFunctions',
-      description: 'Chain 2-4 functions where each uses results from previous ones. Example workflow: [1) fetchEconomicEvents({impact:"High"}) → 2) searchTrades({economicNames:"EXTRACT_EVENT_NAMES"}) → 3) getTradeStatistics({tradeIds:"EXTRACT_TRADE_IDS"})]. Use EXTRACT_TRADE_IDS for trade IDs, EXTRACT_EVENT_NAMES for economic event names, LAST_RESULT for full previous result, RESULT_0/RESULT_1 for specific function results. Do NOT use returnCacheKey=true.',
+      description: 'Chain 2-4 functions where each uses results from previous ones. IMPORTANT: Use this instead of sequential function calls when you need placeholders. Example workflow: [1) fetchEconomicEvents({impact:"High"}) → 2) searchTrades({economicNames:"EXTRACT_EVENT_NAMES"}) → 3) getTradeStatistics({tradeIds:"EXTRACT_TRADE_IDS"})]. Use EXTRACT_TRADE_IDS for trade IDs, EXTRACT_EVENT_NAMES for economic event names, LAST_RESULT for full previous result, RESULT_0/RESULT_1 for specific function results. Do NOT use returnCacheKey=true.',
       parameters: {
         type: SchemaType.OBJECT,
         properties: {

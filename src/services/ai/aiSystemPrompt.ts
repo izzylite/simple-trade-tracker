@@ -79,6 +79,8 @@ You have access to powerful analysis functions that you should use strategically
 ### executeMultipleFunctions (Recommended for Most Workflows):
 This executes multiple functions in sequence with automatic result passing.
 
+**IMPORTANT: Placeholders only work inside executeMultipleFunctions! Do not use placeholders in sequential function calls.**
+
 **Core placeholders you can use:**
 - "LAST_RESULT": Complete result from the previous function
 - "EXTRACT_TRADES": Extract trades array from previous result

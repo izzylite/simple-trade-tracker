@@ -97,14 +97,24 @@ export async function searchTrades(
     }
 
     // Filter by economic event names (exact match for any of the provided names)
-    if (params.economicNames && params.economicNames.length > 0) {
-      const eventNamesLower = params.economicNames.map(name => name.toLowerCase());
-      filteredTrades = filteredTrades.filter(trade => {
-        if (!trade.economicEvents || trade.economicEvents.length === 0) return false;
-        return trade.economicEvents.some(event =>
-          eventNamesLower.includes(event.name.toLowerCase())
-        );
-      });
+    if (params.economicNames) {
+      // Validate that economicNames is an array
+      if (!Array.isArray(params.economicNames)) {
+        return {
+          success: false,
+          error: `economicNames must be an array of strings, got: ${typeof params.economicNames}. If you're trying to use a placeholder like "EXTRACT_EVENT_NAMES", use executeMultipleFunctions instead of sequential function calls.`
+        };
+      }
+
+      if (params.economicNames.length > 0) {
+        const eventNamesLower = params.economicNames.map(name => name.toLowerCase());
+        filteredTrades = filteredTrades.filter(trade => {
+          if (!trade.economicEvents || trade.economicEvents.length === 0) return false;
+          return trade.economicEvents.some(event =>
+            eventNamesLower.includes(event.name.toLowerCase())
+          );
+        });
+      }
     }
 
     // Filter by session
