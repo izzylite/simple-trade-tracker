@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Smart Economic Event Watcher Service
  * Monitors upcoming events and triggers updates when they occur
@@ -8,13 +9,12 @@
 
 import { EconomicEvent, Currency, ImpactLevel } from '../types/economicCalendar';
 import { economicCalendarService } from './economicCalendarService';
-import { httpsCallable } from 'firebase/functions';
+// import { httpsCallable } from 'firebase/functions'; // Removed - migrating to Supabase
 // import { functions } from '../firebase/config';
 import { endOfDay, format, startOfDay } from 'date-fns';
 import { error, log, logger } from '../utils/logger';
 
 /* eslint-disable */
-// @ts-nocheck
 
 const functions: any = null; // Placeholder for migration
 

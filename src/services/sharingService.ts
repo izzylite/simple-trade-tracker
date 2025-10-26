@@ -1,19 +1,19 @@
+// @ts-nocheck
 /**
  * NOTE: This service has been migrated to Supabase Edge Functions.
  * All sharing functionality now uses supabaseEdgeFunctions in sharingService.ts
  * This file is kept for reference but is not used in production.
  */
 
-import { httpsCallable } from 'firebase/functions';
+// import { httpsCallable } from 'firebase/functions'; // Removed - migrated to Supabase
 // import { functions, db } from '../firebase/config';
-import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+// import { doc, getDoc, updateDoc, increment } from 'firebase/firestore'; // Removed - migrated to Supabase
 import { Trade } from '../types/dualWrite';
 import { Calendar } from '../types/dualWrite';
 import { logger } from '../utils/logger';
 import { getCalendar, getAllTrades } from './calendarService';
 
 /* eslint-disable */
-// @ts-nocheck
 
 const functions: any = null; // Placeholder for migration
 const db: any = null; // Placeholder for migration

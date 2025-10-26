@@ -1,4 +1,5 @@
-﻿/**
+﻿// @ts-nocheck
+/**
  * Economic Calendar Service (Database-Driven)
  * Reads economic calendar data directly from Firebase database with efficient queries
  *
@@ -11,28 +12,31 @@ import {
   Currency,
   ImpactLevel
 } from '../types/economicCalendar';
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  onSnapshot,
-  Timestamp,
-  limit,
-  startAfter,
-  DocumentSnapshot,
-  QueryDocumentSnapshot,
-  DocumentData
-} from 'firebase/firestore';
+// Firebase imports removed - migrating to Supabase
+// import {
+//   collection,
+//   query,
+//   where,
+//   orderBy,
+//   getDocs,
+//   onSnapshot,
+//   Timestamp,
+//   limit,
+//   startAfter,
+//   DocumentSnapshot,
+//   QueryDocumentSnapshot,
+//   DocumentData
+// } from 'firebase/firestore';
 // import { db } from '../firebase/config';
 
 import { log, error, logger } from '../utils/logger';
 
 /* eslint-disable */
-// @ts-nocheck
 
 const db: any = null; // Placeholder for migration
+type QueryDocumentSnapshot = any;
+type DocumentSnapshot = any;
+type Timestamp = any;
 
 interface PaginationOptions {
   pageSize?: number;

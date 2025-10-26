@@ -1,3 +1,9 @@
+// @ts-nocheck
+/**
+ * Legacy Firebase Functions - Main Index
+ * NOTE: Moved to src/legacy for reference only. Not used in production.
+ */
+
 import * as admin from 'firebase-admin';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onDocumentUpdated, onDocumentDeleted } from 'firebase-functions/v2/firestore';

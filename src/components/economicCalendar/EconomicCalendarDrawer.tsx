@@ -57,7 +57,7 @@ import {
 import { Calendar } from '../../types/calendar';
 import { economicCalendarService } from '../../services/economicCalendarService';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { QueryDocumentSnapshot } from 'firebase/firestore';
+// import { QueryDocumentSnapshot } from 'firebase/firestore'; // Removed - migrating to Supabase
 import EconomicEventListItem from './EconomicEventListItem';
 import EconomicCalendarFilters from './EconomicCalendarFilters';
 import Shimmer from '../Shimmer';
@@ -237,7 +237,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
   // Pagination state
   const [hasMore, setHasMore] = useState(false);
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | undefined>(undefined);
+  const [lastDoc, setLastDoc] = useState<any | undefined>(undefined); // QueryDocumentSnapshot removed - migrating to Supabase
   const [loadingMore, setLoadingMore] = useState(false);
   const [pageSize] = useState(50); // Events per page
 

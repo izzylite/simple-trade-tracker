@@ -1,3 +1,8 @@
+// @ts-nocheck
+/**
+ * Legacy Firebase Functions - Utilities
+ * NOTE: Moved to src/legacy for reference only. Not used in production.
+ */
 
 import * as admin from 'firebase-admin';
 

@@ -1,5 +1,12 @@
+// @ts-nocheck
+/**
+ * NOTE: This file contains legacy Firebase Firestore converters.
+ * Not used in production - kept for reference only.
+ * Supabase uses direct JSON serialization.
+ */
+
 import { Trade } from './dualWrite';
-import { Timestamp, DocumentData } from 'firebase/firestore';
+// import { Timestamp, DocumentData } from 'firebase/firestore'; // Removed - migrated to Supabase
 
 export interface YearlyTrades {
   year: number;
@@ -12,6 +19,9 @@ interface FirestoreConvertible<T> {
   fromJson(data: any): T;
   toJson(data: T, ...args: any[]): any;
 }
+
+const Timestamp: any = null; // Placeholder
+const DocumentData: any = null; // Placeholder
 
 const tradeConverter: FirestoreConvertible<Trade> = {
   fromJson(data: any): Trade {
@@ -37,7 +47,7 @@ const tradeConverter: FirestoreConvertible<Trade> = {
 
 // YearlyTrades Converter implementing FirestoreConvertible interface
 export class YearlyTradesConverter implements FirestoreConvertible<YearlyTrades> {
-  fromJson(doc: DocumentData): YearlyTrades {
+  fromJson(doc: any): YearlyTrades {
     const data = doc.data();
     return {
       year: data.year,

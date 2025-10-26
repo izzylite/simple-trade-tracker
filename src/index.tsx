@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import './firebase/config'; // Initialize Firebase
 
 // Import Inter font
 const link = document.createElement('link');

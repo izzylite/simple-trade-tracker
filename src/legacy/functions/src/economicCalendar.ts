@@ -1,3 +1,9 @@
+// @ts-nocheck
+/**
+ * Legacy Firebase Functions - Economic Calendar
+ * NOTE: Moved to src/legacy for reference only. Not used in production.
+ */
+
 import { onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore } from 'firebase-admin/firestore';
