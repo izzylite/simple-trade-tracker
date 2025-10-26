@@ -26,17 +26,17 @@ import { ImagePickerDialog, ImageAttribution } from './heroImage';
 
 export interface CalendarFormData {
   name: string;
-  accountBalance: number;
-  maxDailyDrawdown: number;
-  weeklyTarget?: number;
-  monthlyTarget?: number;
-  yearlyTarget?: number;
-  riskPerTrade?: number;
-  dynamicRiskEnabled?: boolean;
-  increasedRiskPercentage?: number;
-  profitThresholdPercentage?: number;
-  heroImageUrl?: string;
-  heroImageAttribution?: ImageAttribution;
+  account_balance: number;
+  max_daily_drawdown: number;
+  weekly_target?: number;
+  monthly_target?: number;
+  yearly_target?: number;
+  risk_per_trade?: number;
+  dynamic_risk_enabled?: boolean;
+  increased_risk_percentage?: number;
+  profit_threshold_percentage?: number;
+  hero_image_url?: string;
+  hero_image_attribution?: ImageAttribution;
 
 }
 
@@ -65,19 +65,19 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
 
   // Form state
   const [name, setName] = useState('');
-  const [accountBalance, setAccountBalance] = useState('');
-  const [maxDailyDrawdown, setMaxDailyDrawdown] = useState('');
-  const [weeklyTarget, setWeeklyTarget] = useState('');
-  const [monthlyTarget, setMonthlyTarget] = useState('');
-  const [yearlyTarget, setYearlyTarget] = useState('');
-  const [riskPerTrade, setRiskPerTrade] = useState('');
-  const [dynamicRiskEnabled, setDynamicRiskEnabled] = useState(false);
-  const [increasedRiskPercentage, setIncreasedRiskPercentage] = useState('');
-  const [profitThresholdPercentage, setProfitThresholdPercentage] = useState('');
+  const [account_balance, setAccount_balance] = useState('');
+  const [max_daily_drawdown, setMax_daily_drawdown] = useState('');
+  const [weekly_target, setWeekly_target] = useState('');
+  const [monthly_target, setMonthly_target] = useState('');
+  const [yearly_target, setYearly_target] = useState('');
+  const [risk_per_trade, setRisk_per_trade] = useState('');
+  const [dynamic_risk_enabled, setDynamicRiskEnabled] = useState(false);
+  const [increased_risk_percentage, setIncreasedRiskPercentage] = useState('');
+  const [profit_threshold_percentage, setProfitThresholdPercentage] = useState('');
 
   // Hero image state
-  const [heroImageUrl, setHeroImageUrl] = useState<string>('');
-  const [heroImageAttribution, setHeroImageAttribution] = useState<ImageAttribution | undefined>(undefined);
+  const [hero_image_url, setHeroImageUrl] = useState<string>('');
+  const [hero_image_attribution, setHeroImageAttribution] = useState<ImageAttribution | undefined>(undefined);
 
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
@@ -86,17 +86,17 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
     if (open) {
       if (initialData) {
         setName(initialData.name || '');
-        setAccountBalance(initialData.accountBalance?.toString() || '');
-        setMaxDailyDrawdown(initialData.maxDailyDrawdown?.toString() || '');
-        setWeeklyTarget(initialData.weeklyTarget?.toString() || '');
-        setMonthlyTarget(initialData.monthlyTarget?.toString() || '');
-        setYearlyTarget(initialData.yearlyTarget?.toString() || '');
-        setRiskPerTrade(initialData.riskPerTrade?.toString() || '');
-        setDynamicRiskEnabled(initialData.dynamicRiskEnabled || false);
-        setIncreasedRiskPercentage(initialData.increasedRiskPercentage?.toString() || '');
-        setProfitThresholdPercentage(initialData.profitThresholdPercentage?.toString() || '');
-        setHeroImageUrl(initialData.heroImageUrl || '');
-        setHeroImageAttribution(initialData.heroImageAttribution);
+        setAccount_balance(initialData.account_balance?.toString() || '');
+        setMax_daily_drawdown(initialData.max_daily_drawdown?.toString() || '');
+        setWeekly_target(initialData.weekly_target?.toString() || '');
+        setMonthly_target(initialData.monthly_target?.toString() || '');
+        setYearly_target(initialData.yearly_target?.toString() || '');
+        setRisk_per_trade(initialData.risk_per_trade?.toString() || '');
+        setDynamicRiskEnabled(initialData.dynamic_risk_enabled || false);
+        setIncreasedRiskPercentage(initialData.increased_risk_percentage?.toString() || '');
+        setProfitThresholdPercentage(initialData.profit_threshold_percentage?.toString() || '');
+        setHeroImageUrl(initialData.hero_image_url || '');
+        setHeroImageAttribution(initialData.hero_image_attribution);
 
       } else {
         // Reset form for create mode without initial data
@@ -107,12 +107,12 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
 
   const resetForm = () => {
     setName('');
-    setAccountBalance('');
-    setMaxDailyDrawdown('');
-    setWeeklyTarget('');
-    setMonthlyTarget('');
-    setYearlyTarget('');
-    setRiskPerTrade('');
+    setAccount_balance('');
+    setMax_daily_drawdown('');
+    setWeekly_target('');
+    setMonthly_target('');
+    setYearly_target('');
+    setRisk_per_trade('');
     setDynamicRiskEnabled(false);
     setIncreasedRiskPercentage('');
     setProfitThresholdPercentage('');
@@ -122,15 +122,15 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (name.trim() && accountBalance.trim() && maxDailyDrawdown.trim()) {
-      const balance = parseFloat(accountBalance);
-      const maxDrawdown = parseFloat(maxDailyDrawdown);
-      const weeklyTargetValue = weeklyTarget.trim() ? parseFloat(weeklyTarget) : undefined;
-      const monthlyTargetValue = monthlyTarget.trim() ? parseFloat(monthlyTarget) : undefined;
-      const yearlyTargetValue = yearlyTarget.trim() ? parseFloat(yearlyTarget) : undefined;
-      const riskPerTradeValue = riskPerTrade.trim() ? parseFloat(riskPerTrade) : undefined;
-      const increasedRiskValue = increasedRiskPercentage.trim() ? parseFloat(increasedRiskPercentage) : undefined;
-      const profitThresholdValue = profitThresholdPercentage.trim() ? parseFloat(profitThresholdPercentage) : undefined;
+    if (name.trim() && account_balance.trim() && max_daily_drawdown.trim()) {
+      const balance = parseFloat(account_balance);
+      const maxDrawdown = parseFloat(max_daily_drawdown);
+      const weeklyTargetValue = weekly_target.trim() ? parseFloat(weekly_target) : undefined;
+      const monthlyTargetValue = monthly_target.trim() ? parseFloat(monthly_target) : undefined;
+      const yearlyTargetValue = yearly_target.trim() ? parseFloat(yearly_target) : undefined;
+      const riskPerTradeValue = risk_per_trade.trim() ? parseFloat(risk_per_trade) : undefined;
+      const increasedRiskValue = increased_risk_percentage.trim() ? parseFloat(increased_risk_percentage) : undefined;
+      const profitThresholdValue = profit_threshold_percentage.trim() ? parseFloat(profit_threshold_percentage) : undefined;
 
       if (!isNaN(balance) && balance >= 0 && !isNaN(maxDrawdown) && maxDrawdown > 0 &&
           (weeklyTargetValue === undefined || (!isNaN(weeklyTargetValue) && weeklyTargetValue > 0)) &&
@@ -142,17 +142,17 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
 
         await onSubmit({
           name: name.trim(),
-          accountBalance: balance,
-          maxDailyDrawdown: maxDrawdown,
-          weeklyTarget: weeklyTargetValue,
-          monthlyTarget: monthlyTargetValue,
-          yearlyTarget: yearlyTargetValue,
-          riskPerTrade: riskPerTradeValue,
-          dynamicRiskEnabled,
-          increasedRiskPercentage: increasedRiskValue,
-          profitThresholdPercentage: profitThresholdValue,
-          heroImageUrl: heroImageUrl || undefined,
-          heroImageAttribution: heroImageAttribution,
+          account_balance: balance,
+          max_daily_drawdown: maxDrawdown,
+          weekly_target: weeklyTargetValue,
+          monthly_target: monthlyTargetValue,
+          yearly_target: yearlyTargetValue,
+          risk_per_trade: riskPerTradeValue,
+          dynamic_risk_enabled,
+          increased_risk_percentage: increasedRiskValue,
+          profit_threshold_percentage: profitThresholdValue,
+          hero_image_url: hero_image_url || undefined,
+          hero_image_attribution: hero_image_attribution,
 
         });
       }
@@ -174,7 +174,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
 
 
 
-  const isFormValid = name.trim() && accountBalance.trim() && maxDailyDrawdown.trim();
+  const isFormValid = name.trim() && account_balance.trim() && max_daily_drawdown.trim();
 
   const dialogTitle = title;
 
@@ -233,7 +233,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
               Cover Image (Optional)
             </Typography>
 
-            {heroImageUrl ? (
+            {hero_image_url ? (
               <Card sx={{
                 position: 'relative',
                 borderRadius: 2,
@@ -245,7 +245,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
                   component="div"
                   sx={{
                     height: 120,
-                    backgroundImage: `url(${heroImageUrl})`,
+                    backgroundImage: `url(${hero_image_url})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',
@@ -292,7 +292,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
                 </Box>
 
                 {/* Attribution */}
-                {heroImageAttribution && (
+                {hero_image_attribution && (
                   <Box sx={{
                     position: 'absolute',
                     bottom: 4,
@@ -305,7 +305,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
                     zIndex: 2
                   }}>
                     <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>
-                      📸 {heroImageAttribution.photographer}
+                      📸 {hero_image_attribution.photographer}
                     </Typography>
                   </Box>
                 )}
@@ -335,11 +335,11 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
           <TextField
             label={mode === 'create' ? "Initial Account Balance" : "Account Balance"}
             fullWidth
-            value={accountBalance}
+            value={account_balance}
             onChange={(e) => {
               const value = e.target.value;
               if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setAccountBalance(value);
+                setAccount_balance(value);
               }
             }}
             type="number"
@@ -350,11 +350,11 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
           <TextField
             label="Max Daily Drawdown (%)"
             fullWidth
-            value={maxDailyDrawdown}
+            value={max_daily_drawdown}
             onChange={(e) => {
               const value = e.target.value;
               if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setMaxDailyDrawdown(value);
+                setMax_daily_drawdown(value);
               }
             }}
             type="number"
@@ -366,11 +366,11 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
           <TextField
             label="Weekly Target (%)"
             fullWidth
-            value={weeklyTarget}
+            value={weekly_target}
             onChange={(e) => {
               const value = e.target.value;
               if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setWeeklyTarget(value);
+                setWeekly_target(value);
               }
             }}
             type="number"
@@ -382,11 +382,11 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
           <TextField
             label="Monthly Target (%)"
             fullWidth
-            value={monthlyTarget}
+            value={monthly_target}
             onChange={(e) => {
               const value = e.target.value;
               if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setMonthlyTarget(value);
+                setMonthly_target(value);
               }
             }}
             type="number"
@@ -398,11 +398,11 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
           <TextField
             label="Yearly Target (%)"
             fullWidth
-            value={yearlyTarget}
+            value={yearly_target}
             onChange={(e) => {
               const value = e.target.value;
               if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setYearlyTarget(value);
+                setYearly_target(value);
               }
             }}
             type="number"
@@ -414,11 +414,11 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
           <TextField
             label="Risk Per Trade (%)"
             fullWidth
-            value={riskPerTrade}
+            value={risk_per_trade}
             onChange={(e) => {
               const value = e.target.value;
               if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setRiskPerTrade(value);
+                setRisk_per_trade(value);
               }
             }}
             type="number"
@@ -428,7 +428,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
             helperText="Percentage of account balance to risk per trade (optional)"
           />
 
-          {riskPerTrade && (
+          {risk_per_trade && (
             <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2, mt: 1 }}>
               <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
                 Dynamic Risk Settings
@@ -437,7 +437,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
               <FormControlLabel
                 control={
                   <Switch
-                    checked={dynamicRiskEnabled}
+                    checked={dynamic_risk_enabled}
                     onChange={(e) => setDynamicRiskEnabled(e.target.checked)}
                     color="primary"
                   />
@@ -446,12 +446,12 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
                 sx={{ mb: 1.5 }}
               />
 
-              {dynamicRiskEnabled && (
+              {dynamic_risk_enabled && (
                 <Stack spacing={2}>
                   <TextField
                     label="Profit Threshold (%)"
                     fullWidth
-                    value={profitThresholdPercentage}
+                    value={profit_threshold_percentage}
                     onChange={(e) => {
                       const value = e.target.value;
                       if (value === '' || /^\d*\.?\d*$/.test(value)) {
@@ -469,7 +469,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
                   <TextField
                     label="Increased Risk (%)"
                     fullWidth
-                    value={increasedRiskPercentage}
+                    value={increased_risk_percentage}
                     onChange={(e) => {
                       const value = e.target.value;
                       if (value === '' || /^\d*\.?\d*$/.test(value)) {

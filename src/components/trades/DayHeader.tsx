@@ -11,17 +11,17 @@ import { alpha } from '@mui/material/styles';
 
 interface DayHeaderProps {
   formInputVisible: boolean;
-  accountBalance: number;
+  account_balance: number;
   title:string,
-  totalPnL: number;
+  total_pnl: number;
   onPrevDay: () => void;
   onNextDay: () => void;
 }
 
 const DayHeader: React.FC<DayHeaderProps> = ({
-  accountBalance,
+  account_balance,
   formInputVisible,
-  totalPnL,
+  total_pnl,
   title,
   onPrevDay,
   onNextDay
@@ -56,11 +56,11 @@ const DayHeader: React.FC<DayHeaderProps> = ({
             flex: 1,
             p: 2,
             borderRadius: 1,
-            bgcolor: totalPnL >= 0
+            bgcolor: total_pnl >= 0
               ? alpha(theme.palette.success.main, 0.1)
               : alpha(theme.palette.error.main, 0.1),
             border: '1px solid',
-            borderColor: totalPnL >= 0
+            borderColor: total_pnl >= 0
               ? alpha(theme.palette.success.main, 0.2)
               : alpha(theme.palette.error.main, 0.2)
           }}
@@ -72,12 +72,12 @@ const DayHeader: React.FC<DayHeaderProps> = ({
             variant="h6"
             sx={{
               fontWeight: 600,
-              color: totalPnL >= 0
+              color: total_pnl >= 0
                 ? theme.palette.success.main
                 : theme.palette.error.main
             }}
           >
-            {totalPnL >= 0 ? '+' : ''}{totalPnL.toLocaleString()}
+            {total_pnl >= 0 ? '+' : ''}{total_pnl.toLocaleString()}
           </Typography>
         </Box>
 
@@ -95,7 +95,7 @@ const DayHeader: React.FC<DayHeaderProps> = ({
             Balance Of The Day
           </Typography>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            ${accountBalance.toLocaleString()}
+            ${account_balance.toLocaleString()}
           </Typography>
         </Box>
       </Box>

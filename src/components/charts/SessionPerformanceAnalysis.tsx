@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Paper, Typography, useTheme, Stack, alpha } from '@mui/material';
 import { isSameMonth } from 'date-fns';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import { formatValue } from '../../utils/formatters';
 
 interface SessionPerformanceAnalysisProps {
@@ -69,20 +69,20 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                 )}`,
                 borderRadius: 2,
                 bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)',
-                opacity: session.totalTrades === 0 ? 0.5 : 1,
-                cursor: session.totalTrades > 0 ? 'pointer' : 'default',
+                opacity: session.total_trades === 0 ? 0.5 : 1,
+                cursor: session.total_trades > 0 ? 'pointer' : 'default',
                 transition: 'all 0.2s',
                 '&:hover': {
-                  boxShadow: session.totalTrades > 0 ? theme.shadows[2] : 'none',
-                  bgcolor: session.totalTrades > 0 ? alpha(theme.palette.primary.main, 0.05) : theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)'
+                  boxShadow: session.total_trades > 0 ? theme.shadows[2] : 'none',
+                  bgcolor: session.total_trades > 0 ? alpha(theme.palette.primary.main, 0.05) : theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)'
                 }
               }}
               onClick={() => {
-                if (session.totalTrades > 0) {
+                if (session.total_trades > 0) {
                   const sessionTrades = trades.filter(trade =>
                     trade.session === session.session &&
-                    (timePeriod === 'month' ? isSameMonth(new Date(trade.date), selectedDate) :
-                     timePeriod === 'year' ? new Date(trade.date).getFullYear() === selectedDate.getFullYear() :
+                    (timePeriod === 'month' ? isSameMonth(new Date(trade.trade_date), selectedDate) :
+                     timePeriod === 'year' ? new Date(trade.trade_date).getFullYear() === selectedDate.getFullYear() :
                      true)
                   );
                   setMultipleTradesDialog({
@@ -108,7 +108,7 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                     Total Trades
                   </Typography>
                   <Typography variant="body2">
-                    {session.totalTrades}
+                    {session.total_trades}
                   </Typography>
                 </Box>
 
@@ -119,10 +119,10 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                   <Typography
                     variant="body2"
                     sx={{
-                      color: session.winRate >= 50 ? theme.palette.success.main : theme.palette.error.main
+                      color: session.win_rate >= 50 ? theme.palette.success.main : theme.palette.error.main
                     }}
                   >
-                    {session.winRate.toFixed(1)}%
+                    {session.win_rate.toFixed(1)}%
                   </Typography>
                 </Box>
 
@@ -133,11 +133,11 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                   <Typography
                     variant="body2"
                     sx={{
-                      color: session.totalPnL > 0 ? theme.palette.success.main : theme.palette.error.main,
+                      color: session.total_pnl > 0 ? theme.palette.success.main : theme.palette.error.main,
                       fontWeight: 500
                     }}
                   >
-                    {formatValue(session.totalPnL)}
+                    {formatValue(session.total_pnl)}
                   </Typography>
                 </Box>
 
@@ -202,7 +202,7 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
         </Box>
 
         {/* Pro Tip Section */}
-        {sessionStats.some(session => session.totalTrades > 0) && (
+        {sessionStats.some(session => session.total_trades > 0) && (
           <Box
             sx={{
               p: 2,
@@ -227,17 +227,17 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {(() => {
-                const sessionsWithTrades = sessionStats.filter(session => session.totalTrades > 0);
+                const sessionsWithTrades = sessionStats.filter(session => session.total_trades > 0);
                 if (sessionsWithTrades.length === 0) return "No trading data available for analysis.";
 
                 // Find most profitable session by total P&L
                 const mostProfitable = sessionsWithTrades.reduce((prev, current) =>
-                  current.totalPnL > prev.totalPnL ? current : prev
+                  current.total_pnl > prev.total_pnl ? current : prev
                 );
 
                 // Find session with highest win rate
                 const highestWinRate = sessionsWithTrades.reduce((prev, current) =>
-                  current.winRate > prev.winRate ? current : prev
+                  current.win_rate > prev.win_rate ? current : prev
                 );
 
                 // Find session with best average P&L per trade
@@ -245,19 +245,19 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                   current.averagePnL > prev.averagePnL ? current : prev
                 );
 
-                if (mostProfitable.totalPnL > 0) {
+                if (mostProfitable.total_pnl > 0) {
                   if (mostProfitable.session === highestWinRate.session && mostProfitable.session === bestAverage.session) {
-                    return `${mostProfitable.session} session is your strongest performer with the highest total P&L (${formatValue(mostProfitable.totalPnL)}), best win rate (${mostProfitable.winRate.toFixed(1)}%), and highest average per trade (${formatValue(mostProfitable.averagePnL)}). Consider focusing more trades during this session.`;
+                    return `${mostProfitable.session} session is your strongest performer with the highest total P&L (${formatValue(mostProfitable.total_pnl)}), best win rate (${mostProfitable.win_rate.toFixed(1)}%), and highest average per trade (${formatValue(mostProfitable.averagePnL)}). Consider focusing more trades during this session.`;
                   } else if (mostProfitable.session === highestWinRate.session) {
-                    return `${mostProfitable.session} session has both the highest total P&L (${formatValue(mostProfitable.totalPnL)}) and best win rate (${mostProfitable.winRate.toFixed(1)}%). ${bestAverage.session} session has the best average per trade (${formatValue(bestAverage.averagePnL)}).`;
+                    return `${mostProfitable.session} session has both the highest total P&L (${formatValue(mostProfitable.total_pnl)}) and best win rate (${mostProfitable.win_rate.toFixed(1)}%). ${bestAverage.session} session has the best average per trade (${formatValue(bestAverage.averagePnL)}).`;
                   } else {
-                    return `${mostProfitable.session} session is most profitable overall (${formatValue(mostProfitable.totalPnL)}), while ${highestWinRate.session} session has the highest win rate (${highestWinRate.winRate.toFixed(1)}%). Consider analyzing what makes each session successful.`;
+                    return `${mostProfitable.session} session is most profitable overall (${formatValue(mostProfitable.total_pnl)}), while ${highestWinRate.session} session has the highest win rate (${highestWinRate.win_rate.toFixed(1)}%). Consider analyzing what makes each session successful.`;
                   }
                 } else {
                   const leastLosing = sessionsWithTrades.reduce((prev, current) =>
-                    current.totalPnL > prev.totalPnL ? current : prev
+                    current.total_pnl > prev.total_pnl ? current : prev
                   );
-                  return `All sessions are currently showing losses. ${leastLosing.session} session has the smallest loss (${formatValue(leastLosing.totalPnL)}). Consider reviewing your strategy and risk management.`;
+                  return `All sessions are currently showing losses. ${leastLosing.session} session has the smallest loss (${formatValue(leastLosing.total_pnl)}). Consider reviewing your strategy and risk management.`;
                 }
               })()}
             </Typography>

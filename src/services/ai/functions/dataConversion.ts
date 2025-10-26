@@ -31,22 +31,22 @@ export function filterTradeFields(trades: Trade[], fields?: string[], includeIma
           filteredTrade.name = trade.name;
           break;
         case 'date':
-          filteredTrade.date = trade.date;
+          filteredTrade.trade_date = trade.trade_date;
           break;
         case 'type':
-          filteredTrade.type = trade.type;
+          filteredTrade.trade_type = trade.trade_type;
           break;
         case 'amount':
           filteredTrade.amount = trade.amount;
           break;
         case 'entry':
-          filteredTrade.entry = trade.entry;
+          filteredTrade.entry_price = trade.entry_price;
           break;
         case 'exit':
-          filteredTrade.exit = trade.exit;
+          filteredTrade.exit_price = trade.exit_price;
           break;
         case 'riskToReward':
-          filteredTrade.riskToReward = trade.riskToReward;
+          filteredTrade.risk_to_reward = trade.risk_to_reward;
           break;
         case 'session':
           filteredTrade.session = trade.session;
@@ -58,10 +58,10 @@ export function filterTradeFields(trades: Trade[], fields?: string[], includeIma
           filteredTrade.notes = trade.notes;
           break;
         case 'partialsTaken':
-          filteredTrade.partialsTaken = trade.partialsTaken;
+          filteredTrade.partials_taken = trade.partials_taken;
           break;
         case 'economicEvents':
-          filteredTrade.economicEvents = trade.economicEvents;
+          filteredTrade.economic_events = trade.economic_events;
           break;
         case 'images':
           if (includeImages) {
@@ -104,7 +104,7 @@ export function filterEconomicEventFields(events: any[], fields?: string[]): any
           filteredEvent.timeUtc = event.timeUtc;
           break;
         case 'date':
-          filteredEvent.date = event.date;
+          filteredEvent.trade_date = event.trade_date;
           break;
         case 'flagCode':
           filteredEvent.flagCode = event.flagCode;
@@ -280,8 +280,8 @@ export async function convertTradeIdsToData(
       requestedIds: params.tradeIds.length,
       foundTrades: matchingTrades.length,
       notFoundIds: notFoundIds,
-      totalPnl: matchingTrades.reduce((sum, trade) => sum + trade.amount, 0),
-      winRate: calculateWinRate(matchingTrades),
+      total_pnl: matchingTrades.reduce((sum, trade) => sum + trade.amount, 0),
+      win_rate: calculateWinRate(matchingTrades),
       includedFields: params.fields || ['all'],
       includesImages: params.includeImages || false
     };

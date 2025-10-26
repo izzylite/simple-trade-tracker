@@ -23,7 +23,7 @@ import {
   InfoOutlined
 } from '@mui/icons-material';
 import { ScoreSettings } from '../../types/score';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import { DEFAULT_SCORE_SETTINGS } from '../../utils/scoreUtils';
 import ExcludedTagsSelector from './ExcludedTagsSelector';
 import TagSelector from './TagSelector';
@@ -425,8 +425,8 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
                 <TextField
                   label="Target Win Rate (%)"
                   type="number"
-                  value={localSettings.targets.winRate}
-                  onChange={handleTargetChange('winRate')}
+                  value={localSettings.targets.win_rate}
+                  onChange={handleTargetChange('win_rate')}
                   fullWidth
                   size="small"
                   helperText="Your target win rate percentage"
@@ -435,8 +435,8 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
                   label="Target Profit Factor"
                   type="number"
                   inputProps={{ step: 0.1 }}
-                  value={localSettings.targets.profitFactor}
-                  onChange={handleTargetChange('profitFactor')}
+                  value={localSettings.targets.profit_factor}
+                  onChange={handleTargetChange('profit_factor')}
                   fullWidth
                   size="small"
                   helperText="Your target profit factor"
@@ -444,8 +444,8 @@ const ScoreSettingsComponent: React.FC<ScoreSettingsProps> = ({
                 <TextField
                   label="Max Drawdown (%)"
                   type="number"
-                  value={localSettings.targets.maxDrawdown}
-                  onChange={handleTargetChange('maxDrawdown')}
+                  value={localSettings.targets.max_drawdown}
+                  onChange={handleTargetChange('max_drawdown')}
                   fullWidth
                   size="small"
                   helperText="Maximum acceptable drawdown"

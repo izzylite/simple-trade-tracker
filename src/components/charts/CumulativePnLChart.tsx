@@ -12,14 +12,14 @@ import {
 import { Box, Paper, Typography, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { format } from 'date-fns';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import { formatValue } from '../../utils/formatters';
 import { log } from '../../utils/logger';
 
 interface CumulativePnLChartProps {
   chartData: any[];
   targetValue: number | null;
-  monthlyTarget?: number;
+  monthly_target?: number;
   setMultipleTradesDialog: (dialogState: any) => void;
   timePeriod: 'month' | 'year' | 'all';
 }
@@ -77,7 +77,7 @@ const CustomTooltip = ({ active, payload, label, type }: any) => {
 const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
   chartData,
   targetValue,
-  monthlyTarget,
+  monthly_target,
   setMultipleTradesDialog,
   timePeriod
 }) => {
@@ -95,7 +95,7 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6">Cumulative P&L</Typography>
-        {monthlyTarget && targetValue !== null && (
+        {monthly_target && targetValue !== null && (
           <Box
             sx={{
               display: 'flex',
@@ -107,7 +107,7 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
               fontSize: '0.875rem'
             }}
           >
-            Target: {monthlyTarget}% (${targetValue?.toFixed(2)})
+            Target: {monthly_target}% (${targetValue?.toFixed(2)})
           </Box>
         )}
       </Box>

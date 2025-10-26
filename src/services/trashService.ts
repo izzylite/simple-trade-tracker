@@ -1,26 +1,20 @@
-import { 
-  collection, 
-  doc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  getDocs, 
-  Timestamp,
-  runTransaction,
-  getDoc
-} from 'firebase/firestore';
-import { db } from '../firebase/config';
-import { Calendar, calendarConverter } from '../types/calendar';
-import { log, error, logger } from '../utils/logger';
+/**
+ * Trash Service - Supabase Repository Pattern
+ * Handles soft delete and trash management for calendars
+ * All types use snake_case to match Supabase schema
+ */
 
-const CALENDARS_COLLECTION = 'calendars';
+import { Calendar } from '../types/dualWrite';
+import { logger } from '../utils/logger';
+import { CalendarRepository } from './repository/repositories/CalendarRepository';
+
+const calendarRepository = new CalendarRepository();
 const TRASH_RETENTION_DAYS = 30;
 
 export interface TrashCalendar extends Calendar {
-  deletedAt: Date;
-  deletedBy: string;
-  autoDeleteAt: Date;
+  deleted_at: Date;
+  deleted_by: string;
+  auto_delete_at: Date;
 }
 
 /**
@@ -29,16 +23,14 @@ export interface TrashCalendar extends Calendar {
  */
 export const moveCalendarToTrash = async (calendarId: string, userId: string): Promise<void> => {
   try {
-    const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
     const now = new Date();
-    const autoDeleteAt = new Date(now.getTime() + (TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000));
+    const auto_delete_at = new Date(now.getTime() + (TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000));
 
-    await updateDoc(calendarRef, {
-      isDeleted: true,
-      deletedAt: Timestamp.fromDate(now),
-      deletedBy: userId,
-      autoDeleteAt: Timestamp.fromDate(autoDeleteAt),
-      lastModified: Timestamp.fromDate(now)
+    await calendarRepository.update(calendarId, {
+      deleted_at: now,
+      deleted_by: userId,
+      auto_delete_at: auto_delete_at,
+      updated_at: now
     });
 
     logger.log(`Calendar ${calendarId} moved to trash`);
@@ -54,28 +46,22 @@ export const moveCalendarToTrash = async (calendarId: string, userId: string): P
  */
 export const restoreCalendarFromTrash = async (calendarId: string): Promise<void> => {
   try {
-    const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
+    const calendar = await calendarRepository.findById(calendarId);
 
-    await runTransaction(db, async (transaction) => {
-      const calendarDoc = await transaction.get(calendarRef);
-      
-      if (!calendarDoc.exists()) {
-        throw new Error('Calendar not found');
-      }
+    if (!calendar) {
+      throw new Error('Calendar not found');
+    }
 
-      const calendarData = calendarDoc.data();
-      if (!calendarData.isDeleted) {
-        throw new Error('Calendar is not in trash');
-      }
+    if (!calendar.deleted_at) {
+      throw new Error('Calendar is not in trash');
+    }
 
-      // Remove deletion markers
-      transaction.update(calendarRef, {
-        isDeleted: false,
-        deletedAt: null,
-        deletedBy: null,
-        autoDeleteAt: null,
-        lastModified: Timestamp.fromDate(new Date())
-      });
+    // Remove deletion markers
+    await calendarRepository.update(calendarId, {
+      deleted_at: undefined,
+      deleted_by: undefined,
+      auto_delete_at: undefined,
+      updated_at: new Date()
     });
 
     logger.log(`Calendar ${calendarId} restored from trash`);
@@ -91,23 +77,18 @@ export const restoreCalendarFromTrash = async (calendarId: string): Promise<void
  */
 export const permanentlyDeleteCalendar = async (calendarId: string): Promise<void> => {
   try {
-    const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
+    const calendar = await calendarRepository.findById(calendarId);
 
-    await runTransaction(db, async (transaction) => {
-      const calendarDoc = await transaction.get(calendarRef);
-      
-      if (!calendarDoc.exists()) {
-        throw new Error('Calendar not found');
-      }
+    if (!calendar) {
+      throw new Error('Calendar not found');
+    }
 
-      const calendarData = calendarDoc.data();
-      if (!calendarData.isDeleted) {
-        throw new Error('Calendar is not in trash');
-      }
+    if (!calendar.deleted_at) {
+      throw new Error('Calendar is not in trash');
+    }
 
-      // Permanently delete the calendar document
-      transaction.delete(calendarRef);
-    });
+    // Permanently delete the calendar
+    await calendarRepository.delete(calendarId);
 
     logger.log(`Calendar ${calendarId} permanently deleted`);
   } catch (error) {
@@ -121,25 +102,17 @@ export const permanentlyDeleteCalendar = async (calendarId: string): Promise<voi
  */
 export const getTrashCalendars = async (userId: string): Promise<TrashCalendar[]> => {
   try {
-    const q = query(
-      collection(db, CALENDARS_COLLECTION), 
-      where("userId", "==", userId),
-      where("isDeleted", "==", true)
-    );
-    
-    const querySnapshot = await getDocs(q);
-    
-    return querySnapshot.docs.map(doc => {
-      const calendar = calendarConverter.fromJson(doc);
-      const data = doc.data();
-      
-      return {
-        ...calendar,
-        deletedAt: data.deletedAt.toDate(),
-        deletedBy: data.deletedBy,
-        autoDeleteAt: data.autoDeleteAt.toDate()
-      } as TrashCalendar;
-    });
+    const calendars = await calendarRepository.findByUserId(userId);
+
+    // Filter for deleted calendars
+    return calendars
+      .filter(cal => cal.deleted_at !== undefined && cal.deleted_at !== null)
+      .map(cal => ({
+        ...cal,
+        deleted_at: cal.deleted_at!,
+        deleted_by: cal.deleted_by || userId,
+        auto_delete_at: cal.auto_delete_at || new Date()
+      } as TrashCalendar));
   } catch (error) {
     logger.error('Error getting trash calendars:', error);
     throw error;
@@ -153,25 +126,23 @@ export const getTrashCalendars = async (userId: string): Promise<TrashCalendar[]
 export const getCalendarsReadyForDeletion = async (): Promise<TrashCalendar[]> => {
   try {
     const now = new Date();
-    const q = query(
-      collection(db, CALENDARS_COLLECTION),
-      where("isDeleted", "==", true),
-      where("autoDeleteAt", "<=", Timestamp.fromDate(now))
-    );
-    
-    const querySnapshot = await getDocs(q);
-    
-    return querySnapshot.docs.map(doc => {
-      const calendar = calendarConverter.fromJson(doc);
-      const data = doc.data();
-      
-      return {
-        ...calendar,
-        deletedAt: data.deletedAt.toDate(),
-        deletedBy: data.deletedBy,
-        autoDeleteAt: data.autoDeleteAt.toDate()
-      } as TrashCalendar;
-    });
+    const allCalendars = await calendarRepository.findAll();
+
+    // Filter for deleted calendars that are ready for deletion
+    return allCalendars
+      .filter(cal =>
+        cal.deleted_at !== undefined &&
+        cal.deleted_at !== null &&
+        cal.auto_delete_at !== undefined &&
+        cal.auto_delete_at !== null &&
+        new Date(cal.auto_delete_at) <= now
+      )
+      .map(cal => ({
+        ...cal,
+        deleted_at: cal.deleted_at!,
+        deleted_by: cal.deleted_by || '',
+        auto_delete_at: cal.auto_delete_at!
+      } as TrashCalendar));
   } catch (error) {
     logger.error('Error getting calendars ready for deletion:', error);
     throw error;
@@ -180,7 +151,7 @@ export const getCalendarsReadyForDeletion = async (): Promise<TrashCalendar[]> =
 
 /**
  * Clean up expired calendars from trash
- * This should be called periodically (e.g., by a cloud function)
+ * This should be called periodically (e.g., by a Supabase Edge Function)
  */
 export const cleanupExpiredCalendars = async (): Promise<number> => {
   try {
@@ -191,16 +162,16 @@ export const cleanupExpiredCalendars = async (): Promise<number> => {
       try {
         await permanentlyDeleteCalendar(calendar.id);
         deletedCount++;
-        log(`Auto-deleted expired calendar: ${calendar.id} (${calendar.name})`);
+        logger.log(`Auto-deleted expired calendar: ${calendar.id} (${calendar.name})`);
       } catch (err) {
-        error(`Failed to auto-delete calendar ${calendar.id}:`, err);
+        logger.error(`Failed to auto-delete calendar ${calendar.id}:`, err);
       }
     }
 
-    log(`Cleanup completed: ${deletedCount} calendars permanently deleted`);
+    logger.log(`Cleanup completed: ${deletedCount} calendars permanently deleted`);
     return deletedCount;
   } catch (err) {
-    error('Error during cleanup:', err);
+    logger.error('Error during cleanup:', err);
     throw err;
   }
 };
@@ -208,9 +179,9 @@ export const cleanupExpiredCalendars = async (): Promise<number> => {
 /**
  * Get days remaining until permanent deletion
  */
-export const getDaysUntilDeletion = (autoDeleteAt: Date): number => {
+export const getDaysUntilDeletion = (auto_delete_at: Date): number => {
   const now = new Date();
-  const timeDiff = autoDeleteAt.getTime() - now.getTime();
+  const timeDiff = auto_delete_at.getTime() - now.getTime();
   const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
   return Math.max(0, daysDiff);
 };
@@ -220,15 +191,13 @@ export const getDaysUntilDeletion = (autoDeleteAt: Date): number => {
  */
 export const isCalendarInTrash = async (calendarId: string): Promise<boolean> => {
   try {
-    const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
-    const calendarDoc = await getDoc(calendarRef);
-    
-    if (!calendarDoc.exists()) {
+    const calendar = await calendarRepository.findById(calendarId);
+
+    if (!calendar) {
       return false;
     }
-    
-    const data = calendarDoc.data();
-    return data.isDeleted === true;
+
+    return calendar.deleted_at !== undefined && calendar.deleted_at !== null;
   } catch (error) {
     logger.error('Error checking if calendar is in trash:', error);
     return false;

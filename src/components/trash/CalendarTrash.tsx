@@ -432,7 +432,7 @@ const CalendarTrash: React.FC<CalendarTrashProps> = ({ onToggleTheme, mode }) =>
             }}
           >
             {trashCalendars.map((calendar) => {
-              const daysLeft = getDaysUntilDeletion(calendar.autoDeleteAt);
+              const daysLeft = getDaysUntilDeletion(calendar.auto_delete_at);
               const isExpiringSoon = daysLeft <= 7;
 
               return (
@@ -495,7 +495,7 @@ const CalendarTrash: React.FC<CalendarTrashProps> = ({ onToggleTheme, mode }) =>
                                 {calendar.name}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                Deleted {format(calendar.deletedAt, 'MMM dd, yyyy')}
+                                Deleted {format(calendar.deleted_at, 'MMM dd, yyyy')}
                               </Typography>
                             </Box>
                           </Box>
@@ -520,7 +520,7 @@ const CalendarTrash: React.FC<CalendarTrashProps> = ({ onToggleTheme, mode }) =>
                             </Typography>
                           </Box>
                           <Typography variant="caption" color="text.secondary">
-                            Auto-delete: {format(calendar.autoDeleteAt, 'MMM dd, yyyy')}
+                            Auto-delete: {format(calendar.auto_delete_at, 'MMM dd, yyyy')}
                           </Typography>
                         </Box>
 
@@ -535,7 +535,7 @@ const CalendarTrash: React.FC<CalendarTrashProps> = ({ onToggleTheme, mode }) =>
                         >
                           <Box sx={{ textAlign: 'center' }}>
                             <Typography variant="h6" sx={{ fontWeight: 'bold', color: theme.palette.success.main }}>
-                              ${calendar.accountBalance.toLocaleString()}
+                              ${calendar.account_balance.toLocaleString()}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
                               Balance
@@ -543,7 +543,7 @@ const CalendarTrash: React.FC<CalendarTrashProps> = ({ onToggleTheme, mode }) =>
                           </Box>
                           <Box sx={{ textAlign: 'center' }}>
                             <Typography variant="h6" sx={{ fontWeight: 'bold', color: theme.palette.info.main }}>
-                              {calendar.totalTrades || 0}
+                              {calendar.total_trades || 0}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
                               Trades

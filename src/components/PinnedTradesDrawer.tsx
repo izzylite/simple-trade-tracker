@@ -37,8 +37,7 @@ import {
   Search as SearchIcon,
   Clear as ClearIcon
 } from '@mui/icons-material';
-import { Trade } from '../types/trade';
-import { Calendar, PinnedEvent } from '../types/calendar';
+import { Trade, Calendar, PinnedEvent } from '../types/dualWrite';
 import { format } from 'date-fns';
 import UnifiedDrawer from './common/UnifiedDrawer';
 import { eventNamesMatch } from '../utils/eventNameUtils';
@@ -84,17 +83,17 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
 
   // Get pinned trades
   const pinnedTrades = useMemo(() => {
-    return trades.filter(trade => trade.isPinned);
+    return trades.filter(trade => trade.is_pinned);
   }, [trades]);
 
   // Get pinned events from calendar
   const pinnedEvents = useMemo(() => {
-    return calendar?.pinnedEvents || [];
-  }, [calendar?.pinnedEvents]);
+    return calendar?.pinned_events || [];
+  }, [calendar?.pinned_events]);
 
   // Sort pinned trades by date (most recent first)
   const sortedPinnedTrades = useMemo(() => {
-    return [...pinnedTrades].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return [...pinnedTrades].sort((a, b) => new Date(b.trade_date).getTime() - new Date(a.trade_date).getTime());
   }, [pinnedTrades]);
 
   // Filter pinned trades based on search query
@@ -113,7 +112,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
       if (trade.session?.toLowerCase().includes(query)) return true;
 
       // Search in economic events
-      if (trade.economicEvents?.some(event => event.name.toLowerCase().includes(query))) return true;
+      if (trade.economic_events?.some(event => event.name.toLowerCase().includes(query))) return true;
 
       // Search in notes (if available)
       if (trade.notes?.toLowerCase().includes(query)) return true;
@@ -142,10 +141,10 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   const getTradesWithEvent = useMemo(() => {
     return (eventName: string) => {
       return trades.filter(trade =>
-        trade.economicEvents?.some(event =>
+        trade.economic_events?.some(event =>
            eventNamesMatch(event.name, eventName)
         )
-      ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      ).sort((a, b) => new Date(b.trade_date).getTime() - new Date(a.trade_date).getTime());
     };
   }, [trades]);
 
@@ -184,7 +183,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
 
     try {
       await onUpdateCalendarProperty(calendar.id, (calendar: Calendar) => {
-        const updatedPinnedEvents = calendar.pinnedEvents?.map(event =>
+        const updatedPinnedEvents = calendar.pinned_events?.map(event =>
           event.event === editingEvent.event
             ? { ...event, notes: notesText.trim() || undefined }
             : event
@@ -211,7 +210,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
     setNotesText('');
   };
 
-  const getTradeTypeIcon = (type: Trade['type']) => {
+  const getTradeTypeIcon = (type: Trade['trade_type']) => {
     switch (type) {
       case 'win':
         return <WinIcon sx={{ fontSize: 20, color: 'success.main' }} />;
@@ -222,7 +221,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
     }
   };
 
-  const getTradeTypeColor = (type: Trade['type']) => {
+  const getTradeTypeColor = (type: Trade['trade_type']) => {
     switch (type) {
       case 'win':
         return theme.palette.success.main;
@@ -530,25 +529,25 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                       sx={{
                         p: 2,
                         backgroundColor: alpha(
-                          trade.type === 'win'
+                          trade.trade_type === 'win'
                             ? theme.palette.success.main
-                            : trade.type === 'loss'
+                            : trade.trade_type === 'loss'
                             ? theme.palette.error.main
                             : theme.palette.warning.main,
                           0.03
                         ),
                         borderLeft: `3px solid ${
-                          trade.type === 'win'
+                          trade.trade_type === 'win'
                             ? theme.palette.success.main
-                            : trade.type === 'loss'
+                            : trade.trade_type === 'loss'
                             ? theme.palette.error.main
                             : theme.palette.warning.main
                         }`,
                         '&:hover': {
                           backgroundColor: alpha(
-                            trade.type === 'win'
+                            trade.trade_type === 'win'
                               ? theme.palette.success.main
-                              : trade.type === 'loss'
+                              : trade.trade_type === 'loss'
                               ? theme.palette.error.main
                               : theme.palette.warning.main,
                             0.08
@@ -559,7 +558,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
                         {/* Trade Type Icon */}
                         <Box sx={{ mt: 0.5 }}>
-                          {getTradeTypeIcon(trade.type)}
+                          {getTradeTypeIcon(trade.trade_type)}
                         </Box>
 
                         {/* Trade Content */}
@@ -584,12 +583,12 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                                 <Typography
                                   variant="body2"
                                   sx={{
-                                    color: getTradeTypeColor(trade.type),
+                                    color: getTradeTypeColor(trade.trade_type),
                                     fontWeight: 600,
                                     fontSize: '0.85rem'
                                   }}
                                 >
-                                  {trade.type === 'win' ? '+' : trade.type === 'loss' ? '-' : ''}
+                                  {trade.trade_type === 'win' ? '+' : trade.trade_type === 'loss' ? '-' : ''}
                                   {trade.amount ? `$${Math.abs(trade.amount).toFixed(2)}` : ''}
                                 </Typography>
                               </Box>
@@ -599,12 +598,12 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                                   <DateIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
-                                    {format(new Date(trade.date), 'MMM d, yyyy')}
+                                    {format(new Date(trade.trade_date), 'MMM d, yyyy')}
                                   </Typography>
                                 </Box>
                                 {/* Show matching economic events */}
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                  {trade.economicEvents?.filter(event =>
+                                  {trade.economic_events?.filter(event =>
                                     event.name.toLowerCase().includes(selectedEvent.toLowerCase()) ||
                                     selectedEvent.toLowerCase().includes(event.name.toLowerCase())
                                   ).map((event, eventIndex) => (
@@ -687,25 +686,25 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                       sx={{
                         p: 2,
                         backgroundColor: alpha(
-                          trade.type === 'win'
+                          trade.trade_type === 'win'
                             ? theme.palette.success.main
-                            : trade.type === 'loss'
+                            : trade.trade_type === 'loss'
                             ? theme.palette.error.main
                             : theme.palette.warning.main,
                           0.03
                         ),
                         borderLeft: `3px solid ${
-                          trade.type === 'win'
+                          trade.trade_type === 'win'
                             ? theme.palette.success.main
-                            : trade.type === 'loss'
+                            : trade.trade_type === 'loss'
                             ? theme.palette.error.main
                             : theme.palette.warning.main
                         }`,
                         '&:hover': {
                           backgroundColor: alpha(
-                            trade.type === 'win'
+                            trade.trade_type === 'win'
                               ? theme.palette.success.main
-                              : trade.type === 'loss'
+                              : trade.trade_type === 'loss'
                               ? theme.palette.error.main
                               : theme.palette.warning.main,
                             0.08
@@ -716,7 +715,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
                         {/* Trade Type Icon */}
                         <Box sx={{ mt: 0.5 }}>
-                          {getTradeTypeIcon(trade.type)}
+                          {getTradeTypeIcon(trade.trade_type)}
                         </Box>
 
                         {/* Trade Content */}
@@ -742,7 +741,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                                   variant="subtitle1"
                                   sx={{
                                     fontWeight: 700,
-                                    color: getTradeTypeColor(trade.type),
+                                    color: getTradeTypeColor(trade.trade_type),
                                     whiteSpace: 'nowrap'
                                   }}
                                 >
@@ -756,7 +755,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                                   <DateIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                                   <Typography variant="body2" color="text.secondary">
-                                    {format(new Date(trade.date), 'MMM dd, yyyy')}
+                                    {format(new Date(trade.trade_date), 'MMM dd, yyyy')}
                                   </Typography>
                                   {trade.session && (
                                     <Chip

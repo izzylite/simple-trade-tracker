@@ -1,5 +1,5 @@
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth, getDay, parseISO } from 'date-fns';
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import { Theme } from '@mui/material';
 
 export type TimePeriod = 'month' | 'year' | 'all';
@@ -20,23 +20,23 @@ export interface ChartDataPoint {
 
 export interface SessionStats {
   session: string;
-  totalTrades: number;
+  total_trades: number;
   winners: number;
   losers: number;
   breakevens: number;
-  winRate: number;
-  totalPnL: number;
-  averagePnL: number;
-  pnlPercentage: number;
+  win_rate: number;
+  total_pnl: number;
+  average_pnl: number;
+  pnl_percentage: number;
 }
 
 // Function to filter trades based on selected time period
 export const getFilteredTrades = (trades: Trade[], selectedDate: Date, period: TimePeriod): Trade[] => {
   switch (period) {
     case 'month':
-      return trades.filter(trade => isSameMonth(new Date(trade.date), selectedDate));
+      return trades.filter(trade => isSameMonth(new Date(trade.trade_date), selectedDate));
     case 'year':
-      return trades.filter(trade => new Date(trade.date).getFullYear() === selectedDate.getFullYear());
+      return trades.filter(trade => new Date(trade.trade_date).getFullYear() === selectedDate.getFullYear());
     case 'all':
       return trades;
     default:
@@ -46,16 +46,16 @@ export const getFilteredTrades = (trades: Trade[], selectedDate: Date, period: T
 export const getTradesStats = (trades: Trade[]) => {
 
   // Create a map to store stats for each tag
-  const stats = { wins: 0, losses: 0, breakevens: 0, totalPnL: 0 };
+  const stats = { wins: 0, losses: 0, breakevens: 0, total_pnl: 0 };
   trades.forEach(trade => {
-    if (trade.type === 'win') {
+    if (trade.trade_type === 'win') {
       stats.wins++;
-    } else if (trade.type === 'loss') {
+    } else if (trade.trade_type === 'loss') {
       stats.losses++;
-    } else if (trade.type === 'breakeven') {
+    } else if (trade.trade_type === 'breakeven') {
       stats.breakevens++;
     }
-    stats.totalPnL += trade.amount;
+    stats.total_pnl += trade.amount;
   });
 
   // Calculate win rate excluding breakevens from the denominator
@@ -70,7 +70,7 @@ export const getTradesStats = (trades: Trade[]) => {
     breakevens: stats.breakevens,
     totalTrades,
     winRate,
-    totalPnL: stats.totalPnL
+    total_pnl: stats.total_pnl
   };
 
 }
@@ -86,14 +86,14 @@ trades: Trade[],  theme: Theme, winRateMetric : boolean = true) => {
   const tradesByDay = DAYS_OF_WEEK.map((day, index) => {
     // Get trades for this day of week
     const dayTrades = trades.filter(trade => {
-      const tradeDate = new Date(trade.date);
+      const tradeDate = new Date(trade.trade_date);
       return getDay(tradeDate) === index;
     });
 
     // Calculate statistics
     const totalTrades = dayTrades.length;
-    const winTrades = dayTrades.filter(trade => trade.type === 'win').length;
-    const lossTrades = dayTrades.filter(trade => trade.type === 'loss').length;
+    const winTrades = dayTrades.filter(trade => trade.trade_type === 'win').length;
+    const lossTrades = dayTrades.filter(trade => trade.trade_type === 'loss').length;
     const winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0;
     const totalPnL = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
 
@@ -123,11 +123,11 @@ trades: Trade[],  theme: Theme, winRateMetric : boolean = true) => {
   return tradesByDay.map(dayData => ({
       day: dayData.day.substring(0, 3), // Abbreviate day names
       fullDay: dayData.day, 
-      totalTrades: dayData.totalTrades,
-      winTrades: dayData.winTrades,
-      lossTrades: dayData.lossTrades,
+      total_trades: dayData.totalTrades,
+      win_trades: dayData.winTrades,
+      loss_trades: dayData.lossTrades,
       value: winRateMetric? dayData.winRate : dayData.pnl,
-      winRate: dayData.winRate,
+      win_rate: dayData.winRate,
       pnl: dayData.pnl,
       trades: dayData.trades,
       color: COLORS[dayData.day.toLowerCase() as keyof typeof COLORS] || COLORS.neutral
@@ -162,10 +162,10 @@ export const calculateChartData = async (
       endDate = new Date();
     } else {
       const sortedTrades = [...filteredTrades].sort((a, b) =>
-        new Date(a.date).getTime() - new Date(b.date).getTime()
+        new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime()
       );
-      startDate = new Date(sortedTrades[0].date);
-      endDate = new Date(sortedTrades[sortedTrades.length - 1].date);
+      startDate = new Date(sortedTrades[0].trade_date);
+      endDate = new Date(sortedTrades[sortedTrades.length - 1].trade_date);
     }
   }
 
@@ -188,7 +188,7 @@ export const calculateChartData = async (
     for (const day of chunk) {
       // Find trades for this day
       const dayTrades = filteredTrades.filter(trade =>
-        format(new Date(trade.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
+        format(new Date(trade.trade_date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
       );
 
       // Calculate daily P&L
@@ -237,9 +237,9 @@ export const calculateSessionStats = (
   return sessions.map(sessionName => {
     const sessionTrades = filteredTrades.filter(trade => trade.session === sessionName);
     const totalTrades = sessionTrades.length;
-    const winners = sessionTrades.filter(trade => trade.type === 'win').length;
-    const losers = sessionTrades.filter(trade => trade.type === 'loss').length;
-    const breakevens = sessionTrades.filter(trade => trade.type === 'breakeven').length;
+    const winners = sessionTrades.filter(trade => trade.trade_type === 'win').length;
+    const losers = sessionTrades.filter(trade => trade.trade_type === 'loss').length;
+    const breakevens = sessionTrades.filter(trade => trade.trade_type === 'breakeven').length;
 
     // Calculate win rate excluding breakevens from the denominator
     const totalTradesForWinRate = winners + losers;
@@ -251,14 +251,14 @@ export const calculateSessionStats = (
 
     return {
       session: sessionName,
-      totalTrades,
+      total_trades: totalTrades,
       winners,
       losers,
       breakevens,
-      winRate,
-      totalPnL,
-      averagePnL,
-      pnlPercentage
+      win_rate: winRate,
+      total_pnl: totalPnL,
+      average_pnl: averagePnL,
+      pnl_percentage: pnlPercentage
     };
   });
 };
@@ -280,8 +280,8 @@ export const calculateDrawdownViolationValue = (maxDailyDrawdown: number, accoun
 export const calculateWinLossStatsAsync = async (
   filteredTrades: Trade[]
 ): Promise<{
-  totalTrades: number;
-  winRate: number;
+  total_trades: number;
+  win_rate: number;
   winners: {
     total: number;
     avgAmount: number;
@@ -302,9 +302,9 @@ export const calculateWinLossStatsAsync = async (
   // Yield control to prevent UI blocking
   await new Promise(resolve => setTimeout(resolve, 0));
 
-  const wins = filteredTrades.filter(trade => trade.type === 'win');
-  const losses = filteredTrades.filter(trade => trade.type === 'loss');
-  const breakevens = filteredTrades.filter(trade => trade.type === 'breakeven');
+  const wins = filteredTrades.filter(trade => trade.trade_type === 'win');
+  const losses = filteredTrades.filter(trade => trade.trade_type === 'loss');
+  const breakevens = filteredTrades.filter(trade => trade.trade_type === 'breakeven');
 
   const totalWins = wins.length;
   const totalLosses = losses.length;
@@ -339,18 +339,18 @@ export const calculateWinLossStatsAsync = async (
 
   // Sort trades by date
   const sortedTrades = [...filteredTrades].sort((a, b) =>
-    new Date(a.date).getTime() - new Date(b.date).getTime()
+    new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime()
   );
 
   sortedTrades.forEach(trade => {
-    if (trade.type === 'win') {
+    if (trade.trade_type === 'win') {
       currentWinStreak++;
       currentLossStreak = 0;
 
       if (currentWinStreak > maxWinStreak) {
         maxWinStreak = currentWinStreak;
       }
-    } else if (trade.type === 'loss') {
+    } else if (trade.trade_type === 'loss') {
       if (currentWinStreak > 0) {
         totalWinStreaks += currentWinStreak;
         winStreakCount++;
@@ -361,7 +361,7 @@ export const calculateWinLossStatsAsync = async (
       if (currentLossStreak > maxLossStreak) {
         maxLossStreak = currentLossStreak;
       }
-    } else if (trade.type === 'breakeven') {
+    } else if (trade.trade_type === 'breakeven') {
       // For breakeven trades, we don't reset the streaks
       // This allows a breakeven trade to maintain an existing streak
     }
@@ -380,8 +380,8 @@ export const calculateWinLossStatsAsync = async (
   const avgLossStreak = lossStreakCount > 0 ? totalLossStreaks / lossStreakCount : 0;
 
   return {
-    totalTrades,
-    winRate,
+    total_trades: totalTrades,
+    win_rate: winRate,
     winners: {
       total: totalWins,
       avgAmount: avgWin,
@@ -409,28 +409,28 @@ export const calculateTagStatsAsync = async (
   wins: number;
   losses: number;
   breakevens: number;
-  totalTrades: number;
-  winRate: number;
-  totalPnL: number;
+  total_trades: number;
+  win_rate: number;
+  total_pnl: number;
 }>> => {
   // Yield control to prevent UI blocking
   await new Promise(resolve => setTimeout(resolve, 0));
 
   // Create a map to store stats for each tag
-  const tagMap = new Map<string, { wins: number; losses: number; breakevens: number; totalPnL: number }>();
+  const tagMap = new Map<string, { wins: number; losses: number; breakevens: number; total_pnl: number }>();
 
   filteredTrades.forEach(trade => {
     if (trade.tags) {
       trade.tags.forEach(tag => {
-        const stats = tagMap.get(tag) || { wins: 0, losses: 0, breakevens: 0, totalPnL: 0 };
-        if (trade.type === 'win') {
+        const stats = tagMap.get(tag) || { wins: 0, losses: 0, breakevens: 0, total_pnl: 0 };
+        if (trade.trade_type === 'win') {
           stats.wins++;
-        } else if (trade.type === 'loss') {
+        } else if (trade.trade_type === 'loss') {
           stats.losses++;
-        } else if (trade.type === 'breakeven') {
+        } else if (trade.trade_type === 'breakeven') {
           stats.breakevens++;
         }
-        stats.totalPnL += trade.amount;
+        stats.total_pnl += trade.amount;
         tagMap.set(tag, stats);
       });
     }
@@ -451,11 +451,11 @@ export const calculateTagStatsAsync = async (
       wins: stats.wins,
       losses: stats.losses,
       breakevens: stats.breakevens,
-      totalTrades,
-      winRate,
-      totalPnL: stats.totalPnL
+      total_trades: totalTrades,
+      win_rate: winRate,
+      total_pnl: stats.total_pnl
     };
-  }).sort((a, b) => b.totalTrades - a.totalTrades); // Sort by total trades descending
+  }).sort((a, b) => b.total_trades - a.total_trades); // Sort by total trades descending
 };
 
 // Calculate daily summary data asynchronously
@@ -472,7 +472,7 @@ export const calculateDailySummaryDataAsync = async (
 
   // Group trades by date
   const tradesByDate = filteredTrades.reduce((acc, trade) => {
-    const dateKey = format(new Date(trade.date), 'yyyy-MM-dd');
+    const dateKey = format(new Date(trade.trade_date), 'yyyy-MM-dd');
     if (!acc[dateKey]) {
       acc[dateKey] = [];
     }
@@ -525,12 +525,12 @@ export const calculateRiskRewardStatsAsync = async (
   // Yield control to prevent UI blocking
   await new Promise(resolve => setTimeout(resolve, 0));
 
-  const filteredTrades_ = filteredTrades.filter(trade => trade.riskToReward !== undefined)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const filteredTrades_ = filteredTrades.filter(trade => trade.risk_to_reward !== undefined)
+    .sort((a, b) => new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime());
 
   if (filteredTrades_.length === 0) return { average: 0, max: 0, data: [] };
 
-  const riskRewardValues = filteredTrades_.map(trade => trade.riskToReward!);
+  const riskRewardValues = filteredTrades_.map(trade => trade.risk_to_reward!);
   const average = riskRewardValues.reduce((sum, value) => sum + value, 0) / riskRewardValues.length;
   const max = Math.max(...riskRewardValues);
 
@@ -539,8 +539,8 @@ export const calculateRiskRewardStatsAsync = async (
 
   // Create data points for the line graph
   const data = filteredTrades_.map(trade => ({
-    date: format(new Date(trade.date), timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
-    rr: trade.riskToReward || 0
+    date: format(new Date(trade.trade_date), timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
+    rr: trade.risk_to_reward || 0
   }));
 
   return { average, max, data };
@@ -560,9 +560,9 @@ export const calculateSessionStatsAsync = async (
   return sessions.map(sessionName => {
     const sessionTrades = filteredTrades_.filter(trade => trade.session === sessionName);
     const totalTrades = sessionTrades.length;
-    const winners = sessionTrades.filter(trade => trade.type === 'win').length;
-    const losers = sessionTrades.filter(trade => trade.type === 'loss').length;
-    const breakevens = sessionTrades.filter(trade => trade.type === 'breakeven').length;
+    const winners = sessionTrades.filter(trade => trade.trade_type === 'win').length;
+    const losers = sessionTrades.filter(trade => trade.trade_type === 'loss').length;
+    const breakevens = sessionTrades.filter(trade => trade.trade_type === 'breakeven').length;
 
     // Calculate win rate excluding breakevens from the denominator
     const totalTradesForWinRate = winners + losers;
@@ -574,14 +574,14 @@ export const calculateSessionStatsAsync = async (
 
     return {
       session: sessionName,
-      totalTrades,
+      total_trades: totalTrades,
       winners,
       losers,
       breakevens,
-      winRate,
-      totalPnL,
-      averagePnL,
-      pnlPercentage
+      win_rate: winRate,
+      total_pnl: totalPnL,
+      average_pnl: averagePnL,
+      pnl_percentage: pnlPercentage
     };
   });
 };
@@ -602,9 +602,9 @@ export const calculateComparisonWinLossDataAsync = async (
       return comparisonTags.some(tag => trade.tags!.includes(tag));
     });
 
-  const wins = filteredTrades_.filter(trade => trade.type === 'win');
-  const losses = filteredTrades_.filter(trade => trade.type === 'loss');
-  const breakevens = filteredTrades_.filter(trade => trade.type === 'breakeven');
+  const wins = filteredTrades_.filter(trade => trade.trade_type === 'win');
+  const losses = filteredTrades_.filter(trade => trade.trade_type === 'loss');
+  const breakevens = filteredTrades_.filter(trade => trade.trade_type === 'breakeven');
 
   return [
     { name: 'Wins', value: wins.length },

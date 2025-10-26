@@ -25,8 +25,7 @@ import {
   LinkOff as UnshareIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
-import { Trade } from '../../types/trade';
-import { Calendar } from '../../types/calendar';
+import { Trade, Calendar } from '../../types/dualWrite';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { logger } from '../../utils/logger';
 import {
@@ -110,8 +109,8 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
 
     try {
       // Check if item already has a share link
-      if (item.shareLink && item.isShared) {
-        setShareLink(item.shareLink);
+      if (item.share_link && item.is_shared) {
+        setShareLink(item.share_link);
         setShareDialogOpen(true);
         showSnackbar('Using existing share link', 'info');
         setIsSharing(false);
@@ -168,7 +167,7 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
   };
 
   const handleUnshare = async () => {
-    if (!item.shareId) {
+    if (!item.share_id) {
       showSnackbar(`No active share found for this ${type}`, 'error');
       return;
     }
@@ -179,9 +178,9 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
     try {
       // Deactivate share link based on type
       if (type === 'trade') {
-        await deactivateTradeShareLink(item.shareId);
+        await deactivateTradeShareLink(item.share_id);
       } else {
-        await deactivateCalendarShareLink(item.shareId);
+        await deactivateCalendarShareLink(item.share_id);
       }
 
       // Update the item to remove sharing information using onUpdateItemProperty if available
@@ -218,7 +217,7 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
-  const isCurrentlyShared = item.isShared && item.shareLink;
+  const isCurrentlyShared = item.is_shared && item.share_link;
   const itemDisplayName = type === 'trade' ? 'trade' : 'calendar';
  
     return (
@@ -265,7 +264,7 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
           ) : (
             [
               <MenuItem key="copy" onClick={() => {
-                setShareLink(item.shareLink!);
+                setShareLink(item.share_link!);
                 setShareDialogOpen(true);
                 handleClose();
               }}>

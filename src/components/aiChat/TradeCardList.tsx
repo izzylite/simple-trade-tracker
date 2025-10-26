@@ -54,9 +54,9 @@ const TradeCardList: React.FC<TradeCardListProps> = ({
 
   // Calculate summary statistics
   const totalPnL = trades.reduce((sum, trade) => sum + trade.amount, 0);
-  const winTrades = trades.filter(trade => trade.type === 'win');
-  const lossTrades = trades.filter(trade => trade.type === 'loss');
-  const breakevenTrades = trades.filter(trade => trade.type === 'breakeven');
+  const winTrades = trades.filter(trade => trade.trade_type === 'win');
+  const lossTrades = trades.filter(trade => trade.trade_type === 'loss');
+  const breakevenTrades = trades.filter(trade => trade.trade_type === 'breakeven');
   const winRate = trades.length > 0 ? (winTrades.length / trades.length) * 100 : 0;
 
   const formatAmount = (amount: number) => {

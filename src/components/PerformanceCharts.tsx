@@ -1,8 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Box, Typography, useTheme, Paper, CircularProgress, LinearProgress, Alert, Button } from '@mui/material';
-import { Trade } from '../types/trade';
-import { Calendar } from '../types/calendar';
+import { Trade, Calendar } from '../types/dualWrite';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import ScoreSection from './ScoreSection';
@@ -105,9 +104,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       const updatedDialogTrades = multipleTradesDialog.trades
         .filter(dialogTrade => {
           // Keep the trade only if it still exists in the main trades array
-          // or if it doesn't have isDeleted flag set to true
           const stillExists = trades.some(t => t.id === dialogTrade.id);
-          return stillExists && !dialogTrade.isDeleted;
+          return stillExists;
         })
         .map(dialogTrade => {
           // Find the corresponding trade in the main trades array
@@ -237,8 +235,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
   // Get win/loss statistics from async calculations
   const winLossStats = performanceData?.winLossStats || {
-    totalTrades: 0,
-    winRate: 0,
+    total_trades: 0,
+    win_rate: 0,
     winners: { total: 0, avgAmount: 0, maxConsecutive: 0, avgConsecutive: 0 },
     losers: { total: 0, avgAmount: 0, maxConsecutive: 0, avgConsecutive: 0 },
     breakevens: { total: 0, avgAmount: 0 }
@@ -305,8 +303,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     if (category === 'Wins' || category === 'Losses') {
       // Filter trades based on the clicked category (Wins or Losses)
       categoryTrades = filteredTrades.filter(trade =>
-        (category === 'Wins' && trade.type === 'win') ||
-        (category === 'Losses' && trade.type === 'loss')
+        (category === 'Wins' && trade.trade_type === 'win') ||
+        (category === 'Losses' && trade.trade_type === 'loss')
       );
 
       // Format the date range for the dialog title
@@ -365,13 +363,13 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         onClose={() => setMultipleTradesDialog(prev => ({ ...prev, open: false }))}
         onTradeExpand={handleTradeExpand}
         onZoomImage={handleZoomImage}
-        accountBalance={accountBalance}
+        account_balance={accountBalance}
         allTrades={trades}
         onEditClick={onEditTrade}
         onDeleteClick={onDeleteTrade}
         onOpenGalleryMode={onOpenGalleryMode}
         calendarId={calendarId}
-        calendar={calendar}
+        calendar={calendar ? { economicCalendarFilters: calendar.economic_calendar_filters } : undefined}
       />
 
       {/* Header Section - Stack on mobile */}
@@ -480,7 +478,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
           <PnLChartsWrapper
             chartData={chartData}
             targetValue={targetValue}
-            monthlyTarget={monthlyTarget}
+            monthly_target={monthlyTarget}
             drawdownViolationValue={drawdownViolationValue}
             setMultipleTradesDialog={setMultipleTradesDialog}
             timePeriod={timePeriod}

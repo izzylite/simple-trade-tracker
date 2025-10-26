@@ -51,9 +51,9 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   // Check if any images are currently uploading
   const isAnyImageUploading = (): boolean => {
     return pendingImages.some(img =>
-      img.uploadProgress !== undefined &&
-      img.uploadProgress >= 0 &&
-      img.uploadProgress < 100
+      img.upload_progress !== undefined &&
+      img.upload_progress >= 0 &&
+      img.upload_progress < 100
     );
   };
 
@@ -78,7 +78,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       ...image,
       row: index,
       column: 0,
-      columnWidth: 100 // Full width for vertical layout
+      column_width: 100 // Full width for vertical layout
     }));
 
     // Split back into pending and uploaded images

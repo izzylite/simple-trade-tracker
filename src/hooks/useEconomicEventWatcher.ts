@@ -103,7 +103,7 @@ export const useEconomicEventWatcher = ({
 export const useEconomicEventsUpdates = (callback: (events: EconomicEvent[], allEvents: EconomicEvent[], calendarId: string) => void) => {
   useEffect(() => {
     const handleEventsUpdate = (e: CustomEvent) => {
-      callback(e.detail.events, e.detail.allEvents, e.detail.calendarId);
+      callback(e.detail.events, e.detail.allEvents, e.detail.calendar_id);
     };
 
     window.addEventListener('economicEventsUpdated', handleEventsUpdate as EventListener);
@@ -118,7 +118,7 @@ export const useEconomicEventsUpdates = (callback: (events: EconomicEvent[], all
 export const useEconomicEventWatcherErrors = (callback: (error: string, calendarId: string) => void) => {
   useEffect(() => {
     const handleError = (e: CustomEvent) => {
-      callback(e.detail.error, e.detail.calendarId);
+      callback(e.detail.error, e.detail.calendar_id);
     };
 
     window.addEventListener('economicEventWatcherError', handleError as EventListener);

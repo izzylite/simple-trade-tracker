@@ -7,7 +7,7 @@ import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
 interface PnLChartsWrapperProps {
   chartData: any[];
   targetValue: number | null;
-  monthlyTarget?: number;
+  monthly_target?: number;
   drawdownViolationValue: number;
   setMultipleTradesDialog: (dialogState: any) => void;
   timePeriod: 'month' | 'year' | 'all';
@@ -18,7 +18,7 @@ interface PnLChartsWrapperProps {
 const PnLChartsWrapper: React.FC<PnLChartsWrapperProps> = ({
   chartData,
   targetValue,
-  monthlyTarget,
+  monthly_target,
   drawdownViolationValue,
   setMultipleTradesDialog,
   timePeriod
@@ -53,7 +53,7 @@ const PnLChartsWrapper: React.FC<PnLChartsWrapperProps> = ({
           <CumulativePnLChart
             chartData={chartData}
             targetValue={targetValue}
-            monthlyTarget={monthlyTarget}
+            monthly_target={monthly_target}
             setMultipleTradesDialog={setMultipleTradesDialog}
             timePeriod={timePeriod}
           />

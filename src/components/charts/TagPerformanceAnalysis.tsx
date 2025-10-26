@@ -13,7 +13,7 @@ import {
 import { Box, Paper, Typography, useTheme, Button, alpha, Tooltip as MuiTooltip, CircularProgress } from '@mui/material';
 import { InfoOutlined } from '@mui/icons-material';
 import { format, isSameMonth } from 'date-fns';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import { formatValue } from '../../utils/formatters';
 import TagFilterDialog from '../TagFilterDialog';
 import { getTradesStats } from '../../utils/chartDataUtils';
@@ -233,17 +233,17 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
                         Losses: {data.losses}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Win Rate: {data.winRate}%
+                        Win Rate: {data.win_rate}%
                       </Typography>
                       <Typography
                         variant="body2"
                         sx={{
-                          color: data.totalPnL > 0 ? COLORS.win : COLORS.loss,
+                          color: data.total_pnl > 0 ? COLORS.win : COLORS.loss,
                           fontWeight: 'bold',
                           mt: 0.5
                         }}
                       >
-                        P&L: {formatValue(data.totalPnL)}
+                        P&L: {formatValue(data.total_pnl)}
                       </Typography>
                     </Paper>
                   );
@@ -263,9 +263,9 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
                   const trades = data.payload.trades as Trade[];
                   const tag = data.payload.tag;
                   const filteredTrades = trades.filter(trade =>
-                    trade.type === 'win' &&
-                    (timePeriod === 'month' ? isSameMonth(new Date(trade.date), selectedDate) :
-                      timePeriod === 'year' ? new Date(trade.date).getFullYear() === selectedDate.getFullYear() :
+                    trade.trade_type === 'win' &&
+                    (timePeriod === 'month' ? isSameMonth(new Date(trade.trade_date), selectedDate) :
+                      timePeriod === 'year' ? new Date(trade.trade_date).getFullYear() === selectedDate.getFullYear() :
                         true)
                   );
                   if (filteredTrades.length > 0) {
@@ -291,9 +291,9 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
                   const tag = data.payload.tag;
                   const trades = data.payload.trades as Trade[];
                   const filteredTrades = trades.filter(trade =>
-                    trade.type === 'loss' &&
-                    (timePeriod === 'month' ? isSameMonth(new Date(trade.date), selectedDate) :
-                      timePeriod === 'year' ? new Date(trade.date).getFullYear() === selectedDate.getFullYear() :
+                    trade.trade_type === 'loss' &&
+                    (timePeriod === 'month' ? isSameMonth(new Date(trade.trade_date), selectedDate) :
+                      timePeriod === 'year' ? new Date(trade.trade_date).getFullYear() === selectedDate.getFullYear() :
                         true)
                   );
                   if (filteredTrades.length > 0) {

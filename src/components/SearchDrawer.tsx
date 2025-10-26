@@ -37,7 +37,7 @@ import {
   Event as EventIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers';
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import {
   getTagChipStyles,
@@ -116,17 +116,17 @@ const buildSearchIndex = (trades: Trade[]): SearchIndex[] => {
       trade.session || '',
       ...(trade.tags || []),
       ...(trade.tags || []).map(tag => formatTagForDisplay(tag)),
-      ...(trade.economicEvents || []).map(event => event.name)
+      ...(trade.economic_events || []).map(event => event.name)
     ].join(' ').toLowerCase(),
     tags: [
       ...(trade.tags || []).map(tag => tag.toLowerCase()),
-      ...(trade.economicEvents || []).map(event => event.name.toLowerCase())
+      ...(trade.economic_events || []).map(event => event.name.toLowerCase())
     ],
     displayTags: [
       ...(trade.tags || []).map(tag => formatTagForDisplay(tag).toLowerCase()),
-      ...(trade.economicEvents || []).map(event => event.name.toLowerCase())
+      ...(trade.economic_events || []).map(event => event.name.toLowerCase())
     ],
-    date: new Date(trade.date).getTime(),
+    date: new Date(trade.trade_date).getTime(),
   }));
 };
 
@@ -253,7 +253,7 @@ const getSuggestedTagsAndEvents = (() => {
 const getAllEventNames = (trades: Trade[]): string[] => {
   const eventSet = new Set<string>();
   trades.forEach(trade => {
-    (trade.economicEvents || []).forEach(event => {
+    (trade.economic_events || []).forEach(event => {
       if (event.name) eventSet.add(event.name);
     });
   });
@@ -433,7 +433,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
     setCurrentPage(1);
   }, [onTagsChange]);
 
-  const getTradeTypeIcon = (type: Trade['type']) => {
+  const getTradeTypeIcon = (type: Trade['trade_type']) => {
     switch (type) {
       case 'win':
         return <WinIcon sx={{ fontSize: 20, color: 'success.main' }} />;
@@ -444,7 +444,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
     }
   };
 
-  const getTradeTypeColor = (type: Trade['type']) => {
+  const getTradeTypeColor = (type: Trade['trade_type']) => {
     switch (type) {
       case 'win':
         return theme.palette.success.main;
@@ -929,7 +929,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
                             {/* Trade Type Icon */}
                             <Box sx={{ mt: 0.5 }}>
-                              {getTradeTypeIcon(trade.type)}
+                              {getTradeTypeIcon(trade.trade_type)}
                             </Box>
 
                             {/* Trade Content */}
@@ -955,7 +955,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                                       variant="subtitle1"
                                       sx={{
                                         fontWeight: 700,
-                                        color: getTradeTypeColor(trade.type),
+                                        color: getTradeTypeColor(trade.trade_type),
                                         whiteSpace: 'nowrap'
                                       }}
                                     >
@@ -969,7 +969,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                                       <DateIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                                       <Typography variant="body2" color="text.secondary">
-                                        {format(new Date(trade.date), 'MMM dd, yyyy')}
+                                        {format(new Date(trade.trade_date), 'MMM dd, yyyy')}
                                       </Typography>
                                       {trade.session && (
                                         <Chip

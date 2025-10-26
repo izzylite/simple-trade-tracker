@@ -12,7 +12,7 @@ import {
 } from '@mui/icons-material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { format } from 'date-fns';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import TradeDetailExpanded from '../TradeDetailExpanded';
 import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 import { logger } from '../../utils/logger';
@@ -48,7 +48,7 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
 
         // Debug: Log the raw data to understand the format
         logger.log('Raw shared trade data:', data);
-        logger.log('Trade date:', data.trade.date);
+        logger.log('Trade date:', data.trade.trade_date);
         logger.log('Shared at:', data.sharedAt);
 
         // Helper function to convert various timestamp formats to Date
@@ -86,9 +86,7 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
 
         setSharedTrade({
           trade: {
-            ...data.trade,
-            date: convertToDate(data.trade.date)
-          },
+            ...data.trade},
           viewCount: data.viewCount || 0,
           sharedAt: convertToDate(data.sharedAt)
         });

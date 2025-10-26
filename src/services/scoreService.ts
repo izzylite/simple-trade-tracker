@@ -1,4 +1,4 @@
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import {
   ScoreMetrics,
   ScoreBreakdown,
@@ -186,7 +186,7 @@ export class ScoreService {
     targetDate: Date
   ): Trade[] {
     return trades.filter(trade => {
-      const tradeDate = new Date(trade.date);
+      const tradeDate = new Date(trade.trade_date);
 
       switch (period) {
         case 'daily':
@@ -209,7 +209,7 @@ export class ScoreService {
   private getHistoricalTrades(trades: Trade[], targetDate: Date): Trade[] {
     const cutoffDate = subDays(targetDate, this.settings.thresholds.lookbackPeriod);
     return trades.filter(trade => {
-      const tradeDate = new Date(trade.date);
+      const tradeDate = new Date(trade.trade_date);
       return tradeDate >= cutoffDate && tradeDate <= targetDate;
     });
   }
@@ -310,7 +310,7 @@ export class ScoreService {
     if (trades.length === 0) return 0;
 
     // Simple calculation based on win rate and average return
-    const wins = trades.filter(t => t.type === 'win').length;
+    const wins = trades.filter(t => t.trade_type === 'win').length;
     const winRate = (wins / trades.length) * 100;
 
     const totalPnL = trades.reduce((sum, t) => sum + t.amount, 0);

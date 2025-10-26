@@ -1,0 +1,108 @@
+# Task ID: 27
+# Title: Complete Snake_Case Refactoring for Entire Codebase
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Systematically convert all remaining files from camelCase to snake_case property names to maintain consistency with the already converted trade form components
+# Details:
+The trade form components have been successfully converted to snake_case (entry_price, exit_price, risk_to_reward, partials_taken, pending_images, uploaded_images, is_temporary, economic_events, upload_progress, column_width), but TypeScript compilation reveals 621 errors across 61 files that still use camelCase properties. This task involves systematically updating all service files, utilities, components, and types to use consistent snake_case naming throughout the application.
+
+# Test Strategy:
+
+
+# Subtasks:
+## 1. Update Core Types and Interfaces [pending]
+### Dependencies: None
+### Description: Fix type definitions to use snake_case consistently
+### Details:
+Update types/trade.ts (2 errors with columnWidth), types/calendar.ts (1 error with PinnedEvent), and types/yearlyTrades.ts (1 error with Trade conversion). These are foundational changes that other files depend on.
+
+## 2. Update AI Services and Functions [pending]
+### Dependencies: 27.1
+### Description: Convert AI-related services to use snake_case properties
+### Details:
+Update AI functions and services (89 errors total):
+- searchTrades.ts (24 errors): economicEvents → economic_events, trade.date → trade.trade_date
+- utils.ts (10 errors): trade.type → trade.trade_type, riskToReward → risk_to_reward, partialsTaken → partials_taken
+- calendarInfo.ts (89 errors): calendar.userId → calendar.user_id
+- dataConversion.ts (8 errors): field mapping updates
+- economicEvents.ts, getTradeStatistics.ts (15 errors each)
+- vectorSearchService.ts (10 errors): trade.type → trade.trade_type, trade.updatedAt → trade.updated_at
+- embeddingService.ts (13 errors)
+- tradingAnalysisFunctions.ts (2 errors)
+
+## 3. Update Core Services [pending]
+### Dependencies: 27.1
+### Description: Convert core business logic services to snake_case
+### Details:
+Update core services:
+- performanceCalculationService.ts (4 errors): trade.type → trade.trade_type, economicEvents → economic_events
+- scoreService.ts (3 errors): trade.date → trade.trade_date
+- sharingService.ts (2 errors): trade.date → trade.trade_date
+- tagPatternService.ts (12 errors): trade.date → trade.trade_date, trade.type → trade.trade_type
+- supabaseStorageService.ts (1 error): calendarId → calendar_id
+- RepositoryService.ts (3 errors): calendar.userId → calendar.user_id, trade.calendarId → trade.calendar_id
+- trashService.ts (1 error): missing calendarConverter import
+
+## 4. Update Utility Functions [pending]
+### Dependencies: 27.1
+### Description: Convert utility functions for calculations and data processing
+### Details:
+Update utility files (67 errors total):
+- chartDataUtils.ts (40 errors): trade.date → trade.trade_date, trade.type → trade.trade_type, riskToReward → risk_to_reward
+- statsUtils.ts (19 errors): trade.date → trade.trade_date, trade.type → trade.trade_type
+- scoreUtils.ts (13 errors): riskToReward → risk_to_reward, trade.date → trade.trade_date, trade.type → trade.trade_type
+- dynamicRiskUtils.ts (9 errors): trade.date → trade.trade_date, riskToReward → risk_to_reward, partialsTaken → partials_taken
+- tradeExportImport.ts (5 errors): entryPrice → entry_price, exitPrice → exit_price, riskToReward → risk_to_reward
+- tradeUtils.ts (1 error): trade.date → trade.trade_date
+
+## 5. Update Core Application Components [pending]
+### Dependencies: 27.2, 27.3, 27.4
+### Description: Convert main application components and calendar-related components
+### Details:
+Update core app components:
+- App.tsx (14 errors): Main application component property updates
+- TradeCalendar.tsx (10 errors): Core calendar component updates
+- TradeDetailExpanded.tsx (20 errors): Trade detail view updates
+- CalendarCard.tsx (21 errors): Calendar card component updates
+- CalendarHome.tsx (32 errors): Calendar home page updates
+- CalendarFormDialog.tsx (11 errors): Calendar form dialog updates
+- SelectDateDialog.tsx (11 errors): Date selection dialog updates
+
+## 6. Update Statistics and Chart Components [pending]
+### Dependencies: 27.2, 27.3, 27.4
+### Description: Convert statistics displays and chart components
+### Details:
+Update statistics and chart components:
+- MonthlyStatisticsSection.tsx (7 errors): Monthly stats display updates
+- MonthlyStats.tsx (8 errors): Monthly statistics component updates
+- WeeklyStatsSection.tsx (17 errors): Weekly statistics section updates
+- PerformanceCharts.tsx (4 errors): Performance chart component updates
+- Chart components: DailySummaryTable.tsx (1 error), EconomicEventCorrelationAnalysis.tsx (2 errors), SessionPerformanceAnalysis.tsx (2 errors), TagPerformanceAnalysis.tsx (6 errors), TradesListDialog.tsx (2 errors), WinLossStats.tsx (2 errors)
+
+## 7. Update UI and Feature Components [pending]
+### Dependencies: 27.2, 27.3, 27.4
+### Description: Convert remaining UI components and feature-specific components
+### Details:
+Update remaining UI components:
+- SearchDrawer.tsx (14 errors): Search functionality updates
+- PinnedTradesDrawer.tsx (43 errors): Pinned trades drawer updates
+- TradeList.tsx (9 errors): Trade list component updates
+- AI Chat components: TradeCard.tsx (18 errors), TradeCardList.tsx (3 errors)
+- Sharing components: SharedCalendarPage.tsx (16 errors), SharedTradeView.tsx (3 errors), ShareButton.tsx (9 errors)
+- Other components: DayNotesDialog.tsx (2 errors), EconomicCalendarDrawer.tsx (7 errors), TagEditDialog.tsx (2 errors), TradeGalleryDialog.tsx (1 error), VectorMigrationDialog.tsx (5 errors), CalendarTrash.tsx (2 errors), ScoreDemo.tsx (6 errors)
+
+## 8. Final Testing and Validation [pending]
+### Dependencies: 27.5, 27.6, 27.7
+### Description: Test the complete snake_case conversion and fix any remaining issues
+### Details:
+Final validation phase:
+- Run TypeScript compilation to ensure all errors are resolved
+- Test core functionality: trade creation, editing, statistics, charts
+- Test AI chat functionality with new property names
+- Test import/export functionality
+- Test sharing features
+- Update any remaining test files or scripts
+- Verify database operations work correctly with new property names
+- Update documentation if needed
+

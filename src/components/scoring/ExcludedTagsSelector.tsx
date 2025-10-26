@@ -20,7 +20,7 @@ import {
 } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
 import { HelpOutline, Close, Search as SearchIcon } from '@mui/icons-material';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import {
   getTagChipStyles,
   formatTagForDisplay,

@@ -2,12 +2,12 @@ import React from 'react';
 import { Box, Paper, Typography, Tooltip, useTheme, Stack, alpha } from '@mui/material';
 import { InfoOutlined } from '@mui/icons-material';
 import { formatCurrency } from '../../utils/formatters';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 
 interface WinLossStatsProps {
   winLossStats: {
-    totalTrades: number;
-    winRate: number;
+    total_trades: number;
+    win_rate: number;
     winners: {
       total: number;
       avgAmount: number;
@@ -38,7 +38,7 @@ const WinLossStats: React.FC<WinLossStatsProps> = ({ winLossStats, trades, onTra
 
   // Find the best win (trade with highest amount)
   const bestWin = React.useMemo(() => {
-    const winTrades = trades.filter(trade => trade.type === 'win');
+    const winTrades = trades.filter(trade => trade.trade_type === 'win');
     if (winTrades.length === 0) return null;
     return winTrades.reduce((best, current) =>
       current.amount > best.amount ? current : best, winTrades[0]);
@@ -46,7 +46,7 @@ const WinLossStats: React.FC<WinLossStatsProps> = ({ winLossStats, trades, onTra
 
   // Find the worst loss (trade with lowest/most negative amount)
   const worstLoss = React.useMemo(() => {
-    const lossTrades = trades.filter(trade => trade.type === 'loss');
+    const lossTrades = trades.filter(trade => trade.trade_type === 'loss');
     if (lossTrades.length === 0) return null;
     return lossTrades.reduce((worst, current) =>
       current.amount < worst.amount ? current : worst, lossTrades[0]);

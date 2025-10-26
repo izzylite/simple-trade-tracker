@@ -1,4 +1,4 @@
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import { TradingPattern, ScoreSettings } from '../types/score';
 import {
   calculateWinRate,
@@ -29,9 +29,9 @@ export const DEFAULT_SCORE_SETTINGS: ScoreSettings = {
     consistencyTolerance: 15
   },
   targets: {
-    winRate: 60,
-    profitFactor: 1.5,
-    maxDrawdown: 5,
+    win_rate: 60,
+    profit_factor: 1.5,
+    max_drawdown: 5,
     avgRiskReward: 2.0
   },
   selectedTags: [],
@@ -52,7 +52,7 @@ export const calculateRecommendedScore = (settings: ScoreSettings): number => {
   // Risk Management: Based on targets, calculate expected score
   const riskMgmtTarget = Math.min(85,
     // Win rate factor (60% target = 75 points, 70% = 85 points)
-    (settings.targets.winRate / 60) * 75 +
+    (settings.targets.win_rate / 60) * 75 +
     // Risk/reward factor (2.0 target = 10 points)
     Math.min(10, (settings.targets.avgRiskReward / 2.0) * 10)
   );
@@ -60,9 +60,9 @@ export const calculateRecommendedScore = (settings: ScoreSettings): number => {
   // Performance: Based on profit factor and win rate targets
   const performanceTarget = Math.min(80,
     // Profit factor contribution (1.5 target = 60 points, 2.0 = 80 points)
-    Math.min(60, (settings.targets.profitFactor / 1.5) * 60) +
+    Math.min(60, (settings.targets.profit_factor / 1.5) * 60) +
     // Win rate contribution (60% = 20 points)
-    Math.min(20, (settings.targets.winRate / 60) * 20)
+    Math.min(20, (settings.targets.win_rate / 60) * 20)
   );
 
   // Discipline: 70% is a reasonable target for discipline metrics
@@ -100,15 +100,15 @@ export const calculateTradingPattern = (
       avgTradesPerWeek: 0,
       avgPositionSize: 0,
       avgRiskReward: 0,
-      winRate: 0,
-      profitFactor: 0,
-      maxDrawdown: 0,
+      win_rate: 0,
+      profit_factor: 0,
+      max_drawdown: 0,
       tradingDays: []
     };
   }
 
   const cutoffDate = subDays(targetDate, lookbackDays);
-  const recentTrades = trades.filter(trade => new Date(trade.date) >= cutoffDate);
+  const recentTrades = trades.filter(trade => new Date(trade.trade_date) >= cutoffDate);
 
   // Calculate session preferences
   const sessionCounts = recentTrades.reduce((acc, trade) => {
@@ -154,9 +154,9 @@ export const calculateTradingPattern = (
     : 0;
 
   // Calculate average risk/reward
-  const riskRewardTrades = recentTrades.filter(trade => trade.riskToReward && trade.riskToReward > 0);
+  const riskRewardTrades = recentTrades.filter(trade => trade.risk_to_reward && trade.risk_to_reward > 0);
   const avgRiskReward = riskRewardTrades.length > 0
-    ? riskRewardTrades.reduce((sum, trade) => sum + (trade.riskToReward || 0), 0) / riskRewardTrades.length
+    ? riskRewardTrades.reduce((sum, trade) => sum + (trade.risk_to_reward || 0), 0) / riskRewardTrades.length
     : 0;
 
   // Calculate performance metrics
@@ -194,7 +194,7 @@ export const calculateTradingPattern = (
 
   // Calculate preferred trading days
   const dayOfWeekCounts = recentTrades.reduce((acc, trade) => {
-    const dayOfWeek = getDay(new Date(trade.date));
+    const dayOfWeek = getDay(new Date(trade.trade_date));
     acc[dayOfWeek] = (acc[dayOfWeek] || 0) + 1;
     return acc;
   }, {} as Record<number, number>);
@@ -211,9 +211,9 @@ export const calculateTradingPattern = (
     avgTradesPerWeek,
     avgPositionSize,
     avgRiskReward,
-    winRate,
-    profitFactor,
-    maxDrawdown,
+    win_rate: winRate,
+    profit_factor: profitFactor,
+    max_drawdown: maxDrawdown,
     tradingDays: tradingDaysArray
   };
 };
@@ -257,7 +257,7 @@ export const calculateConsistencyScore = (
   // Timing consistency (trading on preferred days)
   const timingConsistency = trades.length > 0 && pattern.tradingDays.length > 0
     ? (trades.filter(trade =>
-        pattern.tradingDays.includes(getDay(new Date(trade.date)))
+        pattern.tradingDays.includes(getDay(new Date(trade.trade_date)))
       ).length / trades.length) * 100
     : 50;
 
@@ -308,9 +308,9 @@ export const calculateRiskManagementScore = (
   }
 
   // Risk/Reward ratio adherence
-  const rrTrades = trades.filter(trade => trade.riskToReward && trade.riskToReward > 0);
+  const rrTrades = trades.filter(trade => trade.risk_to_reward && trade.risk_to_reward > 0);
   const avgRR = rrTrades.length > 0
-    ? rrTrades.reduce((sum, trade) => sum + (trade.riskToReward || 0), 0) / rrTrades.length
+    ? rrTrades.reduce((sum, trade) => sum + (trade.risk_to_reward || 0), 0) / rrTrades.length
     : 0;
   const rrDeviation = settings.targets.avgRiskReward > 0
     ? Math.abs(avgRR - settings.targets.avgRiskReward) / settings.targets.avgRiskReward
@@ -351,18 +351,18 @@ export const calculateRiskManagementScore = (
     }
   });
 
-  const maxDrawdownAdherence = maxDrawdown <= settings.targets.maxDrawdown
+  const maxDrawdownAdherence = maxDrawdown <= settings.targets.max_drawdown
     ? 100
-    : Math.max(0, 100 - ((maxDrawdown - settings.targets.maxDrawdown) * 10));
+    : Math.max(0, 100 - ((maxDrawdown - settings.targets.max_drawdown) * 10));
 
   // Stop loss usage (approximated by loss trades having reasonable sizes, normalized for dynamic risk)
-  const lossTrades = trades.filter(trade => trade.type === 'loss');
+  const lossTrades = trades.filter(trade => trade.trade_type === 'loss');
   const avgLoss = lossTrades.length > 0
     ? (dynamicRiskSettings && allTrades
       ? Math.abs(lossTrades.reduce((sum, trade) => sum + normalizeTradeAmount(trade, allTrades, dynamicRiskSettings), 0)) / lossTrades.length
       : Math.abs(lossTrades.reduce((sum, trade) => sum + trade.amount, 0)) / lossTrades.length)
     : 0;
-  const winTrades = trades.filter(trade => trade.type === 'win');
+  const winTrades = trades.filter(trade => trade.trade_type === 'win');
   const avgWin = winTrades.length > 0
     ? (dynamicRiskSettings && allTrades
       ? winTrades.reduce((sum, trade) => sum + normalizeTradeAmount(trade, allTrades, dynamicRiskSettings), 0) / winTrades.length
@@ -421,18 +421,18 @@ export const calculatePerformanceScore = (
     : calculateProfitFactor(trades);
 
   // Win rate consistency
-  const winRateDeviation = pattern.winRate > 0
-    ? Math.abs(currentWinRate - pattern.winRate) / pattern.winRate
+  const winRateDeviation = pattern.win_rate > 0
+    ? Math.abs(currentWinRate - pattern.win_rate) / pattern.win_rate
     : 0;
-  const winRateConsistency = pattern.winRate > 0
+  const winRateConsistency = pattern.win_rate > 0
     ? Math.max(0, 100 - (winRateDeviation * 100))
     : 50;
 
   // Profit factor stability
-  const pfDeviation = pattern.profitFactor > 0
-    ? Math.abs(currentProfitFactor - pattern.profitFactor) / pattern.profitFactor
+  const pfDeviation = pattern.profit_factor > 0
+    ? Math.abs(currentProfitFactor - pattern.profit_factor) / pattern.profit_factor
     : 0;
-  const profitFactorStability = pattern.profitFactor > 0
+  const profitFactorStability = pattern.profit_factor > 0
     ? Math.max(0, 100 - (pfDeviation * 100))
     : 50;
 
@@ -470,10 +470,10 @@ export const calculatePerformanceScore = (
     }
   });
 
-  const volatilityControl = pattern.maxDrawdown > 0 && maxDrawdown <= pattern.maxDrawdown * 1.2
+  const volatilityControl = pattern.max_drawdown > 0 && maxDrawdown <= pattern.max_drawdown * 1.2
     ? 100
-    : pattern.maxDrawdown > 0
-      ? Math.max(0, 100 - ((maxDrawdown - pattern.maxDrawdown) * 5))
+    : pattern.max_drawdown > 0
+      ? Math.max(0, 100 - ((maxDrawdown - pattern.max_drawdown) * 5))
       : 50;
 
   const factors = {
@@ -556,7 +556,7 @@ export const calculateDisciplineScore = (
         trade.session &&
         trade.tags &&
         trade.tags.length > 0 &&
-        (trade.riskToReward || trade.type === 'breakeven')
+        (trade.risk_to_reward || trade.trade_type === 'breakeven')
       ).length / trades.length) * 100
     : 0;
 
@@ -639,10 +639,10 @@ export const generateRecommendations = (
   // Add tag pattern insights to recommendations
   if (tagPatternAnalysis && tagPatternAnalysis.insights) {
     tagPatternAnalysis.insights.slice(0, 2).forEach((insight: any) => {
-      if (insight.type === 'high_performance') {
-        recommendations.push(`Focus on "${insight.tagCombination.join(' + ')}" pattern (${insight.winRate.toFixed(1)}% win rate)`);
+      if (insight.trade_type === 'high_performance') {
+        recommendations.push(`Focus on "${insight.tagCombination.join(' + ')}" pattern (${insight.win_rate.toFixed(1)}% win rate)`);
         strengths.push(`Strong performance with ${insight.tagCombination.join(' + ')} combination`);
-      } else if (insight.type === 'declining_pattern') {
+      } else if (insight.trade_type === 'declining_pattern') {
         recommendations.push(`Review "${insight.tagCombination.join(' + ')}" strategy - performance declining`);
         weaknesses.push(`Declining performance in ${insight.tagCombination.join(' + ')} trades`);
       }

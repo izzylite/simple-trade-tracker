@@ -16,7 +16,7 @@ import {
   CalendarToday as CalendarIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import TradeDetailExpanded from './TradeDetailExpanded';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 
@@ -199,7 +199,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                 <Typography variant="caption" color="text.secondary">
-                  {format(new Date(currentTrade.date), 'MMM d, yyyy')}
+                  {format(new Date(currentTrade.trade_date), 'MMM d, yyyy')}
                 </Typography>
               </Box>
             </Box>

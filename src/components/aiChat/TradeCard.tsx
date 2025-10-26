@@ -45,7 +45,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
   const theme = useTheme();
 
   const getTradeTypeIcon = () => {
-    switch (trade.type) {
+    switch (trade.trade_type) {
       case 'win':
         return <WinIcon sx={{ fontSize: '1rem', color: 'success.main' }} />;
       case 'loss':
@@ -58,7 +58,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
   };
 
   const getTradeTypeColorName = () => {
-    switch (trade.type) {
+    switch (trade.trade_type) {
       case 'win':
         return 'success';
       case 'loss':
@@ -71,7 +71,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
   };
 
   const getTradeTypeColorValue = () => {
-    switch (trade.type) {
+    switch (trade.trade_type) {
       case 'win':
         return theme.palette.success.main;
       case 'loss':
@@ -160,17 +160,17 @@ const TradeCard: React.FC<TradeCardProps> = ({
                     </Box>
                   </Tooltip>
                 )}
-                {trade.riskToReward && compact && (
-                  <Tooltip title={`Risk to Reward: ${trade.riskToReward.toFixed(2)}`}>
+                {trade.risk_to_reward && compact && (
+                  <Tooltip title={`Risk to Reward: ${trade.risk_to_reward.toFixed(2)}`}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <RiskIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
                       <Typography variant="caption" color="text.secondary">
-                        {trade.riskToReward.toFixed(2)}
+                        {trade.risk_to_reward.toFixed(2)}
                       </Typography>
                     </Box>
                   </Tooltip>
                 )}
-                {trade.partialsTaken && (
+                {trade.partials_taken && (
                   <Tooltip title="Partials taken">
                     <Chip
                       label="Partials"
@@ -187,7 +187,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
 
                 <>
                   <DateIcon sx={{ fontSize: '0.875rem', color: 'text.secondary' }} />
-                  <Typography variant="caption" color="text.secondary" noWrap>{format(new Date(trade.date), 'MMM dd, yyyy')}</Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap>{format(new Date(trade.trade_date), 'MMM dd, yyyy')}</Typography>
                 </>
 
                 {trade.session && (
@@ -208,22 +208,22 @@ const TradeCard: React.FC<TradeCardProps> = ({
           {/* Trade Details */}
           {!compact && (
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              {trade.entry && (
+              {trade.entry_price && (
                 <Box>
                   <Typography variant="caption" color="text.secondary">Entry</Typography>
-                  <Typography variant="body2" fontWeight="medium">{trade.entry}</Typography>
+                  <Typography variant="body2" fontWeight="medium">{trade.entry_price}</Typography>
                 </Box>
               )}
-              {trade.exit && (
+              {trade.exit_price && (
                 <Box>
                   <Typography variant="caption" color="text.secondary">Exit</Typography>
-                  <Typography variant="body2" fontWeight="medium">{trade.exit}</Typography>
+                  <Typography variant="body2" fontWeight="medium">{trade.exit_price}</Typography>
                 </Box>
               )}
-              {trade.riskToReward && (
+              {trade.risk_to_reward && (
                 <Box>
                   <Typography variant="caption" color="text.secondary">R:R</Typography>
-                  <Typography variant="body2" fontWeight="medium">{trade.riskToReward.toFixed(2)}</Typography>
+                  <Typography variant="body2" fontWeight="medium">{trade.risk_to_reward.toFixed(2)}</Typography>
                 </Box>
               )}
             </Box>

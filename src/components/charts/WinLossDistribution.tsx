@@ -21,7 +21,7 @@ interface WinLossDistributionProps {
   comparisonTags: string[];
   setComparisonTags: (tags: string[]) => void;
   onPieClick?: (category: string) => void;
-  tagStats?: { tag: string; totalTrades: number }[];
+  tagStats?: { tag: string; total_trades: number }[];
 }
 
 const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
@@ -116,7 +116,7 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
       // If we have stats for the selected tags, use them
       if (filteredTagStats.length > 0) {
         filteredTagStats.forEach(stat => {
-          tagCounts.set(stat.tag, stat.totalTrades);
+          tagCounts.set(stat.tag, stat.total_trades);
         });
       } else {
         // Fallback if we don't have stats for the selected tags

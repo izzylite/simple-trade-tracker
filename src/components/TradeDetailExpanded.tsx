@@ -22,7 +22,7 @@ import {
 } from '@mui/material';
 import { alpha, useTheme, keyframes } from '@mui/material/styles';
 import { format } from 'date-fns';
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import {
   ZoomIn as ZoomInIcon,
   AttachMoney as MoneyIcon,
@@ -203,7 +203,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
       setIsPinning(true);
       const result = await onUpdateTradeProperty(trade.id, (currentTrade) => ({
         ...currentTrade,
-        isPinned: !currentTrade.isPinned
+        isPinned: !currentTrade.is_pinned
       }));
       setTrade(result!!);
     } catch (error) {
@@ -222,14 +222,14 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
   // Function to fetch economic events for the trade's date
   const fetchEconomicEvents = async () => {
-    if (!trade.date) return;
+    if (!trade.trade_date) return;
 
     try {
       setLoadingEconomicEvents(true);
       setEconomicEventsError(null);
 
 
-      const sessionRange = tradeEconomicEventService.getSessionTimeRange(trade.session!, trade.date);
+      const sessionRange = tradeEconomicEventService.getSessionTimeRange(trade.session!, trade.trade_date);
       const filterSetting = calendar?.economicCalendarFilters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
       const events = await economicCalendarService.fetchEvents(
         { start: sessionRange.start, end: sessionRange.end },
@@ -276,7 +276,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     if (showEconomicEvents) {
       fetchEconomicEvents();
     }
-  }, [trade.id, trade.date, trade.session]);
+  }, [trade.id, trade.trade_date, trade.session]);
 
   useEffect(() => {
     if (!showEconomicEvents) return;
@@ -363,7 +363,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   onClick={handleTogglePin}
                   disabled={isPinning}
                   sx={{
-                    color: trade.isPinned ? 'primary.main' : 'text.secondary',
+                    color: trade.is_pinned ? 'primary.main' : 'text.secondary',
                     '&:hover': {
                       backgroundColor: alpha(theme.palette.primary.main, 0.1),
                       color: 'primary.main'
@@ -376,7 +376,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   {isPinning ? (
                     <CircularProgress size={20} color="inherit" />
                   ) : (
-                    trade.isPinned ? <UnpinIcon sx={{ fontSize: 20 }} /> : <PinIcon sx={{ fontSize: 20 }} />
+                    trade.is_pinned ? <UnpinIcon sx={{ fontSize: 20 }} /> : <PinIcon sx={{ fontSize: 20 }} />
                   )}
                 </IconButton>
               )}
@@ -414,7 +414,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 width: '100%'
               }}>
                 {/* Entry/Exit Prices */}
-                {(trade.entry || trade.exit) && (
+                {(trade.entry_price || trade.exit_price) && (
                   <Paper elevation={0} sx={{
                     p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
                     borderRadius: 2,
@@ -432,23 +432,23 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       gap: { xs: 1, sm: 0 }, // Add gap on mobile
                       width: '100%'
                     }}>
-                      {trade.entry && (
+                      {trade.entry_price && (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                           <Typography variant="caption" sx={{ fontWeight: 600, color: 'info.main' }}>
                             Entry Price
                           </Typography>
                           <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                            {trade.entry}
+                            {trade.entry_price}
                           </Typography>
                         </Box>
                       )}
-                      {trade.exit && (
+                      {trade.exit_price && (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                           <Typography variant="caption" sx={{ fontWeight: 600, color: 'info.main' }}>
                             Exit Price
                           </Typography>
                           <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                            {trade.exit}
+                            {trade.exit_price}
                           </Typography>
                         </Box>
                       )}
@@ -526,12 +526,12 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                     fontWeight: 700,
                     fontSize: { xs: '1rem', sm: '1.1rem' } // Smaller on mobile
                   }}>
-                    {format(trade.date, 'MMMM d, yyyy')}
+                    {format(trade.trade_date, 'MMMM d, yyyy')}
                   </Typography>
                 </Paper>
 
                 {/* Risk to Reward */}
-                {trade.riskToReward && (
+                {trade.risk_to_reward && (
                   <Paper elevation={0} sx={{
                     p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
                     borderRadius: 2,
@@ -549,16 +549,16 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                     </Box>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
-                        {trade.riskToReward}
+                        {trade.risk_to_reward}
                       </Typography>
-                      {trade.type === 'win' && trade.riskToReward && (
+                      {trade.trade_type === 'win' && trade.risk_to_reward && (
                         <Typography variant="caption" sx={{
                           color: 'text.secondary',
                           fontSize: '0.75rem',
                           fontWeight: 500
                         }}>
                           Amount Risked: ${(() => {
-                            const amountRisked = Math.abs(trade.amount) / trade.riskToReward;
+                            const amountRisked = Math.abs(trade.amount) / trade.risk_to_reward;
                             return amountRisked.toFixed(2);
                           })()}
                         </Typography>
@@ -642,8 +642,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                 key={`image-${image.id}-${rowIndex}-${colIndex}`}
                                 sx={{
                                   width: {
-                                    xs: rowImages.length > 1 ? '100%' : `${image.columnWidth || 100}%`, // Full width on mobile if multiple images
-                                    sm: `${image.columnWidth || 100}%`
+                                    xs: rowImages.length > 1 ? '100%' : `${image.column_width || 100}%`, // Full width on mobile if multiple images
+                                    sm: `${image.column_width || 100}%`
                                   },
                                   borderRadius: 1,
                                   overflow: 'hidden',
@@ -902,7 +902,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       textOverflow: 'ellipsis',
                       whiteSpace: { xs: 'nowrap', sm: 'normal' } // Prevent wrapping on mobile
                     }}>
-                      Economic Events ({format(trade.date, 'MMM d, yyyy')})
+                      Economic Events ({format(trade.trade_date, 'MMM d, yyyy')})
                     </Typography>
                   </Box>
                   <Tooltip title={showEconomicEvents ? "Hide economic events" : "Show economic events"}>

@@ -13,7 +13,7 @@ import {
   Security as SecurityIcon,
   InfoOutlined as InfoIcon
 } from '@mui/icons-material';
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 
 
@@ -24,7 +24,7 @@ interface AccountBalanceProps {
   onChange: (balance: number) => void;
   trades: Trade[];
   onPerformanceClick?: () => void;
-  riskPerTrade?: number;
+  risk_per_trade?: number;
   dynamicRiskSettings?: DynamicRiskSettings;
   onToggleDynamicRisk?: (useActualAmounts: boolean) => void;
   isDynamicRiskToggled?: boolean;
@@ -39,7 +39,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
   trades,
   totalProfit,
   onPerformanceClick,
-  riskPerTrade,
+  risk_per_trade,
   dynamicRiskSettings,
   onToggleDynamicRisk,
   isDynamicRiskToggled = true, // Default to true (using actual amounts)
@@ -53,17 +53,17 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
 
   // Calculate the effective risk percentage based on dynamic risk settings
   const effectiveRiskPercentage = useMemo(() => {
-    if (!riskPerTrade) return undefined;
+    if (!risk_per_trade) return undefined;
 
-    if (dynamicRiskSettings?.dynamicRiskEnabled &&
-      dynamicRiskSettings.increasedRiskPercentage &&
-      dynamicRiskSettings.profitThresholdPercentage &&
-      parseFloat(profitPercentage) >= dynamicRiskSettings.profitThresholdPercentage) {
-      return dynamicRiskSettings.increasedRiskPercentage;
+    if (dynamicRiskSettings?.dynamic_risk_enabled &&
+      dynamicRiskSettings.increased_risk_percentage &&
+      dynamicRiskSettings.profit_threshold_percentage &&
+      parseFloat(profitPercentage) >= dynamicRiskSettings.profit_threshold_percentage) {
+      return dynamicRiskSettings.increased_risk_percentage;
     }
 
-    return riskPerTrade;
-  }, [riskPerTrade, dynamicRiskSettings, profitPercentage]);
+    return risk_per_trade;
+  }, [risk_per_trade, dynamicRiskSettings, profitPercentage]);
 
   // Calculate total account value
   const totalAccountValue = balance + totalProfit;
@@ -235,11 +235,11 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
         </Box>
       </Box>
 
-      {riskPerTrade && (
+      {risk_per_trade && (
         <Box sx={{
           display: 'flex',
           flexDirection: 'column',
-          gap: 1, 
+          gap: 1,
         }}>
           <Box sx={{
             display: 'flex',
@@ -259,7 +259,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
                 }}
               >
                 Risk Per Trade ({effectiveRiskPercentage}%)
-                {dynamicRiskSettings?.dynamicRiskEnabled && effectiveRiskPercentage !== riskPerTrade && (
+                {dynamicRiskSettings?.dynamic_risk_enabled && effectiveRiskPercentage !== risk_per_trade && (
                   <Box component="span" sx={{ ml: 1, color: 'success.main', fontSize: '0.75rem', fontWeight: 700 }}>
                     INCREASED
                   </Box>
@@ -277,7 +277,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
             </Typography>
           </Box>
 
-          {dynamicRiskSettings?.dynamicRiskEnabled && dynamicRiskSettings.profitThresholdPercentage && dynamicRiskSettings.increasedRiskPercentage && (
+          {dynamicRiskSettings?.dynamic_risk_enabled && dynamicRiskSettings.profit_threshold_percentage && dynamicRiskSettings.increased_risk_percentage && (
             <Box sx={{
               display: 'flex',
               flexDirection: 'column',
@@ -290,12 +290,12 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  Dynamic Risk: {parseFloat(profitPercentage) >= dynamicRiskSettings.profitThresholdPercentage ?
+                  Dynamic Risk: {parseFloat(profitPercentage) >= dynamicRiskSettings.profit_threshold_percentage ?
                     <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>Active</Box> :
                     <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Inactive</Box>}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  Threshold: {dynamicRiskSettings.profitThresholdPercentage}% profit
+                  Threshold: {dynamicRiskSettings.profit_threshold_percentage}% profit
                 </Typography>
               </Box>
 

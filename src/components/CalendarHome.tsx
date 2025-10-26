@@ -52,7 +52,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { Calendar } from '../types/calendar';
+import { Calendar, CalendarWithUIState } from '../types/calendar';
 import { formatCurrency } from '../utils/formatters';
 import { dialogProps } from '../styles/dialogStyles';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
@@ -67,8 +67,8 @@ import { logger } from '../utils/logger';
 // TradeDetailDialog has been removed
 
 interface CalendarHomeProps {
-  calendars: Calendar[];
-  onCreateCalendar: (name: string, accountBalance: number, maxDailyDrawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamicRiskEnabled?: boolean, increasedRiskPercentage?: number, profitThresholdPercentage?: number, heroImageUrl?: string, heroImageAttribution?: any, heroImagePosition?: string) => void;
+  calendars: CalendarWithUIState[];
+  onCreateCalendar: (name: string, account_balance: number, max_daily_drawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamic_risk_enabled?: boolean, increased_risk_percentage?: number, profit_threshold_percentage?: number, heroImageUrl?: string, heroImageAttribution?: any, heroImagePosition?: string) => void;
   onDuplicateCalendar: (sourceCalendarId: string, newName: string, includeContent?: boolean) => void;
   onDeleteCalendar: (id: string) => void;
   onUpdateCalendar: (id: string, updates: Partial<Calendar>) => void;
@@ -286,8 +286,8 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDuplicateOptionsDialogOpen, setIsDuplicateOptionsDialogOpen] = useState(false);
   const [calendarToDelete, setCalendarToDelete] = useState<string | null>(null);
-  const [calendarToEdit, setCalendarToEdit] = useState<Calendar | null>(null);
-  const [calendarToDuplicate, setCalendarToDuplicate] = useState<Calendar | null>(null);
+  const [calendarToEdit, setCalendarToEdit] = useState<CalendarWithUIState | null>(null);
+  const [calendarToDuplicate, setCalendarToDuplicate] = useState<CalendarWithUIState | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
@@ -296,7 +296,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   const [menuAnchorEl, setMenuAnchorEl] = useState<{[key: string]: HTMLElement | null}>({});
   const theme = useTheme();
   const navigate = useNavigate();
-  const [selectedCalendarForCharts, setSelectedCalendarForCharts] = useState<Calendar | null>(null);
+  const [selectedCalendarForCharts, setSelectedCalendarForCharts] = useState<CalendarWithUIState | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [isDateDialogOpen, setIsDateDialogOpen] = useState(false);
   const [currentTimePeriod, setCurrentTimePeriod] = useState<'month' | 'year' | 'all'>('month');
@@ -322,17 +322,17 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     try {
       await onCreateCalendar(
         data.name,
-        data.accountBalance,
-        data.maxDailyDrawdown,
-        data.weeklyTarget,
-        data.monthlyTarget,
-        data.yearlyTarget,
-        data.riskPerTrade,
-        data.dynamicRiskEnabled,
-        data.increasedRiskPercentage,
-        data.profitThresholdPercentage,
-        data.heroImageUrl,
-        data.heroImageAttribution
+        data.account_balance,
+        data.max_daily_drawdown,
+        data.weekly_target,
+        data.monthly_target,
+        data.yearly_target,
+        data.risk_per_trade,
+        data.dynamic_risk_enabled,
+        data.increased_risk_percentage,
+        data.profit_threshold_percentage,
+        data.hero_image_url,
+        data.hero_image_attribution
       );
       setIsCreateDialogOpen(false);
     } catch (error) {
@@ -349,17 +349,17 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     try {
       const updates: Partial<Calendar> = {
         name: data.name,
-        accountBalance: data.accountBalance,
-        maxDailyDrawdown: data.maxDailyDrawdown,
-        weeklyTarget: data.weeklyTarget,
-        monthlyTarget: data.monthlyTarget,
-        yearlyTarget: data.yearlyTarget,
-        riskPerTrade: data.riskPerTrade,
-        dynamicRiskEnabled: data.dynamicRiskEnabled,
-        increasedRiskPercentage: data.increasedRiskPercentage,
-        profitThresholdPercentage: data.profitThresholdPercentage,
-        heroImageUrl: data.heroImageUrl,
-        heroImageAttribution: data.heroImageAttribution
+        account_balance: data.account_balance,
+        max_daily_drawdown: data.max_daily_drawdown,
+        weekly_target: data.weekly_target,
+        monthly_target: data.monthly_target,
+        yearly_target: data.yearly_target,
+        risk_per_trade: data.risk_per_trade,
+        dynamic_risk_enabled: data.dynamic_risk_enabled,
+        increased_risk_percentage: data.increased_risk_percentage,
+        profit_threshold_percentage: data.profit_threshold_percentage,
+        hero_image_url: data.hero_image_url,
+        hero_image_attribution: data.hero_image_attribution
       };
 
       await onUpdateCalendar(calendarToEdit.id, updates);
@@ -390,12 +390,12 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
 
 
   // Menu item handlers that don't need event parameter
-  const handleEditCalendar = (calendar: Calendar) => {
+  const handleEditCalendar = (calendar: CalendarWithUIState) => {
     setCalendarToEdit(calendar);
     setIsEditDialogOpen(true);
   };
 
-  const handleDuplicateCalendar = (calendar: Calendar) => {
+  const handleDuplicateCalendar = (calendar: CalendarWithUIState) => {
     setCalendarToDuplicate(calendar);
     setIsDuplicateOptionsDialogOpen(true);
   };
@@ -461,7 +461,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     action();
   };
 
-  const handleViewCharts = async (e: React.MouseEvent, calendar: Calendar) => {
+  const handleViewCharts = async (e: React.MouseEvent, calendar: CalendarWithUIState) => {
     e.stopPropagation();
 
     // First, set the calendar to show the dialog immediately
@@ -501,30 +501,30 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   };
 
   // Create a wrapper function for calendar updates that matches the expected signature
-  const handleUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<Calendar | undefined> => {
+  const handleUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: CalendarWithUIState) => Calendar): Promise<Calendar | undefined> => {
     const calendar = calendars.find(c => c.id === calendarId);
     if (!calendar) return;
 
     const updatedCalendar = updateCallback(calendar);
     const updates: Partial<Calendar> = {
       ...updatedCalendar,
-      scoreSettings: updatedCalendar.scoreSettings
+      score_settings: updatedCalendar.score_settings
     };
 
     await onUpdateCalendar(calendarId, updates);
   };
 
   // Create a wrapper function for sharing-related calendar updates
-  const handleUpdateCalendarPropertyForSharing = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<Calendar | undefined> => {
+  const handleUpdateCalendarPropertyForSharing = async (calendarId: string, updateCallback: (calendar: CalendarWithUIState) => Calendar): Promise<Calendar | undefined> => {
     const calendar = calendars.find(c => c.id === calendarId);
     if (!calendar) return undefined;
 
     const updatedCalendar = updateCallback(calendar);
     const updates: Partial<Calendar> = {
-      shareLink: updatedCalendar.shareLink,
-      shareId: updatedCalendar.shareId,
-      isShared: updatedCalendar.isShared,
-      sharedAt: updatedCalendar.sharedAt
+      share_link: updatedCalendar.share_link,
+      share_id: updatedCalendar.share_id,
+      is_shared: updatedCalendar.is_shared,
+      shared_at: updatedCalendar.shared_at
     };
 
     await onUpdateCalendar(calendarId, updates);
@@ -538,7 +538,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     const trades = selectedCalendarForCharts.cachedTrades || [];
     if (trades.length === 0) return [new Date()];
 
-    const dates = trades.map(trade => new Date(trade.date));
+    const dates = trades.map(trade => new Date(trade.trade_date));
     const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
     const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
 
@@ -939,19 +939,19 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                     <PerformanceCharts
                       trades={selectedCalendarForCharts.cachedTrades || []}
                       selectedDate={selectedMonth}
-                      accountBalance={selectedCalendarForCharts.accountBalance}
-                      monthlyTarget={selectedCalendarForCharts.monthlyTarget ?? undefined}
-                      maxDailyDrawdown={selectedCalendarForCharts.maxDailyDrawdown}
+                      accountBalance={selectedCalendarForCharts.account_balance}
+                      monthlyTarget={selectedCalendarForCharts.monthly_target ?? undefined}
+                      maxDailyDrawdown={selectedCalendarForCharts.max_daily_drawdown}
                       calendarId={selectedCalendarForCharts.id}
                       calendar={selectedCalendarForCharts}
                       dynamicRiskSettings={{
-                        accountBalance: selectedCalendarForCharts.accountBalance,
-                        riskPerTrade: selectedCalendarForCharts.riskPerTrade,
-                        dynamicRiskEnabled: selectedCalendarForCharts.dynamicRiskEnabled,
-                        increasedRiskPercentage: selectedCalendarForCharts.increasedRiskPercentage,
-                        profitThresholdPercentage: selectedCalendarForCharts.profitThresholdPercentage
+                        account_balance: selectedCalendarForCharts.account_balance,
+                        risk_per_trade: selectedCalendarForCharts.risk_per_trade,
+                        dynamic_risk_enabled: selectedCalendarForCharts.dynamic_risk_enabled,
+                        increased_risk_percentage: selectedCalendarForCharts.increased_risk_percentage,
+                        profit_threshold_percentage: selectedCalendarForCharts.profit_threshold_percentage
                       }}
-                      scoreSettings={selectedCalendarForCharts.scoreSettings}
+                      scoreSettings={selectedCalendarForCharts.score_settings}
                       onUpdateCalendarProperty={handleUpdateCalendarProperty}
                       onTimePeriodChange={handleTimePeriodChange}
                     />
@@ -986,9 +986,9 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                 }}
                 initialDate={selectedMonth}
                 trades={selectedCalendarForCharts.cachedTrades || []}
-                accountBalance={selectedCalendarForCharts.accountBalance}
-                monthlyTarget={selectedCalendarForCharts.monthlyTarget ?? undefined}
-                yearlyTarget={selectedCalendarForCharts.yearlyTarget}
+                accountBalance={selectedCalendarForCharts.account_balance}
+                monthlyTarget={selectedCalendarForCharts.monthly_target ?? undefined}
+                yearlyTarget={selectedCalendarForCharts.yearly_target}
               />
             )}
 

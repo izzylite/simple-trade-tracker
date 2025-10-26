@@ -195,7 +195,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const theme = useTheme();
 
   // Get current calendar and its settings
-  const savedSettings: EconomicCalendarFilterSettings = calendar?.economicCalendarFilters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS;
+  const savedSettings: EconomicCalendarFilterSettings = calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS;
 
   // State management
   const [viewType, setViewType] = useState<ViewType>(savedSettings.viewType);
@@ -626,7 +626,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     try {
       setPinningEventId(eventName);
       await onUpdateCalendarProperty(calendar.id, (calendar: Calendar) => {
-        const currentPinnedEvents = calendar.pinnedEvents || [];
+        const currentPinnedEvents = calendar.pinned_events || [];
         const cleanedEventName =  cleanEventNameForPinning(eventName);
         // Check if event is already pinned
         const eventNames = currentPinnedEvents.map(pe => pe.event);
@@ -653,7 +653,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     try {
       setPinningEventId(eventName);
       await onUpdateCalendarProperty(calendar.id, (calendar: Calendar) => {
-        const currentPinnedEvents = calendar.pinnedEvents || [];
+        const currentPinnedEvents = calendar.pinned_events || [];
         const cleanedEventName =  cleanEventNameForPinning(eventName);
         return {
           ...calendar,
@@ -981,7 +981,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                               px={2.5}
                               py={1.5}
                               event={event}
-                              pinnedEvents={calendar?.pinnedEvents?.map(pe => pe.event) || []}
+                              pinnedEvents={calendar?.pinned_events?.map(pe => pe.event) || []}
                               onPinEvent={handlePinEvent}
                               onUnpinEvent={handleUnpinEvent}
                               isPinning={pinningEventId === event.event}

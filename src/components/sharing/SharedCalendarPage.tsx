@@ -15,8 +15,7 @@ import { createAppTheme } from '../../theme';
 import { TradeCalendar } from '../TradeCalendar';
 import AppHeader from '../common/AppHeader';
 import { getSharedTradesWithCalendar } from '../../services/sharingService';
-import { Calendar } from '../../types/calendar';
-import { Trade } from '../../types/trade';
+import { Trade, Calendar } from '../../types/dualWrite';
 import { logger } from '../../utils/logger';
 
 interface SharedCalendarData {
@@ -282,30 +281,30 @@ const SharedCalendarPage: React.FC = () => {
         <TradeCalendar
           trades={calendarData.trades}
           title={`${calendarData.calendar.name} - Shared Calendar`}
-          accountBalance={calendarData.calendar.accountBalance}
-          maxDailyDrawdown={calendarData.calendar.maxDailyDrawdown}
-          weeklyTarget={calendarData.calendar.weeklyTarget}
-          monthlyTarget={calendarData.calendar.monthlyTarget}
-          yearlyTarget={calendarData.calendar.yearlyTarget}
+          accountBalance={calendarData.calendar.account_balance}
+          maxDailyDrawdown={calendarData.calendar.max_daily_drawdown}
+          weeklyTarget={calendarData.calendar.weekly_target}
+          monthly_target={calendarData.calendar.monthly_target}
+          yearlyTarget={calendarData.calendar.yearly_target}
           dynamicRiskSettings={{
-            accountBalance: calendarData.calendar.accountBalance,
-            dynamicRiskEnabled: calendarData.calendar.dynamicRiskEnabled || false,
-            riskPerTrade: calendarData.calendar.riskPerTrade || 0,
-            increasedRiskPercentage: calendarData.calendar.increasedRiskPercentage || 0,
-            profitThresholdPercentage: calendarData.calendar.profitThresholdPercentage || 0
+            account_balance: calendarData.calendar.account_balance,
+            dynamic_risk_enabled: calendarData.calendar.dynamic_risk_enabled || false,
+            risk_per_trade: calendarData.calendar.risk_per_trade || 0,
+            increased_risk_percentage: calendarData.calendar.increased_risk_percentage || 0,
+            profit_threshold_percentage: calendarData.calendar.profit_threshold_percentage || 0
           }}
-          requiredTagGroups={calendarData.calendar.requiredTagGroups}
+          requiredTagGroups={calendarData.calendar.required_tag_groups}
           allTags={calendarData.calendar.tags}
           calendarName={calendarData.calendar.name}
           calendarNote={calendarData.calendar.note}
-          heroImageUrl={calendarData.calendar.heroImageUrl}
-          heroImageAttribution={calendarData.calendar.heroImageAttribution}
-          calendarDayNotes={calendarData.calendar.daysNotes}
-          scoreSettings={calendarData.calendar.scoreSettings}
+          heroImageUrl={calendarData.calendar.hero_image_url}
+          heroImageAttribution={calendarData.calendar.hero_image_attribution}
+          calendarDayNotes={calendarData.calendar.days_notes ? Object.entries(calendarData.calendar.days_notes).reduce((map, [k, v]) => map.set(k, v), new Map<string, string>()) : new Map<string, string>()}
+          scoreSettings={calendarData.calendar.score_settings}
           onClearMonthTrades={() => { }} // No-op for read-only
           onToggleTheme={handleToggleTheme}
           mode={mode}
-          totalPnL={calendarData.calendar.totalPnL}
+          totalPnL={calendarData.calendar.total_pnl}
           onAccountBalanceChange={() => { }} // No-op for read-only
           calendar={calendarData.calendar}
           isReadOnly={true} // Enable read-only mode for shared calendars

@@ -1,183 +1,134 @@
-import {
-  collection,
-  addDoc,
-  updateDoc,
-  doc,
-  getDocs,
-  query,
-  where,
-  Timestamp,
-  DocumentData,
-  setDoc,
-  getDoc,
-  writeBatch,
-  runTransaction,
-  deleteField
-} from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase/config';
+/**
+ * Calendar Service - Supabase Repository Pattern
+ * High-level business logic for calendar and trade operations
+ * Uses CalendarRepository and TradeRepository for data access
+ * All types use snake_case to match dualWrite.ts and Supabase schema
+ */
+
 import { isSameWeek, isSameMonth } from 'date-fns';
-import { auth, db } from '../firebase/config';
-import { Calendar, calendarConverter } from '../types/calendar';
-import { Trade, tradeConverter } from '../types/trade';
-import { YearlyTrades, yearlyTradesConverter } from '../types/yearlyTrades';
-// Firebase Storage imports removed - now using Supabase Storage
-import { uploadTradeImage, optimizeImage } from './supabaseStorageService';
-import { TradeImage } from '../components/trades/TradeForm';
-import { logger } from '../utils/logger'; 
-import { vectorSearchService } from './ai/vectorSearchService';
-import { embeddingService } from './ai/embeddingService';
-import { getAuth } from '@firebase/auth';
+import { Calendar, Trade } from '../types/dualWrite';
+import { logger } from '../utils/logger';
 
-const CALENDARS_COLLECTION = 'calendars';
-const YEARS_SUBCOLLECTION = 'years';
+// Import repositories
+import { CalendarRepository } from './repository/repositories/CalendarRepository';
+import { TradeRepository } from './repository/repositories/TradeRepository';
 
-// Vector sync helper functions
-const syncTradeToVectors = async (
-  trade: Trade,
-  calendarId: string, 
-  operation: 'add' | 'update' | 'delete'
-): Promise<void> => {
-  try {
-    const userId =  getAuth().currentUser!.uid
-    if (operation === 'delete') {
-      // Delete the embedding
-      await vectorSearchService.deleteTradeEmbedding(trade.id, userId, calendarId);
-      logger.log(`Deleted vector embedding for trade ${trade.id}`);
-    } else {
-      // Generate and store embedding
-      const { embedding, content } = await embeddingService.generateTradeEmbedding(trade);
-      await vectorSearchService.storeTradeEmbedding(trade, embedding, content, userId, calendarId);
-      logger.log(`${operation === 'add' ? 'Added' : 'Updated'} vector embedding for trade ${trade.id}`);
-    }
-  } catch (error) {
-    logger.error(`Failed to sync trade ${trade.id} to vectors:`, error);
-    // Don't throw here - vector sync failure shouldn't break the main operation
-  }
-};
+// Create repository instances
+const calendarRepository = new CalendarRepository();
+const tradeRepository = new TradeRepository();
 
-const syncMultipleTradesToVectors = async (
-  trades: Trade[],
-  calendarId: string, 
-  operation: 'add' | 'update' | 'delete'
-): Promise<void> => {
-  try {
-    const userId =  getAuth().currentUser!.uid
-    if (operation === 'delete') {
-      // Delete multiple embeddings individually
-      const deletePromises = trades.map(trade =>
-        vectorSearchService.deleteTradeEmbedding(trade.id, userId, calendarId)
-      );
-      await Promise.allSettled(deletePromises);
-      logger.log(`Deleted vector embeddings for ${trades.length} trades`);
-    } else {
-      // Generate and store multiple embeddings
-      const tradeEmbeddings = await embeddingService.generateTradeEmbeddings(trades);
-      await vectorSearchService.storeTradeEmbeddings(tradeEmbeddings, userId, calendarId);
-      logger.log(`${operation === 'add' ? 'Added' : 'Updated'} vector embeddings for ${trades.length} trades`);
-    }
-  } catch (error) {
-    logger.error(`Failed to sync ${trades.length} trades to vectors:`, error);
-    // Don't throw here - vector sync failure shouldn't break the main operation
-  }
-};
+// =====================================================
+// TYPES AND INTERFACES
+// =====================================================
 
-
-
-// Interface for calendar statistics
-interface CalendarStats {
-  winRate: number;
-  profitFactor: number;
-  maxDrawdown: number;
-  targetProgress: number;
-  pnlPerformance: number;
-  totalTrades: number;
-  winCount: number;
-  lossCount: number;
-  totalPnL: number;
-  drawdownStartDate: Date | null;
-  drawdownEndDate: Date | null;
-  drawdownRecoveryNeeded: number;
-  drawdownDuration: number;
-  avgWin: number;
-  avgLoss: number;
-  currentBalance: number;
-  weeklyPnL?: number;
-  monthlyPnL?: number;
-  yearlyPnL?: number;
-  weeklyPnLPercentage?: number;
-  monthlyPnLPercentage?: number;
-  yearlyPnLPercentage?: number;
-  weeklyProgress?: number;
-  monthlyProgress?: number;
+/**
+ * Calendar statistics interface (camelCase for UI compatibility)
+ * Note: This is a UI-facing interface, not stored in database
+ */
+export interface CalendarStats {
+  win_rate: number;
+  profit_factor: number;
+  max_drawdown: number;
+  target_progress: number;
+  pnl_performance: number;
+  total_trades: number;
+  win_count: number;
+  loss_count: number;
+  total_pnl: number;
+  drawdown_start_date: Date | null;
+  drawdown_end_date: Date | null;
+  drawdown_recovery_needed: number;
+  drawdown_duration: number;
+  avg_win: number;
+  avg_loss: number;
+  current_balance: number;
+  initial_balance: number;
+  growth_percentage: number;
+  weekly_pnl?: number;
+  monthly_pnl?: number;
+  yearly_pnl?: number;
+  weekly_pnl_percentage?: number;
+  monthly_pnl_percentage?: number;
+  yearly_pnl_percentage?: number;
+  weekly_progress?: number;
+  monthly_progress?: number;
+  yearly_progress?: number;
 }
 
-// Calculate calendar statistics
+// =====================================================
+// STATISTICS CALCULATION
+// =====================================================
+
+/**
+ * Calculate calendar statistics from trades
+ */
 export const calculateCalendarStats = (trades: Trade[], calendar: Calendar): CalendarStats => {
   const currentDate = new Date();
 
   // Default values if no trades
   if (trades.length === 0) {
     return {
-      winRate: 0,
-      profitFactor: 0,
-      maxDrawdown: 0,
-      targetProgress: 0,
-      pnlPerformance: 0,
-      totalTrades: 0,
-      winCount: 0,
-      lossCount: 0,
-      totalPnL: 0,
-      drawdownStartDate: null,
-      drawdownEndDate: null,
-      drawdownRecoveryNeeded: 0,
-      drawdownDuration: 0,
-      avgWin: 0,
-      avgLoss: 0,
-      currentBalance: calendar.accountBalance,
-      weeklyPnL: 0,
-      monthlyPnL: 0,
-      yearlyPnL: 0,
-      weeklyPnLPercentage: 0,
-      monthlyPnLPercentage: 0,
-      yearlyPnLPercentage: 0,
-      weeklyProgress: 0,
-      monthlyProgress: 0
+      win_rate: 0,
+      profit_factor: 0,
+      max_drawdown: 0,
+      target_progress: 0,
+      pnl_performance: 0,
+      total_trades: 0,
+      win_count: 0,
+      loss_count: 0,
+      total_pnl: 0,
+      drawdown_start_date: null,
+      drawdown_end_date: null,
+      drawdown_recovery_needed: 0,
+      drawdown_duration: 0,
+      avg_win: 0,
+      avg_loss: 0,
+      current_balance: calendar.account_balance,
+      initial_balance: calendar.account_balance,
+      growth_percentage: 0,
+      weekly_pnl: 0,
+      monthly_pnl: 0,
+      yearly_pnl: 0,
+      weekly_pnl_percentage: 0,
+      monthly_pnl_percentage: 0,
+      yearly_pnl_percentage: 0,
+      weekly_progress: 0,
+      monthly_progress: 0,
+      yearly_progress: 0
     };
   }
 
   // Calculate win rate
-  const winCount = trades.filter(trade => trade.type === 'win').length;
-  const lossCount = trades.filter(trade => trade.type === 'loss').length;
-  const totalTrades = trades.length;
-  const winRate = totalTrades > 0 ? (winCount / totalTrades) * 100 : 0;
+  const win_count = trades.filter(trade => trade.trade_type === 'win').length;
+  const loss_count = trades.filter(trade => trade.trade_type === 'loss').length;
+  const total_trades = trades.length;
+  const win_rate = total_trades > 0 ? (win_count / total_trades) * 100 : 0;
 
   // Calculate profit factor and average win/loss
-  const winningTrades = trades.filter(t => t.type === 'win');
-  const losingTrades = trades.filter(t => t.type === 'loss');
+  const winningTrades = trades.filter(t => t.trade_type === 'win');
+  const losingTrades = trades.filter(t => t.trade_type === 'loss');
   const grossProfit = winningTrades.reduce((sum, t) => sum + t.amount, 0);
   const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.amount, 0));
-  const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : winCount > 0 ? 999 : 0;
+  const profit_factor = grossLoss > 0 ? grossProfit / grossLoss : win_count > 0 ? 999 : 0;
 
-  // Calculate average win and loss
-  const avgWin = winningTrades.length > 0 ? grossProfit / winningTrades.length : 0;
-  const avgLoss = losingTrades.length > 0 ? grossLoss / losingTrades.length * -1 : 0; // Make avgLoss negative
+  const avg_win = winningTrades.length > 0 ? grossProfit / winningTrades.length : 0;
+  const avg_loss = losingTrades.length > 0 ? (grossLoss / losingTrades.length) * -1 : 0;
 
   // Calculate total P&L
-  const totalPnL = trades.reduce((sum, trade) => sum + trade.amount, 0);
+  const total_pnl = trades.reduce((sum, trade) => sum + trade.amount, 0);
 
   // Calculate max drawdown and related statistics
-  let runningBalance = calendar.accountBalance;
+  let runningBalance = calendar.account_balance;
   let maxBalance = runningBalance;
-  let maxDrawdown = 0;
-  let drawdownStartDate: Date | null = null;
-  let drawdownEndDate: Date | null = null;
+  let max_drawdown = 0;
+  let drawdown_start_date: Date | null = null;
+  let drawdown_end_date: Date | null = null;
   let currentDrawdownStart: Date | null = null;
   let currentDrawdown = 0;
 
   // Sort trades by date
   const sortedTrades = [...trades].sort((a, b) =>
-    new Date(a.date).getTime() - new Date(b.date).getTime()
+    new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime()
   );
 
   sortedTrades.forEach(trade => {
@@ -191,254 +142,228 @@ export const calculateCalendarStats = (trades: Trade[], calendar: Calendar): Cal
       if (drawdown > currentDrawdown) {
         currentDrawdown = drawdown;
         if (!currentDrawdownStart) {
-          currentDrawdownStart = new Date(trade.date);
+          currentDrawdownStart = new Date(trade.trade_date);
         }
       }
-      if (drawdown > maxDrawdown) {
-        maxDrawdown = drawdown;
-        drawdownStartDate = currentDrawdownStart;
-        drawdownEndDate = new Date(trade.date);
+      if (drawdown > max_drawdown) {
+        max_drawdown = drawdown;
+        drawdown_start_date = currentDrawdownStart;
+        drawdown_end_date = new Date(trade.trade_date);
       }
     }
   });
 
   // Calculate drawdown recovery needed
-  const drawdownRecoveryNeeded = maxDrawdown > 0 && runningBalance > 0 ?
+  const drawdown_recovery_needed = max_drawdown > 0 && runningBalance > 0 ?
     ((maxBalance - runningBalance) / runningBalance) * 100 : 0;
 
   // Calculate drawdown duration
-  const drawdownDuration = (() => {
-    if (drawdownStartDate === null || drawdownEndDate === null) {
+  const drawdown_duration = (() => {
+    if (drawdown_start_date === null || drawdown_end_date === null) {
       return 0;
     }
-    const start = drawdownStartDate as Date;
-    const end = drawdownEndDate as Date;
-    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const diffTime = Math.abs((drawdown_end_date as Date).getTime() - (drawdown_start_date as Date).getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   })();
 
-  // Calculate weekly, monthly, and yearly PnL
-  const weeklyPnL = trades
-    .filter(trade => isSameWeek(new Date(trade.date), currentDate, { weekStartsOn: 1 }))
-    .reduce((sum, trade) => sum + trade.amount, 0);
-
-  const monthlyPnL = trades
-    .filter(trade => isSameMonth(new Date(trade.date), currentDate))
-    .reduce((sum, trade) => sum + trade.amount, 0);
-
-  const yearlyPnL = trades
-    .filter(trade => new Date(trade.date).getFullYear() === currentDate.getFullYear())
-    .reduce((sum, trade) => sum + trade.amount, 0);
-
-  // Calculate PnL percentages
-  const weeklyPnLPercentage = calendar.accountBalance > 0 ? (weeklyPnL / calendar.accountBalance * 100) : 0;
-  const monthlyPnLPercentage = calendar.accountBalance > 0 ? (monthlyPnL / calendar.accountBalance * 100) : 0;
-  const yearlyPnLPercentage = calendar.accountBalance > 0 ? (yearlyPnL / calendar.accountBalance * 100) : 0;
-
   // Calculate target progress
-  const yearlyTarget = calendar.yearlyTarget || 0;
-  const targetProgress = yearlyTarget > 0 && calendar.accountBalance > 0 ?
-    Math.min(100, (totalPnL / (calendar.accountBalance * yearlyTarget / 100)) * 100) : 0;
-
-  // Calculate weekly and monthly progress
-  const weeklyProgress = calendar.weeklyTarget && calendar.weeklyTarget > 0 ?
-    Math.min(100, (weeklyPnLPercentage / calendar.weeklyTarget) * 100) : 0;
-
-  const monthlyProgress = calendar.monthlyTarget && calendar.monthlyTarget > 0 ?
-    Math.min(100, (monthlyPnLPercentage / calendar.monthlyTarget) * 100) : 0;
+  const yearly_target = calendar.yearly_target || 0;
+  const target_progress = yearly_target > 0 ? (total_pnl / yearly_target) * 100 : 0;
 
   // Calculate P&L performance (percentage of account balance)
-  const pnlPerformance = calendar.accountBalance > 0 ? (totalPnL / calendar.accountBalance) * 100 : 0;
+  const pnl_performance = calendar.account_balance > 0 ? (total_pnl / calendar.account_balance) * 100 : 0;
 
   // Current balance after all trades
-  const currentBalance = calendar.accountBalance + totalPnL;
+  const current_balance = calendar.account_balance + total_pnl;
+
+  // Calculate weekly P&L
+  const weekly_pnl = trades
+    .filter(trade => isSameWeek(new Date(trade.trade_date), currentDate))
+    .reduce((sum, trade) => sum + trade.amount, 0);
+
+  const weekly_pnl_percentage = calendar.account_balance > 0 ?
+    (weekly_pnl / calendar.account_balance) * 100 : 0;
+
+  const weekly_progress = calendar.weekly_target ?
+    (weekly_pnl / calendar.weekly_target) * 100 : 0;
+
+  // Calculate monthly P&L
+  const monthly_pnl = trades
+    .filter(trade => isSameMonth(new Date(trade.trade_date), currentDate))
+    .reduce((sum, trade) => sum + trade.amount, 0);
+
+  const monthly_pnl_percentage = calendar.account_balance > 0 ?
+    (monthly_pnl / calendar.account_balance) * 100 : 0;
+
+  const monthly_progress = calendar.monthly_target ?
+    (monthly_pnl / calendar.monthly_target) * 100 : 0;
+
+  // Calculate yearly P&L
+  const yearly_pnl = trades
+    .filter(trade => new Date(trade.trade_date).getFullYear() === currentDate.getFullYear())
+    .reduce((sum, trade) => sum + trade.amount, 0);
+
+  const yearly_pnl_percentage = calendar.account_balance > 0 ?
+    (yearly_pnl / calendar.account_balance) * 100 : 0;
+
+  const growth_percentage = calendar.account_balance > 0 ?
+    (total_pnl / calendar.account_balance) * 100 : 0;
+
+  const yearly_progress = calendar.yearly_target ?
+    (yearly_pnl / calendar.yearly_target) * 100 : 0;
 
   return {
-    winRate,
-    profitFactor,
-    maxDrawdown,
-    targetProgress,
-    pnlPerformance,
-    totalTrades,
-    winCount,
-    lossCount,
-    totalPnL,
-    drawdownStartDate,
-    drawdownEndDate,
-    drawdownRecoveryNeeded,
-    drawdownDuration,
-    avgWin,
-    avgLoss,
-    currentBalance,
-    weeklyPnL,
-    monthlyPnL,
-    yearlyPnL,
-    weeklyPnLPercentage,
-    monthlyPnLPercentage,
-    yearlyPnLPercentage,
-    weeklyProgress,
-    monthlyProgress
+    win_rate,
+    profit_factor,
+    max_drawdown,
+    target_progress,
+    pnl_performance,
+    total_trades,
+    win_count,
+    loss_count,
+    total_pnl,
+    drawdown_start_date,
+    drawdown_end_date,
+    drawdown_recovery_needed,
+    drawdown_duration,
+    avg_win,
+    avg_loss,
+    current_balance,
+    initial_balance: calendar.account_balance,
+    growth_percentage,
+    weekly_pnl,
+    monthly_pnl,
+    yearly_pnl,
+    weekly_pnl_percentage,
+    monthly_pnl_percentage,
+    yearly_pnl_percentage,
+    weekly_progress,
+    monthly_progress,
+    yearly_progress
   };
 };
 
 
+/**
+ * Get calendar statistics from calendar object
+ * Returns CalendarStats with snake_case properties matching database schema
+ */
+export const getCalendarStats = (calendar: Calendar): CalendarStats => {
+  return {
+    total_pnl: calendar.total_pnl || 0,
+    win_rate: calendar.win_rate || 0,
+    total_trades: calendar.total_trades || 0,
+    growth_percentage: calendar.pnl_performance || 0,
+    avg_win: calendar.avg_win || 0,
+    avg_loss: calendar.avg_loss || 0,
+    profit_factor: calendar.profit_factor || 0,
+    max_drawdown: calendar.max_drawdown || 0,
+    drawdown_recovery_needed: calendar.drawdown_recovery_needed || 0,
+    drawdown_duration: calendar.drawdown_duration || 0,
+    drawdown_start_date: calendar.drawdown_start_date || null,
+    drawdown_end_date: calendar.drawdown_end_date || null,
+    weekly_progress: calendar.weekly_progress || 0,
+    monthly_progress: calendar.monthly_progress || 0,
+    yearly_progress: calendar.target_progress || 0,
+    current_balance: calendar.current_balance || calendar.account_balance || 0,
+    initial_balance: calendar.account_balance || 0,
+    win_count: 0, // Not stored in calendar, calculated from trades
+    loss_count: 0, // Not stored in calendar, calculated from trades
+    target_progress: calendar.target_progress || 0,
+    pnl_performance: calendar.pnl_performance || 0
+  };
+};
 
+// =====================================================
+// CALENDAR CRUD OPERATIONS
+// =====================================================
 
-
-
-
-// Helper function to get trades (either from cache or Firestore)
-const getTrades = async (calendarId: string, cachedTrades: Trade[] = []): Promise<Trade[]> => {
-  if (cachedTrades.length > 0) {
-    // Use cached trades if provided
-    return cachedTrades;
-  } else {
-    // Fallback to fetching all trades from Firestore
-    return await getAllTrades(calendarId);
+/**
+ * Get a single calendar by ID
+ */
+export const getCalendar = async (calendarId: string): Promise<Calendar | null> => {
+  try {
+    return await calendarRepository.findById(calendarId);
+  } catch (error) {
+    logger.error('Error getting calendar:', error);
+    return null;
   }
 };
 
-const getUpdateCalendarData = (stats: CalendarStats): Record<string, any> => {
-  // Create the base object with required fields
-  const baseData = {
-    lastModified: Timestamp.fromDate(new Date()),
-    winRate: stats.winRate,
-    profitFactor: stats.profitFactor,
-    maxDrawdown: stats.maxDrawdown,
-    targetProgress: stats.targetProgress,
-    pnlPerformance: stats.pnlPerformance,
-    totalTrades: stats.totalTrades,
-    winCount: stats.winCount,
-    lossCount: stats.lossCount,
-    totalPnL: stats.totalPnL,
-    drawdownStartDate: stats.drawdownStartDate ? Timestamp.fromDate(stats.drawdownStartDate) : null,
-    drawdownEndDate: stats.drawdownEndDate ? Timestamp.fromDate(stats.drawdownEndDate) : null,
-    drawdownRecoveryNeeded: stats.drawdownRecoveryNeeded,
-    drawdownDuration: stats.drawdownDuration,
-    avgWin: stats.avgWin,
-    avgLoss: stats.avgLoss,
-    currentBalance: stats.currentBalance,
-
-  };
-
-  // Add optional fields only if they are not undefined
-  const optionalFields = {
-    ...(stats.weeklyPnL !== undefined && { weeklyPnL: stats.weeklyPnL }),
-    ...(stats.monthlyPnL !== undefined && { monthlyPnL: stats.monthlyPnL }),
-    ...(stats.yearlyPnL !== undefined && { yearlyPnL: stats.yearlyPnL }),
-    ...(stats.weeklyPnLPercentage !== undefined && { weeklyPnLPercentage: stats.weeklyPnLPercentage }),
-    ...(stats.monthlyPnLPercentage !== undefined && { monthlyPnLPercentage: stats.monthlyPnLPercentage }),
-    ...(stats.yearlyPnLPercentage !== undefined && { yearlyPnLPercentage: stats.yearlyPnLPercentage }),
-    ...(stats.weeklyProgress !== undefined && { weeklyProgress: stats.weeklyProgress }),
-    ...(stats.monthlyProgress !== undefined && { monthlyProgress: stats.monthlyProgress }),
-  };
-
-  return {
-    ...baseData,
-    ...optionalFields
-  };
-}
-// Helper function to update calendar statistics
-const updateCalendarStats = async (calendarRef: any, stats: CalendarStats): Promise<void> => {
-  // Update the calendar document with the new statistics
-  await updateDoc(calendarRef, getUpdateCalendarData(stats));
-};
-
-// Get calendar statistics
-export const getCalendarStats = (calendar: Calendar) => {
-  return {
-    totalPnL: calendar.totalPnL || 0,
-    winRate: calendar.winRate || 0,
-    totalTrades: calendar.totalTrades || 0,
-    growthPercentage: calendar.pnlPerformance || 0,
-    avgWin: calendar.avgWin || 0,
-    avgLoss: calendar.avgLoss || 0,
-    profitFactor: calendar.profitFactor || 0,
-    maxDrawdown: calendar.maxDrawdown || 0,
-    drawdownRecoveryNeeded: calendar.drawdownRecoveryNeeded || 0,
-    drawdownDuration: calendar.drawdownDuration || 0,
-    drawdownStartDate: calendar.drawdownStartDate || null,
-    drawdownEndDate: calendar.drawdownEndDate || null,
-    weeklyProgress: calendar.weeklyProgress || 0,
-    monthlyProgress: calendar.monthlyProgress || 0,
-    yearlyProgress: calendar.targetProgress || 0,
-    winCount: calendar.winCount || 0,
-    lossCount: calendar.lossCount || 0,
-    initialBalance: calendar.accountBalance,
-    currentBalance: calendar.currentBalance || calendar.accountBalance,
-    weeklyPnLPercentage: calendar.weeklyPnLPercentage || 0,
-    monthlyPnLPercentage: calendar.monthlyPnLPercentage || 0,
-    yearlyPnLPercentage: calendar.yearlyPnLPercentage || 0
-  };
-};
-
-
-
-// Get a single calendar by ID
-export const getCalendar = async (calendarId: string): Promise<Calendar | null> => {
+/**
+ * Get all calendars for a user (excluding deleted ones)
+ */
+export const getUserCalendars = async (userId: string): Promise<Calendar[]> => {
   try {
-    const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
-    const calendarDoc = await getDoc(calendarRef);
-
-    if (!calendarDoc.exists()) {
-      return null;
-    }
-
-    return calendarConverter.fromJson(calendarDoc);
+    const calendars = await calendarRepository.findByUserId(userId);
+    // Filter out deleted calendars
+    return calendars.filter(cal => !cal.deleted_at);
   } catch (error) {
-    logger.error('Error getting calendar:', error);
+    logger.error('Error getting user calendars:', error);
+    return [];
+  }
+};
+
+/**
+ * Create a new calendar
+ */
+export const createCalendar = async (
+  userId: string,
+  calendar: Omit<Calendar, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+): Promise<string> => {
+  try {
+    const result = await calendarRepository.create({
+      ...calendar,
+      user_id: userId
+    });
+    if (!result.success || !result.data) {
+      throw new Error('Failed to create calendar');
+    }
+    return result.data.id;
+  } catch (error) {
+    logger.error('Error creating calendar:', error);
     throw error;
   }
 };
 
-
-// Get all calendars for a user (excluding deleted ones)
-export const getUserCalendars = async (userId: string): Promise<Calendar[]> => {
-  const q = query(
-    collection(db, CALENDARS_COLLECTION),
-    where("userId", "==", userId),
-    where("isDeleted", "!=", true)
-  );
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => calendarConverter.fromJson(doc));
+/**
+ * Update an existing calendar
+ */
+export const updateCalendar = async (
+  calendarId: string,
+  updates: Partial<Calendar>
+): Promise<void> => {
+  try {
+    await calendarRepository.update(calendarId, updates);
+  } catch (error) {
+    logger.error('Error updating calendar:', error);
+    throw error;
+  }
 };
 
-// Create a new calendar
-export const createCalendar = async (userId: string, calendar: Omit<Calendar, 'id' | 'userId' | 'cachedTrades' | 'loadedYears'>): Promise<string> => {
-  const calendarData = {
-    ...calendarConverter.toJson(calendar),
-    userId,
-    // Initialize notes
-    note: calendar.note || '',
-    daysNotes: calendar.daysNotes ? Object.fromEntries(calendar.daysNotes) : {},
-    // Initialize tags
-    tags: calendar.tags || [],
-    // Initialize pinned events
-    pinnedEvents: calendar.pinnedEvents || [],
-    // Initialize statistics
-    winRate: 0,
-    profitFactor: 0,
-    maxDrawdown: 0,
-    targetProgress: 0,
-    pnlPerformance: 0,
-    totalTrades: 0,
-    winCount: 0,
-    lossCount: 0,
-    totalPnL: 0,
-    drawdownStartDate: null,
-    drawdownEndDate: null,
-    drawdownRecoveryNeeded: 0,
-    drawdownDuration: 0,
-    avgWin: 0,
-    avgLoss: 0,
-    currentBalance: calendar.accountBalance
-  };
-
-  const docRef = await addDoc(collection(db, CALENDARS_COLLECTION), calendarData);
-  return docRef.id;
+/**
+ * Delete a calendar (soft delete - move to trash)
+ */
+export const deleteCalendar = async (calendarId: string, userId: string): Promise<void> => {
+  try {
+    // Import moveCalendarToTrash to avoid circular dependency
+    const { moveCalendarToTrash } = await import('./trashService');
+    await moveCalendarToTrash(calendarId, userId);
+  } catch (error) {
+    logger.error('Error deleting calendar:', error);
+    throw error;
+  }
 };
 
-// Duplicate an existing calendar
-export const duplicateCalendar = async (userId: string, sourceCalendarId: string, newName: string, includeContent: boolean = false): Promise<Omit<Calendar, 'cachedTrades' | 'loadedYears'>> => {
+/**
+ * Duplicate an existing calendar
+ */
+export const duplicateCalendar = async (
+  userId: string,
+  sourceCalendarId: string,
+  newName: string,
+  includeContent: boolean = false
+): Promise<Calendar> => {
   try {
     // Get the source calendar
     const sourceCalendar = await getCalendar(sourceCalendarId);
@@ -446,590 +371,325 @@ export const duplicateCalendar = async (userId: string, sourceCalendarId: string
       throw new Error('Source calendar not found');
     }
 
-    // Create a new calendar based on the source calendar
-    const duplicatedCalendar: Omit<Calendar, 'id' | 'cachedTrades' | 'loadedYears'> = {
+    // Create new calendar with same settings
+    const newCalendarId = await createCalendar(userId, {
       name: newName,
-      createdAt: new Date(),
-      lastModified: new Date(),
-      userId: sourceCalendar.userId,
-      accountBalance: sourceCalendar.accountBalance,
-      maxDailyDrawdown: sourceCalendar.maxDailyDrawdown,
-      weeklyTarget: sourceCalendar.weeklyTarget,
-      monthlyTarget: sourceCalendar.monthlyTarget,
-      yearlyTarget: sourceCalendar.yearlyTarget,
-      riskPerTrade: sourceCalendar.riskPerTrade,
-      requiredTagGroups: sourceCalendar.requiredTagGroups || [],
-      dynamicRiskEnabled: sourceCalendar.dynamicRiskEnabled,
-      increasedRiskPercentage: sourceCalendar.increasedRiskPercentage,
-      profitThresholdPercentage: sourceCalendar.profitThresholdPercentage,
-      // Mark as duplicated calendar and track source
-      duplicatedCalendar: true,
-      sourceCalendarId: sourceCalendarId,
-      isDeleted: false,
-      // Copy notes, tags, score settings, and economic calendar filters
-      note: sourceCalendar.note,
-      heroImageUrl: sourceCalendar.heroImageUrl,
-      heroImageAttribution: sourceCalendar.heroImageAttribution,
-      daysNotes: sourceCalendar.daysNotes,
-      tags: sourceCalendar.tags || [],
-      scoreSettings: sourceCalendar.scoreSettings,
-      economicCalendarFilters: sourceCalendar.economicCalendarFilters,
-      pinnedEvents: sourceCalendar.pinnedEvents || [],
-      // Copy statistics if including content, otherwise reset
-      winRate: includeContent ? sourceCalendar.winRate : 0,
-      profitFactor: includeContent ? sourceCalendar.profitFactor : 0,
-      maxDrawdown: includeContent ? sourceCalendar.maxDrawdown : 0,
-      targetProgress: includeContent ? sourceCalendar.targetProgress : 0,
-      pnlPerformance: includeContent ? sourceCalendar.pnlPerformance : 0,
-      totalTrades: includeContent ? sourceCalendar.totalTrades : 0,
-      winCount: includeContent ? sourceCalendar.winCount : 0,
-      lossCount: includeContent ? sourceCalendar.lossCount : 0,
-      totalPnL: includeContent ? sourceCalendar.totalPnL : 0,
-      drawdownStartDate: includeContent ? sourceCalendar.drawdownStartDate : null,
-      drawdownEndDate: includeContent ? sourceCalendar.drawdownEndDate : null,
-      drawdownRecoveryNeeded: includeContent ? sourceCalendar.drawdownRecoveryNeeded : 0,
-      drawdownDuration: includeContent ? sourceCalendar.drawdownDuration : 0,
-      avgWin: includeContent ? sourceCalendar.avgWin : 0,
-      avgLoss: includeContent ? sourceCalendar.avgLoss : 0,
-      currentBalance: includeContent ? sourceCalendar.currentBalance : sourceCalendar.accountBalance,
-      weeklyPnL: includeContent ? sourceCalendar.weeklyPnL : 0,
-      monthlyPnL: includeContent ? sourceCalendar.monthlyPnL : 0,
-      yearlyPnL: includeContent ? sourceCalendar.yearlyPnL : 0,
-      weeklyPnLPercentage: includeContent ? sourceCalendar.weeklyPnLPercentage : 0,
-      monthlyPnLPercentage: includeContent ? sourceCalendar.monthlyPnLPercentage : 0,
-      yearlyPnLPercentage: includeContent ? sourceCalendar.yearlyPnLPercentage : 0,
-      weeklyProgress: includeContent ? sourceCalendar.weeklyProgress : 0,
-      monthlyProgress: includeContent ? sourceCalendar.monthlyProgress : 0,
-      
-    };
+      account_balance: sourceCalendar.account_balance,
+      max_daily_drawdown: sourceCalendar.max_daily_drawdown,
+      weekly_target: sourceCalendar.weekly_target,
+      monthly_target: sourceCalendar.monthly_target,
+      yearly_target: sourceCalendar.yearly_target,
+      risk_per_trade: sourceCalendar.risk_per_trade,
+      dynamic_risk_enabled: sourceCalendar.dynamic_risk_enabled,
+      increased_risk_percentage: sourceCalendar.increased_risk_percentage,
+      profit_threshold_percentage: sourceCalendar.profit_threshold_percentage,
+      required_tag_groups: sourceCalendar.required_tag_groups,
+      score_settings: sourceCalendar.score_settings,
+      economic_calendar_filters: sourceCalendar.economic_calendar_filters,
+      duplicated_calendar: true,
+      source_calendar_id: sourceCalendarId
+    });
 
-    // Create the new calendar
-    const newCalendarId = await createCalendar(userId, duplicatedCalendar);
-
-    // If includeContent is true, copy all trades from the source calendar
+    // If includeContent, copy trades
     if (includeContent) {
-      try {
-        const sourceTrades = await getAllTrades(sourceCalendarId);
-        if (sourceTrades.length > 0) {
-          // Import all trades to the new calendar
-          await importTrades(newCalendarId, sourceTrades);
-        }
-      } catch (error) {
-        logger.error('Error copying trades to duplicated calendar:', error);
-        // Don't throw here - the calendar was created successfully, just the trades failed to copy
+      const trades = await getAllTrades(sourceCalendarId);
+      for (const trade of trades) {
+        // Omit id, created_at, updated_at as they will be auto-generated
+        const { id, created_at, updated_at, ...tradeData } = trade;
+        await addTrade(newCalendarId, {
+          ...tradeData,
+          calendar_id: newCalendarId
+        });
       }
     }
 
-    return {
-      id: newCalendarId,
-      ...duplicatedCalendar
-    };
+    const newCalendar = await getCalendar(newCalendarId);
+    if (!newCalendar) {
+      throw new Error('Failed to retrieve duplicated calendar');
+    }
+
+    return newCalendar;
   } catch (error) {
     logger.error('Error duplicating calendar:', error);
     throw error;
   }
 };
 
-// Update an existing calendar
-export const updateCalendar = async (calendarId: string, updates: Partial<Omit<Calendar, 'cachedTrades' | 'loadedYears'>>): Promise<void> => {
-  const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
-  const updateData: Record<string, any> = {
-    ...updates,
-    lastModified: Timestamp.fromDate(new Date())
-  };
 
-  // Remove undefined fields and fields that should not be stored directly
-  Object.keys(updateData).forEach(key => {
-    if (updateData[key] === undefined || key === 'cachedTrades' || key === 'loadedYears') {
-      delete updateData[key];
-    }
-  });
+// =====================================================
+// TRADE CRUD OPERATIONS
+// =====================================================
 
-  await updateDoc(calendarRef, updateData);
-};
-
-// Delete a calendar (soft delete - move to trash)
-export const deleteCalendar = async (calendarId: string, userId: string): Promise<void> => {
-  // Import moveCalendarToTrash to avoid circular dependency
-  const { moveCalendarToTrash } = await import('./trashService');
-  await moveCalendarToTrash(calendarId, userId);
-};
-
-// Get trades for a specific year
-export const getYearlyTrades = async (calendarId: string, year: number): Promise<Trade[]> => {
-  const yearDocRef = doc(db, CALENDARS_COLLECTION, calendarId, YEARS_SUBCOLLECTION, year.toString());
-  const yearDoc = await getDoc(yearDocRef);
-
-  if (yearDoc.exists()) {
-    const yearlyTrades = yearlyTradesConverter.fromJson(yearDoc);
-    return yearlyTrades.trades;
-  }
-
-  return [];
-};
-
-// Get all trades for a calendar (across all years)
+/**
+ * Get all trades for a calendar
+ */
 export const getAllTrades = async (calendarId: string): Promise<Trade[]> => {
-  const yearsCollectionRef = collection(db, CALENDARS_COLLECTION, calendarId, YEARS_SUBCOLLECTION);
-  const yearsSnapshot = await getDocs(yearsCollectionRef);
-
-  let allTrades: Trade[] = [];
-
-  yearsSnapshot.docs.forEach(yearDoc => {
-    const yearlyTrades = yearlyTradesConverter.fromJson(yearDoc);
-    allTrades = [...allTrades, ...yearlyTrades.trades];
-  });
-
-  return allTrades;
+  try {
+    return await tradeRepository.findByCalendarId(calendarId);
+  } catch (error) {
+    logger.error('Error getting all trades:', error);
+    return [];
+  }
 };
 
-// Add a trade to a calendar using a transaction to prevent race conditions
-export const addTrade = async (calendarId: string, trade: Trade, cachedTrades: Trade[] = []): Promise<CalendarStats> => {
+/**
+ * Get a specific trade by ID
+ */
+export const getTrade = async (calendarId: string, tradeId: string): Promise<Trade | null> => {
   try {
-    const year = new Date(trade.date).getFullYear();
-    const yearDocRef = doc(db, CALENDARS_COLLECTION, calendarId, YEARS_SUBCOLLECTION, year.toString());
-    const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
+    const trade = await tradeRepository.findById(tradeId);
+    if (trade && trade.calendar_id === calendarId) {
+      return trade;
+    }
+    return null;
+  } catch (error) {
+    logger.error('Error getting trade:', error);
+    return null;
+  }
+};
 
-    // Run a transaction to add the trade
-    return await runTransaction(db, async (transaction) => {
-      // Get the calendar to calculate stats
-      const calendarDoc = await transaction.get(calendarRef);
-      if (!calendarDoc.exists()) {
-        throw new Error('Calendar not found');
-      }
-      const calendar = calendarConverter.fromJson(calendarDoc);
-
-      // Get trades (either from cache or Firestore)
-      const existingTrades = await getTrades(calendarId, cachedTrades);
-
-      // Add the new trade to the existing trades
-      const allTrades = [...existingTrades, trade];
-
-      // Calculate stats
-      const stats = calculateCalendarStats(allTrades, calendar);
-
-      // Check if the year document exists
-      const yearDoc = await transaction.get(yearDocRef);
-
-      if (yearDoc.exists()) {
-        // Year document exists, update it
-        const yearlyTrades = yearlyTradesConverter.fromJson(yearDoc);
-        yearlyTrades.trades.push(trade);
-        yearlyTrades.userId = calendar.userId;
-        yearlyTrades.lastModified = new Date();
-
-        transaction.update(yearDocRef, yearlyTradesConverter.toJson(yearlyTrades, calendarId));
-      } else {
-        // Year document doesn't exist, create it
-        const yearlyTrades: YearlyTrades = {
-          year,
-          userId: calendar.userId,
-          lastModified: new Date(),
-          trades: [trade]
-        };
-
-        transaction.set(yearDocRef, yearlyTradesConverter.toJson(yearlyTrades, calendarId));
-      }
-
-      // Update the calendar with stats
-      transaction.update(calendarRef, getUpdateCalendarData(stats));
-
-      // Return the updated stats
-      return stats;
-    }).then(async (stats) => {
-      await onUpdateCalendar(calendarId, (calendar) => {
-        const calendarTags = calendar.tags || []
-        trade.tags?.forEach((tag) => {
-          if (!calendarTags.includes(tag)) {
-            calendarTags.push(tag)
-          }
-        })
-        calendar.tags = calendarTags;
-        return calendar;
-      });
-
-      // Sync trade to vector database
-      await syncTradeToVectors(trade, calendarId, 'add');
-
-      return stats;
+/**
+ * Add a trade to a calendar
+ */
+export const addTrade = async (
+  calendarId: string,
+  trade: Omit<Trade, 'id' | 'created_at' | 'updated_at'>,
+  cachedTrades: Trade[] = []
+): Promise<CalendarStats> => {
+  try {
+    // Create the trade
+    await tradeRepository.create({
+      ...trade,
+      calendar_id: calendarId
     });
+
+    // Get all trades for stats calculation
+    const allTrades = cachedTrades.length > 0 ? [...cachedTrades, trade as Trade] : await getAllTrades(calendarId);
+
+    // Get calendar for stats calculation
+    const calendar = await getCalendar(calendarId);
+    if (!calendar) {
+      throw new Error('Calendar not found');
+    }
+
+    // Calculate stats (stats are not stored, only calculated on-demand)
+    const stats = calculateCalendarStats(allTrades, calendar);
+
+    return stats;
   } catch (error) {
     logger.error('Error adding trade:', error);
     throw error;
   }
 };
 
-export const onUpdateCalendar = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<Calendar> => {
+/**
+ * Update a trade
+ */
+export const updateTrade = async (
+  calendarId: string,
+  tradeId: string,
+  cachedTrades: Trade[] = [],
+  updateCallback: (trade: Trade) => Trade
+): Promise<[CalendarStats, Trade[]] | undefined> => {
   try {
-    const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
-
-    // Run a transaction to update the calendar
-    return await runTransaction(db, async (transaction) => {
-      // Get the calendar
-      const calendarDoc = await transaction.get(calendarRef);
-      if (!calendarDoc.exists()) {
-        throw new Error('Calendar not found');
-      }
-      const calendar = calendarConverter.fromJson(calendarDoc);
-
-      // Apply the update callback to get the updated calendar
-      const updatedCalendar = updateCallback(calendar);
-      updatedCalendar.lastModified = new Date();
-      // Convert daysNotes Map to a plain object for Firestore
-
-      // Update the calendar document
-      transaction.update(calendarRef, calendarConverter.toJson(updatedCalendar));
-      return updatedCalendar;
-    });
-  } catch (error) {
-    logger.error('Error updating calendar:', error);
-    throw error;
-  }
-};
-
-// Update a trade in a calendar using a transaction to prevent race conditions
-export const updateTrade = async (calendarId: string, tradeId: string, cachedTrades: Trade[] = [],
-  updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade): Promise<[CalendarStats, Trade[]] | undefined> => {
-  try {
-    // First try to find the trade in cached trades
-    let trade = cachedTrades.find(t => t.id === tradeId);
-    let tempTrade: Trade | undefined;
-    let isNewTrade = false;
-
-    // If not found in cache and createIfNotExists is provided, create a new trade
-    if (trade === undefined && createIfNotExists) {
-      logger.log(`Creating new trade with ID ${tradeId} since it wasn't found in cached trades`);
-      tempTrade = createIfNotExists(tradeId);
-      trade = tempTrade;
-      isNewTrade = true;
-    }
-    // If still not found, try to fetch it from Firestore
-    else if (trade === undefined) {
-      const fetchedTrade = await getTrade(calendarId, tradeId);
-      if (fetchedTrade === null || fetchedTrade === undefined) {
-        throw new Error(`Attempting to fetch trade with ID ${tradeId} from Firestore`);
-      }
-      trade = fetchedTrade;
-
-    }
-
-    const year = new Date(trade.date).getFullYear();
-    // If the trade is moved to a different year, we need to handle it differently
-
-    // Same year, use a transaction to update the trade
-    const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
-    const yearDocRef = doc(db, CALENDARS_COLLECTION, calendarId, YEARS_SUBCOLLECTION, year.toString());
-
-    // Run a transaction to update the trade
-    return runTransaction(db, async (transaction) => {
-      // Get the calendar to calculate stats
-      const calendarDoc = await transaction.get(calendarRef);
-      if (!calendarDoc.exists()) {
-        throw new Error('Calendar not found');
-      }
-      const calendar = calendarConverter.fromJson(calendarDoc);
-
-      // Get the year document
-      const yearDoc = await transaction.get(yearDocRef);
-      // If this is a new trade and the year document doesn't exist, we'll create it
-      if (!yearDoc.exists() && !isNewTrade) {
-        throw new Error(`Year document for ${year} not found`);
-      }
-      let tradeIndex = cachedTrades.findIndex(t => t.id === trade!!.id);
-      // get updated all trade if this is a delete process
-      let allTrades: Trade[] = await getTrades(calendarId, tradeIndex >= 0 && updateCallback(cachedTrades[tradeIndex]).isDeleted ? [] : cachedTrades);
-      let yearTrades: Trade[] = [];
-      let updatedTrade: Trade;
-
-      // Handle the case where the year document exists
-      if (yearDoc.exists()) {
-        // Get the trades for this year
-        const yearData = yearlyTradesConverter.fromJson(yearDoc);
-        yearTrades = yearData.trades;
-      }
-
-      // Find the trade to update or add the new trade
-      tradeIndex = yearTrades.findIndex(t => t.id === trade!!.id);
-
-      if (tradeIndex === -1) {
-        // If this is a new trade, add it to the arrays
-        if (isNewTrade) {
-          logger.log(`Adding new trade with ID ${trade!!.id} to year ${year}`);
-          updatedTrade = trade!!;
-          yearTrades.push(updatedTrade);
-          allTrades.push(updatedTrade);
-          tradeIndex = yearTrades.length - 1;
-        } else {
-          logger.log(`Trade with ID ${trade!!.id} not found in year ${year}`)
-        }
-      }
-
-      // Apply the update callback to the trade
-      updatedTrade = updateCallback(yearTrades[tradeIndex]);
-      // Get all trades (either from cache or Firestore)
-      logger.log(`Updating trade with ID ${trade!!.id} in year ${year} : ${JSON.stringify(updatedTrade)}`);
-
-
-      if (updatedTrade.isDeleted) {
-        yearTrades.splice(tradeIndex, 1);
-        allTrades = allTrades.filter(t => t.id !== updatedTrade.id);
-      }
-      else {
-        // Update the trade in the array
-        yearTrades[tradeIndex] = updatedTrade;
-        allTrades = allTrades.map(t => t.id === updatedTrade.id ? updatedTrade : t);
-      }
-
-      // Calculate stats
-      const stats = calculateCalendarStats(allTrades, calendar);
-      // Update or create the year document with the modified trades array
-      if (yearDoc.exists()) {
-        // Update existing year document
-        transaction.update(yearDocRef, {
-          trades: yearTrades.map(trade => tradeConverter.toJson(trade, calendarId)),
-          lastModified: Timestamp.fromDate(new Date())
-        });
-      } else {
-        // Create new year document
-        logger.log(`Creating new year document for year ${year}`);
-        transaction.set(yearDocRef, {
-          year,
-          trades: yearTrades.map(trade => tradeConverter.toJson(trade, calendarId)),
-          lastModified: Timestamp.fromDate(new Date())
-        });
-      }
-
-      // Update the calendar with stats
-      transaction.update(calendarRef, getUpdateCalendarData(stats));
-
-      // Return both the stats and the updated trades list
-      return [stats, allTrades, updatedTrade];
-    }).then(async (result) => {
-      if (result) {
-        const [stats, allTrades, updatedTrade] = result as [CalendarStats, Trade[], Trade];
-        if (updatedTrade.isDeleted) {
-          await syncTradeToVectors(updatedTrade, calendarId, 'delete');
-        } else {
-          await syncTradeToVectors(updatedTrade, calendarId, 'update');
-        }
-
-        return [stats, allTrades] as [CalendarStats, Trade[]];
-      }
+    // Get the trade
+    const trade = await getTrade(calendarId, tradeId);
+    if (!trade) {
+      logger.error('Trade not found');
       return undefined;
-    });
+    }
+
+    // Apply updates
+    const updatedTrade = updateCallback(trade);
+
+    // Update in database
+    await tradeRepository.update(tradeId, updatedTrade);
+
+    // Get all trades for stats calculation
+    const allTrades = cachedTrades.length > 0 ?
+      cachedTrades.map(t => t.id === tradeId ? updatedTrade : t) :
+      await getAllTrades(calendarId);
+
+    // Get calendar for stats calculation
+    const calendar = await getCalendar(calendarId);
+    if (!calendar) {
+      throw new Error('Calendar not found');
+    }
+
+    // Calculate stats (stats are not stored, only calculated on-demand)
+    const stats = calculateCalendarStats(allTrades, calendar);
+
+    return [stats, allTrades];
   } catch (error) {
     logger.error('Error updating trade:', error);
     throw error;
   }
 };
 
+/**
+ * Delete a trade
+ */
+export const deleteTrade = async (
+  calendarId: string,
+  tradeId: string,
+  cachedTrades: Trade[] = []
+): Promise<CalendarStats> => {
+  try {
+    // Delete the trade
+    await tradeRepository.delete(tradeId);
 
-// Clear all trades for a specific month and year
-export const clearMonthTrades = async (calendarId: string, month: number, year: number, cachedTrades: Trade[] = []): Promise<CalendarStats | undefined> => {
-  const yearDocRef = doc(db, CALENDARS_COLLECTION, calendarId, YEARS_SUBCOLLECTION, year.toString());
-  const yearDoc = await getDoc(yearDocRef);
+    // Get all trades for stats calculation
+    const allTrades = cachedTrades.length > 0 ?
+      cachedTrades.filter(t => t.id !== tradeId) :
+      await getAllTrades(calendarId);
 
-  // Get the calendar to calculate stats
-  const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
-  const calendarDoc = await getDoc(calendarRef);
+    // Get calendar for stats calculation
+    const calendar = await getCalendar(calendarId);
+    if (!calendar) {
+      throw new Error('Calendar not found');
+    }
 
-  if (!calendarDoc.exists()) {
-    throw new Error('Calendar not found');
-  }
-
-  const calendar = calendarConverter.fromJson(calendarDoc);
-
-  if (yearDoc.exists()) {
-    const yearlyTrades = yearlyTradesConverter.fromJson(yearDoc);
-
-    // Filter out trades from the specified month
-    const filteredTrades = yearlyTrades.trades.filter(trade => {
-      const tradeDate = new Date(trade.date);
-      return tradeDate.getMonth() !== month;
-    });
-
-
-
-    yearlyTrades.trades = filteredTrades;
-    yearlyTrades.lastModified = new Date();
-
-    // Get trades (either from cache or Firestore)
-    const existingTrades = await getTrades(calendarId, cachedTrades);
-
-    // Filter out trades from the specified month and year
-    const allTrades = existingTrades.filter(trade => {
-      const tradeDate = new Date(trade.date);
-      return !(tradeDate.getMonth() === month && tradeDate.getFullYear() === year);
-    });
-
-    // Calculate stats
+    // Calculate stats (stats are not stored, only calculated on-demand)
     const stats = calculateCalendarStats(allTrades, calendar);
 
-    await updateDoc(yearDocRef, yearlyTradesConverter.toJson(yearlyTrades, calendarId));
-
-    // Update the calendar with stats and lastModified timestamp
-    await updateCalendarStats(calendarRef, stats);
-
-    // Sync deleted trades to vector database
-    const deletedTrades = existingTrades.filter(trade => {
-      const tradeDate = new Date(trade.date);
-      return tradeDate.getMonth() === month && tradeDate.getFullYear() === year;
-    });
-
-    if (deletedTrades.length > 0) {
-      await syncMultipleTradesToVectors(deletedTrades, calendarId, 'delete');
-    }
-
-    // Return the updated stats
     return stats;
-  }
-
-  return undefined;
-};
-
-// Import trades (replace all trades)
-export const importTrades = async (calendarId: string, trades: Trade[]): Promise<CalendarStats> => {
-  // Get the calendar to calculate stats
-  const calendarRef = doc(db, CALENDARS_COLLECTION, calendarId);
-  const calendarDoc = await getDoc(calendarRef);
-
-  if (!calendarDoc.exists()) {
-    throw new Error('Calendar not found');
-  }
-
-  const calendar = calendarConverter.fromJson(calendarDoc);
-
-  // Calculate stats for the imported trades
-  const stats = calculateCalendarStats(trades, calendar);
-
-  // Group trades by year
-  const tradesByYear = trades.reduce((acc, trade) => {
-    const year = new Date(trade.date).getFullYear();
-    if (!acc[year]) {
-      acc[year] = [];
-    }
-    acc[year].push(trade);
-    return acc;
-  }, {} as Record<number, Trade[]>);
-
-  // Delete all existing year documents
-  const yearsCollectionRef = collection(db, CALENDARS_COLLECTION, calendarId, YEARS_SUBCOLLECTION);
-  const yearsSnapshot = await getDocs(yearsCollectionRef);
-
-  const batch = writeBatch(db);
-  yearsSnapshot.docs.forEach(yearDoc => {
-    batch.delete(yearDoc.ref);
-  });
-  await batch.commit();
-
-  // Create new year documents
-  for (const [year, yearTrades] of Object.entries(tradesByYear)) {
-    const yearlyTrades: YearlyTrades = {
-      userId: calendar.userId,
-      year: parseInt(year),
-      lastModified: new Date(),
-      trades: yearTrades
-    };
-
-    const yearDocRef = doc(db, CALENDARS_COLLECTION, calendarId, YEARS_SUBCOLLECTION, year);
-    await setDoc(yearDocRef, yearlyTradesConverter.toJson(yearlyTrades, calendarId));
-  }
-
-  // Update the calendar with stats and lastModified timestamp
-  await updateCalendarStats(calendarRef, stats);
-
-  // Sync all imported trades to vector database
-  if (trades.length > 0) {
-    await syncMultipleTradesToVectors(trades, calendarId, 'add');
-  }
-
-  // Return the updated stats
-  return stats;
-};
-
-
-
-
-
-
-// Get a specific trade by ID
-export const getTrade = async (calendarId: string, tradeId: string): Promise<Trade | null | undefined> => {
-  // Find which year the trade belongs to
-  const yearsRef = collection(db, CALENDARS_COLLECTION, calendarId, YEARS_SUBCOLLECTION);
-  const yearsSnapshot = await getDocs(yearsRef);
-
-  for (const yearDoc of yearsSnapshot.docs) {
-    const yearlyTrades = yearlyTradesConverter.fromJson(yearDoc);
-    const trade = yearlyTrades.trades.find(t => t.id === tradeId);
-
-    if (trade) {
-      return trade;
-    }
-  }
-
-  return null;
-};
-
-
-
-export const generateImageId = (file: File): string => {
-  const timestamp = new Date().getTime();
-  return `${timestamp}_${file.name}`;
-};
-
-// Upload a single image and return its details using Supabase Storage
-export const uploadImage = async (
-  calendarId: string,
-  filename: string,
-  file: File,
-  width?: number,
-  height?: number,
-  caption?: string,
-  onProgress?: (progress: number) => void
-): Promise<TradeImage> => {
-  try {
-    // Optimize image before upload to reduce file size
-    const optimizedFile = await optimizeImage(file, 1920, 1080, 0.8);
-
-    // Upload using Supabase Storage service
-    const result = await uploadTradeImage(
-      calendarId,
-      filename,
-      optimizedFile,
-      width,
-      height,
-      caption,
-      onProgress
-    );
-
-    return result;
   } catch (error) {
-    logger.error('Error uploading image:', error);
+    logger.error('Error deleting trade:', error);
     throw error;
   }
 };
 
-// Update a tag across all trades in a calendar
-export const updateTag = async (calendarId: string, oldTag: string, newTag: string): Promise<{ success: boolean; tradesUpdated: number }> => {
+
+// =====================================================
+// UTILITY FUNCTIONS
+// =====================================================
+
+/**
+ * Clear all trades for a specific month
+ */
+export const clearMonthTrades = async (
+  calendarId: string,
+  year: number,
+  month: number
+): Promise<void> => {
   try {
-    // Ensure user is authenticated
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error('User not authenticated');
+    const allTrades = await getAllTrades(calendarId);
+    const tradesToDelete = allTrades.filter(trade => {
+      const tradeDate = new Date(trade.trade_date);
+      return tradeDate.getFullYear() === year && tradeDate.getMonth() === month;
+    });
+
+    // Delete trades
+    for (const trade of tradesToDelete) {
+      await tradeRepository.delete(trade.id);
     }
 
-    // Get the cloud function
-    const updateTagFunction = httpsCallable(functions, 'updateTagV2');
+    // Stats are not stored, they are calculated on-demand when needed
+    // No need to recalculate here
+  } catch (error) {
+    logger.error('Error clearing month trades:', error);
+    throw error;
+  }
+};
 
-    // Call the cloud function
-    const result = await updateTagFunction({ calendarId, oldTag, newTag });
+/**
+ * Import trades into a calendar
+ */
+export const importTrades = async (
+  calendarId: string,
+  trades: Trade[]
+): Promise<void> => {
+  try {
+    // Create all trades
+    for (const trade of trades) {
+      await tradeRepository.create({
+        ...trade,
+        calendar_id: calendarId
+      });
+    }
 
-    return result.data as { success: boolean; tradesUpdated: number };
+    // Stats are not stored, they are calculated on-demand when needed
+  } catch (error) {
+    logger.error('Error importing trades:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update a tag across all trades in a calendar
+ */
+export const updateTag = async (
+  calendarId: string,
+  oldTag: string,
+  newTag: string
+): Promise<{ success: boolean; tradesUpdated: number }> => {
+  try {
+    const allTrades = await getAllTrades(calendarId);
+    const tradesToUpdate = allTrades.filter(trade =>
+      trade.tags && trade.tags.includes(oldTag)
+    );
+
+    for (const trade of tradesToUpdate) {
+      const updatedTags = trade.tags!.map(tag => tag === oldTag ? newTag : tag);
+      await tradeRepository.update(trade.id, { tags: updatedTags });
+    }
+
+    return { success: true, tradesUpdated: tradesToUpdate.length };
   } catch (error) {
     logger.error('Error updating tag:', error);
     throw error;
   }
 };
 
+/**
+ * Generate a unique image ID
+ */
+export const generateImageId = (): string => {
+  return `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+};
 
+/**
+ * Upload trade image
+ * Note: Use uploadTradeImage from supabaseStorageService directly
+ * This is a re-export for backward compatibility
+ */
+export { uploadTradeImage } from './supabaseStorageService';
 
+/**
+ * Update calendar with callback (for complex updates)
+ */
+export const onUpdateCalendar = async (
+  calendarId: string,
+  updateCallback: (calendar: Calendar) => Partial<Calendar>
+): Promise<void> => {
+  try {
+    const calendar = await getCalendar(calendarId);
+    if (!calendar) {
+      throw new Error('Calendar not found');
+    }
+
+    const updates = updateCallback(calendar);
+    await updateCalendar(calendarId, updates);
+  } catch (error) {
+    logger.error('Error updating calendar with callback:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get trades for a specific year (for backward compatibility)
+ */
+export const getYearlyTrades = async (
+  calendarId: string,
+  year: number
+): Promise<Trade[]> => {
+  try {
+    const allTrades = await getAllTrades(calendarId);
+    return allTrades.filter(trade =>
+      new Date(trade.trade_date).getFullYear() === year
+    );
+  } catch (error) {
+    logger.error('Error getting yearly trades:', error);
+    return [];
+  }
+};

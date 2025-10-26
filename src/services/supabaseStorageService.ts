@@ -263,7 +263,7 @@ export const uploadTradeImage = async (
     return {
       url: signedUrlData.signedUrl,
       id: filename,
-      calendarId: calendarId,
+      calendar_id: calendarId,
       width,
       height,
       caption

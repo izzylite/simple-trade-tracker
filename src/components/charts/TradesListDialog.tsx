@@ -10,7 +10,7 @@ import {
 import {
   ViewCarousel as GalleryIcon
 } from '@mui/icons-material';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import TradeList from '../trades/TradeList';
 import { BaseDialog } from '../common';
 import DayHeader from '../trades/DayHeader';
@@ -31,7 +31,7 @@ interface TradesDialogProps {
   onTradeExpand: (tradeId: string) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   onZoomImage: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
-  accountBalance: number;
+  account_balance: number;
   allTrades: Trade[];
   onEditClick?: (trade: Trade) => void;
   onDeleteClick?: (tradeId: string) => void;
@@ -58,7 +58,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   onClose,
   onTradeExpand,
   onZoomImage,
-  accountBalance,
+  account_balance,
   allTrades,
   onUpdateTradeProperty,
   onEditClick,
@@ -78,8 +78,8 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
     let containWins = false;
     let containLosses = false;
     trades.forEach((trade) => {
-      if (trade.type === 'win') containWins = true;
-      else if (trade.type === 'loss') containLosses = true;
+      if (trade.trade_type === 'win') containWins = true;
+      else if (trade.trade_type === 'loss') containLosses = true;
     });
     return {
       containWins,
@@ -100,7 +100,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
       if (isMounted) {
         // Sum all totalTrades values
         const totalTradesSum = Array.isArray(result)
-          ? result.reduce((sum, item) => sum + (item.totalTrades > 0 ? 1 : 0), 0)
+          ? result.reduce((sum, item) => sum + (item.total_trades > 0 ? 1 : 0), 0)
           : 0;
         setChartData(totalTradesSum > 1 ? result : undefined);
       }
@@ -124,7 +124,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   };
 
   // Calculate total PnL from trades
-  const [totalPnL, setTotalPnL] = React.useState<number>(0);
+  const [total_pnl, setTotalPnL] = React.useState<number>(0);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -180,9 +180,9 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
         {/* DayHeader with navigation buttons hidden */}
         <DayHeader
           title={subtitle || ''}
-          accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(date), allTrades)}
+          account_balance={account_balance + calculateCumulativePnL(startOfNextDay(date), allTrades)}
           formInputVisible={true} // Set to true to hide navigation buttons
-          totalPnL={totalPnL}
+          total_pnl={total_pnl}
           onPrevDay={() => { }} // Empty function since we're hiding the buttons
           onNextDay={() => { }} // Empty function since we're hiding the buttons
         />
@@ -209,11 +209,11 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
                 </Button>
 
               </Box>}
-            {chartData.some(data => data.totalTrades > 0) ? (
+            {chartData.some(data => data.total_trades > 0) ? (
               <Typography variant="body2" color="primary" sx={{ mt: 1, fontWeight: 500 }}>
                 {tradeStats.containBoth && selectedMetric === 'winRate'
-                  ? `Best day for selected strategies: ${chartData.reduce((best, day) => day.totalTrades > 0 && day.winRate > best.winRate ? day : best, { winRate: 0, fullDay: 'None' }).fullDay}`
-                  : `Most profitable/un-profitable day: ${chartData.reduce((best, day) => day.totalTrades > 0 && day.pnl > best.pnl ? day : best, { pnl: -Infinity, fullDay: 'None' }).fullDay}`
+                  ? `Best day for selected strategies: ${chartData.reduce((best, day) => day.total_trades > 0 && day.win_rate > best.win_rate ? day : best, { win_rate: 0, fullDay: 'None' }).fullDay}`
+                  : `Most profitable/un-profitable day: ${chartData.reduce((best, day) => day.total_trades > 0 && day.pnl > best.pnl ? day : best, { pnl: -Infinity, fullDay: 'None' }).fullDay}`
                 }
               </Typography>
             ) : null}
@@ -251,7 +251,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
                           {data.fullDay}
                         </Typography>
                         <Typography variant="body2">
-                          Total Trades: {data.totalTrades}
+                          Total Trades: {data.total_trades}
                         </Typography>
                         {tradeStats.containWins &&
                           <Typography variant="body2" sx={{ color: theme.palette.success.main }}>
@@ -267,7 +267,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
 
                         {tradeStats.containBoth &&
                           <Typography variant="body2">
-                            Win Rate: {data.winRate.toFixed(1)}%
+                            Win Rate: {data.win_rate.toFixed(1)}%
                           </Typography>}
 
                         <Typography variant="body2">

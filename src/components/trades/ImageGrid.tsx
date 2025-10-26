@@ -14,7 +14,7 @@ export interface GridImage extends TradeImage {
   height?: number;
   row?: number;
   column?: number;
-  columnWidth?: number; // Width as percentage (0-100)
+  column_width?: number; // Width as percentage (0-100)
 }
 
 // Extended PendingImage interface with grid positioning properties
@@ -25,10 +25,10 @@ export interface GridPendingImage extends Partial<PendingImage> {
   caption?: string;
   width?: number;
   height?: number;
-  uploadProgress?: number;
+  upload_progress?: number;
   row?: number;
   column?: number;
-  columnWidth?: number; // Width as percentage (0-100)
+  column_width?: number; // Width as percentage (0-100)
 }
 
 interface ImageGridProps {
@@ -50,8 +50,8 @@ const organizeImagesIntoRows = (
   uploadedImages: Array<TradeImage>
 ): Array<Array<GridImage | GridPendingImage>> => {
   logger.log("Input to organizeImagesIntoRows:",
-    "Pending:", pendingImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })),
-    "Uploaded:", uploadedImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })));
+    "Pending:", pendingImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.column_width })),
+    "Uploaded:", uploadedImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.column_width })));
 
   // Combine and ensure basic grid properties exist
   const allImages: Array<GridImage | GridPendingImage> = [
@@ -62,9 +62,9 @@ const organizeImagesIntoRows = (
         isPending: true, // Add flag for easier type checking later
         row: img.row !== undefined ? img.row : undefined,
         column: img.column !== undefined ? img.column : undefined,
-        columnWidth: img.columnWidth !== undefined ? img.columnWidth : undefined,
+        columnWidth: img.column_width !== undefined ? img.column_width : undefined,
       };
-      logger.log(`Processed pending image ${i}:`, result.id, result.row, result.column, result.columnWidth);
+      logger.log(`Processed pending image ${i}:`, result.id, result.row, result.column, result.column_width);
       return result;
     }),
     ...uploadedImages.map((img, i) => {
@@ -74,9 +74,9 @@ const organizeImagesIntoRows = (
         isPending: false,
         row: img.row !== undefined ? img.row : undefined,
         column: img.column !== undefined ? img.column : undefined,
-        columnWidth: img.columnWidth !== undefined ? img.columnWidth : undefined,
+        columnWidth: img.column_width !== undefined ? img.column_width : undefined,
       };
-      logger.log(`Processed uploaded image ${i}:`, result.id, result.row, result.column, result.columnWidth);
+      logger.log(`Processed uploaded image ${i}:`, result.id, result.row, result.column, result.column_width);
       return result;
     }),
   ];
@@ -108,7 +108,7 @@ const organizeImagesIntoRows = (
     // Assign row and column
     image.row = newRow;
     image.column = 0; // Always place in first column
-    image.columnWidth = 100; // Full width for vertical layout
+    image.column_width = 100; // Full width for vertical layout
 
     // Add to row map
     if (!rowMap[image.row]) {
@@ -142,10 +142,10 @@ const organizeImagesIntoRows = (
      let undefinedWidthCount = 0;
      row.forEach((image, cIndex) => {
        image.column = cIndex; // Ensure column indices are sequential
-       if (image.columnWidth === undefined) {
+       if (image.column_width === undefined) {
          undefinedWidthCount++;
        } else {
-         totalDefinedWidth += image.columnWidth;
+         totalDefinedWidth += image.column_width;
        }
      });
 
@@ -154,21 +154,21 @@ const organizeImagesIntoRows = (
        const remainingWidth = Math.max(0, 100 - totalDefinedWidth);
        const widthPerUndefined = remainingWidth / undefinedWidthCount;
        row.forEach((image) => {
-         if (image.columnWidth === undefined) {
-           image.columnWidth = widthPerUndefined;
+         if (image.column_width === undefined) {
+           image.column_width = widthPerUndefined;
          }
        });
      } else if (row.length > 0 && Math.abs(totalDefinedWidth - 100) > 0.1) {
         // Adjust existing widths proportionally if they don't add up to 100
         const scaleFactor = 100 / totalDefinedWidth;
         row.forEach(image => {
-            image.columnWidth = (image.columnWidth ?? 0) * scaleFactor;
+            image.column_width = (image.column_width ?? 0) * scaleFactor;
         });
      } else if (row.length > 0 && totalDefinedWidth === 0) {
         // If all widths were 0 somehow, distribute equally
         const equalWidth = 100 / row.length;
          row.forEach(image => {
-            image.columnWidth = equalWidth;
+            image.column_width = equalWidth;
         });
      }
   });
@@ -178,7 +178,7 @@ const organizeImagesIntoRows = (
 
   // Log the final organized rows
   logger.log("Final organized rows:", finalRows.map((row, i) =>
-    `Row ${i}: ` + row.map(img => `(id: ${img.id}, col: ${img.column}, width: ${img.columnWidth}%)`).join(', ')
+    `Row ${i}: ` + row.map(img => `(id: ${img.id}, col: ${img.column}, width: ${img.column_width}%)`).join(', ')
   ));
 
   return finalRows;
@@ -217,8 +217,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({
     const newRows = organizeImagesIntoRows(pendingImages, uploadedImages);
     // Debug the layout information
     logger.log("Organizing images with layout info:",
-      pendingImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })),
-      uploadedImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })));
+      pendingImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.column_width })),
+      uploadedImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.column_width })));
     // logger.log("Organized Rows:", JSON.stringify(newRows, null, 2)); // Debugging
     setRows(newRows);
   }, [pendingImages, uploadedImages]);
@@ -232,9 +232,9 @@ const ImageGrid: React.FC<ImageGridProps> = ({
   // Helper to check if any image is currently uploading
   const isAnyImageUploading = (): boolean => {
     return pendingImages.some(img =>
-      img.uploadProgress !== undefined &&
-      img.uploadProgress >= 0 && // default uploadProgress state is -1 or undefined 
-      img.uploadProgress < 100
+      img.upload_progress !== undefined &&
+      img.upload_progress >= 0 && // default uploadProgress state is -1 or undefined 
+      img.upload_progress < 100
     );
   };
 
@@ -406,34 +406,34 @@ const ImageGrid: React.FC<ImageGridProps> = ({
             img.column = cIndex;
             // Reset width only if it changed row or if the row now has only one image
             if (img.id === imageToMove!.id || row.length === 1 || actualSourceRowIndex !== rIndex) {
-               img.columnWidth = widthPerColumn;
+               img.column_width = widthPerColumn;
             }
              // Ensure existing images in the target row also get widths adjusted if needed
              else if (rIndex === finalTargetRowIndex && row.length > 1) {
                  // This part needs refinement: Adjust widths proportionally based on *previous* widths?
                  // For simplicity now, we redistribute equally in the target row upon drop.
                  // A more complex approach would try to maintain relative proportions.
-                 img.columnWidth = widthPerColumn;
+                 img.column_width = widthPerColumn;
              }
              // Adjust widths in the source row if it wasn't emptied
              else if (rIndex === actualSourceRowIndex && newRows[rIndex]?.length > 0) {
                  const sourceRowWidth = 100 / newRows[rIndex].length;
-                 img.columnWidth = sourceRowWidth;
+                 img.column_width = sourceRowWidth;
              }
 
              // Fallback safety check for width
-             if (img.columnWidth === undefined || img.columnWidth === null || isNaN(img.columnWidth) || img.columnWidth <=0) {
-                 img.columnWidth = 100 / row.length;
+             if (img.column_width === undefined || img.column_width === null || isNaN(img.column_width) || img.column_width <=0) {
+                 img.column_width = 100 / row.length;
              }
         });
          // Re-normalize widths for the row to ensure they sum to 100%
-         const currentRowTotalWidth = row.reduce((sum, img) => sum + (img.columnWidth || 0), 0);
+         const currentRowTotalWidth = row.reduce((sum, img) => sum + (img.column_width || 0), 0);
          if (currentRowTotalWidth > 0 && Math.abs(currentRowTotalWidth - 100) > 0.1) {
              const scale = 100 / currentRowTotalWidth;
-             row.forEach(img => img.columnWidth = (img.columnWidth || 0) * scale);
+             row.forEach(img => img.column_width = (img.column_width || 0) * scale);
          } else if (currentRowTotalWidth === 0 && row.length > 0) {
               const equalWidth = 100 / row.length;
-              row.forEach(img => img.columnWidth = equalWidth);
+              row.forEach(img => img.column_width = equalWidth);
          }
     });
 
@@ -491,7 +491,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
           dividerIndex,
           startX: e.clientX,
           rowElementWidth,
-          initialWidths: rows[rowIndex].map(img => img.columnWidth || 0), // Store initial widths of the row
+          initialWidths: rows[rowIndex].map(img => img.column_width || 0), // Store initial widths of the row
       });
   };
 
@@ -500,7 +500,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
     if (!row || row.length === 0) return row;
 
     // Calculate total width
-    const totalWidth = row.reduce((sum, img) => sum + (img.columnWidth || 0), 0);
+    const totalWidth = row.reduce((sum, img) => sum + (img.column_width || 0), 0);
 
     // If total is already close to 100%, no need to normalize
     if (Math.abs(totalWidth - 100) < 0.1) return row;
@@ -508,30 +508,30 @@ const ImageGrid: React.FC<ImageGridProps> = ({
     // If total is 0, distribute equally
     if (totalWidth === 0) {
       const equalWidth = 100 / row.length;
-      row.forEach(img => img.columnWidth = equalWidth);
+      row.forEach(img => img.column_width = equalWidth);
       return row;
     }
 
     // Scale all widths proportionally
     const scaleFactor = 100 / totalWidth;
     row.forEach(img => {
-      img.columnWidth = (img.columnWidth || 0) * scaleFactor;
+      img.column_width = (img.column_width || 0) * scaleFactor;
       // Ensure minimum width
-      img.columnWidth = Math.max(minWidth, img.columnWidth);
+      img.column_width = Math.max(minWidth, img.column_width);
     });
 
     // Final check - if we're still not at 100% due to min width constraints,
     // adjust the largest column to compensate
-    const newTotal = row.reduce((sum, img) => sum + (img.columnWidth || 0), 0);
+    const newTotal = row.reduce((sum, img) => sum + (img.column_width || 0), 0);
     if (Math.abs(newTotal - 100) > 0.1) {
       // Find the largest column
       const largestColIndex = row.reduce(
         (maxIndex, img, index, arr) =>
-          (img.columnWidth || 0) > (arr[maxIndex].columnWidth || 0) ? index : maxIndex,
+          (img.column_width || 0) > (arr[maxIndex].column_width || 0) ? index : maxIndex,
         0
       );
       // Adjust it to make the total 100%
-      row[largestColIndex].columnWidth = (row[largestColIndex].columnWidth || 0) - (newTotal - 100);
+      row[largestColIndex].column_width = (row[largestColIndex].column_width || 0) - (newTotal - 100);
     }
 
     return row;
@@ -604,7 +604,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
       } else {
         newWidth = newTotalLeftWidth / numLeftImages;
       }
-      targetRow[i].columnWidth = Math.max(MIN_COL_WIDTH_PERCENT, newWidth);
+      targetRow[i].column_width = Math.max(MIN_COL_WIDTH_PERCENT, newWidth);
     }
 
     // Right side
@@ -616,7 +616,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
       } else {
         newWidth = newTotalRightWidth / numRightImages;
       }
-      targetRow[i].columnWidth = Math.max(MIN_COL_WIDTH_PERCENT, newWidth);
+      targetRow[i].column_width = Math.max(MIN_COL_WIDTH_PERCENT, newWidth);
     }
 
     // Final normalization to ensure total is exactly 100%
@@ -700,7 +700,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                     sx={{
                         position: 'relative',
                         // Simplified width calculation - use percentage width directly
-                        width: `${image.columnWidth || DEFAULT_COL_WIDTH}%`,
+                        width: `${image.column_width || DEFAULT_COL_WIDTH}%`,
                         // No margin needed since we're using flex gap
                         height: 'auto',
                         borderRadius: 1,
@@ -745,11 +745,11 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                         aspectRatio: pendingImg?.width && pendingImg?.height ? `${pendingImg.width}/${pendingImg.height}` : '16/9', // Default aspect ratio
                                     }}
                                 >
-                                {/* Progress Indicator.uploadProgress == 0 means preparing, > 0 means uploading, -1 or undefined means default  */}
-                                {pendingImg?.uploadProgress !== undefined && pendingImg.uploadProgress >= 0 && pendingImg.uploadProgress < 100 && (
+                                {/* Progress Indicator.upload_progress == 0 means preparing, > 0 means uploading, -1 or undefined means default  */}
+                                {pendingImg?.upload_progress !== undefined && pendingImg.upload_progress >= 0 && pendingImg.upload_progress < 100 && (
                                     <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 2 }}>
                                         <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                                            <CircularProgress variant={pendingImg.uploadProgress === 0 ? 'indeterminate' : 'determinate'} value={pendingImg.uploadProgress} size={80} sx={{ color: 'white' }} />
+                                            <CircularProgress variant={pendingImg.upload_progress === 0 ? 'indeterminate' : 'determinate'} value={pendingImg.upload_progress} size={80} sx={{ color: 'white' }} />
                                             <Box
                                                 sx={{
                                                     top: 0,
@@ -762,8 +762,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                                     justifyContent: 'center',
                                                 }}
                                             >
-                                                <Typography variant="caption" component="div" sx={{ color: 'white', fontSize: `${pendingImg.uploadProgress === 0 ? '0.55rem' : undefined}`, fontWeight: 'bold' }}>
-                                                    {pendingImg.uploadProgress === 0 ? 'Preparing...' : `${Math.round(pendingImg.uploadProgress)}%`}
+                                                <Typography variant="caption" component="div" sx={{ color: 'white', fontSize: `${pendingImg.upload_progress === 0 ? '0.55rem' : undefined}`, fontWeight: 'bold' }}>
+                                                    {pendingImg.upload_progress === 0 ? 'Preparing...' : `${Math.round(pendingImg.upload_progress)}%`}
                                                 </Typography>
                                             </Box>
                                         </Box>
@@ -776,7 +776,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                     style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }}
                                 />
                                 {/* Delete Button */}
-                                {(!pendingImg?.uploadProgress || pendingImg.uploadProgress === 100 || pendingImg.uploadProgress === -1) && (
+                                {(!pendingImg?.upload_progress || pendingImg.upload_progress === 100 || pendingImg.upload_progress === -1) && (
                                      <IconButton size="small" onClick={() => onImageRemove(pendingImages.findIndex(img => img.id === image.id), true)}
                                          sx={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0, 0, 0, 0.5)', color: 'white', zIndex: 10, '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' } }}>
                                          <DeleteIcon fontSize="small" />
@@ -794,7 +794,7 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                     maxRows={20} // Large number to effectively disable scrolling
                                     fullWidth
                                     // Disable the field when image is uploading
-                                    disabled={pendingImg?.uploadProgress !== undefined && pendingImg.uploadProgress >= 0 && pendingImg.uploadProgress < 100}
+                                    disabled={pendingImg?.upload_progress !== undefined && pendingImg.upload_progress >= 0 && pendingImg.upload_progress < 100}
                                     sx={{
                                         px: 1,
                                         py: 0.5,

@@ -593,10 +593,10 @@ Higher scores indicate better emotional control and systematic trading.`;
               <strong style={{ color: theme.palette.text.primary }}>Trading Frequency:</strong> {isNaN(pattern.avgTradesPerWeek) ? '0.0' : pattern.avgTradesPerWeek.toFixed(1)} trades/week
             </Typography>
             <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-              <strong style={{ color: theme.palette.text.primary }}>Win Rate:</strong> {isNaN(pattern.winRate) ? '0.0' : pattern.winRate.toFixed(1)}%
+              <strong style={{ color: theme.palette.text.primary }}>Win Rate:</strong> {isNaN(pattern.win_rate) ? '0.0' : pattern.win_rate.toFixed(1)}%
             </Typography>
             <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-              <strong style={{ color: theme.palette.text.primary }}>Profit Factor:</strong> {isNaN(pattern.profitFactor) ? '0.00' : pattern.profitFactor.toFixed(2)}
+              <strong style={{ color: theme.palette.text.primary }}>Profit Factor:</strong> {isNaN(pattern.profit_factor) ? '0.00' : pattern.profit_factor.toFixed(2)}
             </Typography>
           </Stack>
         </Box>

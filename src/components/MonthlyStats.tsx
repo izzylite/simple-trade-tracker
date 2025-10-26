@@ -27,7 +27,7 @@ import {
   ShowChart,
   Balance
 } from '@mui/icons-material';
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import { exportTrades, importTrades } from '../utils/tradeExportImport';
 import { formatCurrency } from '../utils/formatters';
 import { calculatePercentageOfValueAtDate } from '../utils/dynamicRiskUtils';
@@ -61,19 +61,19 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const monthTrades = trades.filter(trade =>
-    new Date(trade.date).getMonth() === currentDate.getMonth() &&
-    new Date(trade.date).getFullYear() === currentDate.getFullYear()
+    new Date(trade.trade_date).getMonth() === currentDate.getMonth() &&
+    new Date(trade.trade_date).getFullYear() === currentDate.getFullYear()
   );
 
   // Calculate monthly values from the filtered trades
   const netAmountForThisMonth = monthTrades.reduce((sum, trade) => sum + trade.amount, 0);
-  const winCount = monthTrades.filter(trade => trade.type === 'win').length;
-  const lossCount = monthTrades.filter(trade => trade.type === 'loss').length;
+  const winCount = monthTrades.filter(trade => trade.trade_type === 'win').length;
+  const lossCount = monthTrades.filter(trade => trade.trade_type === 'loss').length;
   const winRate = monthTrades.length > 0 ? (winCount / monthTrades.length * 100).toFixed(1) : '0';
 
   // Additional useful statistics
-  const totalWinAmount = monthTrades.filter(trade => trade.type === 'win').reduce((sum, trade) => sum + trade.amount, 0);
-  const totalLossAmount = Math.abs(monthTrades.filter(trade => trade.type === 'loss').reduce((sum, trade) => sum + trade.amount, 0));
+  const totalWinAmount = monthTrades.filter(trade => trade.trade_type === 'win').reduce((sum, trade) => sum + trade.amount, 0);
+  const totalLossAmount = Math.abs(monthTrades.filter(trade => trade.trade_type === 'loss').reduce((sum, trade) => sum + trade.amount, 0));
   const profitFactor = totalLossAmount > 0 ? (totalWinAmount / totalLossAmount).toFixed(2) : totalWinAmount > 0 ? '∞' : '0';
   const averageTradeSize = monthTrades.length > 0 ? (Math.abs(netAmountForThisMonth) / monthTrades.length).toFixed(0) : '0';
   const averageWin = winCount > 0 ? (totalWinAmount / winCount).toFixed(0) : '0';
@@ -82,7 +82,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   // Best and worst day calculations
   const dailyPnL = new Map<string, number>();
   monthTrades.forEach(trade => {
-    const dateKey = new Date(trade.date).toDateString();
+    const dateKey = new Date(trade.trade_date).toDateString();
     dailyPnL.set(dateKey, (dailyPnL.get(dateKey) || 0) + trade.amount);
   });
 
@@ -109,7 +109,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
     : accountBalance > 0 ? ((netAmountForThisMonth / accountBalance) * 100).toFixed(2) : '0';
 
   // Calculate account value at start of month for display
-  const tradesBeforeMonth = trades.filter(trade => new Date(trade.date) < startOfCurrentMonth);
+  const tradesBeforeMonth = trades.filter(trade => new Date(trade.trade_date) < startOfCurrentMonth);
   const accountValueAtStartOfMonth = accountBalance + tradesBeforeMonth.reduce((sum, trade) => sum + trade.amount, 0);
 
 

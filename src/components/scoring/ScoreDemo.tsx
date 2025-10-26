@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Paper, Chip, useTheme } from '@mui/material';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import { scoreService } from '../../services/scoreService';
 import { getTagChipStyles } from '../../utils/tagColors';
 import { logger } from '../../utils/logger';
@@ -13,53 +13,73 @@ const ScoreDemo: React.FC = () => {
   const sampleTrades: Trade[] = [
     {
       id: '1',
-      date: new Date('2024-01-15'),
+      calendar_id: 'demo-calendar',
+      user_id: 'demo-user',
+      trade_date: new Date('2024-01-15'),
       amount: 150,
-      type: 'win',
+      trade_type: 'win',
       name: 'EURUSD Long',
       session: 'London',
       tags: ['Breakout', 'Trend Following'],
-      riskToReward: 2.5
+      risk_to_reward: 2.5,
+      created_at: new Date(),
+      updated_at: new Date()
     },
     {
       id: '2',
-      date: new Date('2024-01-16'),
+      calendar_id: 'demo-calendar',
+      user_id: 'demo-user',
+      trade_date: new Date('2024-01-16'),
       amount: -75,
-      type: 'loss',
+      trade_type: 'loss',
       name: 'GBPUSD Short',
       session: 'London',
       tags: ['Reversal', 'Support/Resistance'],
-      riskToReward: 2.0
+      risk_to_reward: 2.0,
+      created_at: new Date(),
+      updated_at: new Date()
     },
     {
       id: '3',
-      date: new Date('2024-01-17'),
+      calendar_id: 'demo-calendar',
+      user_id: 'demo-user',
+      trade_date: new Date('2024-01-17'),
       amount: 200,
-      type: 'win',
+      trade_type: 'win',
       name: 'USDJPY Long',
       session: 'NY AM',
       tags: ['Breakout', 'News Trading'],
-      riskToReward: 3.0
+      risk_to_reward: 3.0,
+      created_at: new Date(),
+      updated_at: new Date()
     },
     {
       id: '4',
-      date: new Date('2024-01-18'),
+      calendar_id: 'demo-calendar',
+      user_id: 'demo-user',
+      trade_date: new Date('2024-01-18'),
       amount: -50,
-      type: 'loss',
+      trade_type: 'loss',
       name: 'AUDUSD Short',
       session: 'London',
       tags: ['Trend Following', 'Support/Resistance'],
-      riskToReward: 1.5
+      risk_to_reward: 1.5,
+      created_at: new Date(),
+      updated_at: new Date()
     },
     {
       id: '5',
-      date: new Date('2024-01-19'),
+      calendar_id: 'demo-calendar',
+      user_id: 'demo-user',
+      trade_date: new Date('2024-01-19'),
       amount: 125,
-      type: 'win',
+      trade_type: 'win',
       name: 'EURJPY Long',
       session: 'London',
       tags: ['Breakout', 'Trend Following'],
-      riskToReward: 2.2
+      risk_to_reward: 2.2,
+      created_at: new Date(),
+      updated_at: new Date()
     }
   ];
 
@@ -123,7 +143,7 @@ const ScoreDemo: React.FC = () => {
           Sample Data: {sampleTrades.length} trades
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Win Rate: {((sampleTrades.filter(t => t.type === 'win').length / sampleTrades.length) * 100).toFixed(1)}%
+          Win Rate: {((sampleTrades.filter(t => t.trade_type === 'win').length / sampleTrades.length) * 100).toFixed(1)}%
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Total P&L: ${sampleTrades.reduce((sum, t) => sum + t.amount, 0)}

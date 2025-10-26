@@ -24,7 +24,7 @@ import {
   SelectAll as SelectAllIcon,
   DeleteSweep as DeleteMultipleIcon
 } from '@mui/icons-material';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import { TradeListItem, TradeInfo, TradeActions } from '../StyledComponents';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { useTheme } from '@mui/material/styles';
@@ -178,11 +178,11 @@ const TradeList: React.FC<TradeListProps> = ({
           {trades.map((trade) => (
             <React.Fragment key={trade.id}>
               <TradeListItem
-                $type={trade.type}
+                $type={trade.trade_type}
                 onClick={isTradeBeingDeleted(trade.id) ? undefined : () => onTradeClick(trade.id)}
                 sx={{
                   cursor: isTradeBeingDeleted(trade.id) ? 'default' : 'pointer',
-                  ...(trade.isTemporary && {
+                  ...(trade.is_temporary && {
                     opacity: 0.7,
                     border: '1px dashed',
                     borderColor: 'divider',
@@ -224,16 +224,16 @@ const TradeList: React.FC<TradeListProps> = ({
                       {trade.name && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {trade.isTemporary ? trade.name : `📈 ${trade.name.replace(/^📈 /, '')}`}
+                            {trade.is_temporary ? trade.name : `📈 ${trade.name.replace(/^📈 /, '')}`}
                           </Typography>
 
                         </Box>
                       )}
                       <Typography variant="body1" sx={{
                         fontWeight: 500,
-                        color: trade.type === 'win'
+                        color: trade.trade_type === 'win'
                           ? 'success.main'
-                          : trade.type === 'loss'
+                          : trade.trade_type === 'loss'
                             ? 'error.main'
                             : 'info.main'
                       }}>
@@ -272,8 +272,8 @@ const TradeList: React.FC<TradeListProps> = ({
                           </Tooltip>
                         )}
 
-                        {trade.riskToReward && (
-                          <Tooltip title={`Risk to Reward: ${trade.riskToReward}`}>
+                        {trade.risk_to_reward && (
+                          <Tooltip title={`Risk to Reward: ${trade.risk_to_reward}`}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <RiskIcon
                                 fontSize="small"
@@ -293,7 +293,7 @@ const TradeList: React.FC<TradeListProps> = ({
                                 py: 0.2,
                                 borderRadius: 0.5
                               }}>
-                                {trade.riskToReward}R
+                                {trade.risk_to_reward}R
                               </Typography>
                             </Box>
                           </Tooltip>

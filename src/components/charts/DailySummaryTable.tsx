@@ -15,7 +15,7 @@ import {
 import { alpha } from '@mui/material/styles';
 import { InfoOutlined, TrendingUp, TrendingDown, TrendingFlat } from '@mui/icons-material';
 import { format } from 'date-fns';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import { formatValue } from '../../utils/formatters';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 
@@ -155,16 +155,16 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
           <TableBody>
             {dailySummaryData.map((row) => (
               <TableRow
-                key={format(row.date, 'yyyy-MM-dd')}
+                key={format(row.trade_date, 'yyyy-MM-dd')}
                 onClick={() => {
                   const dayTrades = trades.filter(trade =>
-                    format(new Date(trade.date), 'yyyy-MM-dd') === format(row.date, 'yyyy-MM-dd')
+                    format(new Date(trade.trade_date), 'yyyy-MM-dd') === format(row.trade_date, 'yyyy-MM-dd')
                   );
                   if (dayTrades.length > 0) {
                     setMultipleTradesDialog({
                       open: true,
                       trades: dayTrades,
-                      date: format(row.date, 'dd/MM/yyyy'),
+                      date: format(row.trade_date, 'dd/MM/yyyy'),
                       expandedTradeId: dayTrades.length === 1 ? dayTrades[0].id : null
                     });
                   }
@@ -188,7 +188,7 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
                     color: 'text.primary'
                   }}
                 >
-                  {format(row.date, 'dd/MM/yyyy')}
+                  {format(row.trade_date, 'dd/MM/yyyy')}
                 </TableCell>
                 <TableCell
                   align="right"

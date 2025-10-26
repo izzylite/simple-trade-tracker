@@ -14,9 +14,8 @@ import {
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { Close } from '@mui/icons-material';
-import { Trade } from '../types/trade';
+import { Trade, Calendar } from '../types/dualWrite';
 import { ScoreSettings, ScoreAnalysis } from '../types/score';
-import { Calendar } from '../types/calendar';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import { scoreService } from '../services/scoreService';
 
@@ -96,11 +95,11 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
   useEffect(() => {
     if (accountBalance !== undefined) {
       scoreService.updateDynamicRiskSettings({
-        accountBalance,
-        riskPerTrade: dynamicRiskSettings?.riskPerTrade,
-        dynamicRiskEnabled: dynamicRiskSettings?.dynamicRiskEnabled,
-        increasedRiskPercentage: dynamicRiskSettings?.increasedRiskPercentage,
-        profitThresholdPercentage: dynamicRiskSettings?.profitThresholdPercentage
+        account_balance: accountBalance,
+        risk_per_trade: dynamicRiskSettings?.risk_per_trade,
+        dynamic_risk_enabled: dynamicRiskSettings?.dynamic_risk_enabled,
+        increased_risk_percentage: dynamicRiskSettings?.increased_risk_percentage,
+        profit_threshold_percentage: dynamicRiskSettings?.profit_threshold_percentage
       });
     }
   }, [accountBalance, dynamicRiskSettings]);

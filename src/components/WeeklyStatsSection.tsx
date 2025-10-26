@@ -15,7 +15,7 @@ import {
   eachWeekOfInterval,
   isSameMonth
 } from 'date-fns';
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import WinLossStats from './charts/WinLossStats';
 import RiskRewardChart from './charts/RiskRewardChart';
 import CumulativePnLChart from './charts/CumulativePnLChart';
@@ -70,7 +70,7 @@ const WeeklyStatsSection: React.FC<WeeklyStatsSectionProps> = ({
   // Get selected week's trades
   const weeklyTrades = useMemo(() => {
     return trades.filter(trade => {
-      const tradeDate = new Date(trade.date);
+      const tradeDate = new Date(trade.trade_date);
       return isSameWeek(tradeDate, selectedWeekDate, { weekStartsOn: 0 }) &&
              isSameMonth(tradeDate, currentDate); // Ensure trades are from current month
     });
@@ -113,9 +113,9 @@ const WeeklyStatsSection: React.FC<WeeklyStatsSectionProps> = ({
 
   // Calculate win/loss statistics for the week
   const weeklyWinLossStats = useMemo(() => {
-    const wins = weeklyTrades.filter(trade => trade.type === 'win');
-    const losses = weeklyTrades.filter(trade => trade.type === 'loss');
-    const breakevens = weeklyTrades.filter(trade => trade.type === 'breakeven');
+    const wins = weeklyTrades.filter(trade => trade.trade_type === 'win');
+    const losses = weeklyTrades.filter(trade => trade.trade_type === 'loss');
+    const breakevens = weeklyTrades.filter(trade => trade.trade_type === 'breakeven');
 
     const totalWins = wins.length;
     const totalLosses = losses.length;
@@ -141,10 +141,10 @@ const WeeklyStatsSection: React.FC<WeeklyStatsSectionProps> = ({
     let lossStreakCount = 0;
 
     // Sort trades by date for streak calculation
-    const sortedTrades = [...weeklyTrades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sortedTrades = [...weeklyTrades].sort((a, b) => new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime());
 
     sortedTrades.forEach(trade => {
-      if (trade.type === 'win') {
+      if (trade.trade_type === 'win') {
         currentWinStreak++;
         if (currentLossStreak > 0) {
           totalLossStreaks += currentLossStreak;
@@ -152,7 +152,7 @@ const WeeklyStatsSection: React.FC<WeeklyStatsSectionProps> = ({
           maxLossStreak = Math.max(maxLossStreak, currentLossStreak);
           currentLossStreak = 0;
         }
-      } else if (trade.type === 'loss') {
+      } else if (trade.trade_type === 'loss') {
         currentLossStreak++;
         if (currentWinStreak > 0) {
           totalWinStreaks += currentWinStreak;
@@ -178,8 +178,8 @@ const WeeklyStatsSection: React.FC<WeeklyStatsSectionProps> = ({
     const avgLossStreak = lossStreakCount > 0 ? totalLossStreaks / lossStreakCount : 0;
 
     return {
-      totalTrades,
-      winRate,
+      total_trades: totalTrades,
+      win_rate: winRate,
       winners: {
         total: totalWins,
         avgAmount: avgWin,
@@ -201,18 +201,18 @@ const WeeklyStatsSection: React.FC<WeeklyStatsSectionProps> = ({
 
   // Calculate risk/reward statistics for the week
   const weeklyRiskRewardStats = useMemo(() => {
-    const tradesWithRR = weeklyTrades.filter(trade => trade.riskToReward && trade.riskToReward > 0);
+    const tradesWithRR = weeklyTrades.filter(trade => trade.risk_to_reward && trade.risk_to_reward > 0);
     
     if (tradesWithRR.length === 0) return { average: 0, max: 0, data: [] };
 
-    const riskRewardValues = tradesWithRR.map(trade => trade.riskToReward!);
+    const riskRewardValues = tradesWithRR.map(trade => trade.risk_to_reward!);
     const average = riskRewardValues.reduce((sum, value) => sum + value, 0) / riskRewardValues.length;
     const max = Math.max(...riskRewardValues);
 
     // Create data points for the line graph
     const data = tradesWithRR.map(trade => ({
-      date: format(new Date(trade.date), 'MM/dd'),
-      rr: trade.riskToReward || 0
+      date: format(new Date(trade.trade_date), 'MM/dd'),
+      rr: trade.risk_to_reward || 0
     }));
 
     return { average, max, data };
@@ -227,7 +227,7 @@ const WeeklyStatsSection: React.FC<WeeklyStatsSectionProps> = ({
     let cumulativePnL = 0;
 
     return weekDays.map(day => {
-      const dayTrades = weeklyTrades.filter(trade => isSameDay(new Date(trade.date), day));
+      const dayTrades = weeklyTrades.filter(trade => isSameDay(new Date(trade.trade_date), day));
       const dailyPnL = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
       cumulativePnL += dailyPnL;
 
@@ -249,9 +249,9 @@ const WeeklyStatsSection: React.FC<WeeklyStatsSectionProps> = ({
     return sessions.map(sessionName => {
       const sessionTrades = weeklyTrades.filter(trade => trade.session === sessionName);
       const totalTrades = sessionTrades.length;
-      const winners = sessionTrades.filter(trade => trade.type === 'win').length;
-      const losers = sessionTrades.filter(trade => trade.type === 'loss').length;
-      const breakevens = sessionTrades.filter(trade => trade.type === 'breakeven').length;
+      const winners = sessionTrades.filter(trade => trade.trade_type === 'win').length;
+      const losers = sessionTrades.filter(trade => trade.trade_type === 'loss').length;
+      const breakevens = sessionTrades.filter(trade => trade.trade_type === 'breakeven').length;
       
       // Calculate win rate excluding breakevens from the denominator
       const winRateDenominator = winners + losers;

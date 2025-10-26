@@ -67,9 +67,9 @@ export interface ScoreSettings {
     consistencyTolerance: number; // percentage
   };
   targets: {
-    winRate: number;
-    profitFactor: number;
-    maxDrawdown: number;
+    win_rate: number;
+    profit_factor: number;
+    max_drawdown: number;
     avgRiskReward: number;
   };
   selectedTags?: string[];
@@ -83,19 +83,19 @@ export interface TradingPattern {
   avgTradesPerWeek: number;
   avgPositionSize: number;
   avgRiskReward: number;
-  winRate: number;
-  profitFactor: number;
-  maxDrawdown: number;
+  win_rate: number;
+  profit_factor: number;
+  max_drawdown: number;
   tradingDays: number[]; // 0-6 (Sunday-Saturday)
 }
 
 export interface TagCombination {
   tags: string[];
-  winRate: number;
-  totalTrades: number;
+  win_rate: number;
+  total_trades: number;
   wins: number;
   losses: number;
-  totalPnL: number;
+  total_pnl: number;
   avgPnL: number;
   trend: 'improving' | 'declining' | 'stable';
   recentWinRate: number; // Win rate in recent period
@@ -107,7 +107,7 @@ export interface TagPatternInsight {
   title: string;
   description: string;
   tagCombination: string[];
-  winRate: number;
+  win_rate: number;
   confidence: number; // 0-100
   recommendation: string;
   severity: 'low' | 'medium' | 'high';

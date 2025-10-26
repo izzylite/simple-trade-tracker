@@ -1,5 +1,4 @@
-import { Trade } from '../types/trade';
-import { Calendar } from '../types/calendar';
+import { Trade, Calendar } from '../types/dualWrite';
 import {
   calculateWinLossStatsAsync,
   calculateTagStatsAsync,
@@ -171,8 +170,8 @@ export class PerformanceCalculationService {
 
     // Get losing and winning trades
     reportProgress('Filtering trades by outcome...');
-    const losingTrades = trades.filter(trade => trade.type === 'loss');
-    const winningTrades = trades.filter(trade => trade.type === 'win');
+    const losingTrades = trades.filter(trade => trade.trade_type === 'loss');
+    const winningTrades = trades.filter(trade => trade.trade_type === 'win');
 
     // Yield control
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -188,12 +187,12 @@ export class PerformanceCalculationService {
     // Calculate losing trade correlations
     reportProgress('Calculating losing trade correlations...');
     const losingTradeCorrelations = losingTrades.map(trade => {
-      const allTradeEvents = trade.economicEvents || [];
+      const allTradeEvents = trade.economic_events || [];
       const tradeEvents = filterEventsByCurrency(allTradeEvents);
 
       return {
         trade,
-        economicEvents: tradeEvents,
+        economic_events: tradeEvents,
         hasHighImpactEvents: tradeEvents.length > 0,
         hasMediumImpactEvents: tradeEvents.length > 0,
         eventCount: tradeEvents.length
@@ -206,12 +205,12 @@ export class PerformanceCalculationService {
     // Calculate winning trade correlations
     reportProgress('Calculating winning trade correlations...');
     const winningTradeCorrelations = winningTrades.map(trade => {
-      const allTradeEvents = trade.economicEvents || [];
+      const allTradeEvents = trade.economic_events || [];
       const tradeEvents = filterEventsByCurrency(allTradeEvents);
 
       return {
         trade,
-        economicEvents: tradeEvents,
+        economic_events: tradeEvents,
         hasHighImpactEvents: tradeEvents.length > 0,
         hasMediumImpactEvents: tradeEvents.length > 0,
         eventCount: tradeEvents.length
@@ -266,7 +265,7 @@ export class PerformanceCalculationService {
 
     // Process losing trades
     losingTradeCorrelations.forEach(tc => {
-      tc.economicEvents.forEach((event: any) => {
+      tc.economic_events.forEach((event: any) => {
         const existing = eventTypeMap.get(cleanEventNameForPinning(event.name)) || {
           losingTrades: [],
           winningTrades: [],
@@ -290,7 +289,7 @@ export class PerformanceCalculationService {
 
     // Process winning trades
     winningTradeCorrelations.forEach(tc => {
-      tc.economicEvents.forEach((event: any) => {
+      tc.economic_events.forEach((event: any) => {
         const existing = eventTypeMap.get(cleanEventNameForPinning(event.name)) || {
           losingTrades: [],
           winningTrades: [],
@@ -323,8 +322,8 @@ export class PerformanceCalculationService {
           winningTrades: data.winningTrades,
           totalLoss: data.totalLoss,
           totalWin: data.totalWin,
-          avgLoss: data.losingTrades.length > 0 ? data.totalLoss / data.losingTrades.length : 0,
-          avgWin: data.winningTrades.length > 0 ? data.totalWin / data.winningTrades.length : 0,
+          avg_loss: data.losingTrades.length > 0 ? data.totalLoss / data.losingTrades.length : 0,
+          avg_win: data.winningTrades.length > 0 ? data.totalWin / data.winningTrades.length : 0,
           count: totalTrades,
           winRate,
           economicEventDetails: data.economicEventDetails
@@ -339,7 +338,7 @@ export class PerformanceCalculationService {
     };
 
     [...losingTradeCorrelations, ...winningTradeCorrelations].forEach(tc => {
-      tc.economicEvents.forEach((event: any) => {
+      tc.economic_events.forEach((event: any) => {
         impactDistribution[event.impact]++;
       });
     });

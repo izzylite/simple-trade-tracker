@@ -19,7 +19,7 @@ import {
  */
 export function calculateEconomicEventStats(trades: Trade[], impactFilter?: string): any {
   const tradesWithEvents = trades.filter(trade =>
-    trade.economicEvents && trade.economicEvents.length > 0
+    trade.economic_events && trade.economic_events.length > 0
   );
 
   if (tradesWithEvents.length === 0) {
@@ -36,26 +36,26 @@ export function calculateEconomicEventStats(trades: Trade[], impactFilter?: stri
   let eventsToAnalyze = tradesWithEvents;
   if (impactFilter && impactFilter !== 'all') {
     eventsToAnalyze = tradesWithEvents.filter(trade =>
-      trade.economicEvents!.some(event => event.impact === impactFilter)
+      trade.economic_events!.some(event => event.impact === impactFilter)
     );
   }
 
   // Calculate impact breakdown
-  const impactBreakdown: { [key: string]: { count: number; winRate: number; avgPnl: number } } = {};
-  const currencyBreakdown: { [key: string]: { count: number; winRate: number; avgPnl: number } } = {};
+  const impactBreakdown: { [key: string]: { count: number; win_rate: number; avgPnl: number } } = {};
+  const currencyBreakdown: { [key: string]: { count: number; win_rate: number; avgPnl: number } } = {};
   const eventNameCounts: { [key: string]: number } = {};
 
   eventsToAnalyze.forEach(trade => {
-    trade.economicEvents!.forEach(event => {
+    trade.economic_events!.forEach(event => {
       // Impact breakdown
       if (!impactBreakdown[event.impact]) {
-        impactBreakdown[event.impact] = { count: 0, winRate: 0, avgPnl: 0 };
+        impactBreakdown[event.impact] = { count: 0, win_rate: 0, avgPnl: 0 };
       }
       impactBreakdown[event.impact].count++;
 
       // Currency breakdown
       if (!currencyBreakdown[event.currency]) {
-        currencyBreakdown[event.currency] = { count: 0, winRate: 0, avgPnl: 0 };
+        currencyBreakdown[event.currency] = { count: 0, win_rate: 0, avgPnl: 0 };
       }
       currencyBreakdown[event.currency].count++;
 
@@ -67,17 +67,17 @@ export function calculateEconomicEventStats(trades: Trade[], impactFilter?: stri
   // Calculate win rates and average P&L for each category
   Object.keys(impactBreakdown).forEach(impact => {
     const tradesForImpact = eventsToAnalyze.filter(trade =>
-      trade.economicEvents!.some(event => event.impact === impact)
+      trade.economic_events!.some(event => event.impact === impact)
     );
-    impactBreakdown[impact].winRate = calculateWinRate(tradesForImpact);
+    impactBreakdown[impact].win_rate = calculateWinRate(tradesForImpact);
     impactBreakdown[impact].avgPnl = tradesForImpact.reduce((sum, trade) => sum + trade.amount, 0) / tradesForImpact.length;
   });
 
   Object.keys(currencyBreakdown).forEach(currency => {
     const tradesForCurrency = eventsToAnalyze.filter(trade =>
-      trade.economicEvents!.some(event => event.currency === currency)
+      trade.economic_events!.some(event => event.currency === currency)
     );
-    currencyBreakdown[currency].winRate = calculateWinRate(tradesForCurrency);
+    currencyBreakdown[currency].win_rate = calculateWinRate(tradesForCurrency);
     currencyBreakdown[currency].avgPnl = tradesForCurrency.reduce((sum, trade) => sum + trade.amount, 0) / tradesForCurrency.length;
   });
 
@@ -95,7 +95,7 @@ export function calculateEconomicEventStats(trades: Trade[], impactFilter?: stri
     mostCommonEvents,
     winRateWithEvents: calculateWinRate(tradesWithEvents),
     winRateWithoutEvents: calculateWinRate(trades.filter(trade =>
-      !trade.economicEvents || trade.economicEvents.length === 0
+      !trade.economic_events || trade.economic_events.length === 0
     ))
   };
 }
@@ -123,17 +123,17 @@ export async function getTradeStatistics(
     // Filter by trade type if specified
     if (params.tradeType && params.tradeType !== 'all') {
       tradesToAnalyze = tradesToAnalyze.filter(trade => {
-        if (params.tradeType === 'win') return trade.type === 'win';
-        if (params.tradeType === 'loss') return trade.type === 'loss';
-        if (params.tradeType === 'breakeven') return trade.type === 'breakeven';
+        if (params.tradeType === 'win') return trade.trade_type === 'win';
+        if (params.tradeType === 'loss') return trade.trade_type === 'loss';
+        if (params.tradeType === 'breakeven') return trade.trade_type === 'breakeven';
         return true;
       });
     }
 
     const stats = {
-      totalTrades: tradesToAnalyze.length,
-      totalPnl: tradesToAnalyze.reduce((sum, trade) => sum + trade.amount, 0),
-      winRate: calculateWinRate(tradesToAnalyze),
+      total_trades: tradesToAnalyze.length,
+      total_pnl: tradesToAnalyze.reduce((sum, trade) => sum + trade.amount, 0),
+      win_rate: calculateWinRate(tradesToAnalyze),
       averagePnl: tradesToAnalyze.length > 0 ?
         tradesToAnalyze.reduce((sum, trade) => sum + trade.amount, 0) / tradesToAnalyze.length : 0,
       bestTrade: getBestTrade(tradesToAnalyze),

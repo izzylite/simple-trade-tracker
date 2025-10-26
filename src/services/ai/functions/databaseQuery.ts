@@ -128,8 +128,8 @@ export async function queryDatabase(
       rowCount: rowCount,
       trades: filteredTradesData.length > 0 ? filteredTradesData : simpleTradeData(tradesData),
       count: tradesData.length,
-      totalPnl: tradesData.reduce((sum, trade) => sum + trade.amount, 0),
-      winRate: calculateWinRate(tradesData),
+      total_pnl: tradesData.reduce((sum, trade) => sum + trade.amount, 0),
+      win_rate: calculateWinRate(tradesData),
       includedFields: params.fields || ['default']
     };
 

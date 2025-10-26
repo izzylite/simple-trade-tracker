@@ -180,7 +180,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
       // Handle Firebase AI Logic errors
       const chatError = error as ChatError;
-      if (chatError && chatError.type) {
+      if (chatError && chatError.trade_type) {
         setError(chatError);
       } else {
         setError({

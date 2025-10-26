@@ -1,16 +1,16 @@
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import { format, parse } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { error, warn } from './logger';
 
 // Helper function to prepare trade data for export
-const prepareTradeDataForExport = (trades: Trade[], initialBalance: number = 0) => {
+const prepareTradeDataForExport = (trades: Trade[], initial_balance: number = 0) => {
   // Sort trades by date
-  const sortedTrades = [...trades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const sortedTrades = [...trades].sort((a, b) => new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime());
 
   // Calculate cumulative P&L and account balance
   let cumulativePnL = 0;
-  let currentBalance = initialBalance;
+  let currentBalance = initial_balance;
   const tradesWithBalances = sortedTrades.map(trade => {
     cumulativePnL += trade.amount;
     currentBalance += trade.amount;
@@ -23,17 +23,17 @@ const prepareTradeDataForExport = (trades: Trade[], initialBalance: number = 0) 
 
   // Transform trades into a format suitable for export
   return tradesWithBalances.map(trade => ({
-    Date: format(new Date(trade.date), 'MM/dd/yyyy'),
+    Date: format(new Date(trade.trade_date), 'MM/dd/yyyy'),
     Name: trade.name ? trade.name : '',
-    Type: trade.type.charAt(0).toUpperCase() + trade.type.slice(1),
+    Type: trade.trade_type.charAt(0).toUpperCase() + trade.trade_type.slice(1),
     Amount: trade.amount,
     'P&L': trade.amount > 0 ? `+${trade.amount.toFixed(2)}` : trade.amount.toFixed(2),
     'Cumulative P&L': trade.cumulativePnL > 0 ? `+${trade.cumulativePnL.toFixed(2)}` : trade.cumulativePnL.toFixed(2),
     'Account Balance': trade.accountBalance.toFixed(2),
-    'Entry Price': trade.entry || '',
-    'Exit Price': trade.exit || '',
+    'Entry Price': trade.entry_price || '',
+    'Exit Price': trade.exit_price || '',
     Tags: trade.tags?.join(', ') || '',
-    'Risk to Reward': trade.riskToReward?.toFixed(2) || '',
+    'Risk to Reward': trade.risk_to_reward?.toFixed(2) || '',
     Session: trade.session || '',
     Notes: trade.notes || ''
   }));
@@ -109,11 +109,11 @@ const exportToCsv = (data: any[], fileName: string): void => {
 };
 
 // Main export function that supports both Excel and CSV formats
-export const exportTrades = (trades: Trade[], initialBalance: number = 0, fileFormat: 'xlsx' | 'csv' = 'xlsx'): void => {
+export const exportTrades = (trades: Trade[], initial_balance: number = 0, fileFormat: 'xlsx' | 'csv' = 'xlsx'): void => {
   if (trades.length === 0) return;
 
   // Prepare data for export
-  const exportData = prepareTradeDataForExport(trades, initialBalance);
+  const exportData = prepareTradeDataForExport(trades, initial_balance);
 
   // Generate file name with current date
   const dateStr = format(new Date(), 'yyyy-MM-dd');

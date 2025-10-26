@@ -1,6 +1,6 @@
 import { format, parseISO, isSameDay } from 'date-fns';
 import { economicCalendarService } from './economicCalendarService';
-import { TradeEconomicEvent } from '../types/trade';
+import { TradeEconomicEvent } from '../types/dualWrite';
 import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
 import { logger } from '../utils/logger';
 import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
@@ -144,10 +144,10 @@ export class TradeEconomicEventService {
   private convertToTradeEvent(event: EconomicEvent): TradeEconomicEvent {
     return {
       name: event.event,
-      flagCode: event.flagCode,
+      flag_code: event.flagCode,
       impact: event.impact,
       currency: event.currency,
-      timeUtc: event.timeUtc || event.time
+      time_utc: event.timeUtc || event.time
     };
   }
 

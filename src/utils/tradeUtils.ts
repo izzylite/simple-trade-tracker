@@ -1,9 +1,9 @@
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import { isSameDay } from 'date-fns';
 import { calculatePercentageOfValueAtDate } from './dynamicRiskUtils';
 
 export const getDayTrades = (date: Date, trades: Trade[]): Trade[] => {
-  return trades.filter(trade => isSameDay(trade.date, date));
+  return trades.filter(trade => isSameDay(trade.trade_date, date));
 };
 
 export const getTotalForDay = (date: Date, trades: Trade[]): number => {

@@ -1,4 +1,4 @@
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import { isAfter, isBefore, isSameDay, isSameMonth, isSameWeek, isSameYear, startOfDay } from 'date-fns';
 import { calculateEffectiveMaxDailyDrawdown, calculatePercentageOfValueAtDate, DynamicRiskSettings } from './dynamicRiskUtils';
 import { 
@@ -22,8 +22,8 @@ export const calculateTotalPnL = (trades: Trade[]): number => {
 export const calculateWinRate = (trades: Trade[]): number => {
   if (trades.length === 0) return 0;
 
-  const winCount = trades.filter(trade => trade.type === 'win').length;
-  const lossCount = trades.filter(trade => trade.type === 'loss').length;
+  const winCount = trades.filter(trade => trade.trade_type === 'win').length;
+  const lossCount = trades.filter(trade => trade.trade_type === 'loss').length;
   const totalWinLossTrades = winCount + lossCount;
 
   // If no wins or losses, return 0
@@ -43,7 +43,7 @@ export const calculateProfitFactor = (trades: Trade[]): number => {
     .reduce((sum, trade) => sum + trade.amount, 0);
 
   const grossLoss = Math.abs(trades
-    .filter(trade => trade.amount < 0 || trade.type === 'loss')
+    .filter(trade => trade.amount < 0 || trade.trade_type === 'loss')
     .reduce((sum, trade) => sum + trade.amount, 0));
      
   // If no losses, return a high but reasonable number instead of 999
@@ -58,30 +58,30 @@ export const calculateProfitFactor = (trades: Trade[]): number => {
  * @returns Maximum drawdown percentage
  */
 export const calculateMaxDrawdown = (trades: Trade[]): {
-  maxDrawdown: number;
-  drawdownStartDate?: Date;
-  drawdownEndDate?: Date;
-  drawdownRecoveryNeeded: number;
-  drawdownDuration: number;
+  max_drawdown: number;
+  drawdown_start_date?: Date;
+  drawdown_end_date?: Date;
+  drawdown_recovery_needed: number;
+  drawdown_duration: number;
 } => {
   if (trades.length === 0) {
     return {
-      maxDrawdown: 0,
-      drawdownRecoveryNeeded: 0,
-      drawdownDuration: 0
+      max_drawdown: 0,
+      drawdown_recovery_needed: 0,
+      drawdown_duration: 0
     };
   }
 
   // Sort trades by date
   const sortedTrades = [...trades].sort((a, b) =>
-    new Date(a.date).getTime() - new Date(b.date).getTime()
+    new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime()
   );
 
   let balance = 0;
   let peak = 0;
   let maxDrawdown = 0;
-  let drawdownStartDate: Date | undefined;
-  let drawdownEndDate: Date | undefined;
+  let drawdown_start_date: Date | undefined;
+  let drawdown_end_date: Date | undefined;
   let currentDrawdownStartDate: Date | undefined;
   let drawdownDuration = 0;
 
@@ -96,13 +96,13 @@ export const calculateMaxDrawdown = (trades: Trade[]): {
 
       if (drawdown > maxDrawdown) {
         maxDrawdown = drawdown;
-        drawdownStartDate = currentDrawdownStartDate || trade.date;
-        drawdownEndDate = trade.date;
+        drawdown_start_date = currentDrawdownStartDate || trade.trade_date;
+        drawdown_end_date = trade.trade_date;
 
         // Calculate drawdown duration (number of trades)
-        if (drawdownStartDate && drawdownEndDate) {
-          const startIndex = sortedTrades.findIndex(t => t.date === drawdownStartDate);
-          const endIndex = sortedTrades.findIndex(t => t.date === drawdownEndDate);
+        if (drawdown_start_date && drawdown_end_date) {
+          const startIndex = sortedTrades.findIndex(t => t.trade_date === drawdown_start_date);
+          const endIndex = sortedTrades.findIndex(t => t.trade_date === drawdown_end_date);
           if (startIndex !== -1 && endIndex !== -1) {
             drawdownDuration = endIndex - startIndex + 1;
           } else {
@@ -115,7 +115,7 @@ export const calculateMaxDrawdown = (trades: Trade[]): {
       }
 
       if (!currentDrawdownStartDate) {
-        currentDrawdownStartDate = trade.date;
+        currentDrawdownStartDate = trade.trade_date;
       }
     }
   });
@@ -126,11 +126,11 @@ export const calculateMaxDrawdown = (trades: Trade[]): {
     : 0;
 
   return {
-    maxDrawdown,
-    drawdownStartDate,
-    drawdownEndDate,
-    drawdownRecoveryNeeded,
-    drawdownDuration
+    max_drawdown: maxDrawdown,
+    drawdown_start_date,
+    drawdown_end_date,
+    drawdown_recovery_needed: drawdownRecoveryNeeded,
+    drawdown_duration: drawdownDuration
   };
 };
 
@@ -158,7 +158,7 @@ export const calculateTargetProgress = (
   // Calculate account value at start of period if startDate and allTrades are provided
   let baselineAccountValue = accountBalance;
   if (startDate && allTrades) {
-    const tradesBeforePeriod = allTrades.filter(trade => new Date(trade.date) < startDate);
+    const tradesBeforePeriod = allTrades.filter(trade => new Date(trade.trade_date) < startDate);
     baselineAccountValue = accountBalance + tradesBeforePeriod.reduce((sum, trade) => sum + trade.amount, 0);
   }
 
@@ -183,7 +183,7 @@ export const filterTradesByDateRange = (
   endDate: Date
 ): Trade[] => {
   return trades.filter(trade => {
-    const tradeDate = new Date(trade.date);
+    const tradeDate = new Date(trade.trade_date);
     return (
       !isBefore(tradeDate, startOfDay(startDate)) &&
       !isAfter(tradeDate, startOfDay(endDate))
@@ -202,7 +202,7 @@ export const filterTradesByWeek = (
   date: Date
 ): Trade[] => {
   return trades.filter(trade => {
-    const tradeDate = new Date(trade.date);
+    const tradeDate = new Date(trade.trade_date);
     return isSameWeek(tradeDate, date, { weekStartsOn: 1 });
   });
 };
@@ -218,7 +218,7 @@ export const filterTradesByMonth = (
   date: Date
 ): Trade[] => {
   return trades.filter(trade => {
-    const tradeDate = new Date(trade.date);
+    const tradeDate = new Date(trade.trade_date);
     return isSameMonth(tradeDate, date) && isSameYear(tradeDate, date);
   });
 };
@@ -234,7 +234,7 @@ export const filterTradesByYear = (
   date: Date
 ): Trade[] => {
   return trades.filter(trade => {
-    const tradeDate = new Date(trade.date);
+    const tradeDate = new Date(trade.trade_date);
     return isSameYear(tradeDate, date);
   });
 };
@@ -250,7 +250,7 @@ export const filterTradesByDay = (
   date: Date
 ): Trade[] => {
   return trades.filter(trade => {
-    const tradeDate = new Date(trade.date);
+    const tradeDate = new Date(trade.trade_date);
     return isSameDay(tradeDate, date);
   });
 };
@@ -279,11 +279,11 @@ export const filterTradesByTags = (
  * @returns Object with average win and loss
  */
 export const calculateAverages = (trades: Trade[]): {
-  avgWin: number;
-  avgLoss: number;
+  avg_win: number;
+  avg_loss: number;
 } => {
-  const winTrades = trades.filter(trade => trade.type === 'win');
-  const lossTrades = trades.filter(trade => trade.type === 'loss');
+  const winTrades = trades.filter(trade => trade.trade_type === 'win');
+  const lossTrades = trades.filter(trade => trade.trade_type === 'loss');
 
   const avgWin = winTrades.length
     ? winTrades.reduce((sum, trade) => sum + trade.amount, 0) / winTrades.length
@@ -293,7 +293,7 @@ export const calculateAverages = (trades: Trade[]): {
     ? Math.abs(lossTrades.reduce((sum, trade) => sum + trade.amount, 0)) / lossTrades.length
     : 0;
 
-  return { avgWin, avgLoss };
+  return { avg_win: avgWin, avg_loss: avgLoss };
 };
 
 
@@ -322,7 +322,7 @@ export const calculateDayStats = (
 
   let status: DayStatus = 'neutral';
   if (dayTrades.length > 0) {
-    status = netAmount > 0 ? 'win' : netAmount < 0 ? 'loss' : dayTrades.find(trade => trade.type === 'breakeven') ? 'breakeven' : 'neutral';
+    status = netAmount > 0 ? 'win' : netAmount < 0 ? 'loss' : dayTrades.find(trade => trade.trade_type === 'breakeven') ? 'breakeven' : 'neutral';
   }
 
   // Calculate effective max daily drawdown based on dynamic risk settings

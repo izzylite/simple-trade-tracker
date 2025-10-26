@@ -11,8 +11,7 @@ import {
 } from '@mui/material';
 import { logger } from '../utils/logger';
 import { Close as CloseIcon, Analytics as AnalyticsIcon } from '@mui/icons-material';
-import { Trade } from '../types/trade';
-import { Calendar } from '../types/calendar';
+import { Trade, Calendar } from '../types/dualWrite';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { PnLChartsWrapper, SessionPerformanceAnalysis, TradesListDialog, WinLossDistribution } from './charts';
@@ -32,7 +31,7 @@ interface MonthlyStatisticsSectionProps {
   selectedDate: Date;
   accountBalance: number;
   maxDailyDrawdown: number;
-  monthlyTarget?: number;
+  monthly_target?: number;
   calendarId: string;
   scoreSettings?: import('../types/score').ScoreSettings;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
@@ -62,7 +61,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   selectedDate,
   accountBalance,
   maxDailyDrawdown,
-  monthlyTarget,
+  monthly_target,
   calendarId,
   scoreSettings,
   onUpdateTradeProperty,
@@ -116,8 +115,8 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
 
   // Calculate target value using the utility function
   const targetValue = useMemo(() => {
-    return calculateTargetValue(monthlyTarget, accountBalance);
-  }, [monthlyTarget, accountBalance]);
+    return calculateTargetValue(monthly_target, accountBalance);
+  }, [monthly_target, accountBalance]);
 
   // Calculate drawdown violation value using the utility function
   const drawdownViolationValue = useMemo(() => {
@@ -127,9 +126,9 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   // Calculate win/loss distribution data
   const winLossData = useMemo(() => {
     const filteredTrades = getFilteredTrades(trades, selectedDate, timePeriod);
-    const winners = filteredTrades.filter(trade => trade.type === 'win').length;
-    const losers = filteredTrades.filter(trade => trade.type === 'loss').length;
-    const breakevens = filteredTrades.filter(trade => trade.type === 'breakeven').length;
+    const winners = filteredTrades.filter(trade => trade.trade_type === 'win').length;
+    const losers = filteredTrades.filter(trade => trade.trade_type === 'loss').length;
+    const breakevens = filteredTrades.filter(trade => trade.trade_type === 'breakeven').length;
 
     return [
       { name: 'Wins', value: winners },
@@ -170,7 +169,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
 
     return Array.from(tagCounts.entries()).map(([tag, count]) => ({
       tag,
-      totalTrades: count
+      total_trades: count
     }));
   }, [trades, selectedDate, timePeriod]);
 
@@ -180,11 +179,11 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
     let categoryTrades: Trade[] = [];
 
     if (category === 'Wins') {
-      categoryTrades = filteredTrades.filter(trade => trade.type === 'win');
+      categoryTrades = filteredTrades.filter(trade => trade.trade_type === 'win');
     } else if (category === 'Losses') {
-      categoryTrades = filteredTrades.filter(trade => trade.type === 'loss');
+      categoryTrades = filteredTrades.filter(trade => trade.trade_type === 'loss');
     } else if (category === 'Breakeven') {
-      categoryTrades = filteredTrades.filter(trade => trade.type === 'breakeven');
+      categoryTrades = filteredTrades.filter(trade => trade.trade_type === 'breakeven');
     } else {
       // It's a tag
       categoryTrades = filteredTrades.filter(trade =>
@@ -245,7 +244,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
       <PnLChartsWrapper
         chartData={chartData}
         targetValue={targetValue}
-        monthlyTarget={monthlyTarget}
+        monthly_target={monthly_target}
         drawdownViolationValue={drawdownViolationValue}
         setMultipleTradesDialog={setMultipleTradesDialog}
         timePeriod={timePeriod}
@@ -271,13 +270,13 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         }
         onUpdateTradeProperty={onUpdateTradeProperty}
         onZoomImage={onZoomImage || (() => { })}
-        accountBalance={accountBalance}
+        account_balance={accountBalance}
         allTrades={trades}
         onEditClick={onEditTrade}
         onDeleteClick={onDeleteTrade}
         onDeleteMultiple={onDeleteMultipleTrades}
         onOpenGalleryMode={onOpenGalleryMode}
-        calendar={calendar}
+        calendar={calendar ? { economicCalendarFilters: calendar.economic_calendar_filters } : undefined}
       />
 
       {/* Performance Details Dialog */}
@@ -315,7 +314,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
             selectedDate={selectedDate}
             accountBalance={accountBalance}
             maxDailyDrawdown={maxDailyDrawdown}
-            monthlyTarget={monthlyTarget}
+            monthlyTarget={monthly_target}
             calendarId={calendarId}
             scoreSettings={scoreSettings}
             onUpdateTradeProperty={onUpdateTradeProperty}

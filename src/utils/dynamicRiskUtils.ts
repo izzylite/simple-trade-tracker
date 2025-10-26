@@ -1,15 +1,15 @@
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import { endOfDay } from 'date-fns';
 
 /**
  * Dynamic risk settings interface
  */
 export interface DynamicRiskSettings {
-  accountBalance: number;
-  riskPerTrade?: number;
-  dynamicRiskEnabled?: boolean;
-  increasedRiskPercentage?: number;
-  profitThresholdPercentage?: number;
+  account_balance: number;
+  risk_per_trade?: number;
+  dynamic_risk_enabled?: boolean;
+  increased_risk_percentage?: number;
+  profit_threshold_percentage?: number;
 }
 
 /**
@@ -21,8 +21,8 @@ export const calculateCumulativePnLToDate = (
 ): number => {
    
   return allTrades
-    .filter(trade => new Date(trade.date) <= targetDate)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .filter(trade => new Date(trade.trade_date) <= targetDate)
+    .sort((a, b) => new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime())
     .reduce((cumulative, trade) => cumulative + trade.amount, 0);
 };
 
@@ -34,26 +34,26 @@ export const calculateEffectiveRiskPercentage = (
   allTrades: Trade[],
   dynamicRiskSettings: DynamicRiskSettings
 ): number => {
-  if (!dynamicRiskSettings.riskPerTrade) return 0;
+  if (!dynamicRiskSettings.risk_per_trade) return 0;
 
   // If dynamic risk is not enabled, return base risk percentage
-  if (!dynamicRiskSettings.dynamicRiskEnabled ||
-      !dynamicRiskSettings.increasedRiskPercentage ||
-      !dynamicRiskSettings.profitThresholdPercentage ||
-      dynamicRiskSettings.accountBalance <= 0) {
-    return dynamicRiskSettings.riskPerTrade;
+  if (!dynamicRiskSettings.dynamic_risk_enabled ||
+      !dynamicRiskSettings.increased_risk_percentage ||
+      !dynamicRiskSettings.profit_threshold_percentage ||
+      dynamicRiskSettings.account_balance <= 0) {
+    return dynamicRiskSettings.risk_per_trade;
   }
 
   // Calculate cumulative P&L up to the target date
   const cumulativePnL = calculateCumulativePnLToDate(targetDate, allTrades);
 
   // Check if profit threshold is met
-  const profitPercentage = (cumulativePnL / dynamicRiskSettings.accountBalance) * 100;
-  if (profitPercentage >= dynamicRiskSettings.profitThresholdPercentage) {
-    return dynamicRiskSettings.increasedRiskPercentage;
+  const profitPercentage = (cumulativePnL / dynamicRiskSettings.account_balance) * 100;
+  if (profitPercentage >= dynamicRiskSettings.profit_threshold_percentage) {
+    return dynamicRiskSettings.increased_risk_percentage;
   }
 
-  return dynamicRiskSettings.riskPerTrade;
+  return dynamicRiskSettings.risk_per_trade;
 };
 
 /**
@@ -64,11 +64,11 @@ export const calculateCurrentEffectiveRiskPercentage = (
   dynamicRiskSettings: DynamicRiskSettings
 ): number => {
   if (allTrades.length === 0) {
-    return dynamicRiskSettings.riskPerTrade || 0;
+    return dynamicRiskSettings.risk_per_trade || 0;
   }
 
   // Use the latest trade date + 1 day to ensure we include all trades
-  const latestDate = new Date(Math.max(...allTrades.map(trade => new Date(trade.date).getTime())));
+  const latestDate = new Date(Math.max(...allTrades.map(trade => new Date(trade.trade_date).getTime())));
   const currentDate = new Date(latestDate.getTime() + 24 * 60 * 60 * 1000);
 
   return calculateEffectiveRiskPercentage(currentDate, allTrades, dynamicRiskSettings);
@@ -107,7 +107,7 @@ export const calculatePercentageOfValueAtDate = (
   allTrades: Trade[],
   excludeAfterDate: Date
 ): number => {
-  const relevantTrades = allTrades.filter(trade => new Date(trade.date) < excludeAfterDate);
+  const relevantTrades = allTrades.filter(trade => new Date(trade.trade_date) < excludeAfterDate);
   const baselineValue = calculateCurrentTotalValue(accountBalance, relevantTrades);
   return baselineValue > 0 ? (amount / baselineValue) * 100 : 0;
 };
@@ -138,7 +138,7 @@ export const calculateTradeAmount = (
 
   const effectiveRisk = calculateEffectiveRiskPercentage(targetDate, allTrades, dynamicRiskSettings);
   const cumulativePnL = calculateCumulativePnLToDate(targetDate, allTrades);
-  const riskAmount = calculateRiskAmount(effectiveRisk, dynamicRiskSettings.accountBalance, cumulativePnL);
+  const riskAmount = calculateRiskAmount(effectiveRisk, dynamicRiskSettings.account_balance, cumulativePnL);
 
   if (tradeType === 'win') {
     return Math.round(riskAmount * riskToReward);
@@ -156,16 +156,16 @@ export const normalizeTradeAmount = (
   dynamicRiskSettings: DynamicRiskSettings
 ): number => {
   // Skip normalization for trades without risk/reward or partials taken
-  if (!trade.riskToReward || trade.partialsTaken || trade.type === 'breakeven') {
+  if (!trade.risk_to_reward || trade.partials_taken || trade.trade_type === 'breakeven') {
     return Math.abs(trade.amount);
   }
 
-  const effectiveRisk = calculateEffectiveRiskPercentage(new Date(trade.date), allTrades, dynamicRiskSettings);
+  const effectiveRisk = calculateEffectiveRiskPercentage(new Date(trade.trade_date), allTrades, dynamicRiskSettings);
   
   if (effectiveRisk === 0) {
     return Math.abs(trade.amount);
   }
-  const baseRiskPercentage = dynamicRiskSettings.riskPerTrade || 1;
+  const baseRiskPercentage = dynamicRiskSettings.risk_per_trade || 1;
   // Calculate what the trade size would be with the base risk percentage
   const normalizedAmount = (Math.abs(trade.amount) * baseRiskPercentage) / effectiveRisk;
   
@@ -179,15 +179,15 @@ export const isDynamicRiskActive = (
   allTrades: Trade[],
   dynamicRiskSettings: DynamicRiskSettings
 ): boolean => {
-  if (!dynamicRiskSettings.dynamicRiskEnabled ||
-      !dynamicRiskSettings.increasedRiskPercentage ||
-      !dynamicRiskSettings.profitThresholdPercentage ||
-      dynamicRiskSettings.accountBalance <= 0) {
+  if (!dynamicRiskSettings.dynamic_risk_enabled ||
+      !dynamicRiskSettings.increased_risk_percentage ||
+      !dynamicRiskSettings.profit_threshold_percentage ||
+      dynamicRiskSettings.account_balance <= 0) {
     return false;
   }
 
   const currentEffectiveRisk = calculateCurrentEffectiveRiskPercentage(allTrades, dynamicRiskSettings);
-  return currentEffectiveRisk === dynamicRiskSettings.increasedRiskPercentage;
+  return currentEffectiveRisk === dynamicRiskSettings.increased_risk_percentage;
 };
 
 /**
@@ -203,7 +203,7 @@ export const calculateEffectiveMaxDailyDrawdown = (
   }
 
   // Adjust drawdown limit proportionally to the risk increase
-  const riskRatio = dynamicRiskSettings.increasedRiskPercentage! / (dynamicRiskSettings.riskPerTrade || 1);
+  const riskRatio = dynamicRiskSettings.increased_risk_percentage! / (dynamicRiskSettings.risk_per_trade || 1);
   return maxDailyDrawdown * riskRatio;
 };
 
@@ -221,15 +221,15 @@ export const getDynamicRiskStatus = (
   thresholdMet: boolean;
 } => {
   const currentRiskPercentage = calculateCurrentEffectiveRiskPercentage(allTrades, dynamicRiskSettings);
-  const baseRiskPercentage = dynamicRiskSettings.riskPerTrade || 0;
+  const baseRiskPercentage = dynamicRiskSettings.risk_per_trade || 0;
   const isActive = isDynamicRiskActive(allTrades, dynamicRiskSettings);
   
   const totalPnL = allTrades.reduce((sum, trade) => sum + trade.amount, 0);
-  const profitPercentage = dynamicRiskSettings.accountBalance > 0 
-    ? (totalPnL / dynamicRiskSettings.accountBalance) * 100 
+  const profitPercentage = dynamicRiskSettings.account_balance > 0 
+    ? (totalPnL / dynamicRiskSettings.account_balance) * 100 
     : 0;
   
-  const thresholdMet = profitPercentage >= (dynamicRiskSettings.profitThresholdPercentage || 0);
+  const thresholdMet = profitPercentage >= (dynamicRiskSettings.profit_threshold_percentage || 0);
 
   return {
     isActive,

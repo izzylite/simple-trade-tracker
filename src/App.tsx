@@ -5,14 +5,13 @@ import { createTheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { v4 as uuidv4 } from 'uuid';
-import { Trade } from './types/trade';
-import { Calendar } from './types/calendar';
+import { Trade, Calendar } from './types/dualWrite';
+import { CalendarWithUIState } from './types/calendar';
 import { AuthProvider, useAuth } from './contexts/SupabaseAuthContext';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
 import TradeLoadingIndicator from './components/TradeLoadingIndicator';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from './firebase/config';
+import { supabase } from './config/supabase';
 
 import AppLoadingProgress from './components/AppLoadingProgress';
 import {
@@ -44,7 +43,7 @@ function AppContent() {
     return savedMode ? (savedMode as 'light' | 'dark') : (prefersDarkMode ? 'dark' : 'light');
   });
 
-  const [calendars, setCalendars] = useState<Calendar[]>([]);
+  const [calendars, setCalendars] = useState<CalendarWithUIState[]>([]);
   const [isLoadingCalendars, setIsLoadingCalendars] = useState<boolean>(false);
   const [isLoadingTrades, setIsLoadingTrades] = useState<boolean>(false);
   const [loadingCalendarName, setLoadingCalendarName] = useState<string | undefined>(undefined);
@@ -59,7 +58,13 @@ function AppContent() {
         setIsLoadingCalendars(true);
         try {
           const userCalendars = await calendarService.getUserCalendars(user.uid);
-          setCalendars(userCalendars);
+          // Convert Calendar[] to CalendarWithUIState[]
+          const calendarsWithUIState: CalendarWithUIState[] = userCalendars.map(cal => ({
+            ...cal,
+            cachedTrades: [],
+            loadedYears: []
+          }));
+          setCalendars(calendarsWithUIState);
         } catch (error) {
           console.error('Error loading calendars:', error);
         } finally {
@@ -104,7 +109,7 @@ function AppContent() {
             // Get all years from the trades and remove duplicates
             const uniqueYears: number[] = [];
             allTrades.forEach(trade => {
-              const year = new Date(trade.date).getFullYear();
+              const year = new Date(trade.trade_date).getFullYear();
               if (!uniqueYears.includes(year)) {
                 uniqueYears.push(year);
               }
@@ -134,29 +139,36 @@ function AppContent() {
     }
   };
 
-  const handleCreateCalendar = async (name: string, accountBalance: number, maxDailyDrawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamicRiskEnabled?: boolean, increasedRiskPercentage?: number, profitThresholdPercentage?: number, heroImageUrl?: string, heroImageAttribution?: any) => {
+  const handleCreateCalendar = async (name: string, account_balance: number, max_daily_drawdown: number, weekly_target?: number, monthly_target?: number, yearly_target?: number, risk_per_trade?: number, dynamic_risk_enabled?: boolean, increased_risk_percentage?: number, profit_threshold_percentage?: number, heroImageUrl?: string, heroImageAttribution?: any) => {
     if (!user) return;
 
-    const newCalendar: Omit<Calendar, 'id' | 'userId' | 'cachedTrades' | 'loadedYears'> = {
+    const newCalendar: Omit<Calendar, 'id' | 'user_id'> = {
       name,
-      createdAt: new Date(),
-      lastModified: new Date(),
-      accountBalance,
-      maxDailyDrawdown,
-      weeklyTarget,
-      monthlyTarget,
-      yearlyTarget,
-      riskPerTrade,
-      dynamicRiskEnabled,
-      increasedRiskPercentage,
-      profitThresholdPercentage,
-      heroImageUrl,
-      heroImageAttribution
+      created_at: new Date(),
+      updated_at: new Date(),
+      account_balance,
+      max_daily_drawdown,
+      weekly_target,
+      monthly_target,
+      yearly_target,
+      risk_per_trade,
+      dynamic_risk_enabled,
+      increased_risk_percentage,
+      profit_threshold_percentage,
+      hero_image_url: heroImageUrl,
+      hero_image_attribution: heroImageAttribution
     };
 
     try {
       const calendarId = await calendarService.createCalendar(user.uid, newCalendar);
-      setCalendars(prev => [...prev, { ...newCalendar, id: calendarId, userId : user.uid, cachedTrades: [], loadedYears: [] }]);
+      const newCalendarWithUIState: CalendarWithUIState = {
+        ...newCalendar,
+        id: calendarId,
+        user_id: user.uid,
+        cachedTrades: [],
+        loadedYears: []
+      };
+      setCalendars(prev => [...prev, newCalendarWithUIState]);
     } catch (error) {
       console.error('Error creating calendar:', error);
     }
@@ -171,7 +183,7 @@ function AppContent() {
       // Get the source calendar to copy its properties
       const sourceCalendar = calendars.find(cal => cal.id === sourceCalendarId);
       if (sourceCalendar) {
-        const duplicatedCalendar: Calendar = {
+        const duplicatedCalendar: CalendarWithUIState = {
           ...sourceCalendar,
           ...newCalendar,
           // Reset trades
@@ -221,10 +233,10 @@ function AppContent() {
     }
   }
 
-  const updateCalendarState = (id: string, updates: Partial<Calendar>) => {
+  const updateCalendarState = (id: string, updates: Partial<CalendarWithUIState>) => {
     setCalendars(prev => prev.map(cal =>
       cal.id === id
-        ? { ...cal, ...updates, lastModified: new Date() }
+        ? { ...cal, ...updates, updated_at: new Date() }
         : cal
     ));
   };
@@ -254,10 +266,10 @@ function AppContent() {
 
     // Recalculate ALL trade amounts based on risk to reward to show potential with consistent risk management
     const recalculateTrades = () => {
-      if (!calendar.riskPerTrade || !calendar.cachedTrades.length) {
+      if (!calendar.risk_per_trade || !calendar.cachedTrades.length) {
         return {
           trades: calendar.cachedTrades,
-          totalProfit: calendar.totalPnL || 0
+          total_pnl: calendar.total_pnl || 0
         };
       }
 
@@ -265,34 +277,34 @@ function AppContent() {
 
       // Sort trades by date to calculate cumulative P&L correctly
       const sortedTrades = [...calendar.cachedTrades].sort((a, b) =>
-        new Date(a.date).getTime() - new Date(b.date).getTime()
+        new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime()
       );
 
       let cumulativePnL = 0;
       const updatedTrades = sortedTrades.map((trade, index) => {
         // Skip trades without risk to reward ratio
-        if (!trade.riskToReward || trade.type === 'breakeven') {
+        if (!trade.risk_to_reward || trade.trade_type === 'breakeven') {
           cumulativePnL += trade.amount;
           return trade;
         }
 
         // Calculate effective risk percentage using centralized utility
         const dynamicRiskSettings: DynamicRiskSettings = {
-          accountBalance: calendar.accountBalance,
-          riskPerTrade: calendar.riskPerTrade,
-          dynamicRiskEnabled: calendar.dynamicRiskEnabled,
-          increasedRiskPercentage: calendar.increasedRiskPercentage,
-          profitThresholdPercentage: calendar.profitThresholdPercentage
+          account_balance: calendar.account_balance,
+          risk_per_trade: calendar.risk_per_trade,
+          dynamic_risk_enabled: calendar.dynamic_risk_enabled,
+          increased_risk_percentage: calendar.increased_risk_percentage,
+          profit_threshold_percentage: calendar.profit_threshold_percentage
         };
 
-        const effectiveRisk = calculateEffectiveRiskPercentage(new Date(trade.date), sortedTrades.slice(0, index), dynamicRiskSettings);
-        const riskAmount = calculateRiskAmount(effectiveRisk, calendar.accountBalance, cumulativePnL);
+        const effectiveRisk = calculateEffectiveRiskPercentage(new Date(trade.trade_date), sortedTrades.slice(0, index), dynamicRiskSettings);
+        const riskAmount = calculateRiskAmount(effectiveRisk, calendar.account_balance, cumulativePnL);
 
         // Calculate new amount based on trade type and risk to reward
         let newAmount = 0;
-        if (trade.type === 'win') {
-          newAmount = Math.round(riskAmount * trade.riskToReward);
-        } else if (trade.type === 'loss') { 
+        if (trade.trade_type === 'win') {
+          newAmount = Math.round(riskAmount * trade.risk_to_reward);
+        } else if (trade.trade_type === 'loss') { 
           newAmount = -Math.round(riskAmount);
         }
 
@@ -445,8 +457,8 @@ function App() {
 }
 
 interface CalendarRouteProps {
-  calendars: Calendar[];
-  onUpdateStateCalendar: (id: string, updates: Partial<Calendar>) => void;
+  calendars: CalendarWithUIState[];
+  onUpdateStateCalendar: (id: string, updates: Partial<CalendarWithUIState>) => void;
   onToggleTheme: () => void;
   mode: 'light' | 'dark';
   loadAllTrades: (calendarId: string) => Promise<void>;
@@ -490,28 +502,38 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
   useEffect(() => {
     if (!calendar) return;
 
-    const calendarRef = doc(db, 'calendars', calendar.id);
-    const unsubscribe = onSnapshot(calendarRef, (doc) => {
-      if (doc.exists()) {
-        const updatedCalendarData = doc.data();
+    // Subscribe to Supabase real-time changes for this calendar
+    const channel = supabase
+      .channel(`calendar-${calendar.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'calendars',
+          filter: `id=eq.${calendar.id}`
+        },
+        (payload) => {
+          const updatedCalendarData = payload.new;
 
-        // Only update specific fields that might change from cloud functions
-        // Preserve cached trades and loaded years from local state
-        onUpdateStateCalendar(calendar.id, {
-          tags: updatedCalendarData.tags || [],
-          lastModified: updatedCalendarData.lastModified?.toDate() || new Date(),
-          requiredTagGroups: updatedCalendarData.requiredTagGroups || calendar.requiredTagGroups,
-          scoreSettings: updatedCalendarData.scoreSettings || calendar.scoreSettings,
-          // Update any other fields that cloud functions might modify
-          // but preserve local state for trades and UI-specific data
-        });
-      }
-    }, (error) => {
-      console.error('Error listening to calendar changes:', error);
-    });
+          // Only update specific fields that might change from edge functions
+          // Preserve cached trades and loaded years from local state
+          onUpdateStateCalendar(calendar.id, {
+            tags: updatedCalendarData.tags || [],
+            updated_at: updatedCalendarData.updated_at ? new Date(updatedCalendarData.updated_at) : new Date(),
+            required_tag_groups: updatedCalendarData.required_tag_groups || calendar.required_tag_groups,
+            score_settings: updatedCalendarData.score_settings || calendar.score_settings,
+            // Update any other fields that edge functions might modify
+            // but preserve local state for trades and UI-specific data
+          });
+        }
+      )
+      .subscribe();
 
     // Cleanup subscription on unmount or calendar change
-    return () => unsubscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [calendar?.id]);
 
   if (!calendar) {
@@ -652,14 +674,14 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     // Update local state immediately
     onUpdateStateCalendar(calendar.id, {
       tags: updateTagsWithGroupNameChange(calendar.tags || []),
-      requiredTagGroups: updateRequiredTagGroups(calendar.requiredTagGroups || []),
+      required_tag_groups: updateRequiredTagGroups(calendar.required_tag_groups || []),
       cachedTrades: updatedCachedTrades
     });
   }
 
-  const handleUpdateTradeProperty = async (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade): Promise<Trade | undefined> => {
+  const handleUpdateTradeProperty = async (tradeId: string, updateCallback: (trade: Trade) => Trade): Promise<Trade | undefined> => {
     try {
-      const result = await calendarService.updateTrade(calendar.id, tradeId, calendar.cachedTrades, updateCallback, createIfNotExists);
+      const result = await calendarService.updateTrade(calendar.id, tradeId, calendar.cachedTrades, updateCallback);
       // Update the cached trades and stats in the calendar
       if (result) {
         const [updatedStats, updatedTrades] = result;
@@ -678,10 +700,17 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
 
   const onUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<Calendar | undefined> => {
     try {
-      const updatedCalendar = await calendarService.onUpdateCalendar(calendarId, updateCallback);
-      // Update the cached trades and stats in the calendar
+      // Wrap the updateCallback to convert Calendar to Partial<Calendar>
+      const partialUpdateCallback = (calendar: Calendar): Partial<Calendar> => {
+        const fullUpdate = updateCallback(calendar);
+        return fullUpdate;
+      };
+
+      await calendarService.onUpdateCalendar(calendarId, partialUpdateCallback);
+      // Fetch the updated calendar to get the latest state
+      const updatedCalendar = await calendarService.getCalendar(calendarId);
       if (updatedCalendar) {
-        // First update the cached trades with the complete updated trades list
+        // Update the state with the fetched calendar
         onUpdateStateCalendar(calendar.id, {
           ...updatedCalendar,
           cachedTrades: [...calendar.cachedTrades],
@@ -689,18 +718,17 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
         });
         return updatedCalendar;
       }
-      return undefined;
     } catch (error) {
       console.error('Error updating calendar:', error);
-      return undefined;
     }
+    return undefined;
   };
 
   const handleChangeAccountBalance = async (newBalance: number) => {
     try {
-      await calendarService.updateCalendar(calendar.id, { accountBalance: newBalance });
+      await calendarService.updateCalendar(calendar.id, { account_balance: newBalance });
       onUpdateStateCalendar(calendar.id, {
-        accountBalance: newBalance
+        account_balance: newBalance
       });
     } catch (error) {
       console.error('Error updating account balance:', error);
@@ -719,12 +747,9 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
         cachedTrades: importedTrades,
       });
 
-      // Then update Firestore using the importTrades function and get the updated stats
-      const updatedStats = await calendarService.importTrades(calendar.id, importedTrades);
-      onUpdateStateCalendar(calendar.id, {
-        ...updatedStats
-      });
-      // Update the calendar with the updated stats
+      // Then update database using the importTrades function
+      await calendarService.importTrades(calendar.id, importedTrades);
+      // Stats will be recalculated on next load
     } catch (error) {
       console.error('Error importing trades:', error);
     } finally {
@@ -740,7 +765,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
   const handleClearMonthTrades = async (month: number, year: number) => {
     try {
       const tradesToKeep = calendar.cachedTrades.filter((trade: Trade) => {
-        const tradeDate = new Date(trade.date);
+        const tradeDate = new Date(trade.trade_date);
         return tradeDate.getMonth() !== month || tradeDate.getFullYear() !== year;
       });
 
@@ -749,17 +774,14 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
         cachedTrades: tradesToKeep,
       });
 
-      // Then update Firestore using the clearMonthTrades function and get the updated stats
-      // Pass the cached trades to avoid fetching all trades from Firestore
-      const updatedStats = await calendarService.clearMonthTrades(calendar.id, month, year, tradesToKeep);
+      // Then update database using the clearMonthTrades function
+      await calendarService.clearMonthTrades(calendar.id, year, month);
 
-      // Update the calendar with the updated stats if available
-      if (updatedStats) {
-        // Update the calendar with the updated stats
-        onUpdateStateCalendar(calendar.id, {
-          ...updatedStats
-        });
-      }
+      // Calculate updated stats from the remaining trades
+      const updatedStats = calendarService.calculateCalendarStats(tradesToKeep, calendar);
+
+      // Update the calendar with the updated stats (stats are UI-only, not stored in DB)
+      // Stats will be recalculated on next load
     } catch (error) {
       console.error('Error clearing month trades:', error);
     }
@@ -768,31 +790,31 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
   return (
     <TradeCalendar
       trades={calendar.cachedTrades}
-      accountBalance={calendar.accountBalance}
-      maxDailyDrawdown={calendar.maxDailyDrawdown}
-      weeklyTarget={calendar.weeklyTarget}
-      monthlyTarget={calendar.monthlyTarget}
+      accountBalance={calendar.account_balance}
+      maxDailyDrawdown={calendar.max_daily_drawdown}
+      weeklyTarget={calendar.weekly_target}
+      monthly_target={calendar.monthly_target}
       onTagUpdated={onTagUpdated}
-      yearlyTarget={calendar.yearlyTarget}
+      yearlyTarget={calendar.yearly_target}
       dynamicRiskSettings={{
-        accountBalance: calendar.accountBalance,
-        riskPerTrade: calendar.riskPerTrade,
-        dynamicRiskEnabled: calendar.dynamicRiskEnabled,
-        increasedRiskPercentage: calendar.increasedRiskPercentage,
-        profitThresholdPercentage: calendar.profitThresholdPercentage
+        account_balance: calendar.account_balance,
+        risk_per_trade: calendar.risk_per_trade,
+        dynamic_risk_enabled: calendar.dynamic_risk_enabled,
+        increased_risk_percentage: calendar.increased_risk_percentage,
+        profit_threshold_percentage: calendar.profit_threshold_percentage
       }}
-      requiredTagGroups={calendar.requiredTagGroups}
+      requiredTagGroups={calendar.required_tag_groups}
       allTags={calendar.tags} // Pass calendar.tags for efficient tag access
       calendarName={calendar.name}
       onAddTrade={handleAddTrade}
-      calendarDayNotes={calendar.daysNotes}
+      calendarDayNotes={calendar.days_notes ? Object.entries(calendar.days_notes).reduce((map, [k, v]) => map.set(k, v), new Map<string, string>()) : new Map<string, string>()}
       calendarNote={calendar.note}
-      heroImageUrl={calendar.heroImageUrl}
-      heroImageAttribution={calendar.heroImageAttribution}
+      heroImageUrl={calendar.hero_image_url}
+      heroImageAttribution={calendar.hero_image_attribution}
 
       // setLoading={(loading) => setLoadingTrades(loading)}
       // Score settings
-      scoreSettings={calendar.scoreSettings}
+      scoreSettings={calendar.score_settings}
       onUpdateCalendarProperty={onUpdateCalendarProperty}
       onUpdateTradeProperty={handleUpdateTradeProperty}
       onAccountBalanceChange={handleChangeAccountBalance}
@@ -801,7 +823,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       onToggleTheme={onToggleTheme}
       mode={mode}
       // Pass pre-calculated statistics
-      totalPnL={calendar.totalPnL}
+      totalPnL={calendar.total_pnl}
       // Dynamic risk toggle handler
       onToggleDynamicRisk={(useActualAmounts) => onToggleDynamicRisk(calendar.id, useActualAmounts)}
       // Pass loading state

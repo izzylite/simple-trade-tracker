@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import { EventNote as EventNoteIcon } from '@mui/icons-material';
 import RichTextEditor from './common/RichTextEditor';
-import { Calendar } from '../types/calendar';
+import { Calendar } from '../types/dualWrite';
 import { BaseDialog } from './common';
 import { logger } from '../utils/logger';
 interface DayNotesDialogProps {
@@ -60,16 +60,16 @@ const DayNotesDialog: React.FC<DayNotesDialogProps> = ({
       }
 
       await onUpdateCalendarProperty(calendarId, (calendar) => {
-        // Create a new Map from the existing daysNotes or a new empty Map
-        const daysNotesMap = calendar.daysNotes ? new Map(calendar.daysNotes) : new Map<string, string>();
+        // Create a new Record from the existing days_notes or a new empty Record
+        const daysNotesRecord = calendar.days_notes ? { ...calendar.days_notes } : {};
 
         // Set the notes for this day - ensure consistent key format
         const dayKey = day.toString();
-        daysNotesMap.set(dayKey, currentNotes);
+        daysNotesRecord[dayKey] = currentNotes;
 
         return {
           ...calendar,
-          daysNotes: daysNotesMap
+          days_notes: daysNotesRecord
         };
       });
 

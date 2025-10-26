@@ -32,45 +32,21 @@ import {
   ExpandLess
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import { Calendar } from '../types/calendar';
+import { Calendar, CalendarWithUIState } from '../types/calendar';
+import { CalendarStats } from '../services/calendarService';
 import ShareButton from './sharing/ShareButton';
 
-interface CalendarStats {
-  totalPnL: number;
-  winRate: number;
-  totalTrades: number;
-  growthPercentage: number;
-  avgWin: number;
-  avgLoss: number;
-  profitFactor: number;
-  maxDrawdown: number;
-  drawdownRecoveryNeeded: number;
-  drawdownDuration: number;
-  drawdownStartDate: Date | null;
-  drawdownEndDate: Date | null;
-  weeklyProgress: number;
-  monthlyProgress: number;
-  yearlyProgress: number;
-  weeklyPnLPercentage: number;
-  monthlyPnLPercentage: number;
-  yearlyPnLPercentage: number;
-  winCount: number;
-  lossCount: number;
-  currentBalance: number;
-  initialBalance: number;
-}
-
 interface CalendarCardProps {
-  calendar: Calendar;
+  calendar: CalendarWithUIState;
   stats: CalendarStats;
   isExpanded?: boolean;
   onToggleExpand?: (e: React.MouseEvent, calendarId: string) => void;
   onCalendarClick: (calendarId: string) => void;
-  onViewCharts: (e: React.MouseEvent, calendar: Calendar) => void;
-  onEditCalendar: (calendar: Calendar) => void;
-  onDuplicateCalendar: (calendar: Calendar) => void;
+  onViewCharts: (e: React.MouseEvent, calendar: CalendarWithUIState) => void;
+  onEditCalendar: (calendar: CalendarWithUIState) => void;
+  onDuplicateCalendar: (calendar: CalendarWithUIState) => void;
   onDeleteCalendar: (calendarId: string) => void;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: CalendarWithUIState) => Calendar) => Promise<Calendar | undefined>;
   formatCurrency: (amount: number) => string;
 }
 
@@ -109,7 +85,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
     theme: Theme,
     formatCurrency: (amount: number) => string
   ): React.ReactNode {
-    const growth = stats.growthPercentage;
+    const growth = stats.growth_percentage;
     if (isNaN(growth)) return null;
 
     let color: string;
@@ -134,14 +110,14 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
           gap: 1.5,
           p: 1.5,
           borderRadius: 2,
-          bgcolor: stats.totalPnL > 0
+          bgcolor: stats.total_pnl > 0
             ? alpha(theme.palette.success.main, 0.1)
-            : stats.totalPnL < 0
+            : stats.total_pnl < 0
               ? alpha(theme.palette.error.main, 0.1)
               : alpha(theme.palette.grey[500], 0.1),
-          border: `1px solid ${stats.totalPnL > 0
+          border: `1px solid ${stats.total_pnl > 0
             ? alpha(theme.palette.success.main, 0.2)
-            : stats.totalPnL < 0
+            : stats.total_pnl < 0
               ? alpha(theme.palette.error.main, 0.2)
               : alpha(theme.palette.grey[500], 0.2)}`,
         }}
@@ -154,35 +130,35 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: stats.totalPnL > 0
+            bgcolor: stats.total_pnl > 0
               ? alpha(theme.palette.success.main, 0.1)
-              : stats.totalPnL < 0
+              : stats.total_pnl < 0
                 ? alpha(theme.palette.error.main, 0.1)
                 : alpha(theme.palette.grey[500], 0.1)
           }}
         >
           <TrendingUp sx={{
             fontSize: '1.2rem',
-            color: stats.totalPnL > 0
+            color: stats.total_pnl > 0
               ? theme.palette.success.main
-              : stats.totalPnL < 0
+              : stats.total_pnl < 0
                 ? theme.palette.error.main
                 : theme.palette.grey[500]
           }} />
         </Box>
         <Box>
           <Typography variant="h6" sx={{
-            color: stats.totalPnL > 0
+            color: stats.total_pnl > 0
               ? 'success.main'
-              : stats.totalPnL < 0
+              : stats.total_pnl < 0
                 ? 'error.main'
                 : 'text.secondary',
             fontWeight: 600
           }}>
-            {formatCurrency(stats.totalPnL)}
+            {formatCurrency(stats.total_pnl)}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Growth: {stats.growthPercentage.toFixed(2)}%
+            Growth: {stats.growth_percentage.toFixed(2)}%
           </Typography>
         </Box>
       </Box>
@@ -234,8 +210,8 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
             left: 0,
             right: 0,
             bottom: 0,
-            ...(calendar.heroImageUrl ? {
-              backgroundImage: `url(${calendar.heroImageUrl})`,
+            ...(calendar.hero_image_url ? {
+              backgroundImage: `url(${calendar.hero_image_url})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
@@ -254,7 +230,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               left: 0,
               right: 0,
               bottom: 0,
-              background: calendar.heroImageUrl
+              background: calendar.hero_image_url
                 ? `linear-gradient(135deg, ${alpha(theme.palette.common.black, 0.2)} 0%, ${alpha(theme.palette.common.black, 0.1)} 50%, ${alpha(theme.palette.common.black, 0.4)} 100%)`
                 : 'transparent',
               zIndex: 1,
@@ -264,7 +240,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
         />
 
         {/* Placeholder content for calendars without hero images */}
-        {!calendar.heroImageUrl && (
+        {!calendar.hero_image_url && (
           <Box
             sx={{
               position: 'absolute',
@@ -291,7 +267,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
         )}
 
         {/* Attribution overlay - only show for actual images */}
-        {/* {calendar.heroImageUrl && calendar.heroImageAttribution && (
+        {/* {calendar.hero_image_url && calendar.hero_image_attribution && (
           <Box
             sx={{
               position: 'absolute',
@@ -311,7 +287,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
             <Typography variant="caption" sx={{ fontSize: '0.65rem', display: 'block', fontWeight: 500 }}>
               📸{' '}
               <a
-                href={calendar.heroImageAttribution.photographerUrl}
+                href={calendar.hero_image_attribution.photographerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
@@ -322,11 +298,11 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                {calendar.heroImageAttribution.photographer}
+                {calendar.hero_image_attribution.photographer}
               </a>
               {' '}on{' '}
               <a
-                href={calendar.heroImageAttribution.unsplashUrl}
+                href={calendar.hero_image_attribution.unsplashUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
@@ -371,7 +347,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               }}
             >
               {calendar.name}
-              {stats.totalPnL > 0 && (
+              {stats.total_pnl > 0 && (
                 <Box sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -385,7 +361,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                   <TrendingUp sx={{ fontSize: '1rem', color: 'success.main' }} />
                 </Box>
               )}
-              {stats.totalPnL < 0 && (
+              {stats.total_pnl < 0 && (
                 <Box sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -423,7 +399,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               <CalendarIcon sx={{ fontSize: '0.8rem', color: 'primary.main' }} />
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
-              Created {format(calendar.createdAt, 'MMM d, yyyy')}
+              Created {format(calendar.created_at, 'MMM d, yyyy')}
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
@@ -439,7 +415,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               <EditIcon sx={{ fontSize: '0.8rem', color: 'secondary.main' }} />
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
-              Updated {format(calendar.lastModified, 'MMM d, yyyy')}
+              Updated {format(calendar.updated_at, 'MMM d, yyyy')}
             </Typography>
           </Box>
         </Stack>
@@ -469,10 +445,10 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                   Initial Balance
                 </Typography>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {formatCurrency(stats.initialBalance)}
+                  {formatCurrency(stats.initial_balance)}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Current: {formatCurrency(stats.initialBalance + stats.totalPnL)}
+                  Current: {formatCurrency(stats.initial_balance + stats.total_pnl)}
                 </Typography>
               </Box>
 
@@ -485,10 +461,10 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                   Win Rate
                 </Typography>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {stats.winRate.toFixed(1)}%
+                  {stats.win_rate.toFixed(1)}%
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {stats.winCount}W - {stats.lossCount}L
+                  {stats.win_count}W - {stats.loss_count}L
                 </Typography>
               </Box>
             </Box>
@@ -534,11 +510,11 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                 >
                   <Typography variant="h6" sx={{ fontWeight: 600, cursor: 'help' }}>
                     <InfoOutlined sx={{ fontSize: '1rem', mr: 0.5 }} />
-                    {stats.profitFactor.toFixed(2)}
+                    {stats.profit_factor.toFixed(2)}
                   </Typography>
                 </Tooltip>
                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                  Avg Win: {formatCurrency(stats.avgWin)}
+                  Avg Win: {formatCurrency(stats.avg_win)}
                 </Typography>
               </Box>
 
@@ -556,17 +532,17 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                       <Typography variant="body2" gutterBottom>
                         Maximum drawdown represents the largest peak-to-trough decline in your account balance.
                       </Typography>
-                      {stats.maxDrawdown > 0 && (
+                      {stats.max_drawdown > 0 && (
                         <>
                           <Typography variant="body2" sx={{ mt: 1 }}>
-                            Recovery needed: {stats.drawdownRecoveryNeeded.toFixed(1)}%
+                            Recovery needed: {stats.drawdown_recovery_needed.toFixed(1)}%
                           </Typography>
                           <Typography variant="body2" sx={{ mt: 1 }}>
-                            Duration: {stats.drawdownDuration} days
+                            Duration: {stats.drawdown_duration} days
                           </Typography>
-                          {stats.drawdownStartDate && stats.drawdownEndDate && (
+                          {stats.drawdown_start_date && stats.drawdown_end_date && (
                             <Typography variant="body2" sx={{ mt: 1 }}>
-                              Period: {format(stats.drawdownStartDate, 'MMM d')} - {format(stats.drawdownEndDate, 'MMM d')}
+                              Period: {format(stats.drawdown_start_date, 'MMM d')} - {format(stats.drawdown_end_date, 'MMM d')}
                             </Typography>
                           )}
                         </>
@@ -578,17 +554,17 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                 >
                   <Typography variant="h6" sx={{ fontWeight: 600, cursor: 'help' }}>
                     <InfoOutlined sx={{ fontSize: '1rem', mr: 0.5 }} />
-                    {stats.maxDrawdown.toFixed(1)}%
+                    {stats.max_drawdown.toFixed(1)}%
                   </Typography>
                 </Tooltip>
                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', mt: 0.5 }}>
-                  Avg Loss: {formatCurrency(stats.avgLoss)}
+                  Avg Loss: {formatCurrency(stats.avg_loss)}
                 </Typography>
               </Box>
             </Box>
 
             {/* Target Progress Section */}
-            {(calendar.weeklyTarget || calendar.monthlyTarget || calendar.yearlyTarget) && (
+            {(calendar.weekly_target || calendar.monthly_target || calendar.yearly_target) && (
               <Box sx={{
                 p: 1.5,
                 borderRadius: 1,
@@ -599,40 +575,40 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                 </Typography>
                 <Box sx={{
                   display: 'grid',
-                  gridTemplateColumns: calendar.weeklyTarget && calendar.monthlyTarget && calendar.yearlyTarget
+                  gridTemplateColumns: calendar.weekly_target && calendar.monthly_target && calendar.yearly_target
                     ? 'repeat(3, 1fr)'
-                    : (calendar.weeklyTarget && calendar.monthlyTarget) || (calendar.weeklyTarget && calendar.yearlyTarget) || (calendar.monthlyTarget && calendar.yearlyTarget)
+                    : (calendar.weekly_target && calendar.monthly_target) || (calendar.weekly_target && calendar.yearly_target) || (calendar.monthly_target && calendar.yearly_target)
                       ? 'repeat(2, 1fr)'
                       : '1fr',
                   gap: 2
                 }}>
-                  {calendar.weeklyTarget && (
+                  {calendar.weekly_target && (
                     <Box>
                       <Typography variant="body2" color="text.secondary">
                         Weekly
                       </Typography>
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        {Math.min(stats.weeklyProgress, 100).toFixed(1)}%
+                        {Math.min(stats.weekly_progress ?? 0, 100).toFixed(1)}%
                       </Typography>
                     </Box>
                   )}
-                  {calendar.monthlyTarget && (
+                  {calendar.monthly_target && (
                     <Box>
                       <Typography variant="body2" color="text.secondary">
                         Monthly
                       </Typography>
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        {Math.min(stats.monthlyProgress, 100).toFixed(1)}%
+                        {Math.min(stats.monthly_progress ?? 0, 100).toFixed(1)}%
                       </Typography>
                     </Box>
                   )}
-                  {calendar.yearlyTarget && (
+                  {calendar.yearly_target && (
                     <Box>
                       <Typography variant="body2" color="text.secondary">
                         Yearly
                       </Typography>
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        {Math.min(stats.yearlyProgress, 100).toFixed(1)}%
+                        {Math.min(stats.yearly_progress ?? 0, 100).toFixed(1)}%
                       </Typography>
                     </Box>
                   )}
@@ -662,14 +638,14 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                     variant="h6"
                     sx={{
                       fontWeight: 600,
-                      color: parseFloat(String(stats.weeklyPnLPercentage)) > 0
+                      color: parseFloat(String(stats.weekly_pnl_percentage)) > 0
                         ? 'success.main'
-                        : parseFloat(String(stats.weeklyPnLPercentage)) < 0
+                        : parseFloat(String(stats.weekly_pnl_percentage)) < 0
                           ? 'error.main'
                           : 'text.primary'
                     }}
                   >
-                    {parseFloat(String(stats.weeklyPnLPercentage)) > 0 ? '+' : ''}{parseFloat(String(stats.weeklyPnLPercentage)).toFixed(1)}%
+                    {parseFloat(String(stats.weekly_pnl_percentage)) > 0 ? '+' : ''}{parseFloat(String(stats.weekly_pnl_percentage)).toFixed(1)}%
                   </Typography>
                 </Box>
                 <Box>
@@ -680,14 +656,14 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                     variant="h6"
                     sx={{
                       fontWeight: 600,
-                      color: parseFloat(String(stats.monthlyPnLPercentage)) > 0
+                      color: parseFloat(String(stats.monthly_pnl_percentage)) > 0
                         ? 'success.main'
-                        : parseFloat(String(stats.monthlyPnLPercentage)) < 0
+                        : parseFloat(String(stats.monthly_pnl_percentage)) < 0
                           ? 'error.main'
                           : 'text.primary'
                     }}
                   >
-                    {parseFloat(String(stats.monthlyPnLPercentage)) > 0 ? '+' : ''}{parseFloat(String(stats.monthlyPnLPercentage)).toFixed(1)}%
+                    {parseFloat(String(stats.monthly_pnl_percentage)) > 0 ? '+' : ''}{parseFloat(String(stats.monthly_pnl_percentage)).toFixed(1)}%
                   </Typography>
                 </Box>
                 <Box>
@@ -698,14 +674,14 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                     variant="h6"
                     sx={{
                       fontWeight: 600,
-                      color: parseFloat(String(stats.yearlyPnLPercentage)) > 0
+                      color: parseFloat(String(stats.yearly_pnl_percentage)) > 0
                         ? 'success.main'
-                        : parseFloat(String(stats.yearlyPnLPercentage)) < 0
+                        : parseFloat(String(stats.yearly_pnl_percentage)) < 0
                           ? 'error.main'
                           : 'text.primary'
                     }}
                   >
-                    {parseFloat(String(stats.yearlyPnLPercentage)) > 0 ? '+' : ''}{parseFloat(String(stats.yearlyPnLPercentage)).toFixed(1)}%
+                    {parseFloat(String(stats.yearly_pnl_percentage)) > 0 ? '+' : ''}{parseFloat(String(stats.yearly_pnl_percentage)).toFixed(1)}%
                   </Typography>
                 </Box>
               </Box>

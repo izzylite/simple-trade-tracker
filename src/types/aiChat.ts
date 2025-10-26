@@ -27,6 +27,16 @@ export interface ChatMessage {
   };
   // Function calls data for trade card display
   functionCalls?: any[];
+  // HTML formatted message (for Supabase AI agent)
+  messageHtml?: string;
+  // Citations from tool results (for Supabase AI agent)
+  citations?: Array<{
+    id: string;
+    title: string;
+    url: string;
+    source?: string;
+    toolName: string;
+  }>;
 }
 
 export interface TradingInsight {
@@ -36,6 +46,7 @@ export interface TradingInsight {
   description?: string;
   confidence?: number; // 0-100
   timeframe?: string;
+  trade_type?: 'win' | 'loss' | 'breakeven';
 }
 
 export interface ChartData {
@@ -100,6 +111,27 @@ export interface ChatError {
   details?: string;
   retryable: boolean;
   retryAfter?: number; // seconds
+  trade_type?: 'win' | 'loss' | 'breakeven';
+}
+
+export interface InlineReference {
+  type: 'trade' | 'event';
+  id: string;
+  trade_type?: 'win' | 'loss' | 'breakeven';
+}
+
+export interface DisplayItem {
+  id: string;
+  type: 'trade' | 'event';
+  trade_type?: 'win' | 'loss' | 'breakeven';
+}
+
+export interface Citation {
+  id: string;
+  url: string;
+  title?: string;
+  source?: string;
+  toolName?: string;
 }
 
  

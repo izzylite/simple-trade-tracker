@@ -28,30 +28,30 @@ export async function analyzeEconomicEvents(
     logger.log('AI requested economic events analysis with params:', params);
 
     let tradesWithEvents = trades.filter(trade =>
-      trade.economicEvents && trade.economicEvents.length > 0
+      trade.economic_events && trade.economic_events.length > 0
     );
 
     let tradesWithoutEvents = trades.filter(trade =>
-      !trade.economicEvents || trade.economicEvents.length === 0
+      !trade.economic_events || trade.economic_events.length === 0
     );
 
     // Apply filters
     if (params.impactLevel && params.impactLevel !== 'all') {
       tradesWithEvents = tradesWithEvents.filter(trade =>
-        trade.economicEvents!.some(event => event.impact === params.impactLevel)
+        trade.economic_events!.some(event => event.impact === params.impactLevel)
       );
     }
 
     if (params.currency && params.currency !== 'all') {
       tradesWithEvents = tradesWithEvents.filter(trade =>
-        trade.economicEvents!.some(event => event.currency === params.currency)
+        trade.economic_events!.some(event => event.currency === params.currency)
       );
     }
 
     if (params.eventName) {
       const searchTerm = params.eventName.toLowerCase();
       tradesWithEvents = tradesWithEvents.filter(trade =>
-        trade.economicEvents!.some(event =>
+        trade.economic_events!.some(event =>
           event.name.toLowerCase().includes(searchTerm)
         )
       );
@@ -63,10 +63,10 @@ export async function analyzeEconomicEvents(
       const endDate = new Date(params.dateRange.end);
 
       tradesWithEvents = tradesWithEvents.filter(trade =>
-        trade.date >= startDate && trade.date <= endDate
+        trade.trade_date >= startDate && trade.trade_date <= endDate
       );
       tradesWithoutEvents = tradesWithoutEvents.filter(trade =>
-        trade.date >= startDate && trade.date <= endDate
+        trade.trade_date >= startDate && trade.trade_date <= endDate
       );
     }
 
@@ -74,8 +74,8 @@ export async function analyzeEconomicEvents(
     const analysis: any = {
       tradesWithEvents: {
         count: tradesWithEvents.length,
-        totalPnl: tradesWithEvents.reduce((sum, trade) => sum + trade.amount, 0),
-        winRate: calculateWinRate(tradesWithEvents),
+        total_pnl: tradesWithEvents.reduce((sum, trade) => sum + trade.amount, 0),
+        win_rate: calculateWinRate(tradesWithEvents),
         avgPnl: tradesWithEvents.length > 0 ?
           tradesWithEvents.reduce((sum, trade) => sum + trade.amount, 0) / tradesWithEvents.length : 0
       },
@@ -87,17 +87,17 @@ export async function analyzeEconomicEvents(
     if (params.compareWithoutEvents) {
       analysis.tradesWithoutEvents = {
         count: tradesWithoutEvents.length,
-        totalPnl: tradesWithoutEvents.reduce((sum, trade) => sum + trade.amount, 0),
-        winRate: calculateWinRate(tradesWithoutEvents),
+        total_pnl: tradesWithoutEvents.reduce((sum, trade) => sum + trade.amount, 0),
+        win_rate: calculateWinRate(tradesWithoutEvents),
         avgPnl: tradesWithoutEvents.length > 0 ?
           tradesWithoutEvents.reduce((sum, trade) => sum + trade.amount, 0) / tradesWithoutEvents.length : 0
       };
 
       // Add comparison metrics
       analysis.comparison = {
-        winRateDifference: analysis.tradesWithEvents.winRate - analysis.tradesWithoutEvents.winRate,
+        winRateDifference: analysis.tradesWithEvents.win_rate - analysis.tradesWithoutEvents.win_rate,
         avgPnlDifference: analysis.tradesWithEvents.avgPnl - analysis.tradesWithoutEvents.avgPnl,
-        totalPnlDifference: analysis.tradesWithEvents.totalPnl - analysis.tradesWithoutEvents.totalPnl
+        totalPnlDifference: analysis.tradesWithEvents.total_pnl - analysis.tradesWithoutEvents.total_pnl
       };
     }
 
@@ -147,7 +147,7 @@ export async function fetchEconomicEvents(
       filters.currencies = [params.currency as Currency];
     }
     else {
-      filters.currencies = calendar?.economicCalendarFilters?.currencies || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS.currencies;
+      filters.currencies = calendar?.economic_calendar_filters?.currencies || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS.currencies;
     }
 
     // Only fetch High and Medium impact events to reduce costs and focus on relevant events

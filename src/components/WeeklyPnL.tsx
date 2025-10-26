@@ -5,8 +5,8 @@ import TargetBadge from './TargetBadge';
 interface WeeklyStat {
   weekNumber: number;
   netAmount: number;
-  winRate: number;
-  totalTrades: number;
+  win_rate: number;
+  total_trades: number;
   wins: number;
   losses: number;
   targetProgress?: number;
@@ -55,7 +55,7 @@ export const StatValue = styled(Typography)(({ theme }) => ({
   fontWeight: 600,
 }));
 
-export const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ weeklyStats }) => {
+export const weekly_pnl: React.FC<WeeklyPnLProps> = ({ weeklyStats }) => {
   return (
     <WeeklyStatsContainer>
       {weeklyStats.map((stats: WeeklyStat, index: number) => (
@@ -78,7 +78,7 @@ export const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ weeklyStats }) => {
                 fontWeight: 500
               }}
             >
-              {stats.winRate}% Win Rate
+              {stats.win_rate}% Win Rate
             </Typography>
           </Box>
           <StatValue sx={{ color: stats.netAmount >= 0 ? 'success.main' : 'error.main' }}>
@@ -86,7 +86,7 @@ export const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ weeklyStats }) => {
           </StatValue>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              {stats.totalTrades} trades
+              {stats.total_trades} trades
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
               •

@@ -107,7 +107,7 @@ interface TradeCalendarProps {
   accountBalance: number;
   maxDailyDrawdown: number;
   weeklyTarget?: number;
-  monthlyTarget?: number;
+  monthly_target?: number;
   yearlyTarget?: number;
   dynamicRiskSettings: DynamicRiskSettings;
   requiredTagGroups?: string[];
@@ -149,7 +149,7 @@ interface TradeCalendarProps {
 
 
 interface WeeklyPnLProps {
-  date: Date;
+  trade_date: Date;
   trades: Trade[];
   monthStart: Date;
   weekIndex: number;
@@ -163,14 +163,14 @@ interface WeeklyPnLProps {
 
 
 
-const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ date, trades, monthStart, weekIndex, currentMonth, accountBalance, weeklyTarget, sx }) => {
+const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ trade_date, trades, monthStart, weekIndex, currentMonth, accountBalance, weeklyTarget, sx }) => {
   const theme = useTheme();
-  const weekStart = startOfWeek(date, { weekStartsOn: 0 });
-  const weekEnd = endOfWeek(date, { weekStartsOn: 0 });
+  const weekStart = startOfWeek(trade_date, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(trade_date, { weekStartsOn: 0 });
 
   const weekTrades = trades.filter(trade =>
-    isSameWeek(new Date(trade.date), weekStart, { weekStartsOn: 0 }) &&
-    new Date(trade.date).getMonth() === currentMonth
+    isSameWeek(new Date(trade.trade_date), weekStart, { weekStartsOn: 0 }) &&
+    new Date(trade.trade_date).getMonth() === currentMonth
   );
 
 
@@ -277,18 +277,18 @@ export const createNewTradeData = (): NewTradeForm => ({
   id: uuidv4()!!,
   name: '',
   amount: '',
-  type: 'win',
-  entry: '',
-  date: null,
-  exit: '',
+  trade_type: 'win',
+  entry_price: '',
+  trade_date: null,
+  exit_price: '',
   tags: [],
-  riskToReward: '',
-  partialsTaken: false,
+  risk_to_reward: '',
+  partials_taken: false,
   session: '',
   notes: '',
-  pendingImages: [],
-  uploadedImages: [],
-  economicEvents: [],
+  pending_images: [],
+  uploaded_images: [],
+  economic_events: [],
 });
 
 
@@ -375,7 +375,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     accountBalance,
     maxDailyDrawdown,
     weeklyTarget,
-    monthlyTarget,
+    monthly_target,
     yearlyTarget,
     dynamicRiskSettings,
     requiredTagGroups,
@@ -413,7 +413,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [isMonthSelectorOpen, setIsMonthSelectorOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
-  const [showAddForm, setShowAddForm] = useState<{ open: boolean, date: Date, editTrade?: Trade | null, createTempTrade?: boolean, showDayDialogWhenDone: boolean } | null>(null);
+  const [showAddForm, setShowAddForm] = useState<{ open: boolean, trade_date: Date, editTrade?: Trade | null, createTempTrade?: boolean, showDayDialogWhenDone: boolean } | null>(null);
   const [zoomedImages, setZoomedImagesState] = useState<ImageZoomProp | null>(null);
   const [tradesToDelete, setTradesToDelete] = useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -471,14 +471,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const { highImpactEventDates: monthlyHighImpactEvents } = useHighImpactEvents({
     currentDate,
     calendarId,
-    currencies: calendar?.economicCalendarFilters?.currencies,
-    enabled: !!calendar?.economicCalendarFilters
+    currencies: calendar?.economic_calendar_filters?.currencies,
+    enabled: !!calendar?.economic_calendar_filters
   });
 
   // Economic event watcher for real-time updates
   const { watchingStatus } = useEconomicEventWatcher({
     calendarId,
-    economicCalendarFilters: calendar?.economicCalendarFilters,
+    economicCalendarFilters: calendar?.economic_calendar_filters,
     isActive: true // Always active when TradeCalendar is mounted
   });
 
@@ -489,7 +489,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       log(`📊 ${updatedEvents.length} economic events were updated simultaneously for this calendar`);
 
       // Check if notifications are enabled before showing them
-      const notificationsEnabled = calendar?.economicCalendarFilters?.notificationsEnabled ?? true;
+      const notificationsEnabled = calendar?.economic_calendar_filters?.notificationsEnabled ?? true;
 
       // 1. Show notification sliders for each event (leveraging stacking behavior) - only if enabled
       if (notificationsEnabled) {
@@ -669,7 +669,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     if (!selectedDate) {
       return [];
     }
-    return filteredTrades.filter(trade => isSameDay(new Date(trade.date), selectedDate));
+    return filteredTrades.filter(trade => isSameDay(new Date(trade.trade_date), selectedDate));
   }, [selectedDate, filteredTrades]);
 
 
@@ -711,7 +711,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setCurrentDate(new Date());
   };
   const hasPinnedTrades = useMemo(() => {
-    const pinnedTrades = trades.filter(trade => trade.isPinned);
+    const pinnedTrades = trades.filter(trade => trade.is_pinned);
     return pinnedTrades.length;
   }, [trades]);
 
@@ -777,12 +777,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   };
 
 
-  const handleDayClick = (date: Date) => {
+  const handleDayClick = (trade_date: Date) => {
     // In read-only mode, only allow viewing existing trades
     if (isReadOnly) {
-      const trades = filteredTrades.filter(trade => isSameDay(new Date(trade.date), date));
+      const trades = filteredTrades.filter(trade => isSameDay(new Date(trade.trade_date), trade_date));
       if (trades.length > 0) {
-        setSelectedDate(date);
+        setSelectedDate(trade_date);
       }
       return;
     }
@@ -793,7 +793,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       showSnackbar('Cannot add trade while trades are loading. Please wait...', 'warning');
       return;
     }
-    if (date > new Date()) {
+    if (trade_date > new Date()) {
       log('Cannot add trade in the future');
       showSnackbar('Cannot add trade in the future. Please select a valid date.', 'warning');
       return;
@@ -807,17 +807,17 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       }
       return;
     }
-    const trades = filteredTrades.filter(trade => isSameDay(new Date(trade.date), date));
+    const trades = filteredTrades.filter(trade => isSameDay(new Date(trade.trade_date), trade_date));
     if (trades.length === 0) {
       setNewTrade(createNewTradeData);
-      setShowAddForm({ open: true, date: date, showDayDialogWhenDone: true });
+      setShowAddForm({ open: true, trade_date: trade_date, showDayDialogWhenDone: true });
     }
     else {
-      setSelectedDate(date);
+      setSelectedDate(trade_date);
     }
   };
-  const handleDayChange = (date: Date) => {
-    setSelectedDate(date);
+  const handleDayChange = (trade_date: Date) => {
+    setSelectedDate(trade_date);
   };
 
 
@@ -832,8 +832,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setIsMonthSelectorOpen(true);
   };
 
-  const handleMonthSelect = (date: Date) => {
-    setCurrentDate(date);
+  const handleMonthSelect = (trade_date: Date) => {
+    setCurrentDate(trade_date);
     setIsMonthSelectorOpen(false);
   };
 
@@ -883,7 +883,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const handleMonthlyGalleryMode = () => {
     // Filter trades to only include those from the current month
     const monthTrades = filteredTrades.filter(trade =>
-      isSameMonth(new Date(trade.date), currentDate)
+      isSameMonth(new Date(trade.trade_date), currentDate)
     );
 
     if (monthTrades.length > 0) {
@@ -974,7 +974,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 totalProfit={totalProfit}
                 onChange={onAccountBalanceChange}
                 trades={filteredTrades}
-                riskPerTrade={dynamicRiskSettings?.riskPerTrade}
+                risk_per_trade={dynamicRiskSettings?.risk_per_trade}
                 dynamicRiskSettings={dynamicRiskSettings}
                 onToggleDynamicRisk={(useActualAmounts) => {
                   setIsDynamicRiskToggled(useActualAmounts);
@@ -994,7 +994,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 accountBalance={accountBalance}
                 onImportTrades={onImportTrades}
                 currentDate={currentDate}
-                monthlyTarget={monthlyTarget}
+                monthlyTarget={monthly_target}
                 onClearMonthTrades={onClearMonthTrades}
                 isReadOnly={isReadOnly}
               />
@@ -1112,7 +1112,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
                 {(() => {
                   const monthTrades = filteredTrades.filter(trade =>
-                    isSameMonth(new Date(trade.date), currentDate)
+                    isSameMonth(new Date(trade.trade_date), currentDate)
                   );
                   return monthTrades.length > 0;
                 })() && (
@@ -1309,7 +1309,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 return (
                   <React.Fragment key={weekStart.toISOString()}>
                     {weekDays.map((day) => {
-                      const dayTrades = filteredTrades.filter(trade => isSameDay(new Date(trade.date), day));
+                      const dayTrades = filteredTrades.filter(trade => isSameDay(new Date(trade.trade_date), day));
                       const dayStats = calculateDayStats(
                         dayTrades,
                         accountBalance,
@@ -1405,7 +1405,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                     })}
 
                     <WeeklyPnL
-                      date={weekStart}
+                      trade_date={weekStart}
                       trades={filteredTrades}
                       monthStart={startOfMonth(currentDate)}
                       weekIndex={index}
@@ -1436,7 +1436,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               ).map((weekStart, index) => (
                 <WeeklyPnL
                   key={weekStart.toISOString()}
-                  date={weekStart}
+                  trade_date={weekStart}
                   trades={filteredTrades}
                   monthStart={startOfMonth(currentDate)}
                   weekIndex={index}
@@ -1455,7 +1455,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             selectedDate={currentDate}
             accountBalance={accountBalance}
             maxDailyDrawdown={maxDailyDrawdown}
-            monthlyTarget={monthlyTarget}
+            monthly_target={monthly_target}
             calendarId={calendarId!!}
             scoreSettings={scoreSettings}
             onUpdateTradeProperty={isReadOnly ? undefined : onUpdateTradeProperty}
@@ -1466,7 +1466,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               // Use the same edit handler as in DayDialog
               if (props.onUpdateTradeProperty) {
                 setNewTrade(() => (createEditTradeData(trade)));
-                setShowAddForm({ open: true, date: new Date(trade.date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
+                setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
               }
             }}
             onDeleteTrade={isReadOnly ? undefined : (tradeId) => {
@@ -1493,7 +1493,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             if (trade !== null) {
               setNewTrade(() => (createEditTradeData(trade!!)));
             }
-            setShowAddForm({ open: true, date: selectedDate!!, editTrade: trade, createTempTrade: trade === null, showDayDialogWhenDone: true });
+            setShowAddForm({ open: true, trade_date: selectedDate!!, editTrade: trade, createTempTrade: trade === null, showDayDialogWhenDone: true });
           }}
           date={selectedDate || new Date()}
           trades={selectedDate ? tradesForSelectedDay : []}
@@ -1503,24 +1503,24 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           calendarId={calendarId!!}
           onDateChange={handleDayChange}
           setZoomedImage={setZoomedImage}
-          accountBalance={accountBalance}
+          account_balance={accountBalance}
           allTrades={trades} /* Pass all trades for tag suggestions */
           deletingTradeIds={deletingTradeIds}
           onOpenGalleryMode={openGalleryMode}
-          calendar={calendar}
+          calendar={calendar ? { economicCalendarFilters: calendar.economic_calendar_filters } : undefined}
           isReadOnly={isReadOnly}
         />
 
 
         {!isReadOnly && (
           <TradeFormDialog
-            open={(!!showAddForm?.date && showAddForm?.open) || false}
+            open={(!!showAddForm?.trade_date && showAddForm?.open) || false}
             onClose={() => {
               setSelectedDate(null);
               setShowAddForm(null);
-              if (newTrade != null && newTrade.pendingImages) {
+              if (newTrade != null && newTrade.pending_images) {
                 // Release object URLs to avoid memory leaks
-                newTrade.pendingImages.forEach(image => {
+                newTrade.pending_images.forEach(image => {
                   URL.revokeObjectURL(image.preview);
                 });
                 setNewTrade(null);
@@ -1529,21 +1529,21 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             onCancel={() => {
               if (showAddForm?.showDayDialogWhenDone) {
                 setSelectedDate(null);
-                setSelectedDate(showAddForm?.date!!); // show the day dialog
+                setSelectedDate(showAddForm?.trade_date!!); // show the day dialog
               }
               setShowAddForm(null);
             }}
             showForm={{ open: showAddForm?.open || false, editTrade: showAddForm?.editTrade || null, createTempTrade: showAddForm?.createTempTrade || false }}
-            date={showAddForm?.date || new Date()}
-            trades={showAddForm?.date ? tradesForSelectedDay : []}
+            trade_date={showAddForm?.trade_date || new Date()}
+            trades={showAddForm?.trade_date ? tradesForSelectedDay : []}
             onAddTrade={handleAddTrade}
             onTagUpdated={onTagUpdated}
             newMainTrade={newTrade}
             setNewMainTrade={prev => setNewTrade(prev(newTrade!!))}
             onUpdateTradeProperty={onUpdateTradeProperty}
-            calendarId={calendarId!!}
+            calendar_id={calendarId!!}
             setZoomedImage={setZoomedImage}
-            accountBalance={accountBalance}
+            account_balance={accountBalance}
             onAccountBalanceChange={onAccountBalanceChange}
             allTrades={trades}
             tags={allTags}
@@ -1584,7 +1584,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           initialDate={selectedDate || undefined}
           trades={filteredTrades}
           accountBalance={accountBalance}
-          monthlyTarget={monthlyTarget}
+          monthlyTarget={monthly_target}
           yearlyTarget={yearlyTarget}
           onOpenGalleryMode={openGalleryMode}
         />
@@ -1746,7 +1746,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           title={galleryMode.title}
           calendarId={calendarId}
           onOpenGalleryMode={openGalleryMode}
-          calendar={calendar}
+          calendar={calendar ? { economicCalendarFilters: calendar.economic_calendar_filters } : undefined}
         />
 
 

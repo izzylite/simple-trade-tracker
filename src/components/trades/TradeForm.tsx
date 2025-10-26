@@ -20,7 +20,7 @@ import {
   Button
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers';
-import { Trade } from '../../types/trade';
+import { Trade, TradeEconomicEvent } from '../../types/dualWrite';
 import { FormField } from '../StyledComponents';
 import ImageUploader from './ImageUploader';
 import { GridImage, GridPendingImage } from './ImageGrid';
@@ -42,19 +42,19 @@ export interface NewTradeForm {
   id: string;
   name: string;
   amount: string;
-  type: 'win' | 'loss' | 'breakeven';
-  entry: string;
-  exit: string;
-  date?: Date | null;
+  trade_type: 'win' | 'loss' | 'breakeven';
+  entry_price: string;
+  exit_price: string;
+  trade_date?: Date | null;
   tags: string[];
-  riskToReward: string;
-  partialsTaken: boolean;
+  risk_to_reward: string;
+  partials_taken: boolean;
   session: 'Asia' | 'London' | 'NY AM' | 'NY PM' | '';
   notes: string;
-  pendingImages: Array<PendingImage>;
-  uploadedImages: Array<TradeImage>;
-  isTemporary?: boolean;
-  economicEvents?: import('../../types/trade').TradeEconomicEvent[];
+  pending_images: Array<PendingImage>;
+  uploaded_images: Array<TradeImage>;
+  is_temporary?: boolean;
+  economic_events?: TradeEconomicEvent[];
 }
 
 export interface PendingImage {
@@ -66,21 +66,21 @@ export interface PendingImage {
   height?: number;
   row?: number;
   column?: number;
-  columnWidth?: number; // Width as percentage (0-100)
-  uploadProgress?: number;
+  column_width?: number; // Width as percentage (0-100)
+  upload_progress?: number;
 }
 
 export interface TradeImage {
   url: string;
   id: string;
-  calendarId: string;
+  calendar_id: string;
   pending?: boolean;
   caption?: string;
   width?: number;
   height?: number;
   row?: number;
   column?: number;
-  columnWidth?: number; // Width as percentage (0-100)
+  column_width?: number; // Width as percentage (0-100)
 }
 interface TradeFormProps {
   newTrade: NewTradeForm;
@@ -100,12 +100,12 @@ interface TradeFormProps {
   onTypeChange: (e: any) => void;
   onEntryChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onExitChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onRiskToRewardChange: (riskToReward: string) => void;
+  onRiskToRewardChange: (risk_to_reward: string) => void;
   onPartialsTakenChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSessionChange: (e: any) => void;
   onNotesChange: (value: string) => void;
   onTagsChange: (event: React.SyntheticEvent, newValue: string[]) => void;
-  onDateChange?: (date: Date | null) => void;
+  onDateChange?: (trade_date: Date | null) => void;
   onImageUpload: (files: FileList) => void;
   onImageCaptionChange: (index: number, caption: string, isPending: boolean) => void;
   onImageRemove: (index: number, isPending: boolean) => void;
@@ -186,16 +186,16 @@ const TradeForm: React.FC<TradeFormProps> = ({
 
   // Calculate and update the amount based on risk
   const calculateAmountFromRisk = (): string => {
-    if (!dynamicRiskSettings.riskPerTrade || !newTrade.riskToReward) return '';
+    if (!dynamicRiskSettings.risk_per_trade || !newTrade.risk_to_reward) return '';
 
-    const rr = parseFloat(newTrade.riskToReward);
+    const rr = parseFloat(newTrade.risk_to_reward);
     if (isNaN(rr)) return '';
 
     const amount = calculateAmountFromRiskToReward(rr, cumulativePnl);
 
     // Ensure the amount is updated in the form state
     // This is important to make sure the amount is saved correctly
-    if (!newTrade.partialsTaken && amount > 0) {
+    if (!newTrade.partials_taken && amount > 0) {
       // Only update if we're not in manual mode and have a valid amount
       setTimeout(() => onAmountChange(amount.toString()), 0);
     }
@@ -238,7 +238,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
       onRiskToRewardChange(value)
 
       // If risk per trade is set and partials are not taken, automatically calculate and update the amount
-      if (dynamicRiskSettings.riskPerTrade && value && !newTrade.partialsTaken) {
+      if (dynamicRiskSettings.risk_per_trade && value && !newTrade.partials_taken) {
         const rr = parseFloat(value);
         if (!isNaN(rr)) {
           const calculatedAmount = calculateAmountFromRiskToReward(rr, cumulativePnl);
@@ -287,7 +287,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
         <FormField sx={{ flex: 1 }}>
           <TextField
             label="Entry Price"
-            value={newTrade.entry}
+            value={newTrade.entry_price}
             onChange={onEntryChange}
             fullWidth
             placeholder="Optional entry price"
@@ -296,7 +296,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
         <FormField sx={{ flex: 1 }}>
           <TextField
             label="Exit Price"
-            value={newTrade.exit}
+            value={newTrade.exit_price}
             onChange={onExitChange}
             fullWidth
             placeholder="Optional exit price"
@@ -309,7 +309,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
         <FormField>
           <DatePicker
             label="Trade Date"
-            value={newTrade.date}
+            value={newTrade.trade_date}
             onChange={onDateChange}
             slotProps={{
               textField: {
@@ -325,7 +325,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
         <RadioGroup
           row
           name="type"
-          value={newTrade.type}
+          value={newTrade.trade_type}
           onChange={onTypeChange}
         >
           <FormControlLabel
@@ -345,7 +345,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
           />
         </RadioGroup>
       </FormControl>
-      {(!dynamicRiskSettings.riskPerTrade || (dynamicRiskSettings.riskPerTrade && newTrade.partialsTaken)) ? (
+      {(!dynamicRiskSettings.risk_per_trade || (dynamicRiskSettings.risk_per_trade && newTrade.partials_taken)) ? (
         <FormField>
           <TextField
             label="Amount"
@@ -354,7 +354,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
             onChange={(e) => onAmountChange(e.target.value)}
             fullWidth
             required
-            helperText={dynamicRiskSettings.riskPerTrade && newTrade.partialsTaken ? "Manual entry for partial profits" : undefined}
+            helperText={dynamicRiskSettings.risk_per_trade && newTrade.partials_taken ? "Manual entry for partial profits" : undefined}
           />
         </FormField>
       ) : (
@@ -369,24 +369,24 @@ const TradeForm: React.FC<TradeFormProps> = ({
             fullWidth
             disabled
             helperText={
-              dynamicRiskSettings?.dynamicRiskEnabled &&
-                dynamicRiskSettings.increasedRiskPercentage &&
-                dynamicRiskSettings.profitThresholdPercentage &&
-                (cumulativePnl / accountBalance * 100) >= dynamicRiskSettings.profitThresholdPercentage
-                ? `Based on ${dynamicRiskSettings.increasedRiskPercentage}% of account balance (INCREASED from ${dynamicRiskSettings.riskPerTrade}%)`
-                : `Based on ${dynamicRiskSettings.riskPerTrade}% of account balance (${formatCurrency((accountBalance * (dynamicRiskSettings.riskPerTrade || 0)) / 100)})`
+              dynamicRiskSettings?.dynamic_risk_enabled &&
+                dynamicRiskSettings.increased_risk_percentage &&
+                dynamicRiskSettings.profit_threshold_percentage &&
+                (cumulativePnl / accountBalance * 100) >= dynamicRiskSettings.profit_threshold_percentage
+                ? `Based on ${dynamicRiskSettings.increased_risk_percentage}% of account balance (INCREASED from ${dynamicRiskSettings.risk_per_trade}%)`
+                : `Based on ${dynamicRiskSettings.risk_per_trade}% of account balance (${formatCurrency((accountBalance * (dynamicRiskSettings.risk_per_trade || 0)) / 100)})`
             }
           />
         </FormField>
       )}
 
 
-      {dynamicRiskSettings.riskPerTrade !== undefined && (
+      {dynamicRiskSettings.risk_per_trade !== undefined && (
         <FormField>
           <MuiFormControlLabel
             control={
               <Checkbox
-                checked={newTrade.partialsTaken}
+                checked={newTrade.partials_taken}
                 onChange={onPartialsTakenChange}
               />
             }
@@ -401,7 +401,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
       <FormField>
         <TextField
           label="Risk to Reward"
-          value={newTrade.riskToReward}
+          value={newTrade.risk_to_reward}
           onChange={handleRiskToRewardChange}
           fullWidth
           type="number"
@@ -492,14 +492,14 @@ const TradeForm: React.FC<TradeFormProps> = ({
       {/* Debug layout information */}
       {/* {(() => {
         logger.log("TradeForm rendering with images:",
-          "Pending:", newTrade.pendingImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })),
-          "Uploaded:", newTrade.uploadedImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })));
+          "Pending:", newTrade.pending_images.map(img => ({ id: img.id, row: img.row, column: img.column, column_width: img.column_width })),
+          "Uploaded:", newTrade.uploaded_images.map(img => ({ id: img.id, row: img.row, column: img.column, column_width: img.column_width })));
         return null;
       })()} */}
 
       <ImageUploader
-        pendingImages={newTrade.pendingImages}
-        uploadedImages={newTrade.uploadedImages}
+        pendingImages={newTrade.pending_images}
+        uploadedImages={newTrade.uploaded_images}
         editingTrade={editingTrade !== null}
         onImageUpload={onImageUpload}
         onImageCaptionChange={onImageCaptionChange}

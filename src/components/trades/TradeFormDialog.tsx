@@ -5,7 +5,7 @@ import {
   Alert
 } from '@mui/material';
 import { endOfDay, format } from 'date-fns';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import { BaseDialog } from '../common';
 import * as calendarService from '../../services/calendarService';
 import { DayHeader, TradeForm, NewTradeForm } from './';
@@ -27,10 +27,10 @@ interface FormDialogProps {
   open: boolean;
   onClose: () => void;
   newMainTrade?: NewTradeForm | null
-  date: Date;
+  trade_date: Date;
   showForm: FormProps;
   trades: Trade[];
-  accountBalance: number;
+  account_balance: number;
 
   onAddTrade?: (trade: Trade & { id?: string }) => Promise<void>;
   onTagUpdated?: (oldTag: string, newTag: string) => void;
@@ -41,7 +41,7 @@ interface FormDialogProps {
   onCancel: () => void;
   allTrades?: Trade[];
   dynamicRiskSettings: DynamicRiskSettings;
-  calendarId: string;
+  calendar_id: string;
   tags: string[];
   requiredTagGroups?: string[];
   // Optional props for trade link navigation in notes
@@ -73,12 +73,12 @@ const processTagsForSubmission = (tags: string[]): string[] => {
 };
 
 // Calculate cumulative PnL up to a given date (using centralized utility)
-export const calculateCumulativePnL = (date: Date, allTrades: Trade[]) => {
-  return calculateCumulativePnLToDate(date, allTrades);
+export const calculateCumulativePnL = (trade_date: Date, allTrades: Trade[]) => {
+  return calculateCumulativePnLToDate(trade_date, allTrades);
 };
 
-export const startOfNextDay = (date: Date | string): Date => {
-  const nextDay = new Date(date);
+export const startOfNextDay = (trade_date: Date | string): Date => {
+  const nextDay = new Date(trade_date);
   nextDay.setDate(nextDay.getDate() + 1);
   return nextDay;
 }
@@ -88,24 +88,24 @@ export const createEditTradeData = (trade: Trade): NewTradeForm => {
     id: trade.id,
     name: trade.name ? trade.name.replace(/^📈 /, '') : '',
     amount: Math.abs(trade.amount).toString(),
-    type: trade.type,
-    entry: trade.entry || '',
-    date: trade.date,
-    exit: trade.exit || '',
+    trade_type: trade.trade_type,
+    entry_price: trade.entry_price?.toString() || '',
+    trade_date: trade.trade_date,
+    exit_price: trade.exit_price?.toString() || '',
     tags: trade.tags || [],
-    riskToReward: trade.riskToReward?.toString() || '',
-    partialsTaken: trade.partialsTaken || false,
-    session: trade.session || '',
+    risk_to_reward: trade.risk_to_reward?.toString() || '',
+    partials_taken: trade.partials_taken || false,
+    session: trade.session as '' | 'Asia' | 'London' | 'NY AM' | 'NY PM' || '',
     notes: trade.notes || '',
-    pendingImages: [],
-    isTemporary: trade.isTemporary,
-    economicEvents: trade.economicEvents || [],
-    uploadedImages: trade.images ? trade.images.map((img, index) => ({
+    pending_images: [],
+    is_temporary: trade.is_temporary,
+    economic_events: trade.economic_events || [],
+    uploaded_images: trade.images ? trade.images.map((img, index) => ({
       ...img,
       // Ensure layout properties are explicitly preserved
       row: img.row !== undefined ? img.row : index, // Each image gets its own row by default
       column: img.column !== undefined ? img.column : 0, // Always in first column by default
-      columnWidth: img.columnWidth !== undefined ? img.columnWidth : 100 // Default to 100% for vertical layout
+      column_width: img.column_width !== undefined ? img.column_width : 100 // Default to 100% for vertical layout
     })) : [],
 
   }
@@ -116,9 +116,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   onClose,
   newMainTrade,
   setNewMainTrade,
-  date,
+  trade_date,
   trades,
-  accountBalance,
+  account_balance,
   showForm,
   onCancel,
   onAddTrade,
@@ -126,7 +126,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   onUpdateTradeProperty,
   allTrades = [],
   dynamicRiskSettings,
-  calendarId,
+  calendar_id,
   tags = [],
   requiredTagGroups = [],
   onOpenGalleryMode
@@ -155,20 +155,20 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
     // Create an empty trade in Firebase
     try {
-      if (calendarId && onAddTrade) {
+      if (calendar_id && onAddTrade) {
 
         // Update the form with the temporary trade ID and isTemporary flag
         const data = createNewTradeData();
         setNewTrade(() => ({
           ...data,
-          isTemporary: true,
+          is_temporary: true,
           name: 'New Trade'
         }));
 
-        const tradeData = await createFinalTradeData(data, date);
-        await onAddTrade({ ...tradeData, name: 'New Trade', isTemporary: true });
+        const tradeData = await createFinalTradeData(data, trade_date);
+        await onAddTrade({ ...tradeData, name: 'New Trade', is_temporary: true });
       } else {
-        // Handle case where calendarId or onAddTrade is missing
+        // Handle case where calendar_id or onAddTrade is missing
         throw new Error('Unable to create trade: Missing calendar ID or add trade function');
       }
 
@@ -181,13 +181,13 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       // Still show the form, but without the temporary trade
       setNewTrade(prev => ({
         ...prev!,
-        isTemporary: false
+        is_temporary: false
       }));
     } finally {
       // Re-enable cancel/close buttons regardless of success or failure
       setIsCreatingEmptyTrade(false);
     }
-  }, [calendarId, onAddTrade, date]);
+  }, [calendar_id, onAddTrade, trade_date]);
 
   useEffect(() => {
     // Only call handleAddClick when showForm changes from not meeting conditions to meeting them
@@ -240,7 +240,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   const resetForm = () => {
     // Release object URLs to avoid memory leaks
     if (newTrade) {
-      newTrade.pendingImages.forEach(image => {
+      newTrade.pending_images.forEach(image => {
         URL.revokeObjectURL(image.preview);
       });
     }
@@ -274,45 +274,45 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   };
 
   const handleTypeChange = (e: any) => {
-    setNewTrade(prev => ({ ...prev!, type: e.target.value as 'win' | 'loss' | 'breakeven' }));
+    setNewTrade(prev => ({ ...prev!, trade_type: e.target.value as 'win' | 'loss' | 'breakeven' }));
   };
 
   const handleEntryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewTrade(prev => ({ ...prev!, entry: e.target.value }));
+    setNewTrade(prev => ({ ...prev!, entry_price: e.target.value }));
   };
 
   const handleExitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewTrade(prev => ({ ...prev!, exit: e.target.value }));
+    setNewTrade(prev => ({ ...prev!, exit_price: e.target.value }));
   };
 
   const handleDateChange = (newDate: Date | null) => {
     if (newDate) {
-      setNewTrade(prev => ({ ...prev!, date: newDate }));
+      setNewTrade(prev => ({ ...prev!, trade_date: newDate }));
     }
   };
 
-  const handleRiskToRewardChange = (riskToReward: string) => {
-    setNewTrade(prev => ({ ...prev!, riskToReward: riskToReward }));
+  const handleRiskToRewardChange = (risk_to_reward: string) => {
+    setNewTrade(prev => ({ ...prev!, risk_to_reward: risk_to_reward }));
   };
 
 
   const calculateFinalAmount = (trade: NewTradeForm): number => {
     // If using risk-based calculation and not taking partials, recalculate the amount
-    if (trade.riskToReward && !trade.partialsTaken) {
-      const rr = parseFloat(trade.riskToReward);
+    if (trade.risk_to_reward && !trade.partials_taken) {
+      const rr = parseFloat(trade.risk_to_reward);
       if (!isNaN(rr)) {
-        const calculatedAmount = calculateAmountFromRiskToReward(rr, calculateCumulativePnL(trade.date || endOfDay(date), allTrades));
+        const calculatedAmount = calculateAmountFromRiskToReward(rr, calculateCumulativePnL(trade.trade_date || endOfDay(trade_date), allTrades));
         // Apply sign based on trade type
-        return trade.type === 'loss' ? -Math.abs(calculatedAmount) : Math.abs(calculatedAmount);
+        return trade.trade_type === 'loss' ? -Math.abs(calculatedAmount) : Math.abs(calculatedAmount);
       }
     }
 
     // Otherwise use the amount from the form
     const amount = parseFloat(trade.amount || "0");
-    return trade.type === 'loss' ? -Math.abs(amount) : Math.abs(amount);
+    return trade.trade_type === 'loss' ? -Math.abs(amount) : Math.abs(amount);
   };
 
-  const createFinalTradeData = async (newTrade: NewTradeForm, date: Date) => {
+  const createFinalTradeData = async (newTrade: NewTradeForm, trade_date: Date) => {
     let finalAmount = calculateFinalAmount(newTrade);
     logger.log(`trade final amount ${finalAmount}`)
 
@@ -320,7 +320,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     let finalTags = processTagsForSubmission([...newTrade.tags]);
 
     // Add Partials tag if partialsTaken is true
-    if (newTrade.partialsTaken) {
+    if (newTrade.partials_taken) {
       // Remove any existing Partials tags
       finalTags = finalTags.filter((tag: string) => !tag.startsWith('Partials:'));
       finalTags.push('Partials:Yes');
@@ -329,10 +329,10 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     const currentDate = new Date();
 
     // Use the trade's date if it exists (when editing), otherwise use the provided date
-    const tradeDate = newTrade.date || date;
+    const tradeDate = newTrade.trade_date || trade_date;
 
     // Fetch economic events for this trade session
-    let economicEvents = newTrade.economicEvents || [];
+    let economicEvents = newTrade.economic_events || [];
 
     // Only fetch events if not already provided (e.g., when editing existing trade)
     if (economicEvents.length === 0 && newTrade.session) {
@@ -351,37 +351,41 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
     return {
       id: newTrade.id || uuidv4(),
-      isTemporary: newTrade.isTemporary,
-      date: new Date(tradeDate.getFullYear(), tradeDate.getMonth(), tradeDate.getDate(),
+      is_temporary: newTrade.is_temporary,
+      trade_date: new Date(tradeDate.getFullYear(), tradeDate.getMonth(), tradeDate.getDate(),
         currentDate.getHours(), currentDate.getMinutes(), currentDate.getSeconds()),
-      type: newTrade.type,
+      trade_type: newTrade.trade_type,
       amount: finalAmount,
       isDeleting: false,
       ...(newTrade.name && { name: newTrade.name }),
-      ...(newTrade.entry && { entry: newTrade.entry }),
-      ...(newTrade.exit && { exit: newTrade.exit }),
+      ...(newTrade.entry_price && { entry_price: parseFloat(newTrade.entry_price) }),
+      ...(newTrade.exit_price && { exit_price: parseFloat(newTrade.exit_price) }),
       ...(finalTags.length > 0 && { tags: finalTags }),
-      ...(newTrade.riskToReward && { riskToReward: parseFloat(newTrade.riskToReward) }),
-      partialsTaken: newTrade.partialsTaken,
+      ...(newTrade.risk_to_reward && { risk_to_reward: parseFloat(newTrade.risk_to_reward) }),
+      partials_taken: newTrade.partials_taken,
       ...(newTrade.session && { session: newTrade.session }),
       ...(newTrade.notes && { notes: newTrade.notes }),
-      images: newTrade.uploadedImages || [],
-      ...(economicEvents.length > 0 && { economicEvents }),
+      images: newTrade.uploaded_images || [],
+      ...(economicEvents.length > 0 && { economic_events: economicEvents }),
+      calendar_id: calendar_id,
+      user_id: '', // Will be set by the service layer
+      created_at: new Date(),
+      updated_at: new Date()
     }
   }
 
   // Calculate amount based on risk per trade (as percentage of account balance) and risk-to-reward ratio
-  const calculateAmountFromRiskToReward = (riskToReward: number, cumulativePnL: number): number => {
-    if (!newTrade || !riskToReward || !accountBalance || newTrade.type === 'breakeven') return 0;
+  const calculateAmountFromRiskToReward = (risk_to_reward: number, cumulativePnL: number): number => {
+    if (!newTrade || !risk_to_reward || !account_balance || newTrade.trade_type === 'breakeven') return 0;
 
 
-    const tradeDate = newTrade.date || date;
+    const tradeDate = newTrade.trade_date || trade_date;
     const effectiveRiskPercentage = calculateEffectiveRiskPercentage(tradeDate, allTrades, dynamicRiskSettings);
-    const riskAmount = calculateRiskAmount(effectiveRiskPercentage, accountBalance, cumulativePnL);
+    const riskAmount = calculateRiskAmount(effectiveRiskPercentage, account_balance, cumulativePnL);
     // For win trades: risk amount * R:R
     // For loss trades: risk amount
-    return newTrade.type === 'win'
-      ? Math.round(riskAmount * riskToReward)
+    return newTrade.trade_type === 'win'
+      ? Math.round(riskAmount * risk_to_reward)
       : Math.round(riskAmount);
   };
 
@@ -453,22 +457,22 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         const dimensions = await getDimensions(preview);
 
         return {
-          id: calendarService.generateImageId(file),
+          id: calendarService.generateImageId(),
           file,
           preview,
           caption: '',
           width: dimensions.width,
           height: dimensions.height,
-          uploadProgress: 0
+          upload_progress: 0
         };
       })
     );
 
     // Add the new images to the state with grid layout information
-    let pendingImages: PendingImage[] = []
+    let pending_images: PendingImage[] = []
     setNewTrade((prev) => {
-      const existingPendingImages = prev!.pendingImages;
-      const existingUploadedImages = prev!.uploadedImages;
+      const existingPendingImages = prev!.pending_images;
+      const existingUploadedImages = prev!.uploaded_images;
 
       // Find the highest row value to place new images below existing ones
       let maxRow = -1;
@@ -486,13 +490,13 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           ...img,
           row: newRow,
           column: 0, // Always place in first column
-          columnWidth: 100 // Full width for the row
+          column_width: 100 // Full width for the row
         };
       });
-      pendingImages = [...existingPendingImages, ...newImagesWithLayout]
+      pending_images = [...existingPendingImages, ...newImagesWithLayout]
       return {
         ...prev!,
-        pendingImages: pendingImages,
+        pending_images: pending_images,
       };
     });
 
@@ -519,14 +523,14 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           return {
             url: img.preview,
             pending: true,
-            calendarId: calendarId,
+            calendar_id: calendar_id,
             id: img.id,
             width: img.width,
             height: img.height,
             caption: img.caption,
             row: newRow,
             column: 0, // Always place in first column
-            columnWidth: 100 // Full width for the row
+            column_width: 100 // Full width for the row
           };
         });
 
@@ -540,40 +544,44 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           // Create a temporary trade object if it doesnt exist
           // Note: Economic events will be added later via async update
           const currentDate = new Date();
-          const tradeDate = newTrade!.date || date;
+          const tradeDate = newTrade!.trade_date || trade_date;
           const finalAmount = calculateFinalAmount(newTrade!);
           let finalTags = processTagsForSubmission([...newTrade!.tags]);
 
-          if (newTrade!.partialsTaken) {
+          if (newTrade!.partials_taken) {
             finalTags = finalTags.filter((tag: string) => !tag.startsWith('Partials:'));
             finalTags.push('Partials:Yes');
           }
 
           return {
             id: tradeid,
-            isTemporary: true,
-            date: new Date(tradeDate.getFullYear(), tradeDate.getMonth(), tradeDate.getDate(),
+            is_temporary: true,
+            trade_date: new Date(tradeDate.getFullYear(), tradeDate.getMonth(), tradeDate.getDate(),
               currentDate.getHours(), currentDate.getMinutes(), currentDate.getSeconds()),
-            type: newTrade!.type,
+            trade_type: newTrade!.trade_type,
             amount: finalAmount,
             isDeleting: false,
             name: newTrade!.name || 'New Trade',
-            ...(newTrade!.entry && { entry: newTrade!.entry }),
-            ...(newTrade!.exit && { exit: newTrade!.exit }),
+            ...(newTrade!.entry_price && { entry_price: parseFloat(newTrade!.entry_price) }),
+            ...(newTrade!.exit_price && { exit_price: parseFloat(newTrade!.exit_price) }),
             ...(finalTags.length > 0 && { tags: finalTags }),
-            ...(newTrade!.riskToReward && { riskToReward: parseFloat(newTrade!.riskToReward) }),
-            partialsTaken: newTrade!.partialsTaken,
+            ...(newTrade!.risk_to_reward && { risk_to_reward: parseFloat(newTrade!.risk_to_reward) }),
+            partials_taken: newTrade!.partials_taken,
             ...(newTrade!.session && { session: newTrade!.session }),
             ...(newTrade!.notes && { notes: newTrade!.notes }),
-            images: newTrade!.uploadedImages || [],
+            images: newTrade!.uploaded_images || [],
+            calendar_id: calendar_id,
+            user_id: '', // Will be set by the service layer
+            created_at: new Date(),
+            updated_at: new Date()
           };
         });
 
-      if (trade && trade.isTemporary) {
+      if (trade && trade.is_temporary) {
         setNewTrade(prev => {
           return {
             ...prev!,
-            isTemporary: true
+            is_temporary: true
           };
         })
       }
@@ -584,7 +592,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
 
       for (const image of newPendingImages) {
-        await startImageUpload(image, newTrade!.id!!, pendingImages);
+        await startImageUpload(image, newTrade!.id!!, pending_images);
       }
     }
     catch (error) {
@@ -592,58 +600,58 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     }
   };
   // Function to start uploading an image
-  const startImageUpload = async (image: PendingImage, tradeId: string, pendingImages: PendingImage[]): Promise<void> => {
+  const startImageUpload = async (image: PendingImage, tradeId: string, pending_images: PendingImage[]): Promise<void> => {
     try {
       // Update progress to show upload has started
       setNewTrade(prev => ({
         ...prev!,
-        pendingImages: prev!.pendingImages.map((img) =>
-          img.id === image.id ? { ...img, uploadProgress: 1 } : img
+        pending_images: prev!.pending_images.map((img) =>
+          img.id === image.id ? { ...img, upload_progress: 1 } : img
         )
       }));
 
       // Upload the image with progress tracking
-      const uploadedImage = await calendarService.uploadImage(
-        calendarId,
+      const uploadedImage = await calendarService.uploadTradeImage(
+        calendar_id,
         image.id!!,
         image.file,
         image.width,
         image.height,
         image.caption,
-        (progress) => {
+        (progress: number) => {
           // Update progress in the UI
           setNewTrade(prev => ({
             ...prev!,
-            pendingImages: prev!.pendingImages.map((img) =>
-              img.id === image.id ? { ...img, uploadProgress: progress } : img
+            pending_images: prev!.pending_images.map((img) =>
+              img.id === image.id ? { ...img, upload_progress: progress } : img
             )
           }));
         }
       );
 
-      // Once upload is complete, move from pendingImages to uploadedImages
+      // Once upload is complete, move from pending_images to uploadedImages
       // Find the original pending image to get its layout information
-      const originalPendingImage = pendingImages.find(img => img.id === image.id);
+      const originalPendingImage = pending_images.find(img => img.id === image.id);
       // Preserve layout information
       const updatedImage = {
         ...uploadedImage,
         caption: image.caption,
         row: originalPendingImage?.row || 0,
         column: originalPendingImage?.column || 0,
-        columnWidth: originalPendingImage?.columnWidth || 100
+        column_width: originalPendingImage?.column_width || 100
       };
 
       // Update local state
       setNewTrade(prev => {
-        const newPendingImages = [...prev!.pendingImages];
-        // Remove the uploaded image from pendingImages
+        const newPendingImages = [...prev!.pending_images];
+        // Remove the uploaded image from pending_images
         let imageIndex = newPendingImages.findIndex(img => img.id === image.id);
         if (imageIndex !== -1) {
           newPendingImages.splice(imageIndex, 1);
         }
         // Find the image where pending is true in the uploadedImages list
         // Setting pending to the image is useful for show shimmer in tradeDetail
-        const newUploadedImages = [...prev!.uploadedImages];
+        const newUploadedImages = [...prev!.uploaded_images];
         imageIndex = newUploadedImages.findIndex(img => img.id === image.id);
         if (imageIndex !== -1 && newUploadedImages[imageIndex].pending) {
           newUploadedImages.splice(imageIndex, 1);
@@ -651,15 +659,15 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
         return {
           ...prev!,
-          pendingImages: newPendingImages,
-          uploadedImages: [...newUploadedImages, updatedImage]
+          pending_images: newPendingImages,
+          uploaded_images: [...newUploadedImages, updatedImage]
         };
 
 
       });
 
       // Update Firebase document if we have a temporary trade ID
-      if (calendarId && tradeId) {
+      if (calendar_id && tradeId) {
         try {
           // Use transaction to add the image to the trade
 
@@ -673,7 +681,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               // Preserve existing layout information if available
               row: existingImage?.row !== undefined ? existingImage.row : updatedImage.row,
               column: existingImage?.column !== undefined ? existingImage.column : updatedImage.column,
-              columnWidth: existingImage?.columnWidth !== undefined ? existingImage.columnWidth : updatedImage.columnWidth
+              column_width: existingImage?.column_width !== undefined ? existingImage.column_width : updatedImage.column_width
             };
 
             return {
@@ -702,8 +710,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       // Update UI to show upload failed
       setNewTrade(prev => ({
         ...prev!,
-        pendingImages: prev!.pendingImages.map((img) =>
-          img.id === image.id ? { ...img, uploadProgress: -1 } : img
+        pending_images: prev!.pending_images.map((img) =>
+          img.id === image.id ? { ...img, upload_progress: -1 } : img
         )
       }));
     }
@@ -714,8 +722,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     try {
       if (isPending) {
         // Check if the image is currently being uploaded
-        const image = newTrade!.pendingImages[index];
-        if (image.uploadProgress !== undefined && image.uploadProgress > 0 && image.uploadProgress < 100) {
+        const image = newTrade!.pending_images[index];
+        if (image.upload_progress !== undefined && image.upload_progress > 0 && image.upload_progress < 100) {
           // Image is currently uploading, we shouldn't allow caption changes
           // This is a fallback in case the UI field wasn't disabled properly
           logger.warn('Attempted to change caption of an image that is currently uploading');
@@ -725,7 +733,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         // Update caption for pending image
         setNewTrade(prev => ({
           ...prev!,
-          pendingImages: prev!.pendingImages.map((img, i) =>
+          pending_images: prev!.pending_images.map((img, i) =>
             i === index ? { ...img, caption } : img
           )
         }));
@@ -733,7 +741,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         // Update caption for uploaded image
         setNewTrade(prev => ({
           ...prev!,
-          uploadedImages: prev!.uploadedImages.map((img, i) =>
+          uploaded_images: prev!.uploaded_images.map((img, i) =>
             i === index ? { ...img, caption } : img
           )
         }));
@@ -749,8 +757,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     try {
       if (isPending) {
         // Check if the image is currently being uploaded
-        const image = newTrade!.pendingImages[index];
-        if (image.uploadProgress !== undefined && image.uploadProgress > 0 && image.uploadProgress < 100) {
+        const image = newTrade!.pending_images[index];
+        if (image.upload_progress !== undefined && image.upload_progress > 0 && image.upload_progress < 100) {
           // Image is currently uploading, we shouldn't allow deletion
           // This is a fallback in case the UI button wasn't hidden properly
           logger.warn('Attempted to delete an image that is currently uploading');
@@ -764,15 +772,15 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         // Update local state
         setNewTrade(prev => ({
           ...prev!,
-          pendingImages: prev!.pendingImages.filter((_, i) => i !== index)
+          pending_images: prev!.pending_images.filter((_, i) => i !== index)
         }));
       } else {
-        const image = newTrade!.uploadedImages[index];
+        const image = newTrade!.uploaded_images[index];
 
         // Update local state first for immediate UI feedback
         setNewTrade(prev => ({
           ...prev!,
-          uploadedImages: prev!.uploadedImages.filter((_, i) => i !== index)
+          uploaded_images: prev!.uploaded_images.filter((_, i) => i !== index)
         }));
 
         //delete the image and update the trade in the background
@@ -797,17 +805,17 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   // Handle image reordering
   const handleImagesReordered = async (images: Array<GridImage | GridPendingImage>) => {
     logger.log("handleImagesReordered called with images:",
-      images.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })));
+      images.map(img => ({ id: img.id, row: img.row, column: img.column, column_width: img.column_width })));
 
     // Separate pending and uploaded images
-    const pendingImages = images.filter(img => 'file' in img) as GridPendingImage[];
+    const pending_images = images.filter(img => 'file' in img) as GridPendingImage[];
     const uploadedImages = images.filter(img => !('file' in img)) as GridImage[];
 
     // Update local state
     setNewTrade(prev => ({
       ...prev!,
-      pendingImages: pendingImages as PendingImage[],
-      uploadedImages: uploadedImages
+      pending_images: pending_images as PendingImage[],
+      uploaded_images: uploadedImages
     }));
 
   };
@@ -831,8 +839,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     }
   };
 
-  const hasPendingUploads = (): boolean => newTrade!.pendingImages.some(img =>
-    img.uploadProgress !== undefined && img.uploadProgress < 100 && img.uploadProgress >= 0
+  const hasPendingUploads = (): boolean => newTrade!.pending_images.some(img =>
+    img.upload_progress !== undefined && img.upload_progress < 100 && img.upload_progress >= 0
   );
 
   // Check if all required tag groups are present in the trade's tags
@@ -881,7 +889,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         showErrorSnackbar('Session is required');
         return;
       }
-      if (!newTrade!.riskToReward) {
+      if (!newTrade!.risk_to_reward) {
         showErrorSnackbar('Risk to reward is required');
         return;
       }
@@ -903,14 +911,14 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       }
       setIsSubmitting(true);
       // Prepare data
-      let tradeData = await createFinalTradeData(newTrade!, date);
+      let tradeData = await createFinalTradeData(newTrade!, trade_date);
 
       try {
         // Update the temporary trade with the final data
-        if (newTrade!.isTemporary && newTrade!.id) {
+        if (newTrade!.is_temporary && newTrade!.id) {
           await handleUpdateTradeProperty(newTrade!.id, () => ({
             ...tradeData,
-            isTemporary: false,
+            is_temporary: false,
             updatedAt: new Date() // Set updatedAt when making trade permanent
           })); // Mark as a permanent trade
         }
@@ -924,7 +932,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
       } catch (dbError) {
         // If it's a temporary trade that failed to update, we should clean it up
-        if (newTrade!.isTemporary && newTrade!.id) {
+        if (newTrade!.is_temporary && newTrade!.id) {
           try {
             // Delete the temporary trade that failed to be made permanent
             await handleUpdateTradeProperty(newTrade!.id, (trade) => ({
@@ -990,7 +998,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       let finalTags = processTagsForSubmission([...newTrade!.tags]);
 
       // Add Partials tag if partialsTaken is true
-      if (newTrade!.partialsTaken) {
+      if (newTrade!.partials_taken) {
         // Remove any existing Partials tags
         finalTags = finalTags.filter((tag: string) => !tag.startsWith('Partials:'));
         finalTags.push('Partials:Yes');
@@ -1004,73 +1012,73 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       try {
         // Verify the trade still exists
         if (editingTrade.id) {
-          const existingTrade = await calendarService.getTrade(calendarId, editingTrade.id);
+          const existingTrade = await calendarService.getTrade(calendar_id, editingTrade.id);
 
           if (!existingTrade) {
             throw new Error(`Trade with ID ${editingTrade.id} not found. It may have been deleted.`);
           }
           // Prepare the images array with layout information
           const updatedImages = [
-            ...newTrade!.pendingImages.map(img => ({
+            ...newTrade!.pending_images.map(img => ({
               url: img.preview || '',
               id: img.id!,
-              calendarId: calendarId,
+              calendar_id: calendar_id,
               pending: true,
               caption: img.caption || '',
               width: img.width || 0,
               height: img.height || 0,
               row: img.row !== undefined ? img.row : 0,
               column: img.column !== undefined ? img.column : 0,
-              columnWidth: img.columnWidth !== undefined ? img.columnWidth : 100 // Default to 100% for vertical layout
+              column_width: img.column_width !== undefined ? img.column_width : 100 // Default to 100% for vertical layout
             })),
-            ...newTrade!.uploadedImages.map(img => ({
+            ...newTrade!.uploaded_images.map(img => ({
               url: img.url || '',
               id: img.id,
-              calendarId: calendarId,
+              calendar_id: calendar_id,
               pending: img.pending,
               caption: img.caption || '',
               width: img.width || 0,
               height: img.height || 0,
               row: img.row !== undefined ? img.row : 0,
               column: img.column !== undefined ? img.column : 0,
-              columnWidth: img.columnWidth !== undefined ? img.columnWidth : 100 // Default to 100% for vertical layout
+              column_width: img.column_width !== undefined ? img.column_width : 100 // Default to 100% for vertical layout
             }))
           ];
 
           // Debug what's being saved to Firebase
           // logger.log("Saving images to Firebase with layout info in handleEditSubmit:",
-          //   updatedImages.map(img => ({ id: img.id, row: img.row, column: img.column, columnWidth: img.columnWidth })));
+          //   updatedImages.map(img => ({ id: img.id, row: img.row, column: img.column, column_width: img.column_width })));
 
           await handleUpdateTradeProperty(editingTrade.id, (trade) => {
             // Use the new date if it was changed, otherwise keep the original date
             const currentDate = new Date();
-            const tradeDate = newTrade!.date || trade.date;
+            const tradeDate = newTrade!.trade_date || trade.trade_date;
             const updatedDate = new Date(tradeDate.getFullYear(), tradeDate.getMonth(), tradeDate.getDate(),
               currentDate.getHours(), currentDate.getMinutes(), currentDate.getSeconds());
 
             return {
               ...trade,
-              type: newTrade!.type,
+              trade_type: newTrade!.trade_type,
               amount: finalAmount,
               name: newTrade!.name || "",
-              entry: newTrade!.entry || "",
-              exit: newTrade!.exit || "",
-              date: updatedDate,
-              isTemporary: newTrade?.isTemporary && !newTrade.name,
+              entry_price: newTrade!.entry_price ? parseFloat(newTrade!.entry_price) : undefined,
+              exit_price: newTrade!.exit_price ? parseFloat(newTrade!.exit_price) : undefined,
+              trade_date: updatedDate,
+              is_temporary: newTrade?.is_temporary && !newTrade.name,
               tags: finalTags || [],
-              riskToReward: parseFloat(newTrade!.riskToReward) || 1,
-              partialsTaken: newTrade!.partialsTaken,
+              risk_to_reward: parseFloat(newTrade!.risk_to_reward) || 1,
+              partials_taken: newTrade!.partials_taken,
               session: newTrade!.session || "London",
               notes: newTrade!.notes || "",
               images: updatedImages,
-              updatedAt: new Date() // Set updatedAt when editing trades
+              updated_at: new Date() // Set updated_at when editing trades
             };
           });
 
           // Fetch and update economic events if session changed or if trade doesn't have events
           if (newTrade!.session && editingTrade.id) {
             try {
-              const tradeDate = newTrade!.date || editingTrade.date;
+              const tradeDate = newTrade!.trade_date || editingTrade.trade_date;
               const economicEvents = await tradeEconomicEventService.fetchEventsForTrade(
                 tradeDate,
                 newTrade!.session,
@@ -1149,20 +1157,20 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         <Box sx={{ p: 3 }}>
 
           <DayHeader
-            title={format(date, 'EEEE, MMMM d, yyyy')}
-            accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(date), allTrades)}
+            title={format(trade_date, 'EEEE, MMMM d, yyyy')}
+            account_balance={account_balance + calculateCumulativePnL(startOfNextDay(trade_date), allTrades)}
             formInputVisible={true}
-            totalPnL={trades.reduce((sum, trade) => sum + trade.amount, 0)}
+            total_pnl={trades.reduce((sum, trade) => sum + trade.amount, 0)}
             onPrevDay={() => { }}
             onNextDay={() => { }}
           />
 
           <Box>
             <TradeForm
-              accountBalance={accountBalance}
-              calculateCumulativePnl={(newTrade) => calculateCumulativePnL(newTrade?.date || endOfDay(date), allTrades)}
+              accountBalance={account_balance}
+              calculateCumulativePnl={(newTrade) => calculateCumulativePnL(newTrade?.trade_date || endOfDay(trade_date), allTrades)}
               dynamicRiskSettings={dynamicRiskSettings}
-              calendarId={calendarId}
+              calendarId={calendar_id}
               requiredTagGroups={requiredTagGroups}
               onTagUpdated={handleTagUpdated}
               newTrade={newTrade!}

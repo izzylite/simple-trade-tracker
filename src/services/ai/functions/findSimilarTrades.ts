@@ -1,14 +1,21 @@
+// @ts-nocheck
 /**
  * Similar trades search functionality for AI trading analysis
+ *
+ * NOTE: Vector search functionality has been removed.
+ * This file is kept for reference but is not used in production.
  */
 
-import { Trade } from '../../../types/trade';
-import { Calendar } from '../../../types/calendar';
+import { Trade } from '../../../types/dualWrite';
+import { Calendar } from '../../../types/dualWrite';
 import { logger } from '../../../utils/logger';
-import { vectorSearchService } from '../vectorSearchService';
+// import { vectorSearchService } from '../vectorSearchService';
 import { FindSimilarTradesParams, TradingAnalysisResult } from './types';
 import { handleCacheKeyResult } from './utils';
 import { filterTradeFields } from './dataConversion';
+
+/* eslint-disable */
+// @ts-nocheck
 
 /**
  * Find trades similar to given criteria using vector search

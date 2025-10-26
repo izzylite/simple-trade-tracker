@@ -1,4 +1,4 @@
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 
 /**
  * Generate trade name suggestions based on past trades

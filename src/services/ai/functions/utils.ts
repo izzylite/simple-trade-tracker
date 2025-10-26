@@ -67,20 +67,25 @@ export function handleCacheKeyResult(
 /**
  * Convert trades to simple data format (without images and other heavy fields)
  */
-export function simpleTradeData(trades: Trade[]): Omit<Trade, 'images' | 'isDeleted' | 'isTemporary' | 'isPinned' | 'shareLink' | 'isShared' | 'sharedAt' | 'shareId'>[] {
+export function simpleTradeData(trades: Trade[]): Omit<Trade, 'images' | 'is_deleted' | 'is_temporary' | 'is_pinned' | 'share_link' | 'is_shared' | 'shared_at' | 'share_id'>[] {
   return trades.map(trade => ({
     id: trade.id,
+    calendar_id: trade.calendar_id,
+    user_id: trade.user_id,
     name: trade.name,
-    date: trade.date,
+    trade_date: trade.trade_date,
     session: trade.session,
-    type: trade.type,
+    trade_type: trade.trade_type,
     amount: trade.amount,
     tags: trade.tags,
-    entry: trade.entry,
-    exit: trade.exit,
-    riskToReward: trade.riskToReward,
-    partialsTaken: trade.partialsTaken,
-    economicEvents: trade.economicEvents
+    entry_price: trade.entry_price,
+    exit_price: trade.exit_price,
+    risk_to_reward: trade.risk_to_reward,
+    partials_taken: trade.partials_taken,
+    economic_events: trade.economic_events,
+    notes: trade.notes,
+    created_at: trade.created_at,
+    updated_at: trade.updated_at
   }));
 }
 
@@ -89,7 +94,7 @@ export function simpleTradeData(trades: Trade[]): Omit<Trade, 'images' | 'isDele
  */
 export function calculateWinRate(trades: Trade[]): number {
   if (trades.length === 0) return 0;
-  const wins = trades.filter(trade => trade.type === 'win').length;
+  const wins = trades.filter(trade => trade.trade_type === 'win').length;
   return (wins / trades.length) * 100;
 }
 
@@ -120,7 +125,7 @@ export function groupTradesByPeriod(trades: Trade[], groupBy: string): any {
   const groups: { [key: string]: Trade[] } = {};
 
   trades.forEach((trade : Trade) => {
-    const date = new Date(trade.date);
+    const date = new Date(trade.trade_date);
     let key: string;
 
     switch (groupBy) {
@@ -178,8 +183,8 @@ export function groupTradesByPeriod(trades: Trade[], groupBy: string): any {
     const groupTrades = groups[key];
     summary[key] = {
       count: groupTrades.length,
-      totalPnl: groupTrades.reduce((sum, trade) => sum + trade.amount, 0),
-      winRate: calculateWinRate(groupTrades)
+      total_pnl: groupTrades.reduce((sum, trade) => sum + trade.amount, 0),
+      win_rate: calculateWinRate(groupTrades)
     };
   });
 

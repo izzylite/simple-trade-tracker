@@ -13,7 +13,7 @@ export const updateCalendarHeroImage = async (
     await onUpdateCalendarProperty(calendarId, (calendar) => {
       return {
         ...calendar,
-        heroImageUrl: imageUrl || undefined
+        hero_image_url: imageUrl || undefined
       };
     });
   } catch (error) {

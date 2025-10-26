@@ -147,7 +147,7 @@ For complex scenarios, executeMultipleFunctions also supports:
 
 **Advanced Placeholder Patterns:**
 - **Indexed extraction**: EXTRACT_TRADE_IDS_{index}, EXTRACT_TRADES_{index}, EXTRACT_EVENT_NAMES_{index} (e.g., EXTRACT_TRADE_IDS_0, EXTRACT_EVENT_NAMES_1)
-- **Field extraction**: EXTRACT_{index}.{field.path} (e.g., EXTRACT_0.trades.id, EXTRACT_LAST.statistics.winRate)
+- **Field extraction**: EXTRACT_{index}.{field.path} (e.g., EXTRACT_0.trades.id, EXTRACT_LAST.statistics.win_rate)
 - **Array operations**: MERGE_TRADE_IDS_{index}_{index}, UNIQUE_TRADES_{index}_{index}, MERGE_EVENT_NAMES_{index}_{index}, INTERSECT_TRADE_IDS_{index}_{index}
 - **Transformations**: SLICE_{index}.{field}.{start}.{end}, FILTER_{index}.{field}.{property}.{value}, SORT_{index}.{field}.{property}.{asc|desc}
 

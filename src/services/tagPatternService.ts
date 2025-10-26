@@ -1,4 +1,4 @@
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import { TagCombination, TagPatternInsight, TagPatternAnalysis, ScoreSettings } from '../types/score';
 import { subDays, isAfter } from 'date-fns';
 
@@ -19,10 +19,10 @@ class TagPatternService {
     const historicalCutoff = subDays(targetDate, this.historicalPeriodDays);
 
     // Filter trades into recent and historical periods
-    const recentTrades = trades.filter(trade => isAfter(new Date(trade.date), recentCutoff));
+    const recentTrades = trades.filter(trade => isAfter(new Date(trade.trade_date), recentCutoff));
     const historicalTrades = trades.filter(trade => 
-      isAfter(new Date(trade.date), historicalCutoff) && 
-      !isAfter(new Date(trade.date), recentCutoff)
+      isAfter(new Date(trade.trade_date), historicalCutoff) && 
+      !isAfter(new Date(trade.trade_date), recentCutoff)
     );
 
     // Get all tag combinations (excluding specified tags)
@@ -31,15 +31,15 @@ class TagPatternService {
     // Analyze each combination
     const analyzedCombinations = combinations.map(combo => 
       this.analyzeTagCombination(combo, recentTrades, historicalTrades, trades)
-    ).filter(combo => combo.totalTrades >= this.minTradesForCombination);
+    ).filter(combo => combo.total_trades >= this.minTradesForCombination);
 
     // Sort by win rate and total trades
     const topCombinations = [...analyzedCombinations]
       .sort((a, b) => {
         // Primary sort by win rate, secondary by total trades
-        const winRateDiff = b.winRate - a.winRate;
+        const winRateDiff = b.win_rate - a.win_rate;
         if (Math.abs(winRateDiff) < 5) { // If win rates are close, prioritize volume
-          return b.totalTrades - a.totalTrades;
+          return b.total_trades - a.total_trades;
         }
         return winRateDiff;
       })
@@ -47,7 +47,7 @@ class TagPatternService {
 
     // Find declining combinations
     const decliningCombinations = analyzedCombinations
-      .filter(combo => combo.trend === 'declining' && combo.totalTrades >= this.minTradesForAnalysis)
+      .filter(combo => combo.trend === 'declining' && combo.total_trades >= this.minTradesForAnalysis)
       .sort((a, b) => (a.recentWinRate - a.historicalWinRate) - (b.recentWinRate - b.historicalWinRate))
       .slice(0, 5);
 
@@ -149,21 +149,21 @@ class TagPatternService {
     );
 
     // Calculate overall stats
-    const wins = matchingTrades.filter(trade => trade.type === 'win').length;
-    const losses = matchingTrades.filter(trade => trade.type === 'loss').length;
+    const wins = matchingTrades.filter(trade => trade.trade_type === 'win').length;
+    const losses = matchingTrades.filter(trade => trade.trade_type === 'loss').length;
     const totalTrades = wins + losses; // Exclude breakevens from win rate calculation
     const winRate = totalTrades > 0 ? (wins / totalTrades) * 100 : 0;
     const totalPnL = matchingTrades.reduce((sum, trade) => sum + trade.amount, 0);
     const avgPnL = matchingTrades.length > 0 ? totalPnL / matchingTrades.length : 0;
 
     // Calculate recent and historical win rates
-    const recentWins = recentMatchingTrades.filter(trade => trade.type === 'win').length;
-    const recentLosses = recentMatchingTrades.filter(trade => trade.type === 'loss').length;
+    const recentWins = recentMatchingTrades.filter(trade => trade.trade_type === 'win').length;
+    const recentLosses = recentMatchingTrades.filter(trade => trade.trade_type === 'loss').length;
     const recentTotal = recentWins + recentLosses;
     const recentWinRate = recentTotal > 0 ? (recentWins / recentTotal) * 100 : 0;
 
-    const historicalWins = historicalMatchingTrades.filter(trade => trade.type === 'win').length;
-    const historicalLosses = historicalMatchingTrades.filter(trade => trade.type === 'loss').length;
+    const historicalWins = historicalMatchingTrades.filter(trade => trade.trade_type === 'win').length;
+    const historicalLosses = historicalMatchingTrades.filter(trade => trade.trade_type === 'loss').length;
     const historicalTotal = historicalWins + historicalLosses;
     const historicalWinRate = historicalTotal > 0 ? (historicalWins / historicalTotal) * 100 : 0;
 
@@ -177,11 +177,11 @@ class TagPatternService {
 
     return {
       tags,
-      winRate,
-      totalTrades: matchingTrades.length,
+      win_rate: winRate,
+      total_trades: matchingTrades.length,
       wins,
       losses,
-      totalPnL,
+      total_pnl: totalPnL,
       avgPnL,
       trend,
       recentWinRate,
@@ -201,16 +201,16 @@ class TagPatternService {
 
     // High performance insights
     topCombinations.slice(0, 3).forEach((combo, index) => {
-      if (combo.winRate > 70 && combo.totalTrades >= this.minTradesForAnalysis) {
+      if (combo.win_rate > 70 && combo.total_trades >= this.minTradesForAnalysis) {
         insights.push({
           type: 'high_performance',
           title: `High-Performance Pattern #${index + 1}`,
-          description: `The combination "${combo.tags.join(' + ')}" shows exceptional performance with ${combo.winRate.toFixed(1)}% win rate across ${combo.totalTrades} trades.`,
+          description: `The combination "${combo.tags.join(' + ')}" shows exceptional performance with ${combo.win_rate.toFixed(1)}% win rate across ${combo.total_trades} trades.`,
           tagCombination: combo.tags,
-          winRate: combo.winRate,
-          confidence: Math.min(95, 50 + (combo.totalTrades * 2)),
+          win_rate: combo.win_rate,
+          confidence: Math.min(95, 50 + (combo.total_trades * 2)),
           recommendation: `Consider focusing more on trades that match this pattern. Your success rate with "${combo.tags.join(' + ')}" is significantly above average.`,
-          severity: combo.winRate > 80 ? 'high' : 'medium'
+          severity: combo.win_rate > 80 ? 'high' : 'medium'
         });
       }
     });
@@ -224,8 +224,8 @@ class TagPatternService {
           title: `Declining Pattern Alert`,
           description: `The combination "${combo.tags.join(' + ')}" has declined from ${combo.historicalWinRate.toFixed(1)}% to ${combo.recentWinRate.toFixed(1)}% win rate recently.`,
           tagCombination: combo.tags,
-          winRate: combo.recentWinRate,
-          confidence: Math.min(90, 40 + (combo.totalTrades * 3)),
+          win_rate: combo.recentWinRate,
+          confidence: Math.min(90, 40 + (combo.total_trades * 3)),
           recommendation: `Review your approach with "${combo.tags.join(' + ')}" trades. Market conditions may have changed, requiring strategy adjustment.`,
           severity: winRateDecline > 25 ? 'high' : 'medium'
         });
@@ -250,7 +250,7 @@ class TagPatternService {
     );
 
     sessionCombos.forEach(combo => {
-      if (combo.trend === 'declining' && combo.totalTrades >= 5) {
+      if (combo.trend === 'declining' && combo.total_trades >= 5) {
         const sessionTag = combo.tags.find(tag => ['Asia', 'London', 'NY AM', 'NY PM'].includes(tag));
         if (sessionTag) {
           alerts.push({
@@ -258,7 +258,7 @@ class TagPatternService {
             title: `${sessionTag} Session Performance Decline`,
             description: `Your performance during ${sessionTag} session with "${combo.tags.filter(t => t !== sessionTag).join(' + ')}" has declined recently.`,
             tagCombination: combo.tags,
-            winRate: combo.recentWinRate,
+            win_rate: combo.recentWinRate,
             confidence: 75,
             recommendation: `Consider adjusting your strategy for ${sessionTag} session or reducing position sizes during this time until performance improves.`,
             severity: 'medium'
@@ -277,10 +277,10 @@ class TagPatternService {
     const recentCutoff = subDays(new Date(), this.recentPeriodDays);
     const historicalCutoff = subDays(new Date(), this.historicalPeriodDays);
 
-    const recentTrades = trades.filter(trade => isAfter(new Date(trade.date), recentCutoff));
+    const recentTrades = trades.filter(trade => isAfter(new Date(trade.trade_date), recentCutoff));
     const historicalTrades = trades.filter(trade => 
-      isAfter(new Date(trade.date), historicalCutoff) && 
-      !isAfter(new Date(trade.date), recentCutoff)
+      isAfter(new Date(trade.trade_date), historicalCutoff) && 
+      !isAfter(new Date(trade.trade_date), recentCutoff)
     );
 
     return this.analyzeTagCombination(tags, recentTrades, historicalTrades, trades);

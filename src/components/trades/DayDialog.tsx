@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { ViewCarousel as GalleryIcon } from '@mui/icons-material';
 import { format, isAfter, startOfDay } from 'date-fns';
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import { BaseDialog } from '../common';
 import { DayHeader, TradeList } from './';
 import { calculateCumulativePnL, startOfNextDay } from './TradeFormDialog';
@@ -15,7 +15,7 @@ interface DayDialogProps {
   onClose: () => void;
   date: Date;
   trades: Trade[];
-  accountBalance: number;
+  account_balance: number;
   onDateChange: (date: Date) => void;
   showAddForm: (ediTrade?: Trade | null) => void;
   onDeleteTrade: (tradeId: string) => void;
@@ -47,7 +47,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
   onClose,
   date,
   trades,
-  accountBalance,
+  account_balance,
   onDeleteTrade,
   onDeleteMultipleTrades,
   showAddForm,
@@ -144,9 +144,9 @@ const DayDialog: React.FC<DayDialogProps> = ({
 
           <DayHeader
             title={format(date, 'EEEE, MMMM d, yyyy')}
-            accountBalance={accountBalance + calculateCumulativePnL(startOfNextDay(date), allTrades)}
+            account_balance={account_balance + calculateCumulativePnL(startOfNextDay(date), allTrades)}
             formInputVisible={false}
-            totalPnL={trades.reduce((sum, trade) => sum + trade.amount, 0)}
+            total_pnl={trades.reduce((sum, trade) => sum + trade.amount, 0)}
             onPrevDay={handlePrevDay}
             onNextDay={handleNextDay}
           />

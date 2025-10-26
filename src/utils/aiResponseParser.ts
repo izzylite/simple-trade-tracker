@@ -3,7 +3,7 @@
  * Parses AI responses to detect and extract structured trade data for card display
  */
 
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 
 export interface DisplayItem {
   type: 'trade' | 'event';

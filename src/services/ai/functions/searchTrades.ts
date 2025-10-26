@@ -39,9 +39,9 @@ export async function searchTrades(
     // Filter by trade type
     if (params.tradeType && params.tradeType !== 'all') {
       filteredTrades = filteredTrades.filter(trade => {
-        if (params.tradeType === 'win') return trade.type === 'win';
-        if (params.tradeType === 'loss') return trade.type === 'loss';
-        if (params.tradeType === 'breakeven') return trade.type === 'breakeven';
+        if (params.tradeType === 'win') return trade.trade_type === 'win';
+        if (params.tradeType === 'loss') return trade.trade_type === 'loss';
+        if (params.tradeType === 'breakeven') return trade.trade_type === 'breakeven';
         return true;
       });
     }
@@ -64,7 +64,7 @@ export async function searchTrades(
     // Filter by economic events presence
     if (params.hasEconomicEvents !== undefined) {
       filteredTrades = filteredTrades.filter(trade => {
-        const hasEvents = trade.economicEvents && trade.economicEvents.length > 0;
+        const hasEvents = trade.economic_events && trade.economic_events.length > 0;
         return params.hasEconomicEvents ? hasEvents : !hasEvents;
       });
     }
@@ -72,16 +72,16 @@ export async function searchTrades(
     // Filter by economic event impact
     if (params.economicEventImpact && params.economicEventImpact !== 'all') {
       filteredTrades = filteredTrades.filter(trade => {
-        if (!trade.economicEvents || trade.economicEvents.length === 0) return false;
-        return trade.economicEvents.some(event => event.impact === params.economicEventImpact);
+        if (!trade.economic_events || trade.economic_events.length === 0) return false;
+        return trade.economic_events.some(event => event.impact === params.economicEventImpact);
       });
     }
 
     // Filter by economic event currency
     if (params.economicEventCurrency && params.economicEventCurrency !== 'all') {
       filteredTrades = filteredTrades.filter(trade => {
-        if (!trade.economicEvents || trade.economicEvents.length === 0) return false;
-        return trade.economicEvents.some(event => event.currency === params.economicEventCurrency);
+        if (!trade.economic_events || trade.economic_events.length === 0) return false;
+        return trade.economic_events.some(event => event.currency === params.economicEventCurrency);
       });
     }
 
@@ -89,8 +89,8 @@ export async function searchTrades(
     if (params.economicEventName) {
       const searchTerm = params.economicEventName.toLowerCase();
       filteredTrades = filteredTrades.filter(trade => {
-        if (!trade.economicEvents || trade.economicEvents.length === 0) return false;
-        return trade.economicEvents.some(event =>
+        if (!trade.economic_events || trade.economic_events.length === 0) return false;
+        return trade.economic_events.some(event =>
           event.name.toLowerCase().includes(searchTerm)
         );
       });
@@ -109,8 +109,8 @@ export async function searchTrades(
       if (params.economicNames.length > 0) {
         const eventNamesLower = params.economicNames.map(name => name.toLowerCase());
         filteredTrades = filteredTrades.filter(trade => {
-          if (!trade.economicEvents || trade.economicEvents.length === 0) return false;
-          return trade.economicEvents.some(event =>
+          if (!trade.economic_events || trade.economic_events.length === 0) return false;
+          return trade.economic_events.some(event =>
             eventNamesLower.includes(event.name.toLowerCase())
           );
         });
@@ -135,7 +135,7 @@ export async function searchTrades(
         }
 
         // Fallback to DST-aware time-based filtering for trades without session field
-        const tradeDate = new Date(trade.date);
+        const tradeDate = new Date(trade.trade_date);
         return isTradeInSession(tradeDate, params.session!);
       });
     }
@@ -144,7 +144,7 @@ export async function searchTrades(
     if (params.dayOfWeek) {
       const targetDay = params.dayOfWeek.toLowerCase();
       filteredTrades = filteredTrades.filter(trade => {
-        const tradeDate = new Date(trade.date);
+        const tradeDate = new Date(trade.trade_date);
         const dayName = tradeDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
         return dayName === targetDay;
       });
@@ -156,7 +156,7 @@ export async function searchTrades(
       const endDate = new Date(params.dateRange.end);
 
       filteredTrades = filteredTrades.filter(trade => {
-        const tradeDate = new Date(trade.date);
+        const tradeDate = new Date(trade.trade_date);
         return tradeDate >= startDate && tradeDate <= endDate;
       });
     }
@@ -172,8 +172,8 @@ export async function searchTrades(
     const resultData = {
       trades: tradesData,
       count: filteredTrades.length,
-      totalPnl: filteredTrades.reduce((sum, trade) => sum + trade.amount, 0),
-      winRate: calculateWinRate(filteredTrades),
+      total_pnl: filteredTrades.reduce((sum, trade) => sum + trade.amount, 0),
+      win_rate: calculateWinRate(filteredTrades),
       includedFields: params.fields || ['default']
     };
 

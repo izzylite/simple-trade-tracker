@@ -13,7 +13,7 @@ import {
 import { Box, Paper, Typography, useTheme, Button, alpha, Tooltip as MuiTooltip, CircularProgress } from '@mui/material';
 import { InfoOutlined } from '@mui/icons-material';
 
-import { Trade } from '../../types/trade';
+import { Trade } from '../../types/dualWrite';
 import { formatCurrency } from '../../utils/formatters';
 import TagFilterDialog from '../TagFilterDialog';
 import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
@@ -95,7 +95,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
             {data.fullDay}
           </Typography>
           <Typography variant="body2">
-            Total Trades: {data.totalTrades}
+            Total Trades: {data.total_trades}
           </Typography>
           <Typography variant="body2" sx={{ color: theme.palette.success.main }}>
             Wins: {data.winTrades}
@@ -104,7 +104,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
             Losses: {data.lossTrades}
           </Typography>
           <Typography variant="body2">
-            Win Rate: {data.winRate.toFixed(1)}%
+            Win Rate: {data.win_rate.toFixed(1)}%
           </Typography>
           <Typography variant="body2">
             P&L: {formatCurrency(data.pnl)}
@@ -245,11 +245,11 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
                 : ' Higher bars indicate better profitability on those days. '}
               Click on any bar to see the specific trades for that day.
             </Typography>
-            {chartData.some(data => data.totalTrades > 0) ? (
+            {chartData.some(data => data.total_trades > 0) ? (
               <Typography variant="body2" color="primary" sx={{ mt: 1, fontWeight: 500 }}>
                 {selectedMetric === 'winRate'
-                  ? `Best day for selected strategies: ${chartData.reduce((best, day) => day.totalTrades > 0 && day.winRate > best.winRate ? day : best, { winRate: 0, fullDay: 'None' }).fullDay}`
-                  : `Most profitable day: ${chartData.reduce((best, day) => day.totalTrades > 0 && day.pnl > best.pnl ? day : best, { pnl: -Infinity, fullDay: 'None' }).fullDay}`
+                  ? `Best day for selected strategies: ${chartData.reduce((best, day) => day.total_trades > 0 && day.win_rate > best.win_rate ? day : best, { win_rate: 0, fullDay: 'None' }).fullDay}`
+                  : `Most profitable day: ${chartData.reduce((best, day) => day.total_trades > 0 && day.pnl > best.pnl ? day : best, { pnl: -Infinity, fullDay: 'None' }).fullDay}`
                 }
               </Typography>
             ) : null}

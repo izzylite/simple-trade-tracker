@@ -24,7 +24,7 @@ import {
   Info,
   HelpOutline
 } from '@mui/icons-material';
-import { Trade } from '../types/trade';
+import { Trade } from '../types/dualWrite';
 import { TagPatternInsight, ScoreSettings } from '../types/score';
 import { tagPatternService } from '../services/tagPatternService';
 import { getTagChipStyles, formatTagForDisplay } from '../utils/tagColors';
@@ -74,14 +74,14 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
     }
   };
 
-  const getWinRateColor = (winRate: number) => {
-    if (winRate >= 70) return theme.palette.success.main;
-    if (winRate >= 50) return theme.palette.warning.main;
+  const getWinRateColor = (win_rate: number) => {
+    if (win_rate >= 70) return theme.palette.success.main;
+    if (win_rate >= 50) return theme.palette.warning.main;
     return theme.palette.error.main;
   };
 
-  const formatWinRate = (winRate: number) => {
-    return `${winRate.toFixed(1)}%`;
+  const formatWinRate = (win_rate: number) => {
+    return `${win_rate.toFixed(1)}%`;
   };
 
   if (!analysis || trades.length < 10) {
@@ -221,17 +221,17 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
                       <Typography
                         variant="h6"
                         sx={{
-                          color: getWinRateColor(combo.winRate),
+                          color: getWinRateColor(combo.win_rate),
                           fontWeight: 'bold'
                         }}
                       >
-                        {formatWinRate(combo.winRate)}
+                        {formatWinRate(combo.win_rate)}
                       </Typography>
                     </Stack>
                     
                     <LinearProgress
                       variant="determinate"
-                      value={combo.winRate}
+                      value={combo.win_rate}
                       sx={{
                         height: 6,
                         borderRadius: 3,
@@ -239,7 +239,7 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
                           ? alpha(theme.palette.common.white, 0.1)
                           : theme.palette.grey[200],
                         '& .MuiLinearProgress-bar': {
-                          backgroundColor: getWinRateColor(combo.winRate),
+                          backgroundColor: getWinRateColor(combo.win_rate),
                           borderRadius: 3
                         }
                       }}
@@ -247,7 +247,7 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
                     
                     <Stack direction="row" spacing={3} mt={1}>
                       <Typography variant="caption" color="text.secondary">
-                        <strong>Trades:</strong> {combo.totalTrades}
+                        <strong>Trades:</strong> {combo.total_trades}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         <strong>W/L:</strong> {combo.wins}/{combo.losses}

@@ -24,12 +24,11 @@ import {
   TrendingUp,
   EventNote
 } from '@mui/icons-material';
-import { Trade, TradeEconomicEvent } from '../../types/trade';
+import { Trade, TradeEconomicEvent, Calendar } from '../../types/dualWrite';
 import { ImpactLevel, Currency } from '../../types/economicCalendar';
 import { formatValue } from '../../utils/formatters';
 
 import RoundedTabs from '../common/RoundedTabs';
-import { Calendar } from '../../types/calendar';
 import { getCurrenciesForPair } from '../../services/tradeEconomicEventService';
 import { cleanEventNameForPinning } from '../../utils/eventNameUtils';
 import { performanceCalculationService, CalculationProgress } from '../../services/performanceCalculationService';
@@ -60,10 +59,10 @@ interface EventTradeDetails {
   winningTrades: Trade[];
   totalLoss: number;
   totalWin: number;
-  avgLoss: number;
-  avgWin: number;
+  avg_loss: number;
+  avg_win: number;
   count: number;
-  winRate: number;
+  win_rate: number;
   // Economic event details
   economicEventDetails?: {
     country?: string;
@@ -206,11 +205,11 @@ const CURRENCY_OPTIONS = [
 
   // Get losing and winning trades (kept for legacy compatibility)
   const losingTrades = useMemo(() => {
-    return trades.filter(trade => trade.type === 'loss');
+    return trades.filter(trade => trade.trade_type === 'loss');
   }, [trades]);
 
   const winningTrades = useMemo(() => {
-    return trades.filter(trade => trade.type === 'win');
+    return trades.filter(trade => trade.trade_type === 'win');
   }, [trades]);
 
 
@@ -586,7 +585,7 @@ const CURRENCY_OPTIONS = [
                         </Box>
 
                         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                          {eventType.count || 0} trades • {(eventType.winRate || 0).toFixed(1)}% win rate
+                          {eventType.count || 0} trades • {(eventType.win_rate || 0).toFixed(1)}% win rate
                         </Typography>
                       </Box>
                       
@@ -613,7 +612,7 @@ const CURRENCY_OPTIONS = [
                               open: true,
                               trades: eventType.losingTrades,
                               title: `Losing trades during "${eventType.event}" events`,
-                              subtitle: `${eventType.losingTrades.length} losing trades • Avg loss: ${formatValue(eventType.avgLoss)}`
+                              subtitle: `${eventType.losingTrades.length} losing trades • Avg loss: ${formatValue(eventType.avg_loss)}`
                             });
                           }
                         }}
@@ -625,7 +624,7 @@ const CURRENCY_OPTIONS = [
                           losses
                         </Typography>
                         <Typography variant="caption" color="error.main" sx={{ fontSize: '0.7rem' }}>
-                          ({formatValue(eventType.avgLoss)})
+                          ({formatValue(eventType.avg_loss)})
                         </Typography>
                       </Box>
 
@@ -651,7 +650,7 @@ const CURRENCY_OPTIONS = [
                               open: true,
                               trades: eventType.winningTrades,
                               title: `Winning trades during "${eventType.event}" events`,
-                              subtitle: `${eventType.winningTrades.length} winning trades • Avg win: ${formatValue(eventType.avgWin)}`
+                              subtitle: `${eventType.winningTrades.length} winning trades • Avg win: ${formatValue(eventType.avg_win)}`
                             });
                           }
                         }}
@@ -663,7 +662,7 @@ const CURRENCY_OPTIONS = [
                           wins
                         </Typography>
                         <Typography variant="caption" color="success.main" sx={{ fontSize: '0.7rem' }}>
-                          ({formatValue(eventType.avgWin)})
+                          ({formatValue(eventType.avg_win)})
                         </Typography>
                       </Box>
                     </Box>
