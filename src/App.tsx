@@ -463,12 +463,12 @@ interface CalendarRouteProps {
   onUpdateStateCalendar: (id: string, updates: Partial<CalendarWithUIState>) => void;
   onToggleTheme: () => void;
   mode: 'light' | 'dark';
-  loadAllTrades: (calendarId: string) => Promise<void>;
+  loadAllTrades: (calendarId: string, fetchCalendar?: boolean) => Promise<void>;
   setIsImportingTrades: React.Dispatch<React.SetStateAction<boolean>>;
   setLoadingCalendarName: React.Dispatch<React.SetStateAction<string | undefined>>;
   setLoadingAction: React.Dispatch<React.SetStateAction<'loading' | 'importing' | 'exporting'>>;
   onToggleDynamicRisk: (calendarId: string, useActualAmounts: boolean) => void;
-  isLoadingTrades: boolean; 
+  isLoadingTrades: boolean;
   setLoadingTrades: (loading: boolean) => void
 }
 
@@ -700,6 +700,35 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     }
   };
 
+  const handleDeleteTrades = async (tradeIds: string[]): Promise<void> => {
+    try {
+      // Optimistically update UI by removing trades from cached list
+      const updatedCachedTrades = calendar.cachedTrades.filter(trade => !tradeIds.includes(trade.id));
+      onUpdateStateCalendar(calendar.id, {
+        cachedTrades: updatedCachedTrades
+      });
+
+      // Delete trades in parallel for better performance
+      await Promise.all(
+        tradeIds.map(tradeId => calendarService.deleteTrade(calendar.id, tradeId))
+      );
+
+      // Get updated calendar with auto-calculated stats from database
+      const updatedCalendar = await calendarService.getCalendar(calendar.id);
+      if (updatedCalendar) {
+        const stats = calendarService.getCalendarStats(updatedCalendar);
+        onUpdateStateCalendar(calendar.id, {
+          ...stats
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting trades:', error);
+      // Reload trades to restore correct state after error
+      await loadAllTrades(calendar.id, true);
+      throw error;
+    }
+  };
+
   const onUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<Calendar | undefined> => {
     try {
       // Wrap the updateCallback to convert Calendar to Partial<Calendar>
@@ -816,6 +845,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       scoreSettings={calendar.score_settings}
       onUpdateCalendarProperty={onUpdateCalendarProperty}
       onUpdateTradeProperty={handleUpdateTradeProperty}
+      onDeleteTrades={handleDeleteTrades}
       onAccountBalanceChange={handleChangeAccountBalance}
       onImportTrades={handleImportTrades}
       onClearMonthTrades={handleClearMonthTrades}

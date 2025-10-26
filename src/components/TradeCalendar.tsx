@@ -121,7 +121,7 @@ interface TradeCalendarProps {
   isReadOnly?: boolean;
 
   onImageUpload?: (tradeId: string, image: TradeImage, add: boolean) => Promise<void>;
-  onDeleteTrade?: (tradeId: string) => Promise<void>;
+  onDeleteTrades?: (tradeIds: string[]) => Promise<void>;
   onAccountBalanceChange: (balance: number) => void;
   onTagUpdated?: (oldTag: string, newTag: string) => void;
   onImportTrades?: (trades: Trade[]) => void;
@@ -383,6 +383,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     onAddTrade,
     onTagUpdated,
     onUpdateTradeProperty,
+    onDeleteTrades,
     onUpdateCalendarProperty,
     onAccountBalanceChange,
     onImportTrades,
@@ -739,15 +740,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setDeletingTradeIds(prev => [...prev, ...tradesToDelete]);
 
     try {
-      // Delete trades in parallel for better performance
-      const deletePromises = tradesToDelete.map(async (tradeId) => {
-        if (onUpdateTradeProperty) {
-          return await onUpdateTradeProperty(tradeId, (trade) => ({ ...trade, isDeleted: true }));
-        }
-        return Promise.resolve();
-      });
-
-      await Promise.all(deletePromises);
+      // Use the new onDeleteTrades callback to actually delete trades from database
+      if (onDeleteTrades) {
+        await onDeleteTrades(tradesToDelete);
+      }
 
       // Show success message
       const successMessage = tradesToDelete.length === 1
@@ -1541,6 +1537,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             newMainTrade={newTrade}
             setNewMainTrade={prev => setNewTrade(prev(newTrade!!))}
             onUpdateTradeProperty={onUpdateTradeProperty}
+            onDeleteTrades={onDeleteTrades}
             calendar_id={calendarId!!}
             setZoomedImage={setZoomedImage}
             account_balance={accountBalance}

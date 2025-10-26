@@ -35,6 +35,7 @@ interface FormDialogProps {
   onAddTrade?: (trade: Trade & { id?: string }) => Promise<void>;
   onTagUpdated?: (oldTag: string, newTag: string) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
+  onDeleteTrades?: (tradeIds: string[]) => Promise<void>;
   onAccountBalanceChange?: (balance: number) => void;
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   setNewMainTrade: (prev: (trade: NewTradeForm) => NewTradeForm | null) => void
@@ -124,6 +125,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   onAddTrade,
   onTagUpdated,
   onUpdateTradeProperty,
+  onDeleteTrades,
   allTrades = [],
   dynamicRiskSettings,
   calendar_id,
@@ -932,13 +934,10 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
       } catch (dbError) {
         // If it's a temporary trade that failed to update, we should clean it up
-        if (newTrade!.is_temporary && newTrade!.id) {
+        if (newTrade!.is_temporary && newTrade!.id && onDeleteTrades) {
           try {
             // Delete the temporary trade that failed to be made permanent
-            await handleUpdateTradeProperty(newTrade!.id, (trade) => ({
-              ...trade,
-              isDeleted: true
-            }));
+            await onDeleteTrades([newTrade!.id]);
             log('Cleaned up temporary trade after failed update');
           } catch (cleanupError) {
             error('Failed to cleanup temporary trade:', cleanupError);
