@@ -1,0 +1,11 @@
+# Task ID: 25
+# Title: Execute Cutover and Decommission Firebase
+# Status: pending
+# Dependencies: 24
+# Priority: high
+# Description: Switch production traffic to Supabase and decommission Firebase resources.
+# Details:
+Monitor system during cutover. Disable dual-write mode. Decommission Firebase resources after successful migration. Update documentation and inform users.
+
+# Test Strategy:
+Monitor for errors and downtime. Confirm all features work post-cutover.

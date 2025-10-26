@@ -1,0 +1,11 @@
+# Task ID: 18
+# Title: Update Callable Function Endpoints
+# Status: pending
+# Dependencies: 15
+# Priority: medium
+# Description: Expose HTTP endpoints for business logic previously handled by Firebase callable functions.
+# Details:
+Implement HTTP endpoints using Supabase Edge Functions. Secure endpoints with JWT validation. Update frontend to call new endpoints.
+
+# Test Strategy:
+Test endpoint responses and security. Validate integration with frontend.

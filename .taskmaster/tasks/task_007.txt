@@ -1,0 +1,11 @@
+# Task ID: 7
+# Title: Update Frontend Authentication Flows
+# Status: pending
+# Dependencies: 6
+# Priority: high
+# Description: Refactor frontend authentication logic to use Supabase Auth APIs.
+# Details:
+Replace Firebase Auth SDK calls with Supabase JS client methods for sign-in, sign-out, session management, and token refresh. Update error handling and edge cases. Recommended: Use React context or similar for auth state.
+
+# Test Strategy:
+Test all auth flows (login, logout, session expiry) across browsers and devices.

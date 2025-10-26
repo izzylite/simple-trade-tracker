@@ -1,0 +1,11 @@
+{
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "task-master-ai"
+  ],
+  "permissions": {
+    "allow": [
+      "mcp__task-master-ai__next_task"
+    ]
+  }
+}

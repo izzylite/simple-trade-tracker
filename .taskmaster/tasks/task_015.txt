@@ -1,0 +1,73 @@
+# Task ID: 15
+# Title: Convert Firebase Cloud Functions to Supabase Edge Functions
+# Status: pending
+# Dependencies: 2, 3, 4, 7
+# Priority: high
+# Description: Rewrite all Firebase Cloud Functions as Supabase Edge Functions.
+# Details:
+Use Supabase Edge Functions (Deno runtime) to implement triggers (onTradeChangedV2, cleanupDeletedCalendarV2), callable endpoints, and sharing logic. Use supabase/functions CLI for deployment. Reference Supabase Edge Functions docs for best practices.
+
+# Test Strategy:
+Unit and integration tests for each function. Verify correct triggers and responses.
+
+# Subtasks:
+## 1. Inventory Existing Firebase Cloud Functions [pending]
+### Dependencies: None
+### Description: List all current Firebase Cloud Functions, including triggers, callable endpoints, and sharing logic to be migrated.
+### Details:
+Review the Firebase project source code and documentation to identify all deployed Cloud Functions and their purposes.
+
+## 2. Analyze Function Logic and Dependencies [pending]
+### Dependencies: 15.1
+### Description: Examine each function's logic, dependencies, and integration points with Firebase services (Firestore, Auth, Storage, etc.).
+### Details:
+Document how each function interacts with Firebase and external APIs, noting any platform-specific features.
+
+## 3. Map Firebase Functionality to Supabase Edge Functions [pending]
+### Dependencies: 15.2
+### Description: Determine how each Firebase function will be implemented using Supabase Edge Functions and the Deno runtime.
+### Details:
+Identify equivalent triggers, endpoints, and event sources in Supabase. Plan for differences in runtime and API.
+
+## 4. Set Up Supabase Edge Functions Development Environment [pending]
+### Dependencies: 15.3
+### Description: Configure the local environment for developing and testing Supabase Edge Functions using the supabase/functions CLI.
+### Details:
+Install necessary tools (Deno, supabase CLI), set up project structure, and connect to the Supabase project.
+
+## 5. Rewrite onTradeChangedV2 Trigger as Supabase Edge Function [pending]
+### Dependencies: 15.4
+### Description: Implement the onTradeChangedV2 logic as a Supabase Edge Function, adapting to the new runtime and event model.
+### Details:
+Translate the function logic to TypeScript for Deno, using Supabase APIs for database and event handling.
+
+## 6. Rewrite cleanupDeletedCalendarV2 Trigger as Supabase Edge Function [pending]
+### Dependencies: 15.4
+### Description: Implement the cleanupDeletedCalendarV2 logic as a Supabase Edge Function.
+### Details:
+Adapt the function to Supabase's event model and database schema, ensuring proper cleanup operations.
+
+## 7. Implement Callable Endpoints as Supabase Edge Functions [pending]
+### Dependencies: 15.4
+### Description: Rewrite all callable Firebase functions as HTTP endpoints using Supabase Edge Functions.
+### Details:
+Expose necessary endpoints, handle authentication, and ensure compatibility with client calls.
+
+## 8. Migrate Sharing Logic to Supabase Edge Functions [pending]
+### Dependencies: 15.4
+### Description: Reimplement sharing-related logic (e.g., sharedTrades, sharedCalendars) as Edge Functions.
+### Details:
+Ensure sharing features integrate with the new PostgreSQL schema and Supabase Auth.
+
+## 9. Deploy Edge Functions to Supabase [pending]
+### Dependencies: 15.5, 15.6, 15.7, 15.8
+### Description: Deploy all rewritten Edge Functions to the Supabase project using the supabase/functions CLI.
+### Details:
+Follow Supabase documentation for deployment best practices and environment configuration.
+
+## 10. Test and Validate All Migrated Functions [pending]
+### Dependencies: 15.9
+### Description: Perform unit and integration tests for each Edge Function to ensure correct triggers, responses, and integration with Supabase services.
+### Details:
+Use automated tests and manual verification to confirm functional parity with original Firebase Cloud Functions.
+

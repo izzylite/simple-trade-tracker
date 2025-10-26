@@ -1,0 +1,11 @@
+# Task ID: 10
+# Title: Update Frontend Storage Logic
+# Status: pending
+# Dependencies: 9
+# Priority: medium
+# Description: Refactor upload/download logic in frontend to use Supabase Storage APIs.
+# Details:
+Replace Firebase Storage SDK calls with Supabase JS client methods for file upload, download, and deletion. Implement upload progress tracking using onUploadProgress. Optimize images before upload using browser APIs.
+
+# Test Strategy:
+Test image upload, download, and deletion. Verify progress tracking and image optimization.

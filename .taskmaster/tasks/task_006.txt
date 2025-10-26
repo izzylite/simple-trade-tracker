@@ -1,0 +1,11 @@
+# Task ID: 6
+# Title: Migrate Firebase Auth Users to Supabase
+# Status: pending
+# Dependencies: 5
+# Priority: high
+# Description: Export users from Firebase Auth and import into Supabase Auth.
+# Details:
+Use the firebase-to-supabase migration tool (https://github.com/supabase-community/firebase-to-supabase). Export users to JSON, then import into Supabase using the provided scripts. Handle password hash parameters for seamless login.
+
+# Test Strategy:
+Verify all users are present in Supabase Auth. Test login for migrated users.

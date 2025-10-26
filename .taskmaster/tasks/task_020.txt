@@ -1,0 +1,85 @@
+# Task ID: 20
+# Title: Update Frontend Service Layer to Use Supabase
+# Status: pending
+# Dependencies: 19
+# Priority: high
+# Description: Refactor all frontend service files to use Supabase client instead of Firebase SDK.
+# Details:
+Update calendarService.ts, authService.ts, etc. Replace all Firebase SDK calls with Supabase equivalents. Update data models and TypeScript types. Implement Supabase-specific error handling and retry logic.
+
+# Test Strategy:
+Run unit and integration tests for all service methods. Validate error handling.
+
+# Subtasks:
+## 1. Audit Current Service Layer for Firebase Usage [pending]
+### Dependencies: None
+### Description: Identify all frontend service files and functions that utilize the Firebase SDK, including calendarService.ts, authService.ts, and others.
+### Details:
+Create a comprehensive list of all Firebase SDK calls and their usage patterns across the service layer.
+
+## 2. Map Firebase SDK Calls to Supabase Equivalents [pending]
+### Dependencies: 20.1
+### Description: Document the Supabase client methods that correspond to each Firebase SDK call identified in the audit.
+### Details:
+Reference Supabase and Firebase documentation to ensure accurate mapping for authentication, database, storage, and real-time features.
+
+## 3. Refactor Authentication Logic to Use Supabase [pending]
+### Dependencies: 20.2
+### Description: Replace all Firebase authentication calls with Supabase Auth client methods in authService.ts and related files.
+### Details:
+Implement sign-in, sign-out, session management, and token refresh using Supabase Auth APIs.
+
+## 4. Refactor Database Operations to Use Supabase Client [pending]
+### Dependencies: 20.2
+### Description: Update all CRUD operations in service files to use Supabase client methods instead of Firebase Firestore/Realtime Database.
+### Details:
+Ensure correct usage of Supabase's SQL-based querying and real-time subscriptions.
+
+## 5. Refactor Storage Logic to Use Supabase Storage [pending]
+### Dependencies: 20.2
+### Description: Replace Firebase Storage SDK calls with Supabase Storage client methods for file upload, download, and deletion.
+### Details:
+Implement upload progress tracking and optimize images before upload using browser APIs.
+
+## 6. Update Data Models and TypeScript Types [pending]
+### Dependencies: 20.3, 20.4, 20.5
+### Description: Modify data models and TypeScript types to align with Supabase's PostgreSQL schema and API responses.
+### Details:
+Ensure all service methods and components use updated types and interfaces.
+
+## 7. Implement Supabase-Specific Error Handling [pending]
+### Dependencies: 20.3, 20.4, 20.5
+### Description: Add error handling logic tailored to Supabase client error formats and codes throughout the service layer.
+### Details:
+Handle authentication, database, and storage errors according to Supabase documentation.
+
+## 8. Implement Retry Logic for Supabase Operations [pending]
+### Dependencies: 20.7
+### Description: Add retry mechanisms for transient errors in Supabase client calls, such as network failures or rate limits.
+### Details:
+Use exponential backoff or similar strategies for retries where appropriate.
+
+## 9. Update Real-Time Data Subscriptions [pending]
+### Dependencies: 20.4
+### Description: Replace Firebase real-time listeners with Supabase real-time subscriptions using Postgres Changes or equivalent.
+### Details:
+Ensure correct handling of subscription setup, teardown, and error recovery.
+
+## 10. Update Service Layer Documentation [pending]
+### Dependencies: 20.3, 20.4, 20.5, 20.6, 20.7, 20.8, 20.9
+### Description: Revise or create documentation for all updated service files, including usage examples and migration notes.
+### Details:
+Document Supabase-specific patterns, error handling, and retry logic.
+
+## 11. Run and Update Unit and Integration Tests [pending]
+### Dependencies: 20.3, 20.4, 20.5, 20.6, 20.7, 20.8, 20.9
+### Description: Update existing tests and write new ones to cover all Supabase-based service methods and error handling.
+### Details:
+Ensure all tests reflect the new Supabase logic and data models.
+
+## 12. Validate End-to-End Functionality and Error Handling [pending]
+### Dependencies: 20.11
+### Description: Perform manual and automated end-to-end testing of the frontend service layer to ensure correct integration with Supabase.
+### Details:
+Test all user flows, data operations, real-time updates, and error scenarios in staging or development environments.
+

@@ -1,0 +1,958 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Initialize Supabase Project and Repository",
+        "description": "Set up a new Supabase project and initialize a Git repository for migration.",
+        "details": "Create a new Supabase project via the Supabase dashboard. Initialize a Git repository if not already present. Configure environment variables for Supabase (SUPABASE_URL, SUPABASE_KEY). Ensure all team members have access. Recommended: Use Supabase CLI v1.153+ for local development and migrations.",
+        "testStrategy": "Verify Supabase project accessibility and repository initialization. Confirm environment variables are correctly set.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Design PostgreSQL Database Schema",
+        "description": "Design relational schema in PostgreSQL to replace Firestore collections and subcollections.",
+        "details": "Map Firestore collections (calendars, sharedTrades, sharedCalendars, economicEvents) and subcollections (calendars/{id}/years/{year}) to normalized PostgreSQL tables. Define foreign keys, indexes, and constraints. Use Supabase SQL Editor or migration scripts. Recommended: Use dbdiagram.io or similar for schema visualization.",
+        "testStrategy": "Review schema with ERD tools. Validate relationships and constraints via test data inserts.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Analyze Firestore Data Model",
+            "description": "Review the structure of Firestore collections and subcollections, including calendars, sharedTrades, sharedCalendars, economicEvents, and calendars/{id}/years/{year}.",
+            "dependencies": [],
+            "details": "Document all entities, relationships, and data types present in the Firestore model to inform relational mapping.",
+            "status": "done",
+            "testStrategy": "Verify completeness by cross-referencing with existing Firestore documentation and sample data."
+          },
+          {
+            "id": 2,
+            "title": "Define PostgreSQL Entities and Relationships",
+            "description": "Map Firestore collections and subcollections to normalized PostgreSQL tables, identifying primary keys and relationships.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Apply third normal form principles and ensure all entities and relationships are represented with minimal redundancy.",
+            "status": "done",
+            "testStrategy": "Validate entity mapping against Firestore model and check for normalization issues."
+          },
+          {
+            "id": 3,
+            "title": "Design Table Schemas with Constraints",
+            "description": "Specify table structures, including columns, data types, foreign keys, unique constraints, and not-null constraints.",
+            "dependencies": [
+              "2.2"
+            ],
+            "details": "Ensure referential integrity and data consistency using appropriate PostgreSQL constraints.",
+            "status": "done",
+            "testStrategy": "Attempt invalid inserts and updates to confirm constraints are enforced."
+          },
+          {
+            "id": 4,
+            "title": "Plan Schema Namespacing and Organization",
+            "description": "Determine logical grouping of tables into schemas for manageability and security.",
+            "dependencies": [
+              "2.3"
+            ],
+            "details": "Create custom schemas to separate public and private data, following PostgreSQL best practices for object separation.",
+            "status": "done",
+            "testStrategy": "Review schema organization for clarity and access control."
+          },
+          {
+            "id": 5,
+            "title": "Design Indexing Strategy",
+            "description": "Identify columns and relationships requiring indexes to optimize query performance.",
+            "dependencies": [
+              "2.3"
+            ],
+            "details": "Plan for primary, foreign, compound, and partial indexes based on expected query patterns.",
+            "status": "done",
+            "testStrategy": "Simulate queries and benchmark performance with and without indexes."
+          },
+          {
+            "id": 6,
+            "title": "Create Entity Relationship Diagram (ERD)",
+            "description": "Visualize the schema using dbdiagram.io or similar tools to illustrate tables, relationships, and constraints.",
+            "dependencies": [
+              "2.2",
+              "2.3",
+              "2.4"
+            ],
+            "details": "Generate and annotate ERD to facilitate team review and future maintenance.",
+            "status": "done",
+            "testStrategy": "Validate ERD accuracy against schema definitions and Firestore model."
+          },
+          {
+            "id": 7,
+            "title": "Implement Schema in Supabase SQL Editor",
+            "description": "Write and execute SQL scripts or use migration tools to create tables, schemas, constraints, and indexes in Supabase.",
+            "dependencies": [
+              "2.3",
+              "2.4",
+              "2.5"
+            ],
+            "details": "Ensure scripts are idempotent and compatible with Supabase migration workflows.",
+            "status": "done",
+            "testStrategy": "Deploy schema to test database and verify successful creation of all objects."
+          },
+          {
+            "id": 8,
+            "title": "Validate Schema with Test Data",
+            "description": "Insert representative test data to verify relationships, constraints, and indexing effectiveness.",
+            "dependencies": [
+              "2.7"
+            ],
+            "details": "Check referential integrity, constraint enforcement, and query performance using sample inserts and queries.",
+            "status": "done",
+            "testStrategy": "Review test results and adjust schema as needed to resolve issues."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Implement Row Level Security (RLS) Policies",
+        "description": "Configure RLS policies for all user data tables to enforce security.",
+        "details": "Write RLS policies in Supabase SQL for each table (users, trades, calendars, etc.) to restrict access to authenticated users and enforce ownership. Use Supabase dashboard or SQL scripts. Reference Supabase RLS documentation for best practices.",
+        "testStrategy": "Attempt unauthorized queries and verify access is denied. Write automated tests for RLS enforcement.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Set Up Advanced Indexing and Performance Optimization",
+        "description": "Create indexes to support complex queries and optimize for read-heavy workloads.",
+        "details": "Analyze query patterns from existing app. Add compound indexes, partial indexes, and full-text search indexes as needed. Use PostgreSQL EXPLAIN to validate performance. Recommended: Use pgvector for vector search and pg_trgm for text search.",
+        "testStrategy": "Benchmark query performance before and after indexing. Ensure all queries meet <500ms response time.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Configure Supabase Auth with Google OAuth",
+        "description": "Set up Supabase Auth to use Google OAuth provider for user authentication.",
+        "details": "Enable Google OAuth in Supabase Auth settings. Configure OAuth credentials in Google Cloud Console. Update redirect URIs. Use Supabase JS client v2.43+ for frontend integration.",
+        "testStrategy": "Sign in with Google from frontend and verify user creation in Supabase.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Migrate Firebase Auth Users to Supabase",
+        "description": "Export users from Firebase Auth and import into Supabase Auth.",
+        "details": "Use the firebase-to-supabase migration tool (https://github.com/supabase-community/firebase-to-supabase). Export users to JSON, then import into Supabase using the provided scripts. Handle password hash parameters for seamless login.",
+        "testStrategy": "Verify all users are present in Supabase Auth. Test login for migrated users.",
+        "priority": "high",
+        "dependencies": [
+          5
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Update Frontend Authentication Flows",
+        "description": "Refactor frontend authentication logic to use Supabase Auth APIs.",
+        "details": "Replace Firebase Auth SDK calls with Supabase JS client methods for sign-in, sign-out, session management, and token refresh. Update error handling and edge cases. Recommended: Use React context or similar for auth state.",
+        "testStrategy": "Test all auth flows (login, logout, session expiry) across browsers and devices.",
+        "priority": "high",
+        "dependencies": [
+          6
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Set Up Supabase Storage Buckets and Policies",
+        "description": "Create a private storage bucket and configure security policies for trade images, using SQL migrations and helper functions for path validation.",
+        "status": "done",
+        "dependencies": [
+          1,
+          5
+        ],
+        "priority": "high",
+        "details": "A migration file (003_storage_setup.sql) has been created to set up a private 'trade-images' bucket in Supabase Storage with a 50MB file size limit and allowed MIME types: JPEG, PNG, GIF, WebP. The folder structure is users/{userId}/trade-images/. Row-Level Security (RLS) policies are defined for user-specific access (upload, download, update, delete), and helper functions are included for path validation. The migration is ready to be applied once the Supabase project is fully restored.",
+        "testStrategy": "After applying the migration, attempt uploads, downloads, updates, and deletions as different users to verify that access is restricted to authenticated users and only to their own folders. Confirm that the folder structure and file type/size restrictions are enforced.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Wait for Supabase project restoration",
+            "description": "Monitor the Supabase project status and ensure it is fully restored before proceeding with migration.",
+            "status": "done",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Apply storage migration",
+            "description": "Run the 003_storage_setup.sql migration to create the 'trade-images' bucket, set file size and MIME type restrictions, and implement RLS policies and helper functions.",
+            "status": "done",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Test storage access and restrictions",
+            "description": "Test uploading, downloading, updating, and deleting trade images as different users. Verify that users can only access their own files and that file type and size limits are enforced.",
+            "status": "done",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Migrate Images from Firebase Storage to Supabase Storage",
+        "description": "Transfer all trade images from Firebase Storage to Supabase Storage, preserving folder structure and metadata. Migration is actively running and has successfully processed the initial batch of files.",
+        "status": "done",
+        "dependencies": [
+          8
+        ],
+        "priority": "high",
+        "details": "The firebase-to-supabase migration tool is being used to transfer images. The script connects to both Firebase and Supabase Storage, discovers all trade images in the users/{userId}/trade-images/ structure, and uploads them to the Supabase 'trade-images' bucket. Migration is performed in batches of 5 files with progress tracking. The process preserves the original folder structure, file names, paths, and metadata (such as content type). As of now, 666 images were found in Firebase Storage, and over 25 files have been migrated successfully with no errors. The Supabase bucket and access policies have been verified and are functioning as expected.",
+        "testStrategy": "Monitor migration progress and verify that all 666 images are present and accessible in Supabase Storage after completion. Check that folder structure, file names, and metadata are preserved. Spot-check a sample of migrated files for accessibility and integrity. Confirm that no files are missing or corrupted. Continue to monitor for errors during the remainder of the migration.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Monitor migration script progress and log completion percentage",
+            "description": "Track the migration script as it processes batches of files. Log the number of files migrated, current completion percentage, and any errors encountered. Update stakeholders on progress at key milestones (e.g., 25%, 50%, 75%, 100%).",
+            "status": "done",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Verify preservation of folder structure and metadata in Supabase",
+            "description": "After migration, confirm that all files in Supabase Storage retain the original users/{userId}/trade-images/{filename} structure and that file metadata (content type, etc.) matches the source in Firebase.",
+            "status": "done",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Spot-check migrated files for accessibility and integrity",
+            "description": "Randomly select a sample of migrated images in Supabase Storage. Verify that each file is accessible, uncorrupted, and matches the original in Firebase.",
+            "status": "done",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Confirm all 666 trade images are present in Supabase Storage",
+            "description": "Once migration completes, compare the total number of images in Supabase Storage to the original count in Firebase (666). Investigate and resolve any discrepancies.",
+            "status": "done",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Update Frontend Storage Logic",
+        "description": "Refactor upload/download logic in frontend to use Supabase Storage APIs.",
+        "details": "Replace Firebase Storage SDK calls with Supabase JS client methods for file upload, download, and deletion. Implement upload progress tracking using onUploadProgress. Optimize images before upload using browser APIs.",
+        "testStrategy": "Test image upload, download, and deletion. Verify progress tracking and image optimization.",
+        "priority": "medium",
+        "dependencies": [
+          9
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 11,
+        "title": "Design and Implement Data Migration Scripts",
+        "description": "Create scripts to migrate Firestore data to PostgreSQL, handling structure transformation.",
+        "details": "Use firebase-to-supabase migration tool for initial export. For complex subcollections, write custom Node.js scripts to flatten and map data to relational tables. Validate data types and relationships. Use pg-promise or node-postgres for inserts.",
+        "testStrategy": "Run migration on test data. Validate row counts and referential integrity in Supabase.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          3,
+          4
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Gather Firestore and PostgreSQL Credentials",
+            "description": "Collect all necessary credentials and access keys for Firestore and the target PostgreSQL (Supabase) instance.",
+            "dependencies": [],
+            "details": "Obtain Firestore service account JSON and Supabase/PostgreSQL connection details. Store securely for use in migration scripts.",
+            "status": "done",
+            "testStrategy": "Verify successful authentication to both Firestore and PostgreSQL using test connections."
+          },
+          {
+            "id": 2,
+            "title": "Set Up and Run firebase-to-supabase Migration Tool",
+            "description": "Clone and configure the firebase-to-supabase migration tool to perform the initial export of Firestore collections to PostgreSQL tables.",
+            "dependencies": [
+              "11.1"
+            ],
+            "details": "Follow official Supabase migration guide to clone the tool, configure connection files, and execute the export for top-level collections.",
+            "status": "done",
+            "testStrategy": "Check that all top-level collections are exported and imported as basic tables in PostgreSQL."
+          },
+          {
+            "id": 3,
+            "title": "Identify and Analyze Complex Subcollections",
+            "description": "Catalog all Firestore subcollections and nested structures that require custom transformation for relational mapping.",
+            "dependencies": [
+              "11.2"
+            ],
+            "details": "Review Firestore schema and document relationships to determine which subcollections need flattening or special handling.",
+            "status": "done",
+            "testStrategy": "Produce a documented list of all subcollections and their parent relationships."
+          },
+          {
+            "id": 4,
+            "title": "Design Data Transformation Logic for Subcollections",
+            "description": "Define how each complex subcollection will be flattened and mapped to relational tables, including foreign key relationships.",
+            "dependencies": [
+              "11.3"
+            ],
+            "details": "Create a mapping specification for each subcollection, detailing target table structure and relationship keys.",
+            "status": "done",
+            "testStrategy": "Review mapping logic with schema designers and validate against PostgreSQL schema."
+          },
+          {
+            "id": 5,
+            "title": "Develop Custom Node.js Migration Scripts",
+            "description": "Write Node.js scripts to extract, transform, and load subcollection data into normalized PostgreSQL tables.",
+            "dependencies": [
+              "11.4"
+            ],
+            "details": "Use Firestore and PostgreSQL client libraries (e.g., firebase-admin, pg-promise/node-postgres) to process and insert data.",
+            "status": "done",
+            "testStrategy": "Run scripts on sample data and verify correct row creation and relationship mapping."
+          },
+          {
+            "id": 6,
+            "title": "Validate Data Types and Structure",
+            "description": "Ensure all migrated data conforms to the PostgreSQL schema, with correct data types and constraints.",
+            "dependencies": [
+              "11.5"
+            ],
+            "details": "Implement validation checks in scripts to enforce type safety and schema compliance before insertion.",
+            "status": "done",
+            "testStrategy": "Compare data types and constraints in PostgreSQL with expected schema; log and resolve mismatches."
+          },
+          {
+            "id": 7,
+            "title": "Implement Referential Integrity Checks",
+            "description": "Verify that all foreign key relationships and references are correctly established in the migrated data.",
+            "dependencies": [
+              "11.6"
+            ],
+            "details": "Add post-migration checks to confirm that all references (e.g., parent-child links) are valid and consistent.",
+            "status": "done",
+            "testStrategy": "Run SQL queries to detect orphaned rows or broken references; fix issues as needed."
+          },
+          {
+            "id": 8,
+            "title": "Test Migration on Sample Data",
+            "description": "Execute the full migration process on a subset of Firestore data to validate end-to-end correctness.",
+            "dependencies": [
+              "11.7"
+            ],
+            "details": "Use test datasets to simulate migration, then inspect PostgreSQL for data completeness and accuracy.",
+            "status": "done",
+            "testStrategy": "Compare row counts, data values, and relationships between Firestore and PostgreSQL."
+          },
+          {
+            "id": 9,
+            "title": "Optimize Migration Scripts for Performance and Reliability",
+            "description": "Refactor scripts to handle large datasets efficiently and add error handling, logging, and retry logic.",
+            "dependencies": [
+              "11.8"
+            ],
+            "details": "Implement batching, transaction management, and robust error reporting to ensure smooth migration.",
+            "status": "done",
+            "testStrategy": "Stress-test scripts with large data volumes and monitor for failures or slowdowns."
+          },
+          {
+            "id": 10,
+            "title": "Document Migration Process and Provide Rollback Plan",
+            "description": "Create comprehensive documentation for the migration steps, scripts, and a rollback strategy in case of failure.",
+            "dependencies": [
+              "11.9"
+            ],
+            "details": "Write clear instructions for running migration, troubleshooting, and reverting changes if needed.",
+            "status": "done",
+            "testStrategy": "Review documentation with stakeholders and perform a rollback test on sample data."
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Implement Dual-Write System for Safe Migration",
+        "description": "Enable application to write to both Firebase and Supabase during migration.",
+        "details": "Abstract data access layer to support dual writes. On every data mutation, write to both Firestore and Supabase. Use feature flags to toggle dual-write mode. Recommended: Use TypeScript interfaces for data models.",
+        "testStrategy": "Verify data consistency between Firebase and Supabase after mutations.",
+        "priority": "high",
+        "dependencies": [
+          11,
+          7,
+          10
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 13,
+        "title": "Validate Data Consistency and Integrity",
+        "description": "Run validation scripts to ensure migrated data matches source data.",
+        "details": "Compare row counts, checksums, and key fields between Firestore and Supabase. Use automated scripts for validation. Log discrepancies for manual review.",
+        "testStrategy": "Automated diff reports. Manual spot checks for edge cases.",
+        "priority": "high",
+        "dependencies": [
+          12
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 14,
+        "title": "Implement Migration Rollback Procedures",
+        "description": "Develop scripts and processes to rollback migration in case of failure.",
+        "details": "Automate backup of Supabase and Firebase data before migration. Write scripts to restore from backup. Document rollback steps for team.",
+        "testStrategy": "Simulate migration failure and execute rollback. Verify data restoration.",
+        "priority": "medium",
+        "dependencies": [
+          11
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 15,
+        "title": "Convert Firebase Cloud Functions to Supabase Edge Functions",
+        "description": "Rewrite all Firebase Cloud Functions as Supabase Edge Functions.",
+        "details": "Use Supabase Edge Functions (Deno runtime) to implement triggers (onTradeChangedV2, cleanupDeletedCalendarV2), callable endpoints, and sharing logic. Use supabase/functions CLI for deployment. Reference Supabase Edge Functions docs for best practices.",
+        "testStrategy": "Unit and integration tests for each function. Verify correct triggers and responses.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          3,
+          4,
+          7
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Inventory Existing Firebase Cloud Functions",
+            "description": "List all current Firebase Cloud Functions, including triggers, callable endpoints, and sharing logic to be migrated.",
+            "dependencies": [],
+            "details": "Review the Firebase project source code and documentation to identify all deployed Cloud Functions and their purposes.",
+            "status": "done",
+            "testStrategy": "Verify the inventory against Firebase console and source repository to ensure completeness."
+          },
+          {
+            "id": 2,
+            "title": "Analyze Function Logic and Dependencies",
+            "description": "Examine each function's logic, dependencies, and integration points with Firebase services (Firestore, Auth, Storage, etc.).",
+            "dependencies": [
+              "15.1"
+            ],
+            "details": "Document how each function interacts with Firebase and external APIs, noting any platform-specific features.",
+            "status": "done",
+            "testStrategy": "Cross-reference with existing documentation and run sample executions to confirm understanding."
+          },
+          {
+            "id": 3,
+            "title": "Map Firebase Functionality to Supabase Edge Functions",
+            "description": "Determine how each Firebase function will be implemented using Supabase Edge Functions and the Deno runtime.",
+            "dependencies": [
+              "15.2"
+            ],
+            "details": "Identify equivalent triggers, endpoints, and event sources in Supabase. Plan for differences in runtime and API.",
+            "status": "done",
+            "testStrategy": "Draft a mapping document and review with technical stakeholders."
+          },
+          {
+            "id": 4,
+            "title": "Set Up Supabase Edge Functions Development Environment",
+            "description": "Configure the local environment for developing and testing Supabase Edge Functions using the supabase/functions CLI.",
+            "dependencies": [
+              "15.3"
+            ],
+            "details": "Install necessary tools (Deno, supabase CLI), set up project structure, and connect to the Supabase project.",
+            "status": "done",
+            "testStrategy": "Run a sample Edge Function locally and deploy to Supabase to verify setup."
+          },
+          {
+            "id": 5,
+            "title": "Rewrite onTradeChangedV2 Trigger as Supabase Edge Function",
+            "description": "Implement the onTradeChangedV2 logic as a Supabase Edge Function, adapting to the new runtime and event model.",
+            "dependencies": [
+              "15.4"
+            ],
+            "details": "Translate the function logic to TypeScript for Deno, using Supabase APIs for database and event handling.",
+            "status": "done",
+            "testStrategy": "Unit test the function locally and verify correct behavior with test data."
+          },
+          {
+            "id": 6,
+            "title": "Rewrite cleanupDeletedCalendarV2 Trigger as Supabase Edge Function",
+            "description": "Implement the cleanupDeletedCalendarV2 logic as a Supabase Edge Function.",
+            "dependencies": [
+              "15.4"
+            ],
+            "details": "Adapt the function to Supabase's event model and database schema, ensuring proper cleanup operations.",
+            "status": "done",
+            "testStrategy": "Unit and integration test with sample calendar deletions."
+          },
+          {
+            "id": 7,
+            "title": "Implement Callable Endpoints as Supabase Edge Functions",
+            "description": "Rewrite all callable Firebase functions as HTTP endpoints using Supabase Edge Functions.",
+            "dependencies": [
+              "15.4"
+            ],
+            "details": "Expose necessary endpoints, handle authentication, and ensure compatibility with client calls.",
+            "status": "done",
+            "testStrategy": "Test endpoints with HTTP requests and validate responses."
+          },
+          {
+            "id": 8,
+            "title": "Migrate Sharing Logic to Supabase Edge Functions",
+            "description": "Reimplement sharing-related logic (e.g., sharedTrades, sharedCalendars) as Edge Functions.",
+            "dependencies": [
+              "15.4"
+            ],
+            "details": "Ensure sharing features integrate with the new PostgreSQL schema and Supabase Auth.",
+            "status": "done",
+            "testStrategy": "Test sharing workflows end-to-end with multiple users."
+          },
+          {
+            "id": 9,
+            "title": "Deploy Edge Functions to Supabase",
+            "description": "Deploy all rewritten Edge Functions to the Supabase project using the supabase/functions CLI.",
+            "dependencies": [
+              "15.5",
+              "15.6",
+              "15.7",
+              "15.8"
+            ],
+            "details": "Follow Supabase documentation for deployment best practices and environment configuration.",
+            "status": "done",
+            "testStrategy": "Verify deployment status and function availability in the Supabase dashboard."
+          },
+          {
+            "id": 10,
+            "title": "Test and Validate All Migrated Functions",
+            "description": "Perform unit and integration tests for each Edge Function to ensure correct triggers, responses, and integration with Supabase services.",
+            "dependencies": [
+              "15.9"
+            ],
+            "details": "Use automated tests and manual verification to confirm functional parity with original Firebase Cloud Functions.",
+            "status": "done",
+            "testStrategy": "Run comprehensive test suites and validate with real-world scenarios."
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "title": "Implement PostgreSQL Database Triggers",
+        "description": "Migrate Firestore-triggered logic to PostgreSQL triggers and functions.",
+        "details": "Write PL/pgSQL functions for triggers (e.g., on trade insert/update/delete). Use Supabase SQL Editor for deployment. Ensure triggers call Edge Functions as needed.",
+        "testStrategy": "Test trigger execution on data changes. Validate side effects.",
+        "priority": "medium",
+        "dependencies": [
+          15
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 17,
+        "title": "Implement Scheduled Functions with pg_cron",
+        "description": "Replace scheduled Firebase functions with pg_cron jobs in Supabase.",
+        "details": "Install and configure pg_cron extension in Supabase. Schedule jobs for autoRefreshEconomicCalendarV2, cleanupExpiredCalendarsV2, etc. Write SQL or PL/pgSQL for scheduled tasks.",
+        "testStrategy": "Verify scheduled jobs run at correct intervals. Check logs and outcomes.",
+        "priority": "medium",
+        "dependencies": [
+          16
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 18,
+        "title": "Update Callable Function Endpoints",
+        "description": "Expose HTTP endpoints for business logic previously handled by Firebase callable functions.",
+        "details": "Implement HTTP endpoints using Supabase Edge Functions. Secure endpoints with JWT validation. Update frontend to call new endpoints.",
+        "testStrategy": "Test endpoint responses and security. Validate integration with frontend.",
+        "priority": "medium",
+        "dependencies": [
+          15
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 19,
+        "title": "Replace Firestore Real-time Listeners with Supabase Subscriptions",
+        "description": "Update real-time functionality to use Supabase's real-time subscriptions.",
+        "details": "Use Supabase JS client v2.43+ to subscribe to table changes. Refactor frontend event handling to process real-time updates from Supabase. Optimize subscription patterns to minimize bandwidth.",
+        "testStrategy": "Test real-time updates for all relevant entities. Measure latency and reliability.",
+        "priority": "high",
+        "dependencies": [
+          7,
+          10,
+          12
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 20,
+        "title": "Update Frontend Service Layer to Use Supabase",
+        "description": "Refactor all frontend service files to use Supabase client instead of Firebase SDK.",
+        "details": "Update calendarService.ts, authService.ts, etc. Replace all Firebase SDK calls with Supabase equivalents. Update data models and TypeScript types. Implement Supabase-specific error handling and retry logic.",
+        "testStrategy": "Run unit and integration tests for all service methods. Validate error handling.",
+        "priority": "high",
+        "dependencies": [
+          19
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Audit Current Service Layer for Firebase Usage",
+            "description": "Identify all frontend service files and functions that utilize the Firebase SDK, including calendarService.ts, authService.ts, and others.",
+            "dependencies": [],
+            "details": "Create a comprehensive list of all Firebase SDK calls and their usage patterns across the service layer.",
+            "status": "pending",
+            "testStrategy": "Verify the audit by cross-referencing with project documentation and codebase search."
+          },
+          {
+            "id": 2,
+            "title": "Map Firebase SDK Calls to Supabase Equivalents",
+            "description": "Document the Supabase client methods that correspond to each Firebase SDK call identified in the audit.",
+            "dependencies": [
+              "20.1"
+            ],
+            "details": "Reference Supabase and Firebase documentation to ensure accurate mapping for authentication, database, storage, and real-time features.",
+            "status": "pending",
+            "testStrategy": "Review mapping with technical leads or Supabase documentation for completeness."
+          },
+          {
+            "id": 3,
+            "title": "Refactor Authentication Logic to Use Supabase",
+            "description": "Replace all Firebase authentication calls with Supabase Auth client methods in authService.ts and related files.",
+            "dependencies": [
+              "20.2"
+            ],
+            "details": "Implement sign-in, sign-out, session management, and token refresh using Supabase Auth APIs.",
+            "status": "pending",
+            "testStrategy": "Test all authentication flows, including edge cases and error scenarios."
+          },
+          {
+            "id": 4,
+            "title": "Refactor Database Operations to Use Supabase Client",
+            "description": "Update all CRUD operations in service files to use Supabase client methods instead of Firebase Firestore/Realtime Database.",
+            "dependencies": [
+              "20.2"
+            ],
+            "details": "Ensure correct usage of Supabase's SQL-based querying and real-time subscriptions.",
+            "status": "pending",
+            "testStrategy": "Run unit and integration tests for all data operations."
+          },
+          {
+            "id": 5,
+            "title": "Refactor Storage Logic to Use Supabase Storage",
+            "description": "Replace Firebase Storage SDK calls with Supabase Storage client methods for file upload, download, and deletion.",
+            "dependencies": [
+              "20.2"
+            ],
+            "details": "Implement upload progress tracking and optimize images before upload using browser APIs.",
+            "status": "pending",
+            "testStrategy": "Test file upload, download, deletion, and progress tracking."
+          },
+          {
+            "id": 6,
+            "title": "Update Data Models and TypeScript Types",
+            "description": "Modify data models and TypeScript types to align with Supabase's PostgreSQL schema and API responses.",
+            "dependencies": [
+              "20.3",
+              "20.4",
+              "20.5"
+            ],
+            "details": "Ensure all service methods and components use updated types and interfaces.",
+            "status": "pending",
+            "testStrategy": "Run type checks and validate type safety across the codebase."
+          },
+          {
+            "id": 7,
+            "title": "Implement Supabase-Specific Error Handling",
+            "description": "Add error handling logic tailored to Supabase client error formats and codes throughout the service layer.",
+            "dependencies": [
+              "20.3",
+              "20.4",
+              "20.5"
+            ],
+            "details": "Handle authentication, database, and storage errors according to Supabase documentation.",
+            "status": "pending",
+            "testStrategy": "Simulate error scenarios and verify correct error handling and messaging."
+          },
+          {
+            "id": 8,
+            "title": "Implement Retry Logic for Supabase Operations",
+            "description": "Add retry mechanisms for transient errors in Supabase client calls, such as network failures or rate limits.",
+            "dependencies": [
+              "20.7"
+            ],
+            "details": "Use exponential backoff or similar strategies for retries where appropriate.",
+            "status": "pending",
+            "testStrategy": "Test retry logic under simulated network and server error conditions."
+          },
+          {
+            "id": 9,
+            "title": "Update Real-Time Data Subscriptions",
+            "description": "Replace Firebase real-time listeners with Supabase real-time subscriptions using Postgres Changes or equivalent.",
+            "dependencies": [
+              "20.4"
+            ],
+            "details": "Ensure correct handling of subscription setup, teardown, and error recovery.",
+            "status": "pending",
+            "testStrategy": "Test real-time updates and verify data consistency across clients."
+          },
+          {
+            "id": 10,
+            "title": "Update Service Layer Documentation",
+            "description": "Revise or create documentation for all updated service files, including usage examples and migration notes.",
+            "dependencies": [
+              "20.3",
+              "20.4",
+              "20.5",
+              "20.6",
+              "20.7",
+              "20.8",
+              "20.9"
+            ],
+            "details": "Document Supabase-specific patterns, error handling, and retry logic.",
+            "status": "pending",
+            "testStrategy": "Review documentation for accuracy and completeness."
+          },
+          {
+            "id": 11,
+            "title": "Run and Update Unit and Integration Tests",
+            "description": "Update existing tests and write new ones to cover all Supabase-based service methods and error handling.",
+            "dependencies": [
+              "20.3",
+              "20.4",
+              "20.5",
+              "20.6",
+              "20.7",
+              "20.8",
+              "20.9"
+            ],
+            "details": "Ensure all tests reflect the new Supabase logic and data models.",
+            "status": "pending",
+            "testStrategy": "Run the full test suite and achieve passing results for all cases."
+          },
+          {
+            "id": 12,
+            "title": "Validate End-to-End Functionality and Error Handling",
+            "description": "Perform manual and automated end-to-end testing of the frontend service layer to ensure correct integration with Supabase.",
+            "dependencies": [
+              "20.11"
+            ],
+            "details": "Test all user flows, data operations, real-time updates, and error scenarios in staging or development environments.",
+            "status": "pending",
+            "testStrategy": "Document and resolve any issues found during validation."
+          }
+        ]
+      },
+      {
+        "id": 21,
+        "title": "Update Caching and Offline Strategies",
+        "description": "Adapt caching and offline support to work with Supabase APIs.",
+        "details": "Implement caching using SWR, React Query, or similar. Handle offline scenarios with local storage or IndexedDB. Ensure cache invalidation on real-time updates.",
+        "testStrategy": "Test data availability and consistency during network interruptions.",
+        "priority": "medium",
+        "dependencies": [
+          20
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 22,
+        "title": "Update AI Integration for PostgreSQL Data",
+        "description": "Refactor AI logic to work with PostgreSQL data and Supabase vector search.",
+        "details": "Update AI functions to query PostgreSQL tables. Use pgvector extension for vector search. Update function calling mechanisms for trading analysis. Ensure compatibility with Gemini models.",
+        "testStrategy": "Test AI chat and analysis features end-to-end. Validate vector search accuracy.",
+        "priority": "medium",
+        "dependencies": [
+          20
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 23,
+        "title": "Comprehensive Testing and Quality Assurance",
+        "description": "Perform functional, performance, security, and load testing.",
+        "details": "Write automated tests using Jest, Cypress, or Playwright. Conduct performance testing with k6 or Artillery. Perform security audit and penetration testing. Run load tests for 1000+ concurrent users.",
+        "testStrategy": "All tests must pass. Performance and security benchmarks must be met.",
+        "priority": "high",
+        "dependencies": [
+          21,
+          22
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Test Coverage and Acceptance Criteria",
+            "description": "Establish the scope of functional, performance, security, and load testing. Specify acceptance criteria and benchmarks for each testing type.",
+            "dependencies": [],
+            "details": "Document all features, endpoints, and user flows to be tested. Set clear pass/fail criteria for functional correctness, performance thresholds, and security standards.",
+            "status": "pending",
+            "testStrategy": "Review requirements with stakeholders and ensure all acceptance criteria are documented and approved."
+          },
+          {
+            "id": 2,
+            "title": "Set Up Automated Functional Testing Framework",
+            "description": "Configure and initialize automated testing frameworks such as Jest, Cypress, or Playwright for the project.",
+            "dependencies": [
+              "23.1"
+            ],
+            "details": "Install and configure the chosen test framework(s) based on project needs. Integrate with CI/CD pipelines for automated execution.",
+            "status": "pending",
+            "testStrategy": "Verify test framework setup by running sample tests and confirming integration with CI/CD."
+          },
+          {
+            "id": 3,
+            "title": "Develop and Maintain Automated Functional Test Suites",
+            "description": "Write comprehensive automated tests covering all critical user flows, edge cases, and regression scenarios.",
+            "dependencies": [
+              "23.2"
+            ],
+            "details": "Implement tests for UI, API, and business logic. Ensure tests are modular, maintainable, and provide clear reporting.",
+            "status": "pending",
+            "testStrategy": "Run all tests locally and in CI. Confirm all critical paths are covered and tests are stable."
+          },
+          {
+            "id": 4,
+            "title": "Configure and Execute Performance Testing",
+            "description": "Set up performance testing tools such as k6 or Artillery and design scenarios to measure system throughput and latency.",
+            "dependencies": [
+              "23.1"
+            ],
+            "details": "Define realistic user scenarios and load profiles. Configure scripts to simulate expected and peak loads.",
+            "status": "pending",
+            "testStrategy": "Run baseline and stress tests. Analyze results to ensure performance benchmarks are met."
+          },
+          {
+            "id": 5,
+            "title": "Conduct Load Testing for High Concurrency",
+            "description": "Design and execute load tests simulating 1000+ concurrent users to validate system scalability and stability.",
+            "dependencies": [
+              "23.4"
+            ],
+            "details": "Use k6 or Artillery to simulate concurrent users. Monitor system behavior under sustained and peak loads.",
+            "status": "pending",
+            "testStrategy": "Verify system maintains acceptable response times and error rates under load."
+          },
+          {
+            "id": 6,
+            "title": "Perform Security Audit and Penetration Testing",
+            "description": "Conduct a comprehensive security review and penetration testing to identify and address vulnerabilities.",
+            "dependencies": [
+              "23.1"
+            ],
+            "details": "Use automated scanners and manual techniques to test for common vulnerabilities (OWASP Top 10, authentication, authorization, etc.).",
+            "status": "pending",
+            "testStrategy": "Document all findings and verify remediation of critical vulnerabilities."
+          },
+          {
+            "id": 7,
+            "title": "Integrate Test Automation with CI/CD Pipeline",
+            "description": "Ensure all automated tests (functional, performance, security) are executed as part of the CI/CD process.",
+            "dependencies": [
+              "23.3",
+              "23.5",
+              "23.6"
+            ],
+            "details": "Configure CI/CD workflows to trigger tests on code changes and deployments. Set up notifications for failures.",
+            "status": "pending",
+            "testStrategy": "Validate that all tests run automatically in CI/CD and block deployments on test failures."
+          },
+          {
+            "id": 8,
+            "title": "Analyze Test Results and Report Quality Metrics",
+            "description": "Aggregate and analyze test results to provide actionable quality metrics and insights to stakeholders.",
+            "dependencies": [
+              "23.7"
+            ],
+            "details": "Generate reports on test coverage, pass/fail rates, performance benchmarks, and security findings. Present results to the team.",
+            "status": "pending",
+            "testStrategy": "Review reports for completeness and accuracy. Ensure all quality gates are met before release."
+          }
+        ]
+      },
+      {
+        "id": 24,
+        "title": "Prepare Deployment and Rollout Scripts",
+        "description": "Create scripts for production deployment and gradual rollout.",
+        "details": "Write deployment scripts using Supabase CLI and CI/CD pipelines (GitHub Actions, GitLab CI). Implement gradual rollout strategy (feature flags, canary releases). Monitor system metrics and errors.",
+        "testStrategy": "Test deployment in staging. Validate rollback and monitoring.",
+        "priority": "high",
+        "dependencies": [
+          23
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 25,
+        "title": "Execute Cutover and Decommission Firebase",
+        "description": "Switch production traffic to Supabase and decommission Firebase resources.",
+        "details": "Monitor system during cutover. Disable dual-write mode. Decommission Firebase resources after successful migration. Update documentation and inform users.",
+        "testStrategy": "Monitor for errors and downtime. Confirm all features work post-cutover.",
+        "priority": "high",
+        "dependencies": [
+          24
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-13T05:40:21.567Z",
+      "updated": "2025-08-24T20:46:10.023Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

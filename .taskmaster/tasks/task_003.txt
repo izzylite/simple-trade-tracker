@@ -1,0 +1,11 @@
+# Task ID: 3
+# Title: Implement Row Level Security (RLS) Policies
+# Status: pending
+# Dependencies: 2
+# Priority: high
+# Description: Configure RLS policies for all user data tables to enforce security.
+# Details:
+Write RLS policies in Supabase SQL for each table (users, trades, calendars, etc.) to restrict access to authenticated users and enforce ownership. Use Supabase dashboard or SQL scripts. Reference Supabase RLS documentation for best practices.
+
+# Test Strategy:
+Attempt unauthorized queries and verify access is denied. Write automated tests for RLS enforcement.

@@ -1,0 +1,194 @@
+[
+    {
+      "event_message": "shutdown",
+      "event_type": "Shutdown",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "e643e1e0-74ce-4a9d-ade0-5bdaa22ecd19",
+      "level": "log",
+      "timestamp": 1756033280493000
+    },
+    {
+      "event_message": "[2025-08-24T11:00:07.323Z] ECONOMIC EVENTS PROCESSING COMPLETED: Economic events processing completed {\n  success: true,\n  events_processed: 296,\n  events_stored: 295,\n  parsed_total: 296,\n  existing_count: 295,\n  inserted_count: 1,\n  upserted_count: 295,\n  events: [\n    {\n      id: \"4b75538fef2534aadf4b\",\n      currency: \"EUR\",\n      event: \"Export Prices YoY Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T05:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284097\",\n      previous: \"284097\",\n      country: \"Finland\",\n      flag_code: \"fi\",\n      flag_url: \"https://flagcdn.com/w160/fi.png\",\n      last_updated: 1756033206024,\n      source: \"myfxbook\",\n      unix_timestamp: 1756098000000\n    },\n    {\n      id: \"89e2b5e9c5ec0b124629\",\n      currency: \"EUR\",\n      event: \"PPI YoY Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T05:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284098\",\n      previous: \"284098\",\n      country: \"Finland\",\n      flag_code: \"fi\",\n      flag_url: \"https://flagcdn.com/w160/fi.png\",\n      last_updated: 1756033206025,\n      source: \"myfxbook\",\n      unix_timestamp: 1756098000000\n    },\n    {\n      id: \"6c2e3e090bd426009fea\",\n      currency: \"EUR\",\n      event: \"Import Prices YoY Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T05:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284099\",\n      previous: \"284099\",\n      country: \"Finland\",\n      flag_code: \"fi\",\n      flag_url: \"https://flagcdn.com/w160/fi.png\",\n      last_updated: 1756033206026,\n      source: \"myfxbook\",\n      unix_timestamp: 1756098000000\n    },\n    {\n      id: \"b713c686a8f92f8c1603\",\n      currency: \"JPY\",\n      event: \"Coincident Index Jun\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T05:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284100\",\n      previous: \"284100\",\n      country: \"Japan\",\n      flag_code: \"jp\",\n      flag_url: \"https://flagcdn.com/w160/jp.png\",\n      last_updated: 1756033206029,\n      source: \"myfxbook\",\n      unix_timestamp: 1756098000000\n    },\n    {\n      id: \"fbadf5ca3b5337e2c821\",\n      currency: \"JPY\",\n      event: \"Leading Economic Index Jun\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T05:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284101\",\n      previous: \"284101\",\n      country: \"Japan\",\n      flag_code: \"jp\",\n      flag_url: \"https://flagcdn.com/w160/jp.png\",\n      last_updated: 1756033206029,\n      source: \"myfxbook\",\n      unix_timestamp: 1756098000000\n    },\n    {\n      id: \"e3e5e4ea022193bb445f\",\n      currency: \"EUR\",\n      event: \"Industrial Production YoY Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T06:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284103\",\n      previous: \"284103\",\n      country: \"Lithuania\",\n      flag_code: \"lt\",\n      flag_url: \"https://flagcdn.com/w160/lt.png\",\n      last_updated: 1756033206030,\n      source: \"myfxbook\",\n      unix_timestamp: 1756101600000\n    },\n    {\n      id: \"bd3e6eaaf9139f44680c\",\n      currency: \"EUR\",\n      event: \"Industrial Production MoM Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T06:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284104\",\n      previous: \"284104\",\n      country: \"Lithuania\",\n      flag_code: \"lt\",\n      flag_url: \"https://flagcdn.com/w160/lt.png\",\n      last_updated: 1756033206036,\n      source: \"myfxbook\",\n      unix_timestamp: 1756101600000\n    },\n    {\n      id: \"7f7403b2dbeadaca174b\",\n      currency: \"CHF\",\n      event: \"Non Farm Payrolls Q2\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T06:30:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284168\",\n      previous: \"284168\",\n      country: \"Switzerland\",\n      flag_code: \"ch\",\n      flag_url: \"https://flagcdn.com/w160/ch.png\",\n      last_updated: 1756033206036,\n      source: \"myfxbook\",\n      unix_timestamp: 1756103400000\n    },\n    {\n      id: \"8ee07a70669ec952b744\",\n      currency: \"EUR\",\n      event: \"PPI YoY Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T07:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284112\",\n      previous: \"284112\",\n      country: \"Spain\",\n      flag_code: \"es\",\n      flag_url: \"https://flagcdn.com/w160/es.png\",\n      last_updated: 1756033206036,\n      source: \"myfxbook\",\n      unix_timestamp: 1756105200000\n    },\n    {\n      id: \"f04a301d8221ff11111e\",\n      currency: \"EUR\",\n      event: \"Ifo Business Climate Aug\",\n      impact: \"high\",\n      time_utc: \"2025-08-25T08:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284120\",\n      previous: \"284120\",\n      country: \"Germany\",\n      flag_code: \"de\",\n      flag_url: \"https://flagcdn.com/w160/de.png\",\n      last_updated: 1756033206037,\n      source: \"myfxbook\",\n      unix_timestamp: 1756108800000\n    },\n    {\n      id: \"47c98ccee5b2b474d0c8\",\n      currency: \"EUR\",\n      event: \"Ifo Expectations Aug\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T08:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284121\",\n      previous: \"284121\",\n      country: \"Germany\",\n      flag_code: \"de\",\n      flag_url: \"https://flagcdn.com/w160/de.png\",\n      last_updated: 1756033206037,\n      source: \"myfxbook\",\n      unix_timestamp: 1756108800000\n    },\n    {\n      id: \"ce41ad5d510d07ba7595\",\n      currency: \"EUR\",\n      event: \"Ifo Current Conditions Aug\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T08:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284122\",\n      previous: \"284122\",\n      country: \"Germany\",\n      flag_code: \"de\",\n      flag_url: \"https://flagcdn.com/w160/de.png\",\n      last_updated: 1756033206037,\n      source: \"myfxbook\",\n      unix_timestamp: 1756108800000\n    },\n    {\n      id: \"53afcdd3530c508f455e\",\n      currency: \"EUR\",\n      event: \"Tourist Arrivals YoY Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T08:30:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284124\",\n      previous: \"284124\",\n      country: \"Slovenia\",\n      flag_code: \"si\",\n      flag_url: \"https://flagcdn.com/w160/si.png\",\n      last_updated: 1756033206037,\n      source: \"myfxbook\",\n      unix_timestamp: 1756110600000\n    },\n    {\n      id: \"1878af324785114c0918\",\n      currency: \"EUR\",\n      event: \"Business Confidence Aug\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T08:30:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284125\",\n      previous: \"284125\",\n      country: \"Slovenia\",\n      flag_code: \"si\",\n      flag_url: \"https://flagcdn.com/w160/si.png\",\n      last_updated: 1756033206038,\n      source: \"myfxbook\",\n      unix_timestamp: 1756110600000\n    },\n    {\n      id: \"afb177e2e7d95abc918c\",\n      currency: \"EUR\",\n      event: \"9-Month Bubill Auction\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T09:30:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284132\",\n      previous: \"284132\",\n      country: \"Germany\",\n      flag_code: \"de\",\n      flag_url: \"https://flagcdn.com/w160/de.png\",\n      last_updated: 1756033206038,\n      source: \"myfxbook\",\n      unix_timestamp: 1756114200000\n    },\n    {\n      id: \"3a5d4503c01d74f44217\",\n      currency: \"EUR\",\n      event: \"3-Month Bubill Auction\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T09:30:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284133\",\n      previous: \"284133\",\n      country: \"Germany\",\n      flag_code: \"de\",\n      flag_url: \"https://flagcdn.com/w160/de.png\",\n      last_updated: 1756033206039,\n      source: \"myfxbook\",\n      unix_timestamp: 1756114200000\n    },\n    {\n      id: \"54bd86c0018ec88a1069\",\n      currency: \"EUR\",\n      event: \"2035 Bond Auction\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T09:45:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"287509\",\n      previous: \"287509\",\n      country: \"European Union\",\n      flag_code: \"eu\",\n      flag_url: \"https://flagcdn.com/w160/eu.png\",\n      last_updated: 1756033206039,\n      source: \"myfxbook\",\n      unix_timestamp: 1756115100000\n    },\n    {\n      id: \"599d6429718c08b62e99\",\n      currency: \"EUR\",\n      event: \"2038 Bond Auction\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T09:45:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"287510\",\n      previous: \"287510\",\n      country: \"European Union\",\n      flag_code: \"eu\",\n      flag_url: \"https://flagcdn.com/w160/eu.png\",\n      last_updated: 1756033206039,\n      source: \"myfxbook\",\n      unix_timestamp: 1756115100000\n    },\n    {\n      id: \"5bed7be9dbf7552629d0\",\n      currency: \"EUR\",\n      event: \"2027 Bond Auction\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T09:45:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"287511\",\n      previous: \"287511\",\n      country: \"European Union\",\n      flag_code: \"eu\",\n      flag_url: \"https://flagcdn.com/w160/eu.png\",\n      last_updated: 1756033206040,\n      source: \"myfxbook\",\n      unix_timestamp: 1756115100000\n    },\n    {\n      id: \"ba2e9e8adef602b7bcc7\",\n      currency: \"EUR\",\n      event: \"Consumer Confidence Jul\",\n      impact: \"medium\",\n      time_utc: \"2025-08-25T10:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284314\",\n      previous: \"284314\",\n      country: \"Spain\",\n      flag_code: \"es\",\n      flag_url: \"https://flagcdn.com/w160/es.png\",\n      last_updated: 1756033206040,\n      source: \"myfxbook\",\n      unix_timestamp: 1756116000000\n    },\n    {\n      id: \"9acb30e141681c145781\",\n      currency: \"EUR\",\n      event: \"Balance of Trade Jun\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T10:30:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284136\",\n ....[truncated]",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "d4a6d698-8ffc-4bbb-b479-628ea7a18ba7",
+      "level": "log",
+      "timestamp": 1756033207335000
+    },
+    {
+      "event_message": "[2025-08-24T11:00:07.323Z] STORED BATCH 2: AFFECTED 96 ROWS (EXISTING SO FAR: 295): Stored batch 2: affected 96 rows (existing so far: 295)\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "fd85eb44-ed7d-4fb3-a216-f2ba280c4fce",
+      "level": "log",
+      "timestamp": 1756033207323000
+    },
+    {
+      "event_message": "[2025-08-24T11:00:07.323Z] TOTALS -> UPSERTED: 295, EXISTING: 295: Totals -> upserted: 295, existing: 295\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "abfd1474-b0ae-45b9-a2d7-9329acb576c8",
+      "level": "log",
+      "timestamp": 1756033207323000
+    },
+    {
+      "event_message": "[2025-08-24T11:00:06.929Z] STORED BATCH 1: AFFECTED 199 ROWS (EXISTING SO FAR: 199): Stored batch 1: affected 199 rows (existing so far: 199)\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "e793b6e8-d339-45ed-a674-79d3b15a9ea9",
+      "level": "log",
+      "timestamp": 1756033206929000
+    },
+    {
+      "event_message": "[2025-08-24T11:00:06.193Z] SUCCESSFULLY PARSED 296 EVENTS FROM HTML: Successfully parsed 296 events from HTML\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "9a4360cc-a53a-4276-98d0-aff930da99ae",
+      "level": "log",
+      "timestamp": 1756033206193000
+    },
+    {
+      "event_message": "[2025-08-24T11:00:06.193Z] FILTERED 296 TOTAL EVENTS TO 296 MAJOR CURRENCY EVENTS: Filtered 296 total events to 296 major currency events\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "1e36516d-cf32-41e0-a1a9-c6b7305a0e64",
+      "level": "log",
+      "timestamp": 1756033206193000
+    },
+    {
+      "event_message": "[2025-08-24T11:00:06.193Z] STORING 296 EVENTS IN DATABASE: Storing 296 events in database\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "bc94d777-369a-4a13-a73f-eab4e5daaf97",
+      "level": "log",
+      "timestamp": 1756033206193000
+    },
+    {
+      "event_message": "[2025-08-24T11:00:05.567Z] PARSING MYFXBOOK WEEKLY HTML (ENHANCED): Parsing MyFXBook weekly HTML (enhanced)\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "fae5c81c-123b-4762-a1b9-c5d7eae9704a",
+      "level": "log",
+      "timestamp": 1756033205567000
+    },
+    {
+      "event_message": "[2025-08-24T11:00:05.565Z] PROCESSING HTML CONTENT FOR ECONOMIC EVENTS: Processing HTML content for economic events { contentSize: 1827716 }\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "df6576aa-7423-414c-881f-c94cbd1f53f0",
+      "level": "log",
+      "timestamp": 1756033205567000
+    },
+    {
+      "event_message": "[2025-08-24T11:00:05.551Z] PROCESS ECONOMIC EVENTS REQUEST RECEIVED: Process economic events request received\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "540526e5-e06d-48d1-a31a-0418f954132e",
+      "level": "log",
+      "timestamp": 1756033205551000
+    },
+    {
+      "event_message": "booted (time: 36ms)",
+      "event_type": "Boot",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "016e1be1-cc15-4d01-9eb6-5dd4c5eab564",
+      "level": "log",
+      "timestamp": 1756033205474000
+    },
+    {
+      "event_message": "shutdown",
+      "event_type": "Shutdown",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "2268d542-7a0e-4ce2-b6a4-955cc2110bf0",
+      "level": "log",
+      "timestamp": 1756032840862000
+    },
+    {
+      "event_message": "[2025-08-24T10:52:49.517Z] ECONOMIC EVENTS PROCESSING COMPLETED: Economic events processing completed {\n  success: true,\n  events_processed: 296,\n  events_stored: 295,\n  parsed_total: 296,\n  existing_count: 133,\n  inserted_count: 163,\n  upserted_count: 295,\n  events: [\n    {\n      id: \"4b75538fef2534aadf4b\",\n      currency: \"EUR\",\n      event: \"Export Prices YoY Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T05:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284097\",\n      previous: \"284097\",\n      country: \"Finland\",\n      flag_code: \"fi\",\n      flag_url: \"https://flagcdn.com/w160/fi.png\",\n      last_updated: 1756032766465,\n      source: \"myfxbook\",\n      unix_timestamp: 1756098000000\n    },\n    {\n      id: \"89e2b5e9c5ec0b124629\",\n      currency: \"EUR\",\n      event: \"PPI YoY Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T05:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284098\",\n      previous: \"284098\",\n      country: \"Finland\",\n      flag_code: \"fi\",\n      flag_url: \"https://flagcdn.com/w160/fi.png\",\n      last_updated: 1756032766466,\n      source: \"myfxbook\",\n      unix_timestamp: 1756098000000\n    },\n    {\n      id: \"6c2e3e090bd426009fea\",\n      currency: \"EUR\",\n      event: \"Import Prices YoY Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T05:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284099\",\n      previous: \"284099\",\n      country: \"Finland\",\n      flag_code: \"fi\",\n      flag_url: \"https://flagcdn.com/w160/fi.png\",\n      last_updated: 1756032766466,\n      source: \"myfxbook\",\n      unix_timestamp: 1756098000000\n    },\n    {\n      id: \"b713c686a8f92f8c1603\",\n      currency: \"JPY\",\n      event: \"Coincident Index Jun\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T05:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284100\",\n      previous: \"284100\",\n      country: \"Japan\",\n      flag_code: \"jp\",\n      flag_url: \"https://flagcdn.com/w160/jp.png\",\n      last_updated: 1756032766467,\n      source: \"myfxbook\",\n      unix_timestamp: 1756098000000\n    },\n    {\n      id: \"fbadf5ca3b5337e2c821\",\n      currency: \"JPY\",\n      event: \"Leading Economic Index Jun\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T05:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284101\",\n      previous: \"284101\",\n      country: \"Japan\",\n      flag_code: \"jp\",\n      flag_url: \"https://flagcdn.com/w160/jp.png\",\n      last_updated: 1756032766467,\n      source: \"myfxbook\",\n      unix_timestamp: 1756098000000\n    },\n    {\n      id: \"e3e5e4ea022193bb445f\",\n      currency: \"EUR\",\n      event: \"Industrial Production YoY Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T06:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284103\",\n      previous: \"284103\",\n      country: \"Lithuania\",\n      flag_code: \"lt\",\n      flag_url: \"https://flagcdn.com/w160/lt.png\",\n      last_updated: 1756032766468,\n      source: \"myfxbook\",\n      unix_timestamp: 1756101600000\n    },\n    {\n      id: \"bd3e6eaaf9139f44680c\",\n      currency: \"EUR\",\n      event: \"Industrial Production MoM Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T06:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284104\",\n      previous: \"284104\",\n      country: \"Lithuania\",\n      flag_code: \"lt\",\n      flag_url: \"https://flagcdn.com/w160/lt.png\",\n      last_updated: 1756032766468,\n      source: \"myfxbook\",\n      unix_timestamp: 1756101600000\n    },\n    {\n      id: \"7f7403b2dbeadaca174b\",\n      currency: \"CHF\",\n      event: \"Non Farm Payrolls Q2\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T06:30:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284168\",\n      previous: \"284168\",\n      country: \"Switzerland\",\n      flag_code: \"ch\",\n      flag_url: \"https://flagcdn.com/w160/ch.png\",\n      last_updated: 1756032766468,\n      source: \"myfxbook\",\n      unix_timestamp: 1756103400000\n    },\n    {\n      id: \"8ee07a70669ec952b744\",\n      currency: \"EUR\",\n      event: \"PPI YoY Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T07:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284112\",\n      previous: \"284112\",\n      country: \"Spain\",\n      flag_code: \"es\",\n      flag_url: \"https://flagcdn.com/w160/es.png\",\n      last_updated: 1756032766469,\n      source: \"myfxbook\",\n      unix_timestamp: 1756105200000\n    },\n    {\n      id: \"f04a301d8221ff11111e\",\n      currency: \"EUR\",\n      event: \"Ifo Business Climate Aug\",\n      impact: \"high\",\n      time_utc: \"2025-08-25T08:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284120\",\n      previous: \"284120\",\n      country: \"Germany\",\n      flag_code: \"de\",\n      flag_url: \"https://flagcdn.com/w160/de.png\",\n      last_updated: 1756032766469,\n      source: \"myfxbook\",\n      unix_timestamp: 1756108800000\n    },\n    {\n      id: \"47c98ccee5b2b474d0c8\",\n      currency: \"EUR\",\n      event: \"Ifo Expectations Aug\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T08:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284121\",\n      previous: \"284121\",\n      country: \"Germany\",\n      flag_code: \"de\",\n      flag_url: \"https://flagcdn.com/w160/de.png\",\n      last_updated: 1756032766470,\n      source: \"myfxbook\",\n      unix_timestamp: 1756108800000\n    },\n    {\n      id: \"ce41ad5d510d07ba7595\",\n      currency: \"EUR\",\n      event: \"Ifo Current Conditions Aug\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T08:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284122\",\n      previous: \"284122\",\n      country: \"Germany\",\n      flag_code: \"de\",\n      flag_url: \"https://flagcdn.com/w160/de.png\",\n      last_updated: 1756032766470,\n      source: \"myfxbook\",\n      unix_timestamp: 1756108800000\n    },\n    {\n      id: \"53afcdd3530c508f455e\",\n      currency: \"EUR\",\n      event: \"Tourist Arrivals YoY Jul\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T08:30:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284124\",\n      previous: \"284124\",\n      country: \"Slovenia\",\n      flag_code: \"si\",\n      flag_url: \"https://flagcdn.com/w160/si.png\",\n      last_updated: 1756032766471,\n      source: \"myfxbook\",\n      unix_timestamp: 1756110600000\n    },\n    {\n      id: \"1878af324785114c0918\",\n      currency: \"EUR\",\n      event: \"Business Confidence Aug\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T08:30:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284125\",\n      previous: \"284125\",\n      country: \"Slovenia\",\n      flag_code: \"si\",\n      flag_url: \"https://flagcdn.com/w160/si.png\",\n      last_updated: 1756032766471,\n      source: \"myfxbook\",\n      unix_timestamp: 1756110600000\n    },\n    {\n      id: \"afb177e2e7d95abc918c\",\n      currency: \"EUR\",\n      event: \"9-Month Bubill Auction\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T09:30:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284132\",\n      previous: \"284132\",\n      country: \"Germany\",\n      flag_code: \"de\",\n      flag_url: \"https://flagcdn.com/w160/de.png\",\n      last_updated: 1756032766471,\n      source: \"myfxbook\",\n      unix_timestamp: 1756114200000\n    },\n    {\n      id: \"3a5d4503c01d74f44217\",\n      currency: \"EUR\",\n      event: \"3-Month Bubill Auction\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T09:30:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284133\",\n      previous: \"284133\",\n      country: \"Germany\",\n      flag_code: \"de\",\n      flag_url: \"https://flagcdn.com/w160/de.png\",\n      last_updated: 1756032766472,\n      source: \"myfxbook\",\n      unix_timestamp: 1756114200000\n    },\n    {\n      id: \"54bd86c0018ec88a1069\",\n      currency: \"EUR\",\n      event: \"2035 Bond Auction\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T09:45:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"287509\",\n      previous: \"287509\",\n      country: \"European Union\",\n      flag_code: \"eu\",\n      flag_url: \"https://flagcdn.com/w160/eu.png\",\n      last_updated: 1756032766472,\n      source: \"myfxbook\",\n      unix_timestamp: 1756115100000\n    },\n    {\n      id: \"599d6429718c08b62e99\",\n      currency: \"EUR\",\n      event: \"2038 Bond Auction\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T09:45:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"287510\",\n      previous: \"287510\",\n      country: \"European Union\",\n      flag_code: \"eu\",\n      flag_url: \"https://flagcdn.com/w160/eu.png\",\n      last_updated: 1756032766472,\n      source: \"myfxbook\",\n      unix_timestamp: 1756115100000\n    },\n    {\n      id: \"5bed7be9dbf7552629d0\",\n      currency: \"EUR\",\n      event: \"2027 Bond Auction\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T09:45:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"287511\",\n      previous: \"287511\",\n      country: \"European Union\",\n      flag_code: \"eu\",\n      flag_url: \"https://flagcdn.com/w160/eu.png\",\n      last_updated: 1756032766473,\n      source: \"myfxbook\",\n      unix_timestamp: 1756115100000\n    },\n    {\n      id: \"ba2e9e8adef602b7bcc7\",\n      currency: \"EUR\",\n      event: \"Consumer Confidence Jul\",\n      impact: \"medium\",\n      time_utc: \"2025-08-25T10:00:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284314\",\n      previous: \"284314\",\n      country: \"Spain\",\n      flag_code: \"es\",\n      flag_url: \"https://flagcdn.com/w160/es.png\",\n      last_updated: 1756032766473,\n      source: \"myfxbook\",\n      unix_timestamp: 1756116000000\n    },\n    {\n      id: \"9acb30e141681c145781\",\n      currency: \"EUR\",\n      event: \"Balance of Trade Jun\",\n      impact: \"low\",\n      time_utc: \"2025-08-25T10:30:00.000Z\",\n      date: \"2025-08-25\",\n      actual: undefined,\n      forecast: \"284136\" ....[truncated]",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "aaebd3ac-a6fc-4df9-82d2-bd6be3f534ef",
+      "level": "log",
+      "timestamp": 1756032769540000
+    },
+    {
+      "event_message": "[2025-08-24T10:52:49.516Z] STORED BATCH 2: AFFECTED 96 ROWS (EXISTING SO FAR: 133): Stored batch 2: affected 96 rows (existing so far: 133)\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "758c4dbb-9896-44f3-8c0f-59907e2194b6",
+      "level": "log",
+      "timestamp": 1756032769516000
+    },
+    {
+      "event_message": "[2025-08-24T10:52:49.516Z] TOTALS -> UPSERTED: 295, EXISTING: 133: Totals -> upserted: 295, existing: 133\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "e99bb3d8-55b0-471a-9d5c-652f24ec5765",
+      "level": "log",
+      "timestamp": 1756032769516000
+    },
+    {
+      "event_message": "[2025-08-24T10:52:48.367Z] STORED BATCH 1: AFFECTED 199 ROWS (EXISTING SO FAR: 37): Stored batch 1: affected 199 rows (existing so far: 37)\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "a40499d7-d728-4145-9e74-feebb266f560",
+      "level": "log",
+      "timestamp": 1756032768367000
+    },
+    {
+      "event_message": "[2025-08-24T10:52:46.647Z] FILTERED 296 TOTAL EVENTS TO 296 MAJOR CURRENCY EVENTS: Filtered 296 total events to 296 major currency events\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "f63e4596-a940-40ff-8269-6f3c7405b2e1",
+      "level": "log",
+      "timestamp": 1756032766647000
+    },
+    {
+      "event_message": "[2025-08-24T10:52:46.647Z] STORING 296 EVENTS IN DATABASE: Storing 296 events in database\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "1d6e1708-f8ae-4a50-a298-990b1e5a3a4d",
+      "level": "log",
+      "timestamp": 1756032766647000
+    },
+    {
+      "event_message": "[2025-08-24T10:52:46.647Z] SUCCESSFULLY PARSED 296 EVENTS FROM HTML: Successfully parsed 296 events from HTML\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "6deecb19-d49d-4260-a9bf-c0e92c6fb801",
+      "level": "log",
+      "timestamp": 1756032766647000
+    },
+    {
+      "event_message": "[2025-08-24T10:52:45.967Z] PROCESSING HTML CONTENT FOR ECONOMIC EVENTS: Processing HTML content for economic events { contentSize: 1827462 }\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "c39406e7-a23a-41b3-a95d-80d9e2caaf8a",
+      "level": "log",
+      "timestamp": 1756032765968000
+    },
+    {
+      "event_message": "[2025-08-24T10:52:45.968Z] PARSING MYFXBOOK WEEKLY HTML (ENHANCED): Parsing MyFXBook weekly HTML (enhanced)\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "1fee4cc3-c84f-44ee-898e-439d34c40a1c",
+      "level": "log",
+      "timestamp": 1756032765968000
+    },
+    {
+      "event_message": "[2025-08-24T10:52:45.953Z] PROCESS ECONOMIC EVENTS REQUEST RECEIVED: Process economic events request received\n",
+      "event_type": "Log",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "3bf58794-55b8-4ffa-b950-37942a5cf13a",
+      "level": "log",
+      "timestamp": 1756032765953000
+    },
+    {
+      "event_message": "booted (time: 40ms)",
+      "event_type": "Boot",
+      "function_id": "9b3ffd2a-3e5b-44e7-ac1c-ac8865d77f20",
+      "id": "786e49f1-ea6b-4cb1-97be-318141f10ba5",
+      "level": "log",
+      "timestamp": 1756032765836000
+    }
+  ]

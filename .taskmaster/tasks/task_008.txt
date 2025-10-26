@@ -1,0 +1,11 @@
+# Task ID: 8
+# Title: Set Up Supabase Storage Buckets and Policies
+# Status: pending
+# Dependencies: 1, 5
+# Priority: high
+# Description: Create storage buckets and configure security policies for trade images.
+# Details:
+Create buckets in Supabase Storage for user trade images. Set up folder structure: users/{userId}/trade-images/. Write storage policies to restrict access to authenticated users. Use Supabase dashboard or SQL.
+
+# Test Strategy:
+Attempt uploads/downloads as different users. Verify access control and folder structure.

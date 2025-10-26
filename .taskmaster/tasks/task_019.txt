@@ -1,0 +1,11 @@
+# Task ID: 19
+# Title: Replace Firestore Real-time Listeners with Supabase Subscriptions
+# Status: pending
+# Dependencies: 7, 10, 12
+# Priority: high
+# Description: Update real-time functionality to use Supabase's real-time subscriptions.
+# Details:
+Use Supabase JS client v2.43+ to subscribe to table changes. Refactor frontend event handling to process real-time updates from Supabase. Optimize subscription patterns to minimize bandwidth.
+
+# Test Strategy:
+Test real-time updates for all relevant entities. Measure latency and reliability.

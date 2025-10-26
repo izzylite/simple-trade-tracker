@@ -1,0 +1,61 @@
+# Task ID: 2
+# Title: Design PostgreSQL Database Schema
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Design relational schema in PostgreSQL to replace Firestore collections and subcollections.
+# Details:
+Map Firestore collections (calendars, sharedTrades, sharedCalendars, economicEvents) and subcollections (calendars/{id}/years/{year}) to normalized PostgreSQL tables. Define foreign keys, indexes, and constraints. Use Supabase SQL Editor or migration scripts. Recommended: Use dbdiagram.io or similar for schema visualization.
+
+# Test Strategy:
+Review schema with ERD tools. Validate relationships and constraints via test data inserts.
+
+# Subtasks:
+## 1. Analyze Firestore Data Model [pending]
+### Dependencies: None
+### Description: Review the structure of Firestore collections and subcollections, including calendars, sharedTrades, sharedCalendars, economicEvents, and calendars/{id}/years/{year}.
+### Details:
+Document all entities, relationships, and data types present in the Firestore model to inform relational mapping.
+
+## 2. Define PostgreSQL Entities and Relationships [pending]
+### Dependencies: 2.1
+### Description: Map Firestore collections and subcollections to normalized PostgreSQL tables, identifying primary keys and relationships.
+### Details:
+Apply third normal form principles and ensure all entities and relationships are represented with minimal redundancy.
+
+## 3. Design Table Schemas with Constraints [pending]
+### Dependencies: 2.2
+### Description: Specify table structures, including columns, data types, foreign keys, unique constraints, and not-null constraints.
+### Details:
+Ensure referential integrity and data consistency using appropriate PostgreSQL constraints.
+
+## 4. Plan Schema Namespacing and Organization [pending]
+### Dependencies: 2.3
+### Description: Determine logical grouping of tables into schemas for manageability and security.
+### Details:
+Create custom schemas to separate public and private data, following PostgreSQL best practices for object separation.
+
+## 5. Design Indexing Strategy [pending]
+### Dependencies: 2.3
+### Description: Identify columns and relationships requiring indexes to optimize query performance.
+### Details:
+Plan for primary, foreign, compound, and partial indexes based on expected query patterns.
+
+## 6. Create Entity Relationship Diagram (ERD) [pending]
+### Dependencies: 2.2, 2.3, 2.4
+### Description: Visualize the schema using dbdiagram.io or similar tools to illustrate tables, relationships, and constraints.
+### Details:
+Generate and annotate ERD to facilitate team review and future maintenance.
+
+## 7. Implement Schema in Supabase SQL Editor [pending]
+### Dependencies: 2.3, 2.4, 2.5
+### Description: Write and execute SQL scripts or use migration tools to create tables, schemas, constraints, and indexes in Supabase.
+### Details:
+Ensure scripts are idempotent and compatible with Supabase migration workflows.
+
+## 8. Validate Schema with Test Data [pending]
+### Dependencies: 2.7
+### Description: Insert representative test data to verify relationships, constraints, and indexing effectiveness.
+### Details:
+Check referential integrity, constraint enforcement, and query performance using sample inserts and queries.
+

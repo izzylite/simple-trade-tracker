@@ -1,0 +1,34 @@
+{
+  "exportDate": "2025-08-23T23:43:56.273Z",
+  "exportDirectory": "G:\\Projects\\simple-trade-tracker\\scripts\\firestore-export",
+  "statistics": {
+    "calendars": 6,
+    "trades": 474,
+    "economicEvents": 6831,
+    "sharedTrades": 11,
+    "sharedCalendars": 19,
+    "totalDocuments": 7341
+  },
+  "files": [
+    {
+      "name": "calendars-with-trades.json",
+      "size": 1582428,
+      "path": "G:\\Projects\\simple-trade-tracker\\scripts\\firestore-export\\calendars-with-trades.json"
+    },
+    {
+      "name": "economicEvents.json",
+      "size": 5311060,
+      "path": "G:\\Projects\\simple-trade-tracker\\scripts\\firestore-export\\economicEvents.json"
+    },
+    {
+      "name": "sharedCalendars.json",
+      "size": 9138,
+      "path": "G:\\Projects\\simple-trade-tracker\\scripts\\firestore-export\\sharedCalendars.json"
+    },
+    {
+      "name": "sharedTrades.json",
+      "size": 6247,
+      "path": "G:\\Projects\\simple-trade-tracker\\scripts\\firestore-export\\sharedTrades.json"
+    }
+  ]
+}

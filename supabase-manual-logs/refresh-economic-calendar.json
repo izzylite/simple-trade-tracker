@@ -1,0 +1,266 @@
+[
+    {
+      "event_message": "shutdown",
+      "event_type": "Shutdown",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "b088df6f-7211-4059-b79c-4fc96e4ba8ff",
+      "level": "log",
+      "timestamp": 1756029677208000
+    },
+    {
+      "event_message": "[2025-08-24T10:00:06.333Z] 📊 FOUND 0 EVENTS TO UPDATE FOR 2025-08-24: 📊 Found 0 events to update for 2025-08-24\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "71c57c68-7a35-4d8f-887a-43190f969897",
+      "level": "log",
+      "timestamp": 1756029606333000
+    },
+    {
+      "event_message": "[2025-08-24T10:00:06.333Z] ✅ SUCCESSFULLY UPDATED 0 ECONOMIC EVENTS: ✅ Successfully updated 0 economic events\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "2f5686c1-64d6-48a1-afce-4d0231905123",
+      "level": "log",
+      "timestamp": 1756029606333000
+    },
+    {
+      "event_message": "[2025-08-24T10:00:06.332Z] 🎯 SUCCESSFULLY EXTRACTED 298 EVENTS FROM MYFXBOOK (UPSERTED=0, EXISTING=36): 🎯 Successfully extracted 298 events from MyFXBook (upserted=0, existing=36)\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "84ba4ea9-0680-4af2-a962-ec0e17d8115b",
+      "level": "log",
+      "timestamp": 1756029606332000
+    },
+    {
+      "event_message": "[2025-08-24T10:00:02.711Z] ✅ RESPONSE RECEIVED: 200, CONTENT LENGTH: 1827708: ✅ Response received: 200, content length: 1827708\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "1d8df923-d3df-49bd-a26e-5c59ccd42ee1",
+      "level": "log",
+      "timestamp": 1756029602712000
+    },
+    {
+      "event_message": "[2025-08-24T10:00:02.313Z] 📡 FETCHING URL: HTTPS://WWW.MYFXBOOK.COM/FOREX-ECONOMIC-CALENDAR: 📡 Fetching URL: https://www.myfxbook.com/forex-economic-calendar\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "81fe72b2-0b14-41b4-ba78-4d6916daa657",
+      "level": "log",
+      "timestamp": 1756029602322000
+    },
+    {
+      "event_message": "[2025-08-24T10:00:02.313Z] 🔄 FETCHING WEEKLY ECONOMIC CALENDAR FROM MYFXBOOK...: 🔄 Fetching weekly economic calendar from MyFXBook...\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "d92bfbd8-49a5-4275-a9b5-75263a3d5453",
+      "level": "log",
+      "timestamp": 1756029602317000
+    },
+    {
+      "event_message": "[2025-08-24T10:00:02.313Z] 🔄 REFRESHING ECONOMIC CALENDAR FOR DATE: 2025-08-24, CURRENCIES: USD, EUR, GBP, JPY, AUD, CAD, CHF: 🔄 Refreshing economic calendar for date: 2025-08-24, currencies: USD, EUR, GBP, JPY, AUD, CAD, CHF\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "9b98d86d-c9c0-466f-9e5f-10e52622721a",
+      "level": "log",
+      "timestamp": 1756029602313000
+    },
+    {
+      "event_message": "[2025-08-24T10:00:02.313Z] 📊 REFRESHING ALL EVENTS FOR THE SPECIFIED DATE AND CURRENCIES: 📊 Refreshing all events for the specified date and currencies\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "b274c162-6c2d-421b-9f85-ea169208e598",
+      "level": "log",
+      "timestamp": 1756029602313000
+    },
+    {
+      "event_message": "[2025-08-24T10:00:02.312Z] REFRESH ECONOMIC CALENDAR REQUEST RECEIVED: Refresh economic calendar request received\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "aeb1c775-0a4f-4916-92e3-0726aed18103",
+      "level": "log",
+      "timestamp": 1756029602313000
+    },
+    {
+      "event_message": "booted (time: 177ms)",
+      "event_type": "Boot",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "ed8b1f13-6f02-4e74-bb72-02cb506890ab",
+      "level": "log",
+      "timestamp": 1756029602186000
+    },
+    {
+      "event_message": "shutdown",
+      "event_type": "Shutdown",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "20df2ce5-dff8-4d29-989d-ddddc4023352",
+      "level": "log",
+      "timestamp": 1756029518975000
+    },
+    {
+      "event_message": "[2025-08-24T09:57:28.978Z] ✅ SUCCESSFULLY UPDATED 0 ECONOMIC EVENTS: ✅ Successfully updated 0 economic events\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "5125df6d-e1a2-4d76-9cb3-7bac55540ca9",
+      "level": "log",
+      "timestamp": 1756029448978000
+    },
+    {
+      "event_message": "[2025-08-24T09:57:28.978Z] 📊 FOUND 0 EVENTS TO UPDATE FOR 2025-08-24: 📊 Found 0 events to update for 2025-08-24\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "ec26d191-e2f2-4325-b27f-ad94f0bddf71",
+      "level": "log",
+      "timestamp": 1756029448978000
+    },
+    {
+      "event_message": "[2025-08-24T09:57:28.977Z] 🎯 SUCCESSFULLY EXTRACTED 298 EVENTS FROM MYFXBOOK (UPSERTED=0, EXISTING=36): 🎯 Successfully extracted 298 events from MyFXBook (upserted=0, existing=36)\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "1be36d96-3cda-4d09-a917-8b415664c62b",
+      "level": "log",
+      "timestamp": 1756029448977000
+    },
+    {
+      "event_message": "[2025-08-24T09:57:25.084Z] ✅ RESPONSE RECEIVED: 200, CONTENT LENGTH: 1827614: ✅ Response received: 200, content length: 1827614\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "8af56b87-cddb-4209-a41b-b6746cb40615",
+      "level": "log",
+      "timestamp": 1756029445084000
+    },
+    {
+      "event_message": "[2025-08-24T09:57:23.957Z] 📡 FETCHING URL: HTTPS://WWW.MYFXBOOK.COM/FOREX-ECONOMIC-CALENDAR: 📡 Fetching URL: https://www.myfxbook.com/forex-economic-calendar\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "30abf85a-9a47-4872-8a5c-b32f0c3b1f8c",
+      "level": "log",
+      "timestamp": 1756029443957000
+    },
+    {
+      "event_message": "[2025-08-24T09:57:23.957Z] 🔄 REFRESHING ECONOMIC CALENDAR FOR DATE: 2025-08-24, CURRENCIES: USD, EUR, GBP, JPY, AUD, CAD, CHF: 🔄 Refreshing economic calendar for date: 2025-08-24, currencies: USD, EUR, GBP, JPY, AUD, CAD, CHF\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "32e21e98-5fcd-428b-8e81-d8c5cd434247",
+      "level": "log",
+      "timestamp": 1756029443957000
+    },
+    {
+      "event_message": "[2025-08-24T09:57:23.956Z] REFRESH ECONOMIC CALENDAR REQUEST RECEIVED: Refresh economic calendar request received\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "403e85ba-937f-4418-9497-24ee1f7d6938",
+      "level": "log",
+      "timestamp": 1756029443957000
+    },
+    {
+      "event_message": "[2025-08-24T09:57:23.957Z] 📊 REFRESHING ALL EVENTS FOR THE SPECIFIED DATE AND CURRENCIES: 📊 Refreshing all events for the specified date and currencies\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "96f68462-a36b-429c-811e-8ac830c37a07",
+      "level": "log",
+      "timestamp": 1756029443957000
+    },
+    {
+      "event_message": "[2025-08-24T09:57:23.957Z] 🔄 FETCHING WEEKLY ECONOMIC CALENDAR FROM MYFXBOOK...: 🔄 Fetching weekly economic calendar from MyFXBook...\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "9de55f9c-be36-476f-b468-3e04b506f3c2",
+      "level": "log",
+      "timestamp": 1756029443957000
+    },
+    {
+      "event_message": "booted (time: 34ms)",
+      "event_type": "Boot",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "da540647-b9fb-4f63-9994-3e606e13baac",
+      "level": "log",
+      "timestamp": 1756029443951000
+    },
+    {
+      "event_message": "shutdown",
+      "event_type": "Shutdown",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "895d56a3-d805-46a4-b4c3-c1aa1688193a",
+      "level": "log",
+      "timestamp": 1756027813580000
+    },
+    {
+      "event_message": "[2025-08-24T09:30:06.796Z] ✅ SUCCESSFULLY UPDATED 0 ECONOMIC EVENTS: ✅ Successfully updated 0 economic events\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "6d436f2e-af95-4c35-8056-c9f81e25bff8",
+      "level": "log",
+      "timestamp": 1756027806796000
+    },
+    {
+      "event_message": "[2025-08-24T09:30:06.795Z] 🎯 SUCCESSFULLY EXTRACTED 298 EVENTS FROM MYFXBOOK (UPSERTED=0, EXISTING=0): 🎯 Successfully extracted 298 events from MyFXBook (upserted=0, existing=0)\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "35ce050a-2b56-44b7-8dde-312e3026b79a",
+      "level": "log",
+      "timestamp": 1756027806795000
+    },
+    {
+      "event_message": "[2025-08-24T09:30:06.795Z] 📊 FOUND 0 EVENTS TO UPDATE FOR 2025-08-24: 📊 Found 0 events to update for 2025-08-24\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "f87e9e87-b50f-4067-a77e-d180fe6c811b",
+      "level": "log",
+      "timestamp": 1756027806795000
+    },
+    {
+      "event_message": "[2025-08-24T09:30:03.215Z] ✅ RESPONSE RECEIVED: 200, CONTENT LENGTH: 1827692: ✅ Response received: 200, content length: 1827692\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "6d24d457-348a-46ae-926f-2a30e71f2a46",
+      "level": "log",
+      "timestamp": 1756027803215000
+    },
+    {
+      "event_message": "[2025-08-24T09:30:02.800Z] 🔄 FETCHING WEEKLY ECONOMIC CALENDAR FROM MYFXBOOK...: 🔄 Fetching weekly economic calendar from MyFXBook...\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "a6d49358-854a-4878-99f6-99cfd1855a8c",
+      "level": "log",
+      "timestamp": 1756027802800000
+    },
+    {
+      "event_message": "[2025-08-24T09:30:02.800Z] 📡 FETCHING URL: HTTPS://WWW.MYFXBOOK.COM/FOREX-ECONOMIC-CALENDAR: 📡 Fetching URL: https://www.myfxbook.com/forex-economic-calendar\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "b0370431-62c5-4a57-a560-695acb170f55",
+      "level": "log",
+      "timestamp": 1756027802800000
+    },
+    {
+      "event_message": "[2025-08-24T09:30:02.800Z] 📊 REFRESHING ALL EVENTS FOR THE SPECIFIED DATE AND CURRENCIES: 📊 Refreshing all events for the specified date and currencies\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "b6e3ae1a-1524-4c6a-9e84-a1418532b2a1",
+      "level": "log",
+      "timestamp": 1756027802800000
+    },
+    {
+      "event_message": "[2025-08-24T09:30:02.799Z] 🔄 REFRESHING ECONOMIC CALENDAR FOR DATE: 2025-08-24, CURRENCIES: USD, EUR, GBP, JPY, AUD, CAD, CHF: 🔄 Refreshing economic calendar for date: 2025-08-24, currencies: USD, EUR, GBP, JPY, AUD, CAD, CHF\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "d8ee53bd-a874-401a-95d9-e6ef9758d5b8",
+      "level": "log",
+      "timestamp": 1756027802799000
+    },
+    {
+      "event_message": "[2025-08-24T09:30:02.785Z] REFRESH ECONOMIC CALENDAR REQUEST RECEIVED: Refresh economic calendar request received\n",
+      "event_type": "Log",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "30a27614-60f6-4bba-9a42-100a4090d608",
+      "level": "log",
+      "timestamp": 1756027802786000
+    },
+    {
+      "event_message": "booted (time: 343ms)",
+      "event_type": "Boot",
+      "function_id": "b3ebf958-83bf-4722-a823-e2549d778f6c",
+      "id": "b49cbd5d-4fe4-4fc7-be23-34a3a67c04c6",
+      "level": "log",
+      "timestamp": 1756027802718000
+    }
+  ]
