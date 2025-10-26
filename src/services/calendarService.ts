@@ -5,7 +5,6 @@
  * All types use snake_case to match dualWrite.ts and Supabase schema
  */
 
-import { isSameWeek, isSameMonth } from 'date-fns';
 import { Calendar, Trade } from '../types/dualWrite';
 import { logger } from '../utils/logger';
 
@@ -58,190 +57,9 @@ export interface CalendarStats {
 // =====================================================
 // STATISTICS CALCULATION
 // =====================================================
-
-/**
- * Calculate calendar statistics from trades
- */
-export const calculateCalendarStats = (trades: Trade[], calendar: Calendar): CalendarStats => {
-  const currentDate = new Date();
-
-  // Default values if no trades
-  if (trades.length === 0) {
-    return {
-      win_rate: 0,
-      profit_factor: 0,
-      max_drawdown: 0,
-      target_progress: 0,
-      pnl_performance: 0,
-      total_trades: 0,
-      win_count: 0,
-      loss_count: 0,
-      total_pnl: 0,
-      drawdown_start_date: null,
-      drawdown_end_date: null,
-      drawdown_recovery_needed: 0,
-      drawdown_duration: 0,
-      avg_win: 0,
-      avg_loss: 0,
-      current_balance: calendar.account_balance,
-      initial_balance: calendar.account_balance,
-      growth_percentage: 0,
-      weekly_pnl: 0,
-      monthly_pnl: 0,
-      yearly_pnl: 0,
-      weekly_pnl_percentage: 0,
-      monthly_pnl_percentage: 0,
-      yearly_pnl_percentage: 0,
-      weekly_progress: 0,
-      monthly_progress: 0,
-      yearly_progress: 0
-    };
-  }
-
-  // Calculate win rate
-  const win_count = trades.filter(trade => trade.trade_type === 'win').length;
-  const loss_count = trades.filter(trade => trade.trade_type === 'loss').length;
-  const total_trades = trades.length;
-  const win_rate = total_trades > 0 ? (win_count / total_trades) * 100 : 0;
-
-  // Calculate profit factor and average win/loss
-  const winningTrades = trades.filter(t => t.trade_type === 'win');
-  const losingTrades = trades.filter(t => t.trade_type === 'loss');
-  const grossProfit = winningTrades.reduce((sum, t) => sum + t.amount, 0);
-  const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.amount, 0));
-  const profit_factor = grossLoss > 0 ? grossProfit / grossLoss : win_count > 0 ? 999 : 0;
-
-  const avg_win = winningTrades.length > 0 ? grossProfit / winningTrades.length : 0;
-  const avg_loss = losingTrades.length > 0 ? (grossLoss / losingTrades.length) * -1 : 0;
-
-  // Calculate total P&L
-  const total_pnl = trades.reduce((sum, trade) => sum + trade.amount, 0);
-
-  // Calculate max drawdown and related statistics
-  let runningBalance = calendar.account_balance;
-  let maxBalance = runningBalance;
-  let max_drawdown = 0;
-  let drawdown_start_date: Date | null = null;
-  let drawdown_end_date: Date | null = null;
-  let currentDrawdownStart: Date | null = null;
-  let currentDrawdown = 0;
-
-  // Sort trades by date
-  const sortedTrades = [...trades].sort((a, b) =>
-    new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime()
-  );
-
-  sortedTrades.forEach(trade => {
-    runningBalance += trade.amount;
-    if (runningBalance > maxBalance) {
-      maxBalance = runningBalance;
-      currentDrawdown = 0;
-      currentDrawdownStart = null;
-    } else {
-      const drawdown = maxBalance > 0 ? ((maxBalance - runningBalance) / maxBalance) * 100 : 0;
-      if (drawdown > currentDrawdown) {
-        currentDrawdown = drawdown;
-        if (!currentDrawdownStart) {
-          currentDrawdownStart = new Date(trade.trade_date);
-        }
-      }
-      if (drawdown > max_drawdown) {
-        max_drawdown = drawdown;
-        drawdown_start_date = currentDrawdownStart;
-        drawdown_end_date = new Date(trade.trade_date);
-      }
-    }
-  });
-
-  // Calculate drawdown recovery needed
-  const drawdown_recovery_needed = max_drawdown > 0 && runningBalance > 0 ?
-    ((maxBalance - runningBalance) / runningBalance) * 100 : 0;
-
-  // Calculate drawdown duration
-  const drawdown_duration = (() => {
-    if (drawdown_start_date === null || drawdown_end_date === null) {
-      return 0;
-    }
-    const diffTime = Math.abs((drawdown_end_date as Date).getTime() - (drawdown_start_date as Date).getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  })();
-
-  // Calculate target progress
-  const yearly_target = calendar.yearly_target || 0;
-  const target_progress = yearly_target > 0 ? (total_pnl / yearly_target) * 100 : 0;
-
-  // Calculate P&L performance (percentage of account balance)
-  const pnl_performance = calendar.account_balance > 0 ? (total_pnl / calendar.account_balance) * 100 : 0;
-
-  // Current balance after all trades
-  const current_balance = calendar.account_balance + total_pnl;
-
-  // Calculate weekly P&L
-  const weekly_pnl = trades
-    .filter(trade => isSameWeek(new Date(trade.trade_date), currentDate))
-    .reduce((sum, trade) => sum + trade.amount, 0);
-
-  const weekly_pnl_percentage = calendar.account_balance > 0 ?
-    (weekly_pnl / calendar.account_balance) * 100 : 0;
-
-  const weekly_progress = calendar.weekly_target ?
-    (weekly_pnl / calendar.weekly_target) * 100 : 0;
-
-  // Calculate monthly P&L
-  const monthly_pnl = trades
-    .filter(trade => isSameMonth(new Date(trade.trade_date), currentDate))
-    .reduce((sum, trade) => sum + trade.amount, 0);
-
-  const monthly_pnl_percentage = calendar.account_balance > 0 ?
-    (monthly_pnl / calendar.account_balance) * 100 : 0;
-
-  const monthly_progress = calendar.monthly_target ?
-    (monthly_pnl / calendar.monthly_target) * 100 : 0;
-
-  // Calculate yearly P&L
-  const yearly_pnl = trades
-    .filter(trade => new Date(trade.trade_date).getFullYear() === currentDate.getFullYear())
-    .reduce((sum, trade) => sum + trade.amount, 0);
-
-  const yearly_pnl_percentage = calendar.account_balance > 0 ?
-    (yearly_pnl / calendar.account_balance) * 100 : 0;
-
-  const growth_percentage = calendar.account_balance > 0 ?
-    (total_pnl / calendar.account_balance) * 100 : 0;
-
-  const yearly_progress = calendar.yearly_target ?
-    (yearly_pnl / calendar.yearly_target) * 100 : 0;
-
-  return {
-    win_rate,
-    profit_factor,
-    max_drawdown,
-    target_progress,
-    pnl_performance,
-    total_trades,
-    win_count,
-    loss_count,
-    total_pnl,
-    drawdown_start_date,
-    drawdown_end_date,
-    drawdown_recovery_needed,
-    drawdown_duration,
-    avg_win,
-    avg_loss,
-    current_balance,
-    initial_balance: calendar.account_balance,
-    growth_percentage,
-    weekly_pnl,
-    monthly_pnl,
-    yearly_pnl,
-    weekly_pnl_percentage,
-    monthly_pnl_percentage,
-    yearly_pnl_percentage,
-    weekly_progress,
-    monthly_progress,
-    yearly_progress
-  };
-};
+// NOTE: Calendar statistics are now automatically calculated by Supabase
+// via database triggers (see migration 005_auto_calculate_calendar_stats.sql)
+// The calculateCalendarStats function has been removed - stats are read directly from the calendar object
 
 
 /**
@@ -453,8 +271,7 @@ export const getTrade = async (calendarId: string, tradeId: string): Promise<Tra
  */
 export const addTrade = async (
   calendarId: string,
-  trade: Omit<Trade, 'id' | 'created_at' | 'updated_at'>,
-  cachedTrades: Trade[] = []
+  trade: Omit<Trade, 'id' | 'created_at' | 'updated_at'>
 ): Promise<CalendarStats> => {
   try {
     // Create the trade
@@ -463,17 +280,14 @@ export const addTrade = async (
       calendar_id: calendarId
     });
 
-    // Get all trades for stats calculation
-    const allTrades = cachedTrades.length > 0 ? [...cachedTrades, trade as Trade] : await getAllTrades(calendarId);
-
-    // Get calendar for stats calculation
+    // Get calendar with auto-calculated stats from database
     const calendar = await getCalendar(calendarId);
     if (!calendar) {
       throw new Error('Calendar not found');
     }
 
-    // Calculate stats (stats are not stored, only calculated on-demand)
-    const stats = calculateCalendarStats(allTrades, calendar);
+    // Stats are automatically calculated by Supabase triggers
+    const stats = getCalendarStats(calendar);
 
     return stats;
   } catch (error) {
@@ -505,19 +319,19 @@ export const updateTrade = async (
     // Update in database
     await tradeRepository.update(tradeId, updatedTrade);
 
-    // Get all trades for stats calculation
+    // Get updated trades list
     const allTrades = cachedTrades.length > 0 ?
       cachedTrades.map(t => t.id === tradeId ? updatedTrade : t) :
       await getAllTrades(calendarId);
 
-    // Get calendar for stats calculation
+    // Get calendar with auto-calculated stats from database
     const calendar = await getCalendar(calendarId);
     if (!calendar) {
       throw new Error('Calendar not found');
     }
 
-    // Calculate stats (stats are not stored, only calculated on-demand)
-    const stats = calculateCalendarStats(allTrades, calendar);
+    // Stats are automatically calculated by Supabase triggers
+    const stats = getCalendarStats(calendar);
 
     return [stats, allTrades];
   } catch (error) {
@@ -531,26 +345,20 @@ export const updateTrade = async (
  */
 export const deleteTrade = async (
   calendarId: string,
-  tradeId: string,
-  cachedTrades: Trade[] = []
+  tradeId: string
 ): Promise<CalendarStats> => {
   try {
     // Delete the trade
     await tradeRepository.delete(tradeId);
 
-    // Get all trades for stats calculation
-    const allTrades = cachedTrades.length > 0 ?
-      cachedTrades.filter(t => t.id !== tradeId) :
-      await getAllTrades(calendarId);
-
-    // Get calendar for stats calculation
+    // Get calendar with auto-calculated stats from database
     const calendar = await getCalendar(calendarId);
     if (!calendar) {
       throw new Error('Calendar not found');
     }
 
-    // Calculate stats (stats are not stored, only calculated on-demand)
-    const stats = calculateCalendarStats(allTrades, calendar);
+    // Stats are automatically calculated by Supabase triggers
+    const stats = getCalendarStats(calendar);
 
     return stats;
   } catch (error) {

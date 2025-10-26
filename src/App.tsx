@@ -94,7 +94,8 @@ function AppContent() {
       if (fetchCalendar) {
         const calendar = await calendarService.getCalendar(calendarId);
         if (calendar) {
-          const stats = calendarService.calculateCalendarStats(allTrades, calendar);
+          // Stats are automatically calculated by Supabase triggers
+          const stats = calendarService.getCalendarStats(calendar);
           updateCalendarState(calendarId, {
             ...calendar,
             ...stats
@@ -318,12 +319,13 @@ function AppContent() {
         };
       });
 
-      const stats = calendarService.calculateCalendarStats(updatedTrades, calendar);
+      // Calculate total P&L for UI display (this is a what-if calculation, not persisted)
+      const total_pnl = updatedTrades.reduce((sum, trade) => sum + trade.amount, 0);
 
       // Update the calendar state with recalculated trades and the new total profit
       updateCalendarState(calendarId, {
         cachedTrades: updatedTrades,
-        ...stats
+        total_pnl
       });
     };
 
@@ -551,8 +553,8 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
 
     try {
       // Add the trade and get the updated stats
-      // Pass the cached trades to avoid fetching all trades from Firestore
-      const updatedStats = await calendarService.addTrade(calendar.id, newTrade, calendar.cachedTrades);
+      // Stats are automatically calculated by Supabase triggers
+      const updatedStats = await calendarService.addTrade(calendar.id, newTrade);
 
       // Update with the final stats from the database
       onUpdateStateCalendar(calendar.id, {
@@ -777,11 +779,8 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       // Then update database using the clearMonthTrades function
       await calendarService.clearMonthTrades(calendar.id, year, month);
 
-      // Calculate updated stats from the remaining trades
-      const updatedStats = calendarService.calculateCalendarStats(tradesToKeep, calendar);
-
-      // Update the calendar with the updated stats (stats are UI-only, not stored in DB)
-      // Stats will be recalculated on next load
+      // Stats are automatically recalculated by Supabase triggers after clearMonthTrades
+      // No need to manually calculate or update stats
     } catch (error) {
       console.error('Error clearing month trades:', error);
     }
