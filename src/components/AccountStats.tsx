@@ -235,133 +235,142 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
         </Box>
       </Box>
 
-      {risk_per_trade && (
+      {/* Risk Per Trade Section - Always visible but disabled when not configured */}
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+        opacity: risk_per_trade ? 1 : 0.4,
+        pointerEvents: risk_per_trade ? 'auto' : 'none',
+      }}>
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: theme => alpha(theme.palette.primary.main, risk_per_trade ? 0.08 : 0.03),
+          p: 1.5,
+          borderRadius: 1.5,
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SecurityIcon sx={{ fontSize: '1rem', color: risk_per_trade ? 'primary.main' : 'text.disabled' }} />
+            <Typography
+              variant="body2"
+              sx={{
+                color: risk_per_trade ? 'text.secondary' : 'text.disabled',
+                fontWeight: 500
+              }}
+            >
+              Risk Per Trade ({effectiveRiskPercentage || 0}%)
+              {risk_per_trade && dynamicRiskSettings?.dynamic_risk_enabled && effectiveRiskPercentage !== risk_per_trade && (
+                <Box component="span" sx={{ ml: 1, color: 'success.main', fontSize: '0.75rem', fontWeight: 700 }}>
+                  INCREASED
+                </Box>
+              )}
+              {!risk_per_trade && (
+                <Box component="span" sx={{ ml: 1, color: 'text.disabled', fontSize: '0.75rem', fontWeight: 600 }}>
+                  (Not Configured)
+                </Box>
+              )}
+            </Typography>
+          </Box>
+          <Typography
+            variant="body1"
+            sx={{
+              fontWeight: 600,
+              color: risk_per_trade ? 'primary.main' : 'text.disabled'
+            }}
+          >
+            ${effectiveRiskPercentage ? ((totalAccountValue * effectiveRiskPercentage) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+          </Typography>
+        </Box>
+
+        {/* Dynamic Risk Section - Always visible but disabled when not configured */}
         <Box sx={{
           display: 'flex',
           flexDirection: 'column',
           gap: 1,
+          backgroundColor: theme => alpha(theme.palette.background.default, dynamicRiskSettings?.dynamic_risk_enabled ? 0.5 : 0.2),
+          p: 1,
+          mt: 1,
+          borderRadius: 1.5,
+          fontSize: '0.75rem',
+          opacity: (dynamicRiskSettings?.dynamic_risk_enabled && dynamicRiskSettings.profit_threshold_percentage && dynamicRiskSettings.increased_risk_percentage) ? 1 : 0.4,
+          pointerEvents: (dynamicRiskSettings?.dynamic_risk_enabled && dynamicRiskSettings.profit_threshold_percentage && dynamicRiskSettings.increased_risk_percentage) ? 'auto' : 'none',
         }}>
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: theme => alpha(theme.palette.primary.main, 0.08),
-            p: 1.5,
-            borderRadius: 1.5,
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <SecurityIcon sx={{ fontSize: '1rem', color: 'primary.main' }} />
-              <Typography
-                variant="body2"
-                sx={{
-                  color: 'text.secondary',
-                  fontWeight: 500
-                }}
-              >
-                Risk Per Trade ({effectiveRiskPercentage}%)
-                {dynamicRiskSettings?.dynamic_risk_enabled && effectiveRiskPercentage !== risk_per_trade && (
-                  <Box component="span" sx={{ ml: 1, color: 'success.main', fontSize: '0.75rem', fontWeight: 700 }}>
-                    INCREASED
-                  </Box>
-                )}
-              </Typography>
-            </Box>
-            <Typography
-              variant="body1"
-              sx={{
-                fontWeight: 600,
-                color: 'primary.main'
-              }}
-            >
-              ${effectiveRiskPercentage ? ((totalAccountValue * effectiveRiskPercentage) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="caption" sx={{ color: dynamicRiskSettings?.dynamic_risk_enabled ? 'text.secondary' : 'text.disabled' }}>
+              Dynamic Risk: {dynamicRiskSettings?.dynamic_risk_enabled && dynamicRiskSettings.profit_threshold_percentage && parseFloat(profitPercentage) >= dynamicRiskSettings.profit_threshold_percentage ?
+                <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>Active</Box> :
+                dynamicRiskSettings?.dynamic_risk_enabled ?
+                  <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Inactive</Box> :
+                  <Box component="span" sx={{ color: 'text.disabled', fontWeight: 600 }}>Not Configured</Box>}
+            </Typography>
+            <Typography variant="caption" sx={{ color: dynamicRiskSettings?.dynamic_risk_enabled ? 'text.secondary' : 'text.disabled' }}>
+              Threshold: {dynamicRiskSettings?.profit_threshold_percentage || 0}% profit
             </Typography>
           </Box>
 
-          {dynamicRiskSettings?.dynamic_risk_enabled && dynamicRiskSettings.profit_threshold_percentage && dynamicRiskSettings.increased_risk_percentage && (
-            <Box sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1,
-              backgroundColor: theme => alpha(theme.palette.background.default, 0.5),
-              p: 1,
-              mt: 1,
-              borderRadius: 1.5,
-              fontSize: '0.75rem'
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  Dynamic Risk: {parseFloat(profitPercentage) >= dynamicRiskSettings.profit_threshold_percentage ?
-                    <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>Active</Box> :
-                    <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Inactive</Box>}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  Threshold: {dynamicRiskSettings.profit_threshold_percentage}% profit
-                </Typography>
-              </Box>
-
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={isDynamicRiskToggled}
-                      onChange={isReadOnly ? undefined : (e) => {
-                        if (onToggleDynamicRisk) {
-                          onToggleDynamicRisk(e.target.checked);
-                        }
-                      }}
-                      disabled={isReadOnly}
-                      size="small"
-                      color="primary"
-                    />
-                  }
-                  label={
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      {isDynamicRiskToggled ? "Using actual trade amounts" : "Using calculated amounts"}
-                    </Typography>
-                  }
-                  sx={{ m: 0 }}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isDynamicRiskToggled}
+                  onChange={isReadOnly ? undefined : (e) => {
+                    if (onToggleDynamicRisk) {
+                      onToggleDynamicRisk(e.target.checked);
+                    }
+                  }}
+                  disabled={isReadOnly || !dynamicRiskSettings?.dynamic_risk_enabled}
+                  size="small"
+                  color="primary"
                 />
-                <Tooltip
-                  title={
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                        🎯 Why This Tool Matters
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Discover your true potential:</strong> See how much more profitable you could be with consistent risk management
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Identify position sizing issues:</strong> Compare your actual trades vs. what optimal risk sizing would look like
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Improve your discipline:</strong> Understand the impact of inconsistent position sizes on your overall performance
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                        💰 Many traders discover they could be 20-50% more profitable with better risk management!
-                      </Typography>
-                    </Box>
-                  }
-                  arrow
-                  placement="top"
-                  enterDelay={300}
-                  leaveDelay={200}
-                >
-                  <InfoIcon
-                    sx={{
-                      fontSize: 16,
-                      color: 'text.secondary',
-                      cursor: 'help',
-                      '&:hover': {
-                        color: 'primary.main'
-                      }
-                    }}
-                  />
-                </Tooltip>
-              </Box>
-            </Box>
-          )}
+              }
+              label={
+                <Typography variant="caption" sx={{ color: dynamicRiskSettings?.dynamic_risk_enabled ? 'text.secondary' : 'text.disabled' }}>
+                  {isDynamicRiskToggled ? "Using actual trade amounts" : "Using calculated amounts"}
+                </Typography>
+              }
+              sx={{ m: 0 }}
+            />
+            <Tooltip
+              title={
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                    🎯 Why This Tool Matters
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Discover your true potential:</strong> See how much more profitable you could be with consistent risk management
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Identify position sizing issues:</strong> Compare your actual trades vs. what optimal risk sizing would look like
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Improve your discipline:</strong> Understand the impact of inconsistent position sizes on your overall performance
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                    💰 Many traders discover they could be 20-50% more profitable with better risk management!
+                  </Typography>
+                </Box>
+              }
+              arrow
+              placement="top"
+              enterDelay={300}
+              leaveDelay={200}
+            >
+              <InfoIcon
+                sx={{
+                  fontSize: 16,
+                  color: dynamicRiskSettings?.dynamic_risk_enabled ? 'text.secondary' : 'text.disabled',
+                  cursor: 'help',
+                  '&:hover': dynamicRiskSettings?.dynamic_risk_enabled ? {
+                    color: 'primary.main'
+                  } : {}
+                }}
+              />
+            </Tooltip>
+          </Box>
         </Box>
-      )}
+      </Box>
     </Paper>
   );
 };
