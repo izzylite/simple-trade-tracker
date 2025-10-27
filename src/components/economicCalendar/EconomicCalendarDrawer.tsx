@@ -237,7 +237,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
   // Pagination state
   const [hasMore, setHasMore] = useState(false);
-  const [lastDoc, setLastDoc] = useState<any | undefined>(undefined); // QueryDocumentSnapshot removed - migrating to Supabase
+  const [offset, setOffset] = useState<number>(0); // Offset for pagination
   const [loadingMore, setLoadingMore] = useState(false);
   const [pageSize] = useState(50); // Events per page
 
@@ -375,14 +375,14 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       setLoading(true);
       setError(null);
       setEvents([]); // Clear existing events
-      setLastDoc(undefined); // Reset pagination
+      setOffset(0); // Reset pagination
 
       try {
         log(`🔄 Fetching ${viewType} events for ${dateRange.start} to ${dateRange.end}`);
 
         const result = await economicCalendarService.fetchEventsPaginated(
           dateRange,
-          { pageSize },
+          { pageSize, offset: 0 },
           {
             currencies: appliedCurrencies,
             impacts: appliedImpacts,
@@ -392,7 +392,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
         setEvents(result.events);
         setHasMore(result.hasMore);
-        setLastDoc(result.lastDoc);
+        setOffset(result.offset || pageSize);
         log(`✅ Fetched ${result.events.length} events (hasMore: ${result.hasMore})`);
 
       } catch (err) {
@@ -400,7 +400,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         setError('Failed to load economic events');
         setEvents([]);
         setHasMore(false);
-        setLastDoc(undefined);
+        setOffset(0);
       } finally {
         setLoading(false);
       }
@@ -466,7 +466,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
   // Load more events function
   const loadMoreEvents = async () => {
-    if (!hasMore || loadingMore || !lastDoc) return;
+    if (!hasMore || loadingMore) return;
 
     setLoadingMore(true);
 
@@ -475,7 +475,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
       const result = await economicCalendarService.fetchEventsPaginated(
         dateRange,
-        { pageSize, lastDoc },
+        { pageSize, offset },
         {
           currencies: appliedCurrencies,
           impacts: appliedImpacts,
@@ -485,7 +485,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
       setEvents(prev => [...prev, ...result.events]);
       setHasMore(result.hasMore);
-      setLastDoc(result.lastDoc);
+      setOffset(result.offset || offset + pageSize);
       log(`✅ Loaded ${result.events.length} more events (hasMore: ${result.hasMore})`);
 
     } catch (err) {
