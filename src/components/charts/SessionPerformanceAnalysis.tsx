@@ -119,10 +119,10 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                   <Typography
                     variant="body2"
                     sx={{
-                      color: session.win_rate >= 50 ? theme.palette.success.main : theme.palette.error.main
+                      color: (session.win_rate ?? 0) >= 50 ? theme.palette.success.main : theme.palette.error.main
                     }}
                   >
-                    {session.win_rate.toFixed(1)}%
+                    {(session.win_rate ?? 0).toFixed(1)}%
                   </Typography>
                 </Box>
 
@@ -163,10 +163,10 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                   <Typography
                     variant="body2"
                     sx={{
-                      color: session.pnlPercentage > 0 ? theme.palette.success.main : theme.palette.error.main
+                      color: (session.pnlPercentage ?? 0) > 0 ? theme.palette.success.main : theme.palette.error.main
                     }}
                   >
-                    {session.pnlPercentage.toFixed(2)}%
+                    {(session.pnlPercentage ?? 0).toFixed(2)}%
                   </Typography>
                 </Box>
 
@@ -247,11 +247,11 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
 
                 if (mostProfitable.total_pnl > 0) {
                   if (mostProfitable.session === highestWinRate.session && mostProfitable.session === bestAverage.session) {
-                    return `${mostProfitable.session} session is your strongest performer with the highest total P&L (${formatValue(mostProfitable.total_pnl)}), best win rate (${mostProfitable.win_rate.toFixed(1)}%), and highest average per trade (${formatValue(mostProfitable.averagePnL)}). Consider focusing more trades during this session.`;
+                    return `${mostProfitable.session} session is your strongest performer with the highest total P&L (${formatValue(mostProfitable.total_pnl)}), best win rate (${(mostProfitable.win_rate ?? 0).toFixed(1)}%), and highest average per trade (${formatValue(mostProfitable.averagePnL)}). Consider focusing more trades during this session.`;
                   } else if (mostProfitable.session === highestWinRate.session) {
-                    return `${mostProfitable.session} session has both the highest total P&L (${formatValue(mostProfitable.total_pnl)}) and best win rate (${mostProfitable.win_rate.toFixed(1)}%). ${bestAverage.session} session has the best average per trade (${formatValue(bestAverage.averagePnL)}).`;
+                    return `${mostProfitable.session} session has both the highest total P&L (${formatValue(mostProfitable.total_pnl)}) and best win rate (${(mostProfitable.win_rate ?? 0).toFixed(1)}%). ${bestAverage.session} session has the best average per trade (${formatValue(bestAverage.averagePnL)}).`;
                   } else {
-                    return `${mostProfitable.session} session is most profitable overall (${formatValue(mostProfitable.total_pnl)}), while ${highestWinRate.session} session has the highest win rate (${highestWinRate.win_rate.toFixed(1)}%). Consider analyzing what makes each session successful.`;
+                    return `${mostProfitable.session} session is most profitable overall (${formatValue(mostProfitable.total_pnl)}), while ${highestWinRate.session} session has the highest win rate (${(highestWinRate.win_rate ?? 0).toFixed(1)}%). Consider analyzing what makes each session successful.`;
                   }
                 } else {
                   const leastLosing = sessionsWithTrades.reduce((prev, current) =>

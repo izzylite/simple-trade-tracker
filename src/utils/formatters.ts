@@ -3,7 +3,12 @@
  * @param amount The amount to format
  * @returns Formatted currency string
  */
-export const formatValue = (amount: number): string => {
+export const formatValue = (amount: number | undefined | null): string => {
+  // Handle undefined, null, or NaN values
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return '$0.00';
+  }
+
   const absAmount = Math.abs(amount);
   if (absAmount >= 1000) {
     return `$${(amount / 1000).toFixed(1)}k`;
@@ -16,7 +21,12 @@ export const formatValue = (amount: number): string => {
  * @param amount The amount to format
  * @returns Formatted currency string
  */
-export const formatCurrency = (amount: number): string => {
+export const formatCurrency = (amount: number | undefined | null): string => {
+  // Handle undefined, null, or NaN values
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return '$0.00';
+  }
+
   return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
@@ -26,7 +36,12 @@ export const formatCurrency = (amount: number): string => {
  * @param decimals Number of decimal places
  * @returns Formatted percentage string
  */
-export const formatPercentage = (value: number, decimals: number = 1): string => {
+export const formatPercentage = (value: number | undefined | null, decimals: number = 1): string => {
+  // Handle undefined, null, or NaN values
+  if (value === undefined || value === null || isNaN(value)) {
+    return '0.0%';
+  }
+
   return `${value.toFixed(decimals)}%`;
 };
 
