@@ -239,8 +239,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
       <Box sx={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 1,
-        opacity: risk_per_trade ? 1 : 0.4,
+        gap: 1, 
         pointerEvents: risk_per_trade ? 'auto' : 'none',
       }}>
         <Box sx={{
@@ -294,7 +293,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
           mt: 1,
           borderRadius: 1.5,
           fontSize: '0.75rem',
-          opacity: (dynamicRiskSettings?.dynamic_risk_enabled && dynamicRiskSettings.profit_threshold_percentage && dynamicRiskSettings.increased_risk_percentage) ? 1 : 0.4,
+          opacity: (dynamicRiskSettings?.dynamic_risk_enabled && dynamicRiskSettings.profit_threshold_percentage && dynamicRiskSettings.increased_risk_percentage) ? 1 : 0.5,
           pointerEvents: (dynamicRiskSettings?.dynamic_risk_enabled && dynamicRiskSettings.profit_threshold_percentage && dynamicRiskSettings.increased_risk_percentage) ? 'auto' : 'none',
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
