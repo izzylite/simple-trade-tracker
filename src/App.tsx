@@ -681,8 +681,44 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     });
   }
 
-  const handleUpdateTradeProperty = async (tradeId: string, updateCallback: (trade: Trade) => Trade): Promise<Trade | undefined> => {
+  const handleUpdateTradeProperty = async (
+    tradeId: string,
+    updateCallback: (trade: Trade) => Trade,
+    createIfNotExists?: (tradeId: string) => Trade
+  ): Promise<Trade | undefined> => {
     try {
+      // Check if trade exists in cached trades first
+      let existingTrade = calendar.cachedTrades.find(t => t.id === tradeId);
+
+      // If trade doesn't exist and we have a create function, create it
+      if (!existingTrade && createIfNotExists) {
+        const newTrade = createIfNotExists(tradeId);
+
+        // Add to cached trades immediately for UI responsiveness
+        const updatedCachedTrades = [...calendar.cachedTrades, newTrade];
+        onUpdateStateCalendar(calendar.id, {
+          cachedTrades: updatedCachedTrades
+        });
+
+        // Create in database
+        await calendarService.addTrade(calendar.id, newTrade);
+
+        // Apply the update callback to the newly created trade
+        const updatedTrade = updateCallback(newTrade);
+
+        // Update in database
+        await calendarService.updateTrade(calendar.id, tradeId, updatedCachedTrades, () => updatedTrade);
+
+        // Update cached trades with the updated trade
+        const finalCachedTrades = updatedCachedTrades.map(t => t.id === tradeId ? updatedTrade : t);
+        onUpdateStateCalendar(calendar.id, {
+          cachedTrades: finalCachedTrades
+        });
+
+        return updatedTrade;
+      }
+
+      // Normal update flow for existing trades
       const result = await calendarService.updateTrade(calendar.id, tradeId, calendar.cachedTrades, updateCallback);
       // Update the cached trades and stats in the calendar
       if (result) {
