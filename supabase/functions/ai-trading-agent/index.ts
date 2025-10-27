@@ -258,9 +258,9 @@ RECOMMENDED WORKFLOWS:
 **DATABASE SCHEMAS** (for execute_sql queries):
 
 **TRADES TABLE SCHEMA**:
-- Columns: id, calendar_id, user_id, firestore_id, name, amount, trade_type, trade_date, created_at,
+- Columns: id, calendar_id, user_id, name, amount, trade_type, trade_date, created_at,
   updated_at, entry_price, exit_price, risk_to_reward, partials_taken, session, notes, tags,
-  is_deleted, is_temporary, is_pinned, share_link, is_shared, shared_at, share_id
+  is_temporary, is_pinned, share_link, is_shared, shared_at, share_id
 - session: One of 'Asia', 'London', 'NY AM', 'NY PM' (nullable)
 - trade_type: One of 'win', 'loss', 'breakeven'
 - tags: Array of strings (TEXT[])
@@ -270,7 +270,7 @@ RECOMMENDED WORKFLOWS:
 - ALWAYS filter by user_id in WHERE clause for security
 
 **CALENDARS TABLE SCHEMA**:
-- Columns: id, user_id, firestore_id, name, account_balance, max_daily_drawdown, risk_per_trade,
+- Columns: id, user_id, name, account_balance, max_daily_drawdown, risk_per_trade,
   total_trades, winning_trades, losing_trades, breakeven_trades, total_profit_loss, win_rate,
   average_win, average_loss, largest_win, largest_loss, profit_factor, created_at, updated_at,
   share_link, is_shared, shared_at, share_id

@@ -3,7 +3,7 @@
  * Safely renders HTML-formatted messages with proper styling
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -13,6 +13,7 @@ import {
   alpha
 } from '@mui/material';
 import DOMPurify from 'dompurify';
+import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 
 interface HtmlMessageRendererProps {
   html: string;
@@ -26,10 +27,15 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
   isUser = false
 }) => {
   const theme = useTheme();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [imageZoomOpen, setImageZoomOpen] = useState(false);
+  const [imageZoomProp, setImageZoomProp] = useState<ImageZoomProp | null>(null);
 
   // Sanitize HTML to prevent XSS attacks
   const sanitizedHtml = useMemo(() => {
-    return DOMPurify.sanitize(html, {
+    // DOMPurify.sanitize returns a string in the browser
+    const purify = DOMPurify(window);
+    return purify.sanitize(html, {
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'span', 'div', 'img'
@@ -38,6 +44,57 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
       KEEP_CONTENT: true
     });
   }, [html]);
+
+  // Extract image URLs from sanitized HTML
+  const imageUrls = useMemo(() => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(sanitizedHtml, 'text/html');
+    const images = doc.querySelectorAll('img');
+    const urls = Array.from(images).map(img => img.src);
+    console.log('[HtmlMessageRenderer] Extracted image URLs:', urls);
+    return urls;
+  }, [sanitizedHtml]);
+
+  // Add click handlers to images after render
+  useEffect(() => {
+    console.log('[HtmlMessageRenderer] useEffect triggered', {
+      hasContainer: !!containerRef.current,
+      imageUrlsLength: imageUrls.length,
+      imageUrls
+    });
+
+    if (!containerRef.current || imageUrls.length === 0) return;
+
+    const images = containerRef.current.querySelectorAll('img');
+    console.log('[HtmlMessageRenderer] Found images in DOM:', images.length);
+
+    const handleImageClick = (index: number) => {
+      console.log('[HtmlMessageRenderer] Image clicked:', index, imageUrls[index]);
+
+      // Check if the clicked image is from QuickChart (AI-generated)
+      const isAIChart = imageUrls[index]?.includes('quickchart.io');
+
+      setImageZoomProp({
+        selectetdImageIndex: index,
+        allImages: imageUrls,
+        useSolidBackground: isAIChart
+      });
+      setImageZoomOpen(true);
+    };
+
+    images.forEach((img, index) => {
+      img.style.cursor = 'pointer';
+      img.onclick = () => handleImageClick(index);
+      console.log('[HtmlMessageRenderer] Added click handler to image', index);
+    });
+
+    // Cleanup
+    return () => {
+      images.forEach(img => {
+        img.onclick = null;
+      });
+    };
+  }, [sanitizedHtml, imageUrls]);
 
   // Create a style object for the HTML content
   const htmlStyles = `
@@ -129,12 +186,14 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
   `;
 
   return (
-    <Box
-      sx={{
-        '& p': {
-          margin: '0.5rem 0',
-          lineHeight: 1.5
-        },
+    <>
+      <Box
+        ref={containerRef}
+        sx={{
+          '& p': {
+            margin: '0.5rem 0',
+            lineHeight: 1.5
+          },
         '& strong': {
           fontWeight: 600
         },
@@ -196,24 +255,40 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
           borderRadius: 2,
           margin: '1rem 0',
           display: 'block',
-          boxShadow: theme.shadows[2]
+          boxShadow: theme.shadows[2],
+          cursor: 'pointer',
+          transition: 'transform 0.2s, box-shadow 0.2s',
+          '&:hover': {
+            transform: 'scale(1.02)',
+            boxShadow: theme.shadows[4]
+          }
         },
         '& sup': {
           fontSize: '0.8em',
           verticalAlign: 'super'
         }
       }}
-    >
-      <Typography
-        component="div"
-        sx={{
-          color: textColor,
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word'
-        }}
-        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-      />
-    </Box>
+      >
+        <Typography
+          component="div"
+          sx={{
+            color: textColor,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word'
+          }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        />
+      </Box>
+
+      {/* Image Zoom Dialog */}
+      {imageZoomProp && (
+        <ImageZoomDialog
+          open={imageZoomOpen}
+          onClose={() => setImageZoomOpen(false)}
+          imageProp={imageZoomProp}
+        />
+      )}
+    </>
   );
 };
 

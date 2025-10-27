@@ -17,12 +17,13 @@ import { scrollbarStyles } from '../styles/scrollbarStyles';
 interface ImageZoomDialogProps {
   open: boolean;
   onClose: () => void;
-  imageProp: ImageZoomProp; 
+  imageProp: ImageZoomProp;
 }
 
 export interface ImageZoomProp{
   selectetdImageIndex: number;
   allImages: string[];
+  useSolidBackground?: boolean; // Optional: use solid background for AI charts
 }
 
 const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
@@ -40,6 +41,12 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
   setImageData(imageProp);
  }
   const theme = useTheme();
+
+  // Determine if we should use solid background
+  // Auto-detect if the current image is from QuickChart (AI-generated chart)
+  const currentImageUrl = imageArray[imageData?.selectetdImageIndex || 0];
+  const isAIChart = currentImageUrl?.includes('quickchart.io');
+  const useSolidBackground = imageProp?.useSolidBackground ?? isAIChart;
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -188,9 +195,12 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
       PaperProps={{
         sx: {
           boxShadow: 'none',
-          backgroundColor: 'transparent',
+          backgroundColor: useSolidBackground
+            ? theme.palette.background.paper
+            : 'transparent',
           overflow: 'hidden',
           maxWidth: '80%',
+          borderRadius: useSolidBackground ? 2 : 0,
           '& .MuiDialogContent-root': {
             ...scrollbarStyles(theme)
           }
@@ -287,6 +297,10 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
             justifyContent: 'center',
             overflow: 'hidden',
             cursor: scale > 1 ? 'grab' : 'default',
+            backgroundColor: useSolidBackground
+              ? theme.palette.background.default
+              : 'transparent',
+            padding: useSolidBackground ? 2 : 0,
             '&:active': {
               cursor: scale > 1 ? 'grabbing' : 'default'
             }

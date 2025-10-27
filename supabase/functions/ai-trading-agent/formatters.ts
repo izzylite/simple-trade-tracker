@@ -186,6 +186,7 @@ export function formatErrorResponse(error: Error, model: string): AgentResponse 
 
 /**
  * Extract URLs from tool results
+ * Excludes QuickChart URLs since they're embedded as images
  */
 function extractUrlsFromToolResult(result: any): string[] {
   const urls: string[] = [];
@@ -197,7 +198,9 @@ function extractUrlsFromToolResult(result: any): string[] {
     const urlRegex = /(https?:\/\/[^\s\n]+)/g;
     const matches = result.match(urlRegex);
     if (matches) {
-      urls.push(...matches);
+      // Filter out QuickChart URLs (they're embedded as images, not citations)
+      const filteredUrls = matches.filter(url => !url.includes('quickchart.io'));
+      urls.push(...filteredUrls);
     }
   }
 
@@ -354,7 +357,31 @@ export function formatResponseWithHtmlAndCitations(
   toolCalls: ToolCall[]
 ): { messageHtml: string; citations: Citation[] } {
   const citations = extractCitations(toolCalls);
-  const messageHtml = convertMarkdownToHtml(message, citations);
+
+  // Remove markdown image syntax from AI's message (we'll add charts from tool results)
+  // This prevents duplicate charts when AI includes ![alt](url) in its response
+  let cleanedMessage = message.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '');
+
+  // Check if the AI's message already contains chart markers [CHART_IMAGE:...]
+  // If it does, don't append chart results again to avoid duplicates
+  const hasChartMarkersInMessage = /\[CHART_IMAGE:(.+?)\]/.test(cleanedMessage);
+
+  // Extract chart images from tool results (generate_chart tool)
+  const chartToolCalls = toolCalls.filter(tc => tc.name === 'generate_chart');
+
+  if (chartToolCalls.length > 0 && !hasChartMarkersInMessage) {
+    // Only append chart results if the AI hasn't already included them
+    const chartResults = chartToolCalls
+      .map(tc => tc.result)
+      .filter(result => result && typeof result === 'string')
+      .join('\n\n');
+
+    if (chartResults) {
+      cleanedMessage = `${cleanedMessage}\n\n${chartResults}`;
+    }
+  }
+
+  const messageHtml = convertMarkdownToHtml(cleanedMessage, citations);
 
   return {
     messageHtml,
