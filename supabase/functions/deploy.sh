@@ -34,12 +34,8 @@ FUNCTIONS=(
     "refresh-economic-calendar"
     "cleanup-expired-calendars"
     "auto-refresh-economic-calendar"
-    "generate-trade-share-link"
     "get-shared-trade"
-    "deactivate-shared-trade"
-    "generate-calendar-share-link"
     "get-shared-calendar"
-    "deactivate-shared-calendar"
 )
 
 echo "📋 Functions to deploy: ${#FUNCTIONS[@]}"

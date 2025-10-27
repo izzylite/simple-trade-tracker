@@ -56,13 +56,11 @@ curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/function-
 - `cleanup-expired-calendars/` - Daily cleanup of expired calendars
 - `auto-refresh-economic-calendar/` - Periodic economic data refresh
 
-#### Sharing Functions
-- `generate-trade-share-link/` - Creates shareable trade links
-- `get-shared-trade/` - Retrieves shared trade data
-- `deactivate-shared-trade/` - Deactivates trade shares
-- `generate-calendar-share-link/` - Creates shareable calendar links
-- `get-shared-calendar/` - Retrieves shared calendar data
-- `deactivate-shared-calendar/` - Deactivates calendar shares
+#### Sharing Functions (Public Viewing Only)
+- `get-shared-trade/` - Retrieves shared trade data for public viewing
+- `get-shared-calendar/` - Retrieves shared calendar data for public viewing
+
+**Note**: Share link generation and deactivation are now handled by ShareRepository in the frontend service layer
 
 ## Deployment
 

@@ -9,14 +9,11 @@
 
 import { EconomicEvent, Currency, ImpactLevel } from '../types/economicCalendar';
 import { economicCalendarService } from './economicCalendarService';
-// import { httpsCallable } from 'firebase/functions'; // Removed - migrating to Supabase
-// import { functions } from '../firebase/config';
 import { endOfDay, format, startOfDay } from 'date-fns';
 import { error, log, logger } from '../utils/logger';
+import { supabase } from '../config/supabase';
 
 /* eslint-disable */
-
-const functions: any = null; // Placeholder for migration
 
 // Default filter settings to use when no calendar filters are available
 const DEFAULT_FILTER_SETTINGS = {
@@ -151,7 +148,7 @@ class EconomicEventWatcher {
   }
 
   /**
-   * Refresh economic calendar data by calling the cloud function
+   * Refresh economic calendar data by calling the Supabase edge function
    */
   private async refreshCalendarData(currencies: Currency[], calendarId: string) {
     try {
@@ -160,15 +157,21 @@ class EconomicEventWatcher {
       const today = new Date();
       const targetDate = format(today, 'yyyy-MM-dd');
 
-      // Call cloud function to refresh today's economic calendar data
-      const refreshEconomicCalendar = httpsCallable(functions, 'refreshEconomicCalendar');
-      const result = await refreshEconomicCalendar({
-        targetDate,
-        currencies
-        // No specific events - refresh all events for today
+      // Call Supabase edge function to refresh today's economic calendar data
+      const { data, error: callError } = await supabase.functions.invoke('refresh-economic-calendar', {
+        body: {
+          targetDate,
+          currencies
+          // No specific events - refresh all events for today
+        }
       });
 
-      const responseData = result.data as any;
+      if (callError) {
+        logger.error('❌ Error calling refresh-economic-calendar function:', callError);
+        return;
+      }
+
+      const responseData = data as any;
       const updatedCount = responseData?.updatedCount || 0;
       const foundEventsCount = responseData?.foundEvents?.length || 0;
 
@@ -407,24 +410,29 @@ class EconomicEventWatcher {
 
       // Get unique currencies from the event group
       const currencySet = new Set(events.map(e => e.currency));
-      const currencies = Array.from(currencySet);
+      const currencies = Array.from(currencySet) as Currency[];
       const targetDate = events[0].date; // All events should have the same date
 
-      // Call cloud function to refresh economic calendar data for all events
-      const refreshEconomicCalendar = httpsCallable(functions, 'refreshEconomicCalendar');
-      const result = await refreshEconomicCalendar({
-        targetDate,
-        currencies,
-        events // Pass the entire events list
+      // Call Supabase edge function to refresh economic calendar data for all events
+      const { data, error: callError } = await supabase.functions.invoke('refresh-economic-calendar', {
+        body: {
+          targetDate,
+          currencies,
+          events // Pass the entire events list
+        }
       });
 
+      if (callError) {
+        logger.error('❌ Error calling refresh-economic-calendar function:', callError);
+        return;
+      }
 
-      // Extract updated events from the cloud function result
-      const responseData = result.data as any;
+      // Extract updated events from the edge function result
+      const responseData = data as any;
       const targetEvents: EconomicEvent[] = responseData?.targetEvents || [];
       const foundEvents: EconomicEvent[] = responseData?.foundEvents || [];
 
-      logger.log(`📊 Cloud function returned ${targetEvents.length} total events, ${foundEvents.length} specifically requested events`);
+      logger.log(`📊 Edge function returned ${targetEvents.length} total events, ${foundEvents.length} specifically requested events`);
 
       // Process each event in the group
       const updatedEvents: EconomicEvent[] = [];

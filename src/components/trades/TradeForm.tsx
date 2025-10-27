@@ -41,15 +41,15 @@ import { CURRENCY_PAIRS } from '../../services/tradeEconomicEventService';
 export interface NewTradeForm {
   id: string;
   name: string;
-  amount: string;
   trade_type: 'win' | 'loss' | 'breakeven';
-  entry_price: string;
-  exit_price: string;
-  stop_loss: string;
-  take_profit: string;
+  amount: number;
+  entry_price: number;
+  exit_price: number;
+  stop_loss: number;
+  take_profit: number;
+  risk_to_reward: number;
   trade_date?: Date | null;
-  tags: string[];
-  risk_to_reward: string;
+  tags: string[]; 
   partials_taken: boolean;
   session: 'Asia' | 'London' | 'NY AM' | 'NY PM' | '';
   notes: string;
@@ -98,13 +98,13 @@ interface TradeFormProps {
   requiredTagGroups?: string[];
   onTagUpdated?: (oldTag: string, newTag: string) => void;
   onNameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onAmountChange: (amount: string) => void;
+  onAmountChange: (amount: number) => void;
   onTypeChange: (e: any) => void;
   onEntryChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onExitChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onStopLossChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTakeProfitChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onRiskToRewardChange: (risk_to_reward: string) => void;
+  onRiskToRewardChange: (risk_to_reward: number) => void;
   onPartialsTakenChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSessionChange: (e: any) => void;
   onNotesChange: (value: string) => void;
@@ -191,11 +191,11 @@ const TradeForm: React.FC<TradeFormProps> = ({
  
 
   // Calculate and update the amount based on risk
-  const calculateAmountFromRisk = (): string => {
-    if (!dynamicRiskSettings.risk_per_trade || !newTrade.risk_to_reward) return '';
+  const calculateAmountFromRisk = (): number => {
+    if (!dynamicRiskSettings.risk_per_trade || !newTrade.risk_to_reward) return 0;
 
-    const rr = parseFloat(newTrade.risk_to_reward);
-    if (isNaN(rr)) return '';
+    const rr = newTrade.risk_to_reward;
+    if (isNaN(rr)) return 0;
 
     const amount = calculateAmountFromRiskToReward(rr, cumulativePnl);
 
@@ -203,10 +203,10 @@ const TradeForm: React.FC<TradeFormProps> = ({
     // This is important to make sure the amount is saved correctly
     if (!newTrade.partials_taken && amount > 0) {
       // Only update if we're not in manual mode and have a valid amount
-      setTimeout(() => onAmountChange(amount.toString()), 0);
+      setTimeout(() => onAmountChange(amount), 0);
     }
 
-    return amount.toString();
+    return amount;
   };
 
   // Add trade name suggestions logic
@@ -241,14 +241,14 @@ const TradeForm: React.FC<TradeFormProps> = ({
   const handleRiskToRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      onRiskToRewardChange(value)
+      const numValue = value === '' ? 0 : parseFloat(value);
+      onRiskToRewardChange(numValue)
 
       // If risk per trade is set and partials are not taken, automatically calculate and update the amount
-      if (dynamicRiskSettings.risk_per_trade && value && !newTrade.partials_taken) {
-        const rr = parseFloat(value);
-        if (!isNaN(rr)) {
-          const calculatedAmount = calculateAmountFromRiskToReward(rr, cumulativePnl);
-          onAmountChange(calculatedAmount.toString())
+      if (dynamicRiskSettings.risk_per_trade && numValue && !newTrade.partials_taken) {
+        if (!isNaN(numValue)) {
+          const calculatedAmount = calculateAmountFromRiskToReward(numValue, cumulativePnl);
+          onAmountChange(calculatedAmount)
         }
       }
     }
@@ -293,7 +293,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
         <FormField sx={{ flex: 1 }}>
           <TextField
             label="Entry Price"
-            value={newTrade.entry_price}
+            value={newTrade.entry_price == 0? undefined : newTrade.entry_price}
             onChange={onEntryChange}
             fullWidth
             placeholder="Optional entry price"
@@ -302,7 +302,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
         <FormField sx={{ flex: 1 }}>
           <TextField
             label="Exit Price"
-            value={newTrade.exit_price}
+            value={newTrade.exit_price == 0? undefined : newTrade.exit_price}
             onChange={onExitChange}
             fullWidth
             placeholder="Optional exit price"
@@ -314,7 +314,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
         <FormField sx={{ flex: 1 }}>
           <TextField
             label="Stop Loss"
-            value={newTrade.stop_loss}
+            value={newTrade.stop_loss == 0? undefined : newTrade.stop_loss}
             onChange={onStopLossChange}
             fullWidth
             placeholder="Optional stop loss"
@@ -323,7 +323,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
         <FormField sx={{ flex: 1 }}>
           <TextField
             label="Take Profit"
-            value={newTrade.take_profit}
+            value={newTrade.take_profit == 0? undefined : newTrade.take_profit}
             onChange={onTakeProfitChange}
             fullWidth
             placeholder="Optional take profit"
@@ -377,8 +377,8 @@ const TradeForm: React.FC<TradeFormProps> = ({
           <TextField
             label="Amount"
             type="number"
-            value={newTrade.amount}
-            onChange={(e) => onAmountChange(e.target.value)}
+            value={newTrade.amount ==0 ? undefined : newTrade.amount}
+            onChange={(e) => onAmountChange(parseFloat(e.target.value) || 0)}
             fullWidth
             required
             helperText={dynamicRiskSettings.risk_per_trade && newTrade.partials_taken ? "Manual entry for partial profits" : undefined}
@@ -428,7 +428,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
       <FormField>
         <TextField
           label="Risk to Reward"
-          value={newTrade.risk_to_reward}
+          value={newTrade.risk_to_reward == 0? undefined : newTrade.risk_to_reward}
           onChange={handleRiskToRewardChange}
           fullWidth
           type="number"

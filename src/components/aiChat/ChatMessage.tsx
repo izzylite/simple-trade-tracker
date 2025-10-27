@@ -20,6 +20,8 @@ import AnimatedText from './AnimatedText';
 import DisplayItemsList from './DisplayItemsList';
 import TradeCard from './TradeCard';
 import EventCard from './EventCard';
+import HtmlMessageRenderer from './HtmlMessageRenderer';
+import CitationsSection from './CitationsSection';
 import {
   Person as PersonIcon,
   SmartToy as AIIcon,
@@ -338,7 +340,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         >
           {/* Message Content */}
           <Box sx={{ mb: message.error ? 1 : 0 }}>
-            {isAssistant && enableAnimation && isLatestMessage ? (
+            {/* Use HTML renderer if messageHtml is available (from Supabase AI agent) */}
+            {message.messageHtml ? (
+              <HtmlMessageRenderer html={message.messageHtml} />
+            ) : isAssistant && enableAnimation && isLatestMessage ? (
               <AnimatedText
                 text={parsedResponse.textContent}
                 speed={200} // Much faster: 200 characters per second
@@ -351,6 +356,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 : formatContent(parsedResponse.textContent)
             )}
           </Box>
+
+          {/* Citations (from Supabase AI agent) */}
+          {isAssistant && message.citations && message.citations.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <CitationsSection citations={message.citations} />
+            </Box>
+          )}
 
           {/* Display Items */}
           {isAssistant && parsedResponse.displayItems && parsedResponse.displayItems.length > 0 && (
@@ -456,36 +468,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             />
           )} */}
 
-          {/* Token Count */}
-          {showTokenCount && message.tokenCount && (
-            <Tooltip title="Token count">
-              <Typography variant="caption" color="text.secondary">
-                {message.tokenCount} tokens
-              </Typography>
-            </Tooltip>
-          )}
         </Box>
-
-        {/* Trading Insights */}
-        {message.metadata?.tradingInsights && message.metadata.tradingInsights.length > 0 && (
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-              Key Insights:
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {message.metadata.tradingInsights.slice(0, 3).map((insight, index) => (
-                <Chip
-                  key={index}
-                  label={`${insight.title}: ${insight.value}`}
-                  size="small"
-                  variant="outlined"
-                  color={insight.type === 'warning' ? 'warning' : 'default'}
-                  sx={{ fontSize: '0.7rem' }}
-                />
-              ))}
-            </Box>
-          </Box>
-        )}
       </Box>
     </Box>
   );

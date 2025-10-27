@@ -70,13 +70,11 @@ supabase functions deploy process-economic-events --no-verify-jwt
 supabase functions deploy refresh-economic-calendar --no-verify-jwt
 supabase functions deploy cleanup-expired-calendars --no-verify-jwt
 supabase functions deploy auto-refresh-economic-calendar --no-verify-jwt
-supabase functions deploy generate-trade-share-link --no-verify-jwt
 supabase functions deploy get-shared-trade --no-verify-jwt
-supabase functions deploy deactivate-shared-trade --no-verify-jwt
-supabase functions deploy generate-calendar-share-link --no-verify-jwt
 supabase functions deploy get-shared-calendar --no-verify-jwt
-supabase functions deploy deactivate-shared-calendar --no-verify-jwt
 ```
+
+**Note**: Share link generation and deactivation are now handled by ShareRepository in the frontend service layer
 
 ## Post-Deployment Configuration
 

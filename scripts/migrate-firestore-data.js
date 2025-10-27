@@ -74,47 +74,17 @@ function generateUUID() {
   });
 }
 
+// Target user ID for all migrated data (Supabase auth ID for isl.israelite@gmail.com)
+const TARGET_USER_ID = '3d72a36e-ce9a-4531-a1ee-5eb4b815ada1';
+
 /**
  * Create or get user from Firebase Auth data
+ * All data will be migrated to the TARGET_USER_ID
  */
 async function migrateUser(firebaseUid, userData = {}) {
-  try {
-    // Check if user already exists
-    const { data: existingUser, error: checkError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('firebase_uid', firebaseUid)
-      .single();
-
-    if (existingUser) {
-      return existingUser.id;
-    }
-
-    // Create new user
-    const userId = generateUUID();
-    const { error: insertError } = await supabase
-      .from('users')
-      .insert({
-        id: userId,
-        firebase_uid: firebaseUid,
-        email: userData.email || null,
-        display_name: userData.displayName || null,
-        photo_url: userData.photoURL || null,
-        created_at: convertTimestamp(userData.createdAt) || new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-
-    if (insertError) {
-      throw insertError;
-    }
-
-    stats.users.migrated++;
-    return userId;
-  } catch (error) {
-    stats.users.errors++;
-    stats.errors.push(`User migration error for ${firebaseUid}: ${error.message}`);
-    throw error;
-  }
+  // Simply return the target user ID - user already exists in Supabase auth
+  console.log(`✅ Using target user: ${TARGET_USER_ID}`);
+  return TARGET_USER_ID;
 }
 
 /**
@@ -171,7 +141,8 @@ async function migrateCalendars() {
           increased_risk_percentage: parseFloat(calendarData.increasedRiskPercentage) || null,
           profit_threshold_percentage: parseFloat(calendarData.profitThresholdPercentage) || null,
           duplicated_calendar: calendarData.duplicatedCalendar || false,
-          is_deleted: calendarData.isDeleted || false,
+          mark_for_deletion: calendarData.isDeleted || false,
+          deletion_date: calendarData.isDeleted ? new Date().toISOString() : null,
           required_tag_groups: calendarData.requiredTagGroups || null,
           tags: calendarData.tags || null,
           note: calendarData.note || null,
@@ -286,19 +257,21 @@ async function migrateTrades(calendarIdMap) {
                 id: tradeId,
                 calendar_id: supabaseCalendarId,
                 user_id: calendar.user_id,
-                firestore_id: firestoreTradeId,
                 name: trade.name || 'Untitled Trade',
                 amount: parseFloat(trade.amount) || 0,
-                trade_type: trade.tradeType || 'breakeven',
-                trade_date: convertTimestamp(trade.tradeDate) || new Date().toISOString(),
+                trade_type: trade.type || trade.tradeType || 'breakeven',
+                trade_date: convertTimestamp(trade.date || trade.tradeDate) || new Date().toISOString(),
                 entry_price: parseFloat(trade.entryPrice) || null,
                 exit_price: parseFloat(trade.exitPrice) || null,
+                stop_loss: parseFloat(trade.stopLoss) || null,
+                take_profit: parseFloat(trade.takeProfit) || null,
                 risk_to_reward: parseFloat(trade.riskToReward) || null,
                 partials_taken: trade.partialsTaken || false,
                 session: trade.session || null,
                 notes: trade.notes || null,
                 tags: trade.tags || [],
-                is_deleted: trade.isDeleted || false,
+                images: trade.images || [],
+                economic_events: trade.economicEvents || [],
                 is_temporary: trade.isTemporary || false,
                 is_pinned: trade.isPinned || false,
                 share_link: trade.shareLink || null,
@@ -429,6 +402,7 @@ async function migrateEconomicEvents() {
  */
 async function migrateFirestoreData() {
   console.log('🚀 Starting Firestore to Supabase Data Migration...\n');
+  console.log('📋 Migrating: Calendars and Trades only (Economic Events excluded)\n');
 
   try {
     // Step 1: Migrate calendars (this also creates users)
@@ -437,8 +411,8 @@ async function migrateFirestoreData() {
     // Step 2: Migrate trades from subcollections
     await migrateTrades(calendarIdMap);
 
-    // Step 3: Migrate economic events
-    await migrateEconomicEvents();
+    // Step 3: Skip economic events (already exist in Supabase)
+    console.log('\n⏭️  Skipping economic events (already exist in Supabase)');
 
     // Display final results
     console.log('\n🎉 Migration completed!\n');
@@ -446,7 +420,6 @@ async function migrateFirestoreData() {
     console.log(`   Users: ${stats.users.migrated} migrated, ${stats.users.errors} errors`);
     console.log(`   Calendars: ${stats.calendars.migrated}/${stats.calendars.total} migrated, ${stats.calendars.errors} errors`);
     console.log(`   Trades: ${stats.trades.migrated}/${stats.trades.total} migrated, ${stats.trades.errors} errors`);
-    console.log(`   Economic Events: ${stats.economicEvents.migrated}/${stats.economicEvents.total} migrated, ${stats.economicEvents.errors} errors`);
 
     if (stats.errors.length > 0) {
       console.log('\n❌ Errors encountered:');

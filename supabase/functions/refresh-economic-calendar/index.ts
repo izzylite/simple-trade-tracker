@@ -1,42 +1,103 @@
 /**
- * Refresh Economic Calendar Edge Function
+ * Refresh Economic Calendar Edge Function (Standalone with CORS fix)
  * Replaces Firebase refreshEconomicCalendar callable function
- * 
+ *
  * Manually refreshes economic calendar data for specific dates/currencies
  * by fetching from MyFXBook API and updating the database
  */
+  import { createClient } from "supabase";
 
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-import {
-  createServiceClient,
-  errorResponse,
-  successResponse,
-  handleCors,
-  log,
-  parseJsonBody
-} from '../_shared/supabase.ts'
-import type {
-  EconomicEvent
-} from '../_shared/types.ts'
+// CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE'
+};
 
-interface RefreshCalendarPayload {
-  targetDate: string // YYYY-MM-DD format
-  currencies: string[] // Array of currency codes
-  events?: EconomicEvent[] // Optional: specific events to look for (EXACT Firebase format)
+// Utility functions
+function createServiceClient() {
+  const url = Deno.env.get('SUPABASE_URL');
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !key) {
+    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  }
+  return createClient(url, key);
 }
 
+function errorResponse(message: string, status = 400): Response {
+  return new Response(JSON.stringify({
+    success: false,
+    error: message
+  }), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...corsHeaders
+    }
+  });
+}
 
+function successResponse(data: unknown, message?: string): Response {
+  return new Response(JSON.stringify({
+    success: true,
+    data,
+    ...(message && {
+      message
+    })
+  }), {
+    headers: {
+      'Content-Type': 'application/json',
+      ...corsHeaders
+    }
+  });
+}
 
-/**
- * Fetch weekly economic calendar data from MyFXBook (EXACT Firebase logic)
- */
-async function fetchFromMyFXBookWeekly(): Promise<EconomicEvent[]> {
+function handleCors(req: Request): Response | null {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
+      headers: corsHeaders
+    });
+  }
+  return null;
+}
+
+function log(message: string, level: string = 'info', context?: unknown): void {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}`;
+  if (context) {
+    if (level === 'error') {
+      console.error(logMessage, context);
+    } else if (level === 'warn') {
+      console.warn(logMessage, context);
+    } else {
+      console.log(logMessage, context);
+    }
+  } else {
+    if (level === 'error') {
+      console.error(logMessage);
+    } else if (level === 'warn') {
+      console.warn(logMessage);
+    } else {
+      console.log(logMessage);
+    }
+  }
+}
+
+async function parseJsonBody(req: Request): Promise<unknown> {
   try {
-    log('🔄 Fetching weekly economic calendar from MyFXBook...')
-
-    const url = 'https://www.myfxbook.com/forex-economic-calendar'
-    log(`📡 Fetching URL: ${url}`)
-
+    return await req.json();
+  } catch (error) {
+    log('Failed to parse JSON body', 'error', error);
+    return null;
+  }
+}
+/**
+ * Fetch weekly economic calendar data from MyFXBook
+ */ async function fetchFromMyFXBookWeekly(): Promise<Record<string, unknown>[]> {
+  try {
+    log('🔄 Fetching weekly economic calendar from MyFXBook...');
+    const url = 'https://www.myfxbook.com/forex-economic-calendar';
+    log(`📡 Fetching URL: ${url}`);
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -47,80 +108,66 @@ async function fetchFromMyFXBookWeekly(): Promise<EconomicEvent[]> {
         'Upgrade-Insecure-Requests': '1',
         'Cache-Control': 'no-cache'
       }
-    })
-
+    });
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-
-    const html = await response.text()
-    log(`✅ Response received: ${response.status}, content length: ${html.length}`)
-
+    const html = await response.text();
+    log(`✅ Response received: ${response.status}, content length: ${html.length}`);
     // Call the process-economic-events function to parse the HTML
-    const processResponse = await fetch(
-      `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-economic-events`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-        },
-        body: JSON.stringify({ htmlContent: html })
-      }
-    )
-
-    if (!processResponse.ok) {
-      throw new Error(`Process function failed: ${await processResponse.text()}`)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
     }
-
-    const processResult = await processResponse.json()
-    const stats = processResult.data || processResult
-
-    const extracted = stats.parsed_total ?? (stats.events?.length || 0)
-    log(`🎯 Successfully extracted ${extracted} events from MyFXBook (upserted=${stats.upserted_count ?? 0}, existing=${stats.existing_count ?? 0})`)
-
-    // Prefer events if provided, otherwise return empty (refresh uses only counts)
-    return stats.events || []
-
+    const processResponse = await fetch(`${supabaseUrl}/functions/v1/process-economic-events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceRoleKey}`
+      },
+      body: JSON.stringify({
+        htmlContent: html
+      })
+    });
+    if (!processResponse.ok) {
+      throw new Error(`Process function failed: ${await processResponse.text()}`);
+    }
+    const processResult = await processResponse.json() as Record<string, unknown>;
+    const stats = (processResult.data as Record<string, unknown>) || processResult;
+    const extracted = (stats.parsed_total as number) ?? ((stats.events as Record<string, unknown>[])?.length || 0);
+    log(`🎯 Successfully extracted ${extracted} events from MyFXBook (upserted=${stats.upserted_count ?? 0}, existing=${stats.existing_count ?? 0})`);
+    return (stats.events as Record<string, unknown>[]) || [];
   } catch (error) {
-    log('❌ Error fetching from MyFXBook:', 'error', error)
-    throw error
+    log('❌ Error fetching from MyFXBook:', 'error', error);
+    throw error;
   }
 }
-
-
-
-
 /**
  * Update events in database
- */
-async function updateEventsInDatabase(events: EconomicEvent[]): Promise<number> {
+ */ async function updateEventsInDatabase(events: Record<string, unknown>[]): Promise<number> {
   try {
     if (events.length === 0) {
-      return 0
+      return 0;
     }
-
-    log(`Updating ${events.length} events in database`)
-
-    const supabase = createServiceClient()
-    let updatedCount = 0
-
+    log(`Updating ${events.length} events in database`);
+    const supabase = createServiceClient();
+    let updatedCount = 0;
     for (const e of events) {
-      const normalizeImpact = (impact?: string) => {
-        const i = (impact || '').toLowerCase()
-        if (i === 'high') return 'High'
-        if (i === 'medium') return 'Medium'
-        if (i === 'low') return 'Low'
-        return 'Low'
-      }
-
+      const normalizeImpact = (impact: unknown): string => {
+        const i = (impact as string || '').toLowerCase();
+        if (i === 'high') return 'High';
+        if (i === 'medium') return 'Medium';
+        if (i === 'low') return 'Low';
+        return 'Low';
+      };
       const row = {
         external_id: e.id,
         currency: e.currency,
         event_name: e.event,
         impact: normalizeImpact(e.impact),
         event_date: e.date,
-        event_time: e.time_utc ? new Date(e.time_utc).toISOString() : null,
+        event_time: e.time_utc ? new Date(e.time_utc as string).toISOString() : null,
         time_utc: e.time_utc ?? null,
         unix_timestamp: e.unix_timestamp ?? null,
         actual_value: e.actual ?? null,
@@ -131,160 +178,106 @@ async function updateEventsInDatabase(events: EconomicEvent[]): Promise<number> 
         flag_url: e.flag_url ?? null,
         source_url: 'https://www.myfxbook.com/forex-economic-calendar',
         data_source: e.source ?? 'myfxbook',
-        last_updated: new Date().toISOString(),
-      }
-
-      const { data, error } = await supabase
-        .from('economic_events')
-        .upsert(row, { onConflict: 'external_id' })
-        .select('external_id')
-
+        last_updated: new Date().toISOString()
+      };
+      const { data, error } = await supabase.from('economic_events').upsert(row, {
+        onConflict: 'external_id'
+      }).select('external_id');
       if (error) {
-        log(`Error updating event ${e.id}`, 'error', error)
+        log(`Error updating event ${e.id}`, 'error', error);
       } else {
-        updatedCount += (data?.length || 0)
+        updatedCount += (data as Record<string, unknown>[])?.length || 0;
       }
     }
-
-    log(`Updated ${updatedCount} events in database`)
-    return updatedCount
-
+    log(`Updated ${updatedCount} events in database`);
+    return updatedCount;
   } catch (error) {
-    log('Error updating events in database', 'error', error)
-    throw error
+    log('Error updating events in database', 'error', error);
+    throw error;
   }
+}
+interface RefreshPayload {
+  targetDate: string;
+  currencies: string[];
+  events?: Record<string, unknown>[];
 }
 
 /**
  * Main Edge Function handler
- */
-Deno.serve(async (req: Request) => {
+ */ Deno.serve(async (req) => {
   // Handle CORS preflight requests
-  const corsResponse = handleCors(req)
-  if (corsResponse) return corsResponse
-
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
   try {
-    log('Refresh economic calendar request received')
-    
-    // This function can be called by users or other functions
-    // No authentication required - it's a data processing function
-    
+    log('Refresh economic calendar request received');
     // Parse request body
-    const payload = await parseJsonBody<RefreshCalendarPayload>(req)
+    const payload = await parseJsonBody(req) as RefreshPayload;
     if (!payload) {
-      return errorResponse('Invalid JSON payload', 400)
+      return errorResponse('Invalid JSON payload', 400);
     }
-    
-    const { targetDate, currencies, events: requestedEvents } = payload
-
-    // Validate required parameters (EXACT Firebase validation)
+    const { targetDate, currencies, events: requestedEvents } = payload;
+    // Validate required parameters
     if (!targetDate || !currencies || !Array.isArray(currencies)) {
-      return errorResponse('Missing required parameters: targetDate and currencies array', 400)
+      return errorResponse('Missing required parameters: targetDate and currencies array', 400);
     }
-
-    // Optional: specific events to look for (EXACT Firebase logic)
-    const hasSpecificEvents = requestedEvents && requestedEvents.length > 0
-
-    log(`🔄 Refreshing economic calendar for date: ${targetDate}, currencies: ${currencies.join(', ')}`)
+    const hasSpecificEvents = requestedEvents && requestedEvents.length > 0;
+    log(`🔄 Refreshing economic calendar for date: ${targetDate}, currencies: ${currencies.join(', ')}`);
     if (hasSpecificEvents) {
-      log(`🎯 Looking for ${requestedEvents!.length} specific event(s): ${requestedEvents!.map(e => e.event).join(', ')}`)
-    } else {
-      log(`📊 Refreshing all events for the specified date and currencies`)
+      log(`🎯 Looking for ${requestedEvents.length} specific event(s): ${requestedEvents.map((e) => (e as Record<string, unknown>).event).join(', ')}`);
     }
-
-    // EXACT Firebase retry logic
-    let updated = false
-    let count = 0
-    const maxRetries = 5
-    let allEventsForDate: EconomicEvent[] = []
-    let foundEvents: EconomicEvent[] = []
-
+    let updated = false;
+    let count = 0;
+    const maxRetries = 5;
+    let allEventsForDate: Record<string, unknown>[] = [];
+    let foundEvents: Record<string, unknown>[] = [];
     while (!updated && count < maxRetries) {
-      const freshEvents = await fetchFromMyFXBookWeekly()
-
-      // Filter events by target date and currencies (EXACT Firebase logic)
-      allEventsForDate = freshEvents.filter(event => {
-        const eventDate = new Date(event.time_utc).toISOString().split('T')[0]
-        return eventDate === targetDate && currencies.includes(event.currency)
-      })
-
+      const freshEvents = await fetchFromMyFXBookWeekly();
+      allEventsForDate = freshEvents.filter((event) => {
+        const eventDate = new Date(event.time_utc as string).toISOString().split('T')[0];
+        return eventDate === targetDate && currencies.includes(event.currency as string);
+      });
       if (hasSpecificEvents) {
-        // Find all requested events by matching IDs (EXACT Firebase logic)
-        const requestedEventIds = requestedEvents!.map(e => e.id)
-        foundEvents = allEventsForDate.filter(event => requestedEventIds.includes(event.id))
-
-        log(`📊 Found ${foundEvents.length}/${requestedEvents!.length} requested events in ${allEventsForDate.length} total events`)
-
-        // Check if any of the found events have updated actual values
-        let hasUpdates = false
+        const requestedEventIds = requestedEvents.map((e) => (e as Record<string, unknown>).id);
+        foundEvents = allEventsForDate.filter((event) => requestedEventIds.includes(event.id));
+        log(`📊 Found ${foundEvents.length}/${requestedEvents.length} requested events in ${allEventsForDate.length} total events`);
+        let hasUpdates = false;
         for (const foundEvent of foundEvents) {
-          const originalEvent = requestedEvents!.find(e => e.id === foundEvent.id)
-          if (originalEvent && foundEvent.actual !== originalEvent.actual) {
-            hasUpdates = true
-            log(`✅ Event updated: ${foundEvent.event} - Actual changed from "${originalEvent.actual}" to "${foundEvent.actual}"`)
+          const originalEvent = requestedEvents.find((e) => (e as Record<string, unknown>).id === foundEvent.id);
+          if (originalEvent && foundEvent.actual !== (originalEvent as Record<string, unknown>).actual) {
+            hasUpdates = true;
+            log(`✅ Event updated: ${foundEvent.event}`);
           }
         }
-
         if (hasUpdates) {
-          updated = true
-          break
-        } else {
-          log(`❌ No updates found for requested events. Retrying (${count + 1}/${maxRetries}) after ${count + 1} seconds...`)
+          updated = true;
+          break;
         }
-
         if (foundEvents.length === 0 || count >= maxRetries) {
-          log(`⚠️ Events not found or max retries reached (${count + 1}/${maxRetries})`)
-          break
+          break;
         }
-
-        await new Promise(resolve => setTimeout(resolve, (count + 1) * 1000))
-        count++
+        await new Promise((resolve) => setTimeout(resolve, (count + 1) * 1000));
+        count++;
       } else {
-        // No specific events requested, just refresh all events for the date
-        updated = true
-        break
+        updated = true;
+        break;
       }
     }
-
-    log(`📊 Found ${allEventsForDate.length} events to update for ${targetDate}`)
-
-    // Store events in database (EXACT Firebase logic)
-    const updatedCount = await updateEventsInDatabase(allEventsForDate)
-    
-    // Log details about found events (EXACT Firebase logic)
-    if (hasSpecificEvents) {
-      if (foundEvents.length > 0) {
-        log(`🎯 Found ${foundEvents.length} specific event(s):`)
-        foundEvents.forEach(event => {
-          log(`- ${event.event}: Actual: ${event.actual}, Forecast: ${event.forecast}, Previous: ${event.previous}`)
-        })
-      } else {
-        const requestedEventIds = requestedEvents!.map(e => e.id)
-        log(`⚠️ None of the requested events found. Requested IDs: ${requestedEventIds.join(', ')}`, 'warn')
-      }
-    }
-
-    log(`✅ Successfully updated ${updatedCount} economic events`)
-
-    // EXACT Firebase response format
-    const response = {
+    const updatedCount = await updateEventsInDatabase(allEventsForDate);
+    log(`✅ Successfully updated ${updatedCount} economic events`);
+    const response: Record<string, unknown> = {
       success: true,
       updatedCount,
-      targetEvents: allEventsForDate, // All events for the date/currencies
-      foundEvents, // The specific events that were requested (if any)
+      targetEvents: allEventsForDate,
+      foundEvents,
       targetDate,
       currencies,
       requestedEvents: requestedEvents || [],
       hasSpecificEvents,
-      message: hasSpecificEvents
-        ? `Updated ${updatedCount} events for ${targetDate}. Found ${foundEvents.length}/${requestedEvents!.length} requested events.`
-        : `Updated ${updatedCount} events for ${targetDate}.`
-    }
-    
-    return successResponse(response)
-    
+      message: hasSpecificEvents ? `Updated ${updatedCount} events for ${targetDate}. Found ${foundEvents.length}/${requestedEvents.length} requested events.` : `Updated ${updatedCount} events for ${targetDate}.`
+    };
+    return successResponse(response);
   } catch (error) {
-    log('Error refreshing economic calendar', 'error', error)
-    return errorResponse('Internal server error', 500)
+    log('Error refreshing economic calendar', 'error', error);
+    return errorResponse('Internal server error', 500);
   }
-})
+});

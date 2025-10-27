@@ -181,168 +181,8 @@ export function formatErrorResponse(error: Error, model: string): AgentResponse 
   };
 }
 
-/**
- * Validate and clean trade data
- */
-export function cleanTradeData(trade: any): Trade | null {
-  try {
-    // Ensure required fields exist
-    if (!trade.id || !trade.calendar_id || !trade.user_id || !trade.trade_date) {
-      return null;
-    }
-
-    return {
-      id: trade.id,
-      calendar_id: trade.calendar_id,
-      user_id: trade.user_id,
-      name: trade.name,
-      amount: parseFloat(trade.amount) || 0,
-      trade_type: trade.trade_type,
-      trade_date: trade.trade_date,
-      entry_price: trade.entry_price ? parseFloat(trade.entry_price) : undefined,
-      exit_price: trade.exit_price ? parseFloat(trade.exit_price) : undefined,
-      stop_loss: trade.stop_loss ? parseFloat(trade.stop_loss) : undefined,
-      take_profit: trade.take_profit ? parseFloat(trade.take_profit) : undefined,
-      risk_to_reward: trade.risk_to_reward ? parseFloat(trade.risk_to_reward) : undefined,
-      partials_taken: trade.partials_taken,
-      session: trade.session,
-      notes: trade.notes,
-      tags: Array.isArray(trade.tags) ? trade.tags : [],
-      is_temporary: trade.is_temporary,
-      is_pinned: trade.is_pinned,
-      images: Array.isArray(trade.images) ? trade.images : [],
-      economic_events: Array.isArray(trade.economic_events) ? trade.economic_events : [],
-      share_link: trade.share_link,
-      is_shared: trade.is_shared,
-      shared_at: trade.shared_at,
-      share_id: trade.share_id,
-      created_at: trade.created_at,
-      updated_at: trade.updated_at,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Format trade statistics for display
- */
-export function formatStatisticsMessage(stats: any): string {
-  const lines = [
-    `📊 **Trading Performance Statistics**\n`,
-    `**Overview:**`,
-    `• Total Trades: ${stats.totalTrades}`,
-    `• Wins: ${stats.winCount} | Losses: ${stats.lossCount} | Breakeven: ${stats.breakevenCount}`,
-    `• Win Rate: ${stats.winRate}%`,
-    `• Profit Factor: ${stats.profitFactor}`,
-    `\n**Performance Metrics:**`,
-    `• Total P&L: $${stats.totalPnL}`,
-    `• Average Win: $${stats.avgWin}`,
-    `• Average Loss: $${stats.avgLoss}`,
-    `• Largest Win: $${stats.largestWin}`,
-    `• Largest Loss: $${stats.largestLoss}`,
-    `• Max Drawdown: $${stats.maxDrawdown}`,
-    `\n**Streaks:**`,
-    `• Max Consecutive Wins: ${stats.consecutiveWins}`,
-    `• Max Consecutive Losses: ${stats.consecutiveLosses}`,
-  ];
-
-  // Add session breakdown if available
-  if (stats.sessionStats && Object.keys(stats.sessionStats).length > 0) {
-    lines.push(`\n**Session Performance:**`);
-    Object.entries(stats.sessionStats).forEach(([session, data]: [string, any]) => {
-      lines.push(`• ${session}: ${data.trades} trades, ${data.winRate.toFixed(1)}% win rate, $${data.pnl.toFixed(2)} P&L`);
-    });
-  }
-
-  // Add tag breakdown if available
-  if (stats.tagStats && Object.keys(stats.tagStats).length > 0) {
-    lines.push(`\n**Tag Performance (Top 5):**`);
-    const topTags = Object.entries(stats.tagStats)
-      .sort(([, a]: [string, any], [, b]: [string, any]) => b.pnl - a.pnl)
-      .slice(0, 5);
-
-    topTags.forEach(([tag, data]: [string, any]) => {
-      lines.push(`• ${tag}: ${data.trades} trades, ${data.winRate.toFixed(1)}% win rate, $${data.pnl.toFixed(2)} P&L`);
-    });
-  }
-
-  return lines.join('\n');
-}
-
-/**
- * Format economic events for display
- */
-export function formatEconomicEventsMessage(events: EconomicEvent[]): string {
-  if (events.length === 0) {
-    return 'No economic events found for the specified criteria.';
-  }
-
-  const lines = [`📅 **Economic Calendar Events** (${events.length} events)\n`];
-
-  // Group by impact
-  const highImpact = events.filter((e) => e.impact === 'High');
-  const mediumImpact = events.filter((e) => e.impact === 'Medium');
-  const lowImpact = events.filter((e) => e.impact === 'Low');
-
-  if (highImpact.length > 0) {
-    lines.push(`🔴 **High Impact (${highImpact.length}):**`);
-    highImpact.slice(0, 5).forEach((event) => {
-      lines.push(`• ${event.currency} - ${event.event} (${new Date(event.timeUtc).toLocaleString()})`);
-    });
-    if (highImpact.length > 5) {
-      lines.push(`  ... and ${highImpact.length - 5} more high impact events`);
-    }
-  }
-
-  if (mediumImpact.length > 0) {
-    lines.push(`\n🟡 **Medium Impact (${mediumImpact.length}):**`);
-    mediumImpact.slice(0, 3).forEach((event) => {
-      lines.push(`• ${event.currency} - ${event.event} (${new Date(event.timeUtc).toLocaleString()})`);
-    });
-    if (mediumImpact.length > 3) {
-      lines.push(`  ... and ${mediumImpact.length - 3} more medium impact events`);
-    }
-  }
-
-  if (lowImpact.length > 0) {
-    lines.push(`\n🟢 **Low Impact:** ${lowImpact.length} events`);
-  }
-
-  return lines.join('\n');
-}
-
-/**
- * Format correlation analysis for display
- */
-export function formatCorrelationMessage(correlations: Array<{ event: EconomicEvent; trades: Trade[] }>): string {
-  if (correlations.length === 0) {
-    return 'No correlations found between economic events and trades.';
-  }
-
-  const lines = [`📊 **Event-Trade Correlation Analysis**\n`, `Found ${correlations.length} events with related trades:\n`];
-
-  correlations.slice(0, 10).forEach((correlation, index) => {
-    const { event, trades } = correlation;
-    const wins = trades.filter((t) => t.trade_type === 'win').length;
-    const losses = trades.filter((t) => t.trade_type === 'loss').length;
-    const totalPnL = trades.reduce((sum, t) => sum + t.amount, 0);
-
-    lines.push(
-      `${index + 1}. **${event.currency} - ${event.event}**`,
-      `   Time: ${new Date(event.timeUtc).toLocaleString()}`,
-      `   Impact: ${event.impact}`,
-      `   Related Trades: ${trades.length} (${wins}W/${losses}L)`,
-      `   P&L: $${totalPnL.toFixed(2)}\n`
-    );
-  });
-
-  if (correlations.length > 10) {
-    lines.push(`... and ${correlations.length - 10} more correlations`);
-  }
-
-  return lines.join('\n');
-}
+ 
+ 
 
 /**
  * Extract URLs from tool results
@@ -432,9 +272,24 @@ export function convertMarkdownToHtml(
 ): string {
   if (!text) return '';
 
-  let html = text;
+  // Extract chart image markers BEFORE any processing
+  const chartImageRegex = /\[CHART_IMAGE:(.+?)\]/g;
+  const chartImages: Array<{ marker: string; url: string }> = [];
+  let match;
+  while ((match = chartImageRegex.exec(text)) !== null) {
+    chartImages.push({
+      marker: match[0],
+      url: match[1]
+    });
+  }
 
-  // Escape HTML special characters first
+  // Replace chart markers with placeholder that won't be escaped
+  let html = text;
+  chartImages.forEach(({ marker }, index) => {
+    html = html.replace(marker, `___CHART_PLACEHOLDER_${index}___`);
+  });
+
+  // Escape HTML special characters
   html = html
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -468,6 +323,13 @@ export function convertMarkdownToHtml(
   if (!html.startsWith('<h') && !html.startsWith('<ul')) {
     html = `<p>${html}</p>`;
   }
+
+  // Replace chart placeholders with actual <img> tags
+  chartImages.forEach(({ url }, index) => {
+    const placeholder = `___CHART_PLACEHOLDER_${index}___`;
+    const imgTag = `<img src="${url}" alt="Chart" style="max-width: 100%; height: auto; border-radius: 8px; margin: 1rem 0; display: block;" />`;
+    html = html.replace(placeholder, imgTag);
+  });
 
   // Add citation superscript links
   citations.forEach((citation, index) => {

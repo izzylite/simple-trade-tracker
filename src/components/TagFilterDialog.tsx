@@ -131,24 +131,27 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
               />
             ))
           }
-          renderOption={(props, option) => (
-            <li {...props}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {isGroupedTag(option) && (
-                  <Chip
-                    label={getTagGroup(option)}
-                    size="small"
-                    sx={{
-                      ...getTagChipStyles(option, theme),
-                      height: '18px',
-                      fontSize: '0.7rem'
-                    }}
-                  />
-                )}
-                {formatTagForDisplay(option, true)}
-              </Box>
-            </li>
-          )}
+          renderOption={(props, option) => {
+            const { key, ...restProps } = props;
+            return (
+              <li key={key} {...restProps}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {isGroupedTag(option) && (
+                    <Chip
+                      label={getTagGroup(option)}
+                      size="small"
+                      sx={{
+                        ...getTagChipStyles(option, theme),
+                        height: '18px',
+                        fontSize: '0.7rem'
+                      }}
+                    />
+                  )}
+                  {formatTagForDisplay(option, true)}
+                </Box>
+              </li>
+            );
+          }}
         />
       </Box>
 

@@ -1,203 +1,97 @@
-// @ts-nocheck
 /**
- * NOTE: This service has been migrated to Supabase Edge Functions.
- * All sharing functionality now uses supabaseEdgeFunctions in sharingService.ts
- * This file is kept for reference but is not used in production.
+ * Sharing Service
+ * Handles all share link operations using ShareRepository
+ * Simplified design: share links are stored directly on trade and calendar documents
  */
 
-// import { httpsCallable } from 'firebase/functions'; // Removed - migrated to Supabase
-// import { functions, db } from '../firebase/config';
-// import { doc, getDoc, updateDoc, increment } from 'firebase/firestore'; // Removed - migrated to Supabase
-import { Trade } from '../types/dualWrite';
-import { Calendar } from '../types/dualWrite';
+import { Trade, Calendar } from '../types/dualWrite';
 import { logger } from '../utils/logger';
-import { getCalendar, getAllTrades } from './calendarService';
+import { shareRepository, ShareLinkResult, SharedTradeData, SharedCalendarData } from './repository/repositories/ShareRepository';
+import { supabase } from '../config/supabase';
 
-/* eslint-disable */
-
-const functions: any = null; // Placeholder for migration
-const db: any = null; // Placeholder for migration
-
-// Simplified sharing service - all operations now handled by cloud functions
-// This provides better security, consistency, and reduces client-side complexity
-
-export interface SharedTrade {
-  id: string;
-  tradeId: string;
-  calendarId: string;
-  userId: string;
-  trade: Trade;
-  shareLink: string;
-  createdAt: Date;
-  isActive: boolean;
-  viewCount: number;
-}
-
-export interface SharedCalendar {
-  id: string;
-  calendarId: string;
-  userId: string;
-  calendar: Calendar;
-  shareLink: string;
-  createdAt: Date;
-  isActive: boolean;
-  viewCount: number;
-}
-
-export interface SharedTradeData {
-  trade: Trade;
-  viewCount: number;
-  sharedAt: any; // Can be various timestamp formats from Firebase
-}
-
-/**
- * Get a shared trade by its share ID
- */
-export const getSharedTrade = async (shareId: string): Promise<SharedTradeData> => {
-  try {
-    const getSharedTradeFunction = httpsCallable(functions, 'getSharedTradeV2');
-    const result = await getSharedTradeFunction({ shareId });
-    return result.data as SharedTradeData;
-  } catch (error) {
-    logger.error('Error getting shared trade:', error);
-    throw new Error('Failed to load shared trade');
-  }
-};
+// Export types for use in components
+export type { SharedTradeData, SharedCalendarData, ShareLinkResult };
 
 /**
  * Generate a shareable link for a trade
- * Uses direct links (future-proof - Firebase Dynamic Links deprecated Aug 25, 2025)
+ * Uses direct links - share link is stored on the trade document
  * This is the main function used by ShareTradeButton
  */
 export const generateTradeShareLink = async (
   calendarId: string,
   tradeId: string
-): Promise<{ shareLink: string; shareId: string; directLink: string }> => {
+): Promise<ShareLinkResult> => {
   try {
-    const generateShareLink = httpsCallable(functions, 'generateTradeShareLinkV2');
+    // Get current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
 
-    const result = await generateShareLink({
-      calendarId,
-      tradeId
-    });
+    const result = await shareRepository.generateTradeShareLink(calendarId, tradeId, user.id);
 
-    return result.data as { shareLink: string; shareId: string; directLink: string };
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Failed to generate share link');
+    }
+
+    logger.log('Trade share link generated successfully');
+    return result.data!;
   } catch (error) {
-    logger.error('Error generating share link:', error);
-    throw new Error('Failed to generate share link');
+    logger.error('Error generating trade share link:', error);
+    throw error;
   }
 };
 
-  
-
 /**
  * Generate a shareable link for a calendar
- * Uses direct links (future-proof - Firebase Dynamic Links deprecated Aug 25, 2025)
+ * Uses direct links - share link is stored on the calendar document
  * This is the main function used by ShareCalendarButton
  */
 export const generateCalendarShareLink = async (
   calendarId: string
-): Promise<{ shareLink: string; shareId: string; directLink: string }> => {
+): Promise<ShareLinkResult> => {
   try {
-    const generateShareLink = httpsCallable(functions, 'generateCalendarShareLinkV2');
+    // Get current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
 
-    const result = await generateShareLink({
-      calendarId
-    });
+    const result = await shareRepository.generateCalendarShareLink(calendarId, user.id);
 
-    return result.data as { shareLink: string; shareId: string; directLink: string };
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Failed to generate share link');
+    }
+
+    logger.log('Calendar share link generated successfully');
+    return result.data!;
   } catch (error) {
     logger.error('Error generating calendar share link:', error);
-    throw new Error('Failed to generate calendar share link');
-  }
-};
- 
- 
- 
-/**
- * Get shared trades with calendar using existing calendar service functions
- * This avoids code duplication and uses the established calendar data handling
- */
-export const getSharedTradesWithCalendar = async (shareId: string) => {
-  try {
-    if (!shareId) {
-      throw new Error('Missing shareId parameter');
-    }
-
-    // Get the shared calendar document
-    const sharedCalendarRef = doc(db, 'sharedCalendars', shareId);
-    const sharedCalendarDoc = await getDoc(sharedCalendarRef);
-
-    if (!sharedCalendarDoc.exists()) {
-      throw new Error('Shared calendar not found');
-    }
-
-    const sharedCalendarData = sharedCalendarDoc.data();
-
-    // Check if the share is still active
-    if (!sharedCalendarData?.isActive) {
-      throw new Error('This shared calendar is no longer available');
-    }
-
-    // Get the actual calendar data using existing service
-    const calendarId = sharedCalendarData.calendarId;
-    const calendar = await getCalendar(calendarId);
-
-    if (!calendar) {
-      throw new Error('The shared calendar no longer exists');
-    }
-
-    // Get all trades using existing service
-    const allTrades = await getAllTrades(calendarId);
-
-    // Sort trades by date (newest first)
-    const sortedTrades = allTrades.sort((a, b) => {
-      const dateA = new Date(a.trade_date);
-      const dateB = new Date(b.trade_date);
-      return dateB.getTime() - dateA.getTime();
-    });
-
-    // Increment view count for the shared calendar
-    await updateDoc(sharedCalendarRef, {
-      viewCount: increment(1)
-    });
-
-    logger.info(`Shared calendar ${shareId} viewed (calendar: ${calendarId}, total trades: ${sortedTrades.length})`);
-
-    return {
-      calendar: {
-        ...calendar,
-        // Ensure required fields are present for frontend
-        cachedTrades: [],
-        loadedYears: []
-      },
-      trades: sortedTrades,
-      shareInfo: {
-        id: sharedCalendarData.id,
-        createdAt: sharedCalendarData.createdAt?.toDate ? sharedCalendarData.createdAt.toDate().toISOString() : sharedCalendarData.createdAt,
-        viewCount: (sharedCalendarData.viewCount || 0) + 1,
-        userId: sharedCalendarData.userId
-      }
-    };
-
-  } catch (error) {
-    logger.error('Error getting shared trades with calendar:', error);
     throw error;
   }
 };
- 
 
 /**
  * Deactivate a shared trade (stop sharing)
  */
 export const deactivateTradeShareLink = async (shareId: string): Promise<void> => {
   try {
-    const deactivateSharedTradeFunction = httpsCallable(functions, 'deactivateSharedTradeV2');
-    await deactivateSharedTradeFunction({ shareId });
-    logger.info('Trade share deactivated successfully');
+    // Get current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const result = await shareRepository.deactivateTradeShareLink(shareId, user.id);
+
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Failed to deactivate trade share');
+    }
+
+    logger.log('Trade share deactivated successfully');
   } catch (error) {
     logger.error('Error deactivating trade share:', error);
-    throw new Error('Failed to deactivate trade share');
+    throw error;
   }
 };
 
@@ -206,14 +100,99 @@ export const deactivateTradeShareLink = async (shareId: string): Promise<void> =
  */
 export const deactivateCalendarShareLink = async (shareId: string): Promise<void> => {
   try {
-    const deactivateSharedCalendarFunction = httpsCallable(functions, 'deactivateSharedCalendarV2');
-    await deactivateSharedCalendarFunction({ shareId });
-    logger.info('Calendar share deactivated successfully');
+    // Get current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const result = await shareRepository.deactivateCalendarShareLink(shareId, user.id);
+
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Failed to deactivate calendar share');
+    }
+
+    logger.log('Calendar share deactivated successfully');
   } catch (error) {
     logger.error('Error deactivating calendar share:', error);
-    throw new Error('Failed to deactivate calendar share');
+    throw error;
   }
 };
 
-// Note: shareTradeWithLink functionality is now handled directly in ShareTradeButton
-// This simplifies the flow and uses cloud functions for all operations
+/**
+ * Get a shared trade by its share ID (for public viewing)
+ * This uses the edge function for public access
+ */
+export const getSharedTrade = async (shareId: string): Promise<SharedTradeData | null> => {
+  try {
+    const result = await shareRepository.getSharedTrade(shareId);
+
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Failed to load shared trade');
+    }
+
+    return result.data || null;
+  } catch (error) {
+    logger.error('Error getting shared trade:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get a shared calendar by its share ID (for public viewing)
+ * This uses the edge function for public access
+ */
+export const getSharedCalendar = async (shareId: string): Promise<SharedCalendarData | null> => {
+  try {
+    const result = await shareRepository.getSharedCalendar(shareId);
+
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Failed to load shared calendar');
+    }
+
+    return result.data || null;
+  } catch (error) {
+    logger.error('Error getting shared calendar:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get shared trades with calendar data
+ * Wrapper function that transforms SharedCalendarData to match component expectations
+ * Used by SharedCalendarPage component
+ */
+export const getSharedTradesWithCalendar = async (
+  shareId: string
+): Promise<{
+  calendar: Calendar;
+  trades: Trade[];
+  shareInfo: {
+    id: string;
+    createdAt: Date;
+    viewCount: number;
+    userId: string;
+  };
+}> => {
+  try {
+    const data = await getSharedCalendar(shareId);
+
+    if (!data) {
+      throw new Error('Shared calendar not found');
+    }
+
+    return {
+      calendar: data.calendar,
+      trades: data.trades,
+      shareInfo: {
+        id: data.calendar.share_id || '',
+        createdAt: data.shareInfo.sharedAt,
+        viewCount: data.shareInfo.viewCount,
+        userId: data.calendar.user_id || ''
+      }
+    };
+  } catch (error) {
+    logger.error('Error getting shared trades with calendar:', error);
+    throw error;
+  }
+};

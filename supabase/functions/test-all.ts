@@ -31,18 +31,14 @@ interface TestSummary {
 // List of all functions to test
 const FUNCTIONS = [
   'handle-trade-changes',
-  'cleanup-deleted-calendar', 
+  'cleanup-deleted-calendar',
   'update-tag',
   'process-economic-events',
   'refresh-economic-calendar',
   'cleanup-expired-calendars',
   'auto-refresh-economic-calendar',
-  'generate-trade-share-link',
   'get-shared-trade',
-  'deactivate-shared-trade',
-  'generate-calendar-share-link',
-  'get-shared-calendar',
-  'deactivate-shared-calendar'
+  'get-shared-calendar'
 ]
 
 /**

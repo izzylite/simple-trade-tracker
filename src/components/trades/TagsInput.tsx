@@ -109,43 +109,46 @@ const TagsInput: React.FC<TagsInputProps> = ({
             />
           ))
         }
-        renderOption={(props, option) => (
-          <li {...props}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {isGroupedTag(option) && (
-                  <Chip
-                    label={getTagGroup(option)}
+        renderOption={(props, option) => {
+          const { key, ...restProps } = props;
+          return (
+            <li key={key} {...restProps}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {isGroupedTag(option) && (
+                    <Chip
+                      label={getTagGroup(option)}
+                      size="small"
+                      sx={{
+                        ...getTagChipStyles(option, theme),
+                        height: '18px',
+                        fontSize: '0.7rem'
+                      }}
+                    />
+                  )}
+                  {formatTagForDisplay(option, true)}
+                </Box>
+                <Tooltip title="Edit this tag across all trades">
+                  <Button
                     size="small"
-                    sx={{
-                      ...getTagChipStyles(option, theme),
-                      height: '18px',
-                      fontSize: '0.7rem'
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTagToEdit(option);
                     }}
-                  />
-                )}
-                {formatTagForDisplay(option, true)}
+                    sx={{
+                      color: theme.palette.text.secondary,
+                      '&:hover': {
+                        color: theme.palette.primary.main
+                      }
+                    }}
+                  >
+                    Edit
+                  </Button>
+                </Tooltip>
               </Box>
-              <Tooltip title="Edit this tag across all trades">
-                <Button
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setTagToEdit(option);
-                  }}
-                  sx={{ 
-                    color: theme.palette.text.secondary,
-                    '&:hover': {
-                      color: theme.palette.primary.main
-                    }
-                  }}
-                >
-                  Edit
-                </Button>
-              </Tooltip>
-            </Box>
-          </li>
-        )}
+            </li>
+          );
+        }}
         renderInput={(params) => (
           <TextField
             {...params}

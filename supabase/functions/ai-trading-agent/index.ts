@@ -174,10 +174,11 @@ function validateUserDataIsolation(response: unknown, expectedUserId: string): {
   const content = JSON.stringify(response).toLowerCase();
   const userIdPattern = /user[_-]?id['\"]?\s*[:=]\s*['\"]?([a-zA-Z0-9-]+)/gi;
   const matches = content.matchAll(userIdPattern);
+  const expectedUserIdLower = expectedUserId.toLowerCase();
 
   for (const match of matches) {
     const foundUserId = match[1];
-    if (foundUserId && foundUserId !== expectedUserId) {
+    if (foundUserId && foundUserId !== expectedUserIdLower) {
       return {
         valid: false,
         reason: `Response contains data for user ${foundUserId} but request was for ${expectedUserId}`,
@@ -254,7 +255,30 @@ RECOMMENDED WORKFLOWS:
 2. Use generate_chart to create visualizations
 3. Return chart URL to user for viewing
 
-**ECONOMIC EVENTS TABLE SCHEMA** (for execute_sql queries):
+**DATABASE SCHEMAS** (for execute_sql queries):
+
+**TRADES TABLE SCHEMA**:
+- Columns: id, calendar_id, user_id, firestore_id, name, amount, trade_type, trade_date, created_at,
+  updated_at, entry_price, exit_price, risk_to_reward, partials_taken, session, notes, tags,
+  is_deleted, is_temporary, is_pinned, share_link, is_shared, shared_at, share_id
+- session: One of 'Asia', 'London', 'NY AM', 'NY PM' (nullable)
+- trade_type: One of 'win', 'loss', 'breakeven'
+- tags: Array of strings (TEXT[])
+- Example query: SELECT name, amount, trade_type, trade_date, session, tags FROM trades
+  WHERE user_id = '${userId}' AND calendar_id = '${calendarId}'
+  ORDER BY trade_date DESC LIMIT 10;
+- ALWAYS filter by user_id in WHERE clause for security
+
+**CALENDARS TABLE SCHEMA**:
+- Columns: id, user_id, firestore_id, name, account_balance, max_daily_drawdown, risk_per_trade,
+  total_trades, winning_trades, losing_trades, breakeven_trades, total_profit_loss, win_rate,
+  average_win, average_loss, largest_win, largest_loss, profit_factor, created_at, updated_at,
+  share_link, is_shared, shared_at, share_id
+- Example query: SELECT name, account_balance, total_trades, win_rate, profit_factor FROM calendars
+  WHERE user_id = '${userId}' ORDER BY created_at DESC;
+- ALWAYS filter by user_id in WHERE clause for security
+
+**ECONOMIC EVENTS TABLE SCHEMA** (global reference - no user_id filtering required):
 - Columns: id, external_id, currency, event_name, impact, event_date (DATE), event_time (TIMESTAMPTZ),
   time_utc, unix_timestamp, actual_value, forecast_value, previous_value, actual_result_type,
   country, flag_code, flag_url, is_all_day, description, source_url, data_source, last_updated, created_at

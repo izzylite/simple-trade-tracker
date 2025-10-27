@@ -110,7 +110,7 @@ export const getForexPriceTool: GeminiFunctionDeclaration = {
  */
 export const generateChartTool: GeminiFunctionDeclaration = {
   name: 'generate_chart',
-  description: 'Generate a chart visualization from data. Use this after querying trade data via MCP tools to create visual representations like equity curves, P&L over time, or performance metrics.',
+  description: 'Generate a chart visualization from data. Returns HTML with an embedded image that displays inline in the chat. Use this after querying trade data via MCP tools to create visual representations like equity curves, P&L over time, or performance metrics.',
   parameters: {
     type: 'object',
     properties: {
@@ -407,7 +407,15 @@ export async function generateChart(
 
     log(`Generated chart URL for: ${title}`, 'info');
 
-    return `Chart generated successfully!\n\nTitle: ${title}\nChart URL: ${chartUrl}\n\nYou can view this chart by opening the URL in a browser.`;
+    // Return special format that the formatter will convert to HTML with embedded image
+    // Using a marker that the formatter can detect and convert to <img> tag
+    return `Chart generated successfully!
+
+**${title}**
+
+[CHART_IMAGE:${chartUrl}]
+
+[Open chart in new tab](${chartUrl})`;
   } catch (error) {
     return `Chart generation error: ${error instanceof Error ? error.message : 'Unknown'}`;
   }

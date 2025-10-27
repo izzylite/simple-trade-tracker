@@ -88,15 +88,15 @@ export const createEditTradeData = (trade: Trade): NewTradeForm => {
   return {
     id: trade.id,
     name: trade.name ? trade.name.replace(/^📈 /, '') : '',
-    amount: Math.abs(trade.amount).toString(),
+    amount: Math.abs(trade.amount),
     trade_type: trade.trade_type,
-    entry_price: trade.entry_price?.toString() || '',
+    entry_price: trade.entry_price || 0,
     trade_date: trade.trade_date,
-    exit_price: trade.exit_price?.toString() || '',
-    stop_loss: trade.stop_loss?.toString() || '',
-    take_profit: trade.take_profit?.toString() || '',
+    exit_price: trade.exit_price || 0,
+    stop_loss: trade.stop_loss || 0,
+    take_profit: trade.take_profit || 0,
     tags: trade.tags || [],
-    risk_to_reward: trade.risk_to_reward?.toString() || '',
+    risk_to_reward: trade.risk_to_reward || 0,
     partials_taken: trade.partials_taken || false,
     session: trade.session as '' | 'Asia' | 'London' | 'NY AM' | 'NY PM' || '',
     notes: trade.notes || '',
@@ -273,7 +273,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     setNewTrade(prev => ({ ...prev!, name: e.target.value }));
   };
 
-  const handleAmountChange = (amount: string) => {
+  const handleAmountChange = (amount: number) => {
     setNewTrade(prev => ({ ...prev!, amount: amount }));
   };
 
@@ -282,19 +282,19 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   };
 
   const handleEntryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewTrade(prev => ({ ...prev!, entry_price: e.target.value }));
+    setNewTrade(prev => ({ ...prev!, entry_price: parseFloat(e.target.value) || 0 }));
   };
 
   const handleExitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewTrade(prev => ({ ...prev!, exit_price: e.target.value }));
+    setNewTrade(prev => ({ ...prev!, exit_price: parseFloat(e.target.value) || 0 }));
   };
 
   const handleStopLossChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewTrade(prev => ({ ...prev!, stop_loss: e.target.value }));
+    setNewTrade(prev => ({ ...prev!, stop_loss: parseFloat(e.target.value) || 0 }));
   };
 
   const handleTakeProfitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewTrade(prev => ({ ...prev!, take_profit: e.target.value }));
+    setNewTrade(prev => ({ ...prev!, take_profit: parseFloat(e.target.value) || 0 }));
   };
 
   const handleDateChange = (newDate: Date | null) => {
@@ -303,24 +303,27 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     }
   };
 
-  const handleRiskToRewardChange = (risk_to_reward: string) => {
+  const handleRiskToRewardChange = (risk_to_reward: number) => {
     setNewTrade(prev => ({ ...prev!, risk_to_reward: risk_to_reward }));
   };
 
 
   const calculateFinalAmount = (trade: NewTradeForm): number => {
-    // If using risk-based calculation and not taking partials, recalculate the amount
-    if (trade.risk_to_reward && !trade.partials_taken) {
-      const rr = parseFloat(trade.risk_to_reward);
+    // Only use risk-based calculation if risk per trade is enabled AND risk_to_reward is set AND not taking partials
+    const isRiskPerTradeEnabled = dynamicRiskSettings.risk_per_trade && dynamicRiskSettings.risk_per_trade > 0;
+
+    if (isRiskPerTradeEnabled && trade.risk_to_reward && trade.risk_to_reward > 0 && !trade.partials_taken) {
+      const rr = trade.risk_to_reward;
       if (!isNaN(rr)) {
         const calculatedAmount = calculateAmountFromRiskToReward(rr, calculateCumulativePnL(trade.trade_date || endOfDay(trade_date), allTrades));
+
         // Apply sign based on trade type
         return trade.trade_type === 'loss' ? -Math.abs(calculatedAmount) : Math.abs(calculatedAmount);
       }
     }
 
     // Otherwise use the amount from the form
-    const amount = parseFloat(trade.amount || "0");
+    const amount = trade.amount || 0;
     return trade.trade_type === 'loss' ? -Math.abs(amount) : Math.abs(amount);
   };
 
@@ -369,12 +372,12 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       trade_type: newTrade.trade_type,
       amount: finalAmount,
       ...(newTrade.name && { name: newTrade.name }),
-      ...(newTrade.entry_price && { entry_price: parseFloat(newTrade.entry_price) }),
-      ...(newTrade.exit_price && { exit_price: parseFloat(newTrade.exit_price) }),
-      ...(newTrade.stop_loss && { stop_loss: parseFloat(newTrade.stop_loss) }),
-      ...(newTrade.take_profit && { take_profit: parseFloat(newTrade.take_profit) }),
+      ...(newTrade.entry_price && { entry_price: newTrade.entry_price }),
+      ...(newTrade.exit_price && { exit_price: newTrade.exit_price }),
+      ...(newTrade.stop_loss && { stop_loss: newTrade.stop_loss }),
+      ...(newTrade.take_profit && { take_profit: newTrade.take_profit }),
       ...(finalTags.length > 0 && { tags: finalTags }),
-      ...(newTrade.risk_to_reward && { risk_to_reward: parseFloat(newTrade.risk_to_reward) }),
+      ...(newTrade.risk_to_reward && { risk_to_reward: newTrade.risk_to_reward }),
       partials_taken: newTrade.partials_taken,
       ...(newTrade.session && { session: newTrade.session }),
       ...(newTrade.notes && { notes: newTrade.notes }),
@@ -391,10 +394,13 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   const calculateAmountFromRiskToReward = (risk_to_reward: number, cumulativePnL: number): number => {
     if (!newTrade || !risk_to_reward || !account_balance || newTrade.trade_type === 'breakeven') return 0;
 
-
+    
     const tradeDate = newTrade.trade_date || trade_date;
     const effectiveRiskPercentage = calculateEffectiveRiskPercentage(tradeDate, allTrades, dynamicRiskSettings);
     const riskAmount = calculateRiskAmount(effectiveRiskPercentage, account_balance, cumulativePnL);
+
+  
+
     // For win trades: risk amount * R:R
     // For loss trades: risk amount
     return newTrade.trade_type === 'win'
@@ -574,12 +580,12 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             trade_type: newTrade!.trade_type,
             amount: finalAmount,
             name: newTrade!.name || 'New Trade',
-            ...(newTrade!.entry_price && { entry_price: parseFloat(newTrade!.entry_price) }),
-            ...(newTrade!.exit_price && { exit_price: parseFloat(newTrade!.exit_price) }),
-            ...(newTrade!.stop_loss && { stop_loss: parseFloat(newTrade!.stop_loss) }),
-            ...(newTrade!.take_profit && { take_profit: parseFloat(newTrade!.take_profit) }),
+            ...(newTrade!.entry_price && { entry_price: newTrade!.entry_price }),
+            ...(newTrade!.exit_price && { exit_price: newTrade!.exit_price }),
+            ...(newTrade!.stop_loss && { stop_loss: newTrade!.stop_loss }),
+            ...(newTrade!.take_profit && { take_profit: newTrade!.take_profit }),
             ...(finalTags.length > 0 && { tags: finalTags }),
-            ...(newTrade!.risk_to_reward && { risk_to_reward: parseFloat(newTrade!.risk_to_reward) }),
+            ...(newTrade!.risk_to_reward && { risk_to_reward: newTrade!.risk_to_reward }),
             partials_taken: newTrade!.partials_taken,
             ...(newTrade!.session && { session: newTrade!.session }),
             ...(newTrade!.notes && { notes: newTrade!.notes }),
@@ -903,7 +909,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         showErrorSnackbar('Session is required');
         return;
       }
-      if (!newTrade!.risk_to_reward) {
+      if (!newTrade!.risk_to_reward || newTrade!.risk_to_reward <= 0) {
         showErrorSnackbar('Risk to reward is required');
         return;
       }
@@ -1072,14 +1078,14 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               trade_type: newTrade!.trade_type,
               amount: finalAmount,
               name: newTrade!.name || "",
-              entry_price: newTrade!.entry_price ? parseFloat(newTrade!.entry_price) : undefined,
-              exit_price: newTrade!.exit_price ? parseFloat(newTrade!.exit_price) : undefined,
-              stop_loss: newTrade!.stop_loss ? parseFloat(newTrade!.stop_loss) : undefined,
-              take_profit: newTrade!.take_profit ? parseFloat(newTrade!.take_profit) : undefined,
+              entry_price: newTrade!.entry_price || undefined,
+              exit_price: newTrade!.exit_price || undefined,
+              stop_loss: newTrade!.stop_loss || undefined,
+              take_profit: newTrade!.take_profit || undefined,
               trade_date: updatedDate,
               is_temporary: newTrade?.is_temporary && !newTrade.name,
               tags: finalTags || [],
-              risk_to_reward: parseFloat(newTrade!.risk_to_reward) || 1,
+              risk_to_reward: newTrade!.risk_to_reward || 1,
               partials_taken: newTrade!.partials_taken,
               session: newTrade!.session || "London",
               notes: newTrade!.notes || "",

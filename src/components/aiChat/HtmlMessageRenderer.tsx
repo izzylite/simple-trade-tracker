@@ -32,9 +32,9 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
     return DOMPurify.sanitize(html, {
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'span', 'div'
+        'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'span', 'div', 'img'
       ],
-      ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style'],
+      ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style', 'src', 'alt', 'width', 'height'],
       KEEP_CONTENT: true
     });
   }, [html]);
@@ -112,7 +112,16 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
     a:hover {
       opacity: 0.8;
     }
-    
+
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      margin: 1rem 0;
+      display: block;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
     sup {
       font-size: 0.8em;
       vertical-align: super;
@@ -180,6 +189,14 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
           '&:hover': {
             opacity: 0.8
           }
+        },
+        '& img': {
+          maxWidth: '100%',
+          height: 'auto',
+          borderRadius: 2,
+          margin: '1rem 0',
+          display: 'block',
+          boxShadow: theme.shadows[2]
         },
         '& sup': {
           fontSize: '0.8em',

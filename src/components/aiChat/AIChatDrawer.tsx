@@ -26,18 +26,13 @@ import {
 } from '@mui/icons-material';
 import { v4 as uuidv4 } from 'uuid';
 import ChatMessage from './ChatMessage';
-// import AIChatSettingsDialog from './AIChatSettingsDialog'; // Commented out - testing only
 import {
   ChatMessage as ChatMessageType,
-  AIProvider,
-  ChatError,
-  AIModelSettings
+  ChatError
 } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
-import { firebaseAIChatService } from '../../services/ai/firebaseAIChatService';
-
-
+import { supabaseAIChatService } from '../../services/supabaseAIChatService';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
@@ -72,26 +67,10 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [currentProvider] = useState<AIProvider>('firebase-ai');
-
   const [error, setError] = useState<ChatError | null>(null);
-  // Use recommended settings - Gemini 1.5 Pro with optimized parameters
-  const chatConfig = {
-    autoScroll: true,
-    showTokenCount: true,
-    enableSyntaxHighlighting: true,
-    maxSessionHistory: 50,
-    autoSaveSessions: true,
-    sessionRetentionDays: 30
-  };
 
-  const modelSettings: AIModelSettings = {
-    model: 'gemini-1.5-pro',
-    settings: {
-      temperature: 0.3, // Lower temperature for more deterministic function calls
-      maxTokens: 4000,  // Higher token limit for complex analysis
-      topP: 0.8         // Balanced diversity
-    }
+  const chatConfig = {
+    autoScroll: true
   };
 
 
@@ -147,49 +126,48 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         throw new Error('User not authenticated');
       }
 
-      // Send message with AI-driven function calling
-      const response = await firebaseAIChatService.sendMessageWithFunctionCalling(
+      if (!calendar.id) {
+        throw new Error('Calendar ID is required');
+      }
+
+      // Send message to Supabase AI agent
+      const response = await supabaseAIChatService.sendMessage(
         messageText,
-        trades,
-        calendar,
-        messages,
-        modelSettings
+        user.uid,
+        calendar.id,
+        messages
       );
 
-      const functionCalls = response.functionCalls || [];
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to get AI response');
+      }
 
-      logger.log(`AI executed ${functionCalls.length} function calls`);
+      logger.log(`AI response received from Supabase edge function`);
 
-      // Add AI response
+      // Add AI response with HTML and citations
       const aiMessage: ChatMessageType = {
         id: uuidv4(),
         role: 'assistant',
-        content: response.response,
+        content: response.message,
+        messageHtml: response.messageHtml,
+        citations: response.citations,
         timestamp: new Date(),
-        status: 'received',
-        provider: currentProvider,
-        tokenCount: response.tokenCount,
-        functionCalls: functionCalls
+        status: 'received'
       };
 
       setMessages(prev => [...prev, aiMessage]);
-      logger.log(`AI response received from Firebase AI Logic`);
 
     } catch (error) {
-      logger.error('Error sending message to Firebase AI Logic:', error);
+      logger.error('Error sending message to Supabase AI agent:', error);
 
-      // Handle Firebase AI Logic errors
-      const chatError = error as ChatError;
-      if (chatError && chatError.trade_type) {
-        setError(chatError);
-      } else {
-        setError({
-          type: 'network_error',
-          message: 'Failed to send message',
-          details: error instanceof Error ? error.message : 'Unknown error',
-          retryable: true
-        });
-      }
+      const chatError: ChatError = {
+        type: 'network_error',
+        message: 'Failed to send message',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        retryable: true
+      };
+
+      setError(chatError);
 
       // Add error message
       const errorMessage: ChatMessageType = {
@@ -198,7 +176,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         content: 'Sorry, I encountered an error processing your message. Please try again.',
         timestamp: new Date(),
         status: 'error',
-        error: chatError?.message || 'Unknown error'
+        error: chatError.message
       };
 
       setMessages(prev => [...prev, errorMessage]);
@@ -240,40 +218,41 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
     try {
       // Remove all messages after the user message that prompted the retried response
-      // This includes the AI message being retried and any subsequent messages
       const updatedMessages = messages.slice(0, userMessageIndex + 1);
       setMessages(updatedMessages);
 
       // Set loading state
       setIsLoading(true);
 
-      // Create conversation history up to the user message
-      const conversationHistory = updatedMessages;
-
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      // Regenerate the response using function calling
-      const response = await firebaseAIChatService.sendMessageWithFunctionCalling(
+      if (!calendar.id) {
+        throw new Error('Calendar ID is required');
+      }
+
+      // Regenerate the response using Supabase AI agent
+      const response = await supabaseAIChatService.sendMessage(
         userMessage.content,
-        trades,
-        calendar,
-        conversationHistory,
-        modelSettings, 
+        user.uid,
+        calendar.id,
+        updatedMessages
       );
 
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to get AI response');
+      }
 
       // Add the new response
       const newAssistantMessage: ChatMessageType = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: response.response,
+        content: response.message,
+        messageHtml: response.messageHtml,
+        citations: response.citations,
         timestamp: new Date(),
-        status: 'received',
-        provider: currentProvider,
-        tokenCount: response.tokenCount,
-        functionCalls: response.functionCalls || []
+        status: 'received'
       };
 
       setMessages(prev => [...prev, newAssistantMessage]);
@@ -296,7 +275,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [messages, currentProvider, trades, calendar, chatConfig]);
+  }, [messages, user, calendar, trades]);
 
 
 
@@ -316,8 +295,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
 What would you like to know about your trading?`,
       timestamp: new Date(),
-      status: 'received',
-      provider: currentProvider
+      status: 'received'
     };
   };
 
@@ -511,7 +489,7 @@ What would you like to know about your trading?`,
                     key={message.id}
                     message={message}
                     showTimestamp={true}
-                    showTokenCount={chatConfig.showTokenCount}
+                    showTokenCount={false}
                     onRetry={handleMessageRetry}
                     isLatestMessage={index === displayMessages.length - 1}
                     enableAnimation={index > 0}

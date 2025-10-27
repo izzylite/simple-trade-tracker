@@ -692,11 +692,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
 
       // If trade doesn't exist and we have a create function, create it
       if (!existingTrade && createIfNotExists) {
-        const newTrade = createIfNotExists(tradeId);
-
-        // Apply the update callback to the new trade before creating it
-        const finalTrade = updateCallback(newTrade);
-
+        const finalTrade = updateCallback(createIfNotExists(tradeId)); 
         // Add to cached trades immediately for UI responsiveness
         const updatedCachedTrades = [...calendar.cachedTrades, finalTrade];
         onUpdateStateCalendar(calendar.id, {

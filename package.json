@@ -50,7 +50,9 @@
     "eject": "react-scripts eject",
     "migrate-events": "npx ts-node src/scripts/backfillTradeEconomicEvents.ts",
     "migrate-trade-events": "node migrate-trade-economic-events.js",
-    "setup-vector-index": "node scripts/setup-vector-index.js"
+    "setup-vector-index": "node scripts/setup-vector-index.js",
+    "test:ai": "node scripts/test-ai-agent.js",
+    "test:ai:formatter": "node scripts/test-chart-formatter.js"
   },
   "eslintConfig": {
     "extends": [
@@ -72,6 +74,7 @@
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.35",
+    "firebase": "^10.14.1",
     "gh-pages": "^6.3.0",
     "source-map-explorer": "^2.5.3",
     "ts-node": "^10.9.2"

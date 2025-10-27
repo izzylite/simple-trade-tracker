@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { InfoOutlined, TrendingUp, TrendingDown, TrendingFlat } from '@mui/icons-material';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { Trade } from '../../types/dualWrite';
 import { formatValue } from '../../utils/formatters';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
@@ -153,43 +153,53 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {dailySummaryData.map((row) => (
-              <TableRow
-                key={format(row.trade_date, 'yyyy-MM-dd')}
-                onClick={() => {
-                  const dayTrades = trades.filter(trade =>
-                    format(new Date(trade.trade_date), 'yyyy-MM-dd') === format(row.trade_date, 'yyyy-MM-dd')
-                  );
-                  if (dayTrades.length > 0) {
-                    setMultipleTradesDialog({
-                      open: true,
-                      trades: dayTrades,
-                      date: format(row.trade_date, 'dd/MM/yyyy'),
-                      expandedTradeId: dayTrades.length === 1 ? dayTrades[0].id : null
-                    });
-                  }
-                }}
-                sx={{
-                  '&:last-child td, &:last-child th': { border: 0 },
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.04),
-                    cursor: 'pointer'
-                  },
-                  bgcolor: row.pnl > 0
-                    ? alpha(theme.palette.success.main, 0.05)
-                    : row.pnl < 0
-                    ? alpha(theme.palette.error.main, 0.05)
-                    : 'transparent'
-                }}
-              >
-                <TableCell
+            {dailySummaryData.map((row, index) => {
+              // Ensure trade_date is a valid Date object
+              const tradeDate = new Date(row.trade_date);
+
+              // Skip invalid dates
+              if (!isValid(tradeDate)) {
+                console.error('Invalid trade_date in dailySummaryData:', row);
+                return null;
+              }
+
+              return (
+                <TableRow
+                  key={format(tradeDate, 'yyyy-MM-dd')}
+                  onClick={() => {
+                    const dayTrades = trades.filter(trade =>
+                      format(new Date(trade.trade_date), 'yyyy-MM-dd') === format(tradeDate, 'yyyy-MM-dd')
+                    );
+                    if (dayTrades.length > 0) {
+                      setMultipleTradesDialog({
+                        open: true,
+                        trades: dayTrades,
+                        date: format(tradeDate, 'dd/MM/yyyy'),
+                        expandedTradeId: dayTrades.length === 1 ? dayTrades[0].id : null
+                      });
+                    }
+                  }}
                   sx={{
-                    fontWeight: 500,
-                    color: 'text.primary'
+                    '&:last-child td, &:last-child th': { border: 0 },
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.04),
+                      cursor: 'pointer'
+                    },
+                    bgcolor: row.pnl > 0
+                      ? alpha(theme.palette.success.main, 0.05)
+                      : row.pnl < 0
+                      ? alpha(theme.palette.error.main, 0.05)
+                      : 'transparent'
                   }}
                 >
-                  {format(row.trade_date, 'dd/MM/yyyy')}
-                </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 500,
+                      color: 'text.primary'
+                    }}
+                  >
+                    {format(tradeDate, 'dd/MM/yyyy')}
+                  </TableCell>
                 <TableCell
                   align="right"
                   sx={{
@@ -235,7 +245,8 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
                   {formatValue(row.pnl)}
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>

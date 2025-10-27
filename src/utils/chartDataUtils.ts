@@ -462,7 +462,7 @@ export const calculateTagStatsAsync = async (
 export const calculateDailySummaryDataAsync = async (
   filteredTrades: Trade[]
 ): Promise<Array<{
-  date: Date;
+  trade_date: Date;
   trades: number;
   session: string;
   pnl: number;
@@ -508,13 +508,13 @@ export const calculateDailySummaryDataAsync = async (
       });
 
       return {
-        date: parseISO(date),
+        trade_date: parseISO(date),
         trades: dayTrades.length,
         session: mostCommonSession,
         pnl: totalPnL
       };
     })
-    .sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
+    .sort((a, b) => b.trade_date.getTime() - a.trade_date.getTime()); // Sort by date descending
 };
 
 // Calculate risk to reward statistics asynchronously

@@ -3,8 +3,8 @@
  * Business logic helpers and common operations
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import type { Trade, TradeImage, TagUpdateResult } from './types.ts'
+import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import type { Trade,  TagUpdateResult } from './types.ts'
 
 /**
  * Extract unique tags from an array of trades
@@ -88,7 +88,7 @@ export function updateTradeTagsWithGroupNameChange(
  * Check if an image exists in any trade within a calendar
  */
 export async function imageExistsInCalendar(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   imageId: string,
   calendarId: string
 ): Promise<boolean> {
@@ -124,7 +124,7 @@ export async function imageExistsInCalendar(
  * Check if an image can be safely deleted (considering duplicated calendars)
  */
 export async function canDeleteImage(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   imageId: string,
   currentCalendarId: string
 ): Promise<boolean> {
@@ -238,39 +238,44 @@ export function parseMyFXBookDate(dateStr: string, timeStr: string): string {
 }
 
 /**
- * Calculate trade statistics
- */
-export function calculateTradeStats(trades: Trade[]) {
-  const closedTrades = trades.filter(t => t.status === 'closed' && t.pnl !== undefined)
-  
-  if (closedTrades.length === 0) {
+ * Delete trade images from Supabase Storage
+ *
+ * @param supabase - Supabase client instance
+ * @param imageIds - Array of image IDs to delete
+ * @param userId - User ID for constructing the storage path
+ * @param logFn - Optional logging function (defaults to console.log)
+ * @returns Object with success count and total count
+ */ export async function deleteTradeImages(supabase: SupabaseClient, imageIds : string[], userId : string, logFn = console.log) {
+  if (imageIds.length === 0) {
     return {
-      total_trades: 0,
-      win_count: 0,
-      loss_count: 0,
-      win_rate: 0,
-      total_pnl: 0,
-      avg_win: 0,
-      avg_loss: 0,
-      profit_factor: 0
+      successCount: 0,
+      totalCount: 0
+    };
+  }
+  const deletePromises = imageIds.map(async (imageId)=>{
+    try {
+      // Path must match upload path: users/${userId}/trade-images/${filename}
+      const filePath = `users/${userId}/trade-images/${imageId}`;
+      const { error } = await supabase.storage.from('trade-images').remove([
+        filePath
+      ]);
+      if (error) {
+        logFn(`Error deleting image ${imageId}`, 'error', error);
+        return false;
+      } else {
+        logFn(`Successfully deleted image: ${imageId}`);
+        return true;
+      }
+    } catch (error) {
+      logFn(`Error deleting image ${imageId}`, 'error', error);
+      return false;
     }
-  }
-
-  const wins = closedTrades.filter(t => (t.pnl || 0) > 0)
-  const losses = closedTrades.filter(t => (t.pnl || 0) < 0)
-  
-  const totalPnl = closedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0)
-  const totalWinPnl = wins.reduce((sum, t) => sum + (t.pnl || 0), 0)
-  const totalLossPnl = Math.abs(losses.reduce((sum, t) => sum + (t.pnl || 0), 0))
-  
+  });
+  const results = await Promise.all(deletePromises);
+  const successCount = results.filter(Boolean).length;
   return {
-    total_trades: closedTrades.length,
-    win_count: wins.length,
-    loss_count: losses.length,
-    win_rate: (wins.length / closedTrades.length) * 100,
-    total_pnl: totalPnl,
-    avg_win: wins.length > 0 ? totalWinPnl / wins.length : 0,
-    avg_loss: losses.length > 0 ? totalLossPnl / losses.length : 0,
-    profit_factor: totalLossPnl > 0 ? totalWinPnl / totalLossPnl : 0
-  }
+    successCount,
+    totalCount: imageIds.length
+  };
 }
+ 
