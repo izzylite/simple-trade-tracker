@@ -131,45 +131,67 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
       throw new Error('User not authenticated');
     }
 
-    const now = new Date();
-    const tradeWithTimestamps = {
+    // Generate ID
+    const tradeId = crypto.randomUUID();
+
+    // Create complete trade object with timestamps
+    const completeTrade: Trade = {
       ...entity,
-      user_id: user.id, // Set user_id from authenticated user
-      created_at: now,
-      updated_at: now
+      id: tradeId,
+      user_id: user.id,
+      created_at: new Date(),
+      updated_at: new Date()
     } as Trade;
 
-    const { data, error } = await supabase
-      .from('trades')
-      .insert(tradeWithTimestamps)
-      .select()
-      .single();
+    // Use the transactional function to create trade and update calendar tags
+    const result = await this.addTradeWithTags(entity.calendar_id, completeTrade);
 
-    if (error) {
-      throw error; // Let the error handler parse this
+    if (!result.tradeId) {
+      throw new Error('Failed to create trade');
     }
 
-    return transformSupabaseTrade(data);
+    // Fetch and return the created trade
+    const createdTrade = await this.findById(result.tradeId);
+    if (!createdTrade) {
+      throw new Error('Trade created but not found');
+    }
+
+    return createdTrade;
   }
 
   protected async updateInSupabase(id: string, updates: Partial<Trade>): Promise<Trade> {
-    const updatesWithTimestamp = {
+    // First, get the existing trade to merge with updates
+    const existingTrade = await this.findById(id);
+    if (!existingTrade) {
+      throw new Error(`Trade not found: ${id}`);
+    }
+
+    // Merge existing trade with updates
+    const completeTrade: Trade = {
+      ...existingTrade,
       ...updates,
+      id: existingTrade.id, // Ensure ID doesn't change
       updated_at: new Date()
     };
 
-    const { data, error } = await supabase
-      .from('trades')
-      .update(updatesWithTimestamp)
-      .eq('id', id)
-      .select()
-      .single();
+    // Use the transactional function to update trade and calendar tags
+    const result = await this.updateTradeWithTags(
+      id,
+      existingTrade.calendar_id,
+      completeTrade
+    );
 
-    if (error) {
-      throw error; // Let the error handler parse this
+    if (!result.success) {
+      throw new Error('Failed to update trade');
     }
 
-    return transformSupabaseTrade(data);
+    // Fetch and return the updated trade
+    const updatedTrade = await this.findById(id);
+    if (!updatedTrade) {
+      throw new Error('Trade updated but not found');
+    }
+
+    return updatedTrade;
   }
 
   protected async deleteInSupabase(id: string): Promise<boolean> {
