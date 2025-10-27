@@ -694,28 +694,19 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       if (!existingTrade && createIfNotExists) {
         const newTrade = createIfNotExists(tradeId);
 
+        // Apply the update callback to the new trade before creating it
+        const finalTrade = updateCallback(newTrade);
+
         // Add to cached trades immediately for UI responsiveness
-        const updatedCachedTrades = [...calendar.cachedTrades, newTrade];
+        const updatedCachedTrades = [...calendar.cachedTrades, finalTrade];
         onUpdateStateCalendar(calendar.id, {
           cachedTrades: updatedCachedTrades
         });
 
-        // Create in database
-        await calendarService.addTrade(calendar.id, newTrade);
+        // Create in database with all updates already applied
+        await calendarService.addTrade(calendar.id, finalTrade);
 
-        // Apply the update callback to the newly created trade
-        const updatedTrade = updateCallback(newTrade);
-
-        // Update in database
-        await calendarService.updateTrade(calendar.id, tradeId, updatedCachedTrades, () => updatedTrade);
-
-        // Update cached trades with the updated trade
-        const finalCachedTrades = updatedCachedTrades.map(t => t.id === tradeId ? updatedTrade : t);
-        onUpdateStateCalendar(calendar.id, {
-          cachedTrades: finalCachedTrades
-        });
-
-        return updatedTrade;
+        return finalTrade;
       }
 
       // Normal update flow for existing trades
