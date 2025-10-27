@@ -131,8 +131,8 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
       throw new Error('User not authenticated');
     }
 
-    // Generate ID
-    const tradeId = crypto.randomUUID();
+    // Use existing ID if provided (entity might have it despite TypeScript type), otherwise generate new one
+    const tradeId = (entity as any).id || crypto.randomUUID();
 
     // Create complete trade object with timestamps
     const completeTrade: Trade = {
