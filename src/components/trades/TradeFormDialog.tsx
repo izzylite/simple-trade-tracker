@@ -93,6 +93,8 @@ export const createEditTradeData = (trade: Trade): NewTradeForm => {
     entry_price: trade.entry_price?.toString() || '',
     trade_date: trade.trade_date,
     exit_price: trade.exit_price?.toString() || '',
+    stop_loss: trade.stop_loss?.toString() || '',
+    take_profit: trade.take_profit?.toString() || '',
     tags: trade.tags || [],
     risk_to_reward: trade.risk_to_reward?.toString() || '',
     partials_taken: trade.partials_taken || false,
@@ -287,6 +289,14 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     setNewTrade(prev => ({ ...prev!, exit_price: e.target.value }));
   };
 
+  const handleStopLossChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewTrade(prev => ({ ...prev!, stop_loss: e.target.value }));
+  };
+
+  const handleTakeProfitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewTrade(prev => ({ ...prev!, take_profit: e.target.value }));
+  };
+
   const handleDateChange = (newDate: Date | null) => {
     if (newDate) {
       setNewTrade(prev => ({ ...prev!, trade_date: newDate }));
@@ -362,6 +372,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       ...(newTrade.name && { name: newTrade.name }),
       ...(newTrade.entry_price && { entry_price: parseFloat(newTrade.entry_price) }),
       ...(newTrade.exit_price && { exit_price: parseFloat(newTrade.exit_price) }),
+      ...(newTrade.stop_loss && { stop_loss: parseFloat(newTrade.stop_loss) }),
+      ...(newTrade.take_profit && { take_profit: parseFloat(newTrade.take_profit) }),
       ...(finalTags.length > 0 && { tags: finalTags }),
       ...(newTrade.risk_to_reward && { risk_to_reward: parseFloat(newTrade.risk_to_reward) }),
       partials_taken: newTrade.partials_taken,
@@ -566,6 +578,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             name: newTrade!.name || 'New Trade',
             ...(newTrade!.entry_price && { entry_price: parseFloat(newTrade!.entry_price) }),
             ...(newTrade!.exit_price && { exit_price: parseFloat(newTrade!.exit_price) }),
+            ...(newTrade!.stop_loss && { stop_loss: parseFloat(newTrade!.stop_loss) }),
+            ...(newTrade!.take_profit && { take_profit: parseFloat(newTrade!.take_profit) }),
             ...(finalTags.length > 0 && { tags: finalTags }),
             ...(newTrade!.risk_to_reward && { risk_to_reward: parseFloat(newTrade!.risk_to_reward) }),
             partials_taken: newTrade!.partials_taken,
@@ -1062,6 +1076,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               name: newTrade!.name || "",
               entry_price: newTrade!.entry_price ? parseFloat(newTrade!.entry_price) : undefined,
               exit_price: newTrade!.exit_price ? parseFloat(newTrade!.exit_price) : undefined,
+              stop_loss: newTrade!.stop_loss ? parseFloat(newTrade!.stop_loss) : undefined,
+              take_profit: newTrade!.take_profit ? parseFloat(newTrade!.take_profit) : undefined,
               trade_date: updatedDate,
               is_temporary: newTrade?.is_temporary && !newTrade.name,
               tags: finalTags || [],
@@ -1183,6 +1199,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               onTypeChange={handleTypeChange}
               onEntryChange={handleEntryChange}
               onExitChange={handleExitChange}
+              onStopLossChange={handleStopLossChange}
+              onTakeProfitChange={handleTakeProfitChange}
               onRiskToRewardChange={handleRiskToRewardChange}
               onPartialsTakenChange={handlePartialsTakenChange}
               onSessionChange={handleSessionChange}

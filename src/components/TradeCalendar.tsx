@@ -281,6 +281,8 @@ export const createNewTradeData = (): NewTradeForm => ({
   entry_price: '',
   trade_date: null,
   exit_price: '',
+  stop_loss: '',
+  take_profit: '',
   tags: [],
   risk_to_reward: '',
   partials_taken: false,

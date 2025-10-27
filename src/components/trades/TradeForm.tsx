@@ -45,6 +45,8 @@ export interface NewTradeForm {
   trade_type: 'win' | 'loss' | 'breakeven';
   entry_price: string;
   exit_price: string;
+  stop_loss: string;
+  take_profit: string;
   trade_date?: Date | null;
   tags: string[];
   risk_to_reward: string;
@@ -100,6 +102,8 @@ interface TradeFormProps {
   onTypeChange: (e: any) => void;
   onEntryChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onExitChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onStopLossChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onTakeProfitChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRiskToRewardChange: (risk_to_reward: string) => void;
   onPartialsTakenChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSessionChange: (e: any) => void;
@@ -134,6 +138,8 @@ const TradeForm: React.FC<TradeFormProps> = ({
   onTypeChange,
   onEntryChange,
   onExitChange,
+  onStopLossChange,
+  onTakeProfitChange,
   onRiskToRewardChange,
   onPartialsTakenChange,
   onSessionChange,
@@ -300,6 +306,27 @@ const TradeForm: React.FC<TradeFormProps> = ({
             onChange={onExitChange}
             fullWidth
             placeholder="Optional exit price"
+          />
+        </FormField>
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+        <FormField sx={{ flex: 1 }}>
+          <TextField
+            label="Stop Loss"
+            value={newTrade.stop_loss}
+            onChange={onStopLossChange}
+            fullWidth
+            placeholder="Optional stop loss"
+          />
+        </FormField>
+        <FormField sx={{ flex: 1 }}>
+          <TextField
+            label="Take Profit"
+            value={newTrade.take_profit}
+            onChange={onTakeProfitChange}
+            fullWidth
+            placeholder="Optional take profit"
           />
         </FormField>
       </Box>
