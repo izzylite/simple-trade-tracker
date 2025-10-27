@@ -85,8 +85,8 @@ export const getCalendarStats = (calendar: Calendar): CalendarStats => {
     yearly_progress: calendar.target_progress || 0,
     current_balance: calendar.current_balance || calendar.account_balance || 0,
     initial_balance: calendar.account_balance || 0,
-    win_count: 0, // Not stored in calendar, calculated from trades
-    loss_count: 0, // Not stored in calendar, calculated from trades
+    win_count: calendar.win_count || 0,  
+    loss_count: calendar.loss_count || 0, 
     target_progress: calendar.target_progress || 0,
     pnl_performance: calendar.pnl_performance || 0
   };
@@ -482,22 +482,4 @@ export const onUpdateCalendar = async (
     logger.error('Error updating calendar with callback:', error);
     throw error;
   }
-};
-
-/**
- * Get trades for a specific year (for backward compatibility)
- */
-export const getYearlyTrades = async (
-  calendarId: string,
-  year: number
-): Promise<Trade[]> => {
-  try {
-    const allTrades = await getAllTrades(calendarId);
-    return allTrades.filter(trade =>
-      new Date(trade.trade_date).getFullYear() === year
-    );
-  } catch (error) {
-    logger.error('Error getting yearly trades:', error);
-    return [];
-  }
-};
+}; 
