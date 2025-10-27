@@ -124,9 +124,17 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
   // =====================================================
 
   protected async createInSupabase(entity: Omit<Trade, 'id' | 'created_at' | 'updated_at'>): Promise<Trade> {
+    // Get current user from Supabase Auth
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      throw new Error('User not authenticated');
+    }
+
     const now = new Date();
     const tradeWithTimestamps = {
       ...entity,
+      user_id: user.id, // Set user_id from authenticated user
       created_at: now,
       updated_at: now
     } as Trade;
