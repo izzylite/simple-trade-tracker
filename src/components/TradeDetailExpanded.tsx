@@ -148,7 +148,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
   // Initialize loading state for all images
   useEffect(() => {
-    if (trade.images && trade.images.length > 0) {
+    if (trade && trade.images && trade.images.length > 0) {
       const initialLoadingState: { [key: string]: boolean } = {};
 
       trade.images.forEach(image => {
