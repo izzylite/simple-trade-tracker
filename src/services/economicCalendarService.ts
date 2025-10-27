@@ -1,10 +1,6 @@
-﻿// @ts-nocheck
-/**
- * Economic Calendar Service (Database-Driven)
- * Reads economic calendar data directly from Firebase database with efficient queries
- *
- * NOTE: This service is being migrated to Supabase.
- * Temporarily disabled to fix TypeScript errors during migration.
+﻿/**
+ * Economic Calendar Service (Supabase)
+ * Reads economic calendar data from Supabase database with efficient queries
  */
 
 import {
@@ -12,41 +8,23 @@ import {
   Currency,
   ImpactLevel
 } from '../types/economicCalendar';
-// Firebase imports removed - migrating to Supabase
-// import {
-//   collection,
-//   query,
-//   where,
-//   orderBy,
-//   getDocs,
-//   onSnapshot,
-//   Timestamp,
-//   limit,
-//   startAfter,
-//   DocumentSnapshot,
-//   QueryDocumentSnapshot,
-//   DocumentData
-// } from 'firebase/firestore';
-// import { db } from '../firebase/config';
-
+import { supabase } from '../config/supabase';
 import { log, error, logger } from '../utils/logger';
+import { EconomicEventRepository } from './repository/repositories/EconomicEventRepository';
 
 /* eslint-disable */
 
-const db: any = null; // Placeholder for migration
-type QueryDocumentSnapshot = any;
-type DocumentSnapshot = any;
-type Timestamp = any;
+const economicEventRepository = new EconomicEventRepository();
 
 interface PaginationOptions {
   pageSize?: number;
-  lastDoc?: QueryDocumentSnapshot;
+  offset?: number;
 }
 
 interface PaginatedResult {
   events: EconomicEvent[];
   hasMore: boolean;
-  lastDoc?: QueryDocumentSnapshot;
+  offset?: number;
   totalCount?: number;
 }
 
@@ -68,101 +46,24 @@ class EconomicCalendarServiceImpl {
     try {
       log('🔄 Fetching economic calendar data from database:', dateRange, filters);
 
+      const result = await economicEventRepository.fetchEvents(dateRange, filters);
 
-      // Build Firestore query
-      let eventsQuery = this.buildBaseQuery(dateRange, filters);
-
-      // Execute query
-      const querySnapshot = await getDocs(eventsQuery);
-      let events: EconomicEvent[] = [];
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        events.push(this.convertToEconomicEvent(data));
-      });
-
-      // Apply client-side filtering for  impacts 
-      if (filters?.impacts && filters.impacts.length > 0) {
-        events = events.filter(event => filters.impacts!.includes(event.impact));
+      if (!result.success || !result.data) {
+        logger.error('❌ Error fetching economic events from database:', result.error);
+        return [];
       }
 
-      logger.log(`✅ Successfully fetched ${events.length} economic events from database`);
+      logger.log(`✅ Successfully fetched ${result.data.length} economic events from database`);
 
       // Notify subscribers
-      this.notifySubscribers(events);
+      this.notifySubscribers(result.data);
 
-      return events;
+      return result.data;
     } catch (error) {
       logger.error('❌ Error fetching economic events from database:', error);
-      throw error;
+      return [];
     }
   }
-  convertToEconomicEvent(data: DocumentData): EconomicEvent {
-    return {
-      id: data.id,
-      currency: data.currency as Currency,
-      event: data.event,
-      impact: data.impact as ImpactLevel,
-      time: data.time?.toDate?.()?.toISOString() || data.timeUtc,
-      actualResultType: data.actualResultType || '',
-      timeUtc: data.timeUtc,
-      actual: data.actual || '',
-      forecast: data.forecast || '',
-      previous: data.previous || '',
-      date: data.date,
-      country: data.country || '',
-      flagCode: data.flagCode || '',
-      flagUrl: data.flagUrl || '',
-      isAllDay: false,
-      unixTimestamp: data.unixTimestamp
-    }
-  }
-  private buildBaseQuery(dateRange: { start: string | Date; end: string | Date }, filters?: {
-    currencies?: Currency[];
-    impacts?: ImpactLevel[];
-    onlyUpcoming?: boolean;
-  }) {
-    // Optimized base query builder for economic events
-    const baseCollection = collection(db, 'economicEvents');
-    const queryConstraints = [
-      where(typeof dateRange.start === 'string' ? 'date' : 'time', '>=', dateRange.start),
-      where(typeof dateRange.end === 'string' ? 'date' : 'time', '<=', dateRange.end),
-      orderBy(typeof dateRange.end === 'string' ? 'date' : 'time'),
-      orderBy(typeof dateRange.end === 'string' ? 'time' : 'date'),
-    ];
-
-    // Add currency filter if specified
-    if (filters?.currencies && filters.currencies.length > 0) {
-      if (filters.currencies.length === 1) {
-        queryConstraints.push(where('currency', '==', filters.currencies[0]));
-      }
-      else {
-        queryConstraints.push(where('currency', 'in', filters.currencies));
-      }
-    }
-     // Add impact filter if specified
-    if ((filters?.impacts && filters.impacts.length > 0)) {
-      if (filters.impacts.length === 1) {
-        queryConstraints.push(where('impact', '==', filters.impacts[0]));
-      }
-      else if(!filters?.currencies || filters?.currencies.length <= 1) {
-        // Only apply impact filter if no currency filter is specified
-        // firebase limitation
-        queryConstraints.push(where('impact', 'in', filters.impacts));
-      }
-    }
-
-
-    // Add upcoming events filter - only show events with future dates/times
-    if (filters?.onlyUpcoming) {
-      const now = new Date();
-      queryConstraints.push(where('time', '>=', now));
-    }
-
-
-    // Compose and return the query
-    return query(baseCollection, ...queryConstraints);
-  };
 
 
   /**
@@ -179,51 +80,36 @@ class EconomicCalendarServiceImpl {
   ): Promise<PaginatedResult> {
     try {
       const pageSize = options?.pageSize || this.DEFAULT_PAGE_SIZE;
-      logger.log(`🔄 Fetching paginated economic calendar data (page size: ${pageSize}):`, dateRange, filters);
+      const offset = options?.offset || 0;
+      logger.log(`🔄 Fetching paginated economic calendar data (page size: ${pageSize}, offset: ${offset}):`, dateRange, filters);
 
+      const result = await economicEventRepository.fetchEventsPaginated(
+        dateRange,
+        { pageSize, offset },
+        filters
+      );
 
-      let baseQuery = this.buildBaseQuery(dateRange, filters);
-
-      // Add pagination
-      let paginatedQuery = query(baseQuery, limit(pageSize + 1)); // +1 to check if there are more
-
-      // Add startAfter for pagination
-      if (options?.lastDoc) {
-        paginatedQuery = query(baseQuery, startAfter(options.lastDoc), limit(pageSize + 1));
+      if (!result.success || !result.data) {
+        logger.error('❌ Error fetching paginated economic events:', result.error);
+        return {
+          events: [],
+          hasMore: false,
+          offset: 0,
+          totalCount: 0
+        };
       }
 
-      // Execute query
-      const querySnapshot = await getDocs(paginatedQuery);
-      const docs = querySnapshot.docs;
+      logger.log(`✅ Successfully fetched ${result.data.events.length} paginated events (hasMore: ${result.data.hasMore})`);
 
-      // Check if there are more results
-      const hasMore = docs.length > pageSize;
-      const eventsToReturn = hasMore ? docs.slice(0, pageSize) : docs;
-
-      let events: EconomicEvent[] = [];
-
-      eventsToReturn.forEach((doc) => {
-        const data = doc.data();
-        events.push(this.convertToEconomicEvent(data));
-      });
-
-      // Apply client-side filtering for impacts
-      if (filters?.impacts && filters.impacts.length > 0) {
-        events = events.filter(event => filters.impacts!.includes(event.impact));
-      }
-
-      const lastDoc = eventsToReturn.length > 0 ? eventsToReturn[eventsToReturn.length - 1] : undefined;
-
-      logger.log(`✅ Successfully fetched ${events.length} paginated events (hasMore: ${hasMore})`);
-
-      return {
-        events,
-        hasMore,
-        lastDoc
-      };
+      return result.data;
     } catch (error) {
       logger.error('❌ Error fetching paginated economic events:', error);
-      throw error;
+      return {
+        events: [],
+        hasMore: false,
+        offset: 0,
+        totalCount: 0
+      };
     }
   }
 
@@ -286,29 +172,33 @@ class EconomicCalendarServiceImpl {
       onlyUpcoming?: boolean;
     }
   ): () => void {
-    logger.log('� Setting up real-time subscription for economic events');
+    logger.log('📡 Setting up real-time subscription for economic events');
 
-    // Build Firestore query
-    const eventsQuery = query(this.buildBaseQuery(dateRange, filters), limit(10));
+    // Set up Supabase real-time subscription
+    const channel = supabase
+      .channel('economic-events-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'economic_events',
+          filter: `event_date=gte.${dateRange.start},event_date=lte.${dateRange.end}`
+        },
+        async (payload) => {
+          log(`🔄 Real-time update received:`, payload);
 
-    // Set up real-time listener
-    const unsubscribe = onSnapshot(eventsQuery, (querySnapshot) => {
-      let events: EconomicEvent[] = [];
+          // Fetch fresh data when changes occur
+          const events = await this.fetchEvents(dateRange, filters);
+          callback(events);
+        }
+      )
+      .subscribe();
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        events.push(this.convertToEconomicEvent(data));
-      });
-
-
-      log(`🔄 Real-time update: ${events.length} events`);
-      callback(events);
-      this.notifySubscribers(events);
-    }, (err) => {
-      error('❌ Error in real-time subscription:', err);
-    });
-
-    return unsubscribe;
+    // Return unsubscribe function
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }
 
   /**
@@ -317,21 +207,16 @@ class EconomicCalendarServiceImpl {
   async getEventById(eventId: string): Promise<EconomicEvent | null> {
     try {
       logger.log(`Fetching economic event by ID: ${eventId}`);
-      const eventsRef = collection(db, 'economicEvents');
-      const q = query(eventsRef, where('id', '==', eventId));
-      const querySnapshot = await getDocs(q);
 
-      if (querySnapshot.empty) {
+      const result = await economicEventRepository.findById(eventId);
+
+      if (!result.success || !result.data) {
         logger.log(`No economic event found with ID: ${eventId}`);
         return null;
       }
 
-      const doc = querySnapshot.docs[0];
-      const data = doc.data();
-
-      const event: EconomicEvent = this.convertToEconomicEvent(data);
-      logger.log(`Successfully fetched economic event: ${event.event}`);
-      return event;
+      logger.log(`Successfully fetched economic event: ${result.data.event}`);
+      return result.data;
 
     } catch (err) {
       error('Error fetching economic event by ID:', err);
