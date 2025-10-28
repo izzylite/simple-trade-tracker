@@ -198,8 +198,12 @@ function extractUrlsFromToolResult(result: any): string[] {
     const urlRegex = /(https?:\/\/[^\s\n]+)/g;
     const matches = result.match(urlRegex);
     if (matches) {
-      // Filter out QuickChart URLs (they're embedded as images, not citations)
-      const filteredUrls = matches.filter(url => !url.includes('quickchart.io'));
+      // Filter out URLs that should be embedded as images, not citations
+      const filteredUrls = matches.filter(url =>
+        !url.includes('quickchart.io') && // Chart images
+        !url.includes('firebasestorage.googleapis.com') && // Firebase storage images
+        !url.includes('.supabase.co/storage') // Supabase storage images
+      );
       urls.push(...filteredUrls);
     }
   }
@@ -292,6 +296,92 @@ export function convertMarkdownToHtml(
     html = html.replace(marker, `___CHART_PLACEHOLDER_${index}___`);
   });
 
+  // Extract Firebase/Supabase storage image URLs and convert to markdown images
+  // Patterns to match:
+  // - https://firebasestorage.googleapis.com/...
+  // - https://*.supabase.co/storage/v1/object/public/...
+  // - Plain URLs ending in image extensions
+  const imageUrlPattern = /(https?:\/\/(?:firebasestorage\.googleapis\.com|[^/]+\.supabase\.co\/storage)\/[^\s)]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s)]*)?)/gi;
+  const storageImages: Array<{ marker: string; url: string }> = [];
+  let imageMatch;
+
+  while ((imageMatch = imageUrlPattern.exec(html)) !== null) {
+    const url = imageMatch[0];
+    // Only process if it's not already part of a markdown image
+    const beforeUrl = html.substring(Math.max(0, imageMatch.index - 2), imageMatch.index);
+    if (!beforeUrl.includes('![') && !beforeUrl.includes('](')) {
+      storageImages.push({
+        marker: url,
+        url: url
+      });
+    }
+  }
+
+  // Replace storage image URLs with placeholders
+  storageImages.forEach(({ marker }, index) => {
+    html = html.replace(marker, `___STORAGE_IMAGE_PLACEHOLDER_${index}___`);
+  });
+
+  // Extract and protect markdown images BEFORE escaping
+  const markdownImages: Array<{ marker: string; original: string; imgTag: string }> = [];
+
+  // Match markdown images ![alt](url)
+  const mdImagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let mdImageMatch;
+
+  while ((mdImageMatch = mdImagePattern.exec(html)) !== null) {
+    const alt = mdImageMatch[1];
+    const url = mdImageMatch[2];
+    const original = mdImageMatch[0];
+    const isStorageUrl = url.includes('firebasestorage.googleapis.com') || url.includes('.supabase.co/storage');
+
+    const imgTag = isStorageUrl
+      ? `<img src="${url}" alt="${alt || 'Trade Image'}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 1rem 0; display: block; cursor: pointer;" />`
+      : `<img src="${url}" alt="${alt || 'Image'}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 1rem 0; display: block;" />`;
+
+    markdownImages.push({
+      marker: `___MARKDOWN_IMAGE_${markdownImages.length}___`,
+      original: original,
+      imgTag: imgTag
+    });
+  }
+
+  // Replace markdown images with placeholders
+  markdownImages.forEach(({ marker, original }) => {
+    html = html.replace(original, marker);
+  });
+
+  // Extract and protect inline references BEFORE escaping
+  const inlineRefs: Array<{ marker: string; original: string }> = [];
+
+  // Pattern 1: HTML tags (trade-ref and event-ref)
+  const tradeTagPattern = /<trade-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/trade-ref>)?/g;
+  const eventTagPattern = /<event-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/event-ref>)?/g;
+
+  let refMatch;
+
+  // Extract trade-ref tags
+  while ((refMatch = tradeTagPattern.exec(html)) !== null) {
+    inlineRefs.push({
+      marker: `___INLINE_REF_${inlineRefs.length}___`,
+      original: refMatch[0]
+    });
+  }
+
+  // Extract event-ref tags
+  while ((refMatch = eventTagPattern.exec(html)) !== null) {
+    inlineRefs.push({
+      marker: `___INLINE_REF_${inlineRefs.length}___`,
+      original: refMatch[0]
+    });
+  }
+
+   
+  // Replace inline refs with placeholders
+  inlineRefs.forEach(({ marker, original }) => {
+    html = html.replace(original, marker);
+  });
+
   // Escape HTML special characters
   html = html
     .replace(/&/g, '&amp;')
@@ -334,6 +424,23 @@ export function convertMarkdownToHtml(
     html = html.replace(placeholder, imgTag);
   });
 
+  // Replace storage image placeholders with actual <img> tags
+  storageImages.forEach(({ url }, index) => {
+    const placeholder = `___STORAGE_IMAGE_PLACEHOLDER_${index}___`;
+    const imgTag = `<img src="${url}" alt="Trade Image" style="max-width: 100%; height: auto; border-radius: 8px; margin: 1rem 0; display: block; cursor: pointer;" />`;
+    html = html.replace(placeholder, imgTag);
+  });
+
+  // Restore inline references
+  inlineRefs.forEach(({ marker, original }) => {
+    html = html.replace(marker, original);
+  });
+
+  // Restore markdown images as <img> tags
+  markdownImages.forEach(({ marker, imgTag }) => {
+    html = html.replace(marker, imgTag);
+  });
+
   // Add citation superscript links
   citations.forEach((citation, index) => {
     const citationNum = index + 1;
@@ -358,9 +465,25 @@ export function formatResponseWithHtmlAndCitations(
 ): { messageHtml: string; citations: Citation[] } {
   const citations = extractCitations(toolCalls);
 
-  // Remove markdown image syntax from AI's message (we'll add charts from tool results)
+  // Remove markdown chart images from AI's message (we'll add charts from tool results)
   // This prevents duplicate charts when AI includes ![alt](url) in its response
-  let cleanedMessage = message.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '');
+  // But keep storage images (Firebase/Supabase) as they should be displayed
+  let cleanedMessage = message.replace(/!\[([^\]]*)\]\((https?:\/\/[^)]*quickchart\.io[^)]*)\)/g, '');
+
+  // Remove "Open chart in new tab" links that appear after chart images
+  cleanedMessage = cleanedMessage.replace(/\[Open chart in new tab\]\([^)]+\)/gi, '');
+
+  // Remove standalone chart URLs that appear after [CHART_IMAGE:...] markers
+  cleanedMessage = cleanedMessage.replace(/\[CHART_IMAGE:[^\]]+\]\s*\n?\s*https?:\/\/[^\s]+/g, (match) => {
+    // Keep only the [CHART_IMAGE:...] part, remove the URL
+    return match.match(/\[CHART_IMAGE:[^\]]+\]/)?.[0] || '';
+  });
+
+  // Remove JSON array at the end (display items)
+  cleanedMessage = cleanedMessage.replace(/\[\s*\{[^}]*"type"\s*:\s*"(trade|event)"[^}]*"id"\s*:\s*"[^"]*"[^}]*\}[^\]]*\]/g, '');
+
+  // Clean up extra whitespace
+  cleanedMessage = cleanedMessage.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
 
   // Check if the AI's message already contains chart markers [CHART_IMAGE:...]
   // If it does, don't append chart results again to avoid duplicates

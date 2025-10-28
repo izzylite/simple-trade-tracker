@@ -72,7 +72,7 @@ class SupabaseIntegrationTester {
         eventsRetrieved: events.length,
         sampleEvent: events[0] ? {
           id: events[0].id,
-          event: events[0].event,
+          event: events[0].event_name,
           currency: events[0].currency
         } : 'No events found'
       });

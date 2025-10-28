@@ -189,7 +189,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
       const searchLower = eventNameSearch.toLowerCase();
       setEconomicEvents(
         allEconomicEvents.filter(event =>
-          event.event.toLowerCase().includes(searchLower)
+          event.event_name.toLowerCase().includes(searchLower)
         )
       );
     }
@@ -241,7 +241,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
       // Sort events by time
       const sortedEvents = events.sort((a, b) =>
-        new Date(a.timeUtc).getTime() - new Date(b.timeUtc).getTime()
+        new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime()
       );
 
       setAllEconomicEvents(sortedEvents);
@@ -290,7 +290,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
           prevMap.set(event.id, { ...prevMap.get(event.id), ...event });
         });
         // Return the merged array, sorted by time
-        return Array.from(prevMap.values()).sort((a, b) => new Date(a.timeUtc).getTime() - new Date(b.timeUtc).getTime());
+        return Array.from(prevMap.values()).sort((a, b) => new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime());
       });
     });
 
@@ -302,7 +302,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     setEconomicEvents(
       allEconomicEvents.filter(event =>
         selectedImpacts.includes(event.impact) &&
-        event.event.toLowerCase().includes(eventNameSearch.toLowerCase())
+        event.event_name.toLowerCase().includes(eventNameSearch.toLowerCase())
       )
     );
   }, [eventNameSearch, allEconomicEvents, selectedImpacts]);
@@ -1085,7 +1085,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                         ) : (
                           <Box sx={{ p: 0 }}>
                             {economicEvents.map((event, index) => (
-                              <React.Fragment key={`${event.id}-${event.timeUtc}-${index}`}>
+                              <React.Fragment key={`${event.id}-${event.time_utc}-${index}`}>
                                 <Box sx={{
                                   px: { xs: 1.5, sm: 2.5 }, // Reduced padding on mobile
                                   py: { xs: 1, sm: 1.5 }, // Reduced padding on mobile

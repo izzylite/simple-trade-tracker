@@ -3,7 +3,7 @@
  *
  * Triggered by database webhooks when trades are modified
  * Handles: image cleanup on DELETE and UPDATE operations
- */ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+ */  
 import { createServiceClient, errorResponse, successResponse, handleCors, log, parseJsonBody } from '../_shared/supabase.ts';
 import { canDeleteImage, deleteTradeImages } from '../_shared/utils.ts';
 import type { Trade, TradeWebhookPayload } from '../_shared/types.ts';

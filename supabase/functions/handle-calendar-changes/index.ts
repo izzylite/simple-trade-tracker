@@ -6,7 +6,7 @@
  *         INSERT - placeholder for future logic
  *         UPDATE - processes mark_for_deletion flag from cleanup-expired-calendars cron job
  */ import { createServiceClient, errorResponse, successResponse, handleCors, log, parseJsonBody } from '../_shared/supabase.ts';
-import { canDeleteImage } from '../_shared/utils.ts';
+import { canDeleteImage, deleteTradeImages } from '../_shared/utils.ts';
 import type { Calendar, Trade, CalendarWebhookPayload } from '../_shared/types.ts';
 /**
  * Get all trades for a calendar to identify images

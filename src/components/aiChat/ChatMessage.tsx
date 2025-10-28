@@ -69,15 +69,15 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   // Parse AI response for display items
   const parsedResponse = useMemo(() => {
     if (isAssistant) {
-      // Parse response for JSON display items
-      return parseAIResponse(message.content, allTrades);
+      // Parse response for JSON display items and inline references
+      return parseAIResponse(message.content, allTrades, message.embeddedTrades);
     }
     return {
       textContent: message.content,
       displayItems: [],
       hasStructuredData: false
     };
-  }, [message.content, isAssistant, allTrades]);
+  }, [message.content, isAssistant, allTrades, message.embeddedTrades]);
 
   const handleCopy = async () => {
     try {
@@ -209,7 +209,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     });
   };
 
-  // Format content with inline references replaced by cards
+  // Format content with inline references replaced by cards using embedded data
   const formatContentWithInlineReferences = (content: string, inlineReferences: InlineReference[]) => {
     if (!inlineReferences || inlineReferences.length === 0) {
       return formatContent(content);
@@ -231,30 +231,48 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         }
       }
 
-      // Add the card for this reference
-      if (ref.type === 'trade' && allTrades) {
-        const trade = allTrades.find(t => t.id === ref.id);
+      // Add the card for this reference using embedded data
+      if (ref.type === 'trade') {
+        // Try to get trade from embedded data first, fallback to allTrades
+        const trade = message.embeddedTrades?.[ref.id] || allTrades?.find(t => t.id === ref.id);
         if (trade) {
           segments.unshift(
             <Box key={`trade-${ref.id}-${ref.startIndex}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
               <TradeCard
                 trade={trade}
-                onClick={() => onTradeClick?.(trade.id, allTrades)}
+                onClick={() => onTradeClick?.(trade.id, allTrades || [])}
                 compact={true}
               />
             </Box>
           );
         }
       } else if (ref.type === 'event') {
-        segments.unshift(
-          <Box key={`event-${ref.id}-${ref.startIndex}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
-            <EventCard
-              eventId={ref.id}
-              onClick={onEventClick}
-              compact={true}
-            />
-          </Box>
-        );
+        // Try to get event from embedded data first
+        const event = message.embeddedEvents?.[ref.id];
+        if (event) {
+          // Render event card with inline data (no fetching needed)
+          segments.unshift(
+            <Box key={`event-${ref.id}-${ref.startIndex}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
+              <EventCard
+                eventId={ref.id}
+                eventData={event}
+                onClick={onEventClick}
+                compact={true}
+              />
+            </Box>
+          );
+        } else {
+          // Fallback to fetch mode
+          segments.unshift(
+            <Box key={`event-${ref.id}-${ref.startIndex}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
+              <EventCard
+                eventId={ref.id}
+                onClick={onEventClick}
+                compact={true}
+              />
+            </Box>
+          );
+        }
       }
 
       lastIndex = ref.startIndex;
@@ -342,7 +360,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           <Box sx={{ mb: message.error ? 1 : 0 }}>
             {/* Use HTML renderer if messageHtml is available (from Supabase AI agent) */}
             {message.messageHtml ? (
-              <HtmlMessageRenderer html={message.messageHtml} />
+              <HtmlMessageRenderer
+                html={message.messageHtml}
+                embeddedTrades={message.embeddedTrades}
+                embeddedEvents={message.embeddedEvents}
+                onTradeClick={onTradeClick}
+                onEventClick={onEventClick}
+              />
             ) : isAssistant && enableAnimation && isLatestMessage ? (
               <AnimatedText
                 text={parsedResponse.textContent}

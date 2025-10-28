@@ -144,13 +144,15 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
       logger.log(`AI response received from Supabase edge function`);
 
-      // Add AI response with HTML and citations
+      // Add AI response with HTML, citations, and embedded data
       const aiMessage: ChatMessageType = {
         id: uuidv4(),
         role: 'assistant',
         content: response.message,
         messageHtml: response.messageHtml,
         citations: response.citations,
+        embeddedTrades: response.embeddedTrades,
+        embeddedEvents: response.embeddedEvents,
         timestamp: new Date(),
         status: 'received'
       };
@@ -244,13 +246,15 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         throw new Error(response.message || 'Failed to get AI response');
       }
 
-      // Add the new response
+      // Add the new response with embedded data
       const newAssistantMessage: ChatMessageType = {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: response.message,
         messageHtml: response.messageHtml,
         citations: response.citations,
+        embeddedTrades: response.embeddedTrades,
+        embeddedEvents: response.embeddedEvents,
         timestamp: new Date(),
         status: 'received'
       };

@@ -21,6 +21,8 @@ export interface AgentResponse {
     source?: string;
     toolName: string;
   }>;
+  embeddedTrades?: Record<string, any>;
+  embeddedEvents?: Record<string, any>;
   metadata?: {
     functionCalls: Array<{
       name: string;
@@ -79,7 +81,7 @@ class SupabaseAIChatService {
         throw new Error('AI agent returned empty response');
       }
 
-      logger.log('Received response from Supabase AI agent');
+      logger.log(`Received response from Supabase AI agent ${JSON.stringify(data)}`);
       logger.log(`Response includes ${data.citations?.length || 0} citations`);
 
       return data;
@@ -102,6 +104,8 @@ class SupabaseAIChatService {
       content: response.message,
       messageHtml: response.messageHtml,
       citations: response.citations,
+      embeddedTrades: response.embeddedTrades,
+      embeddedEvents: response.embeddedEvents,
       timestamp: new Date(),
       status: 'received'
     };

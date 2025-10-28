@@ -33,7 +33,8 @@ export interface ParsedAIResponse {
  */
 export function parseAIResponse(
   response: string,
-  allTrades?: Trade[]
+  allTrades?: Trade[],
+  embeddedTrades?: Record<string, any>
 ): ParsedAIResponse {
   let textContent = response;
   let displayItems: DisplayItem[] = [];
@@ -41,7 +42,7 @@ export function parseAIResponse(
   let hasStructuredData = false;
 
   // Check for inline references first (trade_id:xxx, event_id:xxx)
-  const inlineRefs = extractInlineReferences(response, allTrades);
+  const inlineRefs = extractInlineReferences(response, allTrades, embeddedTrades);
   if (inlineRefs.length > 0) {
     inlineReferences = inlineRefs;
     hasStructuredData = true;
@@ -53,8 +54,10 @@ export function parseAIResponse(
   if (jsonDisplayItems.length > 0) {
     displayItems = jsonDisplayItems;
     hasStructuredData = true;
-    textContent = cleanJsonFromResponse(response);
   }
+
+  // Always clean JSON from response text
+  textContent = cleanJsonFromResponse(response);
 
   return {
     textContent,
@@ -125,7 +128,8 @@ function extractDisplayItemsFromResponse(
  */
 function extractInlineReferences(
   response: string,
-  allTrades?: Trade[]
+  allTrades?: Trade[],
+  embeddedTrades?: Record<string, any>
 ): InlineReference[] {
   const inlineReferences: InlineReference[] = [];
 
@@ -138,8 +142,9 @@ function extractInlineReferences(
     const type = typePrefix.toLowerCase() === 'trade_id' ? 'trade' : 'event';
 
     // Validate trade exists if it's a trade reference
-    if (type === 'trade' && allTrades) {
-      const tradeExists = allTrades.some(trade => trade.id === id);
+    if (type === 'trade') {
+      // Check in embedded trades first, then allTrades
+      const tradeExists = embeddedTrades?.[id] || allTrades?.some(trade => trade.id === id);
       if (!tradeExists) {
         continue; // Skip invalid trade references
       }

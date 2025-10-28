@@ -126,7 +126,7 @@ class EconomicCalendarServiceImpl {
     });
 
     return events.filter(event => {
-      const eventTime = new Date(event.time);
+      const eventTime = new Date(event.event_time);
       return eventTime >= now && eventTime <= end;
     });
   }
@@ -215,7 +215,7 @@ class EconomicCalendarServiceImpl {
         return null;
       }
 
-      logger.log(`Successfully fetched economic event: ${result.data.event}`);
+      logger.log(`Successfully fetched economic event: ${result.data.event_name}`);
       return result.data;
 
     } catch (err) {

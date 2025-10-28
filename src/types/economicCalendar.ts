@@ -12,22 +12,22 @@ export type Currency = 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | '
 export interface EconomicEvent {
   id: string;
   currency: Currency;
-  event: string;
+  event_name: string;
   impact: ImpactLevel;
-  actualResultType: 'good' | 'bad' | 'neutral' | '';
-  time: string; // ISO string
-  timeUtc: string; // UTC timestamp
-  actual: string;
-  forecast: string;
-  previous: string;
-  date: string; // YYYY-MM-DD format
+  actual_result_type: 'good' | 'bad' | 'neutral' | '';
+  event_time: string; // ISO string
+  time_utc: string; // UTC timestamp
+  actual_value: string;
+  forecast_value: string;
+  previous_value: string;
+  event_date: string; // YYYY-MM-DD format
   country?: string;
-  flagCode?: string;
-  flagUrl?: string;
-  isAllDay?: boolean;
+  flag_code?: string;
+  flag_url?: string;
+  is_all_day?: boolean;
   description?: string;
-  url?: string;
-  unixTimestamp?: number; // Unix timestamp in milliseconds from MyFXBook's time attribute
+  source_url?: string;
+  unix_timestamp?: number; // Unix timestamp in milliseconds from MyFXBook's time attribute
 }
 
 export interface EconomicCalendarDay {

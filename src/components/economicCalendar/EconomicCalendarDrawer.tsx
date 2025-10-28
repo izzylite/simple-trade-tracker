@@ -107,7 +107,7 @@ const groupEventsByDate = (events: EconomicEvent[]) => {
   const grouped: { [key: string]: EconomicEvent[] } = {};
 
   events.forEach(event => {
-    const date = event.date;
+    const date = event.event_date;
     if (!grouped[date]) {
       grouped[date] = [];
     }
@@ -119,7 +119,7 @@ const groupEventsByDate = (events: EconomicEvent[]) => {
 
   return sortedDates.map(date => ({
     date,
-    events: grouped[date].sort((a, b) => a.timeUtc.localeCompare(b.timeUtc))
+    events: grouped[date].sort((a, b) => a.time_utc.localeCompare(b.time_utc))
   }));
 };
 
@@ -984,7 +984,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                               pinnedEvents={calendar?.pinned_events?.map(pe => pe.event) || []}
                               onPinEvent={handlePinEvent}
                               onUnpinEvent={handleUnpinEvent}
-                              isPinning={pinningEventId === event.event}
+                              isPinning={pinningEventId === event.event_name}
                             />
                             {eventIndex < dayGroup.events.length - 1 && <Divider sx={{ ml: 3 }} />}
                           </React.Fragment>

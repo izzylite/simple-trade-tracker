@@ -10,22 +10,22 @@ export type Currency = 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | '
 export interface EconomicEvent {
   id: string;
   currency: Currency;
-  event: string;
+  event_name: string;
   impact: ImpactLevel;
-  actualResultType: 'good' | 'bad' | 'neutral' | '';
-  time: string;
-  timeUtc: string;
-  actual: string;
-  forecast: string;
-  previous: string;
-  date: string;
+  actual_result_type: 'good' | 'bad' | 'neutral' | '';
+  event_time: string;
+  time_utc: string;
+  actual_value: string;
+  forecast_value: string;
+  previous_value: string;
+  event_date: string;
   country?: string;
-  flagCode?: string;
-  flagUrl?: string;
-  isAllDay?: boolean;
+  flag_code?: string;
+  flag_url?: string;
+  is_all_day?: boolean;
   description?: string;
-  url?: string;
-  unixTimestamp?: number;
+  source_url?: string;
+  unix_timestamp?: number;
 }
 
 // Trade Types
@@ -206,6 +206,9 @@ export interface AgentResponse {
   trades?: Trade[];
   calendars?: Calendar[];
   economicEvents?: EconomicEvent[];
+  // Embedded data for inline references (trade_id:xxx, event_id:xxx)
+  embeddedTrades?: Record<string, Trade>;
+  embeddedEvents?: Record<string, EconomicEvent>;
   metadata: {
     functionCalls: ToolCall[];
     tokenUsage?: number;

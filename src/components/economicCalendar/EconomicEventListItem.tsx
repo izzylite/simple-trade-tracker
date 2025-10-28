@@ -165,21 +165,21 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Check if this event is pinned
-  const eventIsPinned = isEventPinned(event.event, pinnedEvents);
+  const eventIsPinned = isEventPinned(event.event_name, pinnedEvents);
 
   // Handle pin/unpin toggle
   const handleTogglePin = () => {
     if (isPinning) return;
 
     if (eventIsPinned) {
-      onUnpinEvent?.(event.event);
+      onUnpinEvent?.(event.event_name);
     } else {
-      onPinEvent?.(event.event);
+      onPinEvent?.(event.event_name);
     }
   };
 
   // Get initial time info to check if event is imminent
-  const initialTimeInfo = formatTimeWithCountdown(event.timeUtc, currentTime);
+  const initialTimeInfo = formatTimeWithCountdown(event.time_utc, currentTime);
 
   // Realtime countdown effect for imminent events
   useEffect(() => {
@@ -208,7 +208,7 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
   }, [initialTimeInfo.isImminent, initialTimeInfo.isUpcoming]);
 
   // Get current time info (will be updated in real-time for imminent events)
-  const timeInfo = formatTimeWithCountdown(event.timeUtc, currentTime);
+  const timeInfo = formatTimeWithCountdown(event.time_utc, currentTime);
 
   return (
     <ListItem sx={{
@@ -224,7 +224,7 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
         {/* Flag and Currency */}
         <Box sx={{ minWidth: 32, mt: 0.25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
           <img
-            src={event.flagUrl}
+            src={event.flag_url}
             alt={event.country}
             style={{
               width: 20,
@@ -342,26 +342,26 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
             lineHeight: 1.3,
             mb: 0.5
           }}>
-            {event.event}
+            {event.event_name}
           </Typography>
 
           {/* Third Row: Values (if available) */}
-          {(event.actual || event.forecast || event.previous) && (
+          {(event.actual_value || event.forecast_value || event.previous_value) && (
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-              {event.actual ? (
+              {event.actual_value ? (
                 <Typography variant="caption" sx={{
                   fontWeight: 700,
                   fontSize: '0.7rem',
                   px: 1,
                   py: 0.25,
                   borderRadius: 1,
-                  ...getActualResultStyle(event.actualResultType, theme)
+                  ...getActualResultStyle(event.actual_result_type, theme)
                 }}>
-                  A: {event.actual}
+                  A: {event.actual_value}
                 </Typography>
               ) : (
                 // Show hourglass if actual is missing but forecast or previous exists
-                (event.forecast || event.previous) && (
+                (event.forecast_value || event.previous_value) && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Typography variant="caption" sx={{
                       fontWeight: 700,
@@ -374,7 +374,7 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
                   </Box>
                 )
               )}
-              {event.forecast && (
+              {event.forecast_value && (
                 <Typography variant="caption" sx={{
                   color: 'text.secondary',
                   fontSize: '0.7rem',
@@ -385,10 +385,10 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
                   borderRadius: 1,
                   border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
                 }}>
-                  F: {event.forecast}
+                  F: {event.forecast_value}
                 </Typography>
               )}
-              {event.previous && (
+              {event.previous_value && (
                 <Typography variant="caption" sx={{
                   color: 'text.disabled',
                   fontSize: '0.7rem',
@@ -399,7 +399,7 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
                   borderRadius: 1,
                   border: `1px solid ${alpha(theme.palette.grey[500], 0.2)}`
                 }}>
-                  P: {event.previous}
+                  P: {event.previous_value}
                 </Typography>
               )}
             </Box>

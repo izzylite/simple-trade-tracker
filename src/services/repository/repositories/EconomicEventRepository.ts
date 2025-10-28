@@ -49,21 +49,21 @@ export class EconomicEventRepository {
   private transformToEvent(row: any): EconomicEvent {
     return {
       id: row.id,
-      event: row.event_name || row.title || row.event || '',
+      event_name: row.event_name || row.title || row.event || '',
       country: row.country || '',
-      date: row.event_date || row.trade_date,
-      time: row.time || '',
-      timeUtc: row.time_utc || row.timeUtc || '',
+      event_date: row.event_date || row.trade_date,
+      event_time: row.event_time || row.time || '',
+      time_utc: row.time_utc || row.timeUtc || '',
       impact: row.impact as ImpactLevel,
-      actualResultType: row.actual_result_type || row.actualResultType || '',
-      forecast: row.forecast_value || row.forecast || '',
-      previous: row.previous_value || row.previous || '',
-      actual: row.actual_value || row.actual || '',
+      actual_result_type: row.actual_result_type || row.actualResultType || '',
+      forecast_value: row.forecast_value || row.forecast || '',
+      previous_value: row.previous_value || row.previous || '',
+      actual_value: row.actual_value || row.actual || '',
       currency: row.currency as Currency,
-      flagCode: row.flag_code || row.flagCode || '',
-      flagUrl: row.flag_url || row.flagUrl || '',
-      isAllDay: row.is_all_day || row.isAllDay || false,
-      unixTimestamp: row.unix_timestamp || row.unixTimestamp
+      flag_code: row.flag_code || row.flagCode || '',
+      flag_url: row.flag_url || row.flagUrl || '',
+      is_all_day: row.is_all_day || row.isAllDay || false,
+      unix_timestamp: row.unix_timestamp || row.unixTimestamp
     };
   }
 

@@ -24,6 +24,9 @@ export interface ChatMessage {
     source?: string;
     toolName: string;
   }>;
+  // Embedded data for inline references (fetched from backend)
+  embeddedTrades?: Record<string, any>; // Trade objects keyed by ID
+  embeddedEvents?: Record<string, any>; // Event objects keyed by ID
 }
 
 

@@ -152,7 +152,7 @@ export const useHighImpactEvents = ({
         // Create a map of dates that have high-impact events
         const eventDatesMap = new Map<string, boolean>();
         events.forEach(event => {
-          eventDatesMap.set(event.date, true);
+          eventDatesMap.set(event.event_date, true);
         });
 
         setHighImpactEventDates(eventDatesMap);

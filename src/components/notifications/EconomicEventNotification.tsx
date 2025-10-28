@@ -113,13 +113,13 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
 
   // Determine trend icon and color based on actualResultType
   const getTrendInfo = () => {
-    if (!event.actual) {
+    if (!event.actual_value) {
       return { icon: <NeutralIcon />, color: theme.palette.grey[500], text: 'Updated' };
     }
 
     // Use actualResultType if available, otherwise fall back to comparison logic
-    if (event.actualResultType) {
-      switch (event.actualResultType) {
+    if (event.actual_result_type) {
+      switch (event.actual_result_type) {
         case 'good':
           return { icon: <TrendingUpIcon />, color: theme.palette.success.main, text: 'Good Result' };
         case 'bad':
@@ -132,12 +132,12 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
     }
 
     // Fallback to old comparison logic if actualResultType is not available
-    if (!event.forecast) {
+    if (!event.forecast_value) {
       return { icon: <NeutralIcon />, color: theme.palette.grey[500], text: 'Updated' };
     }
 
-    const actual = parseFloat(event.actual.replace(/[^\d.-]/g, ''));
-    const forecast = parseFloat(event.forecast.replace(/[^\d.-]/g, ''));
+    const actual = parseFloat(event.actual_value.replace(/[^\d.-]/g, ''));
+    const forecast = parseFloat(event.forecast_value.replace(/[^\d.-]/g, ''));
 
     if (isNaN(actual) || isNaN(forecast)) {
       return { icon: <NeutralIcon />, color: theme.palette.grey[500], text: 'Updated' };
@@ -204,7 +204,7 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
             {/* Flag and Currency */}
             <Box sx={{ minWidth: 32, mt: 0.25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
               <img
-                src={event.flagUrl}
+                src={event.flag_url}
                 alt={event.country}
                 style={{
                   width: 20,
@@ -236,7 +236,7 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
                   fontSize: '0.75rem',
                   minWidth: 80
                 }}>
-                  {format(parseISO(event.timeUtc), 'h:mm a')}
+                  {format(parseISO(event.time_utc), 'h:mm a')}
                 </Typography>
 
                 {/* Status Icon */}
@@ -281,25 +281,25 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
                 lineHeight: 1.3,
                 mb: 0.5
               }}>
-                {event.event}
+                {event.event_name}
               </Typography>
 
               {/* Third Row: Values (if available) */}
-              {(event.actual || event.forecast || event.previous) && (
+              {(event.actual_value || event.forecast_value || event.previous_value) && (
                 <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                  {event.actual && (
+                  {event.actual_value && (
                     <Typography variant="caption" sx={{
                       fontWeight: 700,
                       fontSize: '0.7rem',
                       px: 1,
                       py: 0.25,
                       borderRadius: 1,
-                      ...getActualResultStyle(event.actualResultType)
+                      ...getActualResultStyle(event.actual_result_type)
                     }}>
-                      A: {event.actual}
+                      A: {event.actual_value}
                     </Typography>
                   )}
-                  {event.forecast && (
+                  {event.forecast_value && (
                     <Typography variant="caption" sx={{
                       color: 'text.secondary',
                       fontSize: '0.7rem',
@@ -310,10 +310,10 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
                       borderRadius: 1,
                       border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
                     }}>
-                      F: {event.forecast}
+                      F: {event.forecast_value}
                     </Typography>
                   )}
-                  {event.previous && (
+                  {event.previous_value && (
                     <Typography variant="caption" sx={{
                       color: 'text.disabled',
                       fontSize: '0.7rem',
@@ -324,7 +324,7 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
                       borderRadius: 1,
                       border: `1px solid ${alpha(theme.palette.grey[500], 0.2)}`
                     }}>
-                      P: {event.previous}
+                      P: {event.previous_value}
                     </Typography>
                   )}
                 </Box>

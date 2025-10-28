@@ -1,6 +1,7 @@
 /**
  * HTML Message Renderer Component
  * Safely renders HTML-formatted messages with proper styling
+ * Supports inline trade and event cards via trade_id:xxx and event_id:xxx references
  */
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
@@ -14,28 +15,116 @@ import {
 } from '@mui/material';
 import DOMPurify from 'dompurify';
 import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
+import TradeCard from './TradeCard';
+import EventCard from './EventCard';
+import type { Trade } from '../../types/trade';
+import type { EconomicEvent } from '../../types/economicCalendar';
 
 interface HtmlMessageRendererProps {
   html: string;
   textColor?: string;
   isUser?: boolean;
+  // Embedded data for inline card replacement
+  embeddedTrades?: Record<string, Trade>;
+  embeddedEvents?: Record<string, EconomicEvent>;
+  onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void;
+  onEventClick?: (event: EconomicEvent) => void;
 }
 
 const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
   html,
   textColor = 'text.primary',
-  isUser = false
+  embeddedTrades,
+  embeddedEvents,
+  onTradeClick,
+  onEventClick
 }) => {
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const [imageZoomProp, setImageZoomProp] = useState<ImageZoomProp | null>(null);
 
-  // Sanitize HTML to prevent XSS attacks
-  const sanitizedHtml = useMemo(() => {
-    // DOMPurify.sanitize returns a string in the browser
+  // Parse HTML into segments with inline cards
+  const contentSegments = useMemo(() => {
+    if (!embeddedTrades && !embeddedEvents) {
+      // No inline cards needed, return single HTML segment
+      return [{ type: 'html' as const, content: html }];
+    }
+
+    const segments: Array<{ type: 'html' | 'trade' | 'event'; content: string; id?: string }> = [];
+    let lastIndex = 0;
+    let workingHtml = html;
+
+    // Find all inline references (HTML tags: <trade-ref id="xxx"/> or <trade-ref id="xxx"></trade-ref>)
+    const references: Array<{ type: 'trade' | 'event'; id: string; index: number; length: number }> = [];
+
+    // Find trade reference tags (self-closing or with closing tag)
+    const tradePattern = /<trade-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/trade-ref>)?/g;
+    let match;
+    while ((match = tradePattern.exec(workingHtml)) !== null) {
+      const tradeId = match[1];
+      if (embeddedTrades?.[tradeId]) {
+        references.push({
+          type: 'trade',
+          id: tradeId,
+          index: match.index,
+          length: match[0].length
+        });
+      }
+    }
+
+    // Find event reference tags
+    const eventPattern = /<event-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/event-ref>)?/g;
+    while ((match = eventPattern.exec(workingHtml)) !== null) {
+      const eventId = match[1];
+      if (embeddedEvents?.[eventId]) {
+        references.push({
+          type: 'event',
+          id: eventId,
+          index: match.index,
+          length: match[0].length
+        });
+      }
+    }
+
+    // Sort references by index
+    references.sort((a, b) => a.index - b.index);
+
+    // Build segments
+    references.forEach(ref => {
+      // Add HTML before this reference
+      if (ref.index > lastIndex) {
+        const htmlSegment = workingHtml.substring(lastIndex, ref.index);
+        if (htmlSegment.trim()) {
+          segments.push({ type: 'html', content: htmlSegment });
+        }
+      }
+
+      // Add card segment
+      segments.push({
+        type: ref.type,
+        content: '',
+        id: ref.id
+      });
+
+      lastIndex = ref.index + ref.length;
+    });
+
+    // Add remaining HTML
+    if (lastIndex < workingHtml.length) {
+      const htmlSegment = workingHtml.substring(lastIndex);
+      if (htmlSegment.trim()) {
+        segments.push({ type: 'html', content: htmlSegment });
+      }
+    }
+
+    return segments.length > 0 ? segments : [{ type: 'html' as const, content: html }];
+  }, [html, embeddedTrades, embeddedEvents]);
+
+  // Sanitize HTML segments
+  const sanitizeHtml = (htmlContent: string) => {
     const purify = DOMPurify(window);
-    return purify.sanitize(html, {
+    return purify.sanitize(htmlContent, {
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'span', 'div', 'img'
@@ -43,7 +132,15 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
       ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style', 'src', 'alt', 'width', 'height'],
       KEEP_CONTENT: true
     });
-  }, [html]);
+  };
+
+  // Extract image URLs for all HTML segments
+  const sanitizedHtml = useMemo(() => {
+    return contentSegments
+      .filter(seg => seg.type === 'html')
+      .map(seg => sanitizeHtml(seg.content))
+      .join('');
+  }, [contentSegments]);
 
   // Extract image URLs from sanitized HTML
   const imageUrls = useMemo(() => {
@@ -55,7 +152,7 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
     return urls;
   }, [sanitizedHtml]);
 
-  // Add click handlers to images after render
+  // Add click handlers to images and inject card components after render
   useEffect(() => {
     console.log('[HtmlMessageRenderer] useEffect triggered', {
       hasContainer: !!containerRef.current,
@@ -63,8 +160,9 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
       imageUrls
     });
 
-    if (!containerRef.current || imageUrls.length === 0) return;
+    if (!containerRef.current) return;
 
+    // Handle image clicks
     const images = containerRef.current.querySelectorAll('img');
     console.log('[HtmlMessageRenderer] Found images in DOM:', images.length);
 
@@ -269,15 +367,49 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
         }
       }}
       >
-        <Typography
-          component="div"
-          sx={{
-            color: textColor,
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word'
-          }}
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-        />
+        {/* Render segments (HTML and cards mixed) */}
+        {contentSegments.map((segment, index) => {
+          if (segment.type === 'html') {
+            return (
+              <Typography
+                key={`html-${index}`}
+                component="div"
+                sx={{
+                  color: textColor,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  display: 'inline'
+                }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(segment.content) }}
+              />
+            );
+          } else if (segment.type === 'trade' && segment.id && embeddedTrades?.[segment.id]) {
+            const trade = embeddedTrades[segment.id];
+            const contextTrades = Object.values(embeddedTrades);
+            return (
+              <Box key={`trade-${index}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
+                <TradeCard
+                  trade={trade}
+                  onClick={() => onTradeClick?.(trade.id, contextTrades)}
+                  compact={true}
+                />
+              </Box>
+            );
+          } else if (segment.type === 'event' && segment.id && embeddedEvents?.[segment.id]) {
+            const event = embeddedEvents[segment.id];
+            return (
+              <Box key={`event-${index}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
+                <EventCard
+                  eventId={segment.id}
+                  eventData={event}
+                  onClick={onEventClick}
+                  compact={true}
+                />
+              </Box>
+            );
+          }
+          return null;
+        })}
       </Box>
 
       {/* Image Zoom Dialog */}

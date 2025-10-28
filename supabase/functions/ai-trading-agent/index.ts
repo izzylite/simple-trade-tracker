@@ -11,6 +11,7 @@ import {
   getAllCustomTools,
   executeCustomTool
 } from './tools.ts';
+import { fetchEmbeddedData } from './embedDataFetcher.ts';
 
 /**
  * Call Supabase MCP list_tools endpoint
@@ -214,6 +215,7 @@ Your Capabilities:
 5. 💱 **Forex Market Data**: Get real-time forex rates using get_forex_price (EUR/USD, GBP/USD, etc.)
 6. 📈 **Visualization**: Generate charts from data using generate_chart
 7. 📰 **Economic Events**: Query global economic calendar (no user_id required)
+8. 🎴 **Rich Card Display**: Embed interactive trade/event cards in your responses
 
 RECOMMENDED WORKFLOWS:
 
@@ -244,11 +246,14 @@ RECOMMENDED WORKFLOWS:
 - Never end without generating text response
 
 **For Trade Context Analysis**:
-1. Query user's trades via execute_sql
-2. Use get_crypto_price to get current market prices
-3. Compare user's entry/exit points with current market
-4. Use generate_chart to visualize performance
-5. Provide insights and correlations
+1. Query user's trades via execute_sql (ALWAYS include the id column)
+2. When mentioning specific trades in your response, ALWAYS wrap the trade ID in <trade-ref id="trade-uuid"/> tags
+3. Use get_crypto_price to get current market prices
+4. Compare user's entry/exit points with current market
+5. Use generate_chart to visualize performance
+6. Provide insights and correlations
+
+CRITICAL: When you query trades and mention them in your response, you MUST use <trade-ref id="uuid"/> tags with the actual trade IDs from the database query results!
 
 **For Visual Analysis**:
 1. Query data via execute_sql (e.g., daily P&L, win rates)
@@ -258,42 +263,137 @@ RECOMMENDED WORKFLOWS:
 **DATABASE SCHEMAS** (for execute_sql queries):
 
 **TRADES TABLE SCHEMA**:
-- Columns: id, calendar_id, user_id, name, amount, trade_type, trade_date, created_at,
-  updated_at, entry_price, exit_price, risk_to_reward, partials_taken, session, notes, tags,
-  is_temporary, is_pinned, share_link, is_shared, shared_at, share_id
+- Columns: id (UUID), calendar_id (UUID), user_id (TEXT), name (TEXT), amount (NUMERIC),
+  trade_type (TEXT), trade_date (TIMESTAMPTZ), created_at (TIMESTAMPTZ), updated_at (TIMESTAMPTZ),
+  entry_price (NUMERIC), exit_price (NUMERIC), stop_loss (NUMERIC), take_profit (NUMERIC),
+  risk_to_reward (NUMERIC), partials_taken (BOOLEAN), session (TEXT), notes (TEXT), tags (TEXT[]),
+  is_temporary (BOOLEAN), is_pinned (BOOLEAN), share_link (TEXT), is_shared (BOOLEAN),
+  shared_at (TIMESTAMPTZ), share_id (TEXT), images (JSONB), economic_events (JSONB)
+- trade_type: One of 'win', 'loss', 'breakeven' (required)
 - session: One of 'Asia', 'London', 'NY AM', 'NY PM' (nullable)
-- trade_type: One of 'win', 'loss', 'breakeven'
-- tags: Array of strings (TEXT[])
-- Example query: SELECT name, amount, trade_type, trade_date, session, tags FROM trades
-  WHERE user_id = '${userId}' AND calendar_id = '${calendarId}'
-  ORDER BY trade_date DESC LIMIT 10;
+- tags: Array of strings (TEXT[]), default empty array
+- images: JSONB array of image metadata (id, url, filename, storage_path, width, height, caption, row, column, column_width)
+- economic_events: JSONB array of denormalized economic events for quick access
+- Example query: SELECT name, amount, trade_type, trade_date, entry_price, exit_price, stop_loss,
+  take_profit, session, tags, notes FROM trades WHERE user_id = '${userId}'
+  AND calendar_id = '${calendarId}' ORDER BY trade_date DESC LIMIT 10;
 - ALWAYS filter by user_id in WHERE clause for security
 
 **CALENDARS TABLE SCHEMA**:
-- Columns: id, user_id, name, account_balance, max_daily_drawdown, risk_per_trade,
-  total_trades, winning_trades, losing_trades, breakeven_trades, total_profit_loss, win_rate,
-  average_win, average_loss, largest_win, largest_loss, profit_factor, created_at, updated_at,
-  share_link, is_shared, shared_at, share_id
-- Example query: SELECT name, account_balance, total_trades, win_rate, profit_factor FROM calendars
-  WHERE user_id = '${userId}' ORDER BY created_at DESC;
+- Core Columns: id (UUID), user_id (TEXT), name (TEXT), created_at (TIMESTAMPTZ), updated_at (TIMESTAMPTZ)
+- Account Settings: account_balance (NUMERIC), max_daily_drawdown (NUMERIC), risk_per_trade (NUMERIC),
+  weekly_target (NUMERIC), monthly_target (NUMERIC), yearly_target (NUMERIC)
+- Risk Management: dynamic_risk_enabled (BOOLEAN), increased_risk_percentage (NUMERIC),
+  profit_threshold_percentage (NUMERIC)
+- Configuration: required_tag_groups (TEXT[]), tags (TEXT[]), note (TEXT), hero_image_url (TEXT),
+  hero_image_attribution (JSONB), days_notes (JSONB), score_settings (JSONB),
+  economic_calendar_filters (JSONB), pinned_events (JSONB)
+- Statistics: total_trades (INTEGER), win_count (INTEGER), loss_count (INTEGER), total_pnl (NUMERIC),
+  win_rate (NUMERIC), profit_factor (NUMERIC), avg_win (NUMERIC), avg_loss (NUMERIC),
+  current_balance (NUMERIC)
+- Performance Metrics: weekly_pnl (NUMERIC), monthly_pnl (NUMERIC), yearly_pnl (NUMERIC),
+  weekly_pnl_percentage (NUMERIC), monthly_pnl_percentage (NUMERIC), yearly_pnl_percentage (NUMERIC),
+  weekly_progress (NUMERIC), monthly_progress (NUMERIC), target_progress (NUMERIC),
+  pnl_performance (NUMERIC)
+- Drawdown Tracking: max_drawdown (NUMERIC), drawdown_start_date (TIMESTAMPTZ),
+  drawdown_end_date (TIMESTAMPTZ), drawdown_recovery_needed (NUMERIC), drawdown_duration (INTEGER)
+- Sharing: share_link (TEXT), is_shared (BOOLEAN), shared_at (TIMESTAMPTZ), share_id (TEXT)
+- Duplication: duplicated_calendar (BOOLEAN), source_calendar_id (UUID)
+- Deletion: deleted_at (TIMESTAMPTZ), deleted_by (UUID), auto_delete_at (TIMESTAMPTZ),
+  mark_for_deletion (BOOLEAN), deletion_date (TIMESTAMPTZ)
+- Example query: SELECT name, account_balance, total_trades, win_count, loss_count, win_rate,
+  profit_factor, total_pnl, current_balance, weekly_pnl, monthly_pnl, yearly_pnl,
+  max_drawdown, avg_win, avg_loss FROM calendars WHERE user_id = '${userId}'
+  ORDER BY created_at DESC;
 - ALWAYS filter by user_id in WHERE clause for security
 
 **ECONOMIC EVENTS TABLE SCHEMA** (global reference - no user_id filtering required):
-- Columns: id, external_id, currency, event_name, impact, event_date (DATE), event_time (TIMESTAMPTZ),
-  time_utc, unix_timestamp, actual_value, forecast_value, previous_value, actual_result_type,
-  country, flag_code, flag_url, is_all_day, description, source_url, data_source, last_updated, created_at
-- Example query: SELECT event_name, country, event_date, impact FROM economic_events
+- Columns: id (UUID), external_id (TEXT), currency (TEXT), event_name (TEXT), impact (TEXT),
+  event_date (DATE), event_time (TIMESTAMPTZ), time_utc (TEXT), unix_timestamp (BIGINT),
+  actual_value (TEXT), forecast_value (TEXT), previous_value (TEXT), actual_result_type (TEXT),
+  country (TEXT), flag_code (TEXT), flag_url (TEXT), is_all_day (BOOLEAN), description (TEXT),
+  source_url (TEXT), data_source (TEXT), last_updated (TIMESTAMPTZ), created_at (TIMESTAMPTZ)
+- impact: One of 'High', 'Medium', 'Low', 'Holiday', 'Non-Economic' (required)
+- actual_result_type: One of 'good', 'bad', 'neutral', '' (nullable)
+- Example query: SELECT event_name, country, event_date, event_time, impact, actual_value,
+  forecast_value, previous_value FROM economic_events
   WHERE (country = 'United States' OR country = 'Euro Zone')
   AND event_date >= CURRENT_DATE AND event_date <= CURRENT_DATE + INTERVAL '7 days'
-  ORDER BY event_date ASC;
+  ORDER BY event_date ASC, event_time ASC;
 - Use CURRENT_DATE for today, CURRENT_DATE + INTERVAL 'X days' for date ranges
 - Filter by country (e.g., 'United States', 'Euro Zone', 'United Kingdom', 'Japan')
 - Filter by impact ('High', 'Medium', 'Low', 'Holiday', 'Non-Economic')
+
+**EMBEDDED CARD DISPLAY**:
+When referencing specific trades or events in your responses, use self-closing HTML tags for card display:
+
+1. **Trade Cards** - Use self-closing trade reference tags:
+   - Format: <trade-ref id="abc-123-def-456"/>
+   - CRITICAL: Each tag MUST be on its own line with NO text before or after it
+   - The tag will be replaced with an interactive trade card
+
+2. **Event Cards** - Use self-closing event reference tags:
+   - Format: <event-ref id="event-abc-123"/>
+   - CRITICAL: Each tag MUST be on its own line with NO text before or after it
+   - The tag will be replaced with an interactive event card
+
+**FORMATTING RULES FOR EMBEDDED CARDS** (VERY IMPORTANT):
+- ❌ NEVER put text on the same line as a card tag
+- ❌ NEVER use commas, "and", "or", numbers, or any text between card tags
+- ❌ WRONG: "Your best trade was <trade-ref id="xxx"/> with excellent risk"
+- ❌ WRONG: "<trade-ref id="xxx"/>, <trade-ref id="yyy"/>, and <trade-ref id="zzz"/>"
+- ❌ WRONG: "1. <trade-ref id="xxx"/> 2. <trade-ref id="yyy"/>"
+- ✅ CORRECT: Each tag on its own line with blank line before/after
+
+**CORRECT FORMAT EXAMPLE**:
+"Here are your top 3 winning trades:
+
+<trade-ref id="f46e5852-070e-488b-8144-25663ff52f06"/>
+
+<trade-ref id="ccc10d28-c9b2-4edd-a729-d6273d2f0939"/>
+
+<trade-ref id="a5f15595-3388-4e86-bece-abe3398a7643"/>
+
+These trades show excellent risk management."
+
+**WHEN TO USE CARD TAGS**:
+- ✅ Whenever you query and display trade information from execute_sql
+- ✅ When listing top trades, worst trades, or any specific trades
+- ✅ When comparing or analyzing specific trades
+- ✅ When mentioning economic events that affected trading
+- ✅ ALWAYS use the actual UUID from the database query results
+- ✅ ALWAYS put each card tag on its own line with blank lines separating them
+
+**DISPLAYING TRADE IMAGES**:
+When users ask to see trade images or screenshots, extract the image URLs from the 'images' JSONB column and display them using markdown image syntax:
+
+1. **Query with images column**:
+   - SELECT id, name, images FROM trades WHERE ... LIMIT 1;
+   - The images column contains a JSONB array: [{"url": "https://...", "caption": "..."}, ...]
+
+2. **Extract and display URLs**:
+   - Parse the images array from the query result
+   - Display each image using markdown: ![Image 1](https://firebasestorage.googleapis.com/...)
+   - Use sequential numbering for multiple images: Image 1, Image 2, Image 3
+   - Example response format:
+     "Here are the images from your last trade:
+
+     ![Image 1](https://firebasestorage.googleapis.com/.../image1.png)
+     ![Image 2](https://firebasestorage.googleapis.com/.../image2.png)
+     ![Image 3](https://firebasestorage.googleapis.com/.../image3.png)"
+
+3. **Important**:
+   - Always use markdown image syntax ![alt](url), NOT markdown links [text](url)
+   - The system will automatically render these as visible images
+   - Extract the "url" field from each object in the images array
+   - Firebase/Supabase storage URLs will be rendered as clickable images
 
 IMPORTANT GUIDELINES:
 - Be proactive and helpful - always try multiple approaches if one fails
 - If web search returns empty results, try simpler search terms or use your market knowledge
 - Combine multiple data sources (price data + news + economic events) for comprehensive analysis
+- When discussing specific trades, reference them using <trade-ref id="uuid"/> self-closing tags for inline card display
+- When discussing specific events, reference them using <event-ref id="uuid"/> self-closing tags for inline card display
 - Never give up - provide the best analysis you can with available information
 - You are a trading expert with Gemini's language understanding - use it!`;
 }
@@ -530,11 +630,33 @@ Deno.serve(async (req: Request) => {
       functionCalls as ToolCall[]
     );
 
+    // Fetch embedded data for inline references (trade_id:xxx, event_id:xxx)
+    log('Fetching embedded data for inline references', 'info');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!serviceKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
+    }
+
+    const embeddedData = await fetchEmbeddedData(
+      finalText || '',
+      supabaseUrl,
+      serviceKey,
+      userId
+    );
+
+    // Convert Maps to objects for JSON serialization
+    const embeddedTrades = Object.fromEntries(embeddedData.trades);
+    const embeddedEvents = Object.fromEntries(embeddedData.events);
+
+    log(`Fetched ${embeddedData.trades.size} embedded trades and ${embeddedData.events.size} embedded events`, 'info');
+
     const formattedResponse = {
       success: !!finalText,
       message: finalText || '',
       messageHtml,
       citations,
+      embeddedTrades: Object.keys(embeddedTrades).length > 0 ? embeddedTrades : undefined,
+      embeddedEvents: Object.keys(embeddedEvents).length > 0 ? embeddedEvents : undefined,
       metadata: {
         functionCalls,
         model: 'gemini-2.5-pro-preview-03-25',

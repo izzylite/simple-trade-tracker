@@ -27,6 +27,7 @@ import { logger } from '../../utils/logger';
 
 interface EventCardProps {
   eventId: string;
+  eventData?: EconomicEvent; // Optional: pre-fetched event data from backend
   compact?: boolean;
   onClick?: (event: EconomicEvent) => void;
 }
@@ -95,11 +96,11 @@ const getImpactColor = (impact: string, theme: any) => {
 };
 
 // Helper function to format time with status
-const formatTimeWithStatus = (timeUtc: string) => {
-  const eventTime = parseISO(timeUtc);
+const formatTimeWithStatus = (time_utc: string) => {
+  const eventTime = parseISO(time_utc);
   const now = new Date();
   const isPassed = isAfter(now, eventTime);
-  
+
   return {
     time: format(eventTime, 'MMM dd, h:mm a'),
     isPassed,
@@ -108,11 +109,11 @@ const formatTimeWithStatus = (timeUtc: string) => {
 };
 
 // Helper function to get trend info from actual vs forecast
-const getTrendInfo = (actual: string, forecast: string, theme: any) => {
-  if (!actual || !forecast) return null;
-  
-  const actualNum = parseFloat(actual.replace(/[^\d.-]/g, ''));
-  const forecastNum = parseFloat(forecast.replace(/[^\d.-]/g, ''));
+const getTrendInfo = (actual_value: string, forecast_value: string, theme: any) => {
+  if (!actual_value || !forecast_value) return null;
+
+  const actualNum = parseFloat(actual_value.replace(/[^\d.-]/g, ''));
+  const forecastNum = parseFloat(forecast_value.replace(/[^\d.-]/g, ''));
   
   if (isNaN(actualNum) || isNaN(forecastNum)) return null;
   
@@ -139,23 +140,31 @@ const getTrendInfo = (actual: string, forecast: string, theme: any) => {
 
 const EventCard: React.FC<EventCardProps> = ({
   eventId,
+  eventData,
   compact = false,
   onClick
 }) => {
   const theme = useTheme();
-  const [event, setEvent] = useState<EconomicEvent | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [event, setEvent] = useState<EconomicEvent | null>(eventData || null);
+  const [loading, setLoading] = useState(!eventData); // Skip loading if data provided
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Skip fetching if event data was provided
+    if (eventData) {
+      setEvent(eventData);
+      setLoading(false);
+      return;
+    }
+
     const fetchEvent = async () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Fetch event by ID from economic calendar service
         const fetchedEvent = await economicCalendarService.getEventById(eventId);
-        
+
         if (fetchedEvent) {
           setEvent(fetchedEvent);
         } else {
@@ -170,7 +179,7 @@ const EventCard: React.FC<EventCardProps> = ({
     };
 
     fetchEvent();
-  }, [eventId]);
+  }, [eventId, eventData]);
 
   // Show shimmer while loading
   if (loading) {
@@ -198,8 +207,8 @@ const EventCard: React.FC<EventCardProps> = ({
     );
   }
 
-  const timeInfo = formatTimeWithStatus(event.timeUtc);
-  const trendInfo = getTrendInfo(event.actual, event.forecast, theme);
+  const timeInfo = formatTimeWithStatus(event.time_utc);
+  const trendInfo = getTrendInfo(event.actual_value, event.forecast_value, theme);
 
   return (
     <Paper
@@ -224,9 +233,9 @@ const EventCard: React.FC<EventCardProps> = ({
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
         {/* Flag and Currency */}
         <Box sx={{ minWidth: 32, mt: 0.25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-          {event.flagUrl && (
+          {event.flag_url && (
             <img
-              src={event.flagUrl}
+              src={event.flag_url}
               alt={event.country}
               style={{
                 width: 20,
@@ -309,42 +318,42 @@ const EventCard: React.FC<EventCardProps> = ({
             lineHeight: 1.3,
             mb: compact ? 0 : 0.5
           }}>
-            {event.event}
+            {event.event_name}
           </Typography>
 
           {/* Third Row: Values (if available and not compact) */}
-          {!compact && (event.actual || event.forecast || event.previous) && (
+          {!compact && (event.actual_value || event.forecast_value || event.previous_value) && (
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-              {event.actual && (
+              {event.actual_value && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
                     Actual:
                   </Typography>
                   <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
-                    {event.actual}
+                    {event.actual_value}
                   </Typography>
                   {trendInfo && trendInfo.icon}
                 </Box>
               )}
 
-              {event.forecast && (
+              {event.forecast_value && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
                     Forecast:
                   </Typography>
                   <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
-                    {event.forecast}
+                    {event.forecast_value}
                   </Typography>
                 </Box>
               )}
 
-              {event.previous && (
+              {event.previous_value && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
                     Previous:
                   </Typography>
                   <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
-                    {event.previous}
+                    {event.previous_value}
                   </Typography>
                 </Box>
               )}

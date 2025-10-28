@@ -19,7 +19,7 @@ import {
 import { Search as SearchIcon } from '@mui/icons-material';
 
 import { alpha } from '@mui/material/styles';
-import { Trade } from '../../types/trade';
+import { Trade, Calendar } from '../../types/dualWrite'; 
 import {
   getTagChipStyles,
   formatTagForDisplay,

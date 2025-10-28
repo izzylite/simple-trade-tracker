@@ -222,8 +222,8 @@ class EconomicEventWatcher {
       // Filter and sort upcoming events
       const currentDate = new Date();
       const upcomingEvents = todaysEvents.events
-        .filter(event => new Date(event.timeUtc) > currentDate)
-        .sort((a, b) => new Date(a.timeUtc).getTime() - new Date(b.timeUtc).getTime());
+        .filter(event => new Date(event.time_utc) > currentDate)
+        .sort((a, b) => new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime());
 
       // Store in memory queue
       this.eventQueues.set(calendarId, {
@@ -261,7 +261,7 @@ class EconomicEventWatcher {
     this.watchEventGroup(eventGroup, calendarId);
     logger.log(`⏰ Watching ${eventGroup.events.length} event(s) releasing at ${eventGroup.releaseTime} for calendar: ${calendarId}`);
     eventGroup.events.forEach((event, index) => {
-      logger.log(`   ${index + 1}. ${event.event}`);
+      logger.log(`   ${index + 1}. ${event.event_name}`);
     });
   }
 
@@ -274,11 +274,11 @@ class EconomicEventWatcher {
     }
 
     const firstEvent = queue.events[0]
-    const releaseTime = firstEvent.timeUtc; 
+    const releaseTime = firstEvent.time_utc;
 
     return {
       releaseTime, // Collect all events with the same release time
-      events: queue.events.filter((e) => e.timeUtc === releaseTime)
+      events: queue.events.filter((e) => e.time_utc === releaseTime)
     };
   }
 
@@ -411,7 +411,7 @@ class EconomicEventWatcher {
       // Get unique currencies from the event group
       const currencySet = new Set(events.map(e => e.currency));
       const currencies = Array.from(currencySet) as Currency[];
-      const targetDate = events[0].date; // All events should have the same date
+      const targetDate = events[0].event_date; // All events should have the same date
 
       // Call Supabase edge function to refresh economic calendar data for all events
       const { data, error: callError } = await supabase.functions.invoke('refresh-economic-calendar', {
@@ -445,21 +445,21 @@ class EconomicEventWatcher {
 
         const eventToNotify: EconomicEvent = updatedEvent ? {
           ...originalEvent,
-          actual: updatedEvent.actual || originalEvent.actual,
-          forecast: updatedEvent.forecast || originalEvent.forecast,
-          previous: updatedEvent.previous || originalEvent.previous
+          actual_value: updatedEvent.actual_value || originalEvent.actual_value,
+          forecast_value: updatedEvent.forecast_value || originalEvent.forecast_value,
+          previous_value: updatedEvent.previous_value || originalEvent.previous_value
         } : originalEvent;
 
         updatedEvents.push(eventToNotify);
 
         // Log individual event updates
         if (updatedEvent) {
-          logger.log(`📊 Event "${originalEvent.event}" updated successfully:`);
-          logger.log(`   Actual: ${originalEvent.actual} → ${updatedEvent.actual}`);
-          logger.log(`   Forecast: ${originalEvent.forecast} → ${updatedEvent.forecast}`);
-          logger.log(`   Previous: ${originalEvent.previous} → ${updatedEvent.previous}`);
+          logger.log(`📊 Event "${originalEvent.event_name}" updated successfully:`);
+          logger.log(`   Actual: ${originalEvent.actual_value} → ${updatedEvent.actual_value}`);
+          logger.log(`   Forecast: ${originalEvent.forecast_value} → ${updatedEvent.forecast_value}`);
+          logger.log(`   Previous: ${originalEvent.previous_value} → ${updatedEvent.previous_value}`);
         } else {
-          logger.log(`⚠️ Event "${originalEvent.event}" not found in updated results, using original data`);
+          logger.log(`⚠️ Event "${originalEvent.event_name}" not found in updated results, using original data`);
         }
       }
       // Remove the events from the queue
@@ -557,7 +557,7 @@ class EconomicEventWatcher {
       watchedEventsCount: this.watchedEventGroups.size,
       watchedEventGroups: Array.from(this.watchedEventGroups.values()).map(w => ({
         eventCount: w.events.length,
-        events: w.events.map(e => e.event),
+        events: w.events.map(e => e.event_name),
         releaseTime: w.releaseTime,
         calendarId: w.calendarId
       })),

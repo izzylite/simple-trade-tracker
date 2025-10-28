@@ -124,7 +124,7 @@ export class TradeEconomicEventService {
   private isEventInTradeSession(event: EconomicEvent, tradeDate: Date, session?: string): boolean {
     if (!session) {
       // If trade has no session, fall back to same day matching
-      const eventDate = parseISO(event.date);
+      const eventDate = parseISO(event.event_date);
       return isSameDay(tradeDate, eventDate);
     }
 
@@ -132,7 +132,7 @@ export class TradeEconomicEventService {
     const sessionRange = this.getSessionTimeRange(session, tradeDate);
 
     // Parse the event time (assuming it's in UTC)
-    const eventTime = parseISO(event.timeUtc || event.time);
+    const eventTime = parseISO(event.time_utc || event.event_time);
 
     // Check if event time falls within the session range
     return eventTime >= sessionRange.start && eventTime <= sessionRange.end;
@@ -143,11 +143,11 @@ export class TradeEconomicEventService {
    */
   private convertToTradeEvent(event: EconomicEvent): TradeEconomicEvent {
     return {
-      name: event.event,
-      flag_code: event.flagCode,
+      name: event.event_name,
+      flag_code: event.flag_code,
       impact: event.impact,
       currency: event.currency,
-      time_utc: event.timeUtc || event.time
+      time_utc: event.time_utc || event.event_time
     };
   }
 
