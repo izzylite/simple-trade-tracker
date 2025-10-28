@@ -192,6 +192,9 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
       onClose={onClose}
       maxWidth="md"
       fullWidth
+      sx={{
+        zIndex: 1500 // Higher than AI drawer (1400) and delete dialog (1500), so use 1500
+      }}
       PaperProps={{
         sx: {
           boxShadow: 'none',

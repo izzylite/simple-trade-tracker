@@ -11,7 +11,8 @@ import { AuthProvider, useAuth } from './contexts/SupabaseAuthContext';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
 import TradeLoadingIndicator from './components/TradeLoadingIndicator';
-import { supabase } from './config/supabase';
+import { useRealtimeSubscription } from './hooks/useRealtimeSubscription';
+import { logger } from './utils/logger';
 
 import AppLoadingProgress from './components/AppLoadingProgress';
 import {
@@ -500,43 +501,50 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     }
   }, [calendar, loadAllTrades, loadAttempted]);
 
-  // Subscribe to calendar changes to automatically update tags and other fields
+  // Subscribe to calendar changes with automatic reconnection
+  const { createChannel } = useRealtimeSubscription({
+    channelName: `calendar-${calendar?.id}`,
+    enabled: !!calendar,
+    onSubscribed: () => {
+      logger.log(`✅ Calendar subscription active for ${calendar?.id}`);
+    },
+    onError: (error) => {
+      logger.error(`❌ Calendar subscription error for ${calendar?.id}:`, error);
+    },
+    maxReconnectAttempts: 5,
+    reconnectDelay: 1000,
+  });
+
   useEffect(() => {
     if (!calendar) return;
 
-    // Subscribe to Supabase real-time changes for this calendar
-    const channel = supabase
-      .channel(`calendar-${calendar.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'calendars',
-          filter: `id=eq.${calendar.id}`
-        },
-        (payload) => {
-          const updatedCalendarData = payload.new;
+    // Create the channel with automatic reconnection
+    const channel = createChannel();
+    if (!channel) return;
 
-          // Only update specific fields that might change from edge functions
-          // Preserve cached trades and loaded years from local state
-          onUpdateStateCalendar(calendar.id, {
-            tags: updatedCalendarData.tags || [],
-            updated_at: updatedCalendarData.updated_at ? new Date(updatedCalendarData.updated_at) : new Date(),
-            required_tag_groups: updatedCalendarData.required_tag_groups || calendar.required_tag_groups,
-            score_settings: updatedCalendarData.score_settings || calendar.score_settings,
-            // Update any other fields that edge functions might modify
-            // but preserve local state for trades and UI-specific data
-          });
-        }
-      )
-      .subscribe();
+    // Subscribe to calendar updates
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'calendars',
+        filter: `id=eq.${calendar.id}`
+      },
+      (payload) => {
+        const updatedCalendarData = payload.new;
 
-    // Cleanup subscription on unmount or calendar change
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [calendar?.id]);
+        // Only update specific fields that might change from edge functions
+        // Preserve cached trades and loaded years from local state
+
+        onUpdateStateCalendar(calendar.id, {
+          ...updatedCalendarData
+        });
+      }
+    );
+
+    // Cleanup handled automatically by the hook
+  }, [calendar?.id, createChannel]);
 
   if (!calendar) {
     return <Navigate to="/" replace />;

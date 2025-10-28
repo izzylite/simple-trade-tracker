@@ -15,7 +15,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Supabase configuration is incomplete');
 }
 
-// Create Supabase client
+// Create Supabase client with standard configuration
+// Following official Supabase documentation patterns
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true, // Enable session persistence for Supabase Auth
@@ -27,39 +28,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     schema: 'public',
   },
 });
+ 
 
-// Database table names
-export const SUPABASE_TABLES = {
-  TRADE_EMBEDDINGS: 'trade_embeddings',
-  EMBEDDING_METADATA: 'embedding_metadata',
-} as const;
-
-// Vector similarity search configuration
-export const VECTOR_CONFIG = {
-  EMBEDDING_DIMENSION: 384, // all-MiniLM-L6-v2 dimension
-  SIMILARITY_THRESHOLD: 0.3, // Minimum similarity score (lowered after migration testing)
-  MAX_RESULTS: 20, // Maximum results to return
-} as const;
-
-/**
- * Test Supabase connection
- */
-export async function testSupabaseConnection(): Promise<boolean> {
-  try {
-    // Try to access our trade_embeddings table (which we know exists)
-    const { data, error } = await supabase
-      .from('trade_embeddings')
-      .select('count', { count: 'exact', head: true });
-
-    if (error) {
-      logger.error('Supabase connection test failed:', error);
-      return false;
-    }
-
-    logger.log('Supabase connection successful');
-    return true;
-  } catch (error) {
-    logger.error('Supabase connection error:', error);
-    return false;
-  }
-}
+ 

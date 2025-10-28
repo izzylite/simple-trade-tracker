@@ -31,15 +31,15 @@ import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from
 
 interface TradeCardProps {
   trade: Trade;
-  compact?: boolean;
+  showTags?: boolean;
   onClick?: () => void;
   showImages?: boolean;
 }
 
 const TradeCard: React.FC<TradeCardProps> = ({
   trade,
-  compact = true,
   onClick,
+  showTags,
   showImages = false
 }) => {
   const theme = useTheme();
@@ -85,7 +85,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
 
   const formatAmount = (amount: number) => {
     const sign = amount >= 0 ? '+' : '';
-    return `${sign}$${amount.toFixed(2)}`;
+    return `${sign}$${Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   // Group tags by category for compact display
@@ -104,7 +104,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
   return (
     <Card
       sx={{
-        maxWidth: compact ? 400 : 500,
+        maxWidth: 400,
         cursor: onClick ? 'pointer' : 'default',
         transition: 'all 0.2s ease-in-out',
         border: '1px solid',
@@ -118,8 +118,8 @@ const TradeCard: React.FC<TradeCardProps> = ({
       }}
       onClick={onClick}
     >
-      <CardContent sx={{ p: compact ? 2 : 3, '&:last-child': { pb: compact ? 2 : 3 } }}>
-        <Stack spacing={compact ? 1.5 : 1.5}>
+      <CardContent sx={{ p: 2, pt: 0, '&:last-child': { pb: 2 } }}>
+        <Stack spacing={1.5}>
           {/* Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <Box sx={{ flex: 1 }}>
@@ -137,7 +137,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
                     variant="h6"
                     fontWeight="bold"
                     color={`${getTradeTypeColorName()}.main`}
-                    sx={{ fontSize: compact ? '1rem' : '1.25rem' }}
+                    sx={{ fontSize: '1rem' }}
                   >
                     {formatAmount(trade.amount)}
                   </Typography>
@@ -160,7 +160,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
                     </Box>
                   </Tooltip>
                 )}
-                {trade.risk_to_reward && compact && (
+                {trade.risk_to_reward &&  (
                   <Tooltip title={`Risk to Reward: ${trade.risk_to_reward.toFixed(2)}`}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <RiskIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
@@ -205,32 +205,10 @@ const TradeCard: React.FC<TradeCardProps> = ({
 
             </Box>
           </Box>
-          {/* Trade Details */}
-          {!compact && (
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              {trade.entry_price && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary">Entry</Typography>
-                  <Typography variant="body2" fontWeight="medium">{trade.entry_price}</Typography>
-                </Box>
-              )}
-              {trade.exit_price && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary">Exit</Typography>
-                  <Typography variant="body2" fontWeight="medium">{trade.exit_price}</Typography>
-                </Box>
-              )}
-              {trade.risk_to_reward && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary">R:R</Typography>
-                  <Typography variant="body2" fontWeight="medium">{trade.risk_to_reward.toFixed(2)}</Typography>
-                </Box>
-              )}
-            </Box>
-          )}
+         
 
           {/* Tags */}
-          {/* {trade.tags && trade.tags.length > 0 && (
+          {showTags && trade.tags && trade.tags.length > 0 && (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
               {Object.entries(groupedTags).map(([group, groupTags]) => (
                 <Tooltip
@@ -259,7 +237,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
                 </Tooltip>
               ))}
             </Box>
-          )} */}
+          )}
 
 
         </Stack>

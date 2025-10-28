@@ -55,11 +55,13 @@ import {
   ImpactLevel
 } from '../../types/economicCalendar';
 import { Calendar } from '../../types/calendar';
+import { Trade } from '../../types/trade';
 import { economicCalendarService } from '../../services/economicCalendarService';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 // import { QueryDocumentSnapshot } from 'firebase/firestore'; // Removed - migrating to Supabase
 import EconomicEventListItem from './EconomicEventListItem';
 import EconomicCalendarFilters from './EconomicCalendarFilters';
+import EconomicEventDetailDialog from './EconomicEventDetailDialog';
 import Shimmer from '../Shimmer';
 import { log,error, logger, warn } from '../../utils/logger';
 import { cleanEventNameForPinning, isEventPinned } from '../../utils/eventNameUtils';
@@ -189,7 +191,9 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   open,
   onClose,
   calendar,
+  trades = [],
   onUpdateCalendarProperty,
+  onOpenGalleryMode,
   payload
 }) => {
   const theme = useTheme();
@@ -243,6 +247,10 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
   // Filter state
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+
+  // Economic event detail dialog state
+  const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
+  const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
 
   // Applied filters (used for queries) - initialized from localStorage
   const [appliedCurrencies, setAppliedCurrencies] = useState<Currency[]>(savedSettings.currencies);
@@ -411,7 +419,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     }
   }, [dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming, open, viewType, pageSize, startDate, endDate]);
 
-  // Set up real-time subscription when filters change
+   // Set up real-time subscription when filters change
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -985,6 +993,11 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                               onPinEvent={handlePinEvent}
                               onUnpinEvent={handleUnpinEvent}
                               isPinning={pinningEventId === event.event_name}
+                              onClick={(event) => {
+                                logger.log('Economic event clicked:', event);
+                                setSelectedEvent(event);
+                                setEventDetailDialogOpen(true);
+                              }}
                             />
                             {eventIndex < dayGroup.events.length - 1 && <Divider sx={{ ml: 3 }} />}
                           </React.Fragment>
@@ -1048,8 +1061,24 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           )}
 
         </Box>}
-        
+
       </Box>
+
+      {/* Economic Event Detail Dialog */}
+      {selectedEvent && (
+        <EconomicEventDetailDialog
+          open={eventDetailDialogOpen}
+          onClose={() => {
+            setEventDetailDialogOpen(false);
+            setSelectedEvent(null);
+          }}
+          event={selectedEvent}
+          trades={trades}
+          onOpenGalleryMode={onOpenGalleryMode}
+          calendarId={calendar.id}
+          calendar={{ economicCalendarFilters: calendar.economic_calendar_filters }}
+        />
+      )}
     </Drawer>
   );
 };

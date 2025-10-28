@@ -33,6 +33,7 @@ interface EconomicEventListItemProps {
   onPinEvent?: (eventName: string) => void;
   onUnpinEvent?: (eventName: string) => void;
   isPinning?: boolean;
+  onClick?: (event: EconomicEvent) => void;
 }
 
 // Helper function to format time and countdown with realtime updates
@@ -159,7 +160,8 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
   pinnedEvents = [],
   onPinEvent,
   onUnpinEvent,
-  isPinning = false
+  isPinning = false,
+  onClick
 }) => {
   const theme = useTheme();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -211,14 +213,21 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
   const timeInfo = formatTimeWithCountdown(event.time_utc, currentTime);
 
   return (
-    <ListItem sx={{
-      px,
-      py,
-      backgroundColor: timeInfo.isImminent ? alpha(getImpactColor(event.impact, theme), 0.12) : 'transparent',
-      borderLeft: 'none',
-      mb: 0,
-      minHeight: 'auto'
-    }}>
+    <ListItem
+      onClick={onClick ? () => onClick(event) : undefined}
+      sx={{
+        px,
+        py,
+        backgroundColor: timeInfo.isImminent ? alpha(getImpactColor(event.impact, theme), 0.12) : 'transparent',
+        borderLeft: 'none',
+        mb: 0,
+        minHeight: 'auto',
+        cursor: onClick ? 'pointer' : 'default',
+        '&:hover': onClick ? {
+          backgroundColor: alpha(theme.palette.primary.main, 0.08)
+        } : {}
+      }}
+    >
 
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
         {/* Flag and Currency */}

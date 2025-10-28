@@ -413,9 +413,7 @@ export async function generateChart(
 
 **${title}**
 
-[CHART_IMAGE:${chartUrl}]
-
-[Open chart in new tab](${chartUrl})`;
+[CHART_IMAGE:${chartUrl}]`;
   } catch (error) {
     return `Chart generation error: ${error instanceof Error ? error.message : 'Unknown'}`;
   }

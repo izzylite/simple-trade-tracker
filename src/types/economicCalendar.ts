@@ -104,9 +104,11 @@ export interface EconomicCalendarDrawerProps {
   open: boolean;
   onClose: () => void;
   calendar : Calendar // Calendar type from calendar.ts
+  trades?: any[]; // Trades for event detail dialog
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: any) => any) => Promise<any>;
+  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
   payload?: {updatedEvents : EconomicEvent[], allEvents : EconomicEvent[]} | null; // For real-time event updates
-   
+
 }
 
 // Service types

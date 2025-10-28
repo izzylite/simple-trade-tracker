@@ -1,15 +1,13 @@
 /**
  * HTML Message Renderer Component
  * Safely renders HTML-formatted messages with proper styling
- * Supports inline trade and event cards via trade_id:xxx and event_id:xxx references
+ * Supports inline trade and event cards via HTML tags: <trade-ref id="xxx"/> and <event-ref id="xxx"/>
  */
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
-  Paper,
-  Chip,
   useTheme,
   alpha
 } from '@mui/material';
@@ -23,7 +21,6 @@ import type { EconomicEvent } from '../../types/economicCalendar';
 interface HtmlMessageRendererProps {
   html: string;
   textColor?: string;
-  isUser?: boolean;
   // Embedded data for inline card replacement
   embeddedTrades?: Record<string, Trade>;
   embeddedEvents?: Record<string, EconomicEvent>;
@@ -148,140 +145,66 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
     const doc = parser.parseFromString(sanitizedHtml, 'text/html');
     const images = doc.querySelectorAll('img');
     const urls = Array.from(images).map(img => img.src);
-    console.log('[HtmlMessageRenderer] Extracted image URLs:', urls);
     return urls;
   }, [sanitizedHtml]);
 
-  // Add click handlers to images and inject card components after render
+  // Use event delegation - attach ONE handler to container instead of individual images
+  // This way the handler persists even when images are re-rendered
   useEffect(() => {
-    console.log('[HtmlMessageRenderer] useEffect triggered', {
-      hasContainer: !!containerRef.current,
-      imageUrlsLength: imageUrls.length,
-      imageUrls
-    });
+    const container = containerRef.current;
+    if (!container) return;
 
+    // Handler attached to container that delegates to images
+    const handleContainerClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      // Check if clicked element is an image
+      if (target.tagName === 'IMG') {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Find the index of this image
+        const images = container.querySelectorAll('img');
+        const index = Array.from(images).indexOf(target as HTMLImageElement);
+
+        if (index !== -1) {
+
+          const isAIChart = imageUrls[index]?.includes('quickchart.io');
+          setImageZoomProp({
+            selectetdImageIndex: index,
+            allImages: imageUrls,
+            useSolidBackground: isAIChart
+          });
+          setImageZoomOpen(true);
+        }
+      }
+    };
+
+    // Attach single handler to container
+    container.addEventListener('click', handleContainerClick);
+
+    // Cleanup - remove handler when component unmounts
+    return () => {
+      container.removeEventListener('click', handleContainerClick);
+    };
+  }, [imageUrls]); // Only re-attach if imageUrls change
+
+  // Style images with cursor pointer
+  useEffect(() => {
     if (!containerRef.current) return;
 
-    // Handle image clicks
-    const images = containerRef.current.querySelectorAll('img');
-    console.log('[HtmlMessageRenderer] Found images in DOM:', images.length);
+    const timeoutId = setTimeout(() => {
+      if (!containerRef.current) return;
 
-    const handleImageClick = (index: number) => {
-      console.log('[HtmlMessageRenderer] Image clicked:', index, imageUrls[index]);
-
-      // Check if the clicked image is from QuickChart (AI-generated)
-      const isAIChart = imageUrls[index]?.includes('quickchart.io');
-
-      setImageZoomProp({
-        selectetdImageIndex: index,
-        allImages: imageUrls,
-        useSolidBackground: isAIChart
+      const images = containerRef.current.querySelectorAll('img');
+      images.forEach((img) => {
+        (img as HTMLImageElement).style.cursor = 'pointer';
+        (img as HTMLImageElement).style.userSelect = 'none';
       });
-      setImageZoomOpen(true);
-    };
+    }, 100);
 
-    images.forEach((img, index) => {
-      img.style.cursor = 'pointer';
-      img.onclick = () => handleImageClick(index);
-      console.log('[HtmlMessageRenderer] Added click handler to image', index);
-    });
-
-    // Cleanup
-    return () => {
-      images.forEach(img => {
-        img.onclick = null;
-      });
-    };
-  }, [sanitizedHtml, imageUrls]);
-
-  // Create a style object for the HTML content
-  const htmlStyles = `
-    p {
-      margin: 0.5rem 0;
-      line-height: 1.5;
-    }
-    
-    strong {
-      font-weight: 600;
-    }
-    
-    em {
-      font-style: italic;
-    }
-    
-    h1, h2, h3, h4, h5, h6 {
-      margin: 1rem 0 0.5rem 0;
-      font-weight: 600;
-    }
-    
-    h1 { font-size: 1.5rem; }
-    h2 { font-size: 1.25rem; }
-    h3 { font-size: 1.1rem; }
-    h4 { font-size: 1rem; }
-    h5 { font-size: 0.95rem; }
-    h6 { font-size: 0.9rem; }
-    
-    ul, ol {
-      margin: 0.5rem 0;
-      padding-left: 1.5rem;
-    }
-    
-    li {
-      margin: 0.25rem 0;
-    }
-    
-    blockquote {
-      margin: 0.5rem 0;
-      padding-left: 1rem;
-      border-left: 3px solid currentColor;
-      opacity: 0.8;
-    }
-    
-    code {
-      background-color: rgba(0, 0, 0, 0.1);
-      padding: 2px 4px;
-      border-radius: 3px;
-      font-family: monospace;
-      font-size: 0.9em;
-    }
-    
-    pre {
-      background-color: rgba(0, 0, 0, 0.05);
-      padding: 1rem;
-      border-radius: 4px;
-      overflow-x: auto;
-      margin: 0.5rem 0;
-    }
-    
-    pre code {
-      background-color: transparent;
-      padding: 0;
-    }
-    
-    a {
-      color: inherit;
-      text-decoration: underline;
-      cursor: pointer;
-    }
-    
-    a:hover {
-      opacity: 0.8;
-    }
-
-    img {
-      max-width: 100%;
-      height: auto;
-      border-radius: 8px;
-      margin: 1rem 0;
-      display: block;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    sup {
-      font-size: 0.8em;
-      vertical-align: super;
-    }
-  `;
+    return () => clearTimeout(timeoutId);
+  }, [sanitizedHtml]);
 
   return (
     <>
@@ -292,80 +215,83 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
             margin: '0.5rem 0',
             lineHeight: 1.5
           },
-        '& strong': {
-          fontWeight: 600
-        },
-        '& em': {
-          fontStyle: 'italic'
-        },
-        '& h1, & h2, & h3, & h4, & h5, & h6': {
-          margin: '1rem 0 0.5rem 0',
-          fontWeight: 600
-        },
-        '& h1': { fontSize: '1.5rem' },
-        '& h2': { fontSize: '1.25rem' },
-        '& h3': { fontSize: '1.1rem' },
-        '& h4': { fontSize: '1rem' },
-        '& h5': { fontSize: '0.95rem' },
-        '& h6': { fontSize: '0.9rem' },
-        '& ul, & ol': {
-          margin: '0.5rem 0',
-          paddingLeft: '1.5rem'
-        },
-        '& li': {
-          margin: '0.25rem 0'
-        },
-        '& blockquote': {
-          margin: '0.5rem 0',
-          paddingLeft: '1rem',
-          borderLeft: `3px solid ${alpha(theme.palette.text.primary, 0.3)}`,
-          opacity: 0.8
-        },
-        '& code': {
-          backgroundColor: alpha(theme.palette.text.primary, 0.1),
-          padding: '2px 4px',
-          borderRadius: 1,
-          fontFamily: 'monospace',
-          fontSize: '0.9em'
-        },
-        '& pre': {
-          backgroundColor: alpha(theme.palette.text.primary, 0.05),
-          padding: '1rem',
-          borderRadius: 1,
-          overflowX: 'auto',
-          margin: '0.5rem 0'
-        },
-        '& pre code': {
-          backgroundColor: 'transparent',
-          padding: 0
-        },
-        '& a': {
-          color: 'primary.main',
-          textDecoration: 'underline',
-          cursor: 'pointer',
-          '&:hover': {
+          '& strong': {
+            fontWeight: 600
+          },
+          '& em': {
+            fontStyle: 'italic'
+          },
+          '& h1, & h2, & h3, & h4, & h5, & h6': {
+            margin: '1rem 0 0.5rem 0',
+            fontWeight: 600
+          },
+          '& h1': { fontSize: '1.5rem' },
+          '& h2': { fontSize: '1.25rem' },
+          '& h3': { fontSize: '1.1rem' },
+          '& h4': { fontSize: '1rem' },
+          '& h5': { fontSize: '0.95rem' },
+          '& h6': { fontSize: '0.9rem' },
+          '& ul, & ol': {
+            margin: '0.5rem 0',
+            paddingLeft: '1.5rem'
+          },
+          '& li': {
+            margin: '0.25rem 0'
+          },
+          '& blockquote': {
+            margin: '0.5rem 0',
+            paddingLeft: '1rem',
+            borderLeft: `3px solid ${alpha(theme.palette.text.primary, 0.3)}`,
             opacity: 0.8
+          },
+          '& code': {
+            backgroundColor: alpha(theme.palette.text.primary, 0.1),
+            padding: '2px 4px',
+            borderRadius: 1,
+            fontFamily: 'monospace',
+            fontSize: '0.9em'
+          },
+          '& pre': {
+            backgroundColor: alpha(theme.palette.text.primary, 0.05),
+            padding: '1rem',
+            borderRadius: 1,
+            overflowX: 'auto',
+            margin: '0.5rem 0'
+          },
+          '& pre code': {
+            backgroundColor: 'transparent',
+            padding: 0
+          },
+          '& a': {
+            color: 'primary.main',
+            textDecoration: 'underline',
+            cursor: 'pointer',
+            '&:hover': {
+              opacity: 0.8
+            }
+          },
+          '& img': {
+            maxWidth: '100%',
+            height: 'auto',
+            minHeight: 100,
+            backgroundColor: theme.palette.mode === 'dark'
+              ? alpha(theme.palette.background.paper, 0.8)
+              : alpha(theme.palette.grey[100], 0.8),
+            maxHeight: '300px',
+            borderRadius: 2,
+            display: 'block',
+            cursor: 'pointer',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            '&:hover': {
+              transform: 'scale(1.02)',
+              boxShadow: theme.shadows[4]
+            }
+          },
+          '& sup': {
+            fontSize: '0.8em',
+            verticalAlign: 'super'
           }
-        },
-        '& img': {
-          maxWidth: '100%',
-          height: 'auto',
-          borderRadius: 2,
-          margin: '1rem 0',
-          display: 'block',
-          boxShadow: theme.shadows[2],
-          cursor: 'pointer',
-          transition: 'transform 0.2s, box-shadow 0.2s',
-          '&:hover': {
-            transform: 'scale(1.02)',
-            boxShadow: theme.shadows[4]
-          }
-        },
-        '& sup': {
-          fontSize: '0.8em',
-          verticalAlign: 'super'
-        }
-      }}
+        }}
       >
         {/* Render segments (HTML and cards mixed) */}
         {contentSegments.map((segment, index) => {
@@ -377,8 +303,7 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
                 sx={{
                   color: textColor,
                   whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  display: 'inline'
+                  wordBreak: 'break-word'
                 }}
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(segment.content) }}
               />
@@ -387,18 +312,18 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
             const trade = embeddedTrades[segment.id];
             const contextTrades = Object.values(embeddedTrades);
             return (
-              <Box key={`trade-${index}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
+              <Box key={`trade-${index}`} sx={{ my: 1 }}>
                 <TradeCard
                   trade={trade}
+                  showTags={contextTrades.length <= 5}
                   onClick={() => onTradeClick?.(trade.id, contextTrades)}
-                  compact={true}
                 />
               </Box>
             );
           } else if (segment.type === 'event' && segment.id && embeddedEvents?.[segment.id]) {
             const event = embeddedEvents[segment.id];
             return (
-              <Box key={`event-${index}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
+              <Box key={`event-${index}`} sx={{ my: 1 }}>
                 <EventCard
                   eventId={segment.id}
                   eventData={event}

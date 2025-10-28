@@ -29,6 +29,35 @@ export interface ChatMessage {
   embeddedEvents?: Record<string, any>; // Event objects keyed by ID
 }
 
+// Serializable version for database storage (timestamp as ISO string)
+export interface SerializableChatMessage extends Omit<ChatMessage, 'timestamp'> {
+  timestamp: string; // ISO 8601 string
+}
+
+// Conversation stored in database (after transformation from repository)
+export interface AIConversation {
+  id: string;
+  calendar_id: string;
+  user_id: string;
+  title: string;
+  messages: ChatMessage[]; // Transformed to ChatMessage with Date objects
+  message_count: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// Serializable version from database (before transformation, dates as ISO strings)
+export interface SerializableAIConversation {
+  id: string;
+  calendar_id: string;
+  user_id: string;
+  title: string;
+  messages: SerializableChatMessage[]; // Messages with string timestamps
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 
 
 export interface ChatError {

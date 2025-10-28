@@ -98,11 +98,12 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     <AppBar
       position="fixed"
       color="transparent"
-      elevation={0.7}
+      elevation={0}
       sx={{
         backdropFilter: 'blur(8px)',
         backgroundColor: alpha(mode === 'light' ? '#ffffff' : theme.palette.background.default, 0.9),
         borderBottom: `1px solid ${theme.palette.divider}`,
+        boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.08)',
         zIndex: (theme) => theme.zIndex.drawer + 1
       }}
     >

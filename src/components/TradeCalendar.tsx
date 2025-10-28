@@ -1765,7 +1765,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         open={isEconomicCalendarOpen}
         onClose={() => setIsEconomicCalendarOpen(false)}
         calendar={calendar!}
+        trades={trades}
         onUpdateCalendarProperty={onUpdateCalendarProperty}
+        onOpenGalleryMode={openGalleryMode}
         payload={economicCalendarUpdatedEvent}
       />
 

@@ -3,7 +3,7 @@
  * Displays user and AI messages with proper formatting
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Paper,
@@ -17,9 +17,6 @@ import {
   alpha
 } from '@mui/material';
 import AnimatedText from './AnimatedText';
-import DisplayItemsList from './DisplayItemsList';
-import TradeCard from './TradeCard';
-import EventCard from './EventCard';
 import HtmlMessageRenderer from './HtmlMessageRenderer';
 import CitationsSection from './CitationsSection';
 import {
@@ -36,48 +33,30 @@ import { Trade } from '../../types/trade';
 import { EconomicEvent } from '../../types/economicCalendar';
 import { format } from 'date-fns';
 import { logger } from '../../utils/logger';
-import { parseAIResponse, InlineReference } from '../../utils/aiResponseParser';
 
 interface ChatMessageProps {
   message: ChatMessageType;
-  showTimestamp?: boolean;
-  showTokenCount?: boolean;
+  showTimestamp?: boolean; 
   onRetry?: (messageId: string) => void;
   isLatestMessage?: boolean;
   enableAnimation?: boolean;
-  onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void; // Callback for trade card clicks with context trades
-  onEventClick?: (event: EconomicEvent) => void; // Callback for event card clicks
-  allTrades?: Trade[]; // All trades for display item lookup
+  onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void;
+  onEventClick?: (event: EconomicEvent) => void;
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
-  showTimestamp = true,
-  showTokenCount = false,
+  showTimestamp = true, 
   onRetry,
   isLatestMessage = false,
   enableAnimation = true,
   onTradeClick,
-  onEventClick,
-  allTrades
+  onEventClick
 }) => {
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
-
-  // Parse AI response for display items
-  const parsedResponse = useMemo(() => {
-    if (isAssistant) {
-      // Parse response for JSON display items and inline references
-      return parseAIResponse(message.content, allTrades, message.embeddedTrades);
-    }
-    return {
-      textContent: message.content,
-      displayItems: [],
-      hasStructuredData: false
-    };
-  }, [message.content, isAssistant, allTrades, message.embeddedTrades]);
 
   const handleCopy = async () => {
     try {
@@ -209,86 +188,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     });
   };
 
-  // Format content with inline references replaced by cards using embedded data
-  const formatContentWithInlineReferences = (content: string, inlineReferences: InlineReference[]) => {
-    if (!inlineReferences || inlineReferences.length === 0) {
-      return formatContent(content);
-    }
-
-    // Sort references by start index in reverse order to replace from end to start
-    const sortedRefs = [...inlineReferences].sort((a, b) => b.startIndex - a.startIndex);
-
-    // Split content into segments and replace inline references with cards
-    const segments: React.ReactNode[] = [];
-    let lastIndex = content.length;
-
-    for (const ref of sortedRefs) {
-      // Add text after this reference
-      if (lastIndex > ref.endIndex) {
-        const textAfter = content.slice(ref.endIndex, lastIndex);
-        if (textAfter) {
-          segments.unshift(...formatContent(textAfter));
-        }
-      }
-
-      // Add the card for this reference using embedded data
-      if (ref.type === 'trade') {
-        // Try to get trade from embedded data first, fallback to allTrades
-        const trade = message.embeddedTrades?.[ref.id] || allTrades?.find(t => t.id === ref.id);
-        if (trade) {
-          segments.unshift(
-            <Box key={`trade-${ref.id}-${ref.startIndex}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
-              <TradeCard
-                trade={trade}
-                onClick={() => onTradeClick?.(trade.id, allTrades || [])}
-                compact={true}
-              />
-            </Box>
-          );
-        }
-      } else if (ref.type === 'event') {
-        // Try to get event from embedded data first
-        const event = message.embeddedEvents?.[ref.id];
-        if (event) {
-          // Render event card with inline data (no fetching needed)
-          segments.unshift(
-            <Box key={`event-${ref.id}-${ref.startIndex}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
-              <EventCard
-                eventId={ref.id}
-                eventData={event}
-                onClick={onEventClick}
-                compact={true}
-              />
-            </Box>
-          );
-        } else {
-          // Fallback to fetch mode
-          segments.unshift(
-            <Box key={`event-${ref.id}-${ref.startIndex}`} sx={{ display: 'inline-block', my: 0.5, mx: 0.5 }}>
-              <EventCard
-                eventId={ref.id}
-                onClick={onEventClick}
-                compact={true}
-              />
-            </Box>
-          );
-        }
-      }
-
-      lastIndex = ref.startIndex;
-    }
-
-    // Add text before the first reference
-    if (lastIndex > 0) {
-      const textBefore = content.slice(0, lastIndex);
-      if (textBefore) {
-        segments.unshift(...formatContent(textBefore));
-      }
-    }
-
-    return segments;
-  };
-
   return (
     <Box
       sx={{
@@ -327,7 +226,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       {/* Message Content */}
       <Box
         sx={{
-          maxWidth: isUser ? '80%' : '85%',
+          maxWidth: isUser ? '80%' : '95%',
           minWidth: 0,
           flex: 1
         }}
@@ -369,15 +268,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               />
             ) : isAssistant && enableAnimation && isLatestMessage ? (
               <AnimatedText
-                text={parsedResponse.textContent}
+                text={message.content}
                 speed={200} // Much faster: 200 characters per second
                 isAnimating={message.status === 'received'}
               />
             ) : (
-              // Use inline references if available, otherwise use regular formatting
-              parsedResponse.inlineReferences && parsedResponse.inlineReferences.length > 0
-                ? formatContentWithInlineReferences(parsedResponse.textContent, parsedResponse.inlineReferences)
-                : formatContent(parsedResponse.textContent)
+              // Regular text formatting
+              formatContent(message.content)
             )}
           </Box>
 
@@ -385,20 +282,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           {isAssistant && message.citations && message.citations.length > 0 && (
             <Box sx={{ mt: 2 }}>
               <CitationsSection citations={message.citations} />
-            </Box>
-          )}
-
-          {/* Display Items */}
-          {isAssistant && parsedResponse.displayItems && parsedResponse.displayItems.length > 0 && (
-            <Box sx={{ mt: 2 }}>
-              <DisplayItemsList
-                displayItems={parsedResponse.displayItems}
-                allTrades={allTrades}
-                onTradeClick={onTradeClick}
-                onEventClick={onEventClick}
-                compact={true}
-                maxInitialDisplay={2}
-              />
             </Box>
           )}
 

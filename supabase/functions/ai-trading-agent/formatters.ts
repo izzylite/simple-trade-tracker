@@ -504,7 +504,12 @@ export function formatResponseWithHtmlAndCitations(
     }
   }
 
-  const messageHtml = convertMarkdownToHtml(cleanedMessage, citations);
+  let messageHtml = convertMarkdownToHtml(cleanedMessage, citations);
+
+  // Remove "Open chart in new tab" links from HTML (after conversion)
+  // These appear as <a> tags after chart images and are redundant since images are clickable
+  messageHtml = messageHtml.replace(/<p>\s*<a\s+href="[^"]*quickchart\.io[^"]*"[^>]*>Open chart in new tab<\/a>\s*<\/p>/gi, '');
+  messageHtml = messageHtml.replace(/<a\s+href="[^"]*quickchart\.io[^"]*"[^>]*>Open chart in new tab<\/a>/gi, '');
 
   return {
     messageHtml,
