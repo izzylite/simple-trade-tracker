@@ -502,6 +502,8 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
   }, [calendar, loadAllTrades, loadAttempted]);
 
   // Subscribe to calendar changes with automatic reconnection
+  // The hook provides: exponential backoff reconnection, page visibility handling,
+  // network status monitoring, and proper cleanup - features not built into Supabase SDK
   const { createChannel } = useRealtimeSubscription({
     channelName: `calendar-${calendar?.id}`,
     enabled: !!calendar,
@@ -536,9 +538,12 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
 
         // Only update specific fields that might change from edge functions
         // Preserve cached trades and loaded years from local state
-
+        const trades = calendar.cachedTrades;
+        const loadedYears = calendar.loadedYears;
         onUpdateStateCalendar(calendar.id, {
-          ...updatedCalendarData
+          ...updatedCalendarData,
+          cachedTrades: trades,
+          loadedYears
         });
       }
     );

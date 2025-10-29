@@ -43,7 +43,7 @@ export const useSupabaseAuth = () => {
 };
 
 export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [authState, setAuthState] = useState<AuthState>(() => 
+  const [authState, setAuthState] = useState<AuthState>(() =>
     supabaseAuthService.getCurrentAuthState()
   );
 
@@ -55,6 +55,7 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     return unsubscribe;
   }, []);
+
 
   const signInWithGoogle = async () => {
     try {

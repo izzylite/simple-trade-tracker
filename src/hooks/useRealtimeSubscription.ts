@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { RealtimeChannel, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
-import { supabase } from '../config/supabase'; 
+import { supabase } from '../config/supabase';
 import { logger } from '../utils/logger';
 
 interface UseRealtimeSubscriptionOptions {
@@ -14,13 +14,14 @@ interface UseRealtimeSubscriptionOptions {
 
 /**
  * Hook for managing Supabase Realtime subscriptions with automatic reconnection
- * 
- * Based on official Supabase documentation patterns:
+ *
+ * Provides robust realtime subscription management:
  * - Monitors subscription status (SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT, CLOSED)
- * - Implements exponential backoff reconnection
+ * - Implements exponential backoff for reconnection attempts
  * - Properly cleans up channels using removeChannel()
- * - Handles page visibility changes to pause/resume subscriptions
- * 
+ * - Handles page visibility changes and network status
+ * - Works with Supabase SDK v2.77.0+ automatic token refresh
+ *
  * @see https://supabase.com/docs/guides/realtime/postgres-changes
  */
 export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions) {

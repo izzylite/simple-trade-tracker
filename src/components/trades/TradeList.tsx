@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -22,7 +22,8 @@ import {
   Balance as RiskIcon,
   Schedule as SessionIcon,
   SelectAll as SelectAllIcon,
-  DeleteSweep as DeleteMultipleIcon
+  DeleteSweep as DeleteMultipleIcon,
+  KeyboardArrowDown as LoadMoreIcon
 } from '@mui/icons-material';
 import { Trade } from '../../types/dualWrite';
 import { TradeListItem, TradeInfo, TradeActions } from '../StyledComponents';
@@ -54,6 +55,9 @@ interface TradeListProps {
       viewType: 'day' | 'week' | 'month';
     };
   };
+  // Pagination props
+  initialPageSize?: number; // Number of trades to show initially (default: 20)
+  pageSize?: number; // Number of trades to load per "Load More" click (default: 20)
 }
 
 const TradeList: React.FC<TradeListProps> = ({
@@ -71,10 +75,31 @@ const TradeList: React.FC<TradeListProps> = ({
   deletingTradeIds = [],
   calendarId,
   onOpenGalleryMode,
-  calendar
+  calendar,
+  initialPageSize = 20,
+  pageSize = 20
 }) => {
   const theme = useTheme();
   const [selectedTradeIds, setSelectedTradeIds] = useState<string[]>([]);
+  const [displayedCount, setDisplayedCount] = useState<number>(initialPageSize);
+
+  // Reset displayed count when trades array changes (e.g., filtering, new data)
+  useEffect(() => {
+    setDisplayedCount(initialPageSize);
+  }, [trades.length, initialPageSize]);
+
+  // Get the trades to display based on pagination
+  const displayedTrades = useMemo(() => {
+    return trades.slice(0, displayedCount);
+  }, [trades, displayedCount]);
+
+  // Check if there are more trades to load
+  const hasMoreTrades = displayedCount < trades.length;
+
+  // Handle load more
+  const handleLoadMore = () => {
+    setDisplayedCount(prev => Math.min(prev + pageSize, trades.length));
+  };
 
   // Helper function to check if a trade is being deleted
   const isTradeBeingDeleted = (tradeId: string) => deletingTradeIds.includes(tradeId);
@@ -91,12 +116,12 @@ const TradeList: React.FC<TradeListProps> = ({
     }
   };
 
-  // Handle select all/none
+  // Handle select all/none (only for displayed trades)
   const handleSelectAll = () => {
-    if (selectedTradeIds.length === trades.length) {
+    if (selectedTradeIds.length === displayedTrades.length) {
       setSelectedTradeIds([]);
     } else {
-      setSelectedTradeIds(trades.map(trade => trade.id));
+      setSelectedTradeIds(displayedTrades.map(trade => trade.id));
     }
   };
 
@@ -117,7 +142,7 @@ const TradeList: React.FC<TradeListProps> = ({
           </Typography>
           {trades.length > 0 && (
             <Chip
-              label={trades.length}
+              label={displayedCount < trades.length ? `${displayedCount} of ${trades.length}` : trades.length}
               size="small"
               color="primary"
               sx={{
@@ -144,7 +169,7 @@ const TradeList: React.FC<TradeListProps> = ({
           )}
         </Box>
 
-        {enableBulkSelection && trades.length > 0 && (
+        {enableBulkSelection && displayedTrades.length > 0 && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Button
               size="small"
@@ -152,7 +177,7 @@ const TradeList: React.FC<TradeListProps> = ({
               onClick={handleSelectAll}
               sx={{ minWidth: 'auto', fontSize: '0.75rem' }}
             >
-              {selectedTradeIds.length === trades.length ? 'None' : 'All'}
+              {selectedTradeIds.length === displayedTrades.length ? 'None' : 'All'}
             </Button>
             {selectedTradeIds.length > 0 && (
               <Button
@@ -175,7 +200,7 @@ const TradeList: React.FC<TradeListProps> = ({
         </Typography>
       ) : (
         <Stack spacing={1}>
-          {trades.map((trade) => (
+          {displayedTrades.map((trade) => (
             <React.Fragment key={trade.id}>
               <TradeListItem
                 $type={trade.trade_type}
@@ -471,6 +496,36 @@ const TradeList: React.FC<TradeListProps> = ({
               )}
             </React.Fragment>
           ))}
+
+          {/* Load More Button */}
+          {hasMoreTrades && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Button
+                variant="outlined"
+                startIcon={<LoadMoreIcon />}
+                onClick={handleLoadMore}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  px: 3,
+                  py: 1,
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  borderColor: 'divider',
+                  color: 'text.secondary',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    backgroundColor: theme => theme.palette.mode === 'dark'
+                      ? 'rgba(144, 202, 249, 0.08)'
+                      : 'rgba(25, 118, 210, 0.08)',
+                    color: 'primary.main'
+                  }
+                }}
+              >
+                Load More ({trades.length - displayedCount} remaining)
+              </Button>
+            </Box>
+          )}
         </Stack>
       )}
     </Box>

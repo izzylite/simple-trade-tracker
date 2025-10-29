@@ -52,6 +52,8 @@ import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from './economicCalendar/Econo
 import { logger } from '../utils/logger';
 import { tradeEconomicEventService } from '../services/tradeEconomicEventService';
 import ShareButton from './sharing/ShareButton';
+import { useRealtimeSubscription } from '../hooks/useRealtimeSubscription';
+import { isToday } from 'date-fns';
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -278,24 +280,64 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     }
   }, [trade.id, trade.trade_date, trade.session]);
 
+  // Subscribe to economic events updates only if trade date is today
+  // No point subscribing to past events as they don't change
+  const tradeDate = typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date;
+  const tradeDateIsToday = isToday(tradeDate);
+  const tradeDateStr = format(tradeDate, 'yyyy-MM-dd');
+
+  const { createChannel } = useRealtimeSubscription({
+    channelName: `trade-economic-events-${trade.id}`,
+    enabled: showEconomicEvents && tradeDateIsToday,
+    onSubscribed: () => {
+      logger.log(`✅ Subscribed to economic events for trade ${trade.id} (${tradeDateStr})`);
+    },
+    onError: (error) => {
+      logger.error(`❌ Economic events subscription error:`, error);
+    },
+    maxReconnectAttempts: 3,
+    reconnectDelay: 2000,
+  });
+
   useEffect(() => {
-    if (!showEconomicEvents) return;
+    if (!showEconomicEvents || !tradeDateIsToday) return;
 
-    const unsubscribe = economicCalendarService.subscribeToUpdates((updatedEvents) => {
-      setAllEconomicEvents((prevEvents) => {
-        // Create a map of previous events by id
-        const prevMap = new Map(prevEvents.map(e => [e.id, e]));
-        // Update or add each event from the update
-        updatedEvents.forEach(event => {
-          prevMap.set(event.id, { ...prevMap.get(event.id), ...event });
-        });
-        // Return the merged array, sorted by time
-        return Array.from(prevMap.values()).sort((a, b) => new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime());
-      });
-    });
+    const channel = createChannel();
+    if (!channel) return;
 
-    return () => unsubscribe();
-  }, [showEconomicEvents]);
+    // Subscribe to changes in economic_events table for today
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'economic_events'
+      },
+      async (payload) => {
+        logger.log(`🔄 Economic event ${payload.eventType} for trade date ${tradeDateStr}`);
+  
+        // Refetch events for the trade date
+        try {
+          
+          const filterSetting = calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
+          const updatedEvents = await economicCalendarService.fetchEvents({
+            start: tradeDateStr,
+            end: tradeDateStr
+          }, {
+            currencies: (filterSetting?.currencies as Currency[]),
+            impacts: (filterSetting?.impacts as ImpactLevel[])
+          });
+          setAllEconomicEvents(updatedEvents.sort((a, b) =>
+            new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime()
+          ));
+        } catch (error) {
+          logger.error('Error refetching economic events:', error);
+        }
+      }
+    );
+
+    // Cleanup handled automatically by the hook
+  }, [showEconomicEvents, tradeDateIsToday, createChannel, trade.id, tradeDateStr]);
 
   // Update filtering logic
   useEffect(() => {

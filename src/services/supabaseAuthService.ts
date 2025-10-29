@@ -270,7 +270,7 @@ class SupabaseAuthService {
   async refreshSession(): Promise<Session | null> {
     try {
       const { data: { session }, error } = await supabase.auth.refreshSession();
-      
+
       if (error) {
         logger.error('Error refreshing session:', error);
         return null;

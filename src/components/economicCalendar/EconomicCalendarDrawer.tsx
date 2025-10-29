@@ -65,6 +65,8 @@ import EconomicEventDetailDialog from './EconomicEventDetailDialog';
 import Shimmer from '../Shimmer';
 import { log,error, logger, warn } from '../../utils/logger';
 import { cleanEventNameForPinning, isEventPinned } from '../../utils/eventNameUtils';
+import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
+import { supabase } from '../../config/supabase';
 // View types for pagination
 type ViewType = 'day' | 'week' | 'month';
 
@@ -425,58 +427,64 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     }
   }, [dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming, open, viewType, pageSize, startDate, endDate]);
 
-   // Set up real-time subscription when filters change
+  // Subscribe to economic events changes with automatic reconnection
+  // Edge functions update events in real-time (scraping, updates from APIs)
+  const { createChannel } = useRealtimeSubscription({
+    channelName: `economic-events-${startDate}-${endDate}`,
+    enabled: open,
+    onSubscribed: () => {
+      logger.log(`✅ Economic events subscription active for ${startDate} to ${endDate}`);
+    },
+    onError: (error) => {
+      logger.error(`❌ Economic events subscription error:`, error);
+    },
+    maxReconnectAttempts: 3,
+    reconnectDelay: 2000,
+  });
+
   useEffect(() => {
-    setLoading(true);
-    setError(null);
+    if (!open) return;
 
-    // Get today's events for the specified currencies
-    const today = new Date();
-    const dateRange =  {
-      start: today.toISOString().split('T')[0],
-      end: today.toISOString().split('T')[0]
-    }
-    // Set up real-time subscription to database
-    const unsubscribe = economicCalendarService.subscribeToEvents(
-      dateRange,
-      (fetchedEvents) => {
-        log(`📊 Received ${fetchedEvents.length} events from real-time subscription`);
+    const channel = createChannel();
+    if (!channel) return;
 
-        // Validate the fetched events
-        if (Array.isArray(fetchedEvents)) {
-          setEvents(prevEvents => {
-            if (!fetchedEvents) return prevEvents; 
-            let changed = false; 
-            // Replace any matching events with the updated ones
-            const newEvents = prevEvents.map(event => {
-              const idx = fetchedEvents.findIndex(e => e.id === event.id);
-              if (idx >= 0) {
-                changed = true;
-                return { ...event, ...fetchedEvents[idx] };
-              }
-              return event;
-            });
-            // If no changes, return prevEvents to avoid unnecessary re-renders
-            return changed ? newEvents : prevEvents;
-          });
-        } else {
-          warn('Invalid events data received:', fetchedEvents);
-          setEvents([]);
-          setError('Invalid data format received from database.');
-        }
-      },
+    // Subscribe to INSERT, UPDATE, and DELETE events for the current date range
+    channel.on(
+      'postgres_changes',
       {
-        currencies: appliedCurrencies,
-        impacts: appliedImpacts,
-        onlyUpcoming: true
+        event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+        schema: 'public',
+        table: 'economic_events'
+      },
+      async (payload) => {
+        logger.log(`🔄 Economic event ${payload.eventType}:`, payload);
+
+        // Refetch events when any change occurs in the date range
+        // This ensures we get fresh data without complex state management
+        try {
+          const result = await economicCalendarService.fetchEventsPaginated(
+            dateRange,
+            { pageSize, offset: 0 }, // Reset to first page
+            {
+              currencies: appliedCurrencies,
+              impacts: appliedImpacts,
+              onlyUpcoming: appliedOnlyUpcoming
+            }
+          );
+
+          if (result.events) {
+            setEvents(result.events);
+            setHasMore(result.hasMore);
+            setOffset(result.events.length);
+          }
+        } catch (error) {
+          logger.error('Error refetching events after realtime update:', error);
+        }
       }
     );
 
-    // Cleanup subscription on unmount or filter change
-    return () => {
-      unsubscribe();
-    };
-  }, [dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming]);
+    // Cleanup handled automatically by the hook
+  }, [open, createChannel, startDate, endDate, dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming, pageSize]);
 
   // Load more events function
   const loadMoreEvents = async () => {

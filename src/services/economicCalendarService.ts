@@ -8,7 +8,6 @@ import {
   Currency,
   ImpactLevel
 } from '../types/economicCalendar';
-import { supabase } from '../config/supabase';
 import { log, error, logger } from '../utils/logger';
 import { EconomicEventRepository } from './repository/repositories/EconomicEventRepository';
 
@@ -29,7 +28,6 @@ interface PaginatedResult {
 }
 
 class EconomicCalendarServiceImpl {
-  private subscribers: Array<(events: EconomicEvent[]) => void> = [];
   private readonly DEFAULT_PAGE_SIZE = 50;
 
   /**
@@ -54,9 +52,6 @@ class EconomicCalendarServiceImpl {
       }
 
       logger.log(`✅ Successfully fetched ${result.data.length} economic events from database`);
-
-      // Notify subscribers
-      this.notifySubscribers(result.data);
 
       return result.data;
     } catch (error) {
@@ -111,66 +106,8 @@ class EconomicCalendarServiceImpl {
         totalCount: 0
       };
     }
-  }
+  } 
 
-  
- 
-
-  /**
-   * Subscribe to event updates
-   */
-  subscribeToUpdates(callback: (events: EconomicEvent[]) => void): () => void {
-    this.subscribers.push(callback);
-
-    // Return unsubscribe function
-    return () => {
-      const index = this.subscribers.indexOf(callback);
-      if (index > -1) {
-        this.subscribers.splice(index, 1);
-      }
-    };
-  }
-
-  /**
-   * Subscribe to real-time updates from database
-   */
-  subscribeToEvents(
-    dateRange: { start: string; end: string },
-    callback: (events: EconomicEvent[]) => void,
-    filters?: {
-      currencies?: Currency[];
-      impacts?: ImpactLevel[];
-      onlyUpcoming?: boolean;
-    }
-  ): () => void {
-    logger.log('📡 Setting up real-time subscription for economic events');
-
-    // Set up Supabase real-time subscription
-    const channel = supabase
-      .channel('economic-events-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'economic_events',
-          filter: `event_date=gte.${dateRange.start},event_date=lte.${dateRange.end}`
-        },
-        async (payload) => {
-          log(`🔄 Real-time update received:`, payload);
-
-          // Fetch fresh data when changes occur
-          const events = await this.fetchEvents(dateRange, filters);
-          callback(events);
-        }
-      )
-      .subscribe();
-
-    // Return unsubscribe function
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }
 
   /**
    * Get a specific economic event by ID
@@ -195,18 +132,6 @@ class EconomicCalendarServiceImpl {
     }
   }
 
-  /**
-   * Notify all subscribers of new events
-   */
-  private notifySubscribers(events: EconomicEvent[]): void {
-    this.subscribers.forEach(callback => {
-      try {
-        callback(events);
-      } catch (err) {
-        error('Error notifying subscriber:', err);
-      }
-    });
-  }
 }
 
 // Export singleton instance
