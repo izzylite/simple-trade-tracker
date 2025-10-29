@@ -1169,7 +1169,7 @@ What would you like to know about your trading?`,
           trades={trades}
           onOpenGalleryMode={onOpenGalleryMode}
           calendarId={calendar.id}
-          calendar={{ economicCalendarFilters: calendar.economic_calendar_filters }}
+          calendar={{ economic_calendar_filters: calendar.economic_calendar_filters }}
         />
       )}
 

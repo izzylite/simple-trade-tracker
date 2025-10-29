@@ -113,37 +113,8 @@ class EconomicCalendarServiceImpl {
     }
   }
 
-  /**
-   * Get upcoming events within specified hours
-   */
-  async getUpcomingEvents(hours: number = 24): Promise<EconomicEvent[]> {
-    const now = new Date();
-    const end = new Date(now.getTime() + hours * 60 * 60 * 1000);
-
-    const events = await this.fetchEvents({
-      start: now.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0]
-    });
-
-    return events.filter(event => {
-      const eventTime = new Date(event.event_time);
-      return eventTime >= now && eventTime <= end;
-    });
-  }
-
-  /**
-   * Get events by impact level
-   */
-  async getEventsByImpact(impact: ImpactLevel[]): Promise<EconomicEvent[]> {
-    const today = new Date().toISOString().split('T')[0];
-    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    return this.fetchEvents(
-      { start: today, end: nextWeek },
-      { impacts: impact }
-    );
-  }
-
+  
+ 
 
   /**
    * Subscribe to event updates

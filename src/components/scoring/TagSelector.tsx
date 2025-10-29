@@ -215,7 +215,7 @@ const TagSelector: React.FC<TagSelectorProps> = ({
               <Divider />
               <List disablePadding>
                 {tags.map((tag) => {
-                  const stats = tagStats[tag];
+                  const stats = tagStats[tag] || { count: 0, percentage: 0 };
                   return (
                     <ListItem
                       key={tag}
@@ -291,7 +291,7 @@ const TagSelector: React.FC<TagSelectorProps> = ({
           </Stack>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
             {selectedTags.map(tag => {
-              const stats = tagStats[tag];
+              const stats = tagStats[tag] || { count: 0, percentage: 0 };
               return (
                 <Chip
                   key={tag}

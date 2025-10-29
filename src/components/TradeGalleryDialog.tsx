@@ -33,7 +33,7 @@ interface TradeGalleryDialogProps {
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
   // Calendar data for economic events filtering
   calendar?: {
-    economicCalendarFilters?: {
+    economic_calendar_filters?: {
       currencies: string[];
       impacts: string[];
       viewType: 'day' | 'week' | 'month';
@@ -144,6 +144,9 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       onClose={onClose}
       maxWidth="md"
       fullWidth
+      sx={{
+        zIndex: 1600 // Higher than AI drawer (1400) to ensure gallery appears on top
+      }}
       PaperProps={{
         sx: {
           height: '90vh',

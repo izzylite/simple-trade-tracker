@@ -9,7 +9,7 @@ import { error, log } from '../utils/logger';
 
 interface UseEconomicEventWatcherProps {
   calendarId?: string;
-  economicCalendarFilters?: {
+  economic_calendar_filters?: {
     currencies: string[];
     impacts: string[];
     viewType: 'day' | 'week' | 'month';
@@ -28,7 +28,7 @@ interface UseEconomicEventWatcherReturn {
 
 export const useEconomicEventWatcher = ({
   calendarId,
-  economicCalendarFilters,
+  economic_calendar_filters,
   isActive = true
 }: UseEconomicEventWatcherProps): UseEconomicEventWatcherReturn => {
   const isInitialized = useRef(false);
@@ -61,9 +61,9 @@ export const useEconomicEventWatcher = ({
   const startWatching = useCallback(() => {
     if (calendarId && isActive) {
       log(`🔍 Starting economic event watching for calendar: ${calendarId}`);
-      economicEventWatcher.startWatching(calendarId, economicCalendarFilters);
+      economicEventWatcher.startWatching(calendarId, economic_calendar_filters);
     }
-  }, [calendarId, economicCalendarFilters, isActive]);
+  }, [calendarId, economic_calendar_filters, isActive]);
 
   const stopWatching = useCallback(() => {
     if (calendarId) {

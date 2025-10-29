@@ -92,6 +92,7 @@ export class EconomicEventRepository {
         .gte('event_date', startDate)
         .lte('event_date', endDate)
         .order('event_date', { ascending: true })
+        .order('time_utc', { ascending: true })
         .range(offset, offset + pageSize - 1);
 
       // Apply currency filter
@@ -102,6 +103,12 @@ export class EconomicEventRepository {
       // Apply impact filter
       if (filters?.impacts && filters.impacts.length > 0) {
         query = query.in('impact', filters.impacts);
+      }
+
+      // Apply upcoming events filter (events in the future)
+      if (filters?.onlyUpcoming) {
+        const now = new Date().toISOString();
+        query = query.gte('time_utc', now);
       }
 
       const { data, count, error } = await query;

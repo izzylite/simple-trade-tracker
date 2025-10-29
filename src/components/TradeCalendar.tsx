@@ -481,7 +481,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Economic event watcher for real-time updates
   const { watchingStatus } = useEconomicEventWatcher({
     calendarId,
-    economicCalendarFilters: calendar?.economic_calendar_filters,
+    economic_calendar_filters: calendar?.economic_calendar_filters,
     isActive: true // Always active when TradeCalendar is mounted
   });
 
@@ -1505,7 +1505,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           allTrades={trades} /* Pass all trades for tag suggestions */
           deletingTradeIds={deletingTradeIds}
           onOpenGalleryMode={openGalleryMode}
-          calendar={calendar ? { economicCalendarFilters: calendar.economic_calendar_filters } : undefined}
+          calendar={calendar ? { economic_calendar_filters: calendar.economic_calendar_filters } : undefined}
           isReadOnly={isReadOnly}
         />
 
@@ -1745,7 +1745,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           title={galleryMode.title}
           calendarId={calendarId}
           onOpenGalleryMode={openGalleryMode}
-          calendar={calendar ? { economicCalendarFilters: calendar.economic_calendar_filters } : undefined}
+          calendar={calendar ? { economic_calendar_filters: calendar.economic_calendar_filters } : undefined}
         />
 
 

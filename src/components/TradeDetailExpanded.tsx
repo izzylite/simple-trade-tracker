@@ -21,7 +21,7 @@ import {
   TextField
 } from '@mui/material';
 import { alpha, useTheme, keyframes } from '@mui/material/styles';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Trade } from '../types/dualWrite';
 import {
   ZoomIn as ZoomInIcon,
@@ -67,7 +67,7 @@ interface TradeDetailExpandedProps {
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
   // Calendar data for economic events filtering
   calendar?: {
-    economicCalendarFilters?: {
+    economic_calendar_filters?: {
       currencies: string[];
       impacts: string[];
       viewType: 'day' | 'week' | 'month';
@@ -203,7 +203,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
       setIsPinning(true);
       const result = await onUpdateTradeProperty(trade.id, (currentTrade) => ({
         ...currentTrade,
-        isPinned: !currentTrade.is_pinned
+        is_pinned: !currentTrade.is_pinned
       }));
       setTrade(result!!);
     } catch (error) {
@@ -230,7 +230,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
 
       const sessionRange = tradeEconomicEventService.getSessionTimeRange(trade.session!, trade.trade_date);
-      const filterSetting = calendar?.economicCalendarFilters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
+      const filterSetting = calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
       const events = await economicCalendarService.fetchEvents(
         { start: sessionRange.start, end: sessionRange.end },
         {
@@ -526,7 +526,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                     fontWeight: 700,
                     fontSize: { xs: '1rem', sm: '1.1rem' } // Smaller on mobile
                   }}>
-                    {format(trade.trade_date, 'MMMM d, yyyy')}
+                    {format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'MMMM d, yyyy')}
                   </Typography>
                 </Paper>
 
@@ -902,7 +902,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       textOverflow: 'ellipsis',
                       whiteSpace: { xs: 'nowrap', sm: 'normal' } // Prevent wrapping on mobile
                     }}>
-                      Economic Events ({format(trade.trade_date, 'MMM d, yyyy')})
+                      Economic Events ({format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'MMM d, yyyy')})
                     </Typography>
                   </Box>
                   <Tooltip title={showEconomicEvents ? "Hide economic events" : "Show economic events"}>
@@ -1009,7 +1009,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                   gap: { xs: 0.5, sm: 0.75 },
                                   justifyContent: { xs: 'flex-start', sm: 'flex-start' }
                                 }}>
-                                  {((calendar?.economicCalendarFilters?.impacts as ImpactLevel[]) || (['High', 'Medium', 'Low'] as ImpactLevel[])).map((impact: ImpactLevel) => (
+                                  {((calendar?.economic_calendar_filters?.impacts as ImpactLevel[]) || (['High', 'Medium', 'Low'] as ImpactLevel[])).map((impact: ImpactLevel) => (
                                     <Chip
                                       key={impact}
                                       label={impact}

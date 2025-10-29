@@ -193,7 +193,7 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
       maxWidth="md"
       fullWidth
       sx={{
-        zIndex: 1500 // Higher than AI drawer (1400) and delete dialog (1500), so use 1500
+        zIndex: 1600 // Higher than AI drawer (1400) to ensure gallery appears on top
       }}
       PaperProps={{
         sx: {

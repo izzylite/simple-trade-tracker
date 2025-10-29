@@ -44,7 +44,7 @@ interface EconomicEventDetailDialogProps {
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
   calendarId?: string;
   calendar?: {
-    economicCalendarFilters?: {
+    economic_calendar_filters?: {
       currencies: string[];
       impacts: string[];
       viewType: 'day' | 'week' | 'month';
@@ -69,20 +69,44 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   const theme = useTheme();
   const [expandedTradeId, setExpandedTradeId] = React.useState<string | null>(null);
 
+  // Helper function to extract base event name (remove date suffix)
+  // E.g., "Initial Jobless Claims Oct25" -> "Initial Jobless Claims"
+  // E.g., "Consumer Confidence (May)" -> "Consumer Confidence"
+  // E.g., "Durable Goods Orders MoM Sep" -> "Durable Goods Orders MoM"
+  const getBaseEventName = (eventName: string): string => {
+    // Remove common date patterns:
+    // - Dates in parentheses: (May), (Jan), (2024), etc.
+    // - Month abbreviations at the end: Sep, Oct, Jan, etc. (with or without year)
+    // - Dates at the end: Oct25, Feb25, 2024, etc.
+    return eventName
+      .replace(/\s*\((Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\)/gi, '')
+      .replace(/\s*\(\d{4}\)/g, '')
+      .replace(/\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\d{2}$/i, '')
+      .replace(/\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/i, '')
+      .replace(/\s+\d{4}$/, '')
+      .replace(/\s+\d{1,2}\/\d{1,2}\/\d{2,4}$/, '')
+      .trim();
+  };
+
   // Filter trades that occurred during this event
   // Match trades by checking if the event is in the trade's economic_events array
+  // We match by base event name (without date suffix), currency, and impact
   const eventTrades = useMemo(() => {
+    const baseEventName = getBaseEventName(event.event_name);
+
     return trades.filter(trade => {
       if (!trade.economic_events || trade.economic_events.length === 0) {
         return false;
       }
-      
+
       // Check if any of the trade's economic events match this event
-      return trade.economic_events.some(tradeEvent => 
-        tradeEvent.name === event.event_name &&
-        tradeEvent.currency === event.currency &&
-        tradeEvent.time_utc === event.time_utc
-      );
+      // Match by base name, currency, and impact
+      return trade.economic_events.some(tradeEvent => {
+        const tradeBaseEventName = getBaseEventName(tradeEvent.name);
+        return tradeBaseEventName === baseEventName &&
+               tradeEvent.currency === event.currency &&
+               tradeEvent.impact === event.impact;
+      });
     });
   }, [trades, event]);
 
@@ -158,186 +182,176 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   return (
     <BaseDialog
       open={open}
-      onClose={onClose}
+      onClose={onClose} 
       title={
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           {event.flag_url && (
             <img
               src={event.flag_url}
               alt={event.country}
               style={{
-                width: 28,
-                height: 21,
-                borderRadius: 4,
-                objectFit: 'cover',
-                border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
+                width: 24,
+                height: 18,
+                borderRadius: 3,
+                objectFit: 'cover'
               }}
             />
           )}
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
               {event.event_name}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {format(parseISO(event.event_time), 'EEEE, MMMM d, yyyy • h:mm a')}
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+              {format(parseISO(event.event_time), 'MMM d, yyyy • h:mm a')}
             </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Chip
+              label={event.currency}
+              size="small"
+              sx={{
+                height: 24,
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                color: 'primary.main'
+              }}
+            />
+            <Chip
+              label={event.impact}
+              size="small"
+              sx={{
+                height: 24,
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                backgroundColor: alpha(getImpactColor(event.impact), 0.1),
+                color: getImpactColor(event.impact)
+              }}
+            />
           </Box>
         </Box>
       }
-      maxWidth="lg"
+      maxWidth="md"
       fullWidth
       hideFooterCancelButton
     >
       <Box>
-        {/* Event Details Section */}
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2,
-            mb: 3,
-            backgroundColor: alpha(theme.palette.background.paper, 0.5),
-            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-            borderRadius: 2
-          }}
-        >
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            {/* Currency and Impact */}
-            <Box sx={{ flex: '1 1 calc(50% - 8px)', minWidth: 150 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                Currency
-              </Typography>
-              <Chip
-                label={event.currency}
-                size="small"
-                sx={{
-                  fontWeight: 700,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                  color: 'primary.main'
-                }}
-              />
-            </Box>
+        {/* Event Values - Compact Row */}
+        {(event.actual_value || event.forecast_value || event.previous_value || resultDisplay) && (
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: 2,
+              mb: 2,
+              p: 1.5,
+              backgroundColor: alpha(theme.palette.background.paper, 0.5),
+              borderRadius: 1,
+              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+            }}
+          >
 
-            <Box sx={{ flex: '1 1 calc(50% - 8px)', minWidth: 150 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                Impact
-              </Typography>
-              <Chip
-                label={event.impact}
-                size="small"
-                sx={{
-                  fontWeight: 700,
-                  backgroundColor: alpha(getImpactColor(event.impact), 0.1),
-                  color: getImpactColor(event.impact)
-                }}
-              />
-            </Box>
-
-            {/* Actual Value */}
-            {event.actual_value && (
-              <Box sx={{ flex: '1 1 calc(33.333% - 11px)', minWidth: 120 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                  Actual
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {event.actual_value}
-                </Typography>
-              </Box>
-            )}
-
-            {/* Forecast Value */}
-            {event.forecast_value && (
-              <Box sx={{ flex: '1 1 calc(33.333% - 11px)', minWidth: 120 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                  Forecast
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {event.forecast_value}
-                </Typography>
-              </Box>
-            )}
-
-            {/* Previous Value */}
             {event.previous_value && (
-              <Box sx={{ flex: '1 1 calc(33.333% - 11px)', minWidth: 120 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+              <Box sx={{ flex: 1, textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                   Previous
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
                   {event.previous_value}
                 </Typography>
               </Box>
             )}
 
-            {/* Result Type */}
+            {event.forecast_value && (
+              <Box sx={{ flex: 1, textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                  Forecast
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                  {event.forecast_value}
+                </Typography>
+              </Box>
+            )}
+
+            {event.actual_value && (
+              <Box sx={{ flex: 1, textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                  Actual
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                  {event.actual_value}
+                </Typography>
+              </Box>
+            )}
             {resultDisplay && (
-              <Box sx={{ flex: '1 1 100%' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                  <Box sx={{ color: resultDisplay.color }}>
-                    {resultDisplay.icon}
-                  </Box>
-                  <Typography variant="body2" sx={{ color: resultDisplay.color, fontWeight: 600 }}>
-                    {resultDisplay.label}
-                  </Typography>
+              <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{ color: resultDisplay.color }}>
+                  {resultDisplay.icon}
                 </Box>
+                <Typography variant="caption" sx={{ color: resultDisplay.color, fontWeight: 600, fontSize: '0.75rem' }}>
+                  {resultDisplay.label}
+                </Typography>
               </Box>
             )}
           </Box>
-        </Paper>
+        )}
 
-        {/* Statistics Section */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ShowChartIcon sx={{ fontSize: 20 }} />
-            Trading Performance During Event
+        {/* Statistics Section - Compact Grid */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.875rem' }}>
+            <ShowChartIcon sx={{ fontSize: 18 }} />
+            Performance Stats
           </Typography>
 
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
             {/* Total Trades */}
-            <Box sx={{ flex: '1 1 calc(50% - 8px)', minWidth: 140 }}>
+            <Box sx={{ flex: '1 1 calc(33.333% - 8px)', minWidth: 100 }}>
               <Paper
                 elevation={0}
                 sx={{
-                  p: 2,
+                  p: 1.5,
                   textAlign: 'center',
                   backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                  border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                  borderRadius: 1
                 }}
               >
-                <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main', fontSize: '1.5rem' }}>
                   {stats.totalTrades}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Total Trades
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                  Trades
                 </Typography>
               </Paper>
             </Box>
 
             {/* Win Rate */}
-            <Box sx={{ flex: '1 1 calc(50% - 8px)', minWidth: 140 }}>
+            <Box sx={{ flex: '1 1 calc(33.333% - 8px)', minWidth: 100 }}>
               <Paper
                 elevation={0}
                 sx={{
-                  p: 2,
+                  p: 1.5,
                   textAlign: 'center',
                   backgroundColor: alpha(theme.palette.success.main, 0.05),
-                  border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`
+                  border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`,
+                  borderRadius: 1
                 }}
               >
-                <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main' }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: 'success.main', fontSize: '1.5rem' }}>
                   {stats.winRate.toFixed(1)}%
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                   Win Rate
                 </Typography>
               </Paper>
             </Box>
 
             {/* Total PnL */}
-            <Box sx={{ flex: '1 1 calc(50% - 8px)', minWidth: 140 }}>
+            <Box sx={{ flex: '1 1 calc(33.333% - 8px)', minWidth: 100 }}>
               <Paper
                 elevation={0}
                 sx={{
-                  p: 2,
+                  p: 1.5,
                   textAlign: 'center',
                   backgroundColor: alpha(
                     stats.totalPnL >= 0 ? theme.palette.success.main : theme.palette.error.main,
@@ -346,104 +360,119 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
                   border: `1px solid ${alpha(
                     stats.totalPnL >= 0 ? theme.palette.success.main : theme.palette.error.main,
                     0.1
-                  )}`
+                  )}`,
+                  borderRadius: 1
                 }}
               >
                 <Typography
-                  variant="h4"
+                  variant="h5"
                   sx={{
                     fontWeight: 700,
-                    color: stats.totalPnL >= 0 ? 'success.main' : 'error.main'
+                    color: stats.totalPnL >= 0 ? 'success.main' : 'error.main',
+                    fontSize: '1.5rem'
                   }}
                 >
                   ${stats.totalPnL.toFixed(2)}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                   Total PnL
                 </Typography>
               </Paper>
             </Box>
 
-            {/* Wins */}
-            <Box sx={{ flex: '1 1 calc(50% - 8px)', minWidth: 140 }}>
+            {/* Wins/Losses/Profit Factor - Compact Row */}
+            <Box sx={{ flex: '1 1 100%', display: 'flex', gap: 1.5 }}>
               <Paper
                 elevation={0}
                 sx={{
-                  p: 2,
-                  textAlign: 'center',
+                  flex: 1,
+                  p: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 0.5,
                   backgroundColor: alpha(theme.palette.success.main, 0.05),
-                  border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`
+                  border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`,
+                  borderRadius: 1
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, mb: 0.5 }}>
-                  <CheckIcon sx={{ fontSize: 20, color: 'success.main' }} />
-                  <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main' }}>
-                    {stats.totalWins}
-                  </Typography>
-                </Box>
-                <Typography variant="caption" color="text.secondary">
+                <CheckIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                <Typography variant="body2" sx={{ fontWeight: 700, color: 'success.main', fontSize: '0.875rem' }}>
+                  {stats.totalWins}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                   Wins
                 </Typography>
               </Paper>
-            </Box>
 
-            {/* Losses */}
-            <Box sx={{ flex: '1 1 calc(50% - 8px)', minWidth: 140 }}>
               <Paper
                 elevation={0}
                 sx={{
-                  p: 2,
-                  textAlign: 'center',
+                  flex: 1,
+                  p: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 0.5,
                   backgroundColor: alpha(theme.palette.error.main, 0.05),
-                  border: `1px solid ${alpha(theme.palette.error.main, 0.1)}`
+                  border: `1px solid ${alpha(theme.palette.error.main, 0.1)}`,
+                  borderRadius: 1
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, mb: 0.5 }}>
-                  <CloseIcon sx={{ fontSize: 20, color: 'error.main' }} />
-                  <Typography variant="h4" sx={{ fontWeight: 700, color: 'error.main' }}>
-                    {stats.totalLosses}
-                  </Typography>
-                </Box>
-                <Typography variant="caption" color="text.secondary">
+                <CloseIcon sx={{ fontSize: 16, color: 'error.main' }} />
+                <Typography variant="body2" sx={{ fontWeight: 700, color: 'error.main', fontSize: '0.875rem' }}>
+                  {stats.totalLosses}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                   Losses
                 </Typography>
               </Paper>
-            </Box>
 
-            {/* Profit Factor */}
-            <Box sx={{ flex: '1 1 calc(50% - 8px)', minWidth: 140 }}>
               <Paper
                 elevation={0}
                 sx={{
-                  p: 2,
-                  textAlign: 'center',
+                  flex: 1,
+                  p: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 0.5,
                   backgroundColor: alpha(theme.palette.info.main, 0.05),
-                  border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`
+                  border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
+                  borderRadius: 1
                 }}
               >
-                <Typography variant="h4" sx={{ fontWeight: 700, color: 'info.main' }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: 'info.main', fontSize: '0.875rem' }}>
                   {stats.profitFactor.toFixed(2)}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Profit Factor
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                  PF
                 </Typography>
               </Paper>
             </Box>
           </Box>
         </Box>
 
-        <Divider sx={{ my: 3 }} />
+        <Divider sx={{ my: 2 }} />
 
         {/* Trades List */}
         <Box>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-            Trades During Event ({eventTrades.length})
+          <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, fontSize: '0.875rem' }}>
+            Trades ({eventTrades.length})
           </Typography>
 
           {eventTrades.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography variant="body1" color="text.secondary">
-                No trades were made during this economic event
+            <Box
+              sx={{
+                textAlign: 'center',
+                py: 3,
+                backgroundColor: alpha(theme.palette.background.paper, 0.3),
+                borderRadius: 1,
+                border: `1px dashed ${alpha(theme.palette.divider, 0.2)}`
+              }}
+            >
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                No trades during this event
               </Typography>
             </Box>
           ) : (

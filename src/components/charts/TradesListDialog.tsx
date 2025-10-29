@@ -40,7 +40,7 @@ interface TradesDialogProps {
   calendarId?: string;
   // Calendar data for economic events filtering
   calendar?: {
-    economicCalendarFilters?: {
+    economic_calendar_filters?: {
       currencies: string[];
       impacts: string[];
       viewType: 'day' | 'week' | 'month';

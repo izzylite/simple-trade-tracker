@@ -48,7 +48,7 @@ interface TradeListProps {
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
   // Calendar data for economic events filtering
   calendar?: {
-    economicCalendarFilters?: {
+    economic_calendar_filters?: {
       currencies: string[];
       impacts: string[];
       viewType: 'day' | 'week' | 'month';

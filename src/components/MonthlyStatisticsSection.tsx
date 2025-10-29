@@ -240,15 +240,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         dynamicRiskSettings={dynamicRiskSettings}
         allTags={allTags}
       />
-      {/* P&L Charts Section */}
-      <PnLChartsWrapper
-        chartData={chartData}
-        targetValue={targetValue}
-        monthly_target={monthly_target}
-        drawdownViolationValue={drawdownViolationValue}
-        setMultipleTradesDialog={setMultipleTradesDialog}
-        timePeriod={timePeriod}
-      />
+     
 
     
 
@@ -276,7 +268,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         onDeleteClick={onDeleteTrade}
         onDeleteMultiple={onDeleteMultipleTrades}
         onOpenGalleryMode={onOpenGalleryMode}
-        calendar={calendar ? { economicCalendarFilters: calendar.economic_calendar_filters } : undefined}
+        calendar={calendar ? { economic_calendar_filters: calendar.economic_calendar_filters } : undefined}
       />
 
       {/* Performance Details Dialog */}

@@ -298,7 +298,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     try {
       await onUpdateCalendarProperty(calendar.id, (cal) => ({
         ...cal,
-        economicCalendarFilters: settings
+        economic_calendar_filters: settings
       }));
       log('📱 Economic calendar filter settings saved to calendar:', settings);
     } catch (error) {
@@ -387,6 +387,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
       try {
         log(`🔄 Fetching ${viewType} events for ${dateRange.start} to ${dateRange.end}`);
+        log(`🔍 Applied filters - Currencies: [${appliedCurrencies.join(', ')}], Impacts: [${appliedImpacts.join(', ')}], OnlyUpcoming: ${appliedOnlyUpcoming}`);
 
         const result = await economicCalendarService.fetchEventsPaginated(
           dateRange,
@@ -402,6 +403,11 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         setHasMore(result.hasMore);
         setOffset(result.offset || pageSize);
         log(`✅ Fetched ${result.events.length} events (hasMore: ${result.hasMore})`);
+
+        // Debug: Log unique currencies and impacts in results
+        const uniqueCurrencies = Array.from(new Set(result.events.map(e => e.currency)));
+        const uniqueImpacts = Array.from(new Set(result.events.map(e => e.impact)));
+        log(`📊 Results contain - Currencies: [${uniqueCurrencies.join(', ')}], Impacts: [${uniqueImpacts.join(', ')}]`);
 
       } catch (err) {
         logger.error('❌ Error fetching events:', err);
@@ -1076,7 +1082,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           trades={trades}
           onOpenGalleryMode={onOpenGalleryMode}
           calendarId={calendar.id}
-          calendar={{ economicCalendarFilters: calendar.economic_calendar_filters }}
+          calendar={{ economic_calendar_filters: calendar.economic_calendar_filters }}
         />
       )}
     </Drawer>

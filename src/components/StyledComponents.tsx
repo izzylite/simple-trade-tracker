@@ -4,11 +4,12 @@ import { Paper, Box, Typography, Button, IconButton, Chip, DialogTitle, DialogCo
 export type DayStatus = 'win' | 'loss' | 'neutral' | 'breakeven';
 
 // Calendar day styled component
-export const StyledCalendarDay = styled(Box)<{
+export const StyledCalendarDay = styled(Box, {
+  shouldForwardProp: (prop) => !['$isCurrentMonth', '$isCurrentDay', '$dayStatus'].includes(prop as string)
+})<{
   $isCurrentMonth: boolean;
   $isCurrentDay: boolean,
   $dayStatus: DayStatus;
-
 }>(({ theme, $isCurrentMonth, $isCurrentDay, $dayStatus }) => ({
   padding: theme.spacing(1),
   height: '100%',
@@ -80,7 +81,9 @@ export const WeekdayHeader = styled(Box)(({ theme }) => ({
 }));
 
 // Day number styled component
-export const DayNumber = styled(Typography)<{ $isCurrentMonth: boolean }>(({ theme, $isCurrentMonth }) => ({
+export const DayNumber = styled(Typography, {
+  shouldForwardProp: (prop) => prop !== '$isCurrentMonth'
+})<{ $isCurrentMonth: boolean }>(({ theme, $isCurrentMonth }) => ({
   fontSize: '0.875rem',
   fontWeight: 500,
   color: $isCurrentMonth ? theme.palette.text.primary : theme.palette.text.secondary,
@@ -88,7 +91,9 @@ export const DayNumber = styled(Typography)<{ $isCurrentMonth: boolean }>(({ the
 }));
 
 // Trade amount styled component
-export const TradeAmount = styled(Typography)<{ $dayStatus: 'win' | 'loss' | 'neutral' | 'breakeven' }>(({ theme, $dayStatus }) => ({
+export const TradeAmount = styled(Typography, {
+  shouldForwardProp: (prop) => prop !== '$dayStatus'
+})<{ $dayStatus: 'win' | 'loss' | 'neutral' | 'breakeven' }>(({ theme, $dayStatus }) => ({
   fontSize: '0.875rem',
   fontWeight: 600,
   color: $dayStatus === 'win'

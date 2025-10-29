@@ -369,7 +369,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         onDeleteClick={onDeleteTrade}
         onOpenGalleryMode={onOpenGalleryMode}
         calendarId={calendarId}
-        calendar={calendar ? { economicCalendarFilters: calendar.economic_calendar_filters } : undefined}
+        calendar={calendar ? { economic_calendar_filters: calendar.economic_calendar_filters } : undefined}
       />
 
       {/* Header Section - Stack on mobile */}
