@@ -40,8 +40,11 @@ const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {
 };
 
 interface EconomicEventCorrelationAnalysisProps {
+  calendarId: string;
   trades: Trade[];
   calendar: Calendar;
+  timePeriod: 'month' | 'year' | 'all';
+  selectedDate: Date;
   setMultipleTradesDialog?: (dialogState: any) => void;
 }
 
@@ -102,8 +105,11 @@ interface CorrelationStats {
 
 
 const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysisProps> = ({
+  calendarId,
   trades,
   calendar,
+  timePeriod,
+  selectedDate,
   setMultipleTradesDialog
 }) => {
   const theme = useTheme();
@@ -174,16 +180,18 @@ const CURRENCY_OPTIONS = [
     }
   };
 
-  // Calculate economic event correlations asynchronously
+  // Calculate economic event correlations using PostgreSQL RPC function
   useEffect(() => {
     const calculateCorrelations = async () => {
       setIsCalculating(true);
       setCalculationProgress(null);
       try {
         const result = await performanceCalculationService.calculateEconomicEventCorrelations(
-          trades,
+          calendarId,
           selectedCurrency,
           selectedImpact,
+          timePeriod,
+          selectedDate,
           setCalculationProgress
         );
         setLosingTradeCorrelations(result.losingTradeCorrelations);
@@ -201,7 +209,7 @@ const CURRENCY_OPTIONS = [
     };
 
     calculateCorrelations();
-  }, [trades, selectedCurrency, selectedImpact]);
+  }, [calendarId, selectedCurrency, selectedImpact, timePeriod, selectedDate]);
 
   // Get losing and winning trades (kept for legacy compatibility)
   const losingTrades = useMemo(() => {
@@ -385,14 +393,10 @@ const CURRENCY_OPTIONS = [
                      selectedImpact === 'Low' ? 'success.main' :
                      'secondary.main' // Holiday
             }}>
-              {selectedImpact === 'High' ? (correlationStats.highImpactLossCorrelationRate || 0).toFixed(1) :
-               selectedImpact === 'Medium' ? (correlationStats.mediumImpactLossCorrelationRate || 0).toFixed(1) :
-               (correlationStats.anyEventLossCorrelationRate || 0).toFixed(1)}%
+              {(correlationStats.anyEventLossCorrelationRate || 0).toFixed(1)}%
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {selectedImpact === 'High' ? (correlationStats.losingTradesWithHighImpact || 0) :
-               selectedImpact === 'Medium' ? (correlationStats.losingTradesWithMediumImpact || 0) :
-               (correlationStats.losingTradesWithAnyEvents || 0)} trades
+              {correlationStats.losingTradesWithEvents || 0} trades
             </Typography>
           </CardContent>
         </Card>
@@ -449,14 +453,10 @@ const CURRENCY_OPTIONS = [
                      selectedImpact === 'Low' ? 'success.main' :
                      'secondary.main' // Holiday
             }}>
-              {selectedImpact === 'High' ? (correlationStats.highImpactWinCorrelationRate || 0).toFixed(1) :
-               selectedImpact === 'Medium' ? (correlationStats.mediumImpactWinCorrelationRate || 0).toFixed(1) :
-               (correlationStats.anyEventWinCorrelationRate || 0).toFixed(1)}%
+              {(correlationStats.anyEventWinCorrelationRate || 0).toFixed(1)}%
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {selectedImpact === 'High' ? (correlationStats.winningTradesWithHighImpact || 0) :
-               selectedImpact === 'Medium' ? (correlationStats.winningTradesWithMediumImpact || 0) :
-               (correlationStats.winningTradesWithAnyEvents || 0)} trades
+              {correlationStats.winningTradesWithEvents || 0} trades
             </Typography>
           </CardContent>
         </Card>
@@ -598,27 +598,27 @@ const CURRENCY_OPTIONS = [
                           display: 'flex',
                           alignItems: 'center',
                           gap: 0.5,
-                          cursor: setMultipleTradesDialog && eventType.losingTrades.length > 0 ? 'pointer' : 'default',
+                          cursor: setMultipleTradesDialog && (eventType.losingTrades || []).length > 0 ? 'pointer' : 'default',
                           p: 0.5,
                           borderRadius: 1,
-                          '&:hover': setMultipleTradesDialog && eventType.losingTrades.length > 0 ? {
+                          '&:hover': setMultipleTradesDialog && (eventType.losingTrades || []).length > 0 ? {
                             bgcolor: alpha(theme.palette.error.main, 0.08)
                           } : {}
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (setMultipleTradesDialog && eventType.losingTrades.length > 0) {
+                          if (setMultipleTradesDialog && (eventType.losingTrades || []).length > 0) {
                             setMultipleTradesDialog({
                               open: true,
-                              trades: eventType.losingTrades,
+                              trades: eventType.losingTrades || [],
                               title: `Losing trades during "${eventType.event}" events`,
-                              subtitle: `${eventType.losingTrades.length} losing trades • Avg loss: ${formatValue(eventType.avg_loss)}`
+                              subtitle: `${(eventType.losingTrades || []).length} losing trades • Avg loss: ${formatValue(eventType.avg_loss)}`
                             });
                           }
                         }}
                       >
                         <Typography variant="body2" sx={{ fontWeight: 600, color: 'error.main' }}>
-                          {eventType.losingTrades.length}
+                          {(eventType.losingTrades || []).length}
                         </Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                           losses
@@ -636,27 +636,27 @@ const CURRENCY_OPTIONS = [
                           display: 'flex',
                           alignItems: 'center',
                           gap: 0.5,
-                          cursor: setMultipleTradesDialog && eventType.winningTrades.length > 0 ? 'pointer' : 'default',
+                          cursor: setMultipleTradesDialog && (eventType.winningTrades || []).length > 0 ? 'pointer' : 'default',
                           p: 0.5,
                           borderRadius: 1,
-                          '&:hover': setMultipleTradesDialog && eventType.winningTrades.length > 0 ? {
+                          '&:hover': setMultipleTradesDialog && (eventType.winningTrades || []).length > 0 ? {
                             bgcolor: alpha(theme.palette.success.main, 0.08)
                           } : {}
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (setMultipleTradesDialog && eventType.winningTrades.length > 0) {
+                          if (setMultipleTradesDialog && (eventType.winningTrades || []).length > 0) {
                             setMultipleTradesDialog({
                               open: true,
-                              trades: eventType.winningTrades,
+                              trades: eventType.winningTrades || [],
                               title: `Winning trades during "${eventType.event}" events`,
-                              subtitle: `${eventType.winningTrades.length} winning trades • Avg win: ${formatValue(eventType.avg_win)}`
+                              subtitle: `${(eventType.winningTrades || []).length} winning trades • Avg win: ${formatValue(eventType.avg_win)}`
                             });
                           }
                         }}
                       >
                         <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                          {eventType.winningTrades.length}
+                          {(eventType.winningTrades || []).length}
                         </Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                           wins

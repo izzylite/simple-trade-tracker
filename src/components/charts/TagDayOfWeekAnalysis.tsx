@@ -17,9 +17,9 @@ import { Trade } from '../../types/dualWrite';
 import { formatCurrency } from '../../utils/formatters';
 import TagFilterDialog from '../TagFilterDialog';
 import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
-import { performanceCalculationService } from '../../services/performanceCalculationService';
 
 interface TagDayOfWeekAnalysisProps {
+  calendarId: string;
   trades: Trade[];
   selectedDate: Date;
   timePeriod: 'month' | 'year' | 'all';
@@ -34,6 +34,7 @@ interface TagDayOfWeekAnalysisProps {
 
 
 const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
+  calendarId,
   trades,
   selectedDate,
   timePeriod,
@@ -48,34 +49,34 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
   const [primaryTagsDialogOpen, setPrimaryTagsDialogOpen] = useState(false);
   const [secondaryTagsDialogOpen, setSecondaryTagsDialogOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
-  const [filteredTrades, setFilteredTrades] = useState<Trade[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [isCalculating, setIsCalculating] = useState(false);
 
-  // Calculate filtered trades and chart data asynchronously
+  // Calculate chart data (client-side filtering for day-of-week grouping)
+  // Note: Day-of-week analysis requires client-side processing since RPC doesn't group by day
   useEffect(() => {
     const calculateData = async () => {
       if (primaryTags.length === 0) {
-        setFilteredTrades([]);
         setChartData([]);
         return;
       }
 
       setIsCalculating(true);
       try {
-        const filtered = await performanceCalculationService.calculateFilteredTradesForTags(
-          trades,
-          primaryTags,
-          secondaryTags
-        );
-        setFilteredTrades(filtered);
+        // Filter trades client-side (needed for day-of-week grouping and click handlers)
+        const filteredTrades = trades.filter(trade => {
+          // Check if trade has any primary tag
+          if (!trade.tags || !primaryTags.some(tag => trade.tags?.includes(tag))) return false;
+          // Check if trade has all secondary tags
+          if (secondaryTags.length > 0 && !secondaryTags.every(tag => trade.tags?.includes(tag))) return false;
+          return true;
+        });
 
-        // Calculate chart data
-        const chartDataResult = getTagDayOfWeekChartData(filtered, theme, selectedMetric === 'winRate');
+        // Calculate chart data (day of week grouping)
+        const chartDataResult = getTagDayOfWeekChartData(filteredTrades, theme, selectedMetric === 'winRate');
         setChartData(chartDataResult);
       } catch (error) {
         console.error('Error calculating day of week data:', error);
-        setFilteredTrades([]);
         setChartData([]);
       } finally {
         setIsCalculating(false);

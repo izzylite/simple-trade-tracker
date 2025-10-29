@@ -220,11 +220,11 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
     if (!onUpdateCalendarProperty) return;
 
     setIsSaving(true);
-    try { 
+    try {
       const updatedSettings = { ...settings, selectedTags: tagsOverride ?? selectedTags };
       await onUpdateCalendarProperty(calendarId, (calendar) => ({
         ...calendar,
-        scoreSettings: updatedSettings
+        score_settings: updatedSettings
       }));
     } catch (error) {
       logger.error('Error saving score settings:', error);
@@ -537,14 +537,13 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          pb: 1
+          pb: 1,
+          fontWeight: 600
         }}>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            {selectedBreakdownData ?
-              `📊 ${selectedBreakdownData.period.charAt(0).toUpperCase() + selectedBreakdownData.period.slice(1)} Score Analysis`
-              : 'Score Analysis'
-            }
-          </Typography>
+          {selectedBreakdownData ?
+            `📊 ${selectedBreakdownData.period.charAt(0).toUpperCase() + selectedBreakdownData.period.slice(1)} Score Analysis`
+            : 'Score Analysis'
+          }
           <IconButton
             onClick={handleCloseBreakdownModal}
             sx={{

@@ -16,10 +16,10 @@ import { format, isSameMonth } from 'date-fns';
 import { Trade } from '../../types/dualWrite';
 import { formatValue } from '../../utils/formatters';
 import TagFilterDialog from '../TagFilterDialog';
-import { getTradesStats } from '../../utils/chartDataUtils';
 import { performanceCalculationService } from '../../services/performanceCalculationService';
 
 interface TagPerformanceAnalysisProps {
+  calendarId: string;
   trades: Trade[];
   selectedDate: Date;
   timePeriod: 'month' | 'year' | 'all';
@@ -32,6 +32,7 @@ interface TagPerformanceAnalysisProps {
 }
 
 const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
+  calendarId,
   trades,
   selectedDate,
   timePeriod,
@@ -49,7 +50,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
   const [isCalculating, setIsCalculating] = useState(false);
 
 
-  // Calculate filtered tag stats asynchronously
+  // Calculate filtered tag stats using PostgreSQL RPC function
   useEffect(() => {
     const calculateFilteredStats = async () => {
       if (primaryTags.length === 0) {
@@ -59,20 +60,29 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
 
       setIsCalculating(true);
       try {
-        const filteredTrades = await performanceCalculationService.calculateFilteredTradesForTags(
-          trades,
+        // Use RPC function for server-side calculation
+        const tagPerformanceData = await performanceCalculationService.calculateTagPerformanceRPC(
+          calendarId,
           primaryTags,
-          secondaryTags
+          secondaryTags,
+          timePeriod,
+          selectedDate
         );
 
-        // Process each primary tag
-        const tagStats = primaryTags.map((tag) => {
-          const tagTrades = filteredTrades.filter(trade => trade.tags?.includes(tag));
-          return {
-            ...getTradesStats(tagTrades),
-            tag: tag.substring(tag.indexOf(":") + 1, tag.length)
-          };
-        }).filter(stats => stats.trades.length > 0);
+        // Transform RPC data to match component expectations
+        const tagStats = tagPerformanceData.map((tagData: any) => ({
+          tag: tagData.tag.substring(tagData.tag.indexOf(":") + 1, tagData.tag.length),
+          wins: tagData.wins,
+          losses: tagData.losses,
+          breakevens: tagData.breakevens,
+          total_trades: tagData.total_trades,
+          win_rate: tagData.win_rate,
+          total_pnl: tagData.total_pnl,
+          avg_pnl: tagData.avg_pnl,
+          max_win: tagData.max_win,
+          max_loss: tagData.max_loss,
+          trades: [] // RPC doesn't return individual trades (use client-side filter if needed for clicks)
+        }));
 
         setFilteredTagStats(tagStats);
       } catch (error) {
@@ -84,7 +94,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
     };
 
     calculateFilteredStats();
-  }, [trades, primaryTags, secondaryTags]);
+  }, [calendarId, primaryTags, secondaryTags, timePeriod, selectedDate]);
 
 
 
@@ -260,19 +270,26 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
               radius={[4, 4, 0, 0]}
               onClick={(data) => {
                 if (data && data.payload) {
-                  const trades = data.payload.trades as Trade[];
                   const tag = data.payload.tag;
-                  const filteredTrades = trades.filter(trade =>
-                    trade.trade_type === 'win' &&
-                    (timePeriod === 'month' ? isSameMonth(new Date(trade.trade_date), selectedDate) :
-                      timePeriod === 'year' ? new Date(trade.trade_date).getFullYear() === selectedDate.getFullYear() :
-                        true)
-                  );
+                  // Filter trades client-side for click handler
+                  const fullTag = primaryTags.find(t => t.endsWith(`:${tag}`)) || tag;
+                  const filteredTrades = trades.filter(trade => {
+                    // Check if trade has the tag
+                    if (!trade.tags?.includes(fullTag)) return false;
+                    // Check if trade has all secondary tags
+                    if (secondaryTags.length > 0 && !secondaryTags.every(t => trade.tags?.includes(t))) return false;
+                    // Check trade type
+                    if (trade.trade_type !== 'win') return false;
+                    // Check time period
+                    if (timePeriod === 'month') return isSameMonth(new Date(trade.trade_date), selectedDate);
+                    if (timePeriod === 'year') return new Date(trade.trade_date).getFullYear() === selectedDate.getFullYear();
+                    return true;
+                  });
                   if (filteredTrades.length > 0) {
                     setMultipleTradesDialog({
                       open: true,
                       trades: filteredTrades,
-                      date: `Winning trades with tag: ${[tag, ...secondaryTags].join(", ")}`,
+                      date: `Winning trades with tag: ${[fullTag, ...secondaryTags].join(", ")}`,
                       expandedTradeId: filteredTrades.length === 1 ? filteredTrades[0].id : null
                     });
                   }
@@ -289,18 +306,25 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
               onClick={(data) => {
                 if (data && data.payload) {
                   const tag = data.payload.tag;
-                  const trades = data.payload.trades as Trade[];
-                  const filteredTrades = trades.filter(trade =>
-                    trade.trade_type === 'loss' &&
-                    (timePeriod === 'month' ? isSameMonth(new Date(trade.trade_date), selectedDate) :
-                      timePeriod === 'year' ? new Date(trade.trade_date).getFullYear() === selectedDate.getFullYear() :
-                        true)
-                  );
+                  // Filter trades client-side for click handler
+                  const fullTag = primaryTags.find(t => t.endsWith(`:${tag}`)) || tag;
+                  const filteredTrades = trades.filter(trade => {
+                    // Check if trade has the tag
+                    if (!trade.tags?.includes(fullTag)) return false;
+                    // Check if trade has all secondary tags
+                    if (secondaryTags.length > 0 && !secondaryTags.every(t => trade.tags?.includes(t))) return false;
+                    // Check trade type
+                    if (trade.trade_type !== 'loss') return false;
+                    // Check time period
+                    if (timePeriod === 'month') return isSameMonth(new Date(trade.trade_date), selectedDate);
+                    if (timePeriod === 'year') return new Date(trade.trade_date).getFullYear() === selectedDate.getFullYear();
+                    return true;
+                  });
                   if (filteredTrades.length > 0) {
                     setMultipleTradesDialog({
                       open: true,
                       trades: filteredTrades,
-                      date: `Losing trades with tag:  ${[tag, ...secondaryTags].join(", ")}`,
+                      date: `Losing trades with tag: ${[fullTag, ...secondaryTags].join(", ")}`,
                       expandedTradeId: filteredTrades.length === 1 ? filteredTrades[0].id : null
                     });
                   }

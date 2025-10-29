@@ -19,16 +19,14 @@ import {
   RiskRewardChart,
   EconomicEventCorrelationAnalysis
 } from './charts';
-import {
-  calculateChartData,
-  getFilteredTrades
-} from '../utils/chartDataUtils';
+import { getFilteredTrades } from '../utils/chartDataUtils';
 import {
   performanceCalculationService,
   PerformanceCalculationResult,
   CalculationProgress
 } from '../services/performanceCalculationService';
 import ShimmerLoader from './common/ShimmerLoader';
+import { supabase } from '../config/supabase';
 
 interface PerformanceChartsProps {
   trades: Trade[];
@@ -146,13 +144,43 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   const [calculationError, setCalculationError] = useState<string | null>(null);
 
 
-  // Calculate chart data using the async utility function
+  // Calculate chart data using PostgreSQL RPC function
   useEffect(() => {
     const calculateChartDataAsync = async () => {
       setIsCalculatingChartData(true);
       try {
-        const data = await calculateChartData(trades, selectedDate, timePeriod);
-        setChartData(data);
+        const { data, error } = await supabase.rpc('calculate_chart_data', {
+          p_calendar_id: calendarId,
+          p_time_period: timePeriod,
+          p_selected_date: selectedDate.toISOString()
+        });
+
+        if (error) {
+          logger.error('Error calling calculate_chart_data RPC:', error);
+          throw error;
+        }
+
+        // Transform RPC data to match chart component expectations
+        const transformedData = (data || []).map((item: any, index: number, array: any[]) => {
+          const prevCumulativePnl = index > 0 ? array[index - 1].cumulativePnl : 0;
+          const dailyChange = item.cumulativePnl - prevCumulativePnl;
+
+          return {
+            date: format(new Date(item.date), timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
+            pnl: item.pnl,
+            cumulativePnL: item.cumulativePnl, // Match camelCase expected by chart
+            isIncreasing: item.cumulativePnl > prevCumulativePnl,
+            isDecreasing: item.cumulativePnl < prevCumulativePnl,
+            dailyChange: dailyChange,
+            isWin: item.pnl > 0,
+            isLoss: item.pnl < 0,
+            isBreakEven: item.pnl === 0,
+            trades: [], // Empty array since we don't have individual trades from RPC
+            fullDate: new Date(item.date)
+          };
+        });
+
+        setChartData(transformedData);
       } catch (error) {
         logger.error('Error calculating chart data:', error);
         setChartData([]);
@@ -162,9 +190,9 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     };
 
     calculateChartDataAsync();
-  }, [trades, selectedDate, timePeriod]);
+  }, [calendarId, selectedDate, timePeriod]);
 
-  // Calculate performance metrics asynchronously
+  // Calculate performance metrics asynchronously using RPC function
   useEffect(() => {
     const calculatePerformanceAsync = async () => {
       setIsCalculatingPerformance(true);
@@ -172,7 +200,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       setCalculationError(null);
       try {
         const data = await performanceCalculationService.calculatePerformanceMetrics(
-          trades,
+          calendarId,
           selectedDate,
           timePeriod,
           accountBalance,
@@ -191,7 +219,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     };
 
     calculatePerformanceAsync();
-  }, [trades, selectedDate, timePeriod, accountBalance, comparisonTags]);
+  }, [calendarId, selectedDate, timePeriod, accountBalance, comparisonTags]);
 
   const handleTimePeriodChange = (newValue: TimePeriod) => {
     setTimePeriod(newValue);
@@ -544,6 +572,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             {/* Tab Panel 1: Tag Performance Analysis */}
             <Box sx={{ display: tagAnalysisTab === 0 ? 'block' : 'none' }}>
               <TagPerformanceAnalysis
+                calendarId={calendarId}
                 trades={trades}
                 selectedDate={selectedDate}
                 timePeriod={timePeriod}
@@ -565,6 +594,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             {/* Tab Panel 2: Tag Performance by Day of Week Analysis */}
             <Box sx={{ display: tagAnalysisTab === 1 ? 'block' : 'none' }}>
               <TagDayOfWeekAnalysis
+                calendarId={calendarId}
                 trades={trades}
                 selectedDate={selectedDate}
                 timePeriod={timePeriod}
@@ -609,8 +639,11 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
             {/* Economic Event Correlation Analysis */}
             <EconomicEventCorrelationAnalysis
+              calendarId={calendarId}
               trades={filteredTrades}
               calendar={calendar!}
+              timePeriod={timePeriod}
+              selectedDate={selectedDate}
               setMultipleTradesDialog={setMultipleTradesDialog}
             />
           </Box>
