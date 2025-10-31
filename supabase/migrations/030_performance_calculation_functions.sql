@@ -167,12 +167,15 @@ BEGIN
     'average', COALESCE(AVG(risk_to_reward), 0),
     'max', COALESCE(MAX(risk_to_reward), 0),
     'min', COALESCE(MIN(risk_to_reward), 0),
-    'data', jsonb_agg(
-      jsonb_build_object(
-        'date', trade_date,
-        'rr', risk_to_reward
-      )
-      ORDER BY trade_date
+    'data', COALESCE(
+      jsonb_agg(
+        jsonb_build_object(
+          'date', trade_date,
+          'rr', risk_to_reward
+        )
+        ORDER BY trade_date
+      ),
+      '[]'::jsonb
     )
   )
   INTO v_risk_reward_stats

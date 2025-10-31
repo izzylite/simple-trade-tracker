@@ -7,7 +7,9 @@ import {
   Button,
   Stack,
   Avatar,
-  Box
+  Box,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   LightMode as LightModeIcon,
@@ -17,7 +19,9 @@ import {
   Google as GoogleIcon,
   Dashboard as DashboardIcon,
   Home as HomeIcon,
-  Article as ArticleIcon
+  Article as ArticleIcon,
+  CalendarMonth as CalendarIcon,
+  Delete as TrashIcon
 } from '@mui/icons-material';
 import { useTheme, alpha } from '@mui/material/styles';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -37,7 +41,7 @@ interface AppHeaderProps {
 const AppHeader: React.FC<AppHeaderProps> = ({
   onToggleTheme,
   mode,
-  title = 'Trade Tracker',
+  title = 'Cotex',
   showBackButton = false,
   backButtonPath = '/',
   onBackClick
@@ -51,6 +55,13 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   const isHomePage = location.pathname === '/';
   const isDashboardPage = location.pathname === '/dashboard';
   const isBlogPage = location.pathname === '/blog';
+  const isTrashPage = location.pathname === '/trash';
+
+  // Determine current tab
+  const getCurrentTab = () => {
+    if (isTrashPage) return 'trash';
+    return 'calendars';
+  };
 
   // Check if current user is authorized for debug panel
   const isDebugAuthorized = user?.email === 'isl.israelite@gmail.com';
@@ -131,7 +142,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             </IconButton>
           )}
           <IconButton
-            onClick={() => navigate('/home')}
+            onClick={() => navigate('/')}
             size="small"
             sx={{
               p: 0.5,
@@ -143,7 +154,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             <Box
               component="img"
               src="/android-chrome-192x192.png"
-              alt="Trade Tracker Logo"
+              alt="Cotex Logo"
               sx={{
                 width: 32,
                 height: 32,
@@ -151,21 +162,65 @@ const AppHeader: React.FC<AppHeaderProps> = ({
               }}
             />
           </IconButton>
-          <Typography
-            variant="h5"
-            component="h1"
-            sx={{
-              flexGrow: 1,
-              fontSize: { xs: '1.1rem', sm: '1.5rem' }, // Responsive font size
-              fontWeight: 600,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              minWidth: 0
-            }}
-          >
-            {title}
-          </Typography>
+          {user && !showBackButton && (
+            <Tabs
+              value={getCurrentTab()}
+              onChange={(_, newValue) => {
+                if (newValue === 'calendars') {
+                  navigate('/');
+                } else if (newValue === 'trash') {
+                  navigate('/trash');
+                }
+              }}
+              sx={{
+                minHeight: 64,
+                '& .MuiTab-root': {
+                  minHeight: 64,
+                  textTransform: 'none',
+                  fontSize: '0.95rem',
+                  fontWeight: 500,
+                  px: 3,
+                  color: 'text.secondary',
+                  '&.Mui-selected': {
+                    color: 'primary.main',
+                    fontWeight: 600
+                  }
+                },
+                '& .MuiTabs-indicator': {
+                  backgroundColor: 'primary.main',
+                  height: 3,
+                  bottom: 0
+                }
+              }}
+            >
+              <Tab
+                label="Calendars"
+                value="calendars"
+              />
+              <Tab
+                label="Trash"
+                value="trash"
+              />
+            </Tabs>
+          )}
+          {showBackButton && (
+            <Typography
+              variant="h5"
+              component="h1"
+              sx={{
+                flexGrow: 1,
+                fontSize: { xs: '1.1rem', sm: '1.5rem' },
+                fontWeight: 600,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0
+              }}
+            >
+              {title}
+            </Typography>
+          )}
+          <Box sx={{ flexGrow: 1 }} />
         </Box>
         
         {user ? (
@@ -174,43 +229,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             spacing={{ xs: 0.5, sm: 2 }} // Tighter spacing on mobile
             alignItems="center"
           >
-            {isHomePage && (
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => navigate('/dashboard')}
-                startIcon={<DashboardIcon />}
-                sx={{
-                  display: { xs: 'none', sm: 'flex' },
-                  borderColor: 'primary.main',
-                  color: 'primary.main',
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  }
-                }}
-              >
-                Dashboard
-              </Button>
-            )}
-            {(isDashboardPage || isBlogPage) && (
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => navigate('/dashboard')}
-                startIcon={<HomeIcon />}
-                sx={{
-                  display: { xs: 'none', sm: 'flex' },
-                  borderColor: 'primary.main',
-                  color: 'primary.main',
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  }
-                }}
-              >
-                Home
-              </Button>
-            )}
-
             <IconButton
               onClick={onToggleTheme}
               color="inherit"
@@ -276,44 +294,18 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             </Button>
           </Stack>
         ) : (
-          <Stack
-            direction="row"
-            spacing={{ xs: 0.5, sm: 2 }} // Tighter spacing on mobile
-            alignItems="center"
+          <IconButton
+            onClick={onToggleTheme}
+            color="inherit"
+            size="small"
+            sx={{
+              '&:hover': {
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+              }
+            }}
           >
-            <IconButton
-              onClick={onToggleTheme}
-              color="inherit"
-              size="small"
-              sx={{
-                '&:hover': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                }
-              }}
-            >
-              {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
-            </IconButton>
-            <Button
-              variant="contained"
-              onClick={handleSignIn}
-              size="small"
-              sx={{
-                bgcolor: '#4285F4',
-                '&:hover': {
-                  bgcolor: '#3367D6'
-                },
-                px: { xs: 1.5, sm: 2 }, // Less padding on mobile
-                fontSize: { xs: '0.75rem', sm: '0.875rem' }, // Smaller text on mobile
-                minWidth: { xs: 'auto', sm: 'auto' }
-              }}
-            >
-              <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 0.5 }}>
-                <GoogleIcon sx={{ fontSize: 16 }} />
-                Sign in with Google
-              </Box>
-              <Box sx={{ display: { xs: 'block', sm: 'none' } }}>Sign In</Box>
-            </Button>
-          </Stack>
+            {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+          </IconButton>
         )}
       </Toolbar>
     </AppBar>

@@ -175,10 +175,15 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             isWin: item.pnl > 0,
             isLoss: item.pnl < 0,
             isBreakEven: item.pnl === 0,
-            trades: [], // Empty array since we don't have individual trades from RPC
+            trades: trades.filter(trade => {
+              const tradeDate = new Date(trade.trade_date);
+              const itemDate = new Date(item.date);
+              return tradeDate.toDateString() === itemDate.toDateString();
+            }),
             fullDate: new Date(item.date)
           };
         });
+      
 
         setChartData(transformedData);
       } catch (error) {

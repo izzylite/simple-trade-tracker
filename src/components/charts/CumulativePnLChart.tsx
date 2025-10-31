@@ -181,6 +181,7 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
                   onClick={() => {
                     log('Dot clicked, Index:', index);
                     const dataPoint = chartData[index];
+                    log('Data point:', JSON.stringify(dataPoint, null, 2));
                     if (dataPoint && dataPoint.trades && dataPoint.trades.length > 0) {
                       const formattedDate = format(dataPoint.fullDate, 'MMMM d, yyyy');
                       setMultipleTradesDialog({

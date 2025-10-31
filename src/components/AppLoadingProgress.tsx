@@ -121,7 +121,7 @@ const AppLoadingProgress: React.FC = () => {
             color: theme.palette.text.primary,
           }}
         >
-          Trade Tracker
+          Cotex
         </Typography>
 
         <Typography

@@ -3,7 +3,7 @@
  * Redesigned to match search drawer style with day/week/month pagination
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Drawer,
   Box,
@@ -55,7 +55,7 @@ import {
   ImpactLevel
 } from '../../types/economicCalendar';
 import { Calendar } from '../../types/calendar';
-import { Trade } from '../../types/trade';
+import { Trade, TradeEconomicEvent } from '../../types/trade';
 import { economicCalendarService } from '../../services/economicCalendarService';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 // import { QueryDocumentSnapshot } from 'firebase/firestore'; // Removed - migrating to Supabase
@@ -64,7 +64,7 @@ import EconomicCalendarFilters from './EconomicCalendarFilters';
 import EconomicEventDetailDialog from './EconomicEventDetailDialog';
 import Shimmer from '../Shimmer';
 import { log,error, logger, warn } from '../../utils/logger';
-import { cleanEventNameForPinning, isEventPinned } from '../../utils/eventNameUtils';
+import { cleanEventNameForPinning, isEventPinned, eventMatchV3 } from '../../utils/eventNameUtils';
 import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
 import { supabase } from '../../config/supabase';
 // View types for pagination
@@ -196,7 +196,13 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   trades = [],
   onUpdateCalendarProperty,
   onOpenGalleryMode,
-  payload
+  payload,
+  onUpdateTradeProperty,
+  onEditTrade,
+  onDeleteTrade,
+  onDeleteMultipleTrades,
+  onZoomImage,
+  isReadOnly = false
 }) => {
   const theme = useTheme();
 
@@ -281,6 +287,27 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
   // Track if the month picker is active
   const [isMonthPickerActive, setIsMonthPickerActive] = useState(false);
+
+  // Calculate trade counts for each event
+  // This helps traders quickly see which events they've traded before
+  const eventTradeCountMap = useMemo(() => {
+    const countMap = new Map<string, number>();
+
+    events.forEach(event => {
+      const tradeCount = trades.filter(trade => {
+        if (!trade.economic_events || trade.economic_events.length === 0) {
+          return false;
+        }
+        return trade.economic_events.some((tradeEvent: TradeEconomicEvent) => {
+          return eventMatchV3(tradeEvent, event);
+        });
+      }).length;
+
+      countMap.set(event.id, tradeCount);
+    });
+
+    return countMap;
+  }, [events, trades]);
 
   // Function to save filter settings to calendar
   const saveFilterSettings = useCallback(async (currencies: Currency[], impacts: ImpactLevel[], viewTypeToSave: ViewType, notificationsEnabledToSave: boolean, onlyUpcomingToSave: boolean) => {
@@ -427,28 +454,9 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     }
   }, [dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming, open, viewType, pageSize, startDate, endDate]);
 
-  // Subscribe to economic events changes with automatic reconnection
-  // Edge functions update events in real-time (scraping, updates from APIs)
-  const { createChannel } = useRealtimeSubscription({
-    channelName: `economic-events-${startDate}-${endDate}`,
-    enabled: open,
-    onSubscribed: () => {
-      logger.log(`✅ Economic events subscription active for ${startDate} to ${endDate}`);
-    },
-    onError: (error) => {
-      logger.error(`❌ Economic events subscription error:`, error);
-    },
-    maxReconnectAttempts: 3,
-    reconnectDelay: 2000,
-  });
-
-  useEffect(() => {
-    if (!open) return;
-
-    const channel = createChannel();
-    if (!channel) return;
-
-    // Subscribe to INSERT, UPDATE, and DELETE events for the current date range
+  // Memoize realtime subscription callbacks to prevent unnecessary recreations
+  const handleChannelCreated = useCallback((channel: any) => {
+    // Configure the channel BEFORE it subscribes
     channel.on(
       'postgres_changes',
       {
@@ -456,7 +464,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         schema: 'public',
         table: 'economic_events'
       },
-      async (payload) => {
+      async (payload: any) => {
         logger.log(`🔄 Economic event ${payload.eventType}:`, payload);
 
         // Refetch events when any change occurs in the date range
@@ -482,12 +490,62 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         }
       }
     );
+  }, [dateRange, pageSize, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming]);
 
-    // Cleanup handled automatically by the hook
-  }, [open, createChannel, startDate, endDate, dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming, pageSize]);
+  const handleSubscribed = useCallback(() => {
+    logger.log(`✅ Economic events subscription active for ${dateRange.start} to ${dateRange.end}`);
+  }, [dateRange.start, dateRange.end]);
+
+  const handleError = useCallback((error: string) => {
+    logger.error(`❌ Economic events subscription error:`, error);
+  }, []);
+
+  // Subscribe to economic events changes with automatic reconnection
+  // Edge functions update events in real-time (scraping, updates from APIs)
+  const { createChannel, cleanupChannel } = useRealtimeSubscription({
+    channelName: `economic-events`,
+    enabled: open && !!dateRange.start && !!dateRange.end,
+    onChannelCreated: handleChannelCreated,
+    onSubscribed: handleSubscribed,
+    onError: handleError,
+    maxReconnectAttempts: 3,
+    reconnectDelay: 2000,
+  });
+
+  // Track if we've already set up the subscription for this drawer open
+  const subscriptionSetupRef = useRef(false);
+
+  useEffect(() => {
+    if (!open) {
+      // Explicitly cleanup when drawer closes
+      cleanupChannel();
+      subscriptionSetupRef.current = false;
+      return;
+    }
+
+    // Only set up subscription once per drawer open
+    if (!subscriptionSetupRef.current) {
+      // Create and subscribe to the channel
+      // The channel is configured via onChannelCreated callback before subscribing
+      // Note: The subscription listens to ALL events in the table, filters are applied during refetch
+      logger.log('🔄 Setting up economic events realtime subscription');
+      createChannel();
+      subscriptionSetupRef.current = true;
+    }
+
+    // Cleanup when drawer closes or component unmounts
+    return () => {
+      if (!open) {
+        logger.log('🧹 Cleaning up economic events realtime subscription');
+        cleanupChannel();
+        subscriptionSetupRef.current = false;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]); // Only depend on 'open' to prevent infinite loop
 
   // Load more events function
-  const loadMoreEvents = async () => {
+  const loadMoreEvents = useCallback(async () => {
     if (!hasMore || loadingMore) return;
 
     setLoadingMore(true);
@@ -515,15 +573,22 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     } finally {
       setLoadingMore(false);
     }
-  };
+  }, [hasMore, loadingMore, dateRange, pageSize, offset, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming]);
 
   // Infinite scroll handler
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+
+    // Check if content is actually scrollable
+    if (scrollHeight <= clientHeight) {
+      return; // Content doesn't fill the container, no need to load more
+    }
+
     const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
 
     // Load more when user scrolls to 80% of the content
-    if (scrollPercentage > 0.8 && hasMore && !loadingMore && !loading) {
+    // Also ensure we have scrolled at least a little bit (scrollTop > 0) to avoid triggering on mount
+    if (scrollPercentage > 0.8 && scrollTop > 0 && hasMore && !loadingMore && !loading) {
       loadMoreEvents();
     }
   }, [hasMore, loadingMore, loading, loadMoreEvents]);
@@ -642,25 +707,30 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   };
 
   // Handle pin event
-  const handlePinEvent = async (eventName: string) => {
+  const handlePinEvent = async (event: EconomicEvent) => {
     if (!calendar?.id || !onUpdateCalendarProperty) return;
 
     try {
-      setPinningEventId(eventName);
+      setPinningEventId(event.id);
       await onUpdateCalendarProperty(calendar.id, (calendar: Calendar) => {
         const currentPinnedEvents = calendar.pinned_events || [];
-        const cleanedEventName =  cleanEventNameForPinning(eventName);
+        const cleanedEventName = cleanEventNameForPinning(event.event_name);
         // Check if event is already pinned
-        const eventNames = currentPinnedEvents.map(pe => pe.event);
-        if (isEventPinned(cleanedEventName, eventNames)) {
+        if (isEventPinned(event, currentPinnedEvents)) {
           return calendar; // Already pinned, no change needed
         }
         return {
           ...calendar,
-          pinnedEvents: [...currentPinnedEvents, { event: cleanedEventName }]
+          pinned_events: [...currentPinnedEvents, {
+            event: cleanedEventName,
+            event_id: event.id,
+            notes: '',
+            impact: event.impact,
+            currency: event.currency
+          }]
         };
       });
-      logger.log(`📌 Successfully pinned event: ${eventName}`);
+      logger.log(`📌 Successfully pinned event: ${event.event_name} (ID: ${event.id})`);
     } catch (error) {
       logger.error('Error pinning event:', error);
     } finally {
@@ -669,22 +739,23 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   };
 
   // Handle unpin event
-  const handleUnpinEvent = async (eventName: string) => {
+  const handleUnpinEvent = async (event: EconomicEvent) => {
     if (!calendar?.id || !onUpdateCalendarProperty) return;
 
     try {
-      setPinningEventId(eventName);
+      setPinningEventId(event.id);
       await onUpdateCalendarProperty(calendar.id, (calendar: Calendar) => {
         const currentPinnedEvents = calendar.pinned_events || [];
-        const cleanedEventName =  cleanEventNameForPinning(eventName);
         return {
           ...calendar,
-          pinnedEvents: currentPinnedEvents.filter(pinnedEvent =>
-            pinnedEvent.event.toLowerCase() !== cleanedEventName.toLowerCase()
+          pinned_events: currentPinnedEvents.filter(pinnedEvent =>
+            // Use event_id for exact matching if available, fallback to name matching
+            pinnedEvent.event_id ? pinnedEvent.event_id !== event.id :
+            pinnedEvent.event.toLowerCase() !== cleanEventNameForPinning(event.event_name).toLowerCase()
           )
         };
       });
-      logger.log(`📌 Successfully unpinned event: ${eventName}`);
+      logger.log(`📌 Successfully unpinned event: ${event.event_name} (ID: ${event.id})`);
     } catch (error) {
       logger.error('Error unpinning event:', error);
     } finally {
@@ -997,16 +1068,18 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                     <Box>
                       {dayGroup.events.map((event, eventIndex) => {
                         const uniqueKey = `${event.id}-${eventIndex}`;
+                        const tradeCount = eventTradeCountMap.get(event.id) || 0;
                         return (
                           <React.Fragment key={uniqueKey}>
                             <EconomicEventListItem
                               px={2.5}
                               py={1.5}
                               event={event}
-                              pinnedEvents={calendar?.pinned_events?.map(pe => pe.event) || []}
+                              pinnedEvents={calendar?.pinned_events || []}
                               onPinEvent={handlePinEvent}
                               onUnpinEvent={handleUnpinEvent}
-                              isPinning={pinningEventId === event.event_name}
+                              isPinning={pinningEventId === event.id}
+                              tradeCount={tradeCount}
                               onClick={(event) => {
                                 logger.log('Economic event clicked:', event);
                                 setSelectedEvent(event);
@@ -1088,9 +1161,16 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           }}
           event={selectedEvent}
           trades={trades}
+          onUpdateTradeProperty={onUpdateTradeProperty}
+          onEditTrade={onEditTrade}
+          onDeleteTrade={onDeleteTrade}
+          onDeleteMultipleTrades={onDeleteMultipleTrades}
+          onZoomImage={onZoomImage}
           onOpenGalleryMode={onOpenGalleryMode}
           calendarId={calendar.id}
-          calendar={{ economic_calendar_filters: calendar.economic_calendar_filters }}
+          calendar={calendar}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
+          isReadOnly={isReadOnly}
         />
       )}
     </Drawer>

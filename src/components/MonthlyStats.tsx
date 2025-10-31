@@ -14,7 +14,11 @@ import {
   DialogContent,
   DialogActions,
   DialogTitle,
-  Dialog
+  Dialog,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import {
   TrendingUp,
@@ -25,21 +29,24 @@ import {
   Analytics,
   TrendingDown,
   ShowChart,
-  Balance
+  Balance,
+  MoreVert,
+  Delete
 } from '@mui/icons-material';
 import { Trade } from '../types/dualWrite';
-import { exportTrades, importTrades } from '../utils/tradeExportImport';
+import { exportTrades } from '../utils/tradeExportImport';
 import { formatCurrency } from '../utils/formatters';
 import { calculatePercentageOfValueAtDate } from '../utils/dynamicRiskUtils';
 import { calculateTargetProgress } from '../utils/statsUtils';
 import { error } from '../utils/logger';
+import { ImportMappingDialog } from './import/ImportMappingDialog';
 
 
 
 interface MonthlyStatsProps {
   trades: Trade[];
   accountBalance: number;
-  onImportTrades?: (trades: Trade[]) => void;
+  onImportTrades?: (trades: Trade[]) => Promise<void>;
   onDeleteTrade?: (id: string) => void;
   currentDate?: Date;
   monthlyTarget?: number;
@@ -60,6 +67,11 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   isReadOnly = false
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const menuOpen = Boolean(menuAnchorEl);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
   const monthTrades = trades.filter(trade =>
     new Date(trade.trade_date).getMonth() === currentDate.getMonth() &&
     new Date(trade.trade_date).getFullYear() === currentDate.getFullYear()
@@ -120,55 +132,73 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   const targetProgress = targetProgressValue.toFixed(0);
   const isTargetMet = monthlyTarget ? parseFloat(growthPercentage) >= monthlyTarget : false;
 
-  const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv'>('xlsx');
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setMenuAnchorEl(event.currentTarget);
+  };
 
-  const handleExport = () => {
-    if (trades.length === 0) {
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+  };
+
+  const handleExport = (format: 'xlsx' | 'csv') => {
+    if (monthTrades.length === 0) {
       return;
     }
-    exportTrades(trades, accountBalance, exportFormat);
+    exportTrades(trades, accountBalance, format);
+    handleMenuClose();
   };
 
-  const toggleExportFormat = () => {
-    setExportFormat(prev => prev === 'xlsx' ? 'csv' : 'xlsx');
-  };
-
-  const [isImporting, setIsImporting] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<AlertColor>('success');
 
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !onImportTrades) return;
 
-    setIsImporting(true);
-
-    try {
-      const importedTrades = await importTrades(file);
-      onImportTrades(importedTrades);
-
-      // Show success message
-      setSnackbarMessage(`Successfully imported ${importedTrades.length} trades`);
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
-    } catch (err) {
-      error('Import failed:', err);
-
-      // Show error message
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error during import';
-      setSnackbarMessage(`Error importing trades: ${errorMessage}`);
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
-    } finally {
-      setIsImporting(false);
-    }
+    handleMenuClose();
+    setSelectedFile(file);
+    setShowImportDialog(true);
 
     // Reset the input
     event.target.value = '';
   };
 
+  const handleImportComplete = async (importedTrades: Partial<Trade>[]) => {
+    if (!onImportTrades) return;
+
+    try {
+      // Add required fields that might be missing
+      const completeTrades = importedTrades.map(trade => ({
+        ...trade,
+        id: trade.id || crypto.randomUUID(),
+        calendar_id: trade.calendar_id || '',
+        user_id: trade.user_id || '',
+        created_at: trade.created_at || new Date(),
+        updated_at: trade.updated_at || new Date()
+      })) as Trade[];
+
+      // Wait for import to complete before closing dialog
+      await onImportTrades(completeTrades);
+
+      // Show success message
+      setSnackbarMessage(`Successfully imported ${completeTrades.length} trades`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+
+      // Close dialog only after import completes
+      setShowImportDialog(false);
+      setSelectedFile(null);
+    } catch (error) {
+      // Show error message if import fails
+      setSnackbarMessage('Failed to import trades. Please try again.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
   const handleClearClick = () => {
+    handleMenuClose();
     setShowClearConfirm(true);
   };
 
@@ -216,66 +246,24 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
             right: 0,
             display: 'flex',
             gap: 1,
-            justifyContent: { xs: 'center', sm: 'flex-end' }, 
+            justifyContent: { xs: 'center', sm: 'flex-end' },
             mb: 2,
             flex: 1,
             alignItems: 'flex-start'
           }}>
-            {!isReadOnly && (
-              <>
-                <input
-                  type="file"
-                  accept=".xlsx,.csv"
-                  style={{ display: 'none' }}
-                  id="import-file"
-                  onChange={handleImport}
-                />
-                <Tooltip title="Import trades from Excel or CSV. Custom columns will be converted to tags (e.g., 'Strategy: Breakout' becomes 'Strategy:Breakout' tag)">
-                  <label htmlFor="import-file">
-                    <Button
-                      component="span"
-                      size="small"
-                      variant="outlined"
-                      startIcon={<FileUpload />}
-                      sx={{
-                        color: 'text.secondary',
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        textTransform: 'none',
-                        minWidth: 'auto',
-                        p: 0.5,
-                        px: 1,
-                        bgcolor: 'background.paper',
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        '&:hover': {
-                          bgcolor: 'action.hover',
-                          color: 'text.primary',
-                          borderColor: 'text.primary'
-                        }
-                      }}
-                    >
-                      Import
-                    </Button>
-                  </label>
-                </Tooltip>
-              </>
-            )}
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Button
+            <input
+              type="file"
+              accept=".xlsx,.csv"
+              style={{ display: 'none' }}
+              id="import-file"
+              onChange={handleFileSelect}
+            />
+            <Tooltip title="More options">
+              <IconButton
+                onClick={handleMenuOpen}
                 size="small"
-                variant="outlined"
-                startIcon={<FileDownload />}
-                onClick={handleExport}
-                disabled={monthTrades.length === 0}
                 sx={{
                   color: 'text.secondary',
-                  fontSize: '0.75rem',
-                  fontWeight: 500,
-                  textTransform: 'none',
-                  minWidth: 'auto',
-                  p: 0.5,
-                  px: 1,
                   bgcolor: 'background.paper',
                   border: '1px solid',
                   borderColor: 'divider',
@@ -283,61 +271,64 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
                     bgcolor: 'action.hover',
                     color: 'text.primary',
                     borderColor: 'text.primary'
-                  },
-                  '&.Mui-disabled': {
-                    color: 'text.disabled',
-                    bgcolor: 'action.disabledBackground',
-                    borderColor: 'divider'
                   }
                 }}
               >
-                Export {exportFormat.toUpperCase()}
-              </Button>
-              <Tooltip title={`Switch to ${exportFormat === 'xlsx' ? 'CSV' : 'Excel'} format`}>
-                <IconButton
-                  size="small"
-                  onClick={toggleExportFormat}
-                  disabled={monthTrades.length === 0}
-                  sx={{ ml: 0.5 }}
-                >
-                  <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                    {exportFormat === 'xlsx' ? 'CSV' : 'XLS'}
-                  </Typography>
-                </IconButton>
-              </Tooltip>
-            </Box>
-
-            {!isReadOnly && (
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={handleClearClick}
+                <MoreVert />
+              </IconButton>
+            </Tooltip>
+            <Menu
+              anchorEl={menuAnchorEl}
+              open={menuOpen}
+              onClose={handleMenuClose}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'right',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+            >
+              {!isReadOnly && (
+                <MenuItem onClick={() => document.getElementById('import-file')?.click()}>
+                  <ListItemIcon>
+                    <FileUpload fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>Import Trades</ListItemText>
+                </MenuItem>
+              )}
+              <MenuItem
+                onClick={() => handleExport('xlsx')}
                 disabled={monthTrades.length === 0}
-                sx={{
-                  color: 'error.main',
-                  fontSize: '0.75rem',
-                  fontWeight: 500,
-                  textTransform: 'none',
-                  minWidth: 'auto',
-                  p: 0.5,
-                  px: 1,
-                  bgcolor: 'background.paper',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  '&:hover': {
-                    bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
-                    borderColor: 'error.main'
-                  },
-                  '&.Mui-disabled': {
-                    color: 'text.disabled',
-                    bgcolor: 'action.disabledBackground',
-                    borderColor: 'divider'
-                  }
-                }}
               >
-                Clear Month
-              </Button>
-            )}
+                <ListItemIcon>
+                  <FileDownload fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Export XLSX</ListItemText>
+              </MenuItem>
+              <MenuItem
+                onClick={() => handleExport('csv')}
+                disabled={monthTrades.length === 0}
+              >
+                <ListItemIcon>
+                  <FileDownload fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Export CSV</ListItemText>
+              </MenuItem>
+              {!isReadOnly && (
+                <MenuItem
+                  onClick={handleClearClick}
+                  disabled={monthTrades.length === 0}
+                  sx={{ color: 'error.main' }}
+                >
+                  <ListItemIcon>
+                    <Delete fontSize="small" sx={{ color: 'error.main' }} />
+                  </ListItemIcon>
+                  <ListItemText>Clear Month</ListItemText>
+                </MenuItem>
+              )}
+            </Menu>
           </Box>
         </Box>
 
@@ -599,6 +590,16 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           {snackbarMessage}
         </Alert>
       </Snackbar>
+
+      <ImportMappingDialog
+        open={showImportDialog}
+        onClose={() => {
+          setShowImportDialog(false);
+          setSelectedFile(null);
+        }}
+        onImport={handleImportComplete}
+        file={selectedFile}
+      />
     </>
   );
 };

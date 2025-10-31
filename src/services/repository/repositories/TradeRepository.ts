@@ -17,6 +17,10 @@ import { supabase } from '../../../config/supabase';
 import { uploadTradeImage, optimizeImage } from '../../supabaseStorageService';
 import { TradeImage } from '../../../components/trades/TradeForm';
 
+// Economic events imports
+import { tradeEconomicEventService, getRelevantCurrenciesFromTags } from '../../tradeEconomicEventService';
+import { TradeEconomicEvent } from '../../../types/dualWrite';
+
 // Re-export optimizeImage for convenience
 export { optimizeImage };
 
@@ -119,9 +123,199 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     }
   }
 
+  /**
+   * Search and filter trades with server-side pagination
+   * @param calendarId - Calendar ID to search within
+   * @param options - Search and filter options
+   * @returns Paginated search results
+   */
+  async searchTrades(
+    calendarId: string,
+    options: {
+      searchQuery?: string;
+      selectedTags?: string[];
+      dateFilter?: {
+        type: 'all' | 'single' | 'range';
+        startDate?: Date | null;
+        endDate?: Date | null;
+      };
+      tradeTypes?: ('win' | 'loss' | 'breakeven')[];
+      page?: number;
+      pageSize?: number;
+    } = {}
+  ): Promise<{
+    trades: Trade[];
+    totalCount: number;
+    hasMore: boolean;
+    currentPage: number;
+    totalPages: number;
+  }> {
+    try {
+      const {
+        searchQuery = '',
+        selectedTags = [],
+        dateFilter = { type: 'all' },
+        tradeTypes = [],
+        page = 1,
+        pageSize = 20
+      } = options;
+
+      // Calculate pagination
+      const offset = (page - 1) * pageSize;
+
+      // Start building the query
+      let query = supabase
+        .from('trades')
+        .select('*', { count: 'exact' })
+        .eq('calendar_id', calendarId);
+
+      // Apply text search if provided
+      if (searchQuery.trim()) {
+        const searchTerms = searchQuery
+          .toLowerCase()
+          .split(/[,;\s]+/)
+          .map(term => term.trim())
+          .filter(term => term.length > 0);
+
+        if (searchTerms.length > 0) {
+          // For each search term, apply AND logic (all terms must match)
+          searchTerms.forEach(term => {
+            // Use OR across all searchable fields
+            // economic_events_text is a computed column that contains all event names
+            query = query.or(
+              `name.ilike.%${term}%,` +
+              `notes.ilike.%${term}%,` +
+              `session.ilike.%${term}%,` +
+              `tags.cs.{${term}},` +
+              `economic_events_text.ilike.%${term}%`
+            );
+          });
+        }
+      }
+
+      // Apply tag filtering (AND logic - trade must have ALL selected tags)
+      if (selectedTags.length > 0) {
+        // Use contains operator to check if tags array contains all selected tags
+        query = query.contains('tags', selectedTags);
+      }
+
+      // Apply date filtering
+      if (dateFilter.type === 'single' && dateFilter.startDate) {
+        const startOfDay = new Date(dateFilter.startDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(dateFilter.startDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        query = query
+          .gte('trade_date', startOfDay.toISOString())
+          .lte('trade_date', endOfDay.toISOString());
+      } else if (dateFilter.type === 'range' && dateFilter.startDate && dateFilter.endDate) {
+        const startOfDay = new Date(dateFilter.startDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(dateFilter.endDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        query = query
+          .gte('trade_date', startOfDay.toISOString())
+          .lte('trade_date', endOfDay.toISOString());
+      }
+
+      // Apply trade type filtering
+      if (tradeTypes.length > 0) {
+        query = query.in('trade_type', tradeTypes);
+      }
+
+      // Apply sorting (newest first)
+      query = query.order('trade_date', { ascending: false });
+
+      // Apply pagination
+      query = query.range(offset, offset + pageSize - 1);
+
+      // Execute query
+      const { data, count, error } = await query;
+
+      if (error) {
+        logger.error('Error searching trades:', error);
+        throw error;
+      }
+
+      // Transform results
+      const trades = data ? data.map(item => transformSupabaseTrade(item)) : [];
+      const totalCount = count || 0;
+      const totalPages = Math.ceil(totalCount / pageSize);
+      const hasMore = totalCount > offset + pageSize;
+
+      return {
+        trades,
+        totalCount,
+        hasMore,
+        currentPage: page,
+        totalPages
+      };
+    } catch (error) {
+      logger.error('Error searching trades:', error);
+      return {
+        trades: [],
+        totalCount: 0,
+        hasMore: false,
+        currentPage: 1,
+        totalPages: 0
+      };
+    }
+  }
+
   // =====================================================
   // SUPABASE OPERATIONS
   // =====================================================
+
+  /**
+   * Fetch economic events for a trade based on its date, session, and tags
+   * This is a helper method used during trade creation and updates
+   *
+   * @param tradeDate - The date of the trade
+   * @param session - The trading session (Asia, London, NY AM, NY PM)
+   * @param tags - The trade tags (used to extract currency pairs)
+   * @param existingEvents - Existing economic events (if any)
+   * @returns Array of economic events for the trade
+   */
+  private async fetchEconomicEventsForTrade(
+    tradeDate: Date,
+    session?: string,
+    tags?: string[],
+    existingEvents?: TradeEconomicEvent[]
+  ): Promise<TradeEconomicEvent[]> {
+    // Return existing events if already provided
+    if (existingEvents && existingEvents.length > 0) {
+      return existingEvents;
+    }
+
+    // Only fetch events if session is provided
+    if (!session) {
+      return [];
+    }
+    if (!tags) {
+      return [];
+    }
+
+    try {
+      // Extract currencies from trade tags
+      const currencies = tags ? getRelevantCurrenciesFromTags(tags) : [];
+
+      // Fetch economic events for this trade session
+      const economicEvents = await tradeEconomicEventService.fetchEventsForTrade(
+        tradeDate,
+        session,
+        currencies.length > 0 ? currencies : undefined
+      );
+
+      logger.log(`📊 Fetched ${economicEvents.length} economic events for trade session ${session}`);
+      return economicEvents;
+    } catch (error) {
+      logger.error('Failed to fetch economic events for trade:', error);
+      // Return empty array on error - don't block trade creation/update
+      return [];
+    }
+  }
 
   protected async createInSupabase(entity: Omit<Trade, 'id' | 'created_at' | 'updated_at'>): Promise<Trade> {
     // Get current user from Supabase Auth
@@ -134,11 +328,20 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     // Use existing ID if provided (entity might have it despite TypeScript type), otherwise generate new one
     const tradeId = (entity as any).id || crypto.randomUUID();
 
-    // Create complete trade object with timestamps
+    // Fetch economic events for this trade if not already provided
+    const economicEvents = await this.fetchEconomicEventsForTrade(
+      entity.trade_date,
+      entity.session,
+      getRelevantCurrenciesFromTags(entity.tags || []), // Pass trade tags for currency filtering
+      entity.economic_events
+    );
+
+    // Create complete trade object with timestamps and economic events
     const completeTrade: Trade = {
       ...entity,
       id: tradeId,
       user_id: user.id,
+      economic_events: economicEvents,
       created_at: new Date(),
       updated_at: new Date()
     } as Trade;
@@ -166,10 +369,34 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
       throw new Error(`Trade not found: ${id}`);
     }
 
-    // Merge existing trade with updates
+    // Determine if we need to fetch new economic events
+    // Fetch if: session changed, date changed, tags changed, or no events exist
+    const shouldFetchEvents =
+      (updates.session && updates.session !== existingTrade.session) ||
+      (updates.trade_date && updates.trade_date.getTime() !== existingTrade.trade_date.getTime()) ||
+      (updates.tags && JSON.stringify(updates.tags) !== JSON.stringify(existingTrade.tags)) ||
+      (!existingTrade.economic_events || existingTrade.economic_events.length === 0);
+
+    // Fetch economic events if needed
+    let economicEvents = updates.economic_events || existingTrade.economic_events;
+    if (shouldFetchEvents) {
+      const tradeDate = updates.trade_date || existingTrade.trade_date;
+      const session = updates.session || existingTrade.session;
+      const tags = updates.tags || existingTrade.tags;
+
+      economicEvents = await this.fetchEconomicEventsForTrade(
+        tradeDate,
+        session,
+        tags,
+        updates.economic_events // Don't override if explicitly provided
+      );
+    }
+
+    // Merge existing trade with updates and economic events
     const completeTrade: Trade = {
       ...existingTrade,
       ...updates,
+      economic_events: economicEvents,
       id: existingTrade.id, // Ensure ID doesn't change
       updated_at: new Date()
     };
@@ -282,6 +509,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         notes: trade.notes,
         tags: trade.tags || [],
         images: trade.images || [],
+        economic_events: trade.economic_events || [],
         is_temporary: trade.is_temporary,
       };
 
@@ -340,6 +568,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         notes: trade.notes,
         tags: trade.tags || [],
         images: trade.images || [],
+        economic_events: trade.economic_events || [],
         is_temporary: trade.is_temporary,
         is_pinned: trade.is_pinned,
       };

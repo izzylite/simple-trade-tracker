@@ -409,10 +409,38 @@ export const importTrades = async (
 ): Promise<void> => {
   try {
     // Create all trades
+    // Note: Economic events are automatically fetched by TradeRepository.createInSupabase()
     for (const trade of trades) {
+      // Normalize pair tags to lowercase format (pair:<PAIR>)
+      // This ensures getRelevantCurrenciesFromTags() can extract currencies
+      let tags = trade.tags || [];
+
+      // Check if any tag looks like a pair tag and normalize it
+      tags = tags.map(tag => {
+        // Match tags like "Pair:EURUSD", "pair:EURUSD", "PAIR:EURUSD"
+        const pairMatch = tag.match(/^pair:(.+)$/i);
+        if (pairMatch) {
+          return `pair:${pairMatch[1]}`;  // Normalize to lowercase "pair:"
+        }
+        return tag;
+      });
+
+      // Also check if (trade as any).pair exists (in case it's passed as a property)
+      const pairValue = (trade as any).pair;
+      if (pairValue) {
+        const pairTag = `pair:${pairValue}`;
+        if (!tags.some(t => t.toLowerCase() === pairTag.toLowerCase())) {
+          tags = [...tags, pairTag];
+          logger.log(`📌 Added pair tag "${pairTag}" for imported trade`);
+        }
+      }
+
+      // Create the trade with normalized tags
+      // TradeRepository will automatically fetch economic events based on these tags
       await tradeRepository.create({
         ...trade,
-        calendar_id: calendarId
+        calendar_id: calendarId,
+        tags
       });
     }
 

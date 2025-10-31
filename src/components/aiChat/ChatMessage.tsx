@@ -19,6 +19,7 @@ import {
 import AnimatedText from './AnimatedText';
 import HtmlMessageRenderer from './HtmlMessageRenderer';
 import CitationsSection from './CitationsSection';
+import MarkdownRenderer from './MarkdownRenderer';
 import {
   Person as PersonIcon,
   SmartToy as AIIcon,
@@ -256,7 +257,26 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           }}
         >
           {/* Message Content */}
-          <Box sx={{ mb: message.error ? 1 : 0 }}>
+          <Box
+            sx={{
+              mb: message.error ? 1 : 0,
+              // Add subtle fade-in animation for streaming content
+              animation: message.status === 'receiving' && isAssistant ? 'subtlePulse 0.5s ease-in-out' : 'none',
+              '@keyframes subtlePulse': {
+                '0%': {
+                  opacity: 0.85
+                },
+                '50%': {
+                  opacity: 1
+                },
+                '100%': {
+                  opacity: 0.95
+                }
+              },
+              // Smooth transition for content changes
+              transition: 'opacity 0.5s ease-in-out'
+            }}
+          >
             {/* Use HTML renderer if messageHtml is available (from Supabase AI agent) */}
             {message.messageHtml ? (
               <HtmlMessageRenderer
@@ -273,8 +293,21 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 isAnimating={message.status === 'received'}
               />
             ) : (
-              // Regular text formatting
-              formatContent(message.content)
+              // Regular text formatting with streaming-friendly styling
+              <Box
+                sx={{
+                  // Smooth fade for new content chunks
+                  '& > *': {
+                    animation: message.status === 'receiving' && isAssistant ? 'fadeIn 0.3s ease-in' : 'none',
+                    '@keyframes fadeIn': {
+                      '0%': { opacity: 0 },
+                      '100%': { opacity: 1 }
+                    }
+                  }
+                }}
+              >
+                <MarkdownRenderer content={message.content} />
+              </Box>
             )}
           </Box>
 

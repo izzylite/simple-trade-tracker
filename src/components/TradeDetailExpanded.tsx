@@ -230,8 +230,9 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
       setLoadingEconomicEvents(true);
       setEconomicEventsError(null);
 
-
-      const sessionRange = tradeEconomicEventService.getSessionTimeRange(trade.session!, trade.trade_date);
+      // Convert trade_date to Date object if it's a string
+      const tradeDate = typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date;
+      const sessionRange = tradeEconomicEventService.getSessionTimeRange(trade.session!, tradeDate);
       const filterSetting = calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
       const events = await economicCalendarService.fetchEvents(
         { start: sessionRange.start, end: sessionRange.end },
@@ -289,6 +290,37 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   const { createChannel } = useRealtimeSubscription({
     channelName: `trade-economic-events-${trade.id}`,
     enabled: showEconomicEvents && tradeDateIsToday,
+    onChannelCreated: (channel) => {
+      // Configure the channel BEFORE it subscribes
+      channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'economic_events'
+        },
+        async (payload) => {
+          logger.log(`🔄 Economic event ${payload.eventType} for trade date ${tradeDateStr}`);
+
+          // Refetch events for the trade date
+          try {
+            const filterSetting = calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
+            const updatedEvents = await economicCalendarService.fetchEvents({
+              start: tradeDateStr,
+              end: tradeDateStr
+            }, {
+              currencies: (filterSetting?.currencies as Currency[]),
+              impacts: (filterSetting?.impacts as ImpactLevel[])
+            });
+            setAllEconomicEvents(updatedEvents.sort((a, b) =>
+              new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime()
+            ));
+          } catch (error) {
+            logger.error('Error refetching economic events:', error);
+          }
+        }
+      );
+    },
     onSubscribed: () => {
       logger.log(`✅ Subscribed to economic events for trade ${trade.id} (${tradeDateStr})`);
     },
@@ -302,39 +334,9 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   useEffect(() => {
     if (!showEconomicEvents || !tradeDateIsToday) return;
 
-    const channel = createChannel();
-    if (!channel) return;
-
-    // Subscribe to changes in economic_events table for today
-    channel.on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'economic_events'
-      },
-      async (payload) => {
-        logger.log(`🔄 Economic event ${payload.eventType} for trade date ${tradeDateStr}`);
-  
-        // Refetch events for the trade date
-        try {
-          
-          const filterSetting = calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
-          const updatedEvents = await economicCalendarService.fetchEvents({
-            start: tradeDateStr,
-            end: tradeDateStr
-          }, {
-            currencies: (filterSetting?.currencies as Currency[]),
-            impacts: (filterSetting?.impacts as ImpactLevel[])
-          });
-          setAllEconomicEvents(updatedEvents.sort((a, b) =>
-            new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime()
-          ));
-        } catch (error) {
-          logger.error('Error refetching economic events:', error);
-        }
-      }
-    );
+    // Create and subscribe to the channel
+    // The channel is configured via onChannelCreated callback before subscribing
+    createChannel();
 
     // Cleanup handled automatically by the hook
   }, [showEconomicEvents, tradeDateIsToday, createChannel, trade.id, tradeDateStr]);

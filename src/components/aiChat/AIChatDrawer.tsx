@@ -62,6 +62,14 @@ interface AIChatDrawerProps {
   trades: Trade[];
   calendar: Calendar;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
+  // Trade operation callbacks for EconomicEventDetailDialog
+  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
+  onEditTrade?: (trade: Trade) => void;
+  onDeleteTrade?: (tradeId: string) => void;
+  onDeleteMultipleTrades?: (tradeIds: string[]) => void;
+  onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
+  isReadOnly?: boolean;
 }
 
 // Bottom sheet heights
@@ -74,7 +82,14 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   onClose,
   trades,
   calendar,
-  onOpenGalleryMode
+  onOpenGalleryMode,
+  onUpdateTradeProperty,
+  onEditTrade,
+  onDeleteTrade,
+  onDeleteMultipleTrades,
+  onZoomImage,
+  onUpdateCalendarProperty,
+  isReadOnly = false
 }) => {
   const theme = useTheme();
   const { user } = useAuth();
@@ -88,6 +103,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<ChatError | null>(null);
+  const [toolExecutionStatus, setToolExecutionStatus] = useState<string>('');
 
   // Conversation management state
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
@@ -274,6 +290,11 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     setIsTyping(true);
+    setToolExecutionStatus(''); // Clear any previous tool status
+
+    // Track AI message ID (don't add placeholder yet - wait for first chunk or tool call)
+    const aiMessageId = uuidv4();
+    let aiMessageAdded = false;
 
     try {
       if (!user) {
@@ -284,37 +305,114 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         throw new Error('Calendar ID is required');
       }
 
-      // Send message to Supabase AI agent
-      const response = await supabaseAIChatService.sendMessage(
+      // Stream message from Supabase AI agent
+      let accumulatedText = '';
+      let messageHtml = '';
+      let citations: any[] | undefined;
+      let embeddedTrades: any | undefined;
+      let embeddedEvents: any | undefined;
+      let success = false;
+      let toolCallsInProgress: string[] = [];
+
+      for await (const event of supabaseAIChatService.sendMessageStreaming(
         messageText,
         user.uid,
         calendar.id,
         messages
-      );
+      )) {
+        switch (event.type) {
+          case 'text_chunk':
+            // Accumulate text
+            accumulatedText += event.data.text;
 
-      if (!response.success) {
-        throw new Error(response.message || 'Failed to get AI response');
+            // Add AI message on first chunk
+            if (!aiMessageAdded) {
+              const newMessage: ChatMessageType = {
+                id: aiMessageId,
+                role: 'assistant',
+                content: accumulatedText,
+                timestamp: new Date(),
+                status: 'receiving'
+              };
+              setMessages(prev => [...prev, newMessage]);
+              aiMessageAdded = true;
+            } else {
+              // Update existing message
+              setMessages(prev => prev.map(msg =>
+                msg.id === aiMessageId
+                  ? { ...msg, content: accumulatedText, status: 'receiving' as const }
+                  : msg
+              ));
+            }
+            break;
+
+          case 'tool_call':
+            logger.log(`Tool called: ${event.data.name}`);
+            toolCallsInProgress.push(event.data.name);
+
+            // Update typing indicator status
+            setToolExecutionStatus(toolCallsInProgress.join(', '));
+            break;
+
+          case 'tool_result':
+            logger.log(`Tool result: ${event.data.name}`);
+            // Remove from in-progress list
+            toolCallsInProgress = toolCallsInProgress.filter(t => t !== event.data.name);
+
+            // Update typing indicator status
+            if (toolCallsInProgress.length > 0) {
+              setToolExecutionStatus(toolCallsInProgress.join(', '));
+            } else {
+              // All tools completed
+              setToolExecutionStatus('');
+            }
+            break;
+
+          case 'citation':
+            citations = event.data.citations;
+            break;
+
+          case 'embedded_data':
+            embeddedTrades = event.data.embeddedTrades;
+            embeddedEvents = event.data.embeddedEvents;
+            break;
+
+          case 'done':
+            success = event.data.success;
+            messageHtml = event.data.messageHtml || '';
+            logger.log('AI response streaming complete');
+            break;
+
+          case 'error':
+            throw new Error(event.data.error || 'Streaming error');
+        }
       }
 
-      logger.log(`AI response received from Supabase edge function`);
-
-      // Add AI response with HTML, citations, and embedded data
-      const aiMessage: ChatMessageType = {
-        id: uuidv4(),
+      // Update or add final message with all data
+      const finalMessage: ChatMessageType = {
+        id: aiMessageId,
         role: 'assistant',
-        content: response.message,
-        messageHtml: response.messageHtml,
-        citations: response.citations,
-        embeddedTrades: response.embeddedTrades,
-        embeddedEvents: response.embeddedEvents,
+        content: accumulatedText,
+        messageHtml: messageHtml,
+        citations,
+        embeddedTrades,
+        embeddedEvents,
         timestamp: new Date(),
         status: 'received'
       };
 
-      const updatedMessages = [...messages, userMessage, aiMessage];
-      setMessages(updatedMessages);
+      if (aiMessageAdded) {
+        // Update existing message
+        setMessages(prev => prev.map(msg =>
+          msg.id === aiMessageId ? finalMessage : msg
+        ));
+      } else {
+        // Add message if no text chunks were received
+        setMessages(prev => [...prev, finalMessage]);
+      }
 
       // Auto-save conversation after successful message exchange
+      const updatedMessages = [...messages, userMessage, finalMessage];
       await saveCurrentConversation(updatedMessages);
 
     } catch (error) {
@@ -329,9 +427,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
       setError(chatError);
 
-      // Add error message
+      // Add or update error message
       const errorMessage: ChatMessageType = {
-        id: uuidv4(),
+        id: aiMessageId,
         role: 'assistant',
         content: 'Sorry, I encountered an error processing your message. Please try again.',
         timestamp: new Date(),
@@ -339,10 +437,19 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         error: chatError.message
       };
 
-      setMessages(prev => [...prev, errorMessage]);
+      if (aiMessageAdded) {
+        // Update existing message
+        setMessages(prev => prev.map(msg =>
+          msg.id === aiMessageId ? errorMessage : msg
+        ));
+      } else {
+        // Add error message if not already added
+        setMessages(prev => [...prev, errorMessage]);
+      }
     } finally {
       setIsLoading(false);
       setIsTyping(false);
+      setToolExecutionStatus(''); // Clear tool status
     }
   };
 
@@ -436,6 +543,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setToolExecutionStatus(''); // Clear tool status
     }
   }, [messages, user, calendar, trades]);
 
@@ -834,7 +942,9 @@ What would you like to know about your trading?`,
                         color="text.secondary"
                         sx={{ fontStyle: 'italic' }}
                       >
-                        AI is thinking...
+                        {toolExecutionStatus
+                          ? `AI is thinking... ${toolExecutionStatus}`
+                          : 'AI is thinking...'}
                       </Typography>
                     </Box>
                   </Box>
@@ -1167,9 +1277,16 @@ What would you like to know about your trading?`,
           }}
           event={selectedEvent}
           trades={trades}
+          onUpdateTradeProperty={onUpdateTradeProperty}
+          onEditTrade={onEditTrade}
+          onDeleteTrade={onDeleteTrade}
+          onDeleteMultipleTrades={onDeleteMultipleTrades}
+          onZoomImage={onZoomImage}
           onOpenGalleryMode={onOpenGalleryMode}
           calendarId={calendar.id}
-          calendar={{ economic_calendar_filters: calendar.economic_calendar_filters }}
+          calendar={calendar}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
+          isReadOnly={isReadOnly}
         />
       )}
 

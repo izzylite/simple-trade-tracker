@@ -35,7 +35,8 @@ const prepareTradeDataForExport = (trades: Trade[], initial_balance: number = 0)
     Tags: trade.tags?.join(', ') || '',
     'Risk to Reward': trade.risk_to_reward?.toFixed(2) || '',
     Session: trade.session || '',
-    Notes: trade.notes || ''
+    Notes: trade.notes || '',
+    Images: trade.images?.map(img => img.url).join(', ') || ''
   }));
 };
 
@@ -59,7 +60,8 @@ const exportToExcel = (data: any[], fileName: string): void => {
     { wch: 30 }, // Tags
     { wch: 12 }, // Risk to Reward
     { wch: 12 }, // Session
-    { wch: 50 }  // Notes
+    { wch: 50 }, // Notes
+    { wch: 50 }  // Images
   ];
   ws['!cols'] = colWidths;
 

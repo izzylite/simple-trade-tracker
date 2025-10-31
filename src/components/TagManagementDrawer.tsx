@@ -15,7 +15,10 @@ import {
   Tooltip,
   Button,
   FormControlLabel,
-  Switch
+  Switch,
+  Select,
+  MenuItem,
+  FormControl
 } from '@mui/material';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import {
@@ -174,7 +177,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
     if (onUpdateCalendarProperty) {
       onUpdateCalendarProperty(calendarId, (calendar) => ({
         ...calendar,
-        requiredTagGroups: groups
+        required_tag_groups: groups
       }));
     }
   };
@@ -228,47 +231,39 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
           )}
 
           <Box sx={{ mb: 3 }}>
-            <TextField
-              fullWidth
-              placeholder="Search tags..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+              <TextField
+                fullWidth
+                placeholder="Search tags..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }}
+                size="small"
+              />
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <Select
+                  value={selectedTagGroup}
+                  onChange={(e) => setSelectedTagGroup(e.target.value)}
+                  displayEmpty
+                  startAdornment={
+                    <InputAdornment position="start">
                       <FilterListIcon fontSize="small" />
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
-                        <select
-                          value={selectedTagGroup}
-                          onChange={(e) => setSelectedTagGroup(e.target.value)}
-                          style={{
-                            border: 'none',
-                            background: 'transparent',
-                            fontSize: '0.875rem',
-                            color: theme.palette.text.primary,
-                            padding: '4px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <option value="">All Groups</option>
-                          {tagGroups.map(group => (
-                            <option key={group} value={group}>{group}</option>
-                          ))}
-                        </select>
-                      </Box>
-                    </Box>
-                  </InputAdornment>
-                )
-              }}
-              size="small"
-              sx={{ mb: 2 }}
-            />
+                    </InputAdornment>
+                  }
+                >
+                  <MenuItem value="">All Groups</MenuItem>
+                  {tagGroups.map(group => (
+                    <MenuItem key={group} value={group}>{group}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
 
             <Box sx={{
               maxHeight: '100%',

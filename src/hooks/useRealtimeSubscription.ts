@@ -10,6 +10,7 @@ interface UseRealtimeSubscriptionOptions {
   onError?: (error: string) => void;
   maxReconnectAttempts?: number;
   reconnectDelay?: number;
+  onChannelCreated?: (channel: RealtimeChannel) => void; // NEW: Configure channel before subscribing
 }
 
 /**
@@ -32,6 +33,7 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
     onError,
     maxReconnectAttempts = 5,
     reconnectDelay = 1000,
+    onChannelCreated, // NEW: Extract callback
   } = options;
 
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -80,6 +82,8 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
 
   /**
    * Create and return a channel with status monitoring
+   * IMPORTANT: The channel is configured but NOT subscribed yet.
+   * Caller must configure event listeners, then call .subscribe()
    */
   const createChannel = useCallback(() => {
     if (!enabled) {
@@ -89,6 +93,11 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
     logger.log(`📡 Creating realtime channel: ${channelName}`);
 
     const channel = supabase.channel(channelName);
+
+    // Allow caller to configure the channel (add event listeners) BEFORE subscribing
+    if (onChannelCreated) {
+      onChannelCreated(channel);
+    }
 
     // Monitor subscription status as per official docs
     channel.subscribe((status) => {
@@ -121,7 +130,7 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
 
     channelRef.current = channel;
     return channel;
-  }, [enabled, channelName, onSubscribed, onError, attemptReconnect]);
+  }, [enabled, channelName, onSubscribed, onError, attemptReconnect, onChannelCreated]);
 
   /**
    * Handle page visibility changes
@@ -167,6 +176,27 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
       window.removeEventListener('offline', handleOffline);
     };
   }, [channelName, onError, attemptReconnect]);
+
+  /**
+   * Listen for auth token refresh events and reconnect channels
+   * This is CRITICAL: When JWT tokens expire and refresh, realtime channels
+   * need to be recreated with the new token to maintain connection
+   */
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'TOKEN_REFRESHED' && enabled && channelRef.current) {
+        logger.log(`🔄 Token refreshed, reconnecting ${channelName} channel to use new JWT`);
+        // Reset reconnect attempts since this is a legitimate reconnect
+        reconnectAttemptsRef.current = 0;
+        // Clean up old channel and it will be recreated with new token
+        attemptReconnect();
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, [enabled, channelName, attemptReconnect]);
 
   /**
    * Cleanup on unmount

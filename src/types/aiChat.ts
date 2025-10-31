@@ -5,7 +5,7 @@
 
 export type MessageRole = 'user' | 'assistant' | 'system';
 
-export type MessageStatus = 'sending' | 'sent' | 'error' | 'received';
+export type MessageStatus = 'sending' | 'sent' | 'error' | 'received' | 'pending' | 'receiving';
 
 export interface ChatMessage {
   id: string;

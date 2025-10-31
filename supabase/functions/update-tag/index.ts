@@ -7,10 +7,11 @@
  * - Tag deletion and replacement
  * - Calendar metadata updates
  * - Batch processing with transactions
- */ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+ */  
 import { createAuthenticatedClient, errorResponse, successResponse, handleCors, log, parseJsonBody } from '../_shared/supabase.ts';
+import type { AuthenticatedRequest } from '../_shared/supabase.ts';
 import { updateTradeTagsWithGroupNameChange, extractTagsFromTrades } from '../_shared/utils.ts';
-import type { Calendar, Trade, UpdateTagRequest, UpdateTagResponse } from '../_shared/types.ts';
+import type { Calendar, Trade, UpdateTagRequest } from '../_shared/types.ts';
 
 /**
  * Helper function to update tags array with group name changes
@@ -50,7 +51,7 @@ import type { Calendar, Trade, UpdateTagRequest, UpdateTagResponse } from '../_s
 }
 /**
  * Update tags in calendar metadata (tags, scoreSettings, requiredTagGroups)
- */ async function updateCalendarMetadata(supabase: any, calendarId: string, calendarData: Calendar, oldTag: string, newTag: string): Promise<void> {
+ */ async function updateCalendarMetadata(supabase: AuthenticatedRequest['supabase'], calendarId: string, calendarData: Calendar, oldTag: string, newTag: string): Promise<void> {
   try {
     log('Updating calendar metadata');
     const updateData: Record<string, unknown> = {
@@ -84,7 +85,11 @@ import type { Calendar, Trade, UpdateTagRequest, UpdateTagResponse } from '../_s
       log(`Updated score settings`);
     }
     // Update the calendar
-    const { error } = await supabase.from('calendars').update(updateData).eq('id', calendarId);
+    // Cast to satisfy TypeScript in edge runtime (no generated DB types)
+    const { error } = await supabase
+      .from('calendars')
+      .update(updateData as never)
+      .eq('id', calendarId);
     if (error) {
       throw error;
     }
@@ -97,11 +102,14 @@ import type { Calendar, Trade, UpdateTagRequest, UpdateTagResponse } from '../_s
 
 /**
  * Update tags in all trades for the calendar
- */ async function updateTradesTags(supabase: any, calendarId: string, oldTag: string, newTag: string): Promise<number> {
+ */ async function updateTradesTags(supabase: AuthenticatedRequest['supabase'], calendarId: string, oldTag: string, newTag: string): Promise<number> {
   try {
     log(`Updating trades tags: ${oldTag} → ${newTag}`);
-    // Get all trades for this calendar
-    const { data: trades, error: fetchError } = await supabase.from('trades').select('*').eq('calendar_id', calendarId);
+    // Get only necessary fields for this calendar
+    const { data: trades, error: fetchError } = await supabase
+      .from('trades')
+      .select('id,tags')
+      .eq('calendar_id', calendarId);
     if (fetchError) {
       throw fetchError;
     }
@@ -130,10 +138,13 @@ import type { Calendar, Trade, UpdateTagRequest, UpdateTagResponse } from '../_s
       // Update this batch if there are changes
       if (updates.length > 0) {
         for (const update of updates) {
-          const { error } = await supabase.from('trades').update({
-            tags: update.tags,
-            updated_at: update.updated_at
-          }).eq('id', update.id);
+          const { error } = await supabase
+            .from('trades')
+            .update({
+              tags: update.tags,
+              updated_at: update.updated_at
+            } as never)
+            .eq('id', update.id);
           if (error) {
             log(`Error updating trade ${update.id}`, 'error', error);
           }
@@ -156,6 +167,9 @@ import type { Calendar, Trade, UpdateTagRequest, UpdateTagResponse } from '../_s
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
   try {
+    if (req.method !== 'POST') {
+      return errorResponse('Method Not Allowed', 405);
+    }
     log('Update tag request received');
     // Authenticate user
     const authResult = await createAuthenticatedClient(req);
@@ -168,7 +182,9 @@ import type { Calendar, Trade, UpdateTagRequest, UpdateTagResponse } from '../_s
     if (!payload) {
       return errorResponse('Invalid JSON payload', 400);
     }
-    const { calendar_id: calendarId, old_tag: oldTag, new_tag: newTag } = payload;
+    const { calendar_id: calendarId, old_tag: rawOldTag, new_tag: rawNewTag } = payload;
+    const oldTag = typeof rawOldTag === 'string' ? rawOldTag.trim() : rawOldTag as string;
+    const newTag = typeof rawNewTag === 'string' ? rawNewTag.trim() : rawNewTag as string;
     // Validate required parameters
     if (!calendarId || !oldTag || newTag === undefined || newTag === null) {
       return errorResponse('Missing required parameters: calendarId, oldTag, or newTag', 400);
@@ -187,13 +203,14 @@ import type { Calendar, Trade, UpdateTagRequest, UpdateTagResponse } from '../_s
       newTag,
       userId: user.id
     });
-    // Get calendar and verify ownership
-    const { data: calendar, error: calendarError } = await supabase.from('calendars').select('*').eq('id', calendarId).single();
+    // Get calendar (RLS enforces ownership)
+    const { data: calendar, error: calendarError } = await supabase
+      .from('calendars')
+      .select('*')
+      .eq('id', calendarId)
+      .single();
     if (calendarError || !calendar) {
       return errorResponse('Calendar not found', 404);
-    }
-    if (calendar.user_id !== user.id) {
-      return errorResponse('Unauthorized access to calendar', 403);
     }
     // Perform the tag updates
     const [tradesUpdated] = await Promise.all([
@@ -206,10 +223,13 @@ import type { Calendar, Trade, UpdateTagRequest, UpdateTagResponse } from '../_s
     const { data: updatedTrades, error: tradesError } = await supabase.from('trades').select('tags').eq('calendar_id', calendarId);
     if (!tradesError && updatedTrades) {
       const allTags = extractTagsFromTrades(updatedTrades);
-      await supabase.from('calendars').update({
-        tags: allTags,
-        updated_at: new Date().toISOString()
-      }).eq('id', calendarId);
+      await supabase
+        .from('calendars')
+        .update({
+          tags: allTags,
+          updated_at: new Date().toISOString()
+        } as never)
+        .eq('id', calendarId);
       log(`Refreshed calendar tags: ${allTags.length} unique tags`);
     }
     log(`Tag update completed successfully: ${tradesUpdated} trades updated`);

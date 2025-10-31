@@ -26,7 +26,8 @@ import {
   CircularProgress,
   Menu,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  Fab
 } from '@mui/material';
 
 import CalendarFormDialog, { CalendarFormData } from './CalendarFormDialog';
@@ -48,7 +49,8 @@ import {
   ExpandLess,
   ContentCopy as CopyIcon,
   MoreVert as MoreVertIcon,
-  Delete as TrashIcon
+  Delete as TrashIcon,
+  AutoAwesome as AIIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -585,33 +587,9 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
         mode={mode}
       />
       <Toolbar />
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <Container maxWidth="lg" sx={{ mt: 4, pb: 10 }}>
         {user ? (
           <>
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Box>
-                <Typography variant="h4" component="h2">
-                  Your Calendars
-                </Typography>
-              </Box>
-              <Stack direction="row" spacing={2}>
-                <Button
-                  variant="outlined"
-                  startIcon={<TrashIcon />}
-                  onClick={() => navigate('/trash')}
-                  sx={{ color: 'text.secondary' }}
-                >
-                  Trash
-                </Button>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => setIsCreateDialogOpen(true)}
-                >
-                  Create Calendar
-                </Button>
-              </Stack>
-            </Box>
 
             {calendars.length === 0 && !isLoading ? (
               <Box
@@ -995,16 +973,168 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
 
           </>
         ) : (
-          <Box sx={{ textAlign: 'center', mt: 8 }}>
-            <Typography variant="h5" gutterBottom>
-              Welcome to Trade Tracker
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-              Sign in to start managing your trades
-            </Typography>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: 'calc(100vh - 200px)',
+            }}
+          >
+            <Card
+              sx={{
+                maxWidth: 450,
+                width: '100%',
+                mx: 2,
+                p: 4,
+                textAlign: 'center',
+                background: theme.palette.mode === 'dark'
+                  ? `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.background.paper, 0.9)} 100%)`
+                  : `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${theme.palette.background.paper} 100%)`,
+                backdropFilter: 'blur(10px)',
+                boxShadow: theme.palette.mode === 'dark'
+                  ? `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.4)}`
+                  : `0 8px 32px 0 ${alpha(theme.palette.primary.main, 0.15)}`,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+              }}
+            >
+              {/* Logo/Icon */}
+              <Box
+                sx={{
+                  margin: '0 auto 24px',
+                }}
+              >
+                <Box
+                  component="img"
+                  src="/android-chrome-192x192.png"
+                  alt="Cotex Logo"
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: '20px',
+                    boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
+                  }}
+                />
+              </Box>
+
+              {/* Welcome Text */}
+              <Typography
+                variant="h4"
+                gutterBottom
+                sx={{
+                  fontWeight: 700,
+                  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  mb: 1
+                }}
+              >
+                Cotex
+              </Typography>
+
+              <Typography
+                variant="body1"
+                color="text.secondary"
+                sx={{ mb: 4 }}
+              >
+                Track, analyze, and improve your trading performance
+              </Typography>
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* Sign In Button */}
+              <Button
+                variant="contained"
+                size="large"
+                fullWidth
+                onClick={handleSignIn}
+                startIcon={<GoogleIcon />}
+                sx={{
+                  py: 1.5,
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  borderRadius: 2,
+                  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                  boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
+                  '&:hover': {
+                    boxShadow: `0 6px 24px ${alpha(theme.palette.primary.main, 0.4)}`,
+                    transform: 'translateY(-2px)',
+                    transition: 'all 0.3s ease'
+                  }
+                }}
+              >
+                Sign in with Google
+              </Button>
+
+              {/* Features List */}
+              <Box sx={{ mt: 4, textAlign: 'left' }}>
+                <Stack spacing={2}>
+                  {[
+                    { icon: <TrendingUp />, text: 'Track all your trades' },
+                    { icon: <ChartIcon />, text: 'Analyze performance with advanced charts' },
+                    { icon: <CalendarMonth />, text: 'Calendar view & insights' },
+                    { icon: <AIIcon />, text: 'AI-powered trading assistant & analysis' }
+                  ].map((feature, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                        color: 'text.secondary'
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 32,
+                          height: 32,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '8px',
+                          bgcolor: alpha(theme.palette.primary.main, 0.1),
+                          color: 'primary.main'
+                        }}
+                      >
+                        {feature.icon}
+                      </Box>
+                      <Typography variant="body2">
+                        {feature.text}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            </Card>
           </Box>
         )}
       </Container>
+
+      {/* Floating Action Button */}
+      {user && (
+        <Fab
+          color="primary"
+          aria-label="add calendar"
+          onClick={() => setIsCreateDialogOpen(true)}
+          sx={{
+            position: 'fixed',
+            bottom: 32,
+            right: 32,
+            width: 64,
+            height: 64,
+            boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`,
+            '&:hover': {
+              boxShadow: `0 12px 32px ${alpha(theme.palette.primary.main, 0.5)}`,
+              transform: 'scale(1.05)',
+            },
+            transition: 'all 0.3s ease',
+          }}
+        >
+          <AddIcon sx={{ fontSize: 32 }} />
+        </Fab>
+      )}
     </Box>
   );
 };

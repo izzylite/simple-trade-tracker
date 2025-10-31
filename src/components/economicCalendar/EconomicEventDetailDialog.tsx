@@ -1,41 +1,36 @@
 /**
  * Economic Event Detail Dialog
- * Displays detailed information about an economic event including:
- * - Event details (name, impact, currency, time, etc.)
- * - All trades that occurred during the event
- * - Statistics (win rate, total wins/losses, average win/loss, etc.)
+ * Simple dialog for pinning events and adding notes
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Box,
   Typography,
   Chip,
   useTheme,
   alpha,
-  Divider,
-  Paper
+  IconButton,
+  Tooltip,
+  TextField,
+  CircularProgress
 } from '@mui/material';
 import {
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  Remove as NeutralIcon,
-  Check as CheckIcon,
-  Close as CloseIcon,
-  ShowChart as ShowChartIcon
+  PushPin as PinIcon,
+  PushPinOutlined as PinOutlinedIcon
 } from '@mui/icons-material';
-import { format, parseISO } from 'date-fns';
 import { EconomicEvent } from '../../types/economicCalendar';
 import { Trade } from '../../types/dualWrite';
+import { Calendar } from '../../types/calendar';
 import { BaseDialog } from '../common';
 import TradeList from '../trades/TradeList';
-import { calculateTotalPnL, calculateWinRate, calculateAverages } from '../../utils/statsUtils';
+import { cleanEventNameForPinning, eventMatchV1, eventMatchV3 } from '../../utils/eventNameUtils';
 
 interface EconomicEventDetailDialogProps {
   open: boolean;
   onClose: () => void;
   event: EconomicEvent;
-  trades: Trade[]; // All trades from the calendar
+  trades: Trade[];
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   onEditTrade?: (trade: Trade) => void;
   onDeleteTrade?: (tradeId: string) => void;
@@ -43,13 +38,15 @@ interface EconomicEventDetailDialogProps {
   onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
   calendarId?: string;
-  calendar?: {
+  calendar?: Calendar | {
     economic_calendar_filters?: {
       currencies: string[];
       impacts: string[];
       viewType: 'day' | 'week' | 'month';
     };
   };
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
+  isReadOnly?: boolean;
 }
 
 const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
@@ -64,74 +61,122 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   onZoomImage,
   onOpenGalleryMode,
   calendarId,
-  calendar
+  calendar,
+  onUpdateCalendarProperty,
+  isReadOnly = false
 }) => {
   const theme = useTheme();
   const [expandedTradeId, setExpandedTradeId] = React.useState<string | null>(null);
-
-  // Helper function to extract base event name (remove date suffix)
-  // E.g., "Initial Jobless Claims Oct25" -> "Initial Jobless Claims"
-  // E.g., "Consumer Confidence (May)" -> "Consumer Confidence"
-  // E.g., "Durable Goods Orders MoM Sep" -> "Durable Goods Orders MoM"
-  const getBaseEventName = (eventName: string): string => {
-    // Remove common date patterns:
-    // - Dates in parentheses: (May), (Jan), (2024), etc.
-    // - Month abbreviations at the end: Sep, Oct, Jan, etc. (with or without year)
-    // - Dates at the end: Oct25, Feb25, 2024, etc.
-    return eventName
-      .replace(/\s*\((Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\)/gi, '')
-      .replace(/\s*\(\d{4}\)/g, '')
-      .replace(/\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\d{2}$/i, '')
-      .replace(/\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/i, '')
-      .replace(/\s+\d{4}$/, '')
-      .replace(/\s+\d{1,2}\/\d{1,2}\/\d{2,4}$/, '')
-      .trim();
-  };
+  const [notesText, setNotesText] = useState('');
+  const [pinning, setPinning] = useState(false);
 
   // Filter trades that occurred during this event
-  // Match trades by checking if the event is in the trade's economic_events array
-  // We match by base event name (without date suffix), currency, and impact
-  const eventTrades = useMemo(() => {
-    const baseEventName = getBaseEventName(event.event_name);
-
+  const eventTrades = useMemo(() => { 
     return trades.filter(trade => {
       if (!trade.economic_events || trade.economic_events.length === 0) {
         return false;
-      }
-
-      // Check if any of the trade's economic events match this event
-      // Match by base name, currency, and impact
-      return trade.economic_events.some(tradeEvent => {
-        const tradeBaseEventName = getBaseEventName(tradeEvent.name);
-        return tradeBaseEventName === baseEventName &&
-               tradeEvent.currency === event.currency &&
-               tradeEvent.impact === event.impact;
+      } 
+      return trade.economic_events.some(tradeEvent => { 
+        return eventMatchV3(tradeEvent,event)
       });
     });
   }, [trades, event]);
 
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const totalPnL = calculateTotalPnL(eventTrades);
-    const winRate = calculateWinRate(eventTrades);
-    const { avg_win, avg_loss } = calculateAverages(eventTrades);
-    
-    const wins = eventTrades.filter(t => t.trade_type === 'win');
-    const losses = eventTrades.filter(t => t.trade_type === 'loss');
-    const breakevens = eventTrades.filter(t => t.trade_type === 'breakeven');
+  // Check if event is pinned and get pinned event data
+  const pinnedEventData = useMemo(() => {
+    if (!calendar || !('pinned_events' in calendar) || !calendar.pinned_events) {
+      return null;
+    }
+ 
+    // First try to match by event_id (exact match), then fallback to name matching
+    return calendar.pinned_events.find(pe =>
+      pe.event_id ? pe.event_id === event.id : eventMatchV1(event, pe)
+    ) || null;
+  }, [calendar, event.id, event.event_name]);
 
-    return {
-      totalTrades: eventTrades.length,
-      totalPnL,
-      winRate,
-      totalWins: wins.length,
-      totalLosses: losses.length,
-      totalBreakevens: breakevens.length,
-      avgWin: avg_win,
-      avgLoss: avg_loss,
-      profitFactor: avg_loss > 0 ? avg_win / avg_loss : 0
-    };
-  }, [eventTrades]);
+  const isPinned = !!pinnedEventData;
+
+  // Initialize notes text when pinned event data changes
+  useEffect(() => {
+    if (pinnedEventData?.notes) {
+      setNotesText(pinnedEventData.notes);
+    } else {
+      setNotesText('');
+    }
+  }, [pinnedEventData]);
+
+  // Handle pin/unpin with progress indicator
+  const handleTogglePin = async () => {
+    if (!calendar || !('id' in calendar) || !('pinned_events' in calendar) || !calendarId || !onUpdateCalendarProperty) {
+      return;
+    }
+
+    const cleanedEventName = cleanEventNameForPinning(event.event_name);
+
+    try {
+      setPinning(true);
+      await onUpdateCalendarProperty(calendarId, (cal: Calendar) => {
+        const currentPinned = cal.pinned_events || [];
+
+        if (isPinned) {
+          // Unpin - use event_id for exact matching if available
+          return {
+            ...cal,
+            pinned_events: currentPinned.filter(pe =>
+              pe.event_id ? pe.event_id !== event.id : !eventMatchV1(event, pe)
+            )
+          };
+        } else {
+          // Pin - include event_id
+          return {
+            ...cal,
+            pinned_events: [...currentPinned, {
+              event: cleanedEventName,
+              event_id: event.id,
+              notes: '',
+              impact: event.impact,
+              currency: event.currency
+            }]
+          };
+        }
+      });
+    } finally {
+      setPinning(false);
+    }
+  };
+
+  // Handle notes change with auto-save
+  const handleNotesChange = async (newNotes: string) => {
+    // Limit to 250 characters
+    const trimmedNotes = newNotes.slice(0, 250);
+    setNotesText(trimmedNotes);
+
+    if (!calendar || !('id' in calendar) || !('pinned_events' in calendar) || !calendarId || !onUpdateCalendarProperty || !isPinned) {
+      return;
+    }
+
+    // Auto-save notes
+    await onUpdateCalendarProperty(calendarId, (cal: Calendar) => {
+      const currentPinned = cal.pinned_events || [];
+      const existingIndex = currentPinned.findIndex(pe =>
+        pe.event_id ? pe.event_id === event.id : eventMatchV1(event, pe)
+      );
+
+      if (existingIndex >= 0) {
+        const updated = [...currentPinned];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          notes: trimmedNotes.trim() || undefined
+        };
+        return {
+          ...cal,
+          pinned_events: updated
+        };
+      }
+
+      return cal;
+    });
+  };
 
   // Get impact color
   const getImpactColor = (impact: string) => {
@@ -147,48 +192,27 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     }
   };
 
-  // Get result type icon and color
-  const getResultTypeDisplay = () => {
-    if (!event.actual_result_type) {
-      return null;
-    }
-
-    switch (event.actual_result_type) {
-      case 'good':
-        return {
-          icon: <TrendingUpIcon sx={{ fontSize: 16 }} />,
-          color: theme.palette.success.main,
-          label: 'Better than expected'
-        };
-      case 'bad':
-        return {
-          icon: <TrendingDownIcon sx={{ fontSize: 16 }} />,
-          color: theme.palette.error.main,
-          label: 'Worse than expected'
-        };
-      case 'neutral':
-        return {
-          icon: <NeutralIcon sx={{ fontSize: 16 }} />,
-          color: theme.palette.text.secondary,
-          label: 'As expected'
-        };
-      default:
-        return null;
-    }
-  };
-
-  const resultDisplay = getResultTypeDisplay();
+  // Compute event trade stats
+  const stats = useMemo(() => {
+    const total = eventTrades.length;
+    const wins = eventTrades.filter(t => t.trade_type === 'win').length;
+    const losses = eventTrades.filter(t => t.trade_type === 'loss').length;
+    const breakevens = eventTrades.filter(t => t.trade_type === 'breakeven').length;
+    const denom = wins + losses;
+    const win_rate = denom > 0 ? Math.round((wins / denom) * 100) : 0;
+    return { total, wins, losses, breakevens, win_rate };
+  }, [eventTrades]);
 
   return (
     <BaseDialog
       open={open}
-      onClose={onClose} 
+      onClose={onClose}
       title={
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
           {event.flag_url && (
             <img
               src={event.flag_url}
-              alt={event.country}
+              alt={event.currency}
               style={{
                 width: 24,
                 height: 18,
@@ -201,11 +225,8 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
             <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
               {event.event_name}
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-              {format(parseISO(event.event_time), 'MMM d, yyyy • h:mm a')}
-            </Typography>
           </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
             <Chip
               label={event.currency}
               size="small"
@@ -228,238 +249,108 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
                 color: getImpactColor(event.impact)
               }}
             />
+            {calendar && 'pinned_events' in calendar && onUpdateCalendarProperty && !isReadOnly && (
+              <Tooltip title={isPinned ? "Unpin event" : "Pin event"}>
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={pinning ? undefined : handleTogglePin}
+                    disabled={pinning}
+                    sx={{
+                      color: isPinned ? 'warning.main' : 'text.secondary',
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.warning.main, 0.1)
+                      },
+                      '&.Mui-disabled': {
+                        color: 'text.disabled'
+                      }
+                    }}
+                  >
+                    {pinning ? (
+                      <CircularProgress size={18} color="inherit" />
+                    ) : (
+                      isPinned ? <PinIcon sx={{ fontSize: 20 }} /> : <PinOutlinedIcon sx={{ fontSize: 20 }} />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
           </Box>
         </Box>
       }
-      maxWidth="md"
+      maxWidth="sm"
       fullWidth
       hideFooterCancelButton
     >
       <Box>
-        {/* Event Values - Compact Row */}
-        {(event.actual_value || event.forecast_value || event.previous_value || resultDisplay) && (
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: 2,
-              mb: 2,
-              p: 1.5,
-              backgroundColor: alpha(theme.palette.background.paper, 0.5),
-              borderRadius: 1,
-              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
-            }}
-          >
-
-            {event.previous_value && (
-              <Box sx={{ flex: 1, textAlign: 'center' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                  Previous
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
-                  {event.previous_value}
-                </Typography>
-              </Box>
-            )}
-
-            {event.forecast_value && (
-              <Box sx={{ flex: 1, textAlign: 'center' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                  Forecast
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
-                  {event.forecast_value}
-                </Typography>
-              </Box>
-            )}
-
-            {event.actual_value && (
-              <Box sx={{ flex: 1, textAlign: 'center' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                  Actual
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
-                  {event.actual_value}
-                </Typography>
-              </Box>
-            )}
-            {resultDisplay && (
-              <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box sx={{ color: resultDisplay.color }}>
-                  {resultDisplay.icon}
-                </Box>
-                <Typography variant="caption" sx={{ color: resultDisplay.color, fontWeight: 600, fontSize: '0.75rem' }}>
-                  {resultDisplay.label}
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        )}
-
-        {/* Statistics Section - Compact Grid */}
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.875rem' }}>
-            <ShowChartIcon sx={{ fontSize: 18 }} />
-            Performance Stats
+        {/* Stats Section */}
+        <Box sx={{
+          mb: 3,
+          mt: 3,
+          p: 2,
+          borderRadius: 2,
+          backgroundColor: alpha(theme.palette.background.paper, 0.5),
+          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+        }}>
+          <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, fontSize: '0.875rem', color: 'text.secondary' }}>
+            Stats
           </Typography>
-
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-            {/* Total Trades */}
-            <Box sx={{ flex: '1 1 calc(33.333% - 8px)', minWidth: 100 }}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 1.5,
-                  textAlign: 'center',
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                  border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                  borderRadius: 1
-                }}
-              >
-                <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main', fontSize: '1.5rem' }}>
-                  {stats.totalTrades}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                  Trades
-                </Typography>
-              </Paper>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(5, 1fr)' }, gap: 1.25 }}>
+            <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.background.paper, 0.3), border: `1px solid ${alpha(theme.palette.divider, 0.15)}` }}>
+              <Typography variant="caption" color="text.secondary">Total Trades</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{stats.total}</Typography>
             </Box>
-
-            {/* Win Rate */}
-            <Box sx={{ flex: '1 1 calc(33.333% - 8px)', minWidth: 100 }}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 1.5,
-                  textAlign: 'center',
-                  backgroundColor: alpha(theme.palette.success.main, 0.05),
-                  border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`,
-                  borderRadius: 1
-                }}
-              >
-                <Typography variant="h5" sx={{ fontWeight: 700, color: 'success.main', fontSize: '1.5rem' }}>
-                  {stats.winRate.toFixed(1)}%
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                  Win Rate
-                </Typography>
-              </Paper>
+            <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.success.main, 0.06), border: `1px solid ${alpha(theme.palette.success.main, 0.15)}` }}>
+              <Typography variant="caption" color="text.secondary">Wins</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'success.main' }}>{stats.wins}</Typography>
             </Box>
-
-            {/* Total PnL */}
-            <Box sx={{ flex: '1 1 calc(33.333% - 8px)', minWidth: 100 }}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 1.5,
-                  textAlign: 'center',
-                  backgroundColor: alpha(
-                    stats.totalPnL >= 0 ? theme.palette.success.main : theme.palette.error.main,
-                    0.05
-                  ),
-                  border: `1px solid ${alpha(
-                    stats.totalPnL >= 0 ? theme.palette.success.main : theme.palette.error.main,
-                    0.1
-                  )}`,
-                  borderRadius: 1
-                }}
-              >
-                <Typography
-                  variant="h5"
-                  sx={{
-                    fontWeight: 700,
-                    color: stats.totalPnL >= 0 ? 'success.main' : 'error.main',
-                    fontSize: '1.5rem'
-                  }}
-                >
-                  ${stats.totalPnL.toFixed(2)}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                  Total PnL
-                </Typography>
-              </Paper>
+            <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.error.main, 0.06), border: `1px solid ${alpha(theme.palette.error.main, 0.15)}` }}>
+              <Typography variant="caption" color="text.secondary">Losses</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'error.main' }}>{stats.losses}</Typography>
             </Box>
-
-            {/* Wins/Losses/Profit Factor - Compact Row */}
-            <Box sx={{ flex: '1 1 100%', display: 'flex', gap: 1.5 }}>
-              <Paper
-                elevation={0}
-                sx={{
-                  flex: 1,
-                  p: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 0.5,
-                  backgroundColor: alpha(theme.palette.success.main, 0.05),
-                  border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`,
-                  borderRadius: 1
-                }}
-              >
-                <CheckIcon sx={{ fontSize: 16, color: 'success.main' }} />
-                <Typography variant="body2" sx={{ fontWeight: 700, color: 'success.main', fontSize: '0.875rem' }}>
-                  {stats.totalWins}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                  Wins
-                </Typography>
-              </Paper>
-
-              <Paper
-                elevation={0}
-                sx={{
-                  flex: 1,
-                  p: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 0.5,
-                  backgroundColor: alpha(theme.palette.error.main, 0.05),
-                  border: `1px solid ${alpha(theme.palette.error.main, 0.1)}`,
-                  borderRadius: 1
-                }}
-              >
-                <CloseIcon sx={{ fontSize: 16, color: 'error.main' }} />
-                <Typography variant="body2" sx={{ fontWeight: 700, color: 'error.main', fontSize: '0.875rem' }}>
-                  {stats.totalLosses}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                  Losses
-                </Typography>
-              </Paper>
-
-              <Paper
-                elevation={0}
-                sx={{
-                  flex: 1,
-                  p: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 0.5,
-                  backgroundColor: alpha(theme.palette.info.main, 0.05),
-                  border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
-                  borderRadius: 1
-                }}
-              >
-                <Typography variant="body2" sx={{ fontWeight: 700, color: 'info.main', fontSize: '0.875rem' }}>
-                  {stats.profitFactor.toFixed(2)}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                  PF
-                </Typography>
-              </Paper>
+            <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.warning.main, 0.06), border: `1px solid ${alpha(theme.palette.warning.main, 0.15)}` }}>
+              <Typography variant="caption" color="text.secondary">Breakeven</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'warning.main' }}>{stats.breakevens}</Typography>
+            </Box>
+            <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.primary.main, 0.06), border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}` }}>
+              <Typography variant="caption" color="text.secondary">Win Rate</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>{`${stats.win_rate}%`}</Typography>
             </Box>
           </Box>
         </Box>
 
-        <Divider sx={{ my: 2 }} />
+        {/* Notes Section - Only visible when pinned */}
+        {isPinned && (
+          <Box sx={{ mb: 3 }}>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              placeholder="Add notes about this event (max 250 characters)..."
+              value={notesText}
+              onChange={(e) => handleNotesChange(e.target.value)}
+              disabled={isReadOnly}
+              slotProps={{
+                input: {
+                  sx: {
+                    backgroundColor: alpha(theme.palette.warning.main, 0.05),
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.warning.main, 0.08)
+                    },
+                    '&.Mui-focused': {
+                      backgroundColor: alpha(theme.palette.warning.main, 0.08)
+                    }
+                  }
+                }
+              }}
+              helperText={`${notesText.length}/250 characters`}
+            />
+          </Box>
+        )}
 
         {/* Trades List */}
         <Box>
-          <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, fontSize: '0.875rem' }}>
-            Trades ({eventTrades.length})
-          </Typography>
+         
 
           {eventTrades.length === 0 ? (
             <Box
@@ -468,27 +359,26 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
                 py: 3,
                 backgroundColor: alpha(theme.palette.background.paper, 0.3),
                 borderRadius: 1,
-                border: `1px dashed ${alpha(theme.palette.divider, 0.2)}`
+                border: `1px dashed ${alpha(theme.palette.divider, 0.3)}`
               }}
             >
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
-                No trades during this event
+              <Typography variant="body2" color="text.secondary">
+                No trades found for this event
               </Typography>
             </Box>
           ) : (
             <TradeList
               trades={eventTrades}
               expandedTradeId={expandedTradeId}
-              onTradeClick={(tradeId) => setExpandedTradeId(expandedTradeId === tradeId ? null : tradeId)}
+              onTradeClick={(id) => setExpandedTradeId(prev => prev === id ? null : id)}
               onEditClick={onEditTrade || (() => {})}
               onDeleteClick={onDeleteTrade || (() => {})}
               onDeleteMultiple={onDeleteMultipleTrades}
               onZoomedImage={onZoomImage || (() => {})}
               onUpdateTradeProperty={onUpdateTradeProperty}
-              hideActions={!onEditTrade && !onDeleteTrade}
-              enableBulkSelection={eventTrades.length > 1 && !!onDeleteMultipleTrades}
-              calendarId={calendarId}
               onOpenGalleryMode={onOpenGalleryMode}
+              hideActions={isReadOnly}
+              calendarId={calendarId}
               calendar={calendar}
             />
           )}

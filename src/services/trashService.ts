@@ -73,7 +73,8 @@ export const restoreCalendarFromTrash = async (calendarId: string): Promise<void
 
 /**
  * Permanently delete a calendar from trash
- * This action cannot be undone
+ * Marks the calendar for deletion
+ * The webhook will handle actual cleanup and final deletion
  */
 export const permanentlyDeleteCalendar = async (calendarId: string): Promise<void> => {
   try {
@@ -87,94 +88,36 @@ export const permanentlyDeleteCalendar = async (calendarId: string): Promise<voi
       throw new Error('Calendar is not in trash');
     }
 
-    // Permanently delete the calendar
+    // Mark for deletion - webhook will handle actual deletion
     await calendarRepository.delete(calendarId);
 
-    logger.log(`Calendar ${calendarId} permanently deleted`);
+    logger.log(`Calendar ${calendarId} marked for permanent deletion`);
   } catch (error) {
-    logger.error('Error permanently deleting calendar:', error);
+    logger.error('Error marking calendar for permanent deletion:', error);
     throw error;
   }
 };
 
 /**
  * Get all calendars in trash for a user
+ * Returns soft-deleted calendars that haven't been marked for final deletion
  */
 export const getTrashCalendars = async (userId: string): Promise<TrashCalendar[]> => {
   try {
-    const calendars = await calendarRepository.findByUserId(userId);
+    const calendars = await calendarRepository.findTrashByUserId(userId);
 
-    // Filter for deleted calendars
-    return calendars
-      .filter(cal => cal.deleted_at !== undefined && cal.deleted_at !== null)
-      .map(cal => ({
-        ...cal,
-        deleted_at: cal.deleted_at!,
-        deleted_by: cal.deleted_by || userId,
-        auto_delete_at: cal.auto_delete_at || new Date()
-      } as TrashCalendar));
+    return calendars.map(cal => ({
+      ...cal,
+      deleted_at: cal.deleted_at!,
+      deleted_by: cal.deleted_by || userId,
+      auto_delete_at: cal.auto_delete_at || new Date()
+    } as TrashCalendar));
   } catch (error) {
     logger.error('Error getting trash calendars:', error);
     throw error;
   }
 };
-
-/**
- * Get calendars that are ready for automatic deletion
- * Used by cleanup functions
- */
-export const getCalendarsReadyForDeletion = async (): Promise<TrashCalendar[]> => {
-  try {
-    const now = new Date();
-    const allCalendars = await calendarRepository.findAll();
-
-    // Filter for deleted calendars that are ready for deletion
-    return allCalendars
-      .filter(cal =>
-        cal.deleted_at !== undefined &&
-        cal.deleted_at !== null &&
-        cal.auto_delete_at !== undefined &&
-        cal.auto_delete_at !== null &&
-        new Date(cal.auto_delete_at) <= now
-      )
-      .map(cal => ({
-        ...cal,
-        deleted_at: cal.deleted_at!,
-        deleted_by: cal.deleted_by || '',
-        auto_delete_at: cal.auto_delete_at!
-      } as TrashCalendar));
-  } catch (error) {
-    logger.error('Error getting calendars ready for deletion:', error);
-    throw error;
-  }
-};
-
-/**
- * Clean up expired calendars from trash
- * This should be called periodically (e.g., by a Supabase Edge Function)
- */
-export const cleanupExpiredCalendars = async (): Promise<number> => {
-  try {
-    const expiredCalendars = await getCalendarsReadyForDeletion();
-    let deletedCount = 0;
-
-    for (const calendar of expiredCalendars) {
-      try {
-        await permanentlyDeleteCalendar(calendar.id);
-        deletedCount++;
-        logger.log(`Auto-deleted expired calendar: ${calendar.id} (${calendar.name})`);
-      } catch (err) {
-        logger.error(`Failed to auto-delete calendar ${calendar.id}:`, err);
-      }
-    }
-
-    logger.log(`Cleanup completed: ${deletedCount} calendars permanently deleted`);
-    return deletedCount;
-  } catch (err) {
-    logger.error('Error during cleanup:', err);
-    throw err;
-  }
-};
+ 
 
 /**
  * Get days remaining until permanent deletion
@@ -185,21 +128,4 @@ export const getDaysUntilDeletion = (auto_delete_at: Date): number => {
   const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
   return Math.max(0, daysDiff);
 };
-
-/**
- * Check if a calendar is in trash
- */
-export const isCalendarInTrash = async (calendarId: string): Promise<boolean> => {
-  try {
-    const calendar = await calendarRepository.findById(calendarId);
-
-    if (!calendar) {
-      return false;
-    }
-
-    return calendar.deleted_at !== undefined && calendar.deleted_at !== null;
-  } catch (error) {
-    logger.error('Error checking if calendar is in trash:', error);
-    return false;
-  }
-};
+ 

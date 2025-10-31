@@ -413,12 +413,23 @@ class EconomicEventWatcher {
       const currencies = Array.from(currencySet) as Currency[];
       const targetDate = events[0].event_date; // All events should have the same date
 
+      // Transform events for the edge function - it expects 'id' to be the external_id for matching
+      const transformedEvents = events.map(event => ({
+        id: event.external_id || event.id, // Use external_id for matching with scraped events
+        event: event.event_name,
+        currency: event.currency,
+        actual: event.actual_value,
+        forecast: event.forecast_value,
+        previous: event.previous_value,
+        time_utc: event.time_utc
+      }));
+
       // Call Supabase edge function to refresh economic calendar data for all events
       const { data, error: callError } = await supabase.functions.invoke('refresh-economic-calendar', {
         body: {
           targetDate,
           currencies,
-          events // Pass the entire events list
+          events: transformedEvents // Pass transformed events with external_id as id
         }
       });
 

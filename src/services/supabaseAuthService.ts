@@ -51,15 +51,54 @@ class SupabaseAuthService {
       this.updateAuthState(session);
 
       // Listen for auth changes
+      // Following Supabase best practices for handling all auth events
       supabase.auth.onAuthStateChange(async (event, session) => {
         logger.info('Auth state changed:', event);
-        
-        if (event === 'SIGNED_IN' && session?.user) {
-          await this.handleUserSignIn(session.user, session);
-        } else if (event === 'SIGNED_OUT') {
-          this.updateAuthState(null);
-        } else {
-          this.updateAuthState(session);
+
+        switch (event) {
+          case 'SIGNED_IN':
+            if (session?.user) {
+              await this.handleUserSignIn(session.user, session);
+            }
+            break;
+
+          case 'SIGNED_OUT':
+            logger.info('User signed out, clearing auth state');
+            this.updateAuthState(null);
+            break;
+
+          case 'TOKEN_REFRESHED':
+            // Token was automatically refreshed by Supabase
+            logger.info('Access token refreshed successfully');
+            if (session) {
+              this.updateAuthState(session);
+            }
+            break;
+
+          case 'USER_UPDATED':
+            // User metadata or email was updated
+            logger.info('User profile updated');
+            if (session) {
+              this.updateAuthState(session);
+            }
+            break;
+
+          case 'PASSWORD_RECOVERY':
+            // User clicked password recovery link
+            logger.info('Password recovery event received');
+            this.updateAuthState(session);
+            break;
+
+          case 'INITIAL_SESSION':
+            // Initial session loaded on page load
+            logger.info('Initial session loaded');
+            this.updateAuthState(session);
+            break;
+
+          default:
+            // Handle any other events
+            logger.info('Unhandled auth event:', event);
+            this.updateAuthState(session);
         }
       });
 
@@ -247,13 +286,29 @@ class SupabaseAuthService {
 
   /**
    * Get access token for API calls
+   *
+   * Uses getUser() to validate the JWT with the Supabase Auth server
+   * before returning the token. This ensures the token is valid and hasn't
+   * been tampered with.
+   *
+   * Note: While getSession() is acceptable for client-side SPAs, using getUser()
+   * provides an extra layer of security by validating the JWT server-side.
    */
   async getAccessToken(): Promise<string | null> {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        logger.error('Error getting session for token:', error);
+      // First validate the user's JWT with the Auth server
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        logger.error('Error validating user for token:', userError);
+        return null;
+      }
+
+      // After validation, get the session to retrieve the access token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        logger.error('Error getting session for token:', sessionError);
         return null;
       }
 

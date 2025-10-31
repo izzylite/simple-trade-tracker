@@ -29,8 +29,7 @@ import { ImpactLevel, Currency } from '../../types/economicCalendar';
 import { formatValue } from '../../utils/formatters';
 
 import RoundedTabs from '../common/RoundedTabs';
-import { getCurrenciesForPair } from '../../services/tradeEconomicEventService';
-import { cleanEventNameForPinning } from '../../utils/eventNameUtils';
+import { getCurrenciesForPair } from '../../services/tradeEconomicEventService'; 
 import { performanceCalculationService, CalculationProgress } from '../../services/performanceCalculationService';
 
 // Helper function to get flag URL

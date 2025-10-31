@@ -105,8 +105,11 @@ export interface Trade {
  * Pinned economic event
  */
 export interface PinnedEvent {
-  event: string;
+  event: string; // Event name for backward compatibility
+  event_id: string; // Database ID of the economic event
   notes?: string;
+  impact?: ImpactLevel;
+  currency?: Currency;
 }
 
 /**

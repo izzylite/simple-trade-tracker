@@ -49,6 +49,7 @@ export class EconomicEventRepository {
   private transformToEvent(row: any): EconomicEvent {
     return {
       id: row.id,
+      external_id: row.external_id, // Include external_id for event matching
       event_name: row.event_name || row.title || row.event || '',
       country: row.country || '',
       event_date: row.event_date || row.trade_date,

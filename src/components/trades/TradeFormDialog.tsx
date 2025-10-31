@@ -20,7 +20,6 @@ import {
   DynamicRiskSettings
 } from '../../utils/dynamicRiskUtils';
 import { error, log, logger } from '../../utils/logger';
-import { getRelevantCurrenciesFromTags, tradeEconomicEventService } from '../../services/tradeEconomicEventService';
 import { validateFiles, FILE_SIZE_LIMITS } from '../../utils/fileValidation';
 
 interface FormDialogProps {
@@ -346,23 +345,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     // Use the trade's date if it exists (when editing), otherwise use the provided date
     const tradeDate = newTrade.trade_date || trade_date;
 
-    // Fetch economic events for this trade session
-    let economicEvents = newTrade.economic_events || [];
-
-    // Only fetch events if not already provided (e.g., when editing existing trade)
-    if (economicEvents.length === 0 && newTrade.session) {
-      try {
-        economicEvents = await tradeEconomicEventService.fetchEventsForTrade(
-          tradeDate,
-          newTrade.session,
-          getRelevantCurrenciesFromTags(newTrade!.tags) // Pass trade tags for currency filtering
-        );
-        logger.log(`📊 Fetched ${economicEvents.length} economic events for trade session ${newTrade.session}`);
-      } catch (error) {
-        logger.error('Failed to fetch economic events for trade:', error);
-        // Continue without events - don't block trade creation
-      }
-    }
+    // Note: Economic events are now automatically fetched by the TradeRepository layer
+    // during trade creation/update based on session, date, and tags
 
     return {
       id: newTrade.id || uuidv4(),
@@ -382,7 +366,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       ...(newTrade.session && { session: newTrade.session }),
       ...(newTrade.notes && { notes: newTrade.notes }),
       images: newTrade.uploaded_images || [],
-      ...(economicEvents.length > 0 && { economic_events: economicEvents }),
+      // Economic events will be fetched automatically by TradeRepository
+      ...(newTrade.economic_events && newTrade.economic_events.length > 0 && { economic_events: newTrade.economic_events }),
       calendar_id: calendar_id,
       user_id: '', // Will be set by the service layer
       created_at: new Date(),
@@ -1094,29 +1079,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             };
           });
 
-          // Fetch and update economic events if session changed or if trade doesn't have events
-          if (newTrade!.session && editingTrade.id) {
-            try {
-              const tradeDate = newTrade!.trade_date || editingTrade.trade_date;
-              const economicEvents = await tradeEconomicEventService.fetchEventsForTrade(
-                tradeDate,
-                newTrade!.session,
-                getRelevantCurrenciesFromTags(newTrade!.tags)
-                // Pass trade tags for currency filtering
-              );
-
-              if (economicEvents.length > 0) {
-                await handleUpdateTradeProperty(editingTrade.id, (trade) => ({
-                  ...trade,
-                  economicEvents
-                }));
-                logger.log(`📊 Updated trade with ${economicEvents.length} economic events`);
-              }
-            } catch (eventError) {
-              logger.error('Failed to fetch economic events for edited trade:', eventError);
-              // Don't throw - trade update was successful, events are optional
-            }
-          }
+          // Note: Economic events are now automatically fetched and updated by the TradeRepository layer
+          // during trade updates based on session, date, and tags changes
 
           logger.log('Trade updated successfully');
         } else {

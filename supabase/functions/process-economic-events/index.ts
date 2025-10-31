@@ -5,8 +5,7 @@
  * Processes HTML content from MyFXBook to extract economic events
  * and stores them in the PostgreSQL database
  */
-
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+ 
 import {
   createServiceClient,
   errorResponse,
@@ -67,15 +66,15 @@ export function mapEventToDbRow(e: EconomicEvent): EconomicEventDBRow {
   return {
     external_id: e.id,
     currency: e.currency,
-    event_name: e.event,
+    event_name: e.event_name,
     impact: normalizeImpact(e.impact),
-    event_date: e.date,
+    event_date: e.event_date,
     event_time: e.time_utc ? new Date(e.time_utc).toISOString() : null,
     time_utc: e.time_utc ?? null,
     unix_timestamp: e.unix_timestamp ?? null,
-    actual_value: e.actual ?? null,
-    forecast_value: e.forecast ?? null,
-    previous_value: e.previous ?? null,
+    actual_value: e.actual_value ?? null,
+    forecast_value: e.forecast_value ?? null,
+    previous_value: e.previous_value ?? null,
     actual_result_type: null,
     country: e.country ?? null,
     flag_code: e.flag_code ?? null,
@@ -83,7 +82,7 @@ export function mapEventToDbRow(e: EconomicEvent): EconomicEventDBRow {
     is_all_day: false,
     description: null,
     source_url: 'https://www.myfxbook.com/forex-economic-calendar',
-    data_source: e.source ?? 'myfxbook',
+    data_source: e.data_source ?? 'myfxbook',
     last_updated: new Date().toISOString(),
   }
 }
@@ -288,24 +287,34 @@ async function parseMyFXBookWeeklyEnhancedHTML(html: string): Promise<EconomicEv
 
         const impactLower = impact ? impact.toLowerCase() : 'low'
 
+        const normalizedImpact = impactLower === 'high' ? 'High' : impactLower === 'medium' ? 'Medium' : 'Low'
+
         const ev: EconomicEvent = {
           id,
+          external_id: id,
           currency,
-          event: cleanedName,
-          impact: (impactLower === 'high' || impactLower === 'medium') ? (impactLower as 'high'|'medium') : 'low',
+          event_name: cleanedName,
+          impact: normalizedImpact,
+          event_date: eventDate,
+          event_time: isoDate,
           time_utc: isoDate,
-          date: eventDate,
-          actual: actual || undefined,
-          forecast: forecast || undefined,
-          previous: previous || undefined,
-          country: country || '',
-          flag_code: flagCode || '',
+          unix_timestamp: unixTs,
+          actual_value: actual || undefined,
+          forecast_value: forecast || undefined,
+          previous_value: previous || undefined,
+          actual_result_type: '',
+          country: country || undefined,
+          flag_code: flagCode || undefined,
           flag_url: flagCode ? getFlagUrl(flagCode) : undefined,
-          last_updated: Date.now(),
-          source: 'myfxbook',
-          unix_timestamp: unixTs
+          is_all_day: false,
+          description: undefined,
+          source_url: 'https://www.myfxbook.com/forex-economic-calendar',
+          data_source: 'myfxbook',
+          last_updated: new Date().toISOString(),
+          created_at: new Date().toISOString()
         }
-        if (!ev.event.toLowerCase().includes('myfxbook')) {
+        
+        if (!ev.event_name.toLowerCase().includes('myfxbook')) {
           events.push(ev)
         }
       } catch (_rowErr) {
@@ -353,8 +362,8 @@ async function storeEventsInDatabase(events: EconomicEvent[]): Promise<{ upserte
 
       if (existErr) {
         log(`Existence check failed for batch ${i / batchSize + 1}`, 'error', existErr)
-      } else {
-        existing += (existingRows?.length || 0)
+      } else if (existingRows) {
+        existing += existingRows.length
       }
 
       // Upsert unique rows on external_id and request ids to count affected rows

@@ -33,12 +33,11 @@ import {
   FilterAlt as FilterIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  DateRange as DateRangeIcon,
-  Event as EventIcon
+  DateRange as DateRangeIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers';
 import { Trade } from '../types/dualWrite';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { format } from 'date-fns';
 import {
   getTagChipStyles,
   formatTagForDisplay,
@@ -51,10 +50,12 @@ import { SelectInput } from './common';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import UnifiedDrawer from './common/UnifiedDrawer';
 import { logger } from '../utils/logger';
+import { TradeRepository } from '../services/repository/repositories/TradeRepository';
+
 interface SearchDrawerProps {
   open: boolean;
   onClose: () => void;
-  trades: Trade[];
+  calendarId: string; // Changed from trades array to calendar ID
   allTags: string[];
   onTradeClick?: (trade: Trade) => void;
   // Tag filtering props
@@ -74,12 +75,6 @@ interface DateFilter {
 // Pagination configuration
 const ITEMS_PER_PAGE = 20;
 
-interface PaginationState {
-  currentPage: number;
-  totalPages: number;
-  totalItems: number;
-}
-
 // Debounce hook for search optimization
 const useDebounce = (value: string, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -97,173 +92,33 @@ const useDebounce = (value: string, delay: number) => {
   return debouncedValue;
 };
 
-// Create search index for faster lookups
-interface SearchIndex {
-  tradeId: string;
-  searchableText: string;
-  tags: string[];
-  displayTags: string[];
-  date: number; 
-}
+// Initialize repository
+const tradeRepository = new TradeRepository();
 
-// Build search index for trades
-const buildSearchIndex = (trades: Trade[]): SearchIndex[] => {
-  return trades.map(trade => ({
-    tradeId: trade.id,
-    searchableText: [
-      trade.name || '',
-      trade.notes || '',
-      trade.session || '',
-      ...(trade.tags || []),
-      ...(trade.tags || []).map(tag => formatTagForDisplay(tag)),
-      ...(trade.economic_events || []).map(event => event.name)
-    ].join(' ').toLowerCase(),
-    tags: [
-      ...(trade.tags || []).map(tag => tag.toLowerCase()),
-      ...(trade.economic_events || []).map(event => event.name.toLowerCase())
-    ],
-    displayTags: [
-      ...(trade.tags || []).map(tag => formatTagForDisplay(tag).toLowerCase()),
-      ...(trade.economic_events || []).map(event => event.name.toLowerCase())
-    ],
-    date: new Date(trade.trade_date).getTime(),
-  }));
-};
+// Helper function to get tag suggestions based on query
+const getSuggestedTags = (allTags: string[], query: string, existingTags: string[]): string[] => {
+  if (!query.trim()) return [];
 
-// Optimized search function using index
-const performOptimizedSearch = (
-  trades: Trade[],
-  searchIndex: SearchIndex[],
-  query: string,
-  selectedTags: string[] = [],
-  dateFilter: DateFilter
-): Trade[] => {
-  // Create a map for quick trade lookup
-  const tradeMap = new Map(trades.map(trade => [trade.id, trade]));
+  const terms = query.split(/[,;\s]+/).map(term => term.trim()).filter(term => term.length > 0);
+  const lastTerm = terms[terms.length - 1]?.toLowerCase() || '';
+  if (!lastTerm) return [];
 
-  // Start with all trade indices
-  let filteredIndices = searchIndex;
+  const existingTagsSet = new Set([...existingTags, ...terms.slice(0, -1)].map(t => t.toLowerCase()));
 
-  // Apply tag filtering first (most selective)
-  if (selectedTags.length > 0) {
-    const selectedTagsLower = selectedTags.map(tag => tag.toLowerCase());
-    filteredIndices = filteredIndices.filter(index =>
-      selectedTagsLower.some(selectedTag =>
-        index.tags.some(tag => tag.includes(selectedTag)) ||
-        index.displayTags.some(tag => tag.includes(selectedTag))
-      )
-    );
-  }
-
-  // Apply date filtering
-  if (dateFilter.type !== 'all') {
-    filteredIndices = filteredIndices.filter(index => {
-      if (dateFilter.type === 'single' && dateFilter.startDate) {
-        const filterDate = startOfDay(dateFilter.startDate).getTime();
-        const endOfFilterDate = endOfDay(dateFilter.startDate).getTime();
-        return index.date >= filterDate && index.date <= endOfFilterDate;
-      }
-
-      if (dateFilter.type === 'range' && dateFilter.startDate && dateFilter.endDate) {
-        const startFilterDate = startOfDay(dateFilter.startDate).getTime();
-        const endFilterDate = endOfDay(dateFilter.endDate).getTime();
-        return index.date >= startFilterDate && index.date <= endFilterDate;
-      }
-
-      return true;
-    });
-  }
-
-  // Apply text search if query exists
-  if (query.trim()) {
-    const lowerQuery = query.toLowerCase();
-    const searchTerms = lowerQuery
-      .split(/[,;\s]+/)
-      .map(term => term.trim())
-      .filter(term => term.length > 0);
-
-    if (searchTerms.length > 1) {
-      // Multiple terms - ALL must match in tags
-      filteredIndices = filteredIndices.filter(index =>
-        searchTerms.every(term =>
-          index.tags.some(tag => tag.includes(term)) || 
-          index.displayTags.some(tag => tag.includes(term))
-        )
-      );
-    } else {
-      // Single term - search in all searchable text
-      const term = searchTerms[0];
-      filteredIndices = filteredIndices.filter(index =>
-        index.searchableText.includes(term)
-      );
-    }
-  }
-
-  // Convert back to trades and sort by date (newest first)
-  return filteredIndices
-    .sort((a, b) => b.date - a.date)
-    .map(index => tradeMap.get(index.tradeId))
-    .filter((trade): trade is Trade => trade !== undefined);
-};
-
-// Optimized tag suggestion function with memoization
-const getSuggestedTagsAndEvents = (() => {
-  const cache = new Map<string, string[]>();
-  const MAX_CACHE_SIZE = 100;
-
-  return (allTags: string[], allEvents: string[], query: string): string[] => {
-    if (!query.trim()) return [];
-
-    const cacheKey = `${allTags.length}-${allEvents.length}-${query.toLowerCase()}`;
-    if (cache.has(cacheKey)) {
-      return cache.get(cacheKey)!;
-    }
-
-    const terms = query.split(/[,;\s]+/).map(term => term.trim()).filter(term => term.length > 0);
-    const lastTerm = terms[terms.length - 1]?.toLowerCase() || '';
-    if (!lastTerm) return [];
-
-    const existingTags = new Set(terms.slice(0, -1).map(term => term.toLowerCase()));
-
-    // Combine tags and events for suggestions
-    const suggestions = [
-      ...allTags.filter(tag => {
-        const lowerTag = tag.toLowerCase();
-        const displayTag = formatTagForDisplay(tag).toLowerCase();
-        if (existingTags.has(lowerTag) || existingTags.has(displayTag)) return false;
-        return lowerTag.includes(lastTerm) || displayTag.includes(lastTerm);
-      }),
-      ...allEvents.filter(eventName => {
-        const lowerEvent = eventName.toLowerCase();
-        if (existingTags.has(lowerEvent)) return false;
-        return lowerEvent.includes(lastTerm);
-      })
-    ].slice(0, 5);
-
-    if (cache.size >= MAX_CACHE_SIZE) {
-      const firstKey = cache.keys().next().value;
-      if (firstKey) cache.delete(firstKey);
-    }
-    cache.set(cacheKey, suggestions);
-
-    return suggestions;
-  };
-})();
-
-const getAllEventNames = (trades: Trade[]): string[] => {
-  const eventSet = new Set<string>();
-  trades.forEach(trade => {
-    (trade.economic_events || []).forEach(event => {
-      if (event.name) eventSet.add(event.name);
-    });
-  });
-  return Array.from(eventSet);
+  return allTags
+    .filter(tag => {
+      const lowerTag = tag.toLowerCase();
+      const displayTag = formatTagForDisplay(tag).toLowerCase();
+      if (existingTagsSet.has(lowerTag) || existingTagsSet.has(displayTag)) return false;
+      return lowerTag.includes(lastTerm) || displayTag.includes(lastTerm);
+    })
+    .slice(0, 5);
 };
 
 const SearchDrawer: React.FC<SearchDrawerProps> = ({
   open,
   onClose,
-  trades,
+  calendarId,
   allTags,
   onTradeClick,
   selectedTags = [],
@@ -272,11 +127,22 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [allFilteredTrades, setAllFilteredTrades] = useState<Trade[]>([]);
+  const [searchResults, setSearchResults] = useState<{
+    trades: Trade[];
+    totalCount: number;
+    totalPages: number;
+    hasMore: boolean;
+  }>({
+    trades: [],
+    totalCount: 0,
+    totalPages: 0,
+    hasMore: false
+  });
 
   // Tag filtering state
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
@@ -301,77 +167,79 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
     return filterTagsByGroup(allTags, selectedTagGroup);
   }, [allTags, selectedTagGroup]);
 
-  // Debounce search query to avoid excessive calculations
+  // Debounce search query to avoid excessive database calls
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  // Memoize search index for performance
-  const searchIndex = useMemo(() => {
-    return buildSearchIndex(trades);
-  }, [trades]);
-
-  // Calculate pagination values
+  // Calculate pagination values from search results
   const paginationData = useMemo(() => {
-    const totalItems = allFilteredTrades.length;
-    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const paginatedTrades = allFilteredTrades.slice(startIndex, endIndex);
-
     return {
-      totalItems,
-      totalPages,
-      paginatedTrades,
-      hasResults: totalItems > 0,
-      showPagination: totalPages > 1
+      totalItems: searchResults.totalCount,
+      totalPages: searchResults.totalPages,
+      paginatedTrades: searchResults.trades,
+      hasResults: searchResults.totalCount > 0,
+      showPagination: searchResults.totalPages > 1
     };
-  }, [allFilteredTrades, currentPage]);
+  }, [searchResults]);
 
-  // Perform search in background when debounced query or selected tags change
+  // Perform database search when debounced query, selected tags, or filters change
   useEffect(() => {
     if (!open) return; // Don't search if drawer is closed
 
-    const performBackgroundSearch = async () => {
+    const performDatabaseSearch = async () => {
       setIsSearching(true);
+      setSearchError(null); // Clear previous errors
 
-      // Use requestIdleCallback for better performance if available, otherwise setTimeout
-      const scheduleWork = (callback: () => void) => {
-        if ('requestIdleCallback' in window) {
-          requestIdleCallback(callback, { timeout: 100 });
-        } else {
-          setTimeout(callback, 0);
-        }
-      };
+      try {
+        // Call the database search method
+        const results = await tradeRepository.searchTrades(calendarId, {
+          searchQuery: debouncedSearchQuery,
+          selectedTags,
+          dateFilter,
+          page: currentPage,
+          pageSize: ITEMS_PER_PAGE
+        });
 
-      scheduleWork(() => {
-        try {
-          const results = performOptimizedSearch(trades, searchIndex, debouncedSearchQuery, selectedTags, dateFilter);
-          const suggestedTagsAndEvents = getSuggestedTagsAndEvents(allTags, getAllEventNames(trades), debouncedSearchQuery);
+        setSearchResults(results);
 
-          // Store all results for pagination
-          setAllFilteredTrades(results);
-          // Reset to first page when search changes
-          setCurrentPage(1);
-          setSuggestedTags(suggestedTagsAndEvents);
-        } catch (error) {
-          logger.error('Search error:', error);
-          setAllFilteredTrades([]);
-          setSuggestedTags([]);
-        } finally {
-          setIsSearching(false);
-        }
-      });
+        // Update tag suggestions
+        const suggestions = getSuggestedTags(allTags, debouncedSearchQuery, selectedTags);
+        setSuggestedTags(suggestions);
+      } catch (error) {
+        logger.error('Database search error:', error);
+        setSearchError('Failed to search trades. Please try again.');
+        setSearchResults({
+          trades: [],
+          totalCount: 0,
+          totalPages: 0,
+          hasMore: false
+        });
+        setSuggestedTags([]);
+      } finally {
+        setIsSearching(false);
+      }
     };
 
-    performBackgroundSearch();
-  }, [debouncedSearchQuery, selectedTags, dateFilter, trades, searchIndex, allTags, open]);
+    performDatabaseSearch();
+  }, [debouncedSearchQuery, selectedTags, dateFilter, currentPage, calendarId, allTags, open]);
+
+  // Reset to page 1 when search query or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchQuery, selectedTags, dateFilter]);
 
   // Reset search when drawer closes
   useEffect(() => {
     if (!open) {
       setSearchQuery('');
-      setAllFilteredTrades([]);
+      setSearchResults({
+        trades: [],
+        totalCount: 0,
+        totalPages: 0,
+        hasMore: false
+      });
       setSuggestedTags([]);
       setIsSearching(false);
+      setSearchError(null);
       setCurrentPage(1);
       setSelectedTagGroup('');
       setIsDateFilterExpanded(false);
@@ -394,7 +262,6 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
       startDate: type === 'all' ? null : prev.startDate,
       endDate: type === 'all' ? null : prev.endDate
     }));
-    setCurrentPage(1); // Reset to first page when changing date filter
   }, []);
 
   const handleStartDateChange = useCallback((date: Date | null) => {
@@ -402,7 +269,6 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
       ...prev,
       startDate: date
     }));
-    setCurrentPage(1); // Reset to first page when changing start date
   }, []);
 
   const handleEndDateChange = useCallback((date: Date | null) => {
@@ -410,7 +276,6 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
       ...prev,
       endDate: date
     }));
-    setCurrentPage(1); // Reset to first page when changing end date
   }, []);
 
   const handleClearDateFilter = useCallback(() => {
@@ -419,19 +284,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
       startDate: null,
       endDate: null
     });
-    setCurrentPage(1); // Reset to first page when clearing filters
   }, []);
-
-  // Reset to first page when tag filters change
-  const handleTagsChangeWithReset = useCallback((tags: string[]) => {
-    onTagsChange?.(tags);
-    setCurrentPage(1);
-  }, [onTagsChange]);
-
-  const handleClearTagsWithReset = useCallback(() => {
-    onTagsChange?.([]);
-    setCurrentPage(1);
-  }, [onTagsChange]);
 
   const getTradeTypeIcon = (type: Trade['trade_type']) => {
     switch (type) {
@@ -473,8 +326,6 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
     onTradeClick?.(trade);
     onClose();
   }, [onTradeClick, onClose]);
-
-  const allEventNames = useMemo(() => getAllEventNames(trades), [trades]);
 
   return (
     <UnifiedDrawer
@@ -598,7 +449,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                     multiple
                     options={filteredTagOptions}
                     value={selectedTags}
-                    onChange={(_, newValue) => handleTagsChangeWithReset(newValue)}
+                    onChange={(_, newValue) => onTagsChange?.(newValue)}
                     slotProps={{
                       listbox: {
                         sx: {
@@ -617,14 +468,18 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                       />
                     )}
                     renderTags={(value, getTagProps) =>
-                      value.map((option, index) => (
-                        <Chip
-                          label={formatTagForDisplay(option, true)}
-                          {...getTagProps({ index })}
-                          sx={getTagChipStyles(option, theme)}
-                          title={isGroupedTag(option) ? `Group: ${getTagGroup(option)}` : undefined}
-                        />
-                      ))
+                      value.map((option, index) => {
+                        const { key, ...chipProps } = getTagProps({ index });
+                        return (
+                          <Chip
+                            key={key}
+                            label={formatTagForDisplay(option, true)}
+                            {...chipProps}
+                            sx={getTagChipStyles(option, theme)}
+                            title={isGroupedTag(option) ? `Group: ${getTagGroup(option)}` : undefined}
+                          />
+                        );
+                      })
                     }
                     renderOption={(props, option) => {
                       const { key, ...restProps } = props;
@@ -654,7 +509,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                       <Typography variant="body2" color="text.secondary">
                         {selectedTags.length} tag{selectedTags.length > 1 ? 's' : ''} selected
                       </Typography>
-                      <Button onClick={handleClearTagsWithReset} size="small" color="inherit">
+                      <Button onClick={() => onTagsChange?.([])} size="small" color="inherit">
                         Clear All
                       </Button>
                     </Box>
@@ -840,7 +695,6 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                     sx={{
                       ...getTagChipStyles(tagOrEvent, theme)
                     }}
-                    icon={allEventNames.includes(tagOrEvent) ? <EventIcon color="primary" fontSize="small" sx={{ color: '#ffffff' }} /> : undefined}
                   />
                 ))}
               </Box>
@@ -895,15 +749,53 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                 )}
               </Box>
 
-              {isSearching ? (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
+              {searchError ? (
+                <Box sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: 'calc(100vh - 400px)',
+                  textAlign: 'center'
+                }}>
+                  <Typography variant="body1" color="error" sx={{ mb: 1 }}>
+                    {searchError}
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      setSearchError(null);
+                      // Trigger a re-search by updating a dependency
+                      setCurrentPage(prev => prev);
+                    }}
+                  >
+                    Retry
+                  </Button>
+                </Box>
+              ) : isSearching ? (
+                <Box sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: 'calc(100vh - 400px)',
+                  textAlign: 'center'
+                }}>
                   <CircularProgress size={40} sx={{ mb: 2 }} />
                   <Typography variant="body1" color="text.secondary">
                     Searching trades...
                   </Typography>
                 </Box>
               ) : !paginationData.hasResults ? (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Box sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: 'calc(100vh - 400px)',
+                  textAlign: 'center'
+                }}>
                   <SearchIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
                   <Typography variant="body1" color="text.secondary">
                     No trades found
@@ -966,8 +858,10 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                                     </Typography>
                                   </Box>
                                 }
+                                primaryTypographyProps={{ component: 'div' }}
+                                secondaryTypographyProps={{ component: 'div' }}
                                 secondary={
-                                  <Box>
+                                  <Box component="div">
                                     {/* Date and Session */}
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                                       <DateIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
@@ -1022,6 +916,9 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
                                     )}
                                   </Box>
                                 }
+                                slotProps={{
+                                  secondary: { component: 'div' }
+                                }}
                               />
                             </Box>
                           </Box>

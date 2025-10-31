@@ -12,28 +12,32 @@ import {
   alpha,
   useTheme,
   IconButton,
-  CircularProgress
+  CircularProgress,
+  Tooltip
 } from '@mui/material';
 import {
   Check as CheckIcon,
   HourglassEmpty as HourglassEmptyIcon,
   PushPin as PinIcon,
-  PushPinOutlined as UnpinIcon
+  PushPinOutlined as UnpinIcon,
+  ShowChart as TradeIcon
 } from '@mui/icons-material';
 import { format, parseISO, isAfter } from 'date-fns';
 import { EconomicEvent } from '../../types/economicCalendar';
 import { isEventPinned } from '../../utils/eventNameUtils';
+import { PinnedEvent } from '../../types/dualWrite';
 
 interface EconomicEventListItemProps {
   event: EconomicEvent;
   px: number,
   py: number,
   showDivider?: boolean;
-  pinnedEvents?: string[];
-  onPinEvent?: (eventName: string) => void;
-  onUnpinEvent?: (eventName: string) => void;
+  pinnedEvents?: PinnedEvent[];
+  onPinEvent?: (event: EconomicEvent) => void;
+  onUnpinEvent?: (event: EconomicEvent) => void;
   isPinning?: boolean;
   onClick?: (event: EconomicEvent) => void;
+  tradeCount?: number; // Number of trades associated with this event
 }
 
 // Helper function to format time and countdown with realtime updates
@@ -161,22 +165,24 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
   onPinEvent,
   onUnpinEvent,
   isPinning = false,
-  onClick
+  onClick,
+  tradeCount = 0
 }) => {
   const theme = useTheme();
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Check if this event is pinned
-  const eventIsPinned = isEventPinned(event.event_name, pinnedEvents);
+  const eventIsPinned = isEventPinned(event, pinnedEvents);
 
   // Handle pin/unpin toggle
-  const handleTogglePin = () => {
+  const handleTogglePin = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (isPinning) return;
-
+    e.preventDefault();
+    e.stopPropagation();
     if (eventIsPinned) {
-      onUnpinEvent?.(event.event_name);
+      onUnpinEvent?.(event);
     } else {
-      onPinEvent?.(event.event_name);
+      onPinEvent?.(event);
     }
   };
 
@@ -297,13 +303,50 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
             {/* Spacer */}
             <Box sx={{ flex: 1 }} />
 
+
+            {/* Trade Count Badge */}
+            {tradeCount > 0 && (
+              <Tooltip
+                title={`You've traded this event ${tradeCount} time${tradeCount > 1 ? 's' : ''}`}
+                arrow
+                placement="top"
+              >
+                <Chip
+                  icon={<TradeIcon sx={{ fontSize: '0.7rem !important', color: 'white !important' }} />}
+                  label={tradeCount}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.9),
+                    color: 'white',
+                    minWidth: 40,
+                    borderRadius: 1,
+                    cursor: 'pointer',
+                    '& .MuiChip-label': {
+                      px: 0.5,
+                      py: 0.25
+                    },
+                    '& .MuiChip-icon': {
+                      ml: 0.5,
+                      mr: -0.25
+                    }
+                  }}
+                />
+              </Tooltip>
+            )}
+
             {/* Impact Badge */}
             <Chip
               label={event.impact.toUpperCase()}
               size="small"
               sx={{
                 height: 20,
-                fontSize: '0.6rem',
+                maxWidth : 40,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                fontSize: '0.5rem',
                 fontWeight: 700,
                 backgroundColor: getImpactColor(event.impact, theme),
                 color: 'white',
@@ -316,6 +359,8 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
               }}
             />
 
+            
+
             {/* Pin Button */}
             {(onPinEvent || onUnpinEvent) && (
               <IconButton
@@ -324,7 +369,7 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
                 size="small"
                 sx={{
                   ml: 0.5,
-                  color: eventIsPinned ? 'primary.main' : 'text.secondary',
+                  color: eventIsPinned ? 'warning.main' : 'text.secondary',
                   '&:hover': {
                     backgroundColor: alpha(theme.palette.primary.main, 0.1),
                     color: 'primary.main'

@@ -11,6 +11,7 @@ export type Currency = 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | '
 
 export interface EconomicEvent {
   id: string;
+  external_id?: string; // Original event ID from data source (MyFXBook, etc.)
   currency: Currency;
   event_name: string;
   impact: ImpactLevel;
@@ -108,7 +109,13 @@ export interface EconomicCalendarDrawerProps {
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: any) => any) => Promise<any>;
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
   payload?: {updatedEvents : EconomicEvent[], allEvents : EconomicEvent[]} | null; // For real-time event updates
-
+  // Trade operation callbacks for EconomicEventDetailDialog
+  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: any) => any) => Promise<any>;
+  onEditTrade?: (trade: any) => void;
+  onDeleteTrade?: (tradeId: string) => void;
+  onDeleteMultipleTrades?: (tradeIds: string[]) => void;
+  onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
+  isReadOnly?: boolean;
 }
 
 // Service types

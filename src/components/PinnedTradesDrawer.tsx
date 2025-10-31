@@ -15,14 +15,9 @@ import {
   Badge,
   Avatar,
   IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
   Tooltip,
-  InputAdornment
+  InputAdornment,
+  TextField
 } from '@mui/material';
 import {
   PushPin as PinIcon,
@@ -31,17 +26,19 @@ import {
   Remove as BreakevenIcon,
   CalendarToday as DateIcon,
   Event as EventIcon,
-  ArrowBack as BackIcon,
-  Note as NoteIcon,
-  Edit as EditIcon,
   Search as SearchIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  Note as NoteIcon
 } from '@mui/icons-material';
 import { Trade, Calendar, PinnedEvent } from '../types/dualWrite';
+import { EconomicEvent } from '../types/economicCalendar';
 import { format } from 'date-fns';
 import UnifiedDrawer from './common/UnifiedDrawer';
-import { eventNamesMatch } from '../utils/eventNameUtils';
+import { eventMatchV1, eventMatchV2 } from '../utils/eventNameUtils';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
+import EconomicEventDetailDialog from './economicCalendar/EconomicEventDetailDialog';
+import { economicCalendarService } from '../services/economicCalendarService';
+import { logger } from '../utils/logger';
 
 interface PinnedTradesDrawerProps {
   open: boolean;
@@ -50,6 +47,13 @@ interface PinnedTradesDrawerProps {
   calendar?: Calendar;
   onTradeClick?: (trade: Trade,trades: Trade[],title : string) => void;
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: any) => any) => Promise<Calendar | undefined>;
+  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
+  // Trade operation callbacks for EconomicEventDetailDialog
+  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
+  onEditTrade?: (trade: Trade) => void;
+  onDeleteTrade?: (tradeId: string) => void;
+  onDeleteMultipleTrades?: (tradeIds: string[]) => void;
+  onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
   // Read-only mode for shared calendars
   isReadOnly?: boolean;
 }
@@ -61,25 +65,26 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   calendar,
   onTradeClick,
   onUpdateCalendarProperty,
+  onOpenGalleryMode,
+  onUpdateTradeProperty,
+  onEditTrade,
+  onDeleteTrade,
+  onDeleteMultipleTrades,
+  onZoomImage,
   isReadOnly = false
 }) => {
   const theme = useTheme();
 
   // Tab state
   const [activeTab, setActiveTab] = useState(0);
-  const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Notes dialog state
-  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<PinnedEvent | null>(null);
-  const [notesText, setNotesText] = useState('');
-
-  // View notes dialog state
-  const [viewNotesDialogOpen, setViewNotesDialogOpen] = useState(false);
-  const [viewingEvent, setViewingEvent] = useState<PinnedEvent | null>(null);
+  // Economic event detail dialog state
+  const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
+  const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
+  const [loadingEvent, setLoadingEvent] = useState(false);
 
   // Get pinned trades
   const pinnedTrades = useMemo(() => {
@@ -137,77 +142,32 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
     });
   }, [pinnedEvents, searchQuery]);
 
-  // Get trades that contain a specific economic event
-  const getTradesWithEvent = useMemo(() => {
-    return (eventName: string) => {
-      return trades.filter(trade =>
-        trade.economic_events?.some(event =>
-           eventNamesMatch(event.name, eventName)
-        )
-      ).sort((a, b) => new Date(b.trade_date).getTime() - new Date(a.trade_date).getTime());
-    };
-  }, [trades]);
-
-  // Get trades for selected event
-  const tradesWithSelectedEvent = useMemo(() => {
-    return selectedEvent ? getTradesWithEvent(selectedEvent) : [];
-  }, [selectedEvent, getTradesWithEvent]);
-
-  // Get the selected pinned event object (for notes)
-  const selectedPinnedEvent = useMemo(() => {
-    return selectedEvent ? pinnedEvents.find(pe => pe.event === selectedEvent) : null;
-  }, [selectedEvent, pinnedEvents]);
-
-  // Handle opening notes dialog
-  const handleEditNotes = (pinnedEvent: PinnedEvent) => {
-    setEditingEvent(pinnedEvent);
-    setNotesText(pinnedEvent.notes || '');
-    setNotesDialogOpen(true);
-  };
-
-  // Handle viewing notes dialog
-  const handleViewNotes = (pinnedEvent: PinnedEvent) => {
-    setViewingEvent(pinnedEvent);
-    setViewNotesDialogOpen(true);
-  };
-
-  // Handle closing view notes dialog
-  const handleCloseViewNotesDialog = () => {
-    setViewNotesDialogOpen(false);
-    setViewingEvent(null);
-  };
-
-  // Handle saving notes
-  const handleSaveNotes = async () => {
-    if (!editingEvent || !calendar?.id || !onUpdateCalendarProperty) return;
+  // Handle clicking on a pinned event - fetch and open detail dialog
+  const handleEventClick = async (pinnedEvent: PinnedEvent) => {
+    if (!calendar) return;
 
     try {
-      await onUpdateCalendarProperty(calendar.id, (calendar: Calendar) => {
-        const updatedPinnedEvents = calendar.pinned_events?.map(event =>
-          event.event === editingEvent.event
-            ? { ...event, notes: notesText.trim() || undefined }
-            : event
-        ) || [];
+      setLoadingEvent(true);
 
-        return {
-          ...calendar,
-          pinnedEvents: updatedPinnedEvents
-        };
-      });
+      // Use event_id to fetch the event directly from the database
+      if (pinnedEvent.event_id) {
+        const event = await economicCalendarService.getEventById(pinnedEvent.event_id);
 
-      setNotesDialogOpen(false);
-      setEditingEvent(null);
-      setNotesText('');
+        if (event) {
+          setSelectedEvent(event);
+          setEventDetailDialogOpen(true);
+        } else {
+          logger.warn(`No economic event found with ID: ${pinnedEvent.event_id}`);
+        }
+      } else {
+        // Fallback for old pinned events without event_id
+        logger.warn('Pinned event does not have event_id. Please re-pin the event to get the latest data.');
+      }
     } catch (error) {
-      console.error('Error saving notes:', error);
+      logger.error('Error fetching economic event:', error);
+    } finally {
+      setLoadingEvent(false);
     }
-  };
-
-  // Handle closing notes dialog
-  const handleCloseNotesDialog = () => {
-    setNotesDialogOpen(false);
-    setEditingEvent(null);
-    setNotesText('');
   };
 
   const getTradeTypeIcon = (type: Trade['trade_type']) => {
@@ -236,34 +196,14 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
 
   // Get dynamic title and icon
   const getTitle = () => {
-    if (selectedEvent) {
-      return `Trades with "${selectedEvent}"`;
-    }
     return activeTab === 0 ? "Pinned Trades" : "Pinned Events";
   };
 
   const getIcon = () => {
-    if (selectedEvent) {
-      return <EventIcon />;
-    }
     return activeTab === 0 ? <PinIcon /> : <EventIcon />;
   };
 
   const getHeaderActions = () => {
-    if (selectedEvent) {
-      return (
-        <Chip
-          label={tradesWithSelectedEvent.length}
-          size="small"
-          sx={{
-            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-            color: 'primary.main',
-            fontWeight: 600
-          }}
-        />
-      );
-    }
-
     if (activeTab === 0) {
       const totalCount = sortedPinnedTrades.length;
       const filteredCount = filteredPinnedTrades.length;
@@ -311,36 +251,8 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
       headerVariant="enhanced"
       headerActions={getHeaderActions()}
     >
-      {/* Back button when viewing event trades */}
-      {selectedEvent && (
-        <Box sx={{
-          p: 2,
-          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          backgroundColor: alpha(theme.palette.background.paper, 0.5)
-        }}>
-          <ListItemButton
-            onClick={() => {
-              setSelectedEvent(null);
-              setSearchQuery(''); // Clear search when going back
-            }}
-            sx={{
-              borderRadius: 1,
-              p: 1,
-              backgroundColor: alpha(theme.palette.primary.main, 0.02),
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-              '&:hover': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.08)
-              }
-            }}
-          >
-            <BackIcon sx={{ mr: 1, fontSize: 20 }} />
-            <Typography variant="body2">Back to Pinned Events</Typography>
-          </ListItemButton>
-        </Box>
-      )}
-
-      {/* Tabs - only show when not viewing event trades */}
-      {!selectedEvent && (
+      {/* Tabs */}
+      {(
         <Box sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
           <Tabs
             value={activeTab}
@@ -391,8 +303,8 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
         </Box>
       )}
 
-      {/* Search Input - only show when not viewing event trades */}
-      {!selectedEvent && (
+      {/* Search Input */}
+      {(
         <Box sx={{
           p: 2,
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
@@ -403,7 +315,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
             size="small"
             placeholder={activeTab === 0 ? "Search pinned trades..." : "Search pinned events..."}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -440,201 +352,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
       {/* Content */}
       <Box sx={{ flex: 1, overflow: 'auto', ...scrollbarStyles(theme) }}>
         {/* Render content based on current state */}
-        {selectedEvent ? (
-          // Show trades with selected event
-          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* Event Notes Section */}
-            {selectedPinnedEvent?.notes && (
-              <Box
-                sx={{
-                  p: 2,
-                  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                  backgroundColor: alpha(theme.palette.warning.main, 0.05),
-                  borderLeft: `3px solid ${theme.palette.warning.main}`
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-                  <NoteIcon sx={{ fontSize: 20, color: 'primary.main', mt: 0.5 }} />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography
-                      variant="subtitle2"
-                      sx={{
-                        fontWeight: 600,
-                        color: 'primary.main',
-                        mb: 0.5
-                      }}
-                    >
-                      Event Notes
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        lineHeight: 1.5
-                      }}
-                    >
-                      {selectedPinnedEvent.notes}
-                    </Typography>
-                  </Box>
-                  {!isReadOnly && (
-                    <Tooltip title="Edit notes">
-                      <IconButton
-                        size="small"
-                        onClick={() => selectedPinnedEvent && handleEditNotes(selectedPinnedEvent)}
-                        sx={{
-                          color: 'primary.main',
-                          '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.1)
-                          }
-                        }}
-                      >
-                        <EditIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </Box>
-              </Box>
-            )}
-
-            {/* Trades List */}
-            {tradesWithSelectedEvent.length === 0 ? (
-              <Box
-                sx={{
-                  p: 4,
-                  textAlign: 'center',
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  alignItems: 'center'
-                }}
-              >
-                <EventIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                <Typography variant="h6" sx={{ mb: 1, fontWeight: 600, color: 'text.secondary' }}>
-                  No Trades Found
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 300 }}>
-                  No trades contain the economic event "{selectedEvent}". Try selecting a different event.
-                </Typography>
-              </Box>
-            ) : (
-              <List sx={{ p: 0, overflow: 'auto', flex: 1, ...scrollbarStyles(theme) }}>
-              {tradesWithSelectedEvent.map((trade, index) => (
-                <React.Fragment key={trade.id}>
-                  <ListItem disablePadding>
-                    <ListItemButton
-                      onClick={() => onTradeClick?.(trade,tradesWithSelectedEvent,`Trades with ${selectedEvent}`)}
-                      sx={{
-                        p: 2,
-                        backgroundColor: alpha(
-                          trade.trade_type === 'win'
-                            ? theme.palette.success.main
-                            : trade.trade_type === 'loss'
-                            ? theme.palette.error.main
-                            : theme.palette.warning.main,
-                          0.03
-                        ),
-                        borderLeft: `3px solid ${
-                          trade.trade_type === 'win'
-                            ? theme.palette.success.main
-                            : trade.trade_type === 'loss'
-                            ? theme.palette.error.main
-                            : theme.palette.warning.main
-                        }`,
-                        '&:hover': {
-                          backgroundColor: alpha(
-                            trade.trade_type === 'win'
-                              ? theme.palette.success.main
-                              : trade.trade_type === 'loss'
-                              ? theme.palette.error.main
-                              : theme.palette.warning.main,
-                            0.08
-                          )
-                        }
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
-                        {/* Trade Type Icon */}
-                        <Box sx={{ mt: 0.5 }}>
-                          {getTradeTypeIcon(trade.trade_type)}
-                        </Box>
-
-                        {/* Trade Content */}
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <ListItemText
-                            primary={
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-                                <Typography
-                                  variant="subtitle1"
-                                  sx={{
-                                    fontWeight: 600,
-                                    color: 'text.primary',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                    flex: 1,
-                                    mr: 1
-                                  }}
-                                >
-                                  {trade.name}
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{
-                                    color: getTradeTypeColor(trade.trade_type),
-                                    fontWeight: 600,
-                                    fontSize: '0.85rem'
-                                  }}
-                                >
-                                  {trade.trade_type === 'win' ? '+' : trade.trade_type === 'loss' ? '-' : ''}
-                                  {trade.amount ? `$${Math.abs(trade.amount).toFixed(2)}` : ''}
-                                </Typography>
-                              </Box>
-                            }
-                            secondary={
-                              <Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                                  <DateIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-                                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
-                                    {format(new Date(trade.trade_date), 'MMM d, yyyy')}
-                                  </Typography>
-                                </Box>
-                                {/* Show matching economic events */}
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                  {trade.economic_events?.filter(event =>
-                                    event.name.toLowerCase().includes(selectedEvent.toLowerCase()) ||
-                                    selectedEvent.toLowerCase().includes(event.name.toLowerCase())
-                                  ).map((event, eventIndex) => (
-                                    <Chip
-                                      key={eventIndex}
-                                      label={event.name}
-                                      size="small"
-                                      sx={{
-                                        height: 20,
-                                        fontSize: '0.65rem',
-                                        backgroundColor: alpha(theme.palette.warning.main, 0.1),
-                                        color: 'warning.main',
-                                        '& .MuiChip-label': { px: 0.75 }
-                                      }}
-                                    />
-                                  ))}
-                                </Box>
-                              </Box>
-                            }
-                          />
-                        </Box>
-                      </Box>
-                    </ListItemButton>
-                  </ListItem>
-                  {index < tradesWithSelectedEvent.length - 1 && <Divider sx={{ ml: 3 }} />}
-                </React.Fragment>
-              ))}
-            </List>
-            )}
-          </Box>
-        ) : activeTab === 0 ? (
+        {activeTab === 0 ? (
           // Pinned Trades Tab
           sortedPinnedTrades.length === 0 ? (
             <Box
@@ -749,6 +467,8 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                                 </Typography>
                               </Box>
                             }
+                            primaryTypographyProps={{ component: 'div' }}
+                            secondaryTypographyProps={{ component: 'div' }}
                             secondary={
                               <Box>
                                 {/* Date and Session */}
@@ -861,12 +581,18 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
           ) : (
             <List sx={{ p: 0, overflow: 'auto', height: '100%', ...scrollbarStyles(theme) }}>
               {filteredPinnedEvents.map((pinnedEvent, index) => {
-                const tradesWithEvent = getTradesWithEvent(pinnedEvent.event);
+                const tradesWithEvent = trades.filter(trade =>
+                  trade.economic_events?.some(event =>
+                    eventMatchV2(event, pinnedEvent)
+                  )
+                );
+
                 return (
                   <React.Fragment key={pinnedEvent.event}>
                     <ListItem disablePadding>
                       <ListItemButton
-                        onClick={() => setSelectedEvent(pinnedEvent.event)}
+                        onClick={() => handleEventClick(pinnedEvent)}
+                        disabled={loadingEvent}
                         sx={{
                           p: 2,
                           backgroundColor: alpha(theme.palette.warning.main, 0.03),
@@ -906,59 +632,8 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                             </Typography>
                             <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
                               {tradesWithEvent.length} trade{tradesWithEvent.length !== 1 ? 's' : ''} found
-                              {pinnedEvent.notes && (
-                                <Box component="span" sx={{ ml: 1, display: 'inline-flex', alignItems: 'center' }}>
-                                  • <NoteIcon sx={{ fontSize: 12, ml: 0.5 }} />
-                                </Box>
-                              )}
                             </Typography>
-                            {pinnedEvent.notes && (
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewNotes(pinnedEvent);
-                                }}
-                                sx={{
-                                  fontSize: '0.75rem',
-                                  fontStyle: 'italic',
-                                  mt: 0.5,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  cursor: 'pointer',
-                                  '&:hover': {
-                                    color: 'primary.main',
-                                    textDecoration: 'underline'
-                                  }
-                                }}
-                              >
-                                {pinnedEvent.notes}
-                              </Typography>
-                            )}
                           </Box>
-
-                          {/* Notes Button */}
-                          {!isReadOnly && (
-                            <Tooltip title={pinnedEvent.notes ? "Edit notes" : "Add notes"}>
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditNotes(pinnedEvent);
-                                }}
-                                sx={{
-                                  color: pinnedEvent.notes ? 'primary.main' : 'text.secondary',
-                                  '&:hover': {
-                                    backgroundColor: alpha(theme.palette.primary.main, 0.1)
-                                  }
-                                }}
-                              >
-                                {pinnedEvent.notes ? <NoteIcon sx={{ fontSize: 18 }} /> : <EditIcon sx={{ fontSize: 18 }} />}
-                              </IconButton>
-                            </Tooltip>
-                          )}
 
                           {/* Trade Count Badge */}
                           {tradesWithEvent.length > 0 && (
@@ -985,83 +660,28 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
         )}
       </Box>
 
-      {/* Edit Notes Dialog */}
-      <Dialog
-        open={notesDialogOpen}
-        onClose={handleCloseNotesDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          {editingEvent?.notes ? 'Edit Notes' : 'Add Notes'}
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {editingEvent?.event}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            multiline
-            rows={4}
-            fullWidth
-            variant="outlined"
-            label="Notes"
-            value={notesText}
-            onChange={(e) => setNotesText(e.target.value)}
-            placeholder="Add your notes about this economic event..."
-            sx={{ mt: 1 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseNotesDialog}>Cancel</Button>
-          <Button onClick={handleSaveNotes} variant="contained">
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* View Notes Dialog */}
-      <Dialog
-        open={viewNotesDialogOpen}
-        onClose={handleCloseViewNotesDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          Event Notes
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {viewingEvent?.event}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          <Typography
-            variant="body1"
-            sx={{
-              mt: 1,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word'
-            }}
-          >
-            {viewingEvent?.notes || 'No notes available.'}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseViewNotesDialog}>Close</Button>
-          {!isReadOnly && (
-            <Button
-              onClick={() => {
-                handleCloseViewNotesDialog();
-                if (viewingEvent) {
-                  handleEditNotes(viewingEvent);
-                }
-              }}
-              variant="outlined"
-            >
-              Edit Notes
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
+      {/* Economic Event Detail Dialog */}
+      {selectedEvent && calendar && (
+        <EconomicEventDetailDialog
+          open={eventDetailDialogOpen}
+          onClose={() => {
+            setEventDetailDialogOpen(false);
+            setSelectedEvent(null);
+          }}
+          event={selectedEvent}
+          trades={trades}
+          onUpdateTradeProperty={onUpdateTradeProperty}
+          onEditTrade={onEditTrade}
+          onDeleteTrade={onDeleteTrade}
+          onDeleteMultipleTrades={onDeleteMultipleTrades}
+          onZoomImage={onZoomImage}
+          onOpenGalleryMode={onOpenGalleryMode}
+          calendarId={calendar.id}
+          calendar={calendar}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
+          isReadOnly={isReadOnly}
+        />
+      )}
     </UnifiedDrawer>
   );
 };

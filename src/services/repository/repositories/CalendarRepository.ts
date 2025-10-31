@@ -61,7 +61,9 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
       const { data, error } = await supabase
         .from('calendars')
         .select('*')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .is('deleted_at', null) // Exclude soft-deleted calendars
+        .neq('mark_for_deletion', true); // Exclude calendars marked for deletion
 
       if (error) {
         logger.error('Error finding calendars by user ID:', error);
@@ -142,10 +144,13 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
     return transformSupabaseCalendar(data);
   }
 
+  /**
+   * HARD DELETE - Permanently removes calendar from database
+   */
   protected async deleteInSupabase(id: string): Promise<boolean> {
     const { error } = await supabase
       .from('calendars')
-      .delete()
+      .update({ mark_for_deletion: true, deletion_date: new Date().toISOString() })
       .eq('id', id);
 
     if (error) {
@@ -153,6 +158,31 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
     }
 
     return true;
+  }
+
+  /**
+   * Get calendars in trash (soft deleted but not marked for deletion)
+   * Returns calendars that have deleted_at set but mark_for_deletion is false/null
+   */
+  async findTrashByUserId(userId: string): Promise<Calendar[]> {
+    try {
+      const { data, error } = await supabase
+        .from('calendars')
+        .select('*')
+        .eq('user_id', userId)
+        .not('deleted_at', 'is', null) // Has been soft deleted
+        .neq('mark_for_deletion', true); // Not marked for final deletion
+
+      if (error) {
+        logger.error('Error finding trash calendars by user ID:', error);
+        return [];
+      }
+
+      return data ? data.map(item => transformSupabaseCalendar(item)) : [];
+    } catch (error) {
+      logger.error('Error finding trash calendars by user ID:', error);
+      return [];
+    }
   }
 
 }

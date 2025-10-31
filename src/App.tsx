@@ -22,7 +22,6 @@ import {
 } from './utils/dynamicRiskUtils'; 
 
 // Lazy load components
-const HomePage = lazy(() => import('./components/HomePage'));
 const CalendarHome = lazy(() => import('./components/CalendarHome'));
 const TradeCalendar = lazy(() => import('./components/TradeCalendar'));
 const CalendarTrash = lazy(() => import('./components/trash/CalendarTrash'));
@@ -354,43 +353,17 @@ function AppContent() {
           <Route
             path="/"
             element={
-              user ? (
-                <Navigate to="/dashboard" replace />
-              ) : (
-                <HomePage
-                  onToggleTheme={toggleColorMode}
-                  mode={mode}
-                />
-              )
-            }
-          />
-          <Route
-            path="/home"
-            element={
-              <HomePage
+              <CalendarHome
+                calendars={calendars}
+                onCreateCalendar={handleCreateCalendar}
+                onDuplicateCalendar={handleDuplicateCalendar}
+                onDeleteCalendar={handleDeleteCalendar}
+                onUpdateCalendar={handleUpdateCalendar}
                 onToggleTheme={toggleColorMode}
                 mode={mode}
+                isLoading={isLoadingCalendars}
+                loadAllTrades={loadAllTrades}
               />
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              user ? (
-                <CalendarHome
-                  calendars={calendars}
-                  onCreateCalendar={handleCreateCalendar}
-                  onDuplicateCalendar={handleDuplicateCalendar}
-                  onDeleteCalendar={handleDeleteCalendar}
-                  onUpdateCalendar={handleUpdateCalendar}
-                  onToggleTheme={toggleColorMode}
-                  mode={mode}
-                  isLoading={isLoadingCalendars}
-                  loadAllTrades={loadAllTrades}
-                />
-              ) : (
-                <Navigate to="/" replace />
-              )
             }
           />
           <Route
@@ -507,6 +480,33 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
   const { createChannel } = useRealtimeSubscription({
     channelName: `calendar-${calendar?.id}`,
     enabled: !!calendar,
+    onChannelCreated: (channel) => {
+      // Configure the channel BEFORE it subscribes
+      channel.on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'calendars',
+          filter: `id=eq.${calendar?.id}`
+        },
+        (payload) => {
+          const updatedCalendarData = payload.new;
+
+          // Only update specific fields that might change from edge functions
+          // Preserve cached trades and loaded years from local state
+          if (calendar) {
+            const trades = [...calendar.cachedTrades];
+            const loadedYears = [...calendar.loadedYears];
+            onUpdateStateCalendar(calendar.id, {
+              ...updatedCalendarData,
+              cachedTrades: trades,
+              loadedYears
+            });
+          }
+        }
+      );
+    },
     onSubscribed: () => {
       logger.log(`✅ Calendar subscription active for ${calendar?.id}`);
     },
@@ -520,33 +520,9 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
   useEffect(() => {
     if (!calendar) return;
 
-    // Create the channel with automatic reconnection
-    const channel = createChannel();
-    if (!channel) return;
-
-    // Subscribe to calendar updates
-    channel.on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'calendars',
-        filter: `id=eq.${calendar.id}`
-      },
-      (payload) => {
-        const updatedCalendarData = payload.new;
-
-        // Only update specific fields that might change from edge functions
-        // Preserve cached trades and loaded years from local state
-        const trades = calendar.cachedTrades;
-        const loadedYears = calendar.loadedYears;
-        onUpdateStateCalendar(calendar.id, {
-          ...updatedCalendarData,
-          cachedTrades: trades,
-          loadedYears
-        });
-      }
-    );
+    // Create and subscribe to the channel
+    // The channel is configured via onChannelCreated callback before subscribing
+    createChannel();
 
     // Cleanup handled automatically by the hook
   }, [calendar?.id, createChannel]);
@@ -819,13 +795,13 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       // Stats will be recalculated on next load
     } catch (error) {
       console.error('Error importing trades:', error);
+      // Re-throw error so MonthlyStats can show error message
+      throw error;
     } finally {
-      // Hide loading indicator after a short delay
-      setTimeout(() => {
-        setIsImportingTrades(false);
-        setLoadingCalendarName(undefined);
-        setLoadingAction('loading'); // Reset to default action
-      }, 500);
+      // Hide loading indicator - no delay needed since we're awaiting the import
+      setIsImportingTrades(false);
+      setLoadingCalendarName(undefined);
+      setLoadingAction('loading'); // Reset to default action
     }
   };
 

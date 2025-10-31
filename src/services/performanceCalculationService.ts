@@ -93,11 +93,17 @@ export class PerformanceCalculationService {
         { name: 'Breakeven', value: breakevens?.total || 0 }
       ].filter(item => item.value > 0);
 
+      // Ensure riskRewardStats has proper structure with non-null data array
+      const riskRewardStats = data.riskRewardStats || { average: 0, max: 0, data: [] };
+      if (!riskRewardStats.data || !Array.isArray(riskRewardStats.data)) {
+        riskRewardStats.data = [];
+      }
+
       return {
         winLossStats: data.winLossStats,
         tagStats: data.tagStats || [],
         dailySummaryData,
-        riskRewardStats: data.riskRewardStats || { average: 0, max: 0, data: [] },
+        riskRewardStats,
         sessionStats,
         comparisonWinLossData: data.comparisonWinLossData || null,
         allTags: data.allTags || [],

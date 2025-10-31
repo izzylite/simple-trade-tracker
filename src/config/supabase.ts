@@ -22,12 +22,20 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true, // Enable session persistence for Supabase Auth
     autoRefreshToken: true, // Enable automatic token refresh
     detectSessionInUrl: true, // Detect auth session from URL (for OAuth redirects)
-    flowType: 'implicit', // Use implicit flow for OAuth (better for web apps)
+    flowType: 'pkce', // Use PKCE flow for OAuth (more secure, recommended by Supabase)
   },
   db: {
     schema: 'public',
   },
+  global: {
+    headers: {
+      'x-client-info': 'cotex-journel',
+    },
+  },
 });
+
+// Export the URL for use in other services
+export { supabaseUrl };
  
 
  
