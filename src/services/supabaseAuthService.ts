@@ -30,6 +30,7 @@ class SupabaseAuthService {
     session: null,
     loading: true
   };
+  private sessionExpiryCheckInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.initializeAuth();
@@ -42,9 +43,13 @@ class SupabaseAuthService {
     try {
       // Get initial session
       const { data: { session }, error } = await supabase.auth.getSession();
-      
+
       if (error) {
         logger.error('Error getting initial session:', error);
+      }
+
+      if (session) {
+        this.logSessionDetails(session, 'Initial session');
       }
 
       // Update auth state
@@ -58,19 +63,22 @@ class SupabaseAuthService {
         switch (event) {
           case 'SIGNED_IN':
             if (session?.user) {
+              this.logSessionDetails(session, 'Sign in');
               await this.handleUserSignIn(session.user, session);
             }
             break;
 
           case 'SIGNED_OUT':
             logger.info('User signed out, clearing auth state');
+            this.stopSessionExpiryMonitoring();
             this.updateAuthState(null);
             break;
 
           case 'TOKEN_REFRESHED':
             // Token was automatically refreshed by Supabase
-            logger.info('Access token refreshed successfully');
+            logger.info('✅ Access token refreshed successfully');
             if (session) {
+              this.logSessionDetails(session, 'Token refresh');
               this.updateAuthState(session);
             }
             break;
@@ -92,6 +100,9 @@ class SupabaseAuthService {
           case 'INITIAL_SESSION':
             // Initial session loaded on page load
             logger.info('Initial session loaded');
+            if (session) {
+              this.logSessionDetails(session, 'Initial session');
+            }
             this.updateAuthState(session);
             break;
 
@@ -107,6 +118,74 @@ class SupabaseAuthService {
       this.updateAuthState(null);
     }
   }
+
+  /**
+   * Log detailed session information for debugging
+   */
+  private logSessionDetails(session: Session, context: string) {
+    const expiresAt = session.expires_at ? new Date(session.expires_at * 1000) : null;
+    const now = new Date();
+    const timeUntilExpiry = expiresAt ? Math.floor((expiresAt.getTime() - now.getTime()) / 1000 / 60) : null;
+
+    logger.info(`📊 [${context}] Session details:`, {
+      expiresAt: expiresAt?.toLocaleString(),
+      timeUntilExpiry: timeUntilExpiry ? `${timeUntilExpiry} minutes` : 'unknown',
+      hasRefreshToken: !!session.refresh_token,
+      accessTokenLength: session.access_token?.length
+    });
+
+    // Start monitoring session expiry
+    this.startSessionExpiryMonitoring(session);
+  }
+
+  /**
+   * Start monitoring session expiry and warn before it expires
+   */
+  private startSessionExpiryMonitoring(session: Session) {
+    // Clear any existing interval
+    this.stopSessionExpiryMonitoring();
+
+    if (!session.expires_at) {
+      logger.warn('⚠️ Session has no expiry time, cannot monitor expiration');
+      return;
+    }
+
+    const expiresAt = new Date(session.expires_at * 1000);
+    const now = new Date();
+    const timeUntilExpiry = expiresAt.getTime() - now.getTime();
+
+    // Log initial state
+    logger.info(`🕐 Starting session expiry monitoring. Token expires at ${expiresAt.toLocaleString()}`);
+
+    // Check every 30 seconds
+    this.sessionExpiryCheckInterval = setInterval(() => {
+      const currentTime = new Date();
+      const remainingTime = expiresAt.getTime() - currentTime.getTime();
+      const remainingMinutes = Math.floor(remainingTime / 1000 / 60);
+      const remainingSeconds = Math.floor((remainingTime / 1000) % 60);
+
+      if (remainingTime <= 0) {
+        logger.error('❌ Session has expired! Token should have been refreshed by now.');
+        this.stopSessionExpiryMonitoring();
+      } else if (remainingTime <= 5 * 60 * 1000) { // 5 minutes warning
+        logger.warn(`⏰ Token expires in ${remainingMinutes}m ${remainingSeconds}s. Auto-refresh should happen soon...`);
+      } else if (remainingTime <= 10 * 60 * 1000) { // 10 minutes warning
+        logger.info(`⏱️ Token expires in ${remainingMinutes}m ${remainingSeconds}s`);
+      }
+    }, 30000); // Check every 30 seconds
+  }
+
+  /**
+   * Stop monitoring session expiry
+   */
+  private stopSessionExpiryMonitoring() {
+    if (this.sessionExpiryCheckInterval) {
+      clearInterval(this.sessionExpiryCheckInterval);
+      this.sessionExpiryCheckInterval = null;
+      logger.info('Stopped session expiry monitoring');
+    }
+  }
+
 
   /**
    * Handle user sign-in and create/update user record
@@ -127,7 +206,7 @@ class SupabaseAuthService {
       const { error: upsertError } = await supabase
         .from('users')
         .upsert({
-          firebase_uid: user.id, // Use Supabase user ID as firebase_uid for now
+          id: user.id, // Supabase Auth user ID
           email: user.email!,
           display_name: displayName,
           photo_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
@@ -135,7 +214,7 @@ class SupabaseAuthService {
           last_login: new Date().toISOString(),
           is_active: true
         }, {
-          onConflict: 'firebase_uid'
+          onConflict: 'id'
         });
 
       if (upsertError) {
@@ -324,17 +403,67 @@ class SupabaseAuthService {
    */
   async refreshSession(): Promise<Session | null> {
     try {
+      logger.info('🔄 Manually refreshing session...');
       const { data: { session }, error } = await supabase.auth.refreshSession();
 
       if (error) {
-        logger.error('Error refreshing session:', error);
+        logger.error('❌ Error refreshing session:', error);
         return null;
+      }
+
+      if (session) {
+        logger.info('✅ Session refreshed successfully');
+        this.logSessionDetails(session, 'Manual refresh');
+      } else {
+        logger.warn('⚠️ Session refresh returned no session');
       }
 
       return session;
     } catch (error) {
-      logger.error('Session refresh failed:', error);
+      logger.error('❌ Session refresh failed:', error);
       return null;
+    }
+  }
+
+  /**
+   * Ensure session is valid before performing operations
+   * Call this before database queries to ensure auth is ready
+   */
+  async ensureValidSession(): Promise<boolean> {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+
+      if (error) {
+        logger.error('❌ Error checking session validity:', error);
+        return false;
+      }
+
+      if (!session) {
+        logger.warn('⚠️ No active session found');
+        return false;
+      }
+
+      const expiresAt = session.expires_at ? new Date(session.expires_at * 1000) : null;
+      const now = new Date();
+
+      if (!expiresAt) {
+        logger.warn('⚠️ Session has no expiry time');
+        return true; // Allow operation but log warning
+      }
+
+      const timeUntilExpiry = expiresAt.getTime() - now.getTime();
+
+      if (timeUntilExpiry <= 0) {
+        logger.warn('⚠️ Session expired, attempting refresh...');
+        const refreshedSession = await this.refreshSession();
+        return !!refreshedSession;
+      }
+
+      logger.info('✅ Session is valid');
+      return true;
+    } catch (error) {
+      logger.error('❌ Error ensuring valid session:', error);
+      return false;
     }
   }
 }

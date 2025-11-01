@@ -15,6 +15,7 @@ interface SupabaseAuthContextType {
   isAuthenticated: boolean;
   getAccessToken: () => Promise<string | null>;
   refreshSession: () => Promise<void>;
+  ensureValidSession: () => Promise<boolean>;
 }
 
 // Firebase-compatible interface for easy migration
@@ -93,6 +94,15 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  const ensureValidSession = async () => {
+    try {
+      return await supabaseAuthService.ensureValidSession();
+    } catch (error) {
+      logger.error('Error ensuring valid session:', error);
+      return false;
+    }
+  };
+
   const value: SupabaseAuthContextType = {
     user: authState.user,
     loading: authState.loading,
@@ -101,6 +111,7 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     isAuthenticated: supabaseAuthService.isAuthenticated(),
     getAccessToken,
     refreshSession,
+    ensureValidSession,
   };
 
   return (

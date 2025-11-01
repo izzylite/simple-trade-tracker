@@ -28,12 +28,12 @@
  * @see {@link docs/SERVICE_LAYER_DOCUMENTATION.md} for service integration
  */
 
-import { 
-  SupabaseError, 
-  SupabaseErrorCategory, 
-  parseSupabaseError, 
-  logSupabaseError, 
-  getErrorRecoveryStrategy 
+import {
+  SupabaseError,
+  SupabaseErrorCategory,
+  parseSupabaseError,
+  logSupabaseError,
+  getErrorRecoveryStrategy
 } from '../utils/supabaseErrorHandler';
 import { logger } from '../utils/logger';
 
@@ -91,7 +91,7 @@ export async function executeSupabaseOperation<T>(
     } catch (error) {
       lastError = error;
       const parsedError = parseSupabaseError(error, finalConfig.context);
-      
+
       if (finalConfig.logErrors) {
         logSupabaseError(parsedError, operationType);
       }
@@ -99,7 +99,7 @@ export async function executeSupabaseOperation<T>(
       // Check if error is retryable and we have attempts left
       const recoveryStrategy = getErrorRecoveryStrategy(parsedError);
       const shouldRetry = recoveryStrategy.shouldRetry && attempt < finalConfig.retryAttempts;
-      
+
       if (shouldRetry) {
         const delay = recoveryStrategy.retryDelay || (finalConfig.retryDelay * attempt);
         logger.info(`Retrying ${operationType} in ${delay}ms (attempt ${attempt + 1}/${finalConfig.retryAttempts})`);

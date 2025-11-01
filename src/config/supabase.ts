@@ -16,13 +16,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create Supabase client with standard configuration
-// Following official Supabase documentation patterns
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true, // Enable session persistence for Supabase Auth
-    autoRefreshToken: true, // Enable automatic token refresh
-    detectSessionInUrl: true, // Detect auth session from URL (for OAuth redirects)
-    flowType: 'pkce', // Use PKCE flow for OAuth (more secure, recommended by Supabase)
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
   },
   db: {
     schema: 'public',

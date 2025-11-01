@@ -12,6 +12,8 @@ import { logger } from '../../../utils/logger';
 
 // Supabase imports
 import { supabase } from '../../../config/supabase';
+import { supabaseAuthService } from '../../supabaseAuthService';
+
 
 // Storage imports
 import { uploadTradeImage, optimizeImage } from '../../supabaseStorageService';
@@ -49,6 +51,9 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
 
   async findById(id: string): Promise<Trade | null> {
     try {
+      // Ensure session is valid before fetching trade by ID
+      await supabaseAuthService.ensureValidSession();
+
       const { data, error } = await supabase
         .from('trades')
         .select('*')
@@ -69,6 +74,9 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
 
   async findByUserId(userId: string): Promise<Trade[]> {
     try {
+      // Ensure session is valid before fetching trades by user
+      await supabaseAuthService.ensureValidSession();
+
       const { data, error } = await supabase
         .from('trades')
         .select('*')
@@ -88,6 +96,9 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
 
   async findByCalendarId(calendarId: string): Promise<Trade[]> {
     try {
+      // Ensure session is valid before fetching trades by calendar
+      await supabaseAuthService.ensureValidSession();
+
       const { data, error } = await supabase
         .from('trades')
         .select('*')
@@ -107,6 +118,9 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
 
   async findAll(): Promise<Trade[]> {
     try {
+      // Ensure session is valid before fetching all trades
+      await supabaseAuthService.ensureValidSession();
+
       const { data, error } = await supabase
         .from('trades')
         .select('*');
@@ -151,6 +165,9 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     totalPages: number;
   }> {
     try {
+      // Ensure session is valid before searching trades
+      await supabaseAuthService.ensureValidSession();
+
       const {
         searchQuery = '',
         selectedTags = [],

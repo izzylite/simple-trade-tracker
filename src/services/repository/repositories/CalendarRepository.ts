@@ -12,6 +12,8 @@ import { logger } from '../../../utils/logger';
 
 // Supabase imports
 import { supabase } from '../../../config/supabase';
+import { supabaseAuthService } from '../../supabaseAuthService';
+
 
 /**
  * Transform Supabase calendar data to Calendar type
@@ -38,6 +40,9 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
 
   async findById(id: string): Promise<Calendar | null> {
     try {
+      // Ensure session is valid before fetching calendar by ID
+      await supabaseAuthService.ensureValidSession();
+
       const { data, error } = await supabase
         .from('calendars')
         .select('*')
@@ -58,12 +63,15 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
 
   async findByUserId(userId: string): Promise<Calendar[]> {
     try {
+      // Ensure session is valid before fetching calendars by user
+      await supabaseAuthService.ensureValidSession();
+
       const { data, error } = await supabase
         .from('calendars')
         .select('*')
         .eq('user_id', userId)
-        .is('deleted_at', null) // Exclude soft-deleted calendars
-        .neq('mark_for_deletion', true); // Exclude calendars marked for deletion
+        .is('deleted_at', null)
+        .neq('mark_for_deletion', true);
 
       if (error) {
         logger.error('Error finding calendars by user ID:', error);
@@ -72,13 +80,16 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
 
       return data ? data.map(item => transformSupabaseCalendar(item)) : [];
     } catch (error) {
-      logger.error('Error finding calendars by user ID:', error);
+      logger.error('Exception finding calendars by user ID:', error);
       return [];
     }
   }
 
   async findAll(): Promise<Calendar[]> {
     try {
+      // Ensure session is valid before fetching all calendars
+      await supabaseAuthService.ensureValidSession();
+
       const { data, error } = await supabase
         .from('calendars')
         .select('*');
@@ -166,6 +177,9 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
    */
   async findTrashByUserId(userId: string): Promise<Calendar[]> {
     try {
+      // Ensure session is valid before fetching trashed calendars
+      await supabaseAuthService.ensureValidSession();
+
       const { data, error } = await supabase
         .from('calendars')
         .select('*')

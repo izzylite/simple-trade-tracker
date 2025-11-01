@@ -40,6 +40,8 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const isReconnectingRef = useRef(false);
+  const isCleaningUpRef = useRef(false);
+
 
   /**
    * Cleanup existing channel before creating a new one
@@ -48,8 +50,13 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
   const cleanupChannel = useCallback(async () => {
     if (channelRef.current) {
       logger.log(`🧹 Cleaning up channel: ${channelName}`);
-      await supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
+      try {
+        isCleaningUpRef.current = true;
+        await supabase.removeChannel(channelRef.current);
+      } finally {
+        isCleaningUpRef.current = false;
+        channelRef.current = null;
+      }
     }
   }, [channelName]);
 
@@ -57,7 +64,7 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
    * Attempt to reconnect with exponential backoff
    */
   const attemptReconnect = useCallback(() => {
-    if (!enabled || isReconnectingRef.current) {
+    if (!enabled || isReconnectingRef.current || isCleaningUpRef.current) {
       return;
     }
 
@@ -122,6 +129,10 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
           break;
 
         case REALTIME_SUBSCRIBE_STATES.CLOSED:
+          if (isCleaningUpRef.current) {
+            logger.log(`🔌 Channel ${channelName} closed due to cleanup/unmount, skipping reconnect`);
+            break;
+          }
           logger.warn(`🔌 Channel closed for ${channelName}`);
           attemptReconnect();
           break;

@@ -392,6 +392,21 @@ export function logSupabaseError(error: SupabaseError, operation?: string): void
     timestamp: error.timestamp.toISOString()
   };
 
+  // Add special logging for authentication errors to help debug token issues
+  if (error.category === SupabaseErrorCategory.AUTHENTICATION) {
+    logger.error(`🔐 AUTHENTICATION ERROR DETECTED:`, {
+      ...logContext,
+      userMessage: error.userMessage,
+      hint: error.hint,
+      details: error.details,
+      originalError: error.originalError
+    });
+    logger.error(`📝 This error occurred during: ${operation || 'unknown operation'}`);
+    logger.error(`💡 Suggestion: Check if token auto-refresh is working properly. Look for "TOKEN_REFRESHED" events in console.`);
+    logger.error(`⚠️ This might happen after tab switching if session is not ready. Session should auto-refresh and retry.`);
+    return;
+  }
+
   switch (error.severity) {
     case SupabaseErrorSeverity.CRITICAL:
     case SupabaseErrorSeverity.HIGH:

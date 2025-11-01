@@ -12,14 +12,17 @@ import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
 import TradeLoadingIndicator from './components/TradeLoadingIndicator';
 import { useRealtimeSubscription } from './hooks/useRealtimeSubscription';
+import { useCalendars } from './hooks/useCalendars';
 import { logger } from './utils/logger';
+import { supabaseAuthService } from './services/supabaseAuthService';
+
 
 import AppLoadingProgress from './components/AppLoadingProgress';
 import {
   calculateEffectiveRiskPercentage,
   calculateRiskAmount,
   DynamicRiskSettings
-} from './utils/dynamicRiskUtils'; 
+} from './utils/dynamicRiskUtils';
 
 // Lazy load components
 const CalendarHome = lazy(() => import('./components/CalendarHome'));
@@ -43,41 +46,57 @@ function AppContent() {
     return savedMode ? (savedMode as 'light' | 'dark') : (prefersDarkMode ? 'dark' : 'light');
   });
 
-  const [calendars, setCalendars] = useState<CalendarWithUIState[]>([]);
-  const [isLoadingCalendars, setIsLoadingCalendars] = useState<boolean>(false);
   const [isLoadingTrades, setIsLoadingTrades] = useState<boolean>(false);
   const [loadingCalendarName, setLoadingCalendarName] = useState<string | undefined>(undefined);
   const [isImportingTrades, setIsImportingTrades] = useState<boolean>(false);
   const [loadingAction, setLoadingAction] = useState<'loading' | 'importing' | 'exporting'>('loading');
   const { user } = useAuth();
 
-  // Load calendars when user changes
+  // Use SWR to fetch calendars with automatic focus revalidation
+  // This solves the Chrome Energy Saver tab freezing issue
+  const {
+    calendars: swrCalendars,
+    isLoading: isLoadingCalendars,
+    error: calendarsError,
+    refresh: refreshCalendars,
+  } = useCalendars(user?.uid, {
+    revalidateOnFocus: true, // Auto-refetch when tab regains focus
+  });
+
+  // Local state for calendars to allow updates (like adding trades)
+  const [calendars, setCalendars] = useState<CalendarWithUIState[]>([]);
+
+  // Sync SWR data to local state when it changes
+  // Only update if we actually received data from SWR
   useEffect(() => {
-    const loadCalendars = async () => {
-      if (user) {
-        setIsLoadingCalendars(true);
-        try {
-          const userCalendars = await calendarService.getUserCalendars(user.uid);
-          // Convert Calendar[] to CalendarWithUIState[]
-          const calendarsWithUIState: CalendarWithUIState[] = userCalendars.map(cal => ({
-            ...cal,
-            cachedTrades: [],
-            loadedYears: []
-          }));
-          setCalendars(calendarsWithUIState);
-        } catch (error) {
-          console.error('Error loading calendars:', error);
-        } finally {
-          setIsLoadingCalendars(false);
+    if (swrCalendars !== undefined) {
+      setCalendars(swrCalendars);
+    }
+  }, [swrCalendars]);
+
+
+  // On tab focus/visibility, ensure auth session is valid then refresh SWR calendars
+  useEffect(() => {
+    const handleVisibilityOrFocus = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const ok = await supabaseAuthService.ensureValidSession();
+        if (ok) {
+          logger.log('🔐 Session valid on focus, refreshing calendars');
+          refreshCalendars();
         }
-      } else {
-        setCalendars([]);
+      } catch (e) {
+        logger.warn('Focus/visibility session check failed', e);
       }
-      return undefined;
     };
 
-    loadCalendars();
-  }, [user]);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
+  }, [refreshCalendars]);
 
   const theme = useMemo(() => createTheme(createAppTheme(mode)), [mode]);
 
@@ -305,7 +324,7 @@ function AppContent() {
         let newAmount = 0;
         if (trade.trade_type === 'win') {
           newAmount = Math.round(riskAmount * trade.risk_to_reward);
-        } else if (trade.trade_type === 'loss') { 
+        } else if (trade.trade_type === 'loss') {
           newAmount = -Math.round(riskAmount);
         }
 
@@ -681,7 +700,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
 
       // If trade doesn't exist and we have a create function, create it
       if (!existingTrade && createIfNotExists) {
-        const finalTrade = updateCallback(createIfNotExists(tradeId)); 
+        const finalTrade = updateCallback(createIfNotExists(tradeId));
         // Add to cached trades immediately for UI responsiveness
         const updatedCachedTrades = [...calendar.cachedTrades, finalTrade];
         onUpdateStateCalendar(calendar.id, {

@@ -4,6 +4,8 @@
  */
 
 import { supabase } from '../../../config/supabase';
+import { supabaseAuthService } from '../../supabaseAuthService';
+
 import { AbstractBaseRepository, RepositoryResult } from './BaseRepository';
 import { EconomicEvent, Currency, ImpactLevel } from '../../../types/economicCalendar';
 import { handleSupabaseError } from '../../../utils/supabaseErrorHandler';
@@ -76,6 +78,9 @@ export class EconomicEventRepository {
     options: PaginationOptions = {},
     filters?: EconomicEventFilters
   ): Promise<RepositoryResult<PaginatedResult>> {
+    // Ensure session is valid (handles tab background expiry)
+    await supabaseAuthService.ensureValidSession();
+
     const pageSize = options?.pageSize || this.DEFAULT_PAGE_SIZE;
     const offset = options?.offset || 0;
 
@@ -159,6 +164,9 @@ export class EconomicEventRepository {
     filters?: EconomicEventFilters
   ): Promise<RepositoryResult<EconomicEvent[]>> {
     try {
+      // Ensure session is valid before fetching
+      await supabaseAuthService.ensureValidSession();
+
       logger.log('🔄 Fetching all events from database:', dateRange, filters);
 
       // Use paginated method with large page size
@@ -199,6 +207,9 @@ export class EconomicEventRepository {
    */
   async findById(eventId: string): Promise<RepositoryResult<EconomicEvent | null>> {
     try {
+      // Ensure session is valid before fetching by ID
+      await supabaseAuthService.ensureValidSession();
+
       logger.log(`Fetching economic event by ID: ${eventId}`);
 
       const { data, error } = await supabase
@@ -247,6 +258,9 @@ export class EconomicEventRepository {
    */
   async searchEvents(query: string): Promise<RepositoryResult<EconomicEvent[]>> {
     try {
+      // Ensure session is valid before searching
+      await supabaseAuthService.ensureValidSession();
+
       const { data, error } = await supabase
         .from('economic_events')
         .select('*')
