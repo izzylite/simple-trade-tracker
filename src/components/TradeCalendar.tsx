@@ -1505,7 +1505,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           allTrades={trades} /* Pass all trades for tag suggestions */
           deletingTradeIds={deletingTradeIds}
           onOpenGalleryMode={openGalleryMode}
-          calendar={calendar ? { economic_calendar_filters: calendar.economic_calendar_filters } : undefined}
+          calendar={calendar}
           isReadOnly={isReadOnly}
         />
 
@@ -1759,7 +1759,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           title={galleryMode.title}
           calendarId={calendarId}
           onOpenGalleryMode={openGalleryMode}
-          calendar={calendar ? { economic_calendar_filters: calendar.economic_calendar_filters } : undefined}
+          calendar={calendar}
         />
 
 

@@ -6,9 +6,9 @@ import {
 } from '@mui/material';
 import { ViewCarousel as GalleryIcon } from '@mui/icons-material';
 import { format, isAfter, startOfDay } from 'date-fns';
-import { Trade } from '../../types/dualWrite';
+import { Trade, Calendar } from '../../types/dualWrite';
 import { BaseDialog } from '../common';
-import { DayHeader, TradeList } from './';
+import { DayHeader, TradeList, ProgressSection } from './';
 import { calculateCumulativePnL, startOfNextDay } from './TradeFormDialog';
 interface DayDialogProps {
   open: boolean;
@@ -26,14 +26,8 @@ interface DayDialogProps {
   calendarId: string;
   deletingTradeIds?: string[];
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
-  // Calendar data for economic events filtering
-  calendar?: {
-    economic_calendar_filters?: {
-      currencies: string[];
-      impacts: string[];
-      viewType: 'day' | 'week' | 'month';
-    };
-  };
+  // Calendar data for economic events filtering and progress tracking
+  calendar?: Calendar;
   // Read-only mode for shared calendars
   isReadOnly?: boolean;
 }
@@ -149,6 +143,13 @@ const DayDialog: React.FC<DayDialogProps> = ({
             total_pnl={trades.reduce((sum, trade) => sum + trade.amount, 0)}
             onPrevDay={handlePrevDay}
             onNextDay={handleNextDay}
+          />
+
+          <ProgressSection
+            allTrades={allTrades}
+            currentBalance={account_balance + calculateCumulativePnL(startOfNextDay(date), allTrades)}
+            currentDate={date}
+            calendar={calendar}
           />
 
           <TradeList

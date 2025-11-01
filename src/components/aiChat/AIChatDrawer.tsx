@@ -41,6 +41,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 import ChatMessage from './ChatMessage';
 import Shimmer from '../Shimmer';
+import TagMentionInput from './TagMentionInput';
 import {
   ChatMessage as ChatMessageType,
   ChatError,
@@ -96,6 +97,21 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const conversationRepo = useRef(new ConversationRepository()).current;
+
+  // Prevent body scroll when drawer is open to fix mention dialog positioning
+  useEffect(() => {
+    if (open) {
+      // Store original overflow style
+      const originalOverflow = document.body.style.overflow;
+      // Prevent scrolling
+      document.body.style.overflow = 'hidden';
+
+      return () => {
+        // Restore original overflow when drawer closes
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [open]);
 
   // State
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
@@ -318,7 +334,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         messageText,
         user.uid,
         calendar.id,
-        messages
+        messages,
+        calendar.tags || []
       )) {
         switch (event.type) {
           case 'text_chunk':
@@ -504,7 +521,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         userMessage.content,
         user.uid,
         calendar.id,
-        updatedMessages
+        updatedMessages,
+        calendar.tags || []
       );
 
       if (!response.success) {
@@ -1009,16 +1027,15 @@ What would you like to know about your trading?`,
                     boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}`
                   }
                 }}>
-                  <TextField
-                    ref={inputRef}
-                    fullWidth
+                  <TagMentionInput
+                    value={inputMessage}
+                    onChange={setInputMessage}
+                    onKeyDown={handleKeyPress}
+                    placeholder="Ask me about your trading performance... (use @tag to mention tags)"
+                    disabled={isLoading || isAtMessageLimit}
+                    allTags={calendar.tags || []}
                     multiline
                     maxRows={4}
-                    placeholder="Ask me about your trading performance..."
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyDown={handleKeyPress}
-                    disabled={isLoading || isAtMessageLimit}
                     variant="standard"
                     InputProps={{
                       disableUnderline: true,
@@ -1072,7 +1089,7 @@ What would you like to know about your trading?`,
                     opacity: 0.7
                   }}
                 >
-                  Press Enter to send • Shift+Enter for new line
+                  Press Enter to send • Shift+Enter for new line • Type @ to mention tags
                 </Typography>
               </Box>
               </Box>

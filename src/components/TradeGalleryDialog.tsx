@@ -16,7 +16,7 @@ import {
   CalendarToday as CalendarIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import { Trade } from '../types/dualWrite';
+import { Trade, Calendar } from '../types/dualWrite';
 import TradeDetailExpanded from './TradeDetailExpanded';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 
@@ -32,13 +32,7 @@ interface TradeGalleryDialogProps {
   // Optional props for trade link navigation in notes
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
   // Calendar data for economic events filtering
-  calendar?: {
-    economic_calendar_filters?: {
-      currencies: string[];
-      impacts: string[];
-      viewType: 'day' | 'week' | 'month';
-    };
-  };
+  calendar?: Calendar;
 }
 
 const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({

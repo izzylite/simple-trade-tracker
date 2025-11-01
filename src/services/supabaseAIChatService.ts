@@ -59,6 +59,55 @@ class SupabaseAIChatService {
   }
 
   /**
+   * Process @tag mentions in the message and provide context to the AI
+   * Converts @tag mentions to structured context for better AI understanding
+   */
+  private processTagMentions(message: string, availableTags: string[]): { processedMessage: string; tagContext: string } {
+    // Find all @tag mentions in the message using exec loop for compatibility
+    const tagMentionRegex = /@([^\s]+)/g;
+    const mentions: RegExpExecArray[] = [];
+    let match;
+
+    while ((match = tagMentionRegex.exec(message)) !== null) {
+      mentions.push(match);
+    }
+
+    if (mentions.length === 0) {
+      return { processedMessage: message, tagContext: '' };
+    }
+
+    const referencedTags: string[] = [];
+    let processedMessage = message;
+
+    // Process each mention
+    for (const match of mentions) {
+      const mentionedTag = match[1];
+
+      // Check if the mentioned tag exists in available tags (case-insensitive)
+      const actualTag = availableTags.find(tag =>
+        tag.toLowerCase() === mentionedTag.toLowerCase()
+      );
+
+      if (actualTag) {
+        referencedTags.push(actualTag);
+        // Replace @tag with a more descriptive reference for the AI
+        processedMessage = processedMessage.replace(
+          match[0],
+          `the "${actualTag}" tag`
+        );
+      }
+    }
+
+    // Build context string for the AI
+    let tagContext = '';
+    if (referencedTags.length > 0) {
+      tagContext = `\n\nTag Context: The user is specifically asking about trades tagged with: ${referencedTags.join(', ')}. When analyzing trades, focus on those with these tags and provide insights specific to these categories.`;
+    }
+
+    return { processedMessage, tagContext };
+  }
+
+  /**
    * Send a message to the AI Trading Agent with streaming support
    * Yields SSE events as they arrive
    */
@@ -66,10 +115,15 @@ class SupabaseAIChatService {
     message: string,
     userId: string,
     calendarId: string,
-    conversationHistory: ChatMessageType[] = []
+    conversationHistory: ChatMessageType[] = [],
+    availableTags: string[] = []
   ): AsyncGenerator<SSEEvent, void, unknown> {
     try {
       logger.log(`Sending streaming message to AI agent: "${message.substring(0, 50)}..."`);
+
+      // Process @tag mentions
+      const { processedMessage, tagContext } = this.processTagMentions(message, availableTags);
+      const finalMessage = processedMessage + tagContext;
 
       // Get auth token
       const { data: { session } } = await supabase.auth.getSession();
@@ -93,7 +147,7 @@ class SupabaseAIChatService {
           'Accept': 'text/event-stream' // Also set Accept header for proper response type
         },
         body: JSON.stringify({
-          message,
+          message: finalMessage,
           userId,
           calendarId,
           conversationHistory: formattedHistory,
@@ -188,10 +242,15 @@ class SupabaseAIChatService {
     message: string,
     userId: string,
     calendarId: string,
-    conversationHistory: ChatMessageType[] = []
+    conversationHistory: ChatMessageType[] = [],
+    availableTags: string[] = []
   ): Promise<AgentResponse> {
     try {
       logger.log(`Sending message to Supabase AI agent: "${message.substring(0, 50)}..."`);
+
+      // Process @tag mentions
+      const { processedMessage, tagContext } = this.processTagMentions(message, availableTags);
+      const finalMessage = processedMessage + tagContext;
 
       // Convert conversation history to the format expected by the edge function
       const formattedHistory = conversationHistory.map(msg => ({
@@ -204,7 +263,7 @@ class SupabaseAIChatService {
         this.FUNCTION_NAME,
         {
           body: {
-            message,
+            message: finalMessage,
             userId,
             calendarId,
             conversationHistory: formattedHistory,
