@@ -39,6 +39,7 @@ class EconomicCalendarServiceImpl {
       currencies?: Currency[];
       impacts?: ImpactLevel[];
       onlyUpcoming?: boolean;
+      limit?: number;
     }
   ): Promise<EconomicEvent[]> {
     try {

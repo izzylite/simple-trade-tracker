@@ -7,9 +7,7 @@ import {
   Button,
   Stack,
   Avatar,
-  Box,
-  Tabs,
-  Tab
+  Box
 } from '@mui/material';
 import {
   LightMode as LightModeIcon,
@@ -21,7 +19,8 @@ import {
   Home as HomeIcon,
   Article as ArticleIcon,
   CalendarMonth as CalendarIcon,
-  Delete as TrashIcon
+  Delete as TrashIcon,
+  Menu as MenuIcon
 } from '@mui/icons-material';
 import { useTheme, alpha } from '@mui/material/styles';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -36,6 +35,7 @@ interface AppHeaderProps {
   showBackButton?: boolean;
   backButtonPath?: string;
   onBackClick?: () => void;
+  onMenuClick?: () => void;
 }
 
 const AppHeader: React.FC<AppHeaderProps> = ({
@@ -44,7 +44,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   title = 'Cotex',
   showBackButton = false,
   backButtonPath = '/',
-  onBackClick
+  onBackClick,
+  onMenuClick
 }) => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -55,13 +56,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   const isHomePage = location.pathname === '/';
   const isDashboardPage = location.pathname === '/dashboard';
   const isBlogPage = location.pathname === '/blog';
-  const isTrashPage = location.pathname === '/trash';
-
-  // Determine current tab
-  const getCurrentTab = () => {
-    if (isTrashPage) return 'trash';
-    return 'calendars';
-  };
 
   // Check if current user is authorized for debug panel
   const isDebugAuthorized = user?.email === 'isl.israelite@gmail.com';
@@ -115,7 +109,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         backgroundColor: alpha(mode === 'light' ? '#ffffff' : theme.palette.background.default, 0.9),
         borderBottom: `1px solid ${theme.palette.divider}`,
         boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.08)',
-        zIndex: (theme) => theme.zIndex.drawer + 1
+        zIndex: (theme) => theme.zIndex.appBar,
+        width: '100%'
       }}
     >
       <Toolbar sx={{ px: { xs: 1, sm: 3 } }}> {/* Responsive padding */}
@@ -126,6 +121,23 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           flexGrow: 1,
           minWidth: 0 // Allow text truncation
         }}>
+          {/* Hamburger Menu Icon */}
+          {onMenuClick && !showBackButton && (
+            <IconButton
+              onClick={onMenuClick}
+              size="small"
+              edge="start"
+              sx={{
+                color: 'text.secondary',
+                '&:hover': {
+                  color: 'primary.main',
+                  bgcolor: alpha(theme.palette.primary.main, 0.08)
+                }
+              }}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
           {showBackButton && (
             <IconButton
               onClick={handleBackButtonClick}
@@ -162,47 +174,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
               }}
             />
           </IconButton>
-          {user && !showBackButton && (
-            <Tabs
-              value={getCurrentTab()}
-              onChange={(_, newValue) => {
-                if (newValue === 'calendars') {
-                  navigate('/');
-                } else if (newValue === 'trash') {
-                  navigate('/trash');
-                }
-              }}
-              sx={{
-                minHeight: 64,
-                '& .MuiTab-root': {
-                  minHeight: 64,
-                  textTransform: 'none',
-                  fontSize: '0.95rem',
-                  fontWeight: 500,
-                  px: 3,
-                  color: 'text.secondary',
-                  '&.Mui-selected': {
-                    color: 'primary.main',
-                    fontWeight: 600
-                  }
-                },
-                '& .MuiTabs-indicator': {
-                  backgroundColor: 'primary.main',
-                  height: 3,
-                  bottom: 0
-                }
-              }}
-            >
-              <Tab
-                label="Calendars"
-                value="calendars"
-              />
-              <Tab
-                label="Trash"
-                value="trash"
-              />
-            </Tabs>
-          )}
           {showBackButton && (
             <Typography
               variant="h5"
@@ -294,18 +265,34 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             </Button>
           </Stack>
         ) : (
-          <IconButton
-            onClick={onToggleTheme}
-            color="inherit"
-            size="small"
-            sx={{
-              '&:hover': {
-                bgcolor: alpha(theme.palette.primary.main, 0.1),
-              }
-            }}
-          >
-            {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
-          </IconButton>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <IconButton
+              onClick={onToggleTheme}
+              color="inherit"
+              size="small"
+              sx={{
+                '&:hover': {
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                }
+              }}
+            >
+              {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleSignIn}
+              size="small"
+              startIcon={<GoogleIcon />}
+              sx={{
+                px: 2,
+                fontSize: '0.875rem',
+                textTransform: 'none'
+              }}
+            >
+              Sign In
+            </Button>
+          </Stack>
         )}
       </Toolbar>
     </AppBar>

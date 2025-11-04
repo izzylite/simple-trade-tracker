@@ -16,7 +16,9 @@ import {
   Stack,
   Divider,
   Toolbar,
-  Container
+  Container,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   Restore as RestoreIcon,
@@ -29,7 +31,7 @@ import {
 } from '@mui/icons-material';
 import { useTheme, alpha } from '@mui/material/styles';
 import { format } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
 import {
   getTrashCalendars,
@@ -40,185 +42,24 @@ import {
 } from '../../services/trashService';
 import Shimmer from '../Shimmer';
 import AppHeader from '../common/AppHeader';
+import CalendarCardShimmer from '../CalendarCardShimmer';
 
-const TrashCalendarSkeleton = () => {
-  const theme = useTheme();
-
-  return (
-    <Card
-      sx={{
-        height: '100%',
-        borderRadius: 3,
-        border: `1px solid ${theme.palette.divider}`,
-        transition: 'all 0.2s ease-in-out',
-        position: 'relative',
-        overflow: 'visible'
-      }}
-    >
-      <CardContent sx={{ p: 3 }}>
-        <Stack spacing={3}>
-          {/* Header */}
-          <Box>
-            <Box display="flex" alignItems="center" gap={1.5} mb={1}>
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 2,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <Shimmer
-                  height={24}
-                  width={24}
-                  borderRadius="50%"
-                  variant="pulse"
-                  intensity="medium"
-                />
-              </Box>
-              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                <Shimmer
-                  height={24}
-                  width="70%"
-                  borderRadius={6}
-                  variant="wave"
-                  intensity="high"
-                  sx={{ mb: 1 }}
-                />
-                <Shimmer
-                  height={16}
-                  width="50%"
-                  borderRadius={4}
-                  variant="default"
-                  intensity="low"
-                />
-              </Box>
-            </Box>
-          </Box>
-
-          {/* Countdown */}
-          <Box
-            sx={{
-              backgroundColor: alpha(theme.palette.warning.main, 0.1),
-              borderRadius: 2,
-              p: 2,
-              textAlign: 'center'
-            }}
-          >
-            <Box display="flex" alignItems="center" justifyContent="center" gap={1} mb={1}>
-              <Shimmer
-                height={20}
-                width={20}
-                borderRadius="50%"
-                variant="pulse"
-                intensity="medium"
-              />
-              <Shimmer
-                height={32}
-                width={40}
-                borderRadius={8}
-                variant="wave"
-                intensity="high"
-              />
-              <Shimmer
-                height={16}
-                width={60}
-                borderRadius={4}
-                variant="default"
-                intensity="low"
-              />
-            </Box>
-            <Shimmer
-              height={14}
-              width="80%"
-              borderRadius={4}
-              variant="default"
-              intensity="low"
-              sx={{ mx: 'auto' }}
-            />
-          </Box>
-
-          {/* Stats */}
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 2,
-              pt: 1
-            }}
-          >
-            <Box sx={{ textAlign: 'center' }}>
-              <Shimmer
-                height={24}
-                width="80%"
-                borderRadius={6}
-                variant="wave"
-                intensity="medium"
-                sx={{ mb: 1, mx: 'auto' }}
-              />
-              <Shimmer
-                height={14}
-                width="60%"
-                borderRadius={4}
-                variant="default"
-                intensity="low"
-                sx={{ mx: 'auto' }}
-              />
-            </Box>
-            <Box sx={{ textAlign: 'center' }}>
-              <Shimmer
-                height={24}
-                width="60%"
-                borderRadius={6}
-                variant="wave"
-                intensity="medium"
-                sx={{ mb: 1, mx: 'auto' }}
-              />
-              <Shimmer
-                height={14}
-                width="50%"
-                borderRadius={4}
-                variant="default"
-                intensity="low"
-                sx={{ mx: 'auto' }}
-              />
-            </Box>
-          </Box>
-        </Stack>
-      </CardContent>
-
-      <CardActions sx={{ p: 3, pt: 0, gap: 1 }}>
-        <Shimmer
-          height={40}
-          width="100%"
-          borderRadius={8}
-          variant="pulse"
-          intensity="medium"
-        />
-        <Shimmer
-          height={40}
-          width="100%"
-          borderRadius={8}
-          variant="default"
-          intensity="low"
-        />
-      </CardActions>
-    </Card>
-  );
-};
+// TrashCalendarSkeleton component removed - now using CalendarCardShimmer
 
 interface CalendarTrashProps {
   onToggleTheme: () => void;
   mode: 'light' | 'dark';
+  onMenuClick?: () => void;
 }
 
-const CalendarTrash: React.FC<CalendarTrashProps> = ({ onToggleTheme, mode }) => {
+const CalendarTrash: React.FC<CalendarTrashProps> = ({ onToggleTheme, mode, onMenuClick }) => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+
+  // Determine current tab based on route
+  const currentTab = location.pathname === '/trash' ? 'trash' : 'calendars';
   const [trashCalendars, setTrashCalendars] = useState<TrashCalendar[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -315,7 +156,7 @@ const CalendarTrash: React.FC<CalendarTrashProps> = ({ onToggleTheme, mode }) =>
             }}
           >
             {Array.from({ length: 3 }).map((_, index) => (
-              <TrashCalendarSkeleton key={index} />
+              <CalendarCardShimmer key={index} />
             ))}
           </Box>
         </Container>
@@ -328,8 +169,63 @@ const CalendarTrash: React.FC<CalendarTrashProps> = ({ onToggleTheme, mode }) =>
       <AppHeader
         onToggleTheme={onToggleTheme}
         mode={mode}
+        onMenuClick={onMenuClick}
       />
       <Toolbar />
+
+      {/* My Calendar Section with Tabs */}
+      <Box sx={{
+        bgcolor: 'background.paper',
+        borderBottom: 1,
+        borderColor: 'divider',
+        px: { xs: 2, sm: 4 }
+      }}>
+        <Container maxWidth="lg" sx={{ px: 0 }}>
+          <Stack direction="row" alignItems="center" spacing={3} sx={{ py: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              My Calendars
+            </Typography>
+            <Tabs
+              value={currentTab}
+              onChange={(_, newValue) => {
+                if (newValue === 'calendars') {
+                  navigate('/calendars');
+                } else if (newValue === 'trash') {
+                  navigate('/trash');
+                }
+              }}
+              sx={{
+                minHeight: 40,
+                '& .MuiTab-root': {
+                  minHeight: 40,
+                  textTransform: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  px: 2,
+                  py: 1,
+                  minWidth: 'auto',
+                  color: 'text.secondary',
+                  borderRadius: 1,
+                  '&.Mui-selected': {
+                    color: 'primary.main',
+                    bgcolor: alpha(theme.palette.primary.main, 0.08),
+                    fontWeight: 600
+                  },
+                  '&:hover': {
+                    bgcolor: alpha(theme.palette.action.hover, 0.04)
+                  }
+                },
+                '& .MuiTabs-indicator': {
+                  display: 'none'
+                }
+              }}
+            >
+              <Tab label="Calendars" value="calendars" />
+              <Tab label="Trash" value="trash" />
+            </Tabs>
+          </Stack>
+        </Container>
+      </Box>
 
       <Container maxWidth="lg" sx={{ mt: 4, pb: 4 }}>
       {trashCalendars.length === 0 ? (

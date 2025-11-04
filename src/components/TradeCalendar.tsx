@@ -916,7 +916,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         showBackButton={true}
         backButtonPath="/dashboard"
       />
-      <Toolbar />
+      <Toolbar sx={{ pl: 0, pr: 0 }} />
 
       <CalendarNote
         calendarNote={calendarNote || ''}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, Box, useMediaQuery, Button } from '@mui/material';
+import { ThemeProvider, CssBaseline, Box, useMediaQuery, Typography } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -24,13 +24,17 @@ import {
   DynamicRiskSettings
 } from './utils/dynamicRiskUtils';
 
+import SideNavigation from './components/common/SideNavigation';
+
 // Lazy load components
+const Home = lazy(() => import('./components/Home'));
 const CalendarHome = lazy(() => import('./components/CalendarHome'));
 const TradeCalendar = lazy(() => import('./components/TradeCalendar'));
-const CalendarTrash = lazy(() => import('./components/trash/CalendarTrash'));
 const SharedTradePage = lazy(() => import('./components/sharing/SharedTradePage'));
 const SharedCalendarPage = lazy(() => import('./components/sharing/SharedCalendarPage'));
 const AuthCallback = lazy(() => import('./components/auth/AuthCallback'));
+const ChatPage = lazy(() => import('./components/ChatPage'));
+const PerformancePage = lazy(() => import('./components/PerformancePage'));
 // const SupabaseAuthTest = lazy(() => import('./components/auth/SupabaseAuthTest')); // Commented out - for testing only
 
 
@@ -50,7 +54,22 @@ function AppContent() {
   const [loadingCalendarName, setLoadingCalendarName] = useState<string | undefined>(undefined);
   const [isImportingTrades, setIsImportingTrades] = useState<boolean>(false);
   const [loadingAction, setLoadingAction] = useState<'loading' | 'importing' | 'exporting'>('loading');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Navigation drawer collapsed state - persist in localStorage
+  const [navCollapsed, setNavCollapsed] = useState<boolean>(() => {
+    const saved = localStorage.getItem('navCollapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
+
   const { user } = useAuth();
+
+  // Save navigation collapsed state to localStorage
+  useEffect(() => {
+    localStorage.setItem('navCollapsed', JSON.stringify(navCollapsed));
+  }, [navCollapsed]);
+
+  const drawerWidth = 50;
 
   // Use SWR to fetch calendars with automatic focus revalidation
   // This solves the Chrome Energy Saver tab freezing issue
@@ -352,220 +371,29 @@ function AppContent() {
     recalculateTrades();
   };
 
-  return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Box
-        sx={{
-          minHeight: '100vh',
-          bgcolor: 'custom.pageBackground',
-          position: 'relative',
-          pb: 4
-        }}
-      >
-        <TradeLoadingIndicator
-          isLoading={isLoadingTrades || isImportingTrades}
-          calendarName={loadingCalendarName}
-          action={loadingAction}
-        />
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <CalendarHome
-                calendars={calendars}
-                onCreateCalendar={handleCreateCalendar}
-                onDuplicateCalendar={handleDuplicateCalendar}
-                onDeleteCalendar={handleDeleteCalendar}
-                onUpdateCalendar={handleUpdateCalendar}
-                onToggleTheme={toggleColorMode}
-                mode={mode}
-                isLoading={isLoadingCalendars}
-                loadAllTrades={loadAllTrades}
-              />
-            }
-          />
-          <Route
-            path="/calendar/:calendarId"
-            element={
-              <CalendarRoute
-                calendars={calendars}
-                onUpdateStateCalendar={updateCalendarState}
-                onToggleTheme={toggleColorMode}
-                mode={mode}
-                loadAllTrades={loadAllTrades}
-                setIsImportingTrades={setIsImportingTrades}
-                setLoadingCalendarName={setLoadingCalendarName}
-                setLoadingAction={setLoadingAction}
-                onToggleDynamicRisk={handleToggleDynamicRisk}
-                isLoadingTrades={isLoadingTrades}
-                setLoadingTrades={(loading)=> setLoading(loading)}
-              />
-            }
-          />
-          <Route
-            path="/trash"
-            element={
-              <CalendarTrash
-                onToggleTheme={toggleColorMode}
-                mode={mode}
-              />
-            }
-          />
-          <Route
-            path="/shared/:shareId"
-            element={<SharedTradePage />}
-          />
-          <Route
-            path="/shared-calendar/:shareId"
-            element={<SharedCalendarPage />}
-          />
-          <Route
-            path="/auth/callback"
-            element={<AuthCallback />}
-          />
-          {/* Commented out - for testing only */}
-          {/* <Route
-            path="/auth-test"
-            element={<SupabaseAuthTest />}
-          /> */}
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Box>
-    </ThemeProvider>
-  );
-}
-
-function App() {
-  return (
-    <AuthProvider>
-      <LocalizationProvider dateAdapter={AdapterDateFns}>
-        <Router>
-          <Suspense fallback={<LoadingFallback />}>
-            <AppContent />
-          </Suspense>
-        </Router>
-      </LocalizationProvider>
-    </AuthProvider>
-  );
-}
-
-interface CalendarRouteProps {
-  calendars: CalendarWithUIState[];
-  onUpdateStateCalendar: (id: string, updates: Partial<CalendarWithUIState>) => void;
-  onToggleTheme: () => void;
-  mode: 'light' | 'dark';
-  loadAllTrades: (calendarId: string, fetchCalendar?: boolean) => Promise<void>;
-  setIsImportingTrades: React.Dispatch<React.SetStateAction<boolean>>;
-  setLoadingCalendarName: React.Dispatch<React.SetStateAction<string | undefined>>;
-  setLoadingAction: React.Dispatch<React.SetStateAction<'loading' | 'importing' | 'exporting'>>;
-  onToggleDynamicRisk: (calendarId: string, useActualAmounts: boolean) => void;
-  isLoadingTrades: boolean;
-  setLoadingTrades: (loading: boolean) => void
-}
-
-const CalendarRoute: React.FC<CalendarRouteProps> = ({
-  calendars,
-  onUpdateStateCalendar,
-  onToggleTheme,
-  mode,
-  loadAllTrades,
-  setIsImportingTrades,
-  setLoadingCalendarName,
-  setLoadingAction,
-  onToggleDynamicRisk,
-  isLoadingTrades,
-  setLoadingTrades,
-}) => {
-  const { calendarId } = useParams<{ calendarId: string }>();
-  const calendar = calendars.find((c: Calendar) => c.id === calendarId);
-
-  // Track whether we've attempted to load trades for this calendar
-  const [loadAttempted, setLoadAttempted] = useState<{ [key: string]: boolean }>({});
-
-  // Load all trades for the calendar if they haven't been loaded yet
-  useEffect(() => {
-    if (calendar && calendar.loadedYears.length === 0 && !loadAttempted[calendar.id]) {
-      // Mark that we've attempted to load trades for this calendar
-      setLoadAttempted(prev => ({ ...prev, [calendar.id]: true }));
-      loadAllTrades(calendar.id);
+  // Trade handlers - shared between Home and TradeCalendar
+  const handleAddTrade = async (calendarId: string, trade: Trade) => {
+    // Find the calendar from state
+    const targetCalendar = calendars.find(c => c.id === calendarId);
+    if (!targetCalendar) {
+      throw new Error(`Calendar with ID ${calendarId} not found`);
     }
-  }, [calendar, loadAllTrades, loadAttempted]);
 
-  // Subscribe to calendar changes with automatic reconnection
-  // The hook provides: exponential backoff reconnection, page visibility handling,
-  // network status monitoring, and proper cleanup - features not built into Supabase SDK
-  const { createChannel } = useRealtimeSubscription({
-    channelName: `calendar-${calendar?.id}`,
-    enabled: !!calendar,
-    onChannelCreated: (channel) => {
-      // Configure the channel BEFORE it subscribes
-      channel.on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'calendars',
-          filter: `id=eq.${calendar?.id}`
-        },
-        (payload) => {
-          const updatedCalendarData = payload.new;
-
-          // Only update specific fields that might change from edge functions
-          // Preserve cached trades and loaded years from local state
-          if (calendar) {
-            const trades = [...calendar.cachedTrades];
-            const loadedYears = [...calendar.loadedYears];
-            onUpdateStateCalendar(calendar.id, {
-              ...updatedCalendarData,
-              cachedTrades: trades,
-              loadedYears
-            });
-          }
-        }
-      );
-    },
-    onSubscribed: () => {
-      logger.log(`✅ Calendar subscription active for ${calendar?.id}`);
-    },
-    onError: (error) => {
-      logger.error(`❌ Calendar subscription error for ${calendar?.id}:`, error);
-    },
-    maxReconnectAttempts: 5,
-    reconnectDelay: 1000,
-  });
-
-  useEffect(() => {
-    if (!calendar) return;
-
-    // Create and subscribe to the channel
-    // The channel is configured via onChannelCreated callback before subscribing
-    createChannel();
-
-    // Cleanup handled automatically by the hook
-  }, [calendar?.id, createChannel]);
-
-  if (!calendar) {
-    return <Navigate to="/" replace />;
-  }
-
-  const handleAddTrade = async (trade: Trade) => {
     const newTrade = trade.id ? trade : { ...trade, id: uuidv4() };
 
     // Optimistically update the UI first for better user experience
-    const optimisticCachedTrades = [...calendar.cachedTrades, newTrade];
-    onUpdateStateCalendar(calendar.id, {
+    const optimisticCachedTrades = [...targetCalendar.cachedTrades, newTrade];
+    updateCalendarState(calendarId, {
       cachedTrades: optimisticCachedTrades
     });
 
     try {
       // Add the trade and get the updated stats
       // Stats are automatically calculated by Supabase triggers
-      const updatedStats = await calendarService.addTrade(calendar.id, newTrade);
+      const updatedStats = await calendarService.addTrade(calendarId, newTrade);
 
       // Update with the final stats from the database
-      onUpdateStateCalendar(calendar.id, {
+      updateCalendarState(calendarId, {
         cachedTrades: optimisticCachedTrades,
         ...updatedStats
       });
@@ -574,8 +402,8 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       console.error('Error adding trade:', error);
 
       // Revert the optimistic update on error
-      onUpdateStateCalendar(calendar.id, {
-        cachedTrades: calendar.cachedTrades // Revert to original state
+      updateCalendarState(calendarId, {
+        cachedTrades: targetCalendar.cachedTrades // Revert to original state
       });
 
       // Re-throw the error so the calling component can handle it
@@ -583,7 +411,13 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     }
   };
 
-  const onTagUpdated = async (oldTag: string, newTag: string) => {
+  const onTagUpdated = async (calendarId: string, oldTag: string, newTag: string) => {
+    // Find the calendar from state
+    const targetCalendar = calendars.find(c => c.id === calendarId);
+    if (!targetCalendar) {
+      throw new Error(`Calendar with ID ${calendarId} not found`);
+    }
+
     // Helper function to update tags in an array, handling group name changes
     const updateTagsWithGroupNameChange = (tags: string[]) => {
       // Check if this is a group name change
@@ -677,49 +511,56 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     };
 
     // Update cached trades locally for immediate UI feedback (create new array to avoid mutation)
-    const updatedCachedTrades = calendar.cachedTrades.map((trade: Trade) => {
+    const updatedCachedTrades = targetCalendar.cachedTrades.map((trade: Trade) => {
       return updateTradeTagsWithGroupNameChange(trade);
     });
 
     // Update local state immediately
-    onUpdateStateCalendar(calendar.id, {
-      tags: updateTagsWithGroupNameChange(calendar.tags || []),
-      required_tag_groups: updateRequiredTagGroups(calendar.required_tag_groups || []),
+    updateCalendarState(calendarId, {
+      tags: updateTagsWithGroupNameChange(targetCalendar.tags || []),
+      required_tag_groups: updateRequiredTagGroups(targetCalendar.required_tag_groups || []),
       cachedTrades: updatedCachedTrades
     });
-  }
+  };
 
   const handleUpdateTradeProperty = async (
+    calendarId: string,
     tradeId: string,
     updateCallback: (trade: Trade) => Trade,
     createIfNotExists?: (tradeId: string) => Trade
   ): Promise<Trade | undefined> => {
+    // Find the calendar from state
+    const targetCalendar = calendars.find(c => c.id === calendarId);
+    if (!targetCalendar) {
+      throw new Error(`Calendar with ID ${calendarId} not found`);
+    }
+
     try {
       // Check if trade exists in cached trades first
-      let existingTrade = calendar.cachedTrades.find(t => t.id === tradeId);
+      let existingTrade = targetCalendar.cachedTrades.find(t => t.id === tradeId);
 
       // If trade doesn't exist and we have a create function, create it
       if (!existingTrade && createIfNotExists) {
         const finalTrade = updateCallback(createIfNotExists(tradeId));
         // Add to cached trades immediately for UI responsiveness
-        const updatedCachedTrades = [...calendar.cachedTrades, finalTrade];
-        onUpdateStateCalendar(calendar.id, {
+        const updatedCachedTrades = [...targetCalendar.cachedTrades, finalTrade];
+        updateCalendarState(calendarId, {
           cachedTrades: updatedCachedTrades
         });
 
         // Create in database with all updates already applied
-        await calendarService.addTrade(calendar.id, finalTrade);
+        await calendarService.addTrade(calendarId, finalTrade);
 
         return finalTrade;
       }
 
       // Normal update flow for existing trades
-      const result = await calendarService.updateTrade(calendar.id, tradeId, calendar.cachedTrades, updateCallback);
+      const result = await calendarService.updateTrade(calendarId, tradeId, targetCalendar.cachedTrades, updateCallback);
       // Update the cached trades and stats in the calendar
       if (result) {
         const [updatedStats, updatedTrades] = result;
         // First update the cached trades with the complete updated trades list
-        onUpdateStateCalendar(calendar.id, {
+        updateCalendarState(calendarId, {
           cachedTrades: updatedTrades,
           ...updatedStats
         });
@@ -731,34 +572,316 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     }
   };
 
-  const handleDeleteTrades = async (tradeIds: string[]): Promise<void> => {
+  const handleDeleteTrades = async (calendarId: string, tradeIds: string[]): Promise<void> => {
+    // Find the calendar from state
+    const targetCalendar = calendars.find(c => c.id === calendarId);
+    if (!targetCalendar) {
+      throw new Error(`Calendar with ID ${calendarId} not found`);
+    }
+
     try {
       // Optimistically update UI by removing trades from cached list
-      const updatedCachedTrades = calendar.cachedTrades.filter(trade => !tradeIds.includes(trade.id));
-      onUpdateStateCalendar(calendar.id, {
+      const updatedCachedTrades = targetCalendar.cachedTrades.filter(trade => !tradeIds.includes(trade.id));
+      updateCalendarState(calendarId, {
         cachedTrades: updatedCachedTrades
       });
 
       // Delete trades in parallel for better performance
       await Promise.all(
-        tradeIds.map(tradeId => calendarService.deleteTrade(calendar.id, tradeId))
+        tradeIds.map(tradeId => calendarService.deleteTrade(calendarId, tradeId))
       );
 
       // Get updated calendar with auto-calculated stats from database
-      const updatedCalendar = await calendarService.getCalendar(calendar.id);
+      const updatedCalendar = await calendarService.getCalendar(calendarId);
       if (updatedCalendar) {
         const stats = calendarService.getCalendarStats(updatedCalendar);
-        onUpdateStateCalendar(calendar.id, {
+        updateCalendarState(calendarId, {
           ...stats
         });
       }
     } catch (error) {
       console.error('Error deleting trades:', error);
       // Reload trades to restore correct state after error
-      await loadAllTrades(calendar.id, true);
+      await loadAllTrades(calendarId, true);
       throw error;
     }
   };
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+        {/* Side Navigation */}
+        <SideNavigation
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          collapsed={navCollapsed}
+          onToggleCollapse={() => setNavCollapsed(!navCollapsed)}
+        />
+
+        {/* Main Content */}
+        <Box
+          sx={{
+            flexGrow: 1,
+            minHeight: '100vh',
+            bgcolor: 'custom.pageBackground',
+            position: 'relative',
+            pb: 4,
+            ml: `${drawerWidth}px`,
+            width: `calc(100% - ${drawerWidth}px)`,
+            transition: theme.transitions.create(['margin', 'width'], {
+              duration: theme.transitions.duration.shorter,
+            })
+          }}
+        >
+          <TradeLoadingIndicator
+            isLoading={isLoadingTrades || isImportingTrades}
+            calendarName={loadingCalendarName}
+            action={loadingAction}
+          />
+          <Routes>
+          <Route
+            path="/"
+            element={
+              <Home
+                calendars={calendars}
+                onToggleTheme={toggleColorMode}
+                mode={mode}
+                isLoading={isLoadingCalendars}
+                onCreateCalendar={handleCreateCalendar}
+                onDuplicateCalendar={handleDuplicateCalendar}
+                onDeleteCalendar={handleDeleteCalendar}
+                onUpdateCalendar={handleUpdateCalendar}
+                onUpdateStateCalendar={updateCalendarState}
+                loadAllTrades={loadAllTrades}
+                onMenuClick={() => setDrawerOpen(true)}
+                onAddTrade={handleAddTrade}
+                onUpdateTradeProperty={handleUpdateTradeProperty}
+                onDeleteTrades={handleDeleteTrades}
+                onTagUpdated={onTagUpdated}
+              />
+            }
+          />
+          <Route
+            path="/calendars"
+            element={
+              <CalendarHome
+                calendars={calendars}
+                onCreateCalendar={handleCreateCalendar}
+                onDuplicateCalendar={handleDuplicateCalendar}
+                onDeleteCalendar={handleDeleteCalendar}
+                onUpdateCalendar={handleUpdateCalendar}
+                onToggleTheme={toggleColorMode}
+                mode={mode}
+                isLoading={isLoadingCalendars}
+                loadAllTrades={loadAllTrades}
+                onMenuClick={() => setDrawerOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/calendar/:calendarId"
+            element={
+              <CalendarRoute
+                calendars={calendars}
+                onUpdateStateCalendar={updateCalendarState}
+                onToggleTheme={toggleColorMode}
+                mode={mode}
+                loadAllTrades={loadAllTrades}
+                setIsImportingTrades={setIsImportingTrades}
+                setLoadingCalendarName={setLoadingCalendarName}
+                setLoadingAction={setLoadingAction}
+                onToggleDynamicRisk={handleToggleDynamicRisk}
+                isLoadingTrades={isLoadingTrades}
+                setLoadingTrades={(loading)=> setLoading(loading)}
+                onAddTrade={handleAddTrade}
+                onUpdateTradeProperty={handleUpdateTradeProperty}
+                onDeleteTrades={handleDeleteTrades}
+                onTagUpdated={onTagUpdated}
+              />
+            }
+          />
+          <Route
+            path="/shared/:shareId"
+            element={<SharedTradePage />}
+          />
+          <Route
+            path="/shared-calendar/:shareId"
+            element={<SharedCalendarPage />}
+          />
+          <Route
+            path="/auth/callback"
+            element={<AuthCallback />}
+          />
+          <Route
+            path="/chat"
+            element={
+              <ChatPage
+                onToggleTheme={toggleColorMode}
+                mode={mode}
+                onMenuClick={() => setDrawerOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/performance"
+            element={
+              <PerformancePage
+                calendars={calendars}
+                onToggleTheme={toggleColorMode}
+                mode={mode}
+                onMenuClick={() => setDrawerOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/community"
+            element={
+              <Box sx={{ p: 4, textAlign: 'center' }}>
+                <Typography variant="h4" gutterBottom>
+                  Community
+                </Typography>
+                <Typography variant="body1" color="text.secondary">
+                  Coming Soon
+                </Typography>
+              </Box>
+            }
+          />
+          {/* Commented out - for testing only */}
+          {/* <Route
+            path="/auth-test"
+            element={<SupabaseAuthTest />}
+          /> */}
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        </Box>
+      </Box>
+    </ThemeProvider>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <LocalizationProvider dateAdapter={AdapterDateFns}>
+        <Router>
+          <Suspense fallback={<LoadingFallback />}>
+            <AppContent />
+          </Suspense>
+        </Router>
+      </LocalizationProvider>
+    </AuthProvider>
+  );
+}
+
+interface CalendarRouteProps {
+  calendars: CalendarWithUIState[];
+  onUpdateStateCalendar: (id: string, updates: Partial<CalendarWithUIState>) => void;
+  onToggleTheme: () => void;
+  mode: 'light' | 'dark';
+  loadAllTrades: (calendarId: string, fetchCalendar?: boolean) => Promise<void>;
+  setIsImportingTrades: React.Dispatch<React.SetStateAction<boolean>>;
+  setLoadingCalendarName: React.Dispatch<React.SetStateAction<string | undefined>>;
+  setLoadingAction: React.Dispatch<React.SetStateAction<'loading' | 'importing' | 'exporting'>>;
+  onToggleDynamicRisk: (calendarId: string, useActualAmounts: boolean) => void;
+  isLoadingTrades: boolean;
+  setLoadingTrades: (loading: boolean) => void;
+  // Trade handlers from App
+  onAddTrade: (calendarId: string, trade: Trade) => Promise<void>;
+  onUpdateTradeProperty: (calendarId: string, tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
+  onDeleteTrades: (calendarId: string, tradeIds: string[]) => Promise<void>;
+  onTagUpdated: (calendarId: string, oldTag: string, newTag: string) => Promise<void>;
+}
+
+const CalendarRoute: React.FC<CalendarRouteProps> = ({
+  calendars,
+  onUpdateStateCalendar,
+  onToggleTheme,
+  mode,
+  loadAllTrades,
+  setIsImportingTrades,
+  setLoadingCalendarName,
+  setLoadingAction,
+  onToggleDynamicRisk,
+  isLoadingTrades,
+  setLoadingTrades,
+  onAddTrade,
+  onUpdateTradeProperty,
+  onDeleteTrades,
+  onTagUpdated,
+}) => {
+  const { calendarId } = useParams<{ calendarId: string }>();
+  const calendar = calendars.find((c: Calendar) => c.id === calendarId);
+
+  // Track whether we've attempted to load trades for this calendar
+  const [loadAttempted, setLoadAttempted] = useState<{ [key: string]: boolean }>({});
+
+  // Load all trades for the calendar if they haven't been loaded yet
+  useEffect(() => {
+    if (calendar && calendar.loadedYears.length === 0 && !loadAttempted[calendar.id]) {
+      // Mark that we've attempted to load trades for this calendar
+      setLoadAttempted(prev => ({ ...prev, [calendar.id]: true }));
+      loadAllTrades(calendar.id);
+    }
+  }, [calendar, loadAllTrades, loadAttempted]);
+
+  // Subscribe to calendar changes with automatic reconnection
+  // The hook provides: exponential backoff reconnection, page visibility handling,
+  // network status monitoring, and proper cleanup - features not built into Supabase SDK
+  const { createChannel } = useRealtimeSubscription({
+    channelName: `calendar-${calendar?.id}`,
+    enabled: !!calendar,
+    onChannelCreated: (channel) => {
+      // Configure the channel BEFORE it subscribes
+      channel.on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'calendars',
+          filter: `id=eq.${calendar?.id}`
+        },
+        (payload) => {
+          const updatedCalendarData = payload.new;
+
+          // Only update specific fields that might change from edge functions
+          // Preserve cached trades and loaded years from local state
+          if (calendar) {
+            const trades = [...calendar.cachedTrades];
+            const loadedYears = [...calendar.loadedYears];
+            onUpdateStateCalendar(calendar.id, {
+              ...updatedCalendarData,
+              cachedTrades: trades,
+              loadedYears
+            });
+          }
+        }
+      );
+    },
+    onSubscribed: () => {
+      logger.log(`✅ Calendar subscription active for ${calendar?.id}`);
+    },
+    onError: (error) => {
+      logger.error(`❌ Calendar subscription error for ${calendar?.id}:`, error);
+    },
+    maxReconnectAttempts: 5,
+    reconnectDelay: 1000,
+  });
+
+  useEffect(() => {
+    if (!calendar) return;
+
+    // Create and subscribe to the channel
+    // The channel is configured via onChannelCreated callback before subscribing
+    createChannel();
+
+    // Cleanup handled automatically by the hook
+  }, [calendar?.id, createChannel]);
+
+  if (!calendar) {
+    return <Navigate to="/" replace />;
+  }
 
   const onUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<Calendar | undefined> => {
     try {
@@ -853,7 +976,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       maxDailyDrawdown={calendar.max_daily_drawdown}
       weeklyTarget={calendar.weekly_target}
       monthly_target={calendar.monthly_target}
-      onTagUpdated={onTagUpdated}
+      onTagUpdated={(oldTag, newTag) => onTagUpdated(calendar.id, oldTag, newTag)}
       yearlyTarget={calendar.yearly_target}
       dynamicRiskSettings={{
         account_balance: calendar.account_balance,
@@ -865,7 +988,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       requiredTagGroups={calendar.required_tag_groups}
       allTags={calendar.tags} // Pass calendar.tags for efficient tag access
       calendarName={calendar.name}
-      onAddTrade={handleAddTrade}
+      onAddTrade={(trade) => onAddTrade(calendar.id, trade)}
       calendarDayNotes={calendar.days_notes ? Object.entries(calendar.days_notes).reduce((map, [k, v]) => map.set(k, v), new Map<string, string>()) : new Map<string, string>()}
       calendarNote={calendar.note}
       heroImageUrl={calendar.hero_image_url}
@@ -875,8 +998,8 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       // Score settings
       scoreSettings={calendar.score_settings}
       onUpdateCalendarProperty={onUpdateCalendarProperty}
-      onUpdateTradeProperty={handleUpdateTradeProperty}
-      onDeleteTrades={handleDeleteTrades}
+      onUpdateTradeProperty={(tradeId, updateCallback, createIfNotExists) => onUpdateTradeProperty(calendar.id, tradeId, updateCallback, createIfNotExists)}
+      onDeleteTrades={(tradeIds) => onDeleteTrades(calendar.id, tradeIds)}
       onAccountBalanceChange={handleChangeAccountBalance}
       onImportTrades={handleImportTrades}
       onClearMonthTrades={handleClearMonthTrades}

@@ -36,6 +36,7 @@ export interface EconomicEventFilters {
   currencies?: Currency[];
   impacts?: ImpactLevel[];
   onlyUpcoming?: boolean;
+  limit?: number;
 }
 
 /**
@@ -169,8 +170,11 @@ export class EconomicEventRepository {
 
       logger.log('🔄 Fetching all events from database:', dateRange, filters);
 
-      // Use paginated method with large page size
-      const result = await this.fetchEventsPaginated(dateRange, { pageSize: 1000 }, filters);
+      // Use limit from filters if provided, otherwise use large page size
+      const pageSize = filters?.limit || 1000;
+
+      // Use paginated method with configured page size
+      const result = await this.fetchEventsPaginated(dateRange, { pageSize }, filters);
 
       if (!result.success || !result.data) {
         return {

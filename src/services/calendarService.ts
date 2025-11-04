@@ -510,4 +510,4 @@ export const onUpdateCalendar = async (
     logger.error('Error updating calendar with callback:', error);
     throw error;
   }
-}; 
+};

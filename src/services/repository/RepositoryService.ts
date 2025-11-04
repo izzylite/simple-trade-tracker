@@ -170,9 +170,16 @@ export class RepositoryService {
     }
   }
 
-  async getTradesByUserId(userId: string): Promise<Trade[]> {
+  async getTradesByUserId(
+    userId: string,
+    options?: {
+      limit?: number;
+      orderBy?: 'trade_date' | 'created_at';
+      ascending?: boolean;
+    }
+  ): Promise<Trade[]> {
     try {
-      return await this.tradeRepo.findByUserId(userId);
+      return await this.tradeRepo.findByUserId(userId, options);
     } catch (error) {
       logger.error('Error getting trades by user ID:', error);
       return [];

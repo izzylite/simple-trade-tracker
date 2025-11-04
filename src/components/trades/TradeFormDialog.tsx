@@ -2,10 +2,14 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import {
   Box,
   Snackbar,
-  Alert
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import { endOfDay, format } from 'date-fns';
-import { Trade } from '../../types/dualWrite';
+import { Trade, Calendar } from '../../types/dualWrite';
 import { BaseDialog } from '../common';
 import * as calendarService from '../../services/calendarService';
 import { DayHeader, TradeForm, NewTradeForm } from './';
@@ -41,11 +45,15 @@ interface FormDialogProps {
   onCancel: () => void;
   allTrades?: Trade[];
   dynamicRiskSettings: DynamicRiskSettings;
-  calendar_id: string;
+  calendar_id?: string; // Made optional for Home.tsx usage
   tags: string[];
   requiredTagGroups?: string[];
   // Optional props for trade link navigation in notes
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
+  // Optional props for calendar selection (used when opened from Home.tsx)
+  calendars?: Calendar[];
+  onCalendarChange?: (calendarId: string) => void;
+  selectedCalendarId?: string;
 }
 
 interface FormProps {
@@ -132,7 +140,10 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   calendar_id,
   tags = [],
   requiredTagGroups = [],
-  onOpenGalleryMode
+  onOpenGalleryMode,
+  calendars,
+  onCalendarChange,
+  selectedCalendarId
 }) => {
 
   // State
@@ -143,6 +154,13 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
+
+  // Determine the effective calendar_id (from prop or selected calendar)
+  const effectiveCalendarId = calendar_id || selectedCalendarId;
+
+  // Check if calendar selection is required (when calendars prop is provided)
+  const isCalendarSelectionMode = !!calendars;
+  const isCalendarSelected = isCalendarSelectionMode ? !!effectiveCalendarId : true;
 
 
 
@@ -158,7 +176,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
     // Create an empty trade in Firebase
     try {
-      if (calendar_id && onAddTrade) {
+      if (effectiveCalendarId && onAddTrade) {
 
         // Update the form with the temporary trade ID and isTemporary flag
         const data = createNewTradeData();
@@ -190,7 +208,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       // Re-enable cancel/close buttons regardless of success or failure
       setIsCreatingEmptyTrade(false);
     }
-  }, [calendar_id, onAddTrade, trade_date]);
+  }, [effectiveCalendarId, onAddTrade, trade_date]);
 
   useEffect(() => {
     // Only call handleAddClick when showForm changes from not meeting conditions to meeting them
@@ -368,7 +386,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       images: newTrade.uploaded_images || [],
       // Economic events will be fetched automatically by TradeRepository
       ...(newTrade.economic_events && newTrade.economic_events.length > 0 && { economic_events: newTrade.economic_events }),
-      calendar_id: calendar_id,
+      calendar_id: effectiveCalendarId!,
       user_id: '', // Will be set by the service layer
       created_at: new Date(),
       updated_at: new Date()
@@ -527,7 +545,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           return {
             url: img.preview,
             pending: true,
-            calendar_id: calendar_id,
+            calendar_id: effectiveCalendarId!,
             id: img.id,
             width: img.width,
             height: img.height,
@@ -575,7 +593,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             ...(newTrade!.session && { session: newTrade!.session }),
             ...(newTrade!.notes && { notes: newTrade!.notes }),
             images: newTrade!.uploaded_images || [],
-            calendar_id: calendar_id,
+            calendar_id: effectiveCalendarId!,
             user_id: '', // Will be set by the service layer
             created_at: new Date(),
             updated_at: new Date()
@@ -617,7 +635,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
       // Upload the image with progress tracking
       const uploadedImage = await calendarService.uploadTradeImage(
-        calendar_id,
+        effectiveCalendarId!,
         image.id!!,
         image.file,
         image.width,
@@ -672,7 +690,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       });
 
       // Update Firebase document if we have a temporary trade ID
-      if (calendar_id && tradeId) {
+      if (effectiveCalendarId && tradeId) {
         try {
           // Use transaction to add the image to the trade
 
@@ -1014,7 +1032,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       try {
         // Verify the trade still exists
         if (editingTrade.id) {
-          const existingTrade = await calendarService.getTrade(calendar_id, editingTrade.id);
+          const existingTrade = await calendarService.getTrade(effectiveCalendarId!, editingTrade.id);
 
           if (!existingTrade) {
             throw new Error(`Trade with ID ${editingTrade.id} not found. It may have been deleted.`);
@@ -1024,7 +1042,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             ...newTrade!.pending_images.map(img => ({
               url: img.preview || '',
               id: img.id!,
-              calendar_id: calendar_id,
+              calendar_id: effectiveCalendarId!,
               pending: true,
               caption: img.caption || '',
               width: img.width || 0,
@@ -1036,7 +1054,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             ...newTrade!.uploaded_images.map(img => ({
               url: img.url || '',
               id: img.id,
-              calendar_id: calendar_id,
+              calendar_id: effectiveCalendarId!,
               pending: img.pending,
               caption: img.caption || '',
               width: img.width || 0,
@@ -1139,6 +1157,29 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       >
         <Box sx={{ p: 3 }}>
 
+          {/* Calendar Selection Dropdown (only shown when calendars prop is provided) */}
+          {isCalendarSelectionMode && (
+            <Box sx={{ mb: 3 }}>
+              <FormControl fullWidth required>
+                <InputLabel id="trade-calendar-select-label">Calendar</InputLabel>
+                <Select
+                  labelId="trade-calendar-select-label"
+                  id="trade-calendar-select"
+                  value={selectedCalendarId || ''}
+                  label="Calendar"
+                  onChange={(e) => onCalendarChange?.(e.target.value)}
+                  disabled={isSubmitting || isCreatingEmptyTrade}
+                >
+                  {calendars?.map((calendar) => (
+                    <MenuItem key={calendar.id} value={calendar.id}>
+                      {calendar.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          )}
+
           <DayHeader
             title={format(trade_date, 'EEEE, MMMM d, yyyy')}
             account_balance={account_balance + calculateCumulativePnL(startOfNextDay(trade_date), allTrades)}
@@ -1148,12 +1189,15 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             onNextDay={() => { }}
           />
 
-          <Box>
+          <Box sx={{
+            opacity: isCalendarSelected ? 1 : 0.5,
+            pointerEvents: isCalendarSelected ? 'auto' : 'none'
+          }}>
             <TradeForm
               accountBalance={account_balance}
               calculateCumulativePnl={(newTrade) => calculateCumulativePnL(newTrade?.trade_date || endOfDay(trade_date), allTrades)}
               dynamicRiskSettings={dynamicRiskSettings}
-              calendarId={calendar_id}
+              calendarId={effectiveCalendarId || ''}
               requiredTagGroups={requiredTagGroups}
               onTagUpdated={handleTagUpdated}
               newTrade={newTrade!}

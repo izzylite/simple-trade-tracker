@@ -72,15 +72,31 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     }
   }
 
-  async findByUserId(userId: string): Promise<Trade[]> {
+  async findByUserId(
+    userId: string,
+    options?: {
+      limit?: number;
+      orderBy?: 'trade_date' | 'created_at';
+      ascending?: boolean;
+    }
+  ): Promise<Trade[]> {
     try {
       // Ensure session is valid before fetching trades by user
       await supabaseAuthService.ensureValidSession();
 
-      const { data, error } = await supabase
+      const { limit, orderBy = 'created_at', ascending = false } = options || {};
+
+      let query = supabase
         .from('trades')
         .select('*')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .order(orderBy, { ascending });
+
+      if (limit) {
+        query = query.limit(limit);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         logger.error('Error finding trades by user ID:', error);

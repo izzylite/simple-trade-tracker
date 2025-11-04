@@ -27,10 +27,15 @@ import {
   Menu,
   ListItemIcon,
   ListItemText,
-  Fab
+  Fab,
+  Tabs,
+  Tab,
+  Alert,
+  Chip
 } from '@mui/material';
 
 import CalendarFormDialog, { CalendarFormData } from './CalendarFormDialog';
+import { DuplicateCalendarDialog } from './dialogs/DuplicateCalendarDialog';
 import {
   Add as AddIcon,
   CalendarToday as CalendarIcon,
@@ -47,13 +52,16 @@ import {
   Brightness7 as LightModeIcon,
   ExpandMore,
   ExpandLess,
-  ContentCopy as CopyIcon,
   MoreVert as MoreVertIcon,
   Delete as TrashIcon,
-  AutoAwesome as AIIcon
+  AutoAwesome as AIIcon,
+  Restore as RestoreIcon,
+  DeleteForever as DeleteForeverIcon,
+  Schedule as ScheduleIcon,
+  Warning as WarningIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Calendar, CalendarWithUIState } from '../types/calendar';
 import { formatCurrency } from '../utils/formatters';
 import { dialogProps } from '../styles/dialogStyles';
@@ -65,8 +73,16 @@ import { getCalendarStats } from '../services/calendarService';
 import Shimmer from './Shimmer';
 import AppHeader from './common/AppHeader';
 import CalendarCard from './CalendarCard';
+import CalendarCardShimmer from './CalendarCardShimmer';
 import { logger } from '../utils/logger';
-// TradeDetailDialog has been removed
+import RoundedTabs from './common/RoundedTabs';
+import {
+  getTrashCalendars,
+  restoreCalendarFromTrash,
+  permanentlyDeleteCalendar,
+  getDaysUntilDeletion,
+  TrashCalendar
+} from '../services/trashService';
 
 interface CalendarHomeProps {
   calendars: CalendarWithUIState[];
@@ -77,199 +93,9 @@ interface CalendarHomeProps {
   onToggleTheme: () => void;
   mode: 'light' | 'dark';
   isLoading?: boolean;
+  onMenuClick?: () => void;
   loadAllTrades?: (calendarId: string) => Promise<void>;
 }
-
-const CalendarSkeleton = () => {
-  const theme = useTheme();
-
-  return (
-    <Card
-      sx={{
-        height: '100%',
-        position: 'relative',
-        overflow: 'hidden',
-        transition: 'transform 0.3s ease-in-out',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '4px',
-          background: alpha(theme.palette.primary.main, 0.3),
-          zIndex: 1
-        }
-      }}
-    >
-      <CardContent sx={{ p: 3 }}>
-        <Box sx={{ mb: 2.5 }}>
-          {/* Title shimmer */}
-          <Shimmer
-            height={28}
-            width="60%"
-            borderRadius={8}
-            variant="wave"
-            intensity="medium"
-            sx={{ mb: 1 }}
-          />
-
-          {/* Date shimmer */}
-          <Stack direction="row" spacing={2} sx={{ mb: 1 }}>
-            <Shimmer
-              height={20}
-              width="30%"
-              borderRadius={4}
-              variant="default"
-              intensity="low"
-            />
-            <Shimmer
-              height={20}
-              width="30%"
-              borderRadius={4}
-              variant="default"
-              intensity="low"
-            />
-          </Stack>
-        </Box>
-
-        <Divider sx={{ my: 2, opacity: 0.6 }} />
-
-        {/* Stats shimmer */}
-        <Stack spacing={2}>
-          {/* Main stats box with gradient */}
-          <Box
-            sx={{
-              p: 1.5,
-              borderRadius: 1,
-              bgcolor: alpha(theme.palette.background.default, 0.6),
-              mb: 1
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Shimmer
-                height={40}
-                width={40}
-                borderRadius="50%"
-                variant="pulse"
-                intensity="medium"
-              />
-              <Box sx={{ width: '100%' }}>
-                <Shimmer
-                  height={24}
-                  width="40%"
-                  borderRadius={6}
-                  variant="wave"
-                  intensity="high"
-                  sx={{ mb: 1 }}
-                />
-                <Shimmer
-                  height={16}
-                  width="30%"
-                  borderRadius={4}
-                  variant="default"
-                  intensity="low"
-                />
-              </Box>
-            </Box>
-          </Box>
-
-          {/* Grid stats */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-            <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: alpha(theme.palette.background.default, 0.6) }}>
-              <Shimmer
-                height={16}
-                width="60%"
-                borderRadius={4}
-                variant="default"
-                intensity="low"
-                sx={{ mb: 1 }}
-              />
-              <Shimmer
-                height={24}
-                width="40%"
-                borderRadius={6}
-                variant="wave"
-                intensity="medium"
-              />
-            </Box>
-            <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: alpha(theme.palette.background.default, 0.6) }}>
-              <Shimmer
-                height={16}
-                width="60%"
-                borderRadius={4}
-                variant="default"
-                intensity="low"
-                sx={{ mb: 1 }}
-              />
-              <Shimmer
-                height={24}
-                width="40%"
-                borderRadius={6}
-                variant="wave"
-                intensity="medium"
-              />
-            </Box>
-          </Box>
-
-          {/* Additional stats */}
-          <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: alpha(theme.palette.background.default, 0.6) }}>
-            <Shimmer
-              height={16}
-              width="40%"
-              borderRadius={4}
-              variant="default"
-              intensity="low"
-              sx={{ mb: 1 }}
-            />
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
-              {[1, 2, 3].map((i) => (
-                <Box key={i}>
-                  <Shimmer
-                    height={14}
-                    width="70%"
-                    borderRadius={4}
-                    variant="default"
-                    intensity="low"
-                    sx={{ mb: 0.5 }}
-                  />
-                  <Shimmer
-                    height={20}
-                    width="50%"
-                    borderRadius={6}
-                    variant={i === 2 ? "pulse" : "default"}
-                    intensity="medium"
-                  />
-                </Box>
-              ))}
-            </Box>
-          </Box>
-        </Stack>
-      </CardContent>
-
-      <CardActions sx={{
-        justifyContent: 'flex-end',
-        p: 2,
-        pt: 1,
-        borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`
-      }}>
-        {/* Action buttons shimmer */}
-        <Stack direction="row" spacing={1}>
-          {[1, 2, 3].map((i) => (
-            <Shimmer
-              key={i}
-              height={32}
-              width={80}
-              borderRadius={8}
-              variant={i === 1 ? "pulse" : "default"}
-              intensity={i === 1 ? "high" : "medium"}
-            />
-          ))}
-        </Stack>
-      </CardActions>
-    </Card>
-  );
-};
 
 export const CalendarHome: React.FC<CalendarHomeProps> = ({
   calendars,
@@ -280,15 +106,37 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   onToggleTheme,
   mode,
   isLoading: externalLoading,
-  loadAllTrades
+  loadAllTrades,
+  onMenuClick
 }) => {
   const { user, signInWithGoogle, signOut } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Tab state - 0 for Calendars, 1 for Trash
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Calendar states
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDuplicateOptionsDialogOpen, setIsDuplicateOptionsDialogOpen] = useState(false);
   const [calendarToDelete, setCalendarToDelete] = useState<string | null>(null);
   const [calendarToEdit, setCalendarToEdit] = useState<CalendarWithUIState | null>(null);
+
+  // Trash states
+  const [trashCalendars, setTrashCalendars] = useState<TrashCalendar[]>([]);
+  const [loadingTrash, setLoadingTrash] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    action: 'restore' | 'delete';
+    calendar: TrashCalendar | null;
+  }>({
+    open: false,
+    action: 'restore',
+    calendar: null
+  });
   const [calendarToDuplicate, setCalendarToDuplicate] = useState<CalendarWithUIState | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -297,17 +145,69 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   const [expandedCalendars, setExpandedCalendars] = useState<{[key: string]: boolean}>({});
   const [menuAnchorEl, setMenuAnchorEl] = useState<{[key: string]: HTMLElement | null}>({});
   const theme = useTheme();
-  const navigate = useNavigate();
+
   const [selectedCalendarForCharts, setSelectedCalendarForCharts] = useState<CalendarWithUIState | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [isDateDialogOpen, setIsDateDialogOpen] = useState(false);
   const [currentTimePeriod, setCurrentTimePeriod] = useState<'month' | 'year' | 'all'>('month');
   // Track which calendars we've attempted to load trades for
   const [loadAttempted, setLoadAttempted] = useState<{[key: string]: boolean}>({});
-  // We no longer need selectedTrade state since TradeDetailDialog has been removed
 
   // Use external loading state if provided, otherwise use internal loading state
   const isLoading = externalLoading !== undefined ? externalLoading : false;
+
+  // Load trash calendars when trash tab is active
+  useEffect(() => {
+    if (activeTab === 1 && user) {
+      loadTrashCalendars();
+    }
+  }, [activeTab, user]);
+
+  const loadTrashCalendars = async () => {
+    if (!user) return;
+
+    try {
+      setLoadingTrash(true);
+      const calendars = await getTrashCalendars(user.uid);
+      setTrashCalendars(calendars);
+    } catch (error) {
+      logger.error('Error loading trash calendars:', error);
+    } finally {
+      setLoadingTrash(false);
+    }
+  };
+
+  const handleRestoreCalendar = async (calendar: TrashCalendar) => {
+    try {
+      setActionLoading(calendar.id);
+      await restoreCalendarFromTrash(calendar.id);
+      await loadTrashCalendars();
+      setConfirmDialog({ open: false, action: 'restore', calendar: null });
+    } catch (error) {
+      logger.error('Error restoring calendar:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handlePermanentDelete = async (calendar: TrashCalendar) => {
+    try {
+      setActionLoading(calendar.id);
+      await permanentlyDeleteCalendar(calendar.id);
+      await loadTrashCalendars();
+      setConfirmDialog({ open: false, action: 'delete', calendar: null });
+    } catch (error) {
+      logger.error('Error permanently deleting calendar:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const getDeletionStatusColor = (daysLeft: number) => {
+    if (daysLeft <= 3) return theme.palette.error.main;
+    if (daysLeft <= 7) return theme.palette.warning.main;
+    return theme.palette.info.main;
+  };
 
   // Update selectedCalendarForCharts when calendars change and a calendar is selected
   useEffect(() => {
@@ -585,13 +485,39 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
       <AppHeader
         onToggleTheme={onToggleTheme}
         mode={mode}
+        onMenuClick={onMenuClick}
       />
-      <Toolbar />
-      <Container maxWidth="lg" sx={{ mt: 4, pb: 10 }}>
+      <Toolbar sx={{ pl: 0, pr: 0 }} />
+
+      {/* My Calendar Section with Tabs */}
+      <Box sx={{
+        px: 0
+      }}>
+        <Container maxWidth="lg" disableGutters sx={{ px: 0 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              My Calendars
+            </Typography>
+            <RoundedTabs
+              tabs={[
+                { label: 'Calendars' },
+                { label: 'Trash' }
+              ]}
+              activeTab={activeTab}
+              onTabChange={(_, newValue) => setActiveTab(newValue)}
+              size="large"
+            />
+          </Stack>
+        </Container>
+      </Box>
+
+      <Container maxWidth="lg" disableGutters sx={{ mt: 4, pb: 10 }}>
         {user ? (
           <>
-
-            {calendars.length === 0 && !isLoading ? (
+            {/* Calendars Tab Content */}
+            {activeTab === 0 && (
+              <>
+                {calendars.length === 0 && !isLoading ? (
               <Box
                 sx={{
                   display: 'flex',
@@ -632,8 +558,8 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
               }}>
                 {isLoading ? (
                   // Show shimmer skeletons while loading
-                  Array.from({ length: 3 }).map((_, index) => (
-                    <CalendarSkeleton key={index} />
+                  Array.from({ length: 6 }).map((_, index) => (
+                    <CalendarCardShimmer key={index} />
                   ))
                 ) : (
                   // Show actual calendars
@@ -668,6 +594,167 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                 )}
               </Box>
             )}
+              </>
+            )}
+
+            {/* Trash Tab Content */}
+            {activeTab === 1 && (
+              <>
+                {loadingTrash ? (
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: {
+                        xs: '1fr',
+                        md: 'repeat(2, 1fr)',
+                        lg: 'repeat(3, 1fr)'
+                      },
+                      gap: 3
+                    }}
+                  >
+                    {Array.from({ length: 6 }).map((_, index) => (
+                      <CalendarCardShimmer key={index} />
+                    ))}
+                  </Box>
+                ) : trashCalendars.length === 0 ? (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      py: 8,
+                      bgcolor: 'background.paper',
+                      borderRadius: 2,
+                      boxShadow: 1
+                    }}
+                  >
+                    <TrashIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                      Trash is empty
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" align="center">
+                      Deleted calendars will appear here
+                    </Typography>
+                  </Box>
+                ) : (
+                  <>
+                    <Alert
+                      severity="info"
+                      icon={<ScheduleIcon />}
+                      sx={{
+                        mb: 3,
+                        borderRadius: 2,
+                        bgcolor: alpha(theme.palette.info.main, 0.1),
+                        border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        Items will be permanently deleted after 30 days
+                      </Typography>
+                      <Typography variant="body2">
+                        Restore calendars before they're automatically removed. This action cannot be undone after deletion.
+                      </Typography>
+                    </Alert>
+
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: {
+                          xs: '1fr',
+                          md: 'repeat(2, 1fr)',
+                          lg: 'repeat(3, 1fr)'
+                        },
+                        gap: 3
+                      }}
+                    >
+                      {trashCalendars.map((calendar) => {
+                        const daysLeft = getDaysUntilDeletion(calendar.auto_delete_at);
+                        const statusColor = getDeletionStatusColor(daysLeft);
+
+                        return (
+                          <Card
+                            key={calendar.id}
+                            sx={{
+                              borderRadius: 2,
+                              border: `1px solid ${alpha(statusColor, 0.3)}`,
+                              bgcolor: alpha(statusColor, 0.05),
+                              transition: 'all 0.2s',
+                              '&:hover': {
+                                boxShadow: 2,
+                                transform: 'translateY(-2px)'
+                              }
+                            }}
+                          >
+                            <CardContent>
+                              <Stack spacing={2}>
+                                <Box>
+                                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                                    {calendar.name}
+                                  </Typography>
+                                  <Chip
+                                    icon={<ScheduleIcon />}
+                                    label={`${daysLeft} days until deletion`}
+                                    size="small"
+                                    sx={{
+                                      bgcolor: alpha(statusColor, 0.1),
+                                      color: statusColor,
+                                      fontWeight: 500
+                                    }}
+                                  />
+                                </Box>
+
+                                <Divider />
+
+                                <Stack spacing={1}>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                      Deleted
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                      {format(new Date(calendar.deleted_at), 'MMM dd, yyyy')}
+                                    </Typography>
+                                  </Box>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                      Auto-delete
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 500, color: statusColor }}>
+                                      {format(new Date(calendar.auto_delete_at), 'MMM dd, yyyy')}
+                                    </Typography>
+                                  </Box>
+                                </Stack>
+                              </Stack>
+                            </CardContent>
+                            <CardActions sx={{ px: 2, pb: 2 }}>
+                              <Button
+                                size="small"
+                                startIcon={<RestoreIcon />}
+                                onClick={() => setConfirmDialog({ open: true, action: 'restore', calendar })}
+                                disabled={actionLoading === calendar.id}
+                                sx={{ flex: 1 }}
+                              >
+                                Restore
+                              </Button>
+                              <Button
+                                size="small"
+                                color="error"
+                                startIcon={<DeleteForeverIcon />}
+                                onClick={() => setConfirmDialog({ open: true, action: 'delete', calendar })}
+                                disabled={actionLoading === calendar.id}
+                                sx={{ flex: 1 }}
+                              >
+                                Delete
+                              </Button>
+                            </CardActions>
+                          </Card>
+                        );
+                      })}
+                    </Box>
+                  </>
+                )}
+              </>
+            )}
 
             <CalendarFormDialog
               open={isCreateDialogOpen}
@@ -690,109 +777,16 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
               submitButtonText="Save Changes"
             />
 
-            <Dialog
+            <DuplicateCalendarDialog
               open={isDuplicateOptionsDialogOpen}
+              calendar={calendarToDuplicate}
+              isDuplicating={isDuplicating}
               onClose={() => {
                 setIsDuplicateOptionsDialogOpen(false);
                 setCalendarToDuplicate(null);
               }}
-              maxWidth="sm"
-              fullWidth
-              {...dialogProps}
-            >
-              <DialogTitle sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                color: 'primary.main'
-              }}>
-                <CopyIcon fontSize="small" />
-                Duplicate Calendar Options
-              </DialogTitle>
-              <DialogContent>
-                {isDuplicating ? (
-                  <Box sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    py: 4
-                  }}>
-                    <CircularProgress size={40} sx={{ mb: 2 }} />
-                    <Typography variant="body1" color="text.secondary">
-                      Duplicating calendar...
-                    </Typography>
-                  </Box>
-                ) : (
-                  <>
-                    <Typography variant="body1" sx={{ mb: 3 }}>
-                      How would you like to duplicate "{calendarToDuplicate?.name}"?
-                    </Typography>
-
-                    <Stack spacing={2}>
-                  <Button
-                    variant="outlined"
-                    onClick={() => handleDuplicateOptionSelect(false)}
-                    disabled={isDuplicating}
-                    sx={{
-                      p: 2,
-                      textAlign: 'left',
-                      justifyContent: 'flex-start',
-                      borderColor: 'primary.main',
-                      '&:hover': {
-                        bgcolor: alpha(theme.palette.primary.main, 0.1)
-                      }
-                    }}
-                  >
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
-                        Settings Only
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Copy calendar settings, targets, and configuration without any trades
-                      </Typography>
-                    </Box>
-                  </Button>
-
-                  <Button
-                    variant="outlined"
-                    onClick={() => handleDuplicateOptionSelect(true)}
-                    disabled={isDuplicating}
-                    sx={{
-                      p: 2,
-                      textAlign: 'left',
-                      justifyContent: 'flex-start',
-                      borderColor: 'info.main',
-                      color: 'info.main',
-                      '&:hover': {
-                        bgcolor: alpha(theme.palette.info.main, 0.1)
-                      }
-                    }}
-                  >
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
-                        Settings + All Trades
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Copy everything including all trades and performance data
-                      </Typography>
-                    </Box>
-                  </Button>
-                    </Stack>
-                  </>
-                )}
-              </DialogContent>
-              <DialogActions>
-                <Button
-                  onClick={() => {
-                    setIsDuplicateOptionsDialogOpen(false);
-                    setCalendarToDuplicate(null);
-                  }}
-                  sx={{ color: 'text.secondary' }}
-                >
-                  Cancel
-                </Button>
-              </DialogActions>
-            </Dialog>
+              onDuplicate={handleDuplicateOptionSelect}
+            />
 
 
 
@@ -831,6 +825,91 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                   }}
                 >
                   Delete
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Trash Confirmation Dialogs */}
+            <Dialog
+              open={confirmDialog.open && confirmDialog.action === 'restore'}
+              onClose={() => setConfirmDialog({ open: false, action: 'restore', calendar: null })}
+              maxWidth="xs"
+              fullWidth
+              {...dialogProps}
+            >
+              <DialogTitle sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                color: 'primary.main'
+              }}>
+                <RestoreIcon fontSize="small" />
+                Restore Calendar
+              </DialogTitle>
+              <DialogContent>
+                <Typography>
+                  Are you sure you want to restore "{confirmDialog.calendar?.name}"? It will be moved back to your calendars.
+                </Typography>
+              </DialogContent>
+              <DialogActions>
+                <Button
+                  onClick={() => setConfirmDialog({ open: false, action: 'restore', calendar: null })}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => confirmDialog.calendar && handleRestoreCalendar(confirmDialog.calendar)}
+                  disabled={actionLoading !== null}
+                  sx={{ color: 'primary.main' }}
+                >
+                  {actionLoading ? <CircularProgress size={20} /> : 'Restore'}
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            <Dialog
+              open={confirmDialog.open && confirmDialog.action === 'delete'}
+              onClose={() => setConfirmDialog({ open: false, action: 'delete', calendar: null })}
+              maxWidth="xs"
+              fullWidth
+              {...dialogProps}
+            >
+              <DialogTitle sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                color: 'error.main'
+              }}>
+                <WarningIcon fontSize="small" />
+                Permanently Delete Calendar
+              </DialogTitle>
+              <DialogContent>
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                    This action cannot be undone!
+                  </Typography>
+                  <Typography variant="body2">
+                    All trades and data will be permanently deleted.
+                  </Typography>
+                </Alert>
+                <Typography>
+                  Are you sure you want to permanently delete "{confirmDialog.calendar?.name}"?
+                </Typography>
+              </DialogContent>
+              <DialogActions>
+                <Button
+                  onClick={() => setConfirmDialog({ open: false, action: 'delete', calendar: null })}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => confirmDialog.calendar && handlePermanentDelete(confirmDialog.calendar)}
+                  disabled={actionLoading !== null}
+                  sx={{ color: 'error.main' }}
+                >
+                  {actionLoading ? <CircularProgress size={20} /> : 'Delete Forever'}
                 </Button>
               </DialogActions>
             </Dialog>
