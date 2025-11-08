@@ -622,7 +622,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       )}
 
       {/* Main content */}
-      {!isCalculatingPerformance && !isCalculatingChartData && (chartData.some(data => data.pnl !== 0) || winLossData.some(data => data.value > 0)) ? (
+      {!isCalculatingPerformance && !isCalculatingChartData && filteredTrades.length > 0 ? (
         <>
           {/* Risk to Reward Statistics Card */}
           <Suspense fallback={<ShimmerLoader variant="chart" height={200} />}>
