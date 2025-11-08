@@ -14,7 +14,6 @@ import {
   DarkMode as DarkModeIcon,
   Logout as LogoutIcon,
   ArrowBack as ArrowBackIcon,
-  Google as GoogleIcon,
   Dashboard as DashboardIcon,
   Home as HomeIcon,
   Article as ArticleIcon,
@@ -27,6 +26,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { error } from '../../utils/logger';
 import DebugPanel from './DebugPanel';
+import LoginDialog from '../auth/LoginDialog';
 
 interface AppHeaderProps {
   onToggleTheme: () => void;
@@ -40,9 +40,10 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   onMenuClick
 }) => {
   const theme = useTheme();
-  const navigate = useNavigate(); 
-  const { user, signOut, signInWithGoogle } = useAuth();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   
 
   // Check if current user is authorized for debug panel
@@ -70,12 +71,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     }
   };
 
-  const handleSignIn = async () => {
-    try {
-      await signInWithGoogle();
-    } catch (err) {
-      error('Failed to sign in:', err);
-    }
+  const handleSignIn = () => {
+    setLoginDialogOpen(true);
   };
 
   return (
@@ -256,7 +253,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
               color="primary"
               onClick={handleSignIn}
               size="small"
-              startIcon={<GoogleIcon />}
               sx={{
                 px: 2,
                 fontSize: '0.875rem',
@@ -277,6 +273,12 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         onClose={() => setDebugPanelOpen(false)}
       />
     )}
+
+    {/* Login Dialog */}
+    <LoginDialog
+      open={loginDialogOpen}
+      onClose={() => setLoginDialogOpen(false)}
+    />
   </>
   );
 };
