@@ -11,7 +11,11 @@ interface SupabaseAuthContextType {
   user: SupabaseUser | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, displayName?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
   isAuthenticated: boolean;
   getAccessToken: () => Promise<string | null>;
   refreshSession: () => Promise<void>;
@@ -30,7 +34,11 @@ interface FirebaseCompatibleAuthContextType {
   user: FirebaseCompatibleUser | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, displayName?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
 }
 
 const SupabaseAuthContext = createContext<SupabaseAuthContextType | undefined>(undefined);
@@ -67,11 +75,47 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  const signInWithEmail = async (email: string, password: string) => {
+    try {
+      await supabaseAuthService.signInWithEmail(email, password);
+    } catch (error) {
+      logger.error('Error signing in with email:', error);
+      throw error;
+    }
+  };
+
+  const signUpWithEmail = async (email: string, password: string, displayName?: string) => {
+    try {
+      await supabaseAuthService.signUpWithEmail(email, password, displayName);
+    } catch (error) {
+      logger.error('Error signing up with email:', error);
+      throw error;
+    }
+  };
+
   const signOut = async () => {
     try {
       await supabaseAuthService.signOut();
     } catch (error) {
       logger.error('Error signing out:', error);
+      throw error;
+    }
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    try {
+      await supabaseAuthService.requestPasswordReset(email);
+    } catch (error) {
+      logger.error('Error requesting password reset:', error);
+      throw error;
+    }
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    try {
+      await supabaseAuthService.updatePassword(newPassword);
+    } catch (error) {
+      logger.error('Error updating password:', error);
       throw error;
     }
   };
@@ -107,7 +151,11 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     user: authState.user,
     loading: authState.loading,
     signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
     signOut,
+    requestPasswordReset,
+    updatePassword,
     isAuthenticated: supabaseAuthService.isAuthenticated(),
     getAccessToken,
     refreshSession,
@@ -143,7 +191,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 const FirebaseCompatibleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user: supabaseUser, loading, signInWithGoogle, signOut } = useSupabaseAuth();
+  const {
+    user: supabaseUser,
+    loading,
+    signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
+    signOut,
+    requestPasswordReset,
+    updatePassword
+  } = useSupabaseAuth();
 
   // Convert Supabase user to Firebase-compatible format
   const user: FirebaseCompatibleUser | null = supabaseUser ? {
@@ -157,7 +214,11 @@ const FirebaseCompatibleAuthProvider: React.FC<{ children: React.ReactNode }> = 
     user,
     loading,
     signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
     signOut,
+    requestPasswordReset,
+    updatePassword,
   };
 
   return (

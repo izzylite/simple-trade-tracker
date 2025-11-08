@@ -194,12 +194,24 @@ class SupabaseAuthService {
     try {
       const displayName = user.user_metadata?.full_name || user.user_metadata?.name || null;
 
+      // Check if user already exists (to determine if this is a new signup)
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const isNewUser = !existingUser;
+
       // Handle user migration if needed
       const migrationResult = await userMigrationService.handleUserSignIn(
         user.id,
         user.email!,
         displayName
       );
+
+      // Determine auth provider
+      const provider = user.app_metadata?.provider || 'email';
 
       // Create or update user in our users table
       // Note: This will work because we added the INSERT policy for users
@@ -210,7 +222,7 @@ class SupabaseAuthService {
           email: user.email!,
           display_name: displayName,
           photo_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
-          provider: user.app_metadata?.provider || 'google',
+          provider: provider,
           last_login: new Date().toISOString(),
           is_active: true
         }, {
@@ -227,6 +239,28 @@ class SupabaseAuthService {
         // Log migration status
         if (migrationResult.migrated) {
           logger.info(`User migration completed for ${user.email}`);
+        }
+
+        // Consume pending invite code if this is a new user
+        if (isNewUser) {
+          const pendingInviteCode = localStorage.getItem('pendingInviteCode');
+          if (pendingInviteCode) {
+            logger.info('New user detected, consuming pending invite code');
+            try {
+              // Import inviteService dynamically to avoid circular dependency
+              const { inviteService } = await import('./inviteService');
+              await inviteService.consumeInviteCode(pendingInviteCode);
+              localStorage.removeItem('pendingInviteCode');
+              logger.info('Invite code consumed successfully for new user');
+            } catch (inviteError) {
+              logger.error('Failed to consume invite code:', inviteError);
+              // Don't fail the authentication, just log the error
+            }
+          }
+        } else {
+          // Existing user - remove any pending invite code
+          localStorage.removeItem('pendingInviteCode');
+          logger.info('Existing user signed in, clearing any pending invite code');
         }
       }
 
@@ -263,9 +297,9 @@ class SupabaseAuthService {
     return {
       id: user.id,
       email: user.email!,
-      displayName: user.user_metadata?.full_name || user.user_metadata?.name || null,
+      displayName: user.user_metadata?.full_name || user.user_metadata?.name || user.user_metadata?.display_name || null,
       photoURL: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
-      provider: user.app_metadata?.provider || 'google',
+      provider: user.app_metadata?.provider || 'email',
       firebaseUid: user.id // For migration compatibility
     };
   }
@@ -304,18 +338,155 @@ class SupabaseAuthService {
   }
 
   /**
+   * Sign up with email and password
+   * Creates a new user account with email/password authentication
+   *
+   * @param email - User's email address
+   * @param password - User's password (minimum 8 characters)
+   * @param displayName - Optional display name for the user
+   * @throws {AuthError} If sign-up fails
+   */
+  async signUpWithEmail(
+    email: string,
+    password: string,
+    displayName?: string
+  ): Promise<void> {
+    try {
+      logger.info('Starting email/password sign-up for:', email);
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            display_name: displayName || null,
+            full_name: displayName || null
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+
+      if (error) {
+        logger.error('Error signing up with email:', error);
+        throw error;
+      }
+
+      if (data.user) {
+        logger.info('Email sign-up successful, user created:', data.user.id);
+
+        // Check if email confirmation is required
+        if (data.user.identities && data.user.identities.length === 0) {
+          logger.info('Email confirmation required - check inbox');
+        } else {
+          logger.info('User signed up and logged in immediately');
+        }
+      }
+    } catch (error) {
+      logger.error('Email sign-up failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sign in with email and password
+   * Authenticates an existing user with email/password credentials
+   *
+   * @param email - User's email address
+   * @param password - User's password
+   * @throws {AuthError} If sign-in fails
+   */
+  async signInWithEmail(email: string, password: string): Promise<void> {
+    try {
+      logger.info('Starting email/password sign-in for:', email);
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        logger.error('Error signing in with email:', error);
+        throw error;
+      }
+
+      if (data.session) {
+        logger.info('Email sign-in successful');
+        // The session will be handled by the onAuthStateChange listener
+      }
+    } catch (error) {
+      logger.error('Email sign-in failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Sign out current user
    */
   async signOut(): Promise<void> {
     try {
       const { error } = await supabase.auth.signOut();
-      
+
       if (error) {
         logger.error('Error signing out:', error);
         throw error;
       }
     } catch (error) {
       logger.error('Sign out failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Request password reset email
+   * Sends a password reset link to the user's email address
+   *
+   * @param email - User's email address
+   * @throws {AuthError} If request fails
+   */
+  async requestPasswordReset(email: string): Promise<void> {
+    try {
+      logger.info('Requesting password reset for:', email);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`
+      });
+
+      if (error) {
+        logger.error('Error requesting password reset:', error);
+        throw error;
+      }
+
+      logger.info('Password reset email sent successfully');
+    } catch (error) {
+      logger.error('Password reset request failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update user password
+   * Updates the password for the currently authenticated user
+   * This should be called after user clicks the reset link in their email
+   *
+   * @param newPassword - New password (minimum 8 characters)
+   * @throws {AuthError} If update fails
+   */
+  async updatePassword(newPassword: string): Promise<void> {
+    try {
+      logger.info('Updating user password');
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        logger.error('Error updating password:', error);
+        throw error;
+      }
+
+      logger.info('Password updated successfully');
+    } catch (error) {
+      logger.error('Password update failed:', error);
       throw error;
     }
   }

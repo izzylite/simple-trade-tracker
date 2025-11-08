@@ -35,6 +35,7 @@ const TradeCalendar = lazy(() => import('./pages/TradeCalendarPage').then(module
 const SharedTradePage = lazy(() => import('./pages/SharedTradePage'));
 const SharedCalendarPage = lazy(() => import('./pages/SharedCalendarPage'));
 const AuthCallback = lazy(() => import('./pages/AuthCallbackPage'));
+const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
 const NotesPage = lazy(() => import('./pages/NotesPage'));
 const NoteEditorPage = lazy(() => import('./pages/NoteEditorPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
@@ -716,6 +717,10 @@ function AppContent() {
           <Route
             path="/auth/callback"
             element={<AuthCallback />}
+          />
+          <Route
+            path="/auth/reset-password"
+            element={<PasswordResetPage />}
           />
           <Route
             path="/notes"

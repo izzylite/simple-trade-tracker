@@ -1,0 +1,246 @@
+/**
+ * Send Invite Email Edge Function
+ *
+ * Sends an invite email with an invite code to a specified email address
+ * This function requires authentication (admin only)
+ *
+ * Request body:
+ *   - email: string (required) - Email address to send invite to
+ *   - inviteCode: string (required) - The invite code to include in email
+ *   - expiresAt: string (optional) - ISO date string for expiration
+ *   - maxUses: number (optional) - Maximum uses for this invite
+ *
+ * Response:
+ *   - success: boolean
+ *   - message: string
+ *
+ *
+ * await fetch('https://gwubzauelilziaqnsfac.supabase.co/functions/v1/send-invite-email', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    email: 'user@example.com',
+    inviteCode: 'ABC123',
+    expiresAt: '2025-12-31T23:59:59Z',
+    maxUses: 1
+  })
+});
+ */
+
+import {
+  corsHeaders,
+  createAuthenticatedClient,
+  errorResponse,
+  handleCors,
+  log,
+  parseJsonBody,
+  successResponse,
+} from "../_shared/supabase.ts";
+
+interface SendInviteEmailRequest {
+  email: string;
+  inviteCode: string;
+  expiresAt?: string;
+  maxUses?: number;
+}
+
+// Get app URL from environment or default to production
+const APP_URL = Deno.env.get("APP_URL") || "https://tradejour.no";
+
+Deno.serve(async (req: Request) => {
+  // Handle CORS preflight
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
+
+  try {
+    log("Send invite email request received", "info");
+
+    // Authenticate user
+    const authClient = await createAuthenticatedClient(req);
+    if (!authClient) {
+      log("Unauthorized request - no valid auth token", "warn");
+      return errorResponse("Unauthorized", 401);
+    }
+
+    const { user } = authClient;
+    log(`Request from user: ${user.id}`, "info");
+
+    // Parse request body
+    const payload = await parseJsonBody<SendInviteEmailRequest>(req);
+    if (!payload || !payload.email || !payload.inviteCode) {
+      log("Missing required parameters", "warn");
+      return errorResponse("Missing email or inviteCode parameter", 400);
+    }
+
+    const { email, inviteCode, expiresAt, maxUses } = payload;
+
+    // Build expiry text
+    let expiryText = "can be used ";
+    if (maxUses && maxUses > 0) {
+      expiryText += maxUses === 1 ? "once" : `up to ${maxUses} times`;
+    } else {
+      expiryText += "unlimited times";
+    }
+
+    if (expiresAt) {
+      const expiryDate = new Date(expiresAt);
+      expiryText += ` and expires on ${
+        expiryDate.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
+      }`;
+    } else {
+      expiryText += " and never expires";
+    }
+    expiryText += ".";
+
+    // Load email template
+    const emailTemplate = `
+      <!-- User Invite Template for TradeJourno -->
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
+        <!-- Header with Gradient Background -->
+        <div style="background: linear-gradient(135deg, #1976d2 0%, #9c27b0 100%); padding: 40px 20px; text-align: center;">
+          <img
+            src="https://gwubzauelilziaqnsfac.supabase.co/storage/v1/object/public/app-resources/Icons/android-chrome-512x512.png"
+            alt="TradeJourno"
+            style="width: 80px; height: 80px; border-radius: 20px; margin: 0 auto 20px; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);"
+          />
+          <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">You're Invited to TradeJourno!</h1>
+        </div>
+
+        <!-- Content Section -->
+        <div style="padding: 40px 30px; background: #f5f5f5;">
+          <h2 style="color: #333333; margin-top: 0; font-size: 22px; font-weight: 600;">Join the Trading Community</h2>
+
+          <p style="color: #666666; line-height: 1.6; font-size: 16px; margin: 20px 0;">
+            You've been invited to join <strong>TradeJourno</strong> - the professional trading journal that helps traders track, analyze, and improve their performance.
+          </p>
+
+          <!-- Invite Code Display -->
+          <div style="background: #ffffff; border: 2px dashed #1976d2; border-radius: 8px; padding: 20px; margin: 30px 0; text-align: center;">
+            <p style="color: #666666; font-size: 14px; margin: 0 0 10px 0;">Your Invite Code</p>
+            <p style="color: #1976d2; font-size: 32px; font-weight: 700; letter-spacing: 2px; margin: 0; font-family: 'Courier New', monospace;">
+              ${inviteCode}
+            </p>
+          </div>
+
+          <!-- What You'll Get Section -->
+          <div style="background: #ffffff; border-radius: 8px; padding: 25px; margin: 30px 0;">
+            <h3 style="color: #333333; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">What you'll get:</h3>
+
+            <div style="margin-bottom: 15px;">
+              <div style="display: inline-block; background: #e3f2fd; color: #1976d2; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px; font-weight: bold; margin-right: 10px; vertical-align: middle;">✓</div>
+              <span style="color: #666666; font-size: 15px; line-height: 1.6; vertical-align: middle;"><strong>Trading Journal</strong> - Document every trade with detailed notes</span>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+              <div style="display: inline-block; background: #e3f2fd; color: #1976d2; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px; font-weight: bold; margin-right: 10px; vertical-align: middle;">✓</div>
+              <span style="color: #666666; font-size: 15px; line-height: 1.6; vertical-align: middle;"><strong>Performance Analytics</strong> - Track your progress with advanced charts</span>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+              <div style="display: inline-block; background: #e3f2fd; color: #1976d2; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px; font-weight: bold; margin-right: 10px; vertical-align: middle;">✓</div>
+              <span style="color: #666666; font-size: 15px; line-height: 1.6; vertical-align: middle;"><strong>Economic Calendar</strong> - Stay updated with market events</span>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+              <div style="display: inline-block; background: #e3f2fd; color: #1976d2; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px; font-weight: bold; margin-right: 10px; vertical-align: middle;">✓</div>
+              <span style="color: #666666; font-size: 15px; line-height: 1.6; vertical-align: middle;"><strong>AI Trading Assistant</strong> - Get intelligent insights powered by AI</span>
+            </div>
+
+            <div>
+              <div style="display: inline-block; background: #e3f2fd; color: #1976d2; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px; font-weight: bold; margin-right: 10px; vertical-align: middle;">✓</div>
+              <span style="color: #666666; font-size: 15px; line-height: 1.6; vertical-align: middle;"><strong>Risk Management</strong> - Calculate and track your risk per trade</span>
+            </div>
+          </div>
+
+          <!-- Call to Action Button -->
+          <div style="text-align: center; margin: 30px 0;">
+            <a
+              href="${APP_URL}?invite=${inviteCode}"
+              style="background: #1976d2; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);"
+            >
+              Accept Invitation
+            </a>
+          </div>
+
+          <!-- Alternative Link -->
+          <p style="color: #999999; font-size: 14px; line-height: 1.6; margin: 30px 0; text-align: center;">
+            Or visit <strong style="color: #666666;">${APP_URL}</strong> and enter your invite code when signing up
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #dddddd; margin: 30px 0;">
+
+          <!-- Expiry Notice -->
+          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="color: #856404; font-size: 14px; margin: 0; line-height: 1.6;">
+              <strong>Note:</strong> This invite code ${expiryText}
+            </p>
+          </div>
+
+          <!-- Footer -->
+          <p style="color: #666666; font-size: 15px; margin: 20px 0 0 0;">
+            Welcome aboard!<br>
+            <strong>The TradeJourno Team</strong>
+          </p>
+        </div>
+
+        <!-- Footer Bar -->
+        <div style="background: #e0e0e0; padding: 20px; text-align: center;">
+          <p style="color: #666666; font-size: 12px; margin: 0;">
+            © 2024 TradeJourno. All rights reserved.
+          </p>
+        </div>
+      </div>
+    `;
+
+    // Send email using Resend (you'll need to add RESEND_API_KEY to your environment)
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+
+    if (!resendApiKey) {
+      log("RESEND_API_KEY not configured", "error");
+      return errorResponse("Email service not configured", 500);
+    }
+
+    const emailResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "TradeJourno <noreply@tradejour.no>",
+        to: [email],
+        subject: "You're Invited to Join TradeJourno!",
+        html: emailTemplate,
+      }),
+    });
+
+    if (!emailResponse.ok) {
+      const errorData = await emailResponse.text();
+      log("Failed to send email via Resend", "error", { error: errorData });
+      return errorResponse("Failed to send email", 500);
+    }
+
+    const emailData = await emailResponse.json();
+    log("Invite email sent successfully", "info", {
+      to: email,
+      inviteCode,
+      emailId: emailData.id,
+    });
+
+    return successResponse({
+      success: true,
+      message: "Invite email sent successfully",
+      emailId: emailData.id,
+    });
+  } catch (error) {
+    log("Unexpected error in send-invite-email", "error", error);
+    return errorResponse("An unexpected error occurred", 500);
+  }
+});
