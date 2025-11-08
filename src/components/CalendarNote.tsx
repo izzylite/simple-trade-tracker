@@ -70,6 +70,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   const isControlled = controlledExpanded !== undefined;
   const isExpanded = isControlled ? !!controlledExpanded : expandedState;
   const [editedData, setEditedData] = useState(calendarNote);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // State for hiding day notes section
