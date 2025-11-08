@@ -53,7 +53,7 @@ function generateShareId(type: 'trade' | 'calendar', id: string): string {
  * Share Repository - handles all share link operations
  */
 export class ShareRepository {
-  private readonly BASE_URL = process.env.REACT_APP_BASE_URL || 'https://tradetracker-30ec1.web.app';
+  private readonly BASE_URL = process.env.REACT_APP_BASE_URL || 'https://tradejourno.com';
 
   /**
    * Generate a share link for a trade
