@@ -19,7 +19,7 @@ import TagFilterDialog from '../TagFilterDialog';
 import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
 
 interface TagDayOfWeekAnalysisProps {
-  calendarId: string;
+  calendarIds: string[]; // Changed from calendarId to support multiple calendars
   trades: Trade[];
   selectedDate: Date;
   timePeriod: 'month' | 'year' | 'all';
@@ -34,7 +34,7 @@ interface TagDayOfWeekAnalysisProps {
 
 
 const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
-  calendarId,
+  calendarIds,
   trades,
   selectedDate,
   timePeriod,

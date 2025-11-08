@@ -25,6 +25,7 @@ import {
   TimePeriod,
   getFilteredTrades
 } from '../utils/chartDataUtils';
+import { EconomicCalendarFilterSettings } from './economicCalendar/EconomicCalendarDrawer';
 
 interface MonthlyStatisticsSectionProps {
   trades: Trade[];
@@ -46,7 +47,7 @@ interface MonthlyStatisticsSectionProps {
   isReadOnly?: boolean;
   onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
-  calendar?: Calendar
+  economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
 }
 
 interface MultipleTradesDialog {
@@ -73,7 +74,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   onDeleteMultipleTrades,
   onZoomImage,
   onOpenGalleryMode,
-  calendar,
+  economicFilter,
   isReadOnly = false
 }) => {
   const theme = useTheme();
@@ -137,7 +138,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
     ].filter(item => item.value > 0);
   }, [trades, selectedDate, timePeriod]);
 
-  // Use calendar.tags from props, fallback to extracting from trades if not available
+  // Use tags from props, fallback to extracting from trades if not available
   const allTags = useMemo(() => {
     if (propAllTags && propAllTags.length > 0) {
       return propAllTags;
@@ -268,7 +269,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         onDeleteClick={onDeleteTrade}
         onDeleteMultiple={onDeleteMultipleTrades}
         onOpenGalleryMode={onOpenGalleryMode}
-        calendar={calendar ? { economic_calendar_filters: calendar.economic_calendar_filters } : undefined}
+        economicFilter={economicFilter}
       />
 
       {/* Performance Details Dialog */}
@@ -307,7 +308,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
             accountBalance={accountBalance}
             maxDailyDrawdown={maxDailyDrawdown}
             monthlyTarget={monthly_target}
-            calendarId={calendarId}
+            calendarIds={[calendarId]}
             scoreSettings={scoreSettings}
             onUpdateTradeProperty={onUpdateTradeProperty}
             onUpdateCalendarProperty={onUpdateCalendarProperty}
@@ -315,7 +316,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
             onEditTrade={onEditTrade}
             onDeleteTrade={onDeleteTrade}
             onOpenGalleryMode={onOpenGalleryMode}
-            calendar={calendar}
+            economicFilter={economicFilter}
           />
         </DialogContent>
       </Dialog>

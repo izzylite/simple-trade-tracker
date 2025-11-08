@@ -59,6 +59,15 @@ interface CalendarNoteDataProps {
   // Calendar sharing props
   calendar?: Calendar;
 
+  // Control visibility of header buttons (default true)
+  showImageButton?: boolean;
+  showShareButton?: boolean;
+  showExpandToggle?: boolean;
+
+  // Optional controlled expand state
+  expanded?: boolean;
+  onToggleExpand?: () => void;
+
   // Read-only mode
   isReadOnly?: boolean;
 }
@@ -77,12 +86,19 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   calendarDayNotes,
   setIsDayNotesDialogOpen,
   calendar,
+  showImageButton = true,
+  showShareButton = true,
+  showExpandToggle = true,
+  expanded: controlledExpanded,
+  onToggleExpand,
   isReadOnly = false
 }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expandedState, setExpandedState] = useState(false);
+  const isControlled = controlledExpanded !== undefined;
+  const isExpanded = isControlled ? !!controlledExpanded : expandedState;
   const [editedData, setEditedData] = useState(calendarNote);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [imageMenuAnchor, setImageMenuAnchor] = useState<HTMLElement | null>(null); 
+  const [imageMenuAnchor, setImageMenuAnchor] = useState<HTMLElement | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // State for hiding day notes section
@@ -106,9 +122,9 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   }, [editedData, calendarNote]);
 
   const handleToggleExpand = async () => {
-    setExpanded(!expanded);
+    const next = !isExpanded;
     // If we're collapsing and there are unsaved changes, save them automatically
-    if (expanded && hasUnsavedChanges && onUpdateCalendarProperty) {
+    if (isExpanded && !next && hasUnsavedChanges && onUpdateCalendarProperty) {
       try {
         setSaveStatus('saving');
         await onUpdateCalendarProperty(calendarId, (calendar) => {
@@ -131,7 +147,11 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
       }
     }
 
-
+    if (isControlled) {
+      onToggleExpand && onToggleExpand();
+    } else {
+      setExpandedState(next);
+    }
   };
 
   const handleToggleDayNotesHidden = () => {
@@ -176,7 +196,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   // Handle keyboard shortcuts
   const handleKeyDown = (event: React.KeyboardEvent) => {
     // Only handle shortcuts when expanded
-    if (!expanded) return;
+    if (!isExpanded) return;
 
     if ((event.ctrlKey || event.metaKey)) {
       if (event.key === 's') {
@@ -225,8 +245,8 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
       sx={{
         overflow: 'hidden',
         borderRadius: 0,
-        backgroundColor: theme.palette.background.paper,
-        minHeight: !expanded ? '60px' : 'auto',
+        backgroundColor: alpha(theme.palette.background.paper, 0.5),
+        minHeight: 'auto',
         transition: 'all 0.3s ease',
         boxShadow: `0 2px 8px ${alpha(theme.palette.grey[500], 0.1)}`,
         '&:hover': {
@@ -235,8 +255,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
         },
       }}
     >
-      <Box sx={{
-        backgroundColor: heroImageUrl ? 'transparent' : alpha(theme.palette.primary.main, 0.08),
+      <Box sx={{ 
         zIndex: 2
       }}>
         {/* Hero Image Section */}
@@ -308,216 +327,10 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
           </Box>
         )}
 
-        {/* Header */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            p: 1.5,
-            pl: 2,
-            backgroundColor: heroImageUrl ? 'transparent' : alpha(theme.palette.primary.main, 0.08),
-            borderBottom: expanded ? `1px solid ${theme.palette.divider}` : 'none',
-            transition: 'background-color 0.3s ease',
-            position: 'relative',
-            zIndex: 2
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 36,
-                height: 36,
-                borderRadius: '50%',
-                backgroundColor: alpha(theme.palette.warning.main, 0.15),
-                mr: 1.5
-              }}
-            >
-              <CalendarMonth
-                sx={{
-                  color: theme.palette.warning.main,
-                  fontSize: '1.5rem'
-                }}
-              />
-            </Box>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 700,
-                fontSize: '1.1rem',
-                letterSpacing: '-0.3px',
-                color: 'inherit',
-              }}
-            >
-              {title}
-            </Typography>
-
-            {/* Save Status Indicator */}
-            {saveStatus !== 'idle' && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {saveStatus === 'saving' && (
-                  <>
-                    <CircularProgress size={12} sx={{ color: theme.palette.warning.main }} />
-                    <Typography variant="caption" sx={{
-                      color: heroImageUrl ? 'white' : theme.palette.text.secondary,
-                      fontSize: '0.7rem',
-                      textShadow: heroImageUrl ? '0 1px 2px rgba(0,0,0,0.8)' : 'none'
-                    }}>
-                      Saving...
-                    </Typography>
-                  </>
-                )}
-                {saveStatus === 'saved' && (
-                  <>
-                    <CheckIcon sx={{ color: theme.palette.success.main, fontSize: '1rem' }} />
-                    <Typography variant="caption" sx={{
-                      color: heroImageUrl ? 'white' : theme.palette.success.main,
-                      fontSize: '0.7rem',
-                      textShadow: heroImageUrl ? '0 1px 2px rgba(0,0,0,0.8)' : 'none'
-                    }}>
-                      Saved
-                    </Typography>
-                  </>
-                )}
-                {saveStatus === 'error' && (
-                  <>
-                    <ErrorIcon sx={{ color: theme.palette.error.main, fontSize: '1rem' }} />
-                    <Typography variant="caption" sx={{
-                      color: heroImageUrl ? 'white' : theme.palette.error.main,
-                      fontSize: '0.7rem',
-                      textShadow: heroImageUrl ? '0 1px 2px rgba(0,0,0,0.8)' : 'none'
-                    }}>
-                      Error saving
-                    </Typography>
-                  </>
-                )}
-              </Box>
-            )}
-
-            {/* Unsaved Changes Indicator */}
-            {hasUnsavedChanges && saveStatus === 'idle' && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Typography variant="caption" sx={{
-                  color: heroImageUrl ? 'white' : theme.palette.warning.main,
-                  fontSize: '0.7rem',
-                  textShadow: heroImageUrl ? '0 1px 2px rgba(0,0,0,0.8)' : 'none',
-                  fontWeight: 500
-                }}>
-                  Unsaved changes
-                </Typography>
-              </Box>
-            )}
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            {/* Save Button */}
-            {onUpdateCalendarProperty && hasUnsavedChanges && (
-              <Tooltip title="Save changes (Ctrl+S)">
-                <Button
-                  variant="contained"
-                  size="small"
-                  startIcon={saveStatus === 'saving' ? <CircularProgress size={16} /> : <SaveIcon />}
-                  onClick={handleSave}
-                  disabled={saveStatus === 'saving'}
-                  sx={{
-                    minWidth: 'auto',
-                    px: 2,
-                    py: 0.5,
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    borderRadius: 1.5,
-                    boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.3)}`,
-                    '&:hover': {
-                      boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.4)}`,
-                      transform: 'translateY(-1px)'
-                    },
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                  }}
-                >
-                  {saveStatus === 'saving' ? 'Saving...' : 'Save'}
-                </Button>
-              </Tooltip>
-            )}
-
-            {onUpdateCalendarProperty && onOpenImagePicker && (
-              <>
-                <Tooltip title={heroImageUrl ? "Manage cover image" : "Add cover image"}>
-                  <IconButton
-                    size="small"
-                    onClick={handleImageButtonClick}
-                    sx={{
-                      color: 'text.secondary',
-                      backgroundColor: alpha(theme.palette.grey[500], 0.08),
-                      '&:hover': {
-                        backgroundColor: alpha(theme.palette.grey[500], 0.15),
-                      }
-                    }}
-                  >
-                    <ImageIcon />
-                  </IconButton>
-                </Tooltip>
-
-                {/* Only show menu when hero image exists */}
-                {heroImageUrl && (
-                  <Menu
-                    anchorEl={imageMenuAnchor}
-                    open={Boolean(imageMenuAnchor)}
-                    onClose={handleImageMenuClose}
-                    onClick={(e) => e.stopPropagation()}
-                    transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-                    anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-                  >
-                    <MenuItem onClick={handleChangeImage}>
-                      <ListItemIcon>
-                        <Photo fontSize="small" />
-                      </ListItemIcon>
-                      <ListItemText>Change cover</ListItemText>
-                    </MenuItem>
-
-                    <MenuItem onClick={handleRemoveImage} sx={{ color: 'error.main' }}>
-                      <ListItemIcon>
-                        <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
-                      </ListItemIcon>
-                      <ListItemText>Remove cover</ListItemText>
-                    </MenuItem>
-                  </Menu>
-                )}
-              </>
-            )}
-
-            {/* Share Calendar Button */}
-            {calendar && onUpdateCalendarProperty && ( 
-                <ShareButton
-                    type="calendar"
-                    item={calendar} 
-                    onUpdateItemProperty={onUpdateCalendarProperty} 
-                  />
-                
-            )}
-
-            <Tooltip title={expanded ? "Hide description (Ctrl+E)" : "Show description"}>
-              <IconButton
-                size="small"
-                onClick={handleToggleExpand}
-                sx={{
-                  color: 'text.secondary',
-                  backgroundColor: alpha(theme.palette.grey[500], 0.08),
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.grey[500], 0.15),
-                  }
-                }}
-              >
-                {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </Box>
+      
       </Box>
 
-      <Collapse in={expanded}>
+      <Collapse in={isExpanded}>
         <Box sx={{ p: 2 }} onKeyDown={isReadOnly ? undefined : handleKeyDown} tabIndex={isReadOnly ? -1 : 0}>
           <RichTextEditor
             value={editedData}
@@ -534,7 +347,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
       </Collapse>
 
       {/* Day Notes Display - Below header */}
-      {calendarDayNotes && !expanded && setIsDayNotesDialogOpen && (() => {
+      {calendarDayNotes && !isExpanded && setIsDayNotesDialogOpen && (() => {
         const currentDayOfWeek = format(new Date(), 'EEE');
         const fullDayName = format(new Date(), 'EEEE');
         const hasNoteForToday = calendarDayNotes.has(currentDayOfWeek) && calendarDayNotes.get(currentDayOfWeek)?.trim() !== '';

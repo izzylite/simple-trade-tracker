@@ -253,7 +253,6 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           calendarId={calendarId}
           trades={trades}
           onOpenGalleryMode={onOpenGalleryMode}
-          calendar={calendar}
         />
       </Box>
     </Dialog>

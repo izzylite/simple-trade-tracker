@@ -125,6 +125,7 @@ const ShimmerLoader: React.FC<ShimmerLoaderProps> = ({
     <Box sx={{
       bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
       borderRadius: 2,
+      m:2,
       overflow: 'hidden'
     }}>
       {Array.from({ length: count }).map((_, index) => (

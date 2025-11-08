@@ -18,6 +18,7 @@ import { calculateCumulativePnL, startOfNextDay } from '../trades/TradeFormDialo
 import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip } from 'recharts';
 import { formatCurrency } from '../../utils/formatters';
 import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
+import { EconomicCalendarFilterSettings } from '../economicCalendar/EconomicCalendarDrawer';
 
 interface TradesDialogProps {
   open: boolean;
@@ -30,6 +31,7 @@ interface TradesDialogProps {
   onClose: () => void;
   onTradeExpand: (tradeId: string) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
+  economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
   onZoomImage: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
   account_balance: number;
   allTrades: Trade[];
@@ -66,7 +68,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   onDeleteMultiple,
   onOpenGalleryMode,
   calendarId,
-  calendar
+  economicFilter
 }) => {
   const theme = useTheme();
   const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
@@ -310,7 +312,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
           enableBulkSelection={trades.length > 1 && !!onDeleteMultiple} // Enable bulk selection when there are multiple trades and handler is provided
           calendarId={calendarId}
           onOpenGalleryMode={onOpenGalleryMode}
-          calendar={calendar}
+          economicFilter={economicFilter}
         />
       </Box>
     </BaseDialog>

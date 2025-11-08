@@ -18,17 +18,26 @@ import { logger } from '../../../utils/logger';
 import { supabase } from '../../../config/supabase';
 
 /**
+ * Safely parse a date value, returning a valid Date or fallback
+ */
+const parseDate = (dateValue: any, fallback: Date = new Date()): Date => {
+  if (!dateValue) return fallback;
+  const parsed = new Date(dateValue);
+  return isNaN(parsed.getTime()) ? fallback : parsed;
+};
+
+/**
  * Transform Supabase conversation data to AIConversation type
  * Converts string dates to Date objects and serializable messages to ChatMessage
  */
 const transformSupabaseConversation = (data: any): AIConversation => {
   return {
     ...data,
-    created_at: data.created_at ? new Date(data.created_at) : new Date(),
-    updated_at: data.updated_at ? new Date(data.updated_at) : new Date(),
+    created_at: parseDate(data.created_at),
+    updated_at: parseDate(data.updated_at),
     messages: data.messages ? data.messages.map((msg: SerializableChatMessage) => ({
       ...msg,
-      timestamp: new Date(msg.timestamp)
+      timestamp: parseDate(msg.timestamp)
     })) : []
   } as AIConversation;
 };

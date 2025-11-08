@@ -41,18 +41,12 @@ import {
   TrashCalendar
 } from '../../services/trashService';
 import Shimmer from '../Shimmer';
-import AppHeader from '../common/AppHeader';
+
 import CalendarCardShimmer from '../CalendarCardShimmer';
 
 // TrashCalendarSkeleton component removed - now using CalendarCardShimmer
 
-interface CalendarTrashProps {
-  onToggleTheme: () => void;
-  mode: 'light' | 'dark';
-  onMenuClick?: () => void;
-}
-
-const CalendarTrash: React.FC<CalendarTrashProps> = ({ onToggleTheme, mode, onMenuClick }) => {
+const CalendarTrash: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -136,11 +130,7 @@ const CalendarTrash: React.FC<CalendarTrashProps> = ({ onToggleTheme, mode, onMe
   if (loading) {
     return (
       <>
-        <AppHeader
-          onToggleTheme={onToggleTheme}
-          mode={mode}
-        />
-        <Toolbar />
+
 
         <Container maxWidth="lg" sx={{ mt: 4, pb: 4 }}>
           {/* Loading skeletons */}
@@ -166,12 +156,7 @@ const CalendarTrash: React.FC<CalendarTrashProps> = ({ onToggleTheme, mode, onMe
 
   return (
     <>
-      <AppHeader
-        onToggleTheme={onToggleTheme}
-        mode={mode}
-        onMenuClick={onMenuClick}
-      />
-      <Toolbar />
+
 
       {/* My Calendar Section with Tabs */}
       <Box sx={{

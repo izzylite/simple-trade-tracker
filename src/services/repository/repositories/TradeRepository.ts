@@ -27,16 +27,34 @@ import { TradeEconomicEvent } from '../../../types/dualWrite';
 export { optimizeImage };
 
 /**
+ * Safely parse a date value, returning a valid Date or fallback
+ */
+const parseDate = (dateValue: any, fallback: Date = new Date()): Date => {
+  if (!dateValue) return fallback;
+  const parsed = new Date(dateValue);
+  return isNaN(parsed.getTime()) ? fallback : parsed;
+};
+
+/**
+ * Safely parse an optional date value, returning Date or undefined
+ */
+const parseOptionalDate = (dateValue: any): Date | undefined => {
+  if (!dateValue) return undefined;
+  const parsed = new Date(dateValue);
+  return isNaN(parsed.getTime()) ? undefined : parsed;
+};
+
+/**
  * Transform Supabase trade data to Trade type
- * Converts string dates to Date objects
+ * Converts string dates to Date objects with validation
  */
 const transformSupabaseTrade = (data: any): Trade => {
   return {
     ...data,
-    trade_date: data.trade_date ? new Date(data.trade_date) : new Date(),
-    created_at: data.created_at ? new Date(data.created_at) : new Date(),
-    updated_at: data.updated_at ? new Date(data.updated_at) : new Date(),
-    shared_at: data.shared_at ? new Date(data.shared_at) : undefined,
+    trade_date: parseDate(data.trade_date),
+    created_at: parseDate(data.created_at),
+    updated_at: parseDate(data.updated_at),
+    shared_at: parseOptionalDate(data.shared_at),
   } as Trade;
 };
 

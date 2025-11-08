@@ -48,7 +48,7 @@ import RichTextEditor from './common/RichTextEditor';
 import EconomicEventListItem from './economicCalendar/EconomicEventListItem';
 import { economicCalendarService } from '../services/economicCalendarService';
 import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
-import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from './economicCalendar/EconomicCalendarDrawer';
+import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS, EconomicCalendarFilterSettings } from './economicCalendar/EconomicCalendarDrawer';
 import { logger } from '../utils/logger';
 import { tradeEconomicEventService } from '../services/tradeEconomicEventService';
 import ShareButton from './sharing/ShareButton';
@@ -63,18 +63,12 @@ interface TradeDetailExpandedProps {
   isExpanded: boolean;
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
+  economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
   calendarId?: string;
   // Optional props for trade link navigation in notes
   trades?: Array<{ id: string;[key: string]: any }>;
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
-  // Calendar data for economic events filtering
-  calendar?: {
-    economic_calendar_filters?: {
-      currencies: string[];
-      impacts: string[];
-      viewType: 'day' | 'week' | 'month';
-    };
-  };
+   
 }
 
 // Define shimmer animation
@@ -119,7 +113,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   calendarId,
   trades,
   onOpenGalleryMode,
-  calendar
+  economicFilter
 }) => {
   const theme = useTheme();
   const [trade, setTrade] = useState<Trade>(tradeData);
@@ -142,6 +136,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   // Add state
   const [selectedImpacts, setSelectedImpacts] = useState<ImpactLevel[]>(['High']
   );
+
+  const filterSetting : EconomicCalendarFilterSettings = economicFilter ? economicFilter(calendarId!) : DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
 
   // Update local trade state when tradeData prop changes
   useEffect(() => {
@@ -233,7 +229,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
       // Convert trade_date to Date object if it's a string
       const tradeDate = typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date;
       const sessionRange = tradeEconomicEventService.getSessionTimeRange(trade.session!, tradeDate);
-      const filterSetting = calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
+      
       const events = await economicCalendarService.fetchEvents(
         { start: sessionRange.start, end: sessionRange.end },
         {
@@ -304,7 +300,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
           // Refetch events for the trade date
           try {
-            const filterSetting = calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
+             
             const updatedEvents = await economicCalendarService.fetchEvents({
               start: tradeDateStr,
               end: tradeDateStr
@@ -1053,7 +1049,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                   gap: { xs: 0.5, sm: 0.75 },
                                   justifyContent: { xs: 'flex-start', sm: 'flex-start' }
                                 }}>
-                                  {((calendar?.economic_calendar_filters?.impacts as ImpactLevel[]) || (['High', 'Medium', 'Low'] as ImpactLevel[])).map((impact: ImpactLevel) => (
+                                  {(filterSetting.impacts).map((impact: ImpactLevel) => (
                                     <Chip
                                       key={impact}
                                       label={impact}

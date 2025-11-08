@@ -4,9 +4,60 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Cotex is a React-based trading journal application that allows traders to track their trades, analyze performance, and manage trading calendars. The project uses Supabase, TypeScript, Material-UI, and includes Supabase edge functions for backend operations.
+TradeJourno is a React-based trading journal application that allows traders to track their trades, analyze performance, and manage trading calendars. The project uses Supabase, TypeScript, Material-UI, and includes Supabase edge functions for backend operations.
 
-## Common Development Commands
+
+
+
+
+## Core Development Philosophy
+
+### KISS (Keep It Simple, Stupid)
+
+Simplicity should be a key goal in design. Choose straightforward solutions over complex ones whenever possible. Simple solutions are easier to understand, maintain, and debug.
+
+### YAGNI (You Aren't Gonna Need It)
+
+Avoid building functionality on speculation. Implement features only when they are needed, not when you anticipate they might be useful in the future.
+
+### Design Principles
+
+- **Dependency Inversion**: High-level modules should not depend on low-level modules. Both should depend on abstractions.
+- **Open/Closed Principle**: Software entities should be open for extension but closed for modification.
+- **Single Responsibility**: Each function, class, and module should have one clear purpose.
+- **Fail Fast**: Check for potential errors early and raise exceptions immediately when issues occur.
+
+## 🧱 Code Structure & Modularity
+
+### File and Function Limits
+
+- **Never create a file longer than 500 lines of code**. If approaching this limit, refactor by splitting into modules.
+- **Functions should be under 50 lines** with a single, clear responsibility.
+- **Classes should be under 100 lines** and represent a single concept or entity.
+- **Organize code into clearly separated modules**, grouped by feature or responsibility.
+- **Line length should be max 100 characters** (ESLint configured)
+
+
+## Specialized Subagents
+
+This project uses specialized AI subagents for specific domains. Claude Code should **proactively** invoke these agents when working on related tasks:
+
+
+### Supabase Backend Expert (`supabase-backend-expert`)
+**When to use:**
+- Database schema design, table creation, or migrations
+- Implementing Row Level Security (RLS) policies
+- Creating or deploying Supabase Edge Functions
+- Setting up authentication, real-time subscriptions, or storage buckets
+- Security audits or performance optimization for database queries
+- Any Supabase-specific operations (must use MCP tools)
+
+**Example triggers:**
+- User mentions "Supabase", "database", "RLS", "edge function"
+- Working in `supabase/` directory or with database migrations
+- API endpoint changes that affect database schema
+- Security or performance concerns with data access
+
 
 ### Frontend Development
 - `npm start` - Start the React development server
@@ -132,3 +183,4 @@ The project is actively migrating from Firebase to Supabase:
 - Functions: Firebase Functions → Supabase Edge Functions (in progress)
 
 When working with data operations, check both Firebase and Supabase implementations as some features may exist in both systems during the transition.
+

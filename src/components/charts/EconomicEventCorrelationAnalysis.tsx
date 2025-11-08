@@ -39,9 +39,8 @@ const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {
 };
 
 interface EconomicEventCorrelationAnalysisProps {
-  calendarId: string;
+  calendarIds: string[]; // Changed from calendarId to support multiple calendars
   trades: Trade[];
-  calendar: Calendar;
   timePeriod: 'month' | 'year' | 'all';
   selectedDate: Date;
   setMultipleTradesDialog?: (dialogState: any) => void;
@@ -104,9 +103,8 @@ interface CorrelationStats {
 
 
 const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysisProps> = ({
-  calendarId,
+  calendarIds,
   trades,
-  calendar,
   timePeriod,
   selectedDate,
   setMultipleTradesDialog
@@ -186,7 +184,7 @@ const CURRENCY_OPTIONS = [
       setCalculationProgress(null);
       try {
         const result = await performanceCalculationService.calculateEconomicEventCorrelations(
-          calendarId,
+          calendarIds,
           selectedCurrency,
           selectedImpact,
           timePeriod,
@@ -208,7 +206,7 @@ const CURRENCY_OPTIONS = [
     };
 
     calculateCorrelations();
-  }, [calendarId, selectedCurrency, selectedImpact, timePeriod, selectedDate]);
+  }, [calendarIds, selectedCurrency, selectedImpact, timePeriod, selectedDate]);
 
   // Get losing and winning trades (kept for legacy compatibility)
   const losingTrades = useMemo(() => {

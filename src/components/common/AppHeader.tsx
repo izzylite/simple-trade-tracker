@@ -40,14 +40,10 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   onMenuClick
 }) => {
   const theme = useTheme();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate = useNavigate(); 
   const { user, signOut, signInWithGoogle } = useAuth();
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
-
-  const isHomePage = location.pathname === '/';
-  const isDashboardPage = location.pathname === '/dashboard';
-  const isBlogPage = location.pathname === '/blog';
+  
 
   // Check if current user is authorized for debug panel
   const isDebugAuthorized = user?.email === 'isl.israelite@gmail.com';

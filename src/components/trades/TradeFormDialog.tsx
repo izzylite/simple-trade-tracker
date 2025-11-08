@@ -16,7 +16,7 @@ import { DayHeader, TradeForm, NewTradeForm } from './';
 import { v4 as uuidv4 } from 'uuid';
 import { PendingImage } from './TradeForm';
 import { GridImage, GridPendingImage } from './ImageGrid';
-import { createNewTradeData } from '../TradeCalendar';
+import { createNewTradeData } from '../../pages/TradeCalendarPage';
 import {
   calculateEffectiveRiskPercentage,
   calculateCumulativePnLToDate,

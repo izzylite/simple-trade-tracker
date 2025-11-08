@@ -11,8 +11,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, CircularProgress, Typography, Alert } from '@mui/material';
-import { supabase } from '../../config/supabase';
-import { logger } from '../../utils/logger';
+import { supabase } from '../config/supabase';
+import { logger } from '../utils/logger';
 
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();

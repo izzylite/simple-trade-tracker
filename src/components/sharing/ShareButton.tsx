@@ -62,6 +62,8 @@ interface ShareCalendarProps {
   item: Calendar;
   onUpdateItemProperty?: (itemId: string, updateCallback: (item: Calendar) => Calendar) => Promise<Calendar | undefined>;
   onMenuClose?: () => void;
+  size?: 'small' | 'medium' | 'large';
+  color?: 'inherit' | 'primary' | 'secondary' | 'default';
 }
 
 type ShareButtonProps = ShareTradeProps | ShareCalendarProps;
@@ -72,8 +74,12 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
 
   // Trade-specific props
   const calendarId = type === 'trade' ? (props as ShareTradeProps).calendarId : undefined;
-  const size = type === 'trade' ? (props as ShareTradeProps).size || 'medium' : 'medium';
-  const color = type === 'trade' ? (props as ShareTradeProps).color || 'inherit' : 'inherit';
+  const size = type === 'trade'
+    ? ((props as ShareTradeProps).size || 'medium')
+    : ((props as ShareCalendarProps).size || 'medium');
+  const color = type === 'trade'
+    ? ((props as ShareTradeProps).color || 'inherit')
+    : ((props as ShareCalendarProps).color || 'inherit');
   
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [isSharing, setIsSharing] = useState(false);

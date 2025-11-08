@@ -16,16 +16,37 @@ import { supabaseAuthService } from '../../supabaseAuthService';
 
 
 /**
+ * Safely parse a date value, returning a valid Date or fallback
+ */
+const parseDate = (dateValue: any, fallback: Date = new Date()): Date => {
+  if (!dateValue) return fallback;
+  const parsed = new Date(dateValue);
+  return isNaN(parsed.getTime()) ? fallback : parsed;
+};
+
+/**
+ * Safely parse an optional date value, returning Date or undefined
+ */
+const parseOptionalDate = (dateValue: any): Date | undefined => {
+  if (!dateValue) return undefined;
+  const parsed = new Date(dateValue);
+  return isNaN(parsed.getTime()) ? undefined : parsed;
+};
+
+/**
  * Transform Supabase calendar data to Calendar type
- * Converts string dates to Date objects
+ * Converts string dates to Date objects with validation
  */
 const transformSupabaseCalendar = (data: any): Calendar => {
   return {
     ...data,
-    created_at: data.created_at ? new Date(data.created_at) : new Date(),
-    updated_at: data.updated_at ? new Date(data.updated_at) : new Date(),
-    deleted_at: data.deleted_at ? new Date(data.deleted_at) : undefined,
-    auto_delete_at: data.auto_delete_at ? new Date(data.auto_delete_at) : undefined,
+    created_at: parseDate(data.created_at),
+    updated_at: parseDate(data.updated_at),
+    deleted_at: parseOptionalDate(data.deleted_at),
+    auto_delete_at: parseOptionalDate(data.auto_delete_at),
+    shared_at: parseOptionalDate(data.shared_at),
+    drawdown_start_date: parseOptionalDate(data.drawdown_start_date),
+    drawdown_end_date: parseOptionalDate(data.drawdown_end_date),
   } as Calendar;
 };
 
@@ -71,7 +92,8 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
         .select('*')
         .eq('user_id', userId)
         .is('deleted_at', null)
-        .neq('mark_for_deletion', true);
+        .neq('mark_for_deletion', true)
+        .order('updated_at', { ascending: false }); // Order by most recently updated first
 
       if (error) {
         logger.error('Error finding calendars by user ID:', error);
@@ -185,7 +207,8 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
         .select('*')
         .eq('user_id', userId)
         .not('deleted_at', 'is', null) // Has been soft deleted
-        .neq('mark_for_deletion', true); // Not marked for final deletion
+        .neq('mark_for_deletion', true) // Not marked for final deletion
+        .order('updated_at', { ascending: false }); // Order by most recently updated first
 
       if (error) {
         logger.error('Error finding trash calendars by user ID:', error);

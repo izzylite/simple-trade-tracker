@@ -17,16 +17,14 @@ import {
 import {
   Home as HomeIcon,
   CalendarToday as CalendarIcon,
-  Chat as ChatIcon,
-  TrendingUp as PerformanceIcon,
+  Note as NoteIcon,
   People as CommunityIcon,
-  ChevronLeft as ChevronLeftIcon,
-  ChevronRight as ChevronRightIcon,
-  Menu as MenuIcon
+  Menu as MenuIcon,
+  ChevronLeft as ChevronLeftIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-const DRAWER_WIDTH_EXPANDED = 300;
+const DRAWER_WIDTH_EXPANDED = 310;
 const DRAWER_WIDTH_COLLAPSED = 72;
 
 interface NavigationItem {
@@ -64,16 +62,10 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
       path: '/calendars'
     },
     {
-      id: 'chat',
-      label: 'Chat',
-      icon: <ChatIcon />,
-      path: '/chat'
-    },
-    {
-      id: 'performance',
-      label: 'Performance',
-      icon: <PerformanceIcon />,
-      path: '/performance'
+      id: 'notes',
+      label: 'Notes',
+      icon: <NoteIcon />,
+      path: '/notes'
     },
     {
       id: 'community',
@@ -89,6 +81,10 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
       return;
     }
     navigate(item.path);
+    // Auto-collapse the drawer when navigating
+    if (!collapsed) {
+      onToggleCollapse();
+    }
   };
 
   const isActive = (path: string) => {
@@ -107,6 +103,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
         sx={{
           p: collapsed ? 2 : 3,
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          maxHeight: 65,
           display: 'flex',
           alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'flex-start',
@@ -133,14 +130,23 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
             <Box
               component="img"
               src="/android-chrome-192x192.png"
-              alt="Trade Tracker Logo"
+              alt="TradeJourno Logo"
               sx={{
                 width: 48,
                 height: 48,
-                borderRadius: 2
+                borderRadius: 2,
+                opacity: collapsed ? 0 : 1,
+                transition: theme.transitions.create('opacity', {
+                  duration: theme.transitions.duration.shorter,
+                  delay: collapsed ? 0 : theme.transitions.duration.shorter,
+                })
               }}
             />
-            <Box sx={{ flex: 1 }}>
+            <Box
+              sx={{
+                flex: 1
+              }}
+            >
               <Typography
                 variant="h6"
                 sx={{
@@ -148,22 +154,29 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
                   background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                   backgroundClip: 'text',
                   WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent'
+                  WebkitTextFillColor: 'transparent',
+                  opacity: collapsed ? 0 : 1,
+                  visibility: collapsed ? 'hidden' : 'visible',
+                  transition: theme.transitions.create(['opacity', 'visibility'], {
+                    duration: 800, // Slower fade-in (800ms)
+                    delay: collapsed ? 0 : 800, // Delay after drawer is fully expanded (800ms)
+                  })
                 }}
               >
-                Trade Tracker
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Your Trading Journal
+                TradeJourno
               </Typography>
             </Box>
             <IconButton
               onClick={onToggleCollapse}
-              size="small"
               sx={{
-                color: 'text.secondary',
+                color: 'primary.main',
+                opacity: collapsed ? 0 : 1,
+                transition: theme.transitions.create('opacity', {
+                  duration: theme.transitions.duration.shorter,
+                  delay: collapsed ? 0 : theme.transitions.duration.shorter,
+                }),
                 '&:hover': {
-                  bgcolor: alpha(theme.palette.action.hover, 0.05)
+                  bgcolor: alpha(theme.palette.primary.main, 0.1)
                 }
               }}
             >
@@ -270,7 +283,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
           }}
         >
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
-            © 2025 Trade Tracker
+            © 2025 TradeJourno
           </Typography>
         </Box>
       )}

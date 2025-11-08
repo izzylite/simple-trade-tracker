@@ -56,7 +56,11 @@ const Shimmer = ({
       shimmerColor: mode === 'dark'
         ? `rgba(255, 255, 255, ${values.dark.shimmer})`
         : `rgba(0, 0, 0, ${values.light.shimmer})`,
-      primaryTint: alpha(theme.palette.primary.main, mode === 'dark' ? 0.15 : 0.08)
+      // Use neutral greys for tint to avoid blueish hue in dark mode
+      primaryTint: alpha(
+        theme.palette.mode === 'dark' ? theme.palette.grey[700] : theme.palette.grey[300],
+        mode === 'dark' ? 0.25 : 0.2
+      )
     };
   };
 

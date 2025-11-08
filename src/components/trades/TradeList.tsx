@@ -30,6 +30,7 @@ import { TradeListItem, TradeInfo, TradeActions } from '../StyledComponents';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { useTheme } from '@mui/material/styles';
 import TradeDetailExpanded from '../TradeDetailExpanded';
+import { EconomicCalendarFilterSettings } from '../economicCalendar/EconomicCalendarDrawer';
 
 interface TradeListProps {
   trades: Trade[];
@@ -40,6 +41,7 @@ interface TradeListProps {
   onDeleteMultiple?: (tradeIds: string[]) => void; // New prop for bulk deletion
   onZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
+  economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
   hideActions?: boolean; // New prop to hide edit/delete buttons
   enableBulkSelection?: boolean; // New prop to enable bulk selection
   sx?: SxProps<Theme>; // Allow styling from parent component
@@ -75,7 +77,7 @@ const TradeList: React.FC<TradeListProps> = ({
   deletingTradeIds = [],
   calendarId,
   onOpenGalleryMode,
-  calendar,
+  economicFilter,
   initialPageSize = 20,
   pageSize = 20
 }) => {
@@ -491,7 +493,7 @@ const TradeList: React.FC<TradeListProps> = ({
                   calendarId={calendarId}
                   trades={trades}
                   onOpenGalleryMode={onOpenGalleryMode}
-                  calendar={calendar}
+                  economicFilter={economicFilter}
                 />
               )}
             </React.Fragment>

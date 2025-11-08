@@ -30,25 +30,34 @@ export class PerformanceCalculationService {
   }
 
   // Calculate all performance metrics using PostgreSQL RPC function
+  // Supports both single calendar and multiple calendars
   public async calculatePerformanceMetrics(
-    calendarId: string,
+    calendarIds: string | string[],
     selectedDate: Date,
     timePeriod: TimePeriod,
     accountBalance: number,
-    comparisonTags: string[] = [],
-    onProgress?: (progress: CalculationProgress) => void
+    comparisonTags: string[] = [], 
   ): Promise<PerformanceCalculationResult> {
     try {
-      // Report progress
-      onProgress?.({ step: 'Fetching performance metrics from database...', progress: 1, total: 1 });
+       
 
-      // Call PostgreSQL RPC function
-      const { data, error } = await supabase.rpc('calculate_performance_metrics', {
-        p_calendar_id: calendarId,
-        p_time_period: timePeriod,
-        p_selected_date: selectedDate.toISOString(),
-        p_comparison_tags: comparisonTags
-      });
+      // Normalize calendarIds to array
+      const calendarIdsArray = Array.isArray(calendarIds) ? calendarIds : [calendarIds];
+
+      // Call appropriate RPC function based on number of calendars
+      const { data, error } = calendarIdsArray.length === 1
+        ? await supabase.rpc('calculate_performance_metrics', {
+            p_calendar_id: calendarIdsArray[0],
+            p_time_period: timePeriod,
+            p_selected_date: selectedDate.toISOString(),
+            p_comparison_tags: comparisonTags
+          })
+        : await supabase.rpc('calculate_performance_metrics_multi', {
+            p_calendar_ids: calendarIdsArray,
+            p_time_period: timePeriod,
+            p_selected_date: selectedDate.toISOString(),
+            p_comparison_tags: comparisonTags
+          });
 
       if (error) {
         logger.error('Error calling calculate_performance_metrics RPC:', error);
@@ -118,8 +127,9 @@ export class PerformanceCalculationService {
 
 
   // Calculate tag performance using PostgreSQL RPC function
+  // Supports both single calendar and multiple calendars
   public async calculateTagPerformanceRPC(
-    calendarId: string,
+    calendarIds: string | string[],
     primaryTags: string[],
     secondaryTags: string[],
     timePeriod: TimePeriod,
@@ -131,13 +141,25 @@ export class PerformanceCalculationService {
         return [];
       }
 
-      const { data, error } = await supabase.rpc('calculate_tag_performance', {
-        p_calendar_id: calendarId,
-        p_primary_tags: primaryTags,
-        p_secondary_tags: secondaryTags,
-        p_time_period: timePeriod,
-        p_selected_date: selectedDate.toISOString()
-      });
+      // Normalize calendarIds to array
+      const calendarIdsArray = Array.isArray(calendarIds) ? calendarIds : [calendarIds];
+
+      // Call appropriate RPC function based on number of calendars
+      const { data, error } = calendarIdsArray.length === 1
+        ? await supabase.rpc('calculate_tag_performance', {
+            p_calendar_id: calendarIdsArray[0],
+            p_primary_tags: primaryTags,
+            p_secondary_tags: secondaryTags,
+            p_time_period: timePeriod,
+            p_selected_date: selectedDate.toISOString()
+          })
+        : await supabase.rpc('calculate_tag_performance_multi', {
+            p_calendar_ids: calendarIdsArray,
+            p_primary_tags: primaryTags,
+            p_secondary_tags: secondaryTags,
+            p_time_period: timePeriod,
+            p_selected_date: selectedDate.toISOString()
+          });
 
       if (error) {
         logger.error('Error calling calculate_tag_performance RPC:', error);
@@ -152,8 +174,9 @@ export class PerformanceCalculationService {
   }
 
   // Calculate economic event correlations using PostgreSQL RPC function
+  // Supports both single calendar and multiple calendars
   public async calculateEconomicEventCorrelations(
-    calendarId: string,
+    calendarIds: string | string[],
     selectedCurrency: string,
     selectedImpact: string,
     timePeriod: TimePeriod,
@@ -167,13 +190,25 @@ export class PerformanceCalculationService {
     try {
       onProgress?.({ step: 'Fetching economic event correlations from database...', progress: 1, total: 1 });
 
-      const { data, error } = await supabase.rpc('calculate_economic_event_correlations', {
-        p_calendar_id: calendarId,
-        p_selected_currency: selectedCurrency,
-        p_selected_impact: selectedImpact,
-        p_time_period: timePeriod,
-        p_selected_date: selectedDate.toISOString()
-      });
+      // Normalize calendarIds to array
+      const calendarIdsArray = Array.isArray(calendarIds) ? calendarIds : [calendarIds];
+
+      // Call appropriate RPC function based on number of calendars
+      const { data, error } = calendarIdsArray.length === 1
+        ? await supabase.rpc('calculate_economic_event_correlations', {
+            p_calendar_id: calendarIdsArray[0],
+            p_selected_currency: selectedCurrency,
+            p_selected_impact: selectedImpact,
+            p_time_period: timePeriod,
+            p_selected_date: selectedDate.toISOString()
+          })
+        : await supabase.rpc('calculate_economic_event_correlations_multi', {
+            p_calendar_ids: calendarIdsArray,
+            p_selected_currency: selectedCurrency,
+            p_selected_impact: selectedImpact,
+            p_time_period: timePeriod,
+            p_selected_date: selectedDate.toISOString()
+          });
 
       if (error) {
         logger.error('Error calling calculate_economic_event_correlations RPC:', error);
@@ -181,9 +216,9 @@ export class PerformanceCalculationService {
       }
 
       return {
-        losingTradeCorrelations: data?.losingTradeCorrelations || [],
-        winningTradeCorrelations: data?.winningTradeCorrelations || [],
-        correlationStats: data?.correlationStats || {
+        losingTradeCorrelations: data?.losingCorrelations || [],
+        winningTradeCorrelations: data?.winningCorrelations || [],
+        correlationStats: data?.stats || {
           totalLosingTrades: 0,
           totalWinningTrades: 0,
           losingTradesWithEvents: 0,

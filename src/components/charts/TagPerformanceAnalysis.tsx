@@ -19,7 +19,7 @@ import TagFilterDialog from '../TagFilterDialog';
 import { performanceCalculationService } from '../../services/performanceCalculationService';
 
 interface TagPerformanceAnalysisProps {
-  calendarId: string;
+  calendarIds: string[]; // Changed from calendarId to support multiple calendars
   trades: Trade[];
   selectedDate: Date;
   timePeriod: 'month' | 'year' | 'all';
@@ -32,7 +32,7 @@ interface TagPerformanceAnalysisProps {
 }
 
 const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
-  calendarId,
+  calendarIds,
   trades,
   selectedDate,
   timePeriod,
@@ -62,7 +62,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
       try {
         // Use RPC function for server-side calculation
         const tagPerformanceData = await performanceCalculationService.calculateTagPerformanceRPC(
-          calendarId,
+          calendarIds,
           primaryTags,
           secondaryTags,
           timePeriod,
@@ -94,7 +94,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
     };
 
     calculateFilteredStats();
-  }, [calendarId, primaryTags, secondaryTags, timePeriod, selectedDate]);
+  }, [calendarIds, primaryTags, secondaryTags, timePeriod, selectedDate]);
 
 
 

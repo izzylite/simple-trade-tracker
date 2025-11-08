@@ -9,9 +9,9 @@ import {
   CssBaseline
 } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
-import { createAppTheme } from '../../theme';
-import SharedTradeView from './SharedTradeView';
-import AppHeader from '../common/AppHeader';
+import { createAppTheme } from '../theme';
+import SharedTradeView from '../components/sharing/SharedTradeView';
+import AppHeader from '../components/common/AppHeader';
 
 const SharedTradePage: React.FC = () => {
   const { shareId } = useParams<{ shareId: string }>();
@@ -57,9 +57,6 @@ const SharedTradePage: React.FC = () => {
           <AppHeader
             onToggleTheme={handleToggleTheme}
             mode={mode}
-            title="📈 Trade Tracker - Shared Trade"
-            showBackButton={!!referrerState?.referrer}
-            onBackClick={handleBackClick}
           />
           <Toolbar />
 
@@ -87,11 +84,8 @@ const SharedTradePage: React.FC = () => {
         <AppHeader
           onToggleTheme={handleToggleTheme}
           mode={mode}
-          title="📈 Trade Tracker - Shared Trade"
-          showBackButton={!!referrerState?.referrer}
-          onBackClick={handleBackClick}
         />
-        <Toolbar />
+        <Toolbar sx={{ pl: 0, pr: 0 }} />
 
         <Container
           maxWidth="md"

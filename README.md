@@ -1,183 +1,190 @@
-# Supabase CLI
+# TradeJourno
 
-[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=main)](https://coveralls.io/github/supabase/cli?branch=main) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
-](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
+**AI-Powered Trading Journal** - Track, analyze, and improve your trading performance with intelligent insights.
 
-[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
+## 🚀 Overview
 
-This repository contains all the functionality for Supabase CLI.
+TradeJourno is a comprehensive trading journal application designed to help traders track their performance, analyze patterns, and make data-driven decisions. Built with modern web technologies and powered by AI, it provides deep insights into your trading behavior.
 
-- [x] Running Supabase locally
-- [x] Managing database migrations
-- [x] Creating and deploying Supabase Functions
-- [x] Generating types directly from your database schema
-- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
+## ✨ Key Features
 
-## Getting started
+### 📊 **Trade Management**
+- **Comprehensive Trade Tracking** - Record entries, exits, stop losses, and take profits
+- **Multi-Calendar Support** - Organize trades across multiple trading accounts or strategies
+- **Rich Trade Notes** - Document your thought process with a powerful rich text editor
+- **Image Attachments** - Attach chart screenshots and analysis to trades
+- **Tag System** - Categorize trades with custom tags and required tag groups
 
-### Install the CLI
+### 📈 **Performance Analytics**
+- **Interactive Charts** - Visualize performance across multiple dimensions
+- **Daily/Weekly/Monthly Statistics** - Track progress over different timeframes
+- **Win Rate Analysis** - Detailed breakdown of winning vs losing trades
+- **Risk/Reward Metrics** - Analyze risk-to-reward ratios
+- **Tag Performance Analysis** - See which strategies perform best
+- **Economic Event Correlation** - Understand how market events impact your trades
 
-Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
+### 🤖 **AI-Powered Insights**
+- **AI Trading Assistant** - Chat with AI about your trading patterns
+- **Automated Analysis** - Get insights on your trading behavior
+- **Pattern Recognition** - Identify recurring patterns in wins and losses
 
-```bash
-npm i supabase --save-dev
-```
+### 📅 **Economic Calendar Integration**
+- **Real-Time Event Tracking** - Stay informed about high-impact economic events
+- **Custom Currency Filters** - Track events relevant to your trading pairs
+- **Event Notifications** - Get alerted when events are released
+- **Trade Correlation** - Link trades to specific economic events
 
-To install the beta release channel:
+### 🎯 **Advanced Features**
+- **Dynamic Risk Management** - Automatically adjust position sizes based on performance
+- **Target Setting** - Set and track daily, weekly, monthly, and yearly goals
+- **Trade Sharing** - Share trades or entire calendars with others
+- **Pinned Trades** - Bookmark important trades for quick reference
+- **Gallery Mode** - Review trades visually in a card-based gallery
+- **Export/Import** - Backup and restore your trading data
 
-```bash
-npm i supabase@beta --save-dev
-```
+## 🛠️ Technology Stack
 
-When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
+### Frontend
+- **React 19** with TypeScript
+- **Material-UI v7** for modern, responsive UI
+- **React Router v7** for navigation
+- **Recharts** for data visualization
+- **Draft.js** for rich text editing
 
-```
-NODE_OPTIONS=--no-experimental-fetch yarn add supabase
-```
+### Backend
+- **Supabase** - PostgreSQL database, authentication, and real-time subscriptions
+- **Supabase Edge Functions** - Serverless Deno-based functions for backend logic
+- **Supabase Storage** - File storage for trade images
 
-> **Note**
-For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
+### AI & Data Processing
+- **Transformers.js** - Client-side AI embeddings
+- **Economic Event Scraper** - Automated data collection from ForexFactory
 
-<details>
-  <summary><b>macOS</b></summary>
+## 🚀 Getting Started
 
-  Available via [Homebrew](https://brew.sh). To install:
+### Prerequisites
+- Node.js 16+ and npm
+- Supabase account (free tier available)
 
-  ```sh
-  brew install supabase/tap/supabase
-  ```
+### Installation
 
-  To install the beta release channel:
-  
-  ```sh
-  brew install supabase/tap/supabase-beta
-  brew link --overwrite supabase-beta
-  ```
-  
-  To upgrade:
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/tradejourno.git
+   cd tradejourno
+   ```
 
-  ```sh
-  brew upgrade supabase
-  ```
-</details>
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-<details>
-  <summary><b>Windows</b></summary>
+3. **Set up environment variables**
+   Create a `.env` file in the root directory:
+   ```env
+   REACT_APP_SUPABASE_URL=your_supabase_url
+   REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
 
-  Available via [Scoop](https://scoop.sh). To install:
+4. **Set up Supabase**
+   ```bash
+   # Install Supabase CLI
+   npm i supabase --save-dev
 
-  ```powershell
-  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
-  scoop install supabase
-  ```
+   # Link to your project
+   npx supabase link --project-ref your-project-ref
 
-  To upgrade:
+   # Run migrations
+   npx supabase db push
+   ```
 
-  ```powershell
-  scoop update supabase
-  ```
-</details>
+5. **Start the development server**
+   ```bash
+   npm start
+   ```
 
-<details>
-  <summary><b>Linux</b></summary>
+   The app will open at [http://localhost:3000](http://localhost:3000)
 
-  Available via [Homebrew](https://brew.sh) and Linux packages.
+## 📱 Usage
 
-  #### via Homebrew
+1. **Create a Calendar** - Set up your first trading calendar with account balance and risk settings
+2. **Add Trades** - Click on any day to add a trade with full details
+3. **Analyze Performance** - View statistics, charts, and AI insights
+4. **Set Goals** - Define targets and track your progress
+5. **Review Patterns** - Use tags and filters to identify successful strategies
 
-  To install:
+## 🧪 Development
 
-  ```sh
-  brew install supabase/tap/supabase
-  ```
+### Available Scripts
 
-  To upgrade:
+- `npm start` - Run development server
+- `npm run build` - Build for production
+- `npm test` - Run tests
+- `npm run deploy` - Deploy to GitHub Pages
 
-  ```sh
-  brew upgrade supabase
-  ```
-
-  #### via Linux packages
-
-  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
-
-  ```sh
-  sudo apk add --allow-untrusted <...>.apk
-  ```
-
-  ```sh
-  sudo dpkg -i <...>.deb
-  ```
-
-  ```sh
-  sudo rpm -i <...>.rpm
-  ```
-
-  ```sh
-  sudo pacman -U <...>.pkg.tar.zst
-  ```
-</details>
-
-<details>
-  <summary><b>Other Platforms</b></summary>
-
-  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
-
-  ```sh
-  go install github.com/supabase/cli@latest
-  ```
-
-  Add a symlink to the binary in `$PATH` for easier access:
-
-  ```sh
-  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
-  ```
-
-  This works on other non-standard Linux distros.
-</details>
-
-<details>
-  <summary><b>Community Maintained Packages</b></summary>
-
-  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
-  To install in your working directory:
-
-  ```bash
-  pkgx install supabase
-  ```
-
-  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
-</details>
-
-### Run the CLI
+### Database Migrations
 
 ```bash
-supabase bootstrap
+# Create a new migration
+npx supabase migration new migration_name
+
+# Apply migrations locally
+npx supabase db reset
+
+# Push to production
+npx supabase db push
 ```
 
-Or using npx:
+### Edge Functions
 
 ```bash
-npx supabase bootstrap
+# Deploy an edge function
+npx supabase functions deploy function-name
+
+# View function logs
+npx supabase functions logs function-name
 ```
 
-The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
+## 📦 Project Structure
 
-## Docs
-
-Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
-
-## Breaking changes
-
-We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
-
-However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
-
-## Developing
-
-To run from source:
-
-```sh
-# Go >= 1.22
-go run . help
 ```
+tradejourno/
+├── public/              # Static files
+├── src/
+│   ├── components/      # React components
+│   │   ├── charts/      # Chart components
+│   │   ├── trades/      # Trade-related components
+│   │   ├── common/      # Shared components
+│   │   └── aiChat/      # AI assistant components
+│   ├── pages/           # Page components
+│   ├── services/        # API and business logic
+│   ├── hooks/           # Custom React hooks
+│   ├── utils/           # Utility functions
+│   └── types/           # TypeScript type definitions
+├── supabase/
+│   ├── functions/       # Edge functions
+│   └── migrations/      # Database migrations
+└── CLAUDE.md            # AI coding guidelines
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- Economic calendar data sourced from ForexFactory
+- UI components powered by Material-UI
+- Backend infrastructure by Supabase
+
+## 📧 Support
+
+For support, please open an issue on GitHub.
+
+---
+
+**TradeJourno** - Your trading journey, intelligently tracked.

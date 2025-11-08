@@ -10,7 +10,8 @@ import {
   TableHead,
   TableRow,
   Box,
-  Tooltip
+  Tooltip,
+  TablePagination
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { InfoOutlined, TrendingUp, TrendingDown, TrendingFlat } from '@mui/icons-material';
@@ -32,11 +33,38 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
 }) => {
   const theme = useTheme();
 
+  // Pagination state
+  const [page, setPage] = React.useState(0);
+  const [rowsPerPage, setRowsPerPage] = React.useState(10);
+
   // Calculate total PnL from dailySummaryData
   const totalPnL = React.useMemo(() => {
     if (!dailySummaryData || dailySummaryData.length === 0) return 0;
     return dailySummaryData.reduce((sum, day) => sum + day.pnl, 0);
   }, [dailySummaryData]);
+
+  // Paginated data
+  const paginatedData = React.useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return dailySummaryData.slice(startIndex, endIndex);
+  }, [dailySummaryData, page, rowsPerPage]);
+
+  // Handle page change
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  // Handle rows per page change
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Reset page when data changes
+  React.useEffect(() => {
+    setPage(0);
+  }, [dailySummaryData.length]);
 
   return (
     <Paper sx={{ p: 3, borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -153,7 +181,7 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {dailySummaryData.map((row, index) => {
+            {paginatedData.map((row, index) => {
               // Ensure trade_date is a valid Date object
               const tradeDate = new Date(row.trade_date);
 
@@ -250,6 +278,21 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
           </TableBody>
         </Table>
       </TableContainer>
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25, 50]}
+        component="div"
+        count={dailySummaryData.length}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+        sx={{
+          borderTop: `1px solid ${theme.palette.divider}`,
+          '.MuiTablePagination-toolbar': {
+            minHeight: 52
+          }
+        }}
+      />
     </Paper>
   );
 };

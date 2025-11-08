@@ -31,10 +31,22 @@ import {
   ExpandMore,
   ExpandLess
 } from '@mui/icons-material';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { Calendar, CalendarWithUIState } from '../types/calendar';
 import { CalendarStats } from '../services/calendarService';
 import ShareButton from './sharing/ShareButton';
+
+/**
+ * Safely format a date value, returning a fallback string for invalid dates
+ */
+const safeFormatDate = (date: Date | undefined | null, formatStr: string, fallback: string = 'N/A'): string => {
+  if (!date || !isValid(date)) return fallback;
+  try {
+    return format(date, formatStr);
+  } catch {
+    return fallback;
+  }
+};
 
 interface CalendarCardProps {
   calendar: CalendarWithUIState;
@@ -399,7 +411,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               <CalendarIcon sx={{ fontSize: '0.8rem', color: 'primary.main' }} />
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
-              Created {format(calendar.created_at, 'MMM d, yyyy')}
+              Created {safeFormatDate(calendar.created_at, 'MMM d, yyyy')}
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
@@ -415,7 +427,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               <EditIcon sx={{ fontSize: '0.8rem', color: 'secondary.main' }} />
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
-              Updated {format(calendar.updated_at, 'MMM d, yyyy')}
+              Updated {safeFormatDate(calendar.updated_at, 'MMM d, yyyy')}
             </Typography>
           </Box>
         </Stack>
@@ -542,7 +554,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                           </Typography>
                           {stats.drawdown_start_date && stats.drawdown_end_date && (
                             <Typography variant="body2" sx={{ mt: 1 }}>
-                              Period: {format(stats.drawdown_start_date, 'MMM d')} - {format(stats.drawdown_end_date, 'MMM d')}
+                              Period: {safeFormatDate(stats.drawdown_start_date, 'MMM d')} - {safeFormatDate(stats.drawdown_end_date, 'MMM d')}
                             </Typography>
                           )}
                         </>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   IconButton,
@@ -33,13 +33,38 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
   isVisible,
   onPrevMonth,
   onNextMonth,
-  onMonthClick, 
+  onMonthClick,
 }) => {
-  const theme = useTheme(); 
+  const theme = useTheme();
   const isCurrentMonth = isToday(currentDate);
 
+  // Hide nav when the page is within the top 20% scroll
+  const [hideByTopScroll, setHideByTopScroll] = useState(false);
+  useEffect(() => {
+    const update = () => {
+      const doc = document.documentElement;
+      const scrollable = Math.max(0, doc.scrollHeight - window.innerHeight);
+      if (scrollable <= 0) {
+        // No scrollable area: treat as top to keep nav hidden per requirement
+        setHideByTopScroll(true);
+        return;
+      }
+      const progress = Math.max(0, Math.min(1, window.scrollY / scrollable));
+      setHideByTopScroll(progress <= 0.2);
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true } as any);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update as any);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
+  const finalVisible = isVisible && !hideByTopScroll;
+
   return (
-    <Slide direction="left" in={isVisible} mountOnEnter unmountOnExit>
+    <Slide direction="left" in={finalVisible} mountOnEnter unmountOnExit>
       <Box
         sx={{
           position: 'fixed',
@@ -65,8 +90,8 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
             alignItems: 'center',
             gap: 0.5,
             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            transform: isVisible ? 'translateY(0)' : 'translateY(-10px)',
-            opacity: isVisible ? 1 : 0,
+            transform: finalVisible ? 'translateY(0)' : 'translateY(-10px)',
+            opacity: finalVisible ? 1 : 0,
             '&:hover': {
               boxShadow: `0 12px 40px ${alpha(theme.palette.common.black, 0.15)}`,
               transform: 'translateY(-2px)'
@@ -101,7 +126,7 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
               cursor: 'pointer',
               px: 2,
               py: 1,
-              borderRadius: '16px', 
+              borderRadius: '16px',
               textAlign: 'center',
               transition: 'all 0.2s ease',
               position: 'relative',
@@ -123,7 +148,7 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
             >
               {format(currentDate, 'MMM')}
 
-           
+
             </Typography>
             <Typography
               variant="caption"
@@ -138,7 +163,7 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
               {format(currentDate, 'yyyy')}
             </Typography>
 
-            
+
           </Box>
 
           {/* Next Month Button */}
@@ -162,10 +187,10 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
             </IconButton>
           </Tooltip>
 
-         
+
         </Box>
 
-        
+
       </Box>
     </Slide>
   );

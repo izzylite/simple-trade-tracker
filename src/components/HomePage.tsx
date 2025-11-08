@@ -260,7 +260,7 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleTheme, mode }) => {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'custom.pageBackground' }}>
-      <AppHeader onToggleTheme={onToggleTheme} mode={mode} />
+       
       
       {/* Hero Section */}
       <Container maxWidth="lg" sx={{ pt: 12, pb: 8, position: 'relative' }}>

@@ -1,24 +1,12 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, lazy, Suspense } from 'react';
 import { format } from 'date-fns';
-import { Box, Typography, useTheme, Paper, CircularProgress, LinearProgress, Alert, Button } from '@mui/material';
+import { Box, Typography, useTheme, Paper, CircularProgress, LinearProgress, Alert, Button, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 import { Trade, Calendar } from '../types/dualWrite';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import ScoreSection from './ScoreSection';
 import RoundedTabs from './common/RoundedTabs';
 import { logger } from '../utils/logger';
-import {
-  PnLChartsWrapper,
-  WinLossDistribution,
-  WinLossStats,
-  TagPerformanceAnalysis,
-  TagDayOfWeekAnalysis,
-  DailySummaryTable,
-  SessionPerformanceAnalysis,
-  TradesListDialog,
-  RiskRewardChart,
-  EconomicEventCorrelationAnalysis
-} from './charts';
 import { getFilteredTrades } from '../utils/chartDataUtils';
 import {
   performanceCalculationService,
@@ -27,14 +15,29 @@ import {
 } from '../services/performanceCalculationService';
 import ShimmerLoader from './common/ShimmerLoader';
 import { supabase } from '../config/supabase';
+import { EconomicCalendarFilterSettings, DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from './economicCalendar/EconomicCalendarDrawer';
+
+// Lazy load chart components for better performance
+const PnLChartsWrapper = lazy(() => import('./charts/PnLChartsWrapper'));
+const WinLossDistribution = lazy(() => import('./charts/WinLossDistribution'));
+const WinLossStats = lazy(() => import('./charts/WinLossStats'));
+const TagPerformanceAnalysis = lazy(() => import('./charts/TagPerformanceAnalysis'));
+const TagDayOfWeekAnalysis = lazy(() => import('./charts/TagDayOfWeekAnalysis'));
+const DailySummaryTable = lazy(() => import('./charts/DailySummaryTable'));
+const SessionPerformanceAnalysis = lazy(() => import('./charts/SessionPerformanceAnalysis'));
+const TradesListDialog = lazy(() => import('./charts/TradesListDialog'));
+const RiskRewardChart = lazy(() => import('./charts/RiskRewardChart'));
+const EconomicEventCorrelationAnalysis = lazy(() => import('./charts/EconomicEventCorrelationAnalysis'));
 
 interface PerformanceChartsProps {
-  trades: Trade[];
-  selectedDate: Date;
+  trades?: Trade[]; // Optional - will be fetched internally if not provided
+  calendars?: Calendar[]; // Optional - if provided, will use these calendars instead of fetching
+  selectedDate?: Date;
   monthlyTarget?: number;
-  accountBalance: number;
-  maxDailyDrawdown: number;
-  calendarId: string;
+  accountBalance?: number;
+  maxDailyDrawdown?: number;
+  tabSize?: 'large' | 'small';
+  calendarIds?: string[]; // Optional - if empty, will fetch all calendars and show selector
   scoreSettings?: import('../types/score').ScoreSettings;
   onTimePeriodChange?: (period: TimePeriod) => void;
   onPrimaryTagsChange?: (tags: string[]) => void;
@@ -43,23 +46,28 @@ interface PerformanceChartsProps {
   onDeleteTrade?: (tradeId: string) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
+  economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
   // Dynamic risk settings
   dynamicRiskSettings?: DynamicRiskSettings;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
   // Calendar data for economic events filtering
   calendar?: Calendar;
+  // Show calendar selector
+  showCalendarSelector?: boolean;
 }
 
 type TimePeriod = 'month' | 'year' | 'all';
 
 const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
-  trades,
-  selectedDate,
-  monthlyTarget,
-  accountBalance,
-  maxDailyDrawdown,
-  calendarId,
-  scoreSettings,
+  trades: tradesProp,
+  calendars: calendarsProp,
+  selectedDate: selectedDateProp,
+  monthlyTarget: monthlyTargetProp,
+  accountBalance: accountBalanceProp,
+  maxDailyDrawdown: maxDailyDrawdownProp,
+  calendarIds: calendarIdsProp = [],
+  scoreSettings: scoreSettingsProp,
+  tabSize,
   onTimePeriodChange,
   onPrimaryTagsChange = () => { },
   onSecondaryTagsChange = () => { },
@@ -67,15 +75,100 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   onDeleteTrade,
   onUpdateTradeProperty,
   onUpdateCalendarProperty,
-  dynamicRiskSettings,
+  dynamicRiskSettings: dynamicRiskSettingsProp,
   onOpenGalleryMode,
-  calendar
+  economicFilter,
+  showCalendarSelector = false
 }) => {
   const theme = useTheme();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
   const [tagAnalysisTab, setTagAnalysisTab] = useState<number>(0);
+
+  // Internal state
+  const [selectedCalendarId, setSelectedCalendarId] = useState<string>('all');
   const [primaryTags, setPrimaryTags] = useState<string[]>([]);
   const [secondaryTags, setSecondaryTags] = useState<string[]>([]);
+
+  // Use props directly - no internal fetching
+  const trades = tradesProp || [];
+  const calendars = calendarsProp || [];
+
+  // Create a stable selectedDate - only create new Date() once on mount
+  const [defaultDate] = useState(() => new Date());
+  const selectedDate = useMemo(() => selectedDateProp || defaultDate, [selectedDateProp, defaultDate]);
+
+  // Create stable calendar IDs array to prevent infinite loops
+  // Only recalculate when the actual IDs change, not when the calendar objects change
+  const allCalendarIds = useMemo(() => calendars.map(c => c.id), [calendars.map(c => c.id).join(',')]);
+
+  // Determine which calendar IDs to use
+  const calendarIds = useMemo(() => {
+    if (calendarIdsProp.length > 0) {
+      return calendarIdsProp;
+    }
+    if (selectedCalendarId === 'all') {
+      return allCalendarIds;
+    }
+    return [selectedCalendarId];
+  }, [calendarIdsProp.join(','), selectedCalendarId, allCalendarIds.join(',')]);
+
+  // Get selected calendar for settings
+  const selectedCalendar = useMemo(() => {
+    if (selectedCalendarId === 'all') return null;
+    return calendars.find(c => c.id === selectedCalendarId);
+  }, [selectedCalendarId, calendars]);
+
+  // Compute aggregated values for "All Calendars" mode
+  const aggregatedValues = useMemo(() => {
+    if (selectedCalendarId !== 'all' || calendars.length === 0) return null;
+
+    return {
+      accountBalance: calendars.reduce((sum, cal) => sum + (cal.account_balance || 0), 0) / calendars.length,
+      maxDailyDrawdown: calendars.reduce((sum, cal) => sum + (cal.max_daily_drawdown || 0), 0) / calendars.length,
+      monthlyTarget: calendars.reduce((sum, cal) => sum + (cal.monthly_target || 0), 0)
+    };
+  }, [selectedCalendarId, calendars]);
+
+  // Compute final values with stable references
+  const accountBalance = useMemo(() =>
+    accountBalanceProp ?? selectedCalendar?.account_balance ?? aggregatedValues?.accountBalance ?? 0,
+    [accountBalanceProp, selectedCalendar?.account_balance, aggregatedValues?.accountBalance]
+  );
+
+  const maxDailyDrawdown = useMemo(() =>
+    maxDailyDrawdownProp ?? selectedCalendar?.max_daily_drawdown ?? aggregatedValues?.maxDailyDrawdown ?? 0,
+    [maxDailyDrawdownProp, selectedCalendar?.max_daily_drawdown, aggregatedValues?.maxDailyDrawdown]
+  );
+
+  const monthlyTarget = useMemo(() =>
+    monthlyTargetProp ?? selectedCalendar?.monthly_target ?? aggregatedValues?.monthlyTarget,
+    [monthlyTargetProp, selectedCalendar?.monthly_target, aggregatedValues?.monthlyTarget]
+  );
+
+  const scoreSettings = useMemo(() =>
+    scoreSettingsProp ?? selectedCalendar?.score_settings,
+    [scoreSettingsProp, selectedCalendar?.score_settings]
+  );
+
+  // Build dynamic risk settings from calendar fields
+  const dynamicRiskSettings = useMemo(() => {
+    if (dynamicRiskSettingsProp) return dynamicRiskSettingsProp;
+    if (!selectedCalendar) return undefined;
+
+    return {
+      account_balance: selectedCalendar.account_balance,
+      risk_per_trade: selectedCalendar.risk_per_trade,
+      dynamic_risk_enabled: selectedCalendar.dynamic_risk_enabled,
+      increased_risk_percentage: selectedCalendar.increased_risk_percentage,
+      profit_threshold_percentage: selectedCalendar.profit_threshold_percentage
+    };
+  }, [dynamicRiskSettingsProp, selectedCalendar]);
+
+  // Economic filter function
+  const economicFilterFn = economicFilter || ((calendarId: string) => {
+    const calendar = calendars.find(c => c.id === calendarId);
+    return calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS;
+  });
   const [comparisonTags, setComparisonTags] = useState<string[]>([]);
   const [multipleTradesDialog, setMultipleTradesDialog] = useState<{
     open: boolean;
@@ -95,22 +188,20 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     expandedTradeId: null
   });
 
+  // Create stable trade IDs string for dependency tracking
+  const tradeIdsString = useMemo(() => trades.map(t => t.id).join(','), [trades.map(t => t.id).join(',')]);
+
   // Keep multipleTradesDialog.trades in sync with the main trades array
+  // Only run when trades array changes (by ID), not when dialog trades change
   useEffect(() => {
     if (multipleTradesDialog.open && multipleTradesDialog.trades.length > 0) {
+      // Create a Map for O(1) lookup instead of O(n) with .find()
+      const tradesMap = new Map(trades.map(t => [t.id, t]));
+
       // Filter out deleted trades and update remaining ones
       const updatedDialogTrades = multipleTradesDialog.trades
-        .filter(dialogTrade => {
-          // Keep the trade only if it still exists in the main trades array
-          const stillExists = trades.some(t => t.id === dialogTrade.id);
-          return stillExists;
-        })
-        .map(dialogTrade => {
-          // Find the corresponding trade in the main trades array
-          const updatedTrade = trades.find(t => t.id === dialogTrade.id);
-          // Return the updated trade if found, otherwise return the original dialog trade
-          return updatedTrade || dialogTrade;
-        });
+        .filter(dialogTrade => tradesMap.has(dialogTrade.id))
+        .map(dialogTrade => tradesMap.get(dialogTrade.id)!);
 
       // If all trades were deleted, close the dialog
       if (updatedDialogTrades.length === 0) {
@@ -121,15 +212,18 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         return;
       }
 
-      // Only update if there are actual changes
-      if (JSON.stringify(updatedDialogTrades) !== JSON.stringify(multipleTradesDialog.trades)) {
+      // Only update if the number of trades changed or IDs changed
+      const dialogTradeIds = multipleTradesDialog.trades.map(t => t.id).join(',');
+      const updatedTradeIds = updatedDialogTrades.map(t => t.id).join(',');
+
+      if (dialogTradeIds !== updatedTradeIds) {
         setMultipleTradesDialog(prev => ({
           ...prev,
           trades: updatedDialogTrades
         }));
       }
     }
-  }, [trades, multipleTradesDialog.open, multipleTradesDialog.trades]);
+  }, [tradeIdsString, multipleTradesDialog.open]);
 
 
 
@@ -139,34 +233,59 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
   // Performance calculation states
   const [performanceData, setPerformanceData] = useState<PerformanceCalculationResult | null>(null);
-  const [isCalculatingPerformance, setIsCalculatingPerformance] = useState(false);
-  const [calculationProgress, setCalculationProgress] = useState<CalculationProgress | null>(null);
+  const [isCalculatingPerformance, setIsCalculatingPerformance] = useState(false); 
   const [calculationError, setCalculationError] = useState<string | null>(null);
 
 
   // Calculate chart data using PostgreSQL RPC function
   useEffect(() => {
+    // Don't calculate if no calendars are selected
+    if (calendarIds.length === 0) {
+      setChartData([]);
+      setIsCalculatingChartData(false);
+      return;
+    }
+
     const calculateChartDataAsync = async () => {
       setIsCalculatingChartData(true);
       try {
-        const { data, error } = await supabase.rpc('calculate_chart_data', {
-          p_calendar_id: calendarId,
-          p_time_period: timePeriod,
-          p_selected_date: selectedDate.toISOString()
-        });
+        // Call appropriate RPC function based on number of calendars
+        const { data, error } = calendarIds.length === 1
+          ? await supabase.rpc('calculate_chart_data', {
+            p_calendar_id: calendarIds[0],
+            p_time_period: timePeriod,
+            p_selected_date: selectedDate.toISOString()
+          })
+          : await supabase.rpc('calculate_chart_data_multi', {
+            p_calendar_ids: calendarIds,
+            p_time_period: timePeriod,
+            p_selected_date: selectedDate.toISOString()
+          });
 
         if (error) {
           logger.error('Error calling calculate_chart_data RPC:', error);
           throw error;
         }
 
+        // Pre-process trades by date for O(1) lookup instead of O(n) filtering
+        const tradesByDate = new Map<string, Trade[]>();
+        trades.forEach(trade => {
+          const dateKey = new Date(trade.trade_date).toDateString();
+          if (!tradesByDate.has(dateKey)) {
+            tradesByDate.set(dateKey, []);
+          }
+          tradesByDate.get(dateKey)!.push(trade);
+        });
+
         // Transform RPC data to match chart component expectations
         const transformedData = (data || []).map((item: any, index: number, array: any[]) => {
           const prevCumulativePnl = index > 0 ? array[index - 1].cumulativePnl : 0;
           const dailyChange = item.cumulativePnl - prevCumulativePnl;
+          const itemDate = new Date(item.date);
+          const dateKey = itemDate.toDateString();
 
           return {
-            date: format(new Date(item.date), timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
+            date: format(itemDate, timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
             pnl: item.pnl,
             cumulativePnL: item.cumulativePnl, // Match camelCase expected by chart
             isIncreasing: item.cumulativePnl > prevCumulativePnl,
@@ -175,15 +294,11 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             isWin: item.pnl > 0,
             isLoss: item.pnl < 0,
             isBreakEven: item.pnl === 0,
-            trades: trades.filter(trade => {
-              const tradeDate = new Date(trade.trade_date);
-              const itemDate = new Date(item.date);
-              return tradeDate.toDateString() === itemDate.toDateString();
-            }),
-            fullDate: new Date(item.date)
+            trades: tradesByDate.get(dateKey) || [],
+            fullDate: itemDate
           };
         });
-      
+
 
         setChartData(transformedData);
       } catch (error) {
@@ -195,22 +310,27 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     };
 
     calculateChartDataAsync();
-  }, [calendarId, selectedDate, timePeriod]);
+  }, [calendarIds, selectedDate, timePeriod, trades]);
 
   // Calculate performance metrics asynchronously using RPC function
   useEffect(() => {
+    // Don't calculate if no calendars are selected
+    if (calendarIds.length === 0) {
+      setPerformanceData(null);
+      setIsCalculatingPerformance(false);
+      return;
+    }
+
     const calculatePerformanceAsync = async () => {
       setIsCalculatingPerformance(true);
-      setCalculationProgress(null);
       setCalculationError(null);
       try {
         const data = await performanceCalculationService.calculatePerformanceMetrics(
-          calendarId,
+          calendarIds,
           selectedDate,
           timePeriod,
           accountBalance,
-          comparisonTags,
-          setCalculationProgress
+          comparisonTags
         );
         setPerformanceData(data);
       } catch (error) {
@@ -219,12 +339,12 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         setPerformanceData(null);
       } finally {
         setIsCalculatingPerformance(false);
-        setCalculationProgress(null);
       }
     };
 
+
     calculatePerformanceAsync();
-  }, [calendarId, selectedDate, timePeriod, accountBalance, comparisonTags]);
+  }, [calendarIds, selectedDate, timePeriod, accountBalance, comparisonTags]);
 
   const handleTimePeriodChange = (newValue: TimePeriod) => {
     setTimePeriod(newValue);
@@ -374,7 +494,31 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   };
 
   return (
-    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+    <Box sx={{ p: { xs: 1, sm: 2 }, minHeight: 500 }}>
+      {/* Calendar Selector - Only shown in standalone mode */}
+      {showCalendarSelector && calendars.length > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <FormControl fullWidth>
+            <InputLabel id="calendar-select-label">Calendar</InputLabel>
+            <Select
+              labelId="calendar-select-label"
+              value={selectedCalendarId}
+              label="Calendar"
+              onChange={(e) => setSelectedCalendarId(e.target.value)}
+            >
+              <MenuItem value="all">All Calendars</MenuItem>
+              {calendars.map((calendar) => (
+                <MenuItem key={calendar.id} value={calendar.id}>
+                  {calendar.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+      )}
+
+
+
       {/* Image Zoom Dialog */}
       {zoomedImages && (
         <ImageZoomDialog
@@ -384,26 +528,30 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         />
       )}
 
-      {/* Trades Dialog */}
-      <TradesListDialog
-        open={multipleTradesDialog.open}
-        trades={multipleTradesDialog.trades}
-        title={multipleTradesDialog.title}
-        date={multipleTradesDialog.date}
-        expandedTradeId={multipleTradesDialog.expandedTradeId}
-        showChartInfo={multipleTradesDialog.showChartInfo || true}
-        onUpdateTradeProperty={onUpdateTradeProperty}
-        onClose={() => setMultipleTradesDialog(prev => ({ ...prev, open: false }))}
-        onTradeExpand={handleTradeExpand}
-        onZoomImage={handleZoomImage}
-        account_balance={accountBalance}
-        allTrades={trades}
-        onEditClick={onEditTrade}
-        onDeleteClick={onDeleteTrade}
-        onOpenGalleryMode={onOpenGalleryMode}
-        calendarId={calendarId}
-        calendar={calendar ? { economic_calendar_filters: calendar.economic_calendar_filters } : undefined}
-      />
+      {/* Trades Dialog - Only render when open */}
+      {multipleTradesDialog.open && (
+        <Suspense fallback={null}>
+          <TradesListDialog
+            open={multipleTradesDialog.open}
+            trades={multipleTradesDialog.trades}
+            title={multipleTradesDialog.title}
+            date={multipleTradesDialog.date}
+            expandedTradeId={multipleTradesDialog.expandedTradeId}
+            showChartInfo={multipleTradesDialog.showChartInfo || true}
+            onUpdateTradeProperty={onUpdateTradeProperty}
+            onClose={() => setMultipleTradesDialog(prev => ({ ...prev, open: false }))}
+            onTradeExpand={handleTradeExpand}
+            onZoomImage={handleZoomImage}
+            account_balance={accountBalance}
+            allTrades={trades}
+            onEditClick={onEditTrade}
+            onDeleteClick={onDeleteTrade}
+            onOpenGalleryMode={onOpenGalleryMode}
+            calendarId={calendarIds[0] || ''}
+            economicFilter={economicFilterFn}
+          />
+        </Suspense>
+      )}
 
       {/* Header Section - Stack on mobile */}
       <Box sx={{
@@ -432,7 +580,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
           tabs={timePeriodTabs}
           activeTab={getTimePeriodTabIndex(timePeriod)}
           onTabChange={handleTimePeriodTabChange}
-          size="small"
+          size={tabSize || 'small'}
           sx={{
             alignSelf: { xs: 'center', sm: 'auto' }
           }}
@@ -440,32 +588,11 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       </Box>
 
       {/* Loading State */}
-      {(isCalculatingPerformance || isCalculatingChartData) && (
-        <>
-          <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-              <CircularProgress size={40} />
-              <Typography variant="h6" color="text.secondary">
-                {isCalculatingChartData ? 'Calculating chart data...' : 'Calculating performance metrics...'}
-              </Typography>
-              {calculationProgress && (
-                <Box sx={{ width: '100%', maxWidth: 400 }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    {calculationProgress.step} ({calculationProgress.progress}/{calculationProgress.total})
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={(calculationProgress.progress / calculationProgress.total) * 100}
-                  />
-                </Box>
-              )}
-            </Box>
-          </Paper>
-
-          {/* Shimmer loaders for different sections */}
-         
+      {(isCalculatingChartData) && (
+        <> 
+          {/* Shimmer loaders for different sections */} 
           <ShimmerLoader variant="chart" height={400} />
-           
+
         </>
       )}
 
@@ -498,24 +625,30 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       {!isCalculatingPerformance && !isCalculatingChartData && (chartData.some(data => data.pnl !== 0) || winLossData.some(data => data.value > 0)) ? (
         <>
           {/* Risk to Reward Statistics Card */}
-          <RiskRewardChart riskRewardStats={riskRewardStats} />
+          <Suspense fallback={<ShimmerLoader variant="chart" height={200} />}>
+            <RiskRewardChart riskRewardStats={riskRewardStats} />
+          </Suspense>
 
           {/* Winners and Losers Statistics */}
-          <WinLossStats
-            winLossStats={winLossStats}
-            trades={filteredTrades}
-            onTradeClick={handleTradeExpand}
-          />
+          <Suspense fallback={<ShimmerLoader variant="chart" height={200} />}>
+            <WinLossStats
+              winLossStats={winLossStats}
+              trades={filteredTrades}
+              onTradeClick={handleTradeExpand}
+            />
+          </Suspense>
 
           {/* P&L Charts with Tabs */}
-          <PnLChartsWrapper
-            chartData={chartData}
-            targetValue={targetValue}
-            monthly_target={monthlyTarget}
-            drawdownViolationValue={drawdownViolationValue}
-            setMultipleTradesDialog={setMultipleTradesDialog}
-            timePeriod={timePeriod}
-          />
+          <Suspense fallback={<ShimmerLoader variant="chart" height={400} />}>
+            <PnLChartsWrapper
+              chartData={chartData}
+              targetValue={targetValue}
+              monthly_target={monthlyTarget}
+              drawdownViolationValue={drawdownViolationValue}
+              setMultipleTradesDialog={setMultipleTradesDialog}
+              timePeriod={timePeriod}
+            />
+          </Suspense>
 
           {/* Win/Loss Distribution and Daily Summary - Stack on mobile */}
           <Box sx={{
@@ -531,15 +664,17 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               height: { xs: '400px', md: '100%' }
             }}>
               {/* Win/Loss Distribution */}
-              <WinLossDistribution
-                winLossData={winLossData}
-                comparisonWinLossData={comparisonWinLossData}
-                allTags={allTags}
-                comparisonTags={comparisonTags}
-                setComparisonTags={setComparisonTags}
-                onPieClick={handlePieClick}
-                tagStats={tagStats}
-              />
+              <Suspense fallback={<ShimmerLoader variant="chart" height={400} />}>
+                <WinLossDistribution
+                  winLossData={winLossData}
+                  comparisonWinLossData={comparisonWinLossData}
+                  allTags={allTags}
+                  comparisonTags={comparisonTags}
+                  setComparisonTags={setComparisonTags}
+                  onPieClick={handlePieClick}
+                  tagStats={tagStats}
+                />
+              </Suspense>
             </Box>
             <Box sx={{
               flex: 1,
@@ -547,11 +682,13 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               height: { xs: '400px', md: '100%' }
             }}>
               {/* Daily Summary Table */}
-              <DailySummaryTable
-                dailySummaryData={dailySummaryData}
-                trades={trades}
-                setMultipleTradesDialog={setMultipleTradesDialog}
-              />
+              <Suspense fallback={<ShimmerLoader variant="chart" height={400} />}>
+                <DailySummaryTable
+                  dailySummaryData={dailySummaryData}
+                  trades={trades}
+                  setMultipleTradesDialog={setMultipleTradesDialog}
+                />
+              </Suspense>
             </Box>
           </Box>
 
@@ -574,68 +711,72 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               />
             </Box>
 
-            {/* Tab Panel 1: Tag Performance Analysis */}
-            <Box sx={{ display: tagAnalysisTab === 0 ? 'block' : 'none' }}>
-              <TagPerformanceAnalysis
-                calendarId={calendarId}
-                trades={trades}
-                selectedDate={selectedDate}
-                timePeriod={timePeriod}
-                allTags={allTags}
-                primaryTags={primaryTags}
-                secondaryTags={secondaryTags}
-                setPrimaryTags={(tags) => {
-                  setPrimaryTags(tags);
-                  onPrimaryTagsChange(tags);
-                }}
-                setSecondaryTags={(tags) => {
-                  setSecondaryTags(tags);
-                  onSecondaryTagsChange(tags);
-                }}
-                setMultipleTradesDialog={setMultipleTradesDialog}
-              />
-            </Box>
+            {/* Tab Panel 1: Tag Performance Analysis - Only render when active */}
+            {tagAnalysisTab === 0 && (
+              <Suspense fallback={<ShimmerLoader variant="chart" height={300} />}>
+                <TagPerformanceAnalysis
+                  calendarIds={calendarIds}
+                  trades={trades}
+                  selectedDate={selectedDate}
+                  timePeriod={timePeriod}
+                  allTags={allTags}
+                  primaryTags={primaryTags}
+                  secondaryTags={secondaryTags}
+                  setPrimaryTags={(tags) => {
+                    setPrimaryTags(tags);
+                    onPrimaryTagsChange(tags);
+                  }}
+                  setSecondaryTags={(tags) => {
+                    setSecondaryTags(tags);
+                    onSecondaryTagsChange(tags);
+                  }}
+                  setMultipleTradesDialog={setMultipleTradesDialog}
+                />
+              </Suspense>
+            )}
 
-            {/* Tab Panel 2: Tag Performance by Day of Week Analysis */}
-            <Box sx={{ display: tagAnalysisTab === 1 ? 'block' : 'none' }}>
-              <TagDayOfWeekAnalysis
-                calendarId={calendarId}
-                trades={trades}
-                selectedDate={selectedDate}
-                timePeriod={timePeriod}
-                allTags={allTags}
-                primaryTags={primaryTags}
-                secondaryTags={secondaryTags}
-                setPrimaryTags={(tags) => {
-                  setPrimaryTags(tags);
-                  onPrimaryTagsChange(tags);
-                }}
-                setSecondaryTags={(tags) => {
-                  setSecondaryTags(tags);
-                  onSecondaryTagsChange(tags);
-                }}
-                setMultipleTradesDialog={setMultipleTradesDialog}
-              />
-            </Box>
+            {/* Tab Panel 2: Tag Performance by Day of Week Analysis - Only render when active */}
+            {tagAnalysisTab === 1 && (
+              <Suspense fallback={<ShimmerLoader variant="chart" height={300} />}>
+                <TagDayOfWeekAnalysis
+                  calendarIds={calendarIds}
+                  trades={trades}
+                  selectedDate={selectedDate}
+                  timePeriod={timePeriod}
+                  allTags={allTags}
+                  primaryTags={primaryTags}
+                  secondaryTags={secondaryTags}
+                  setPrimaryTags={(tags) => {
+                    setPrimaryTags(tags);
+                    onPrimaryTagsChange(tags);
+                  }}
+                  setSecondaryTags={(tags) => {
+                    setSecondaryTags(tags);
+                    onSecondaryTagsChange(tags);
+                  }}
+                  setMultipleTradesDialog={setMultipleTradesDialog}
+                />
+              </Suspense>
+            )}
           </Paper>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* Session Performance Analysis */}
-            <SessionPerformanceAnalysis
-              sessionStats={sessionStats}
-              trades={trades}
-              selectedDate={selectedDate}
-              timePeriod={timePeriod}
-              setMultipleTradesDialog={setMultipleTradesDialog}
-            />
-
-
+            <Suspense fallback={<ShimmerLoader variant="chart" height={300} />}>
+              <SessionPerformanceAnalysis
+                sessionStats={sessionStats}
+                trades={trades}
+                selectedDate={selectedDate}
+                timePeriod={timePeriod}
+                setMultipleTradesDialog={setMultipleTradesDialog}
+              />
+            </Suspense>
 
             {/* Trading Score Section */}
             <ScoreSection
               trades={trades}
               selectedDate={selectedDate}
-              calendarId={calendarId}
+              calendarId={calendarIds[0] || ''}
               scoreSettings={scoreSettings}
               onUpdateCalendarProperty={onUpdateCalendarProperty}
               accountBalance={accountBalance}
@@ -643,14 +784,15 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             />
 
             {/* Economic Event Correlation Analysis */}
-            <EconomicEventCorrelationAnalysis
-              calendarId={calendarId}
-              trades={filteredTrades}
-              calendar={calendar!}
-              timePeriod={timePeriod}
-              selectedDate={selectedDate}
-              setMultipleTradesDialog={setMultipleTradesDialog}
-            />
+            <Suspense fallback={<ShimmerLoader variant="chart" height={300} />}>
+              <EconomicEventCorrelationAnalysis
+                calendarIds={calendarIds}
+                trades={filteredTrades}
+                timePeriod={timePeriod}
+                selectedDate={selectedDate}
+                setMultipleTradesDialog={setMultipleTradesDialog}
+              />
+            </Suspense>
           </Box>
         </>
       ) : !isCalculatingPerformance && !isCalculatingChartData ? (
