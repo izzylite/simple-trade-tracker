@@ -1,1 +1,0 @@
-git add .;git commit -m "economic event completed";git push;npm run build;firebase deploy --only hosting
