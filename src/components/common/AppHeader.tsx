@@ -31,20 +31,12 @@ import DebugPanel from './DebugPanel';
 interface AppHeaderProps {
   onToggleTheme: () => void;
   mode: 'light' | 'dark';
-  title?: string;
-  showBackButton?: boolean;
-  backButtonPath?: string;
-  onBackClick?: () => void;
   onMenuClick?: () => void;
 }
 
 const AppHeader: React.FC<AppHeaderProps> = ({
   onToggleTheme,
   mode,
-  title = 'Cotex',
-  showBackButton = false,
-  backButtonPath = '/',
-  onBackClick,
   onMenuClick
 }) => {
   const theme = useTheme();
@@ -90,14 +82,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     }
   };
 
-  const handleBackButtonClick = () => {
-    if (onBackClick) {
-      onBackClick();
-    } else {
-      navigate(backButtonPath);
-    }
-  };
-
   return (
     <>
     <AppBar
@@ -117,18 +101,19 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         <Box sx={{
           display: 'flex',
           alignItems: 'center',
-          gap: { xs: 1, sm: 2 }, // Smaller gap on mobile
+          gap: 1,
           flexGrow: 1,
           minWidth: 0 // Allow text truncation
         }}>
           {/* Hamburger Menu Icon */}
-          {onMenuClick && !showBackButton && (
+          {onMenuClick && (
             <IconButton
               onClick={onMenuClick}
               size="small"
               edge="start"
               sx={{
                 color: 'text.secondary',
+                mr: 1,
                 '&:hover': {
                   color: 'primary.main',
                   bgcolor: alpha(theme.palette.primary.main, 0.08)
@@ -138,59 +123,51 @@ const AppHeader: React.FC<AppHeaderProps> = ({
               <MenuIcon />
             </IconButton>
           )}
-          {showBackButton && (
-            <IconButton
-              onClick={handleBackButtonClick}
-              size="small"
-              sx={{
-                color: 'text.secondary',
-                '&:hover': {
-                  color: 'primary.main',
-                  bgcolor: alpha(theme.palette.primary.main, 0.08)
-                }
-              }}
-            >
-              <ArrowBackIcon />
-            </IconButton>
-          )}
-          <IconButton
-            onClick={() => navigate('/')}
-            size="small"
+          <Box
             sx={{
-              p: 0.5,
-              '&:hover': {
-                bgcolor: alpha(theme.palette.primary.main, 0.08)
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+              cursor: 'pointer',
+              '&:hover .logo-img': {
+                transform: 'scale(1.05)'
+              },
+              '&:hover .logo-text': {
+                filter: 'brightness(1.1)'
               }
             }}
+            onClick={() => navigate('/')}
           >
             <Box
               component="img"
               src="/android-chrome-192x192.png"
-              alt="Cotex Logo"
+              alt="TradeJourno Logo"
+              className="logo-img"
               sx={{
                 width: 32,
                 height: 32,
-                borderRadius: 1
+                ml: 2,
+                borderRadius: 1,
+                transition: 'transform 0.2s'
               }}
             />
-          </IconButton>
-          {showBackButton && (
             <Typography
-              variant="h5"
+              variant="h6"
               component="h1"
+              className="logo-text"
               sx={{
-                flexGrow: 1,
-                fontSize: { xs: '1.1rem', sm: '1.5rem' },
-                fontWeight: 600,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                minWidth: 0
+                fontSize: { xs: '1.1rem', sm: '1.25rem' },
+                fontWeight: 700,
+                background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                transition: 'all 0.2s'
               }}
             >
-              {title}
+              TradeJourno
             </Typography>
-          )}
+          </Box>
           <Box sx={{ flexGrow: 1 }} />
         </Box>
         

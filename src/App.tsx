@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Trade, Calendar } from './types/dualWrite';
 import { CalendarWithUIState } from './types/calendar';
 import { AuthProvider, useAuth } from './contexts/SupabaseAuthContext';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
 import TradeLoadingIndicator from './components/TradeLoadingIndicator';
@@ -25,16 +26,18 @@ import {
 } from './utils/dynamicRiskUtils';
 
 import SideNavigation from './components/common/SideNavigation';
+import AppHeader from './components/common/AppHeader';
 
-// Lazy load components
-const Home = lazy(() => import('./components/Home'));
-const CalendarHome = lazy(() => import('./components/CalendarHome'));
-const TradeCalendar = lazy(() => import('./components/TradeCalendar'));
-const SharedTradePage = lazy(() => import('./components/sharing/SharedTradePage'));
-const SharedCalendarPage = lazy(() => import('./components/sharing/SharedCalendarPage'));
-const AuthCallback = lazy(() => import('./components/auth/AuthCallback'));
-const ChatPage = lazy(() => import('./components/ChatPage'));
-const PerformancePage = lazy(() => import('./components/PerformancePage'));
+// Lazy load page components from pages directory
+const Home = lazy(() => import('./pages/HomePage'));
+const CalendarHome = lazy(() => import('./pages/CalendarHomePage').then(module => ({ default: module.CalendarHome })));
+const TradeCalendar = lazy(() => import('./pages/TradeCalendarPage').then(module => ({ default: module.TradeCalendar })));
+const SharedTradePage = lazy(() => import('./pages/SharedTradePage'));
+const SharedCalendarPage = lazy(() => import('./pages/SharedCalendarPage'));
+const AuthCallback = lazy(() => import('./pages/AuthCallbackPage'));
+const NotesPage = lazy(() => import('./pages/NotesPage'));
+const NoteEditorPage = lazy(() => import('./pages/NoteEditorPage'));
+const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 // const SupabaseAuthTest = lazy(() => import('./components/auth/SupabaseAuthTest')); // Commented out - for testing only
 
 
@@ -199,15 +202,9 @@ function AppContent() {
     };
 
     try {
-      const calendarId = await calendarService.createCalendar(user.uid, newCalendar);
-      const newCalendarWithUIState: CalendarWithUIState = {
-        ...newCalendar,
-        id: calendarId,
-        user_id: user.uid,
-        cachedTrades: [],
-        loadedYears: []
-      };
-      setCalendars(prev => [...prev, newCalendarWithUIState]);
+      await calendarService.createCalendar(user.uid, newCalendar);
+      // Refresh calendars from database to get properly sorted list (by updated_at desc)
+      await refreshCalendars();
     } catch (error) {
       console.error('Error creating calendar:', error);
     }
@@ -217,21 +214,9 @@ function AppContent() {
     if (!user) return;
 
     try {
-      const newCalendar = await calendarService.duplicateCalendar(user.uid, sourceCalendarId, newName, includeContent);
-
-      // Get the source calendar to copy its properties
-      const sourceCalendar = calendars.find(cal => cal.id === sourceCalendarId);
-      if (sourceCalendar) {
-        const duplicatedCalendar: CalendarWithUIState = {
-          ...sourceCalendar,
-          ...newCalendar,
-          // Reset trades
-          cachedTrades: [],
-          loadedYears: []
-        };
-
-        setCalendars(prev => [...prev, duplicatedCalendar]);
-      }
+      await calendarService.duplicateCalendar(user.uid, sourceCalendarId, newName, includeContent);
+      // Refresh calendars from database to get properly sorted list (by updated_at desc)
+      await refreshCalendars();
     } catch (error) {
       console.error('Error duplicating calendar:', error);
     }
@@ -273,11 +258,17 @@ function AppContent() {
   }
 
   const updateCalendarState = (id: string, updates: Partial<CalendarWithUIState>) => {
-    setCalendars(prev => prev.map(cal =>
-      cal.id === id
-        ? { ...cal, ...updates, updated_at: new Date() }
-        : cal
-    ));
+    setCalendars(prev => {
+      const updated = prev.map(cal =>
+        cal.id === id
+          ? { ...cal, ...updates, updated_at: new Date() }
+          : cal
+      );
+      // Re-sort by updated_at descending to match database order
+      return updated.sort((a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      );
+    });
   };
 
   const toggleColorMode = () => {
@@ -611,6 +602,13 @@ function AppContent() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+        {/* App Header */}
+        <AppHeader
+          onToggleTheme={toggleColorMode}
+          mode={mode}
+          onMenuClick={() => setDrawerOpen(true)}
+        />
+
         {/* Side Navigation */}
         <SideNavigation
           open={drawerOpen}
@@ -627,8 +625,7 @@ function AppContent() {
             bgcolor: 'custom.pageBackground',
             position: 'relative',
             pb: 4,
-            ml: `${drawerWidth}px`,
-            width: `calc(100% - ${drawerWidth}px)`,
+            pt: 8, // Add top padding to account for fixed AppBar
             transition: theme.transitions.create(['margin', 'width'], {
               duration: theme.transitions.duration.shorter,
             })
@@ -665,40 +662,50 @@ function AppContent() {
           <Route
             path="/calendars"
             element={
-              <CalendarHome
-                calendars={calendars}
-                onCreateCalendar={handleCreateCalendar}
-                onDuplicateCalendar={handleDuplicateCalendar}
-                onDeleteCalendar={handleDeleteCalendar}
-                onUpdateCalendar={handleUpdateCalendar}
-                onToggleTheme={toggleColorMode}
-                mode={mode}
-                isLoading={isLoadingCalendars}
-                loadAllTrades={loadAllTrades}
-                onMenuClick={() => setDrawerOpen(true)}
-              />
+              <ProtectedRoute
+                title="Access Your Calendars"
+                subtitle="Sign in to view and manage your trading calendars"
+              >
+                <CalendarHome
+                  calendars={calendars}
+                  onCreateCalendar={handleCreateCalendar}
+                  onDuplicateCalendar={handleDuplicateCalendar}
+                  onDeleteCalendar={handleDeleteCalendar}
+                  onUpdateCalendar={handleUpdateCalendar}
+                  onToggleTheme={toggleColorMode}
+                  mode={mode}
+                  isLoading={isLoadingCalendars}
+                  loadAllTrades={loadAllTrades}
+                  onMenuClick={() => setDrawerOpen(true)}
+                />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/calendar/:calendarId"
             element={
-              <CalendarRoute
-                calendars={calendars}
-                onUpdateStateCalendar={updateCalendarState}
-                onToggleTheme={toggleColorMode}
-                mode={mode}
-                loadAllTrades={loadAllTrades}
-                setIsImportingTrades={setIsImportingTrades}
-                setLoadingCalendarName={setLoadingCalendarName}
-                setLoadingAction={setLoadingAction}
-                onToggleDynamicRisk={handleToggleDynamicRisk}
-                isLoadingTrades={isLoadingTrades}
-                setLoadingTrades={(loading)=> setLoading(loading)}
-                onAddTrade={handleAddTrade}
-                onUpdateTradeProperty={handleUpdateTradeProperty}
-                onDeleteTrades={handleDeleteTrades}
-                onTagUpdated={onTagUpdated}
-              />
+              <ProtectedRoute
+                title="Access Your Trading Calendar"
+                subtitle="Sign in to view and manage your trades"
+              >
+                <CalendarRoute
+                  calendars={calendars}
+                  onUpdateStateCalendar={updateCalendarState}
+                  onToggleTheme={toggleColorMode}
+                  mode={mode}
+                  loadAllTrades={loadAllTrades}
+                  setIsImportingTrades={setIsImportingTrades}
+                  setLoadingCalendarName={setLoadingCalendarName}
+                  setLoadingAction={setLoadingAction}
+                  onToggleDynamicRisk={handleToggleDynamicRisk}
+                  isLoadingTrades={isLoadingTrades}
+                  setLoadingTrades={(loading)=> setLoading(loading)}
+                  onAddTrade={handleAddTrade}
+                  onUpdateTradeProperty={handleUpdateTradeProperty}
+                  onDeleteTrades={handleDeleteTrades}
+                  onTagUpdated={onTagUpdated}
+                />
+              </ProtectedRoute>
             }
           />
           <Route
@@ -714,37 +721,47 @@ function AppContent() {
             element={<AuthCallback />}
           />
           <Route
-            path="/chat"
+            path="/notes"
             element={
-              <ChatPage
-                onToggleTheme={toggleColorMode}
-                mode={mode}
-                onMenuClick={() => setDrawerOpen(true)}
-              />
+              <ProtectedRoute
+                title="Access Trading Notes"
+                subtitle="Sign in to create and manage your trading notes"
+              >
+                <NotesPage
+                  onToggleTheme={toggleColorMode}
+                  mode={mode}
+                  onMenuClick={() => setDrawerOpen(true)}
+                />
+              </ProtectedRoute>
             }
           />
           <Route
-            path="/performance"
+            path="/notes/:noteId"
             element={
-              <PerformancePage
-                calendars={calendars}
-                onToggleTheme={toggleColorMode}
-                mode={mode}
-                onMenuClick={() => setDrawerOpen(true)}
-              />
+              <ProtectedRoute
+                title="Edit Note"
+                subtitle="Sign in to edit your note"
+              >
+                <NoteEditorPage
+                  onToggleTheme={toggleColorMode}
+                  mode={mode}
+                />
+              </ProtectedRoute>
             }
           />
           <Route
             path="/community"
             element={
-              <Box sx={{ p: 4, textAlign: 'center' }}>
-                <Typography variant="h4" gutterBottom>
-                  Community
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                  Coming Soon
-                </Typography>
-              </Box>
+              <ProtectedRoute
+                title="Join the Trading Community"
+                subtitle="Sign in to connect with other traders and share insights"
+              >
+                <CommunityPage
+                  onToggleTheme={toggleColorMode}
+                  mode={mode}
+                  onMenuClick={() => setDrawerOpen(true)}
+                />
+              </ProtectedRoute>
             }
           />
           {/* Commented out - for testing only */}
@@ -813,6 +830,11 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
 }) => {
   const { calendarId } = useParams<{ calendarId: string }>();
   const calendar = calendars.find((c: Calendar) => c.id === calendarId);
+
+  // Scroll to top whenever navigating to a calendar page
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [calendarId]);
 
   // Track whether we've attempted to load trades for this calendar
   const [loadAttempted, setLoadAttempted] = useState<{ [key: string]: boolean }>({});
