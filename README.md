@@ -145,6 +145,40 @@ npx supabase functions deploy function-name
 npx supabase functions logs function-name
 ```
 
+
+## 🌐 Deployment (Vercel + Namecheap + Supabase Auth)
+
+The app is configured for Vercel hosting with SPA routing via `vercel.json` (all routes rewrite to `/index.html`).
+
+1) Vercel project setup
+- Import this repository into Vercel (New Project)
+- Framework preset: Create React App
+- Build command: `npm run build`
+- Output directory: `build`
+- Environment variables (set for Production and Preview):
+  - `REACT_APP_SUPABASE_URL` = https://YOUR-PROJECT.supabase.co
+  - `REACT_APP_SUPABASE_ANON_KEY` = YOUR_ANON_KEY
+
+2) Domain and DNS (Namecheap)
+- In Vercel → Project → Settings → Domains:
+  - Add `tradejourno.com` and `www.tradejourno.com`
+  - Set `tradejourno.com` as Primary domain
+- In Namecheap → Advanced DNS for `tradejourno.com`:
+  - A record: Host `@` → `76.76.21.21`
+  - CNAME: Host `www` → `cname.vercel-dns.com`
+
+3) Supabase Auth URLs
+- Supabase Dashboard → Authentication → URL Configuration:
+  - Site URL: `https://tradejourno.com`
+  - Additional Redirect URLs:
+    - `https://tradejourno.com/auth/callback`
+    - `https://YOUR-PROJECT.vercel.app/auth/callback` (add after first Vercel deploy for previews)
+
+4) Post-deploy verification
+- Deep links render (e.g., `/calendar/:id`, `/auth/callback`)
+- Google sign-in returns to `/auth/callback` on your domain and completes
+- If any edge function builds absolute URLs, set `APP_BASE_URL` to `https://tradejourno.com` in its environment
+
 ## 📦 Project Structure
 
 ```
