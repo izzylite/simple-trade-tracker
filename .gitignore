@@ -55,4 +55,12 @@ GEMINI.md
 
 # Task files
 # tasks.json
-# tasks/ 
+# tasks/
+
+
+# Local tool artifacts
+/.augment/
+/.claude/
+/.playwright-mcp/
+# Windows reserved filename artifact
+nul
