@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  LinearProgress, 
-  Typography, 
-  useTheme, 
-  alpha, 
+import {
+  Box,
+  LinearProgress,
+  Typography,
+  useTheme,
+  alpha,
   Paper,
   keyframes
 } from '@mui/material';
-import { CalendarToday } from '@mui/icons-material';
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(10px); }
@@ -92,36 +91,31 @@ const AppLoadingProgress: React.FC = () => {
           }}
         >
           <Box
+            component="img"
+            src="/android-chrome-192x192.png"
+            alt="TradeJourno Logo"
             sx={{
               width: 70,
               height: 70,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: alpha(theme.palette.primary.main, 0.1),
-              boxShadow: `0 0 20px ${alpha(theme.palette.primary.main, 0.2)}`,
+              borderRadius: 2,
+              boxShadow: `0 0 20px ${alpha(theme.palette.primary.main, 0.3)}`,
             }}
-          >
-            <CalendarToday
-              sx={{
-                fontSize: '2rem',
-                color: theme.palette.primary.main,
-              }}
-            />
-          </Box>
+          />
         </Box>
 
         <Typography
           variant="h6"
           sx={{
             mb: 1,
-            fontWeight: 600,
+            fontWeight: 700,
             textAlign: 'center',
-            color: theme.palette.text.primary,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
           }}
         >
-          Cotex
+          TradeJourno
         </Typography>
 
         <Typography
