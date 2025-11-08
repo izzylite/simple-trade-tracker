@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, Box, useMediaQuery, Typography } from '@mui/material';
+import { ThemeProvider, CssBaseline, Box, useMediaQuery } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -72,14 +72,11 @@ function AppContent() {
     localStorage.setItem('navCollapsed', JSON.stringify(navCollapsed));
   }, [navCollapsed]);
 
-  const drawerWidth = 50;
-
   // Use SWR to fetch calendars with automatic focus revalidation
   // This solves the Chrome Energy Saver tab freezing issue
   const {
     calendars: swrCalendars,
     isLoading: isLoadingCalendars,
-    error: calendarsError,
     refresh: refreshCalendars,
   } = useCalendars(user?.uid, {
     revalidateOnFocus: true, // Auto-refetch when tab regains focus
@@ -899,6 +896,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     createChannel();
 
     // Cleanup handled automatically by the hook
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendar?.id, createChannel]);
 
   if (!calendar) {

@@ -100,19 +100,6 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
     const growth = stats.growth_percentage;
     if (isNaN(growth)) return null;
 
-    let color: string;
-    let Icon: typeof TrendingUp | typeof TrendingDown | null = null;
-    if (growth > 0) {
-      color = theme.palette.success.main;
-      Icon = TrendingUp;
-    } else if (growth < 0) {
-      color = theme.palette.error.main;
-      Icon = TrendingDown;
-    } else {
-      color = theme.palette.text.secondary;
-      Icon = null;
-    }
-
     return (
       <Box
         sx={{

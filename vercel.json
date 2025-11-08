@@ -1,0 +1,9 @@
+{
+  "framework": "create-react-app",
+  "buildCommand": "DISABLE_ESLINT_PLUGIN=true npm run build",
+  "outputDirectory": "build",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
+

@@ -4,41 +4,21 @@ import {
   Box,
   Paper,
   Typography,
-  IconButton,
   Collapse,
-  Tooltip,
   alpha,
   useTheme,
-  CircularProgress,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
-  Button,
   Divider
 } from '@mui/material';
 import { logger } from '../utils/logger';
 import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  CalendarMonth,
-  Check as CheckIcon,
-  Error as ErrorIcon,
-  Image as ImageIcon,
-  Delete as DeleteIcon,
-  Photo,
   EventNote as EventNoteIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
-  Note,
-  Save as SaveIcon,
-  Share as ShareIcon
+  Note
 } from '@mui/icons-material';
 import RichTextEditor from './common/RichTextEditor';
 import { Calendar } from '../types/calendar';
 import { ImageAttribution } from './heroImage';
-import { convertRichTextToHtml } from '../utils/richTextUtils'; 
-import ShareButton from './sharing/ShareButton';
 
 interface CalendarNoteDataProps {
   calendarNote: string;
@@ -76,19 +56,12 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   calendarNote,
   onUpdateCalendarProperty,
   calendarId,
-  title = "Description",
   heroImageUrl,
   heroImageAttribution,
-  onOpenImagePicker,
-  onRemoveHeroImage,
   trades,
   onOpenGalleryMode,
   calendarDayNotes,
   setIsDayNotesDialogOpen,
-  calendar,
-  showImageButton = true,
-  showShareButton = true,
-  showExpandToggle = true,
   expanded: controlledExpanded,
   onToggleExpand,
   isReadOnly = false
@@ -97,8 +70,6 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   const isControlled = controlledExpanded !== undefined;
   const isExpanded = isControlled ? !!controlledExpanded : expandedState;
   const [editedData, setEditedData] = useState(calendarNote);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [imageMenuAnchor, setImageMenuAnchor] = useState<HTMLElement | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // State for hiding day notes section
@@ -108,7 +79,6 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   });
 
   const theme = useTheme();
-  const MAX_NOTE_LENGTH = 600;
 
   // Update editedData when calendarNote prop changes
   useEffect(() => {
@@ -160,38 +130,6 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
     localStorage.setItem(`dayNotes-hidden-${calendarId}`, newHiddenState.toString());
   };
 
-  // Handle image button click
-  const handleImageButtonClick = (event: React.MouseEvent<HTMLElement>) => {
-    event.stopPropagation();
-
-    if (heroImageUrl) {
-      // If hero image exists, show menu with change/remove options
-      setImageMenuAnchor(event.currentTarget);
-    } else {
-      // If no hero image, directly open image picker
-      if (onOpenImagePicker) {
-        onOpenImagePicker();
-      }
-    }
-  };
-
-  const handleImageMenuClose = () => {
-    setImageMenuAnchor(null);
-  };
-
-  const handleChangeImage = () => {
-    handleImageMenuClose();
-    if (onOpenImagePicker) {
-      onOpenImagePicker();
-    }
-  };
-
-  const handleRemoveImage = () => {
-    handleImageMenuClose();
-    if (onRemoveHeroImage) {
-      onRemoveHeroImage();
-    }
-  };
 
   // Handle keyboard shortcuts
   const handleKeyDown = (event: React.KeyboardEvent) => {
