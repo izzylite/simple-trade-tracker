@@ -574,8 +574,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
               </Box>
             ) : (
               <Box sx={{
-                display: 'grid',
-                mx: 2,
+                display: 'grid', 
                 gridTemplateColumns: {
                   xs: '1fr',
                   sm: 'repeat(auto-fill, minmax(300px, 400px))',

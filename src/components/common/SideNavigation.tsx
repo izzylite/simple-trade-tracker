@@ -48,7 +48,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const isSmDown = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
 
   const navigationItems: NavigationItem[] = [
     {
@@ -84,7 +84,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
     }
     navigate(item.path);
     // Close overlay drawer on small screens; otherwise auto-collapse if expanded
-    if (isSmDown) {
+    if (isMdDown) {
       onClose();
     } else if (!collapsed) {
       onToggleCollapse();
@@ -98,7 +98,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
     return location.pathname.startsWith(path);
   };
 
-  const effectiveCollapsed = isSmDown ? false : collapsed;
+  const effectiveCollapsed = isMdDown ? false : collapsed;
   const drawerWidth = effectiveCollapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED;
 
   const drawerContent = (
@@ -174,7 +174,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
             <IconButton
               onClick={onToggleCollapse}
               sx={{
-                display: { xs: 'none', sm: 'inline-flex' },
+                display: { xs: 'none', lg: 'inline-flex' },
                 color: 'primary.main',
                 opacity: effectiveCollapsed ? 0 : 1,
                 transition: theme.transitions.create('opacity', {
@@ -298,8 +298,8 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
 
   return (
     <Drawer
-      variant={isSmDown ? 'temporary' : 'permanent'}
-      open={isSmDown ? open : true}
+      variant={isMdDown ? 'temporary' : 'permanent'}
+      open={isMdDown ? open : true}
       onClose={onClose}
       ModalProps={{ keepMounted: true }}
       sx={{

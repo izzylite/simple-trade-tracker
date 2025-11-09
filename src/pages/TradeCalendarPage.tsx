@@ -506,6 +506,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
   const theme = useTheme();
+  const isSmDown = useMediaQuery(theme.breakpoints.down('sm'));
   const { calendarId } = useParams();
 
   // Breadcrumb items
@@ -1441,9 +1442,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                                 alignItems: 'center',
                                 gap: 0.5
                               }}>
-                                <TradeAmount $dayStatus={dayStats.status}>
-                                  {formatCurrency(Math.abs(dayStats.netAmount))}
-                                </TradeAmount>
+                                {!isSmDown && (
+                                  <TradeAmount $dayStatus={dayStats.status}>
+                                    {formatCurrency(Math.abs(dayStats.netAmount))}
+                                  </TradeAmount>
+                                )}
                                 <TradeCount>
                                   {dayTrades.length} trade{dayTrades.length !== 1 ? 's' : ''}
                                 </TradeCount>

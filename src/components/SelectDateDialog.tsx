@@ -5,7 +5,8 @@ import {
   IconButton,
   Box,
   Paper,
-  useTheme
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import {
@@ -48,6 +49,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   onOpenGalleryMode
 }) => {
   const theme = useTheme();
+  const isSmDown = useMediaQuery(theme.breakpoints.down('sm'));
   const [currentDate, setCurrentDate] = React.useState(initialDate || new Date());
   const currentYear = currentDate.getFullYear();
   const months = [
@@ -185,25 +187,34 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   const dialogTitle = (
     <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
       <CalendarToday sx={{
-        fontSize: '1.75rem',
+        fontSize: { xs: '1.5rem', sm: '1.6rem', md: '1.75rem' },
         color: theme.palette.primary.main
       }} />
-      <Typography variant="h5" sx={{ fontWeight: 700, flex: 1, color: 'text.primary', fontSize: '1.5rem', ml: 1.5 }}>
+      <Typography
+        variant="h5"
+        sx={{
+          fontWeight: 700,
+          flex: 1,
+          color: 'text.primary',
+          fontSize: { xs: '1.25rem', sm: '1.35rem', md: '1.5rem' },
+          ml: { xs: 1, sm: 1.25, md: 1.5 }
+        }}
+      >
         Select Month
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         {currentYear !== new Date().getFullYear() && (
           <Button
             onClick={handleToday}
-            size="medium"
+            size={isSmDown ? 'small' : 'medium'}
             variant="outlined"
-            startIcon={<CalendarToday sx={{ fontSize: '1.1rem' }} />}
+            startIcon={<CalendarToday sx={{ fontSize: '1.05rem' }} />}
             sx={{
               ml: 1,
               textTransform: 'none',
               fontWeight: 600,
               borderRadius: 1.5,
-              px: 2
+              px: { xs: 1.5, sm: 1.75, md: 2 }
             }}
           >
             Today
@@ -212,7 +223,16 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
         <IconButton onClick={handlePrevYear} sx={{ color: 'text.primary', bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
           <ChevronLeft />
         </IconButton>
-        <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary', minWidth: '80px', textAlign: 'center', letterSpacing: '-0.5px' }}>
+        <Typography
+          variant="h5"
+          sx={{
+            fontWeight: 800,
+            color: 'text.primary',
+            minWidth: { xs: 64, sm: 72, md: 80 },
+            textAlign: 'center',
+            letterSpacing: '-0.5px'
+          }}
+        >
           {currentYear}
         </Typography>
         <IconButton onClick={handleNextYear} sx={{ color: 'text.primary', bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
@@ -223,17 +243,17 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   );
 
   const dialogActions = (
-    <Box sx={{ display: 'flex', gap: 2 }}>
-      
+    <Box sx={{ display: 'flex', gap: { xs: 1.5, sm: 2 } }}>
+
       <Button
         onClick={onClose}
         variant="outlined"
-        size="large"
+        size={isSmDown ? 'medium' : 'large'}
         sx={{
           textTransform: 'none',
           fontWeight: 600,
           borderRadius: 1.5,
-          px: 3
+          px: { xs: 2, sm: 2.5, md: 3 }
         }}
       >
         Cancel
@@ -241,13 +261,13 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
         <Button
           onClick={handleYearlyGalleryMode}
           variant="contained"
-          size="large"
+          size={isSmDown ? 'medium' : 'large'}
           startIcon={<GalleryIcon />}
           sx={{
             textTransform: 'none',
             fontWeight: 600,
             borderRadius: 1.5,
-            px: 3
+            px: { xs: 2, sm: 2.5, md: 3 }
           }}
         >
           Gallery View
@@ -268,13 +288,13 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
       hideFooterCancelButton
     >
       <Box sx={{
-        pt: '24px',
-        pb: '24px',
+        pt: { xs: '12px', sm: '16px', md: '24px' },
+        pb: { xs: '12px', sm: '16px', md: '24px' },
         ...scrollbarStyles(theme)
       }}>
          <Paper elevation={0} sx={{
-        px: 3,
-        py: 2,
+        px: { xs: 2, sm: 2.5, md: 3 },
+        py: { xs: 1.5, sm: 2, md: 2 },
         mb: 2,
         borderRadius: 2,
         bgcolor: theme => alpha(theme.palette.background.default, 0.5),
@@ -287,7 +307,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          mb: 2.5,
+          mb: { xs: 2, sm: 2.25, md: 2.5 },
           pl: 1
         }}>
           <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.5 }}>
@@ -295,7 +315,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
             variant="h6"
             sx={{
               color: 'text.primary',
-              fontSize: '1.1rem',
+              fontSize: { xs: '1rem', sm: '1.05rem', md: '1.1rem' },
               fontWeight: 600
             }}
           >
@@ -344,11 +364,11 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
 
         </Box>
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 4, width: '100%' }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: { xs: 2, sm: 3, md: 4 }, width: '100%' }}>
           <Box>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
               <Box sx={{
-                p: 0.8,
+                p: 0.7,
                 borderRadius: 1,
                 bgcolor: theme => alpha(theme.palette.primary.main, 0.1),
                 display: 'flex',
@@ -357,7 +377,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                 mb: 1
               }}>
                 <TrendingUp sx={{
-                  fontSize: '1.2rem',
+                  fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem' },
                   color: 'primary.main'
                 }} />
               </Box>
@@ -375,7 +395,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                 variant="h5"
                 sx={{
                   fontWeight: 700,
-                  fontSize: '1.5rem',
+                  fontSize: { xs: '1.35rem', sm: '1.4rem', md: '1.5rem' },
                   color: theme => {
                     if (yearlyPnL > 0) return theme.palette.success.main;
                     if (yearlyPnL < 0) return theme.palette.error.main;
@@ -396,7 +416,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                 <Typography variant="body2" sx={{
                   fontWeight: 500,
                   color: 'text.secondary',
-                  fontSize: '0.9rem',
+                  fontSize: { xs: '0.85rem', sm: '0.9rem' },
                   textAlign: 'center'
                 }}>
                   Growth
@@ -419,7 +439,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
           <Box>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
               <Box sx={{
-                p: 0.8,
+                p: 0.7,
                 borderRadius: 1,
                 bgcolor: theme => alpha(theme.palette.success.main, 0.1),
                 display: 'flex',
@@ -428,7 +448,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                 mb: 1
               }}>
                 <EmojiEvents sx={{
-                  fontSize: '1.2rem',
+                  fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem' },
                   color: 'success.main'
                 }} />
               </Box>
@@ -443,7 +463,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
             </Box>
             <Typography variant="h5" sx={{
               fontWeight: 700,
-              fontSize: '1.5rem',
+              fontSize: { xs: '1.35rem', sm: '1.4rem', md: '1.5rem' },
               color: parseFloat(yearlyWinRate) > 50 ? 'success.main' : 'text.primary',
               textAlign: 'center'
             }}>
@@ -462,7 +482,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
           <Box>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
               <Box sx={{
-                p: 0.8,
+                p: 0.7,
                 borderRadius: 1,
                 bgcolor: theme => alpha(theme.palette.info.main, 0.1),
                 display: 'flex',
@@ -471,7 +491,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                 mb: 1
               }}>
                 <CalendarMonth sx={{
-                  fontSize: '1.2rem',
+                  fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem' },
                   color: 'info.main'
                 }} />
               </Box>
@@ -486,7 +506,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
             </Box>
             <Typography variant="h5" sx={{
               fontWeight: 700,
-              fontSize: '1.5rem',
+              fontSize: { xs: '1.35rem', sm: '1.4rem', md: '1.5rem' },
               color: 'text.primary',
               textAlign: 'center'
             }}>
@@ -508,8 +528,8 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
           variant="h6"
           sx={{
             color: 'text.primary',
-            mb: 2,
-            fontSize: '1.1rem',
+            mb: { xs: 1.5, sm: 1.75, md: 2 },
+            fontSize: { xs: '1rem', sm: '1.05rem', md: '1.1rem' },
             fontWeight: 600,
             pl: 1
           }}
@@ -518,8 +538,8 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
         </Typography>
         <Box sx={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 1.5
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
+          gap: { xs: 1, sm: 1.25, md: 1.5 }
         }}>
           {months.map((month, index) => {
             const monthPnL = getMonthPnL(index);
@@ -533,11 +553,11 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                 onClick={() => handleMonthSelect(index)}
                 elevation={0}
                 sx={{
-                  p: 2.5,
+                  p: { xs: 1.5, sm: 2, md: 2.5 },
                   cursor: 'pointer',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 1,
+                  gap: { xs: 0.75, sm: 0.85, md: 1 },
                   height: '100%',
                   bgcolor: theme => {
                     if (hasEntries) {
@@ -586,7 +606,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                           ? theme.palette.primary.main
                           : theme.palette.text.primary,
                       fontWeight: 700,
-                      fontSize: '1.1rem'
+                      fontSize: { xs: '1rem', sm: '1.05rem', md: '1.1rem' }
                     }}
                   >
                     {month}
@@ -609,7 +629,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                         variant="h6"
                         sx={{
                           color: monthPnL > 0 ? 'success.main' : 'error.main',
-                          fontSize: '1.2rem',
+                          fontSize: { xs: '1.1rem', sm: '1.15rem', md: '1.2rem' },
                           fontWeight: 700,
                           display: 'flex',
                           alignItems: 'center',
@@ -617,7 +637,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                         }}
                       >
                         ${Math.abs(monthPnL).toLocaleString()}
-                        <Box component="span" sx={{ fontSize: '0.9rem', fontWeight: 600 }}>
+                        <Box component="span" sx={{ fontSize: { xs: '0.8rem', sm: '0.85rem', md: '0.9rem' }, fontWeight: 600 }}>
                           {monthPnL > 0 ? '↑' : '↓'}
                         </Box>
                       </Typography>
