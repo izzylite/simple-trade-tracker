@@ -6,6 +6,7 @@ import {
   CardContent,
   Stack,
   useTheme,
+  useMediaQuery,
   alpha,
   Chip,
   Dialog,
@@ -126,12 +127,16 @@ const Home: React.FC<HomeProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
 
-  // Get recently updated calendars (top 2 for display)
+  // Check if screen is large (xl breakpoint = 1536px+)
+  const isLargeScreen = useMediaQuery(theme.breakpoints.up('xl'));
+
+  // Get recently updated calendars (top 2 for large screens, top 1 for smaller screens)
   const recentCalendars = useMemo(() => {
+    const limit = isLargeScreen ? 2 : 1;
     return [...calendars]
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-      .slice(0, 2); // Only take top 2 calendars
-  }, [calendars]);
+      .slice(0, limit);
+  }, [calendars, isLargeScreen]);
 
   // Fetch trades when performance dialog opens
   useEffect(() => {

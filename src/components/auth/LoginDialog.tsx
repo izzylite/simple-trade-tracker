@@ -27,7 +27,8 @@ import {
   Visibility,
   VisibilityOff,
   ArrowBack,
-  CheckCircle
+  CheckCircle,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { inviteService } from '../../services/inviteService';
@@ -852,9 +853,30 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
             : `linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.98) 100%)`,
           m: isMobile ? 0 : undefined,
           maxHeight: isMobile ? '100vh' : '90vh',
+          position: 'relative'
         }
       }}
     >
+      {/* Close Button */}
+      <IconButton
+        onClick={onClose}
+        sx={{
+          position: 'absolute',
+          right: { xs: 8, sm: 16 },
+          top: { xs: 8, sm: 16 },
+          zIndex: 1,
+          color: 'text.secondary',
+          bgcolor: alpha(theme.palette.background.paper, 0.8),
+          backdropFilter: 'blur(8px)',
+          '&:hover': {
+            bgcolor: alpha(theme.palette.background.paper, 0.95),
+            color: 'text.primary'
+          }
+        }}
+      >
+        <CloseIcon />
+      </IconButton>
+
       <DialogContent
         sx={{
           p: 0,
