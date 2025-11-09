@@ -486,16 +486,36 @@ const Home: React.FC<HomeProps> = ({
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'custom.pageBackground', pl: 4 }}>
-      
+    <Box sx={{
+      minHeight: '100vh',
+      bgcolor: 'custom.pageBackground',
+      pl: { xs: 2, sm: 3, md: 4 }
+    }}>
 
-      <Box sx={{ pt: 4, pb: 4, pl: 0, pr: 4 }}>
+
+      <Box sx={{
+        pt: { xs: 2, sm: 3, md: 4 },
+        pb: { xs: 2, sm: 3, md: 4 },
+        pl: 0,
+        pr: { xs: 2, sm: 3, md: 4 }
+      }}>
         {/* Header Section */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+        <Box sx={{ mb: { xs: 3, sm: 4 } }}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
+              mb: 1,
+              fontSize: { xs: '1.75rem', sm: '2rem', md: '2.125rem' }
+            }}
+          >
             Dashboard
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography
+            variant="body1"
+            color="text.secondary"
+            sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
+          >
             Welcome back! Here's what's happening.
           </Typography>
         </Box>
@@ -505,33 +525,52 @@ const Home: React.FC<HomeProps> = ({
           sx={{
             display: 'grid',
             gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
-            gap: 3,
-            mb: 4
+            gap: { xs: 2, sm: 2.5, md: 3 },
+            mb: { xs: 3, sm: 4 }
           }}
         >
           {/* Total Calendars */}
           <Card sx={{ borderRadius: 2, bgcolor: 'background.paper' }}>
-            <CardContent>
+            <CardContent sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    gutterBottom
+                    sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                  >
                     Total Calendars
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography
+                    variant="h4"
+                    sx={{
+                      fontWeight: 700,
+                      mb: 0.5,
+                      fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+                    }}
+                  >
                     {dashboardStats.totalCalendars}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
+                  >
                     {dashboardStats.activeCalendars} active
                   </Typography>
                 </Box>
                 <Box
                   sx={{
-                    p: 1.5,
+                    p: { xs: 1, sm: 1.25, md: 1.5 },
                     borderRadius: 2,
                     bgcolor: alpha(theme.palette.primary.main, 0.1)
                   }}
                 >
-                  <CalendarToday sx={{ color: theme.palette.primary.main, fontSize: 28 }} />
+                  <CalendarToday sx={{
+                    color: theme.palette.primary.main,
+                    fontSize: { xs: 24, sm: 26, md: 28 }
+                  }} />
                 </Box>
               </Stack>
             </CardContent>
@@ -539,27 +578,46 @@ const Home: React.FC<HomeProps> = ({
 
           {/* Total Trades */}
           <Card sx={{ borderRadius: 2, bgcolor: 'background.paper' }}>
-            <CardContent>
+            <CardContent sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    gutterBottom
+                    sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                  >
                     Total Trades
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography
+                    variant="h4"
+                    sx={{
+                      fontWeight: 700,
+                      mb: 0.5,
+                      fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+                    }}
+                  >
                     {dashboardStats.totalTrades}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
+                  >
                     Across all calendars
                   </Typography>
                 </Box>
                 <Box
                   sx={{
-                    p: 1.5,
+                    p: { xs: 1, sm: 1.25, md: 1.5 },
                     borderRadius: 2,
                     bgcolor: alpha(theme.palette.info.main, 0.1)
                   }}
                 >
-                  <TrendingUp sx={{ color: theme.palette.info.main, fontSize: 28 }} />
+                  <TrendingUp sx={{
+                    color: theme.palette.info.main,
+                    fontSize: { xs: 24, sm: 26, md: 28 }
+                  }} />
                 </Box>
               </Stack>
             </CardContent>
@@ -567,27 +625,46 @@ const Home: React.FC<HomeProps> = ({
 
           {/* Win Rate */}
           <Card sx={{ borderRadius: 2, bgcolor: 'background.paper' }}>
-            <CardContent>
+            <CardContent sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    gutterBottom
+                    sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                  >
                     Win Rate
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography
+                    variant="h4"
+                    sx={{
+                      fontWeight: 700,
+                      mb: 0.5,
+                      fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+                    }}
+                  >
                     {dashboardStats.winRate}%
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
+                  >
                     Overall performance
                   </Typography>
                 </Box>
                 <Box
                   sx={{
-                    p: 1.5,
+                    p: { xs: 1, sm: 1.25, md: 1.5 },
                     borderRadius: 2,
                     bgcolor: alpha(theme.palette.success.main, 0.1)
                   }}
                 >
-                  <TrendingUp sx={{ color: theme.palette.success.main, fontSize: 28 }} />
+                  <TrendingUp sx={{
+                    color: theme.palette.success.main,
+                    fontSize: { xs: 24, sm: 26, md: 28 }
+                  }} />
                 </Box>
               </Stack>
             </CardContent>
@@ -595,24 +672,38 @@ const Home: React.FC<HomeProps> = ({
 
           {/* Total P&L */}
           <Card sx={{ borderRadius: 2, bgcolor: 'background.paper' }}>
-            <CardContent>
+            <CardContent sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    gutterBottom
+                    sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                  >
                     Total P&L
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography
+                    variant="h4"
+                    sx={{
+                      fontWeight: 700,
+                      mb: 0.5,
+                      fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+                    }}
+                  >
                     {formatCurrency(dashboardStats.totalPnL)}
                   </Typography>
-                  <Typography variant="caption" color={
-                    dashboardStats.totalPnL >= 0 ? 'success.main' : 'error.main'
-                  }>
+                  <Typography
+                    variant="caption"
+                    color={dashboardStats.totalPnL >= 0 ? 'success.main' : 'error.main'}
+                    sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
+                  >
                     {dashboardStats.totalPnL >= 0 ? '↑' : '↓'} All time
                   </Typography>
                 </Box>
                 <Box
                   sx={{
-                    p: 1.5,
+                    p: { xs: 1, sm: 1.25, md: 1.5 },
                     borderRadius: 2,
                     bgcolor: alpha(
                       dashboardStats.totalPnL >= 0 ? theme.palette.success.main : theme.palette.error.main,
@@ -621,9 +712,15 @@ const Home: React.FC<HomeProps> = ({
                   }}
                 >
                   {dashboardStats.totalPnL >= 0 ? (
-                    <TrendingUp sx={{ color: theme.palette.success.main, fontSize: 28 }} />
+                    <TrendingUp sx={{
+                      color: theme.palette.success.main,
+                      fontSize: { xs: 24, sm: 26, md: 28 }
+                    }} />
                   ) : (
-                    <TrendingDown sx={{ color: theme.palette.error.main, fontSize: 28 }} />
+                    <TrendingDown sx={{
+                      color: theme.palette.error.main,
+                      fontSize: { xs: 24, sm: 26, md: 28 }
+                    }} />
                   )}
                 </Box>
               </Stack>
@@ -632,15 +729,22 @@ const Home: React.FC<HomeProps> = ({
         </Box>
 
         {/* Quick Actions Section */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+        <Box sx={{ mb: { xs: 3, sm: 4 } }}>
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: 600,
+              mb: { xs: 2, sm: 3 },
+              fontSize: { xs: '1rem', sm: '1.125rem', md: '1.25rem' }
+            }}
+          >
             Quick Actions
           </Typography>
           <Box
             sx={{
               display: 'grid',
               gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-              gap: 2
+              gap: { xs: 1.5, sm: 2 }
             }}
           >
             {/* Create Calendar */}
@@ -659,26 +763,44 @@ const Home: React.FC<HomeProps> = ({
               }}
               onClick={handleCreateCalendar}
             >
-              <CardContent sx={{ textAlign: 'center', py: 4 }}>
+              <CardContent sx={{
+                textAlign: 'center',
+                py: { xs: 2.5, sm: 3, md: 4 },
+                px: { xs: 1.5, sm: 2 }
+              }}>
                 <Box
                   sx={{
-                    width: 56,
-                    height: 56,
+                    width: { xs: 40, sm: 48, md: 56 },
+                    height: { xs: 40, sm: 48, md: 56 },
                     borderRadius: 2,
                     bgcolor: alpha(theme.palette.primary.main, 0.1),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     mx: 'auto',
-                    mb: 2
+                    mb: { xs: 1.5, sm: 2 }
                   }}
                 >
-                  <AddIcon sx={{ fontSize: 32, color: theme.palette.primary.main }} />
+                  <AddIcon sx={{
+                    fontSize: { xs: 24, sm: 28, md: 32 },
+                    color: theme.palette.primary.main
+                  }} />
                 </Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                <Typography
+                  variant="subtitle1"
+                  sx={{
+                    fontWeight: 600,
+                    mb: 0.5,
+                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' }
+                  }}
+                >
                   Create Calendar
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
+                >
                   Start a new trading journal
                 </Typography>
               </CardContent>
@@ -701,26 +823,44 @@ const Home: React.FC<HomeProps> = ({
               }}
               onClick={handleCreateTrade}
             >
-              <CardContent sx={{ textAlign: 'center', py: 4 }}>
+              <CardContent sx={{
+                textAlign: 'center',
+                py: { xs: 2.5, sm: 3, md: 4 },
+                px: { xs: 1.5, sm: 2 }
+              }}>
                 <Box
                   sx={{
-                    width: 56,
-                    height: 56,
+                    width: { xs: 40, sm: 48, md: 56 },
+                    height: { xs: 40, sm: 48, md: 56 },
                     borderRadius: 2,
                     bgcolor: alpha(theme.palette.info.main, 0.1),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     mx: 'auto',
-                    mb: 2
+                    mb: { xs: 1.5, sm: 2 }
                   }}
                 >
-                  <TrendingUp sx={{ fontSize: 32, color: theme.palette.info.main }} />
+                  <TrendingUp sx={{
+                    fontSize: { xs: 24, sm: 28, md: 32 },
+                    color: theme.palette.info.main
+                  }} />
                 </Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                <Typography
+                  variant="subtitle1"
+                  sx={{
+                    fontWeight: 600,
+                    mb: 0.5,
+                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' }
+                  }}
+                >
                   Create Trade
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
+                >
                   Log a new trade entry
                 </Typography>
               </CardContent>
@@ -742,26 +882,44 @@ const Home: React.FC<HomeProps> = ({
               }}
               onClick={() => handleQuickActionClick('/performance')}
             >
-              <CardContent sx={{ textAlign: 'center', py: 4 }}>
+              <CardContent sx={{
+                textAlign: 'center',
+                py: { xs: 2.5, sm: 3, md: 4 },
+                px: { xs: 1.5, sm: 2 }
+              }}>
                 <Box
                   sx={{
-                    width: 56,
-                    height: 56,
+                    width: { xs: 40, sm: 48, md: 56 },
+                    height: { xs: 40, sm: 48, md: 56 },
                     borderRadius: 2,
                     bgcolor: alpha(theme.palette.success.main, 0.1),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     mx: 'auto',
-                    mb: 2
+                    mb: { xs: 1.5, sm: 2 }
                   }}
                 >
-                  <TrendingUp sx={{ fontSize: 32, color: theme.palette.success.main }} />
+                  <TrendingUp sx={{
+                    fontSize: { xs: 24, sm: 28, md: 32 },
+                    color: theme.palette.success.main
+                  }} />
                 </Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                <Typography
+                  variant="subtitle1"
+                  sx={{
+                    fontWeight: 600,
+                    mb: 0.5,
+                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' }
+                  }}
+                >
                   Performance
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
+                >
                   View analytics & charts
                 </Typography>
               </CardContent>
@@ -789,26 +947,44 @@ const Home: React.FC<HomeProps> = ({
                 setIsAIChatOpen(true);
               }}
             >
-              <CardContent sx={{ textAlign: 'center', py: 4 }}>
+              <CardContent sx={{
+                textAlign: 'center',
+                py: { xs: 2.5, sm: 3, md: 4 },
+                px: { xs: 1.5, sm: 2 }
+              }}>
                 <Box
                   sx={{
-                    width: 56,
-                    height: 56,
+                    width: { xs: 40, sm: 48, md: 56 },
+                    height: { xs: 40, sm: 48, md: 56 },
                     borderRadius: 2,
                     bgcolor: alpha(theme.palette.secondary.main, 0.1),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     mx: 'auto',
-                    mb: 2
+                    mb: { xs: 1.5, sm: 2 }
                   }}
                 >
-                  <AIIcon sx={{ fontSize: 32, color: theme.palette.secondary.main }} />
+                  <AIIcon sx={{
+                    fontSize: { xs: 24, sm: 28, md: 32 },
+                    color: theme.palette.secondary.main
+                  }} />
                 </Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                <Typography
+                  variant="subtitle1"
+                  sx={{
+                    fontWeight: 600,
+                    mb: 0.5,
+                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' }
+                  }}
+                >
                   Chat with AI
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
+                >
                   Get trading insights
                 </Typography>
               </CardContent>
@@ -820,25 +996,41 @@ const Home: React.FC<HomeProps> = ({
         <Box
           sx={{
             display: 'flex',
-            flexWrap: 'wrap',
-            gap: 2,
-            mb: 4
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: { xs: 2, sm: 2.5, md: 2 },
+            mb: { xs: 3, sm: 4 }
           }}
         >
           {/* Recent Calendars Card */}
           <Card
             sx={{
               flex: 1,
-              borderRadius: 1, 
-              height: '620px', // Fixed height
-              maxWidth: recentCalendars.length <= 1 ? '500px' : 'none',
-              p: 1,
+              borderRadius: 1,
+              height: { xs: 'auto', md: '620px' },
+              minHeight: { xs: '400px', md: '620px' },
+              maxWidth: recentCalendars.length <= 1 ? { xs: 'none', md: '500px' } : 'none',
+              p: { xs: 0.5, sm: 1 },
               display: 'flex',
               flexDirection: 'column'
             }}
           >
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3, px: 2, pt: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{
+                mb: { xs: 2, sm: 3 },
+                px: { xs: 1.5, sm: 2 },
+                pt: { xs: 1.5, sm: 2 }
+              }}
+            >
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 600,
+                  fontSize: { xs: '1rem', sm: '1.125rem', md: '1.25rem' }
+                }}
+              >
                 Recent Calendars
               </Typography>
               <Typography
@@ -846,6 +1038,7 @@ const Home: React.FC<HomeProps> = ({
                 sx={{
                   color: 'primary.main',
                   cursor: 'pointer',
+                  fontSize: { xs: '0.8125rem', sm: '0.875rem' },
                   '&:hover': { textDecoration: 'underline' }
                 }}
                 onClick={() => navigate('/calendars')}
@@ -946,14 +1139,30 @@ const Home: React.FC<HomeProps> = ({
             sx={{
               flex: 1,
               borderRadius: 1,
-              height: '620px', // Fixed height matching Recent Calendars
-              p: 1,
+              height: { xs: 'auto', md: '620px' },
+              minHeight: { xs: '400px', md: '620px' },
+              p: { xs: 0.5, sm: 1 },
               display: 'flex',
               flexDirection: 'column'
             }}
           >
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3, px: 2, pt: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{
+                mb: { xs: 2, sm: 3 },
+                px: { xs: 1.5, sm: 2 },
+                pt: { xs: 1.5, sm: 2 }
+              }}
+            >
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 600,
+                  fontSize: { xs: '1rem', sm: '1.125rem', md: '1.25rem' }
+                }}
+              >
                 Economic Events Today
               </Typography>
               <Typography
@@ -961,6 +1170,7 @@ const Home: React.FC<HomeProps> = ({
                 sx={{
                   color: 'primary.main',
                   cursor: 'pointer',
+                  fontSize: { xs: '0.8125rem', sm: '0.875rem' },
                   '&:hover': { textDecoration: 'underline' }
                 }}
                 onClick={() => setEconomicCalendarOpen(true)}
@@ -1037,23 +1247,37 @@ const Home: React.FC<HomeProps> = ({
           <Card
             sx={{
               flex: 1,
-              borderRadius: 1, 
-              p: 3,
+              borderRadius: 1,
+              p: { xs: 2, sm: 2.5, md: 3 },
             }}
           >
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ mb: { xs: 2, sm: 3 } }}
+            >
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 600,
+                  fontSize: { xs: '1rem', sm: '1.125rem', md: '1.25rem' }
+                }}
+              >
                 Recent Trades
               </Typography>
-              
+
             </Stack>
 
             {loadingTrades ? (
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                  gap: 2
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: 'repeat(auto-fill, minmax(280px, 1fr))'
+                  },
+                  gap: { xs: 1.5, sm: 2 }
                 }}
               >
                 {Array.from({ length: 5 }).map((_, index) => (
@@ -1115,8 +1339,11 @@ const Home: React.FC<HomeProps> = ({
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                  gap: 2
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: 'repeat(auto-fill, minmax(280px, 1fr))'
+                  },
+                  gap: { xs: 1.5, sm: 2 }
                 }}
               >
                 {recentTrades.map((trade) => (
