@@ -9,6 +9,7 @@ import {
 
   Stack,
   useTheme,
+  useMediaQuery,
   alpha,
   Tooltip,
   SxProps,
@@ -321,18 +322,22 @@ const TagFilter: React.FC<TagFilterProps> = ({ allTags, selectedTags, onTagsChan
   };
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 }, flex: { xs: 1, sm: 'none' } }}>
       <Tooltip title="Filter by tags" arrow>
         <Button
           variant={selectedTags.length > 0 ? "contained" : "outlined"}
-          size="medium"
-          startIcon={<FilterAlt />}
+          size="small"
+          startIcon={<FilterAlt sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
           onClick={onOpenDrawer}
           sx={{
-            minWidth: { xs: '120px', sm: 'auto' },
+            flex: 1,
+            minWidth: { xs: 'auto', sm: '120px' },
             borderRadius: 2,
             fontWeight: 600,
             textTransform: 'none',
+            fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+            py: { xs: 0.75, sm: 1 },
+            px: { xs: 1.5, sm: 2 },
             ...(selectedTags.length > 0 ? {
               bgcolor: alpha(theme.palette.info.main, 0.9),
               color: 'white',
@@ -353,26 +358,27 @@ const TagFilter: React.FC<TagFilterProps> = ({ allTags, selectedTags, onTagsChan
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
         >
-          {selectedTags.length > 0 ? `${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''}` : 'Search & Filter'}
+          {selectedTags.length > 0 ? `${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''}` : 'Filter'}
         </Button>
       </Tooltip>
 
       {selectedTags.length > 0 && (
         <Tooltip title="Clear all filters" arrow>
           <IconButton
-            size="medium"
+            size="small"
             onClick={handleClearTags}
             sx={{
               bgcolor: alpha(theme.palette.error.main, 0.1),
               color: 'error.main',
               borderRadius: 2,
+              p: { xs: 0.5, sm: 0.75 },
               '&:hover': {
                 bgcolor: alpha(theme.palette.error.main, 0.2)
               },
               transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
           >
-            <Clear fontSize="small" />
+            <Clear sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
           </IconButton>
         </Tooltip>
       )}
@@ -979,9 +985,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       <Box sx={{
         display: 'flex',
         flexDirection: 'column',
-        gap: { xs: 2, md: 3 },
-        p: { xs: 2, md: 3 },
-        mt: 1
+        gap: { xs: 2, sm: 2.5, md: 3 },
+        p: { xs: 1.5, sm: 2, md: 3 },
+        mt: { xs: 0.5, sm: 1 }
       }}>
 
         {/* Content Wrapper with Modern Card Design */}
@@ -1047,9 +1053,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            mb: { xs: 2, md: 3 },
+            mb: { xs: 1.5, sm: 2, md: 3 },
             flexDirection: { xs: 'column', lg: 'row' },
-            gap: { xs: 2, lg: 1 }
+            gap: { xs: 1.5, sm: 2, lg: 1 }
           }}>
             {/* Month Navigation with Enhanced Styling */}
             <Box
@@ -1057,15 +1063,17 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 2,
+                gap: { xs: 1, sm: 1.5, md: 2 },
                 order: { xs: 1, lg: 0 }
               }}
             >
               <IconButton
                 onClick={handlePrevMonth}
+                size="small"
                 sx={{
                   bgcolor: alpha(theme.palette.primary.main, 0.1),
                   color: 'primary.main',
+                  p: { xs: 0.75, sm: 1 },
                   '&:hover': {
                     bgcolor: alpha(theme.palette.primary.main, 0.2),
                     transform: 'scale(1.05)'
@@ -1073,7 +1081,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                 }}
               >
-                <ChevronLeft />
+                <ChevronLeft sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
               </IconButton>
 
               <Typography
@@ -1081,9 +1089,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 sx={{
                   fontWeight: 700,
                   cursor: 'pointer',
-                  minWidth: { xs: '200px', sm: '250px' },
+                  minWidth: { xs: '180px', sm: '220px', md: '250px' },
                   textAlign: 'center',
-                  fontSize: { xs: '1.5rem', sm: '1.8rem', md: '2rem' },
+                  fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.8rem', lg: '2rem' },
                   letterSpacing: '-0.5px',
                   color: 'text.primary',
                   background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
@@ -1103,9 +1111,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
               <IconButton
                 onClick={handleNextMonth}
+                size="small"
                 sx={{
                   bgcolor: alpha(theme.palette.primary.main, 0.1),
                   color: 'primary.main',
+                  p: { xs: 0.75, sm: 1 },
                   '&:hover': {
                     bgcolor: alpha(theme.palette.primary.main, 0.2),
                     transform: 'scale(1.05)'
@@ -1113,29 +1123,39 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                 }}
               >
-                <ChevronRight />
+                <ChevronRight sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
               </IconButton>
             </Box>
             {/* Enhanced Action Buttons */}
             <Box sx={{
               display: 'flex',
               flexDirection: { xs: 'column', sm: 'row' },
-              gap: { xs: 1.5, sm: 2 },
+              gap: { xs: 1, sm: 1.5, md: 2 },
               flexWrap: 'wrap',
-              order: { xs: 0, lg: 1 }
+              order: { xs: 0, lg: 1 },
+              width: { xs: '100%', lg: 'auto' }
             }}>
               {/* Primary Actions Group */}
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Box sx={{
+                display: 'flex',
+                gap: { xs: 0.75, sm: 1 },
+                flexWrap: 'wrap',
+                width: { xs: '100%', sm: 'auto' }
+              }}>
                 <Button
-                  startIcon={<Today />}
+                  startIcon={<Today sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
                   onClick={handleTodayClick}
                   variant="contained"
-                  size="medium"
+                  size="small"
                   sx={{
-                    minWidth: { xs: '120px', sm: 'auto' },
+                    flex: { xs: 1, sm: 'none' },
+                    minWidth: { xs: 'auto', sm: '100px' },
                     borderRadius: 2,
                     fontWeight: 600,
                     textTransform: 'none',
+                    fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                    py: { xs: 0.75, sm: 1 },
+                    px: { xs: 1.5, sm: 2 },
                     boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
                     '&:hover': {
                       transform: 'translateY(-1px)',
@@ -1155,15 +1175,19 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 })() && (
                     <Tooltip title="View all trades for this month in gallery mode" arrow>
                       <Button
-                        startIcon={<GalleryIcon />}
+                        startIcon={<GalleryIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
                         onClick={handleMonthlyGalleryMode}
                         variant="outlined"
-                        size="medium"
+                        size="small"
                         sx={{
-                          minWidth: { xs: '140px', sm: 'auto' },
+                          flex: { xs: 1, sm: 'none' },
+                          minWidth: { xs: 'auto', sm: '120px' },
                           borderRadius: 2,
                           fontWeight: 600,
                           textTransform: 'none',
+                          fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                          py: { xs: 0.75, sm: 1 },
+                          px: { xs: 1.5, sm: 2 },
                           borderColor: alpha(theme.palette.primary.main, 0.3),
                           color: 'primary.main',
                           '&:hover': {
@@ -1175,24 +1199,33 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                         }}
                       >
-                        Gallery View
+                        Gallery
                       </Button>
                     </Tooltip>
                   )}
               </Box>
 
               {/* Secondary Actions Group */}
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Box sx={{
+                display: 'flex',
+                gap: { xs: 0.75, sm: 1 },
+                flexWrap: 'wrap',
+                width: { xs: '100%', sm: 'auto' }
+              }}>
                 <Button
-                  startIcon={<PinIcon />}
+                  startIcon={<PinIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
                   onClick={() => setPinnedTradesDrawerOpen(true)}
                   variant={hasPinnedTrades > 0 ? "contained" : "outlined"}
-                  size="medium"
+                  size="small"
                   sx={{
-                    minWidth: { xs: '140px', sm: 'auto' },
+                    flex: { xs: 1, sm: 'none' },
+                    minWidth: { xs: 'auto', sm: '100px' },
                     borderRadius: 2,
                     fontWeight: 600,
                     textTransform: 'none',
+                    fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                    py: { xs: 0.75, sm: 1 },
+                    px: { xs: 1.5, sm: 2 },
                     ...(hasPinnedTrades > 0 ? {
                       bgcolor: alpha(theme.palette.secondary.main, 0.9),
                       color: 'white',
@@ -1229,14 +1262,18 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   <Tooltip title="Manage tags and required tag groups" arrow>
                     <Button
                       variant="outlined"
-                      size="medium"
-                      startIcon={<TagIcon />}
+                      size="small"
+                      startIcon={<TagIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
                       onClick={() => setIsTagManagementDrawerOpen(true)}
                       sx={{
-                        minWidth: { xs: '140px', sm: 'auto' },
+                        flex: { xs: 1, sm: 'none' },
+                        minWidth: { xs: 'auto', sm: '120px' },
                         borderRadius: 2,
                         fontWeight: 600,
                         textTransform: 'none',
+                        fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                        py: { xs: 0.75, sm: 1 },
+                        px: { xs: 1.5, sm: 2 },
                         borderColor: alpha(theme.palette.text.secondary, 0.3),
                         color: 'text.secondary',
                         '&:hover': {
@@ -1248,7 +1285,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                       }}
                     >
-                      Manage Tags
+                      Tags
                     </Button>
                   </Tooltip>
                 )}
@@ -1457,32 +1494,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               })}
             </Box>
 
-            {/* Weekly stats for mobile */}
-            <Box sx={{
-              display: { xs: 'flex', sm: 'none' },
-              flexDirection: 'column',
-              gap: 1,
-              mt: 2
-            }}>
-              {eachWeekOfInterval(
-                {
-                  start: startOfMonth(currentDate),
-                  end: endOfMonth(currentDate)
-                },
-                { weekStartsOn: 0 }
-              ).map((weekStart, index) => (
-                <WeeklyPnL
-                  key={weekStart.toISOString()}
-                  trade_date={weekStart}
-                  trades={filteredTrades}
-                  monthStart={startOfMonth(currentDate)}
-                  weekIndex={index}
-                  currentMonth={currentDate.getMonth()}
-                  accountBalance={accountBalance}
-                  weeklyTarget={weeklyTarget}
-                />
-              ))}
-            </Box>
+            {/* Weekly stats for mobile - HIDDEN to save space */}
+            {/* Mobile users can view weekly stats in the monthly statistics section below */}
           </Box>
 
 
@@ -1711,14 +1724,17 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               color="secondary"
               aria-label="open ai chat"
               onClick={handleToggleAIChat}
+              size="medium"
               sx={{
                 position: 'fixed',
-                bottom: 96,
-                right: 24,
-                zIndex: 1200
+                bottom: { xs: 80, sm: 96 },
+                right: { xs: 16, sm: 24 },
+                zIndex: 1200,
+                width: { xs: 48, sm: 56 },
+                height: { xs: 48, sm: 56 }
               }}
             >
-              <AIIcon />
+              <AIIcon sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
             </Fab>
           </Tooltip>
         )}
@@ -1730,14 +1746,17 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               color="primary"
               aria-label="open economic calendar"
               onClick={handleToggleEconomicCalendar}
+              size="medium"
               sx={{
                 position: 'fixed',
-                bottom: 24,
-                right: 24,
-                zIndex: 1200
+                bottom: { xs: 16, sm: 24 },
+                right: { xs: 16, sm: 24 },
+                zIndex: 1200,
+                width: { xs: 48, sm: 56 },
+                height: { xs: 48, sm: 56 }
               }}
             >
-              <EventIcon />
+              <EventIcon sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
             </Fab>
           </Tooltip>
         )}
@@ -1863,13 +1882,15 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       <Box
         sx={{
           position: 'fixed',
-          bottom: 24,
-          left: 12,
+          bottom: { xs: 16, sm: 24 },
+          left: { xs: 8, sm: 12 },
+          right: { xs: 8, sm: 'auto' },
           zIndex: 1400,
           display: 'flex',
           flexDirection: 'column',
-          gap: 2,
+          gap: { xs: 1.5, sm: 2 },
           pointerEvents: 'none',
+          maxWidth: { xs: 'calc(100% - 16px)', sm: '400px' }
         }}
       >
         {notifications.map(event => (

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, lazy, Suspense } from 'react';
 import { format } from 'date-fns';
-import { Box, Typography, useTheme, Paper, CircularProgress, LinearProgress, Alert, Button, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { Box, Typography, useTheme, useMediaQuery, Paper, CircularProgress, LinearProgress, Alert, Button, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 import { Trade, Calendar } from '../types/dualWrite';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
@@ -81,6 +81,13 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   showCalendarSelector = false
 }) => {
   const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.down('sm'));
+  const chartHeights = useMemo(() => ({
+    large: isXs ? 240 : 400,
+    medium: isXs ? 180 : 260,
+    pair: isXs ? 280 : 500
+  }), [isXs]);
+
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
   const [tagAnalysisTab, setTagAnalysisTab] = useState<number>(0);
 
@@ -233,7 +240,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
   // Performance calculation states
   const [performanceData, setPerformanceData] = useState<PerformanceCalculationResult | null>(null);
-  const [isCalculatingPerformance, setIsCalculatingPerformance] = useState(false); 
+  const [isCalculatingPerformance, setIsCalculatingPerformance] = useState(false);
   const [calculationError, setCalculationError] = useState<string | null>(null);
 
 
@@ -494,7 +501,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   };
 
   return (
-    <Box sx={{ p: { xs: 1, sm: 2 }, minHeight: 500 }}>
+    <Box sx={{ p: { xs: 1, sm: 2 }, minHeight: { xs: 'auto', sm: 500 } }}>
       {/* Calendar Selector - Only shown in standalone mode */}
       {showCalendarSelector && calendars.length > 0 && (
         <Box sx={{ mb: 3 }}>
@@ -589,9 +596,9 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
       {/* Loading State */}
       {(isCalculatingChartData) && (
-        <> 
-          {/* Shimmer loaders for different sections */} 
-          <ShimmerLoader variant="chart" height={400} />
+        <>
+          {/* Shimmer loaders for different sections */}
+          <ShimmerLoader variant="chart" height={chartHeights.large} />
 
         </>
       )}
@@ -625,12 +632,12 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       {!isCalculatingPerformance && !isCalculatingChartData && filteredTrades.length > 0 ? (
         <>
           {/* Risk to Reward Statistics Card */}
-          <Suspense fallback={<ShimmerLoader variant="chart" height={200} />}>
+          <Suspense fallback={<ShimmerLoader variant="chart" height={chartHeights.medium} />}>
             <RiskRewardChart riskRewardStats={riskRewardStats} />
           </Suspense>
 
           {/* Winners and Losers Statistics */}
-          <Suspense fallback={<ShimmerLoader variant="chart" height={200} />}>
+          <Suspense fallback={<ShimmerLoader variant="chart" height={chartHeights.medium} />}>
             <WinLossStats
               winLossStats={winLossStats}
               trades={filteredTrades}
@@ -639,7 +646,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
           </Suspense>
 
           {/* P&L Charts with Tabs */}
-          <Suspense fallback={<ShimmerLoader variant="chart" height={400} />}>
+          <Suspense fallback={<ShimmerLoader variant="chart" height={chartHeights.large} />}>
             <PnLChartsWrapper
               chartData={chartData}
               targetValue={targetValue}
@@ -656,15 +663,15 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             flexDirection: { xs: 'column', md: 'row' },
             gap: { xs: 2, md: 3 },
             mb: 3,
-            height: { xs: 'auto', md: '500px' }
+            height: { xs: 'auto', md: chartHeights.pair }
           }}>
             <Box sx={{
               flex: 1,
               width: { xs: '100%', md: '50%' },
-              height: { xs: '400px', md: '100%' }
+              height: { xs: chartHeights.large, md: '100%' }
             }}>
               {/* Win/Loss Distribution */}
-              <Suspense fallback={<ShimmerLoader variant="chart" height={400} />}>
+              <Suspense fallback={<ShimmerLoader variant="chart" height={chartHeights.large} />}>
                 <WinLossDistribution
                   winLossData={winLossData}
                   comparisonWinLossData={comparisonWinLossData}
@@ -679,10 +686,10 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             <Box sx={{
               flex: 1,
               width: { xs: '100%', md: '50%' },
-              height: { xs: '400px', md: '100%' }
+              height: { xs: chartHeights.large, md: '100%' }
             }}>
               {/* Daily Summary Table */}
-              <Suspense fallback={<ShimmerLoader variant="chart" height={400} />}>
+              <Suspense fallback={<ShimmerLoader variant="chart" height={chartHeights.large} />}>
                 <DailySummaryTable
                   dailySummaryData={dailySummaryData}
                   trades={trades}
@@ -713,7 +720,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
             {/* Tab Panel 1: Tag Performance Analysis - Only render when active */}
             {tagAnalysisTab === 0 && (
-              <Suspense fallback={<ShimmerLoader variant="chart" height={300} />}>
+              <Suspense fallback={<ShimmerLoader variant="chart" height={chartHeights.medium} />}>
                 <TagPerformanceAnalysis
                   calendarIds={calendarIds}
                   trades={trades}
@@ -737,7 +744,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
             {/* Tab Panel 2: Tag Performance by Day of Week Analysis - Only render when active */}
             {tagAnalysisTab === 1 && (
-              <Suspense fallback={<ShimmerLoader variant="chart" height={300} />}>
+              <Suspense fallback={<ShimmerLoader variant="chart" height={chartHeights.medium} />}>
                 <TagDayOfWeekAnalysis
                   calendarIds={calendarIds}
                   trades={trades}
@@ -762,7 +769,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* Session Performance Analysis */}
-            <Suspense fallback={<ShimmerLoader variant="chart" height={300} />}>
+            <Suspense fallback={<ShimmerLoader variant="chart" height={chartHeights.medium} />}>
               <SessionPerformanceAnalysis
                 sessionStats={sessionStats}
                 trades={trades}
@@ -784,7 +791,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             />
 
             {/* Economic Event Correlation Analysis */}
-            <Suspense fallback={<ShimmerLoader variant="chart" height={300} />}>
+            <Suspense fallback={<ShimmerLoader variant="chart" height={chartHeights.medium} />}>
               <EconomicEventCorrelationAnalysis
                 calendarIds={calendarIds}
                 trades={filteredTrades}
@@ -798,7 +805,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       ) : !isCalculatingPerformance && !isCalculatingChartData ? (
         <Box
           sx={{
-            height: 300,
+            height: { xs: chartHeights.medium, sm: 300 },
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

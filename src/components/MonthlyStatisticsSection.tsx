@@ -7,7 +7,8 @@ import {
   DialogTitle,
   IconButton,
   Typography,
-  useTheme
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import { logger } from '../utils/logger';
 import { Close as CloseIcon, Analytics as AnalyticsIcon } from '@mui/icons-material';
@@ -78,6 +79,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   isReadOnly = false
 }) => {
   const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.down('sm'));
   const [multipleTradesDialog, setMultipleTradesDialog] = useState<MultipleTradesDialog>({
     open: false,
     trades: [],
@@ -205,9 +207,10 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   return (
     <>
       {/* View Details Stats Button */}
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+      <Box sx={{ mb: { xs: 1.5, sm: 2 }, display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
         <Button
           variant="outlined"
+          size={isXs ? 'small' : 'medium'}
           startIcon={<AnalyticsIcon />}
           onClick={() => setIsPerformanceDialogOpen(true)}
           sx={{
@@ -221,13 +224,15 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
       </Box>
 
         {/* Session Performance*/}
-        <SessionPerformanceAnalysis
+        {!isXs && (
+          <SessionPerformanceAnalysis
             sessionStats={sessionStats}
             trades={trades}
             selectedDate={selectedDate}
             timePeriod={timePeriod}
             setMultipleTradesDialog={setMultipleTradesDialog}
           />
+        )}
         
 
       {/* Score Section */}
@@ -278,6 +283,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         onClose={() => setIsPerformanceDialogOpen(false)}
         maxWidth="lg"
         fullWidth
+        fullScreen={isXs}
         sx={{
           '& .MuiDialog-paper': {
             borderRadius: 2,
