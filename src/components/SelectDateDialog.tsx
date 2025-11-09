@@ -364,7 +364,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
 
         </Box>
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr' }, gap: { xs: 2, sm: 3, md: 4 }, width: '100%' }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: { xs: 2, sm: 3, md: 4 }, width: '100%' }}>
           <Box>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
               <Box sx={{
