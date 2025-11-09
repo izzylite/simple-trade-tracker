@@ -109,7 +109,10 @@ export const TradeAmount = styled(Typography, {
 export const TradeCount = styled(Typography)(({ theme }) => ({
   fontSize: '0.75rem',
   color: theme.palette.text.secondary,
-  fontWeight: 500
+  fontWeight: 500,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap'
 }));
 
 // Action button styled component
