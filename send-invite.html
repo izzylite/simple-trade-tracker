@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invite Management - TradeJourno</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      color: #1976d2;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .auth-section {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      background: white;
+      padding: 10px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .tab {
+      flex: 1;
+      padding: 15px 20px;
+      background: #f5f5f5;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      color: #666;
+    }
+
+    .tab:hover {
+      background: #e0e0e0;
+    }
+
+    .tab.active {
+      background: linear-gradient(135deg, #1976d2, #9c27b0);
+      color: white;
+    }
+
+    .tab-content {
+      display: none;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #1976d2;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    button {
+      background: linear-gradient(135deg, #1976d2, #9c27b0);
+      color: white;
+      padding: 14px 28px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(25, 118, 210, 0.4);
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    button.secondary {
+      background: #f44336;
+    }
+
+    button.secondary:hover {
+      box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
+    }
+
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      display: none;
+      animation: slideIn 0.3s;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .result.success {
+      background: #d4edda;
+      color: #155724;
+      border: 2px solid #c3e6cb;
+    }
+
+    .result.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 2px solid #f5c6cb;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      margin-top: 20px;
+      color: #1976d2;
+      font-weight: 600;
+    }
+
+    .loading::after {
+      content: '...';
+      animation: dots 1.5s steps(4, end) infinite;
+    }
+
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    th {
+      background: #f5f5f5;
+      font-weight: 600;
+      color: #333;
+    }
+
+    tr:hover {
+      background: #f9f9f9;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge.active {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .badge.expired {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .badge.used {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .action-buttons button {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    small {
+      color: #666;
+      font-size: 12px;
+      display: block;
+      margin-top: 5px;
+    }
+
+    .info-box {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border-left: 4px solid #1976d2;
+    }
+
+    .info-box p {
+      margin: 5px 0;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      border-radius: 12px;
+      color: white;
+    }
+
+    .stat-card h3 {
+      font-size: 32px;
+      margin-bottom: 5px;
+    }
+
+    .stat-card p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🎫 Invite Management System</h1>
+      <p>Create, send, and manage invite codes for TradeJourno</p>
+    </div>
+
+    <!-- Authentication Section -->
+    <div class="auth-section">
+      <div class="form-group">
+        <label for="serviceRoleKey">🔑 Supabase Service Role Key</label>
+        <input
+          type="password"
+          id="serviceRoleKey"
+          placeholder="Paste your Supabase service role key here..."
+          required
+        />
+        <small>⚠️ Keep this key secure! Never share it or commit it to version control.</small>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('create')">➕ Create Invite</button>
+      <button class="tab" onclick="switchTab('send')">📧 Send Invite</button>
+      <button class="tab" onclick="switchTab('view')">👥 View Invites</button>
+      <button class="tab" onclick="switchTab('users')">📊 Users</button>
+    </div>
+
+    <!-- Create Invite Tab -->
+    <div id="create-tab" class="tab-content active">
+      <h2 style="margin-bottom: 20px; color: #333;">Create New Invite Code</h2>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="createCode">Invite Code</label>
+          <input
+            type="text"
+            id="createCode"
+            placeholder="e.g., WELCOME2024"
+            required
+          />
+          <small>Unique code for the invite (uppercase letters and numbers)</small>
+        </div>
+
+        <div class="form-group">
+          <label for="createMaxUses">Max Uses</label>
+          <input
+            type="number"
+            id="createMaxUses"
+            placeholder="10"
+            min="1"
+            value="10"
+            required
+          />
+          <small>Maximum number of times this code can be used</small>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="createExpiresAt">Expiration Date</label>
+        <input
+          type="datetime-local"
+          id="createExpiresAt"
+          required
+        />
+        <small>When this invite code will expire</small>
+      </div>
+
+      <button onclick="createInvite()">Create Invite Code</button>
+
+      <div class="loading" id="create-loading">Creating invite code</div>
+      <div id="create-result" class="result"></div>
+    </div>
+
+    <!-- Send Invite Tab -->
+    <div id="send-tab" class="tab-content">
+      <h2 style="margin-bottom: 20px; color: #333;">Send Invite Email</h2>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="sendEmail">Recipient Email</label>
+          <input
+            type="email"
+            id="sendEmail"
+            placeholder="user@example.com"
+            required
+          />
+          <small>Email address to send the invite to</small>
+        </div>
+
+        <div class="form-group">
+          <label for="sendCode">Invite Code</label>
+          <input
+            type="text"
+            id="sendCode"
+            placeholder="WELCOME2024"
+            required
+          />
+          <small>The invite code to include in the email</small>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="sendMaxUses">Max Uses</label>
+          <input
+            type="number"
+            id="sendMaxUses"
+            placeholder="10"
+            min="1"
+            value="10"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="sendExpiresAt">Expiration Date</label>
+          <input
+            type="datetime-local"
+            id="sendExpiresAt"
+            required
+          />
+        </div>
+      </div>
+
+      <button onclick="sendInvite()">Send Invite Email</button>
+
+      <div class="loading" id="send-loading">Sending invite email</div>
+      <div id="send-result" class="result"></div>
+    </div>
+
+    <!-- View Invites Tab -->
+    <div id="view-tab" class="tab-content">
+      <h2 style="margin-bottom: 20px; color: #333;">All Invite Codes</h2>
+
+      <div class="stats" id="invite-stats">
+        <div class="stat-card">
+          <h3 id="total-invites">0</h3>
+          <p>Total Invites</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="active-invites">0</h3>
+          <p>Active Invites</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="used-invites">0</h3>
+          <p>Used Invites</p>
+        </div>
+      </div>
+
+      <button onclick="loadInvites()">🔄 Refresh Invites</button>
+
+      <div class="loading" id="view-loading">Loading invites</div>
+      <div id="view-result" class="result"></div>
+
+      <div id="invites-table"></div>
+    </div>
+
+    <!-- Users Tab -->
+    <div id="users-tab" class="tab-content">
+      <h2 style="margin-bottom: 20px; color: #333;">Users with Invite Codes</h2>
+
+      <button onclick="loadUsers()">🔄 Refresh Users</button>
+
+      <div class="loading" id="users-loading">Loading users</div>
+      <div id="users-result" class="result"></div>
+
+      <div id="users-table"></div>
+    </div>
+  </div>
+
+
+
+  <script>
+    const SUPABASE_URL = 'https://gwubzauelilziaqnsfac.supabase.co';
+
+    // Initialize default expiration date (1 year from now)
+    function initializeDates() {
+      const oneYearFromNow = new Date();
+      oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+      const dateString = oneYearFromNow.toISOString().slice(0, 16);
+
+      document.getElementById('createExpiresAt').value = dateString;
+      document.getElementById('sendExpiresAt').value = dateString;
+    }
+
+    // Switch between tabs
+    function switchTab(tabName) {
+      // Update tab buttons
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+      event.target.classList.add('active');
+
+      // Update tab content
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      document.getElementById(`${tabName}-tab`).classList.add('active');
+
+      // Load data for specific tabs
+      if (tabName === 'view') {
+        loadInvites();
+      } else if (tabName === 'users') {
+        loadUsers();
+      }
+    }
+
+    // Get service role key
+    function getServiceRoleKey() {
+      const key = document.getElementById('serviceRoleKey').value.trim();
+      if (!key) {
+        throw new Error('Please enter your Supabase service role key');
+      }
+      return key;
+    }
+
+    // Show result message
+    function showResult(elementId, message, isSuccess) {
+      const resultDiv = document.getElementById(elementId);
+      resultDiv.textContent = message;
+      resultDiv.className = `result ${isSuccess ? 'success' : 'error'}`;
+      resultDiv.style.display = 'block';
+
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        resultDiv.style.display = 'none';
+      }, 5000);
+    }
+
+    // Show/hide loading
+    function setLoading(elementId, isLoading) {
+      document.getElementById(elementId).style.display = isLoading ? 'block' : 'none';
+    }
+
+    // Create invite code
+    async function createInvite() {
+      try {
+        const serviceRoleKey = getServiceRoleKey();
+        const code = document.getElementById('createCode').value.trim().toUpperCase();
+        const maxUses = parseInt(document.getElementById('createMaxUses').value);
+        const expiresAt = new Date(document.getElementById('createExpiresAt').value).toISOString();
+
+        if (!code) {
+          throw new Error('Please enter an invite code');
+        }
+
+        setLoading('create-loading', true);
+
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/invite_links`, {
+          method: 'POST',
+          headers: {
+            'apikey': serviceRoleKey,
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            code: code,
+            max_uses: maxUses,
+            uses_remaining: maxUses,
+            expires_at: expiresAt,
+            is_active: true
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to create invite code');
+        }
+
+        const data = await response.json();
+        showResult('create-result', `✅ Invite code "${code}" created successfully!`, true);
+
+        // Clear form
+        document.getElementById('createCode').value = '';
+        document.getElementById('createMaxUses').value = '10';
+        initializeDates();
+
+      } catch (error) {
+        showResult('create-result', `❌ Error: ${error.message}`, false);
+      } finally {
+        setLoading('create-loading', false);
+      }
+    }
+
+    // Send invite email
+    async function sendInvite() {
+      try {
+        const serviceRoleKey = getServiceRoleKey();
+        const email = document.getElementById('sendEmail').value.trim();
+        const inviteCode = document.getElementById('sendCode').value.trim().toUpperCase();
+        const maxUses = parseInt(document.getElementById('sendMaxUses').value);
+        const expiresAt = new Date(document.getElementById('sendExpiresAt').value).toISOString();
+
+        if (!email || !inviteCode) {
+          throw new Error('Please enter both email and invite code');
+        }
+
+        setLoading('send-loading', true);
+
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/send-invite-email`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: email,
+            inviteCode: inviteCode,
+            expiresAt: expiresAt,
+            maxUses: maxUses
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || data.message || 'Failed to send invite email');
+        }
+
+        showResult('send-result', `✅ Invite email sent successfully to ${email}!`, true);
+
+        // Clear form
+        document.getElementById('sendEmail').value = '';
+
+      } catch (error) {
+        showResult('send-result', `❌ Error: ${error.message}`, false);
+      } finally {
+        setLoading('send-loading', false);
+      }
+    }
+
+
+    // Load all invite codes
+    async function loadInvites() {
+      try {
+        const serviceRoleKey = getServiceRoleKey();
+        setLoading('view-loading', true);
+
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/invite_links?select=*&order=created_at.desc`, {
+          method: 'GET',
+          headers: {
+            'apikey': serviceRoleKey,
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load invite codes');
+        }
+
+        const invites = await response.json();
+
+        // Update stats
+        const now = new Date();
+        const activeInvites = invites.filter(inv =>
+          inv.is_active &&
+          (!inv.expires_at || new Date(inv.expires_at) > now) &&
+          (inv.uses_remaining === null || inv.uses_remaining > 0)
+        );
+        const usedInvites = invites.filter(inv => inv.uses_remaining !== null && inv.uses_remaining === 0);
+
+        document.getElementById('total-invites').textContent = invites.length;
+        document.getElementById('active-invites').textContent = activeInvites.length;
+        document.getElementById('used-invites').textContent = usedInvites.length;
+
+        // Display table
+        displayInvitesTable(invites);
+
+      } catch (error) {
+        showResult('view-result', `❌ Error: ${error.message}`, false);
+      } finally {
+        setLoading('view-loading', false);
+      }
+    }
+
+    // Display invites in a table
+    function displayInvitesTable(invites) {
+      const tableContainer = document.getElementById('invites-table');
+
+      if (invites.length === 0) {
+        tableContainer.innerHTML = '<p style="text-align: center; color: #666; margin-top: 20px;">No invite codes found</p>';
+        return;
+      }
+
+      const now = new Date();
+
+      let html = `
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Status</th>
+              <th>Uses</th>
+              <th>Expires</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      invites.forEach(invite => {
+        const expiresAt = invite.expires_at ? new Date(invite.expires_at) : null;
+        const isExpired = expiresAt && expiresAt < now;
+        const isFullyUsed = invite.uses_remaining !== null && invite.uses_remaining === 0;
+        const isActive = invite.is_active && !isExpired && !isFullyUsed;
+
+        let statusBadge = '';
+        if (isActive) {
+          statusBadge = '<span class="badge active">Active</span>';
+        } else if (isExpired) {
+          statusBadge = '<span class="badge expired">Expired</span>';
+        } else if (isFullyUsed) {
+          statusBadge = '<span class="badge used">Fully Used</span>';
+        } else {
+          statusBadge = '<span class="badge expired">Inactive</span>';
+        }
+
+        const usedCount = invite.max_uses !== null ? (invite.max_uses - (invite.uses_remaining || 0)) : invite.used_count || 0;
+        const maxUsesDisplay = invite.max_uses !== null ? invite.max_uses : '∞';
+
+        html += `
+          <tr>
+            <td><strong>${invite.code}</strong></td>
+            <td>${statusBadge}</td>
+            <td>${usedCount} / ${maxUsesDisplay}</td>
+            <td>${expiresAt ? expiresAt.toLocaleDateString() : 'Never'}</td>
+            <td>${new Date(invite.created_at).toLocaleDateString()}</td>
+            <td>
+              <div class="action-buttons">
+                <button onclick="deleteInvite('${invite.id}', '${invite.code}')" class="secondary">Delete</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `
+          </tbody>
+        </table>
+      `;
+
+      tableContainer.innerHTML = html;
+    }
+
+    // Delete invite code
+    async function deleteInvite(inviteId, code) {
+      if (!confirm(`Are you sure you want to delete invite code "${code}"?`)) {
+        return;
+      }
+
+      try {
+        const serviceRoleKey = getServiceRoleKey();
+
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/invite_links?id=eq.${inviteId}`, {
+          method: 'DELETE',
+          headers: {
+            'apikey': serviceRoleKey,
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to delete invite code');
+        }
+
+        showResult('view-result', `✅ Invite code "${code}" deleted successfully!`, true);
+        loadInvites(); // Reload the list
+
+      } catch (error) {
+        showResult('view-result', `❌ Error: ${error.message}`, false);
+      }
+    }
+
+    // Load users with invite codes
+    async function loadUsers() {
+      try {
+        const serviceRoleKey = getServiceRoleKey();
+        setLoading('users-loading', true);
+
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/users?select=*&order=created_at.desc&not.is.invite_code_used,null`, {
+          method: 'GET',
+          headers: {
+            'apikey': serviceRoleKey,
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load users');
+        }
+
+        const users = await response.json();
+        displayUsersTable(users);
+
+      } catch (error) {
+        showResult('users-result', `❌ Error: ${error.message}`, false);
+      } finally {
+        setLoading('users-loading', false);
+      }
+    }
+
+
+    // Display users in a table
+    function displayUsersTable(users) {
+      const tableContainer = document.getElementById('users-table');
+
+      if (users.length === 0) {
+        tableContainer.innerHTML = '<p style="text-align: center; color: #666; margin-top: 20px;">No users with invite codes found</p>';
+        return;
+      }
+
+      let html = `
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Display Name</th>
+              <th>Invite Code Used</th>
+              <th>Joined</th>
+              <th>Last Active</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      users.forEach(user => {
+        html += `
+          <tr>
+            <td>${user.email || 'N/A'}</td>
+            <td>${user.display_name || 'N/A'}</td>
+            <td><strong>${user.invite_code_used || 'N/A'}</strong></td>
+            <td>${user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</td>
+            <td>${user.last_active ? new Date(user.last_active).toLocaleDateString() : 'N/A'}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+          </tbody>
+        </table>
+      `;
+
+      tableContainer.innerHTML = html;
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      initializeDates();
+
+      // Try to load service role key from localStorage (for convenience)
+      const savedKey = localStorage.getItem('supabase_service_role_key');
+      if (savedKey) {
+        document.getElementById('serviceRoleKey').value = savedKey;
+      }
+
+      // Save service role key to localStorage when changed
+      document.getElementById('serviceRoleKey').addEventListener('change', function() {
+        const key = this.value.trim();
+        if (key) {
+          localStorage.setItem('supabase_service_role_key', key);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

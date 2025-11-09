@@ -33,7 +33,6 @@ import {
 import { logger } from '../utils/logger';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/SupabaseAuthContext';
-import AppHeader from './common/AppHeader';
 import {
   AnimatedSlideLeft,
   AnimatedSlideRight

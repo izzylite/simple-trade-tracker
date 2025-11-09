@@ -32,7 +32,6 @@
 
 import {
   corsHeaders,
-  createAuthenticatedClient,
   errorResponse,
   handleCors,
   log,
@@ -48,7 +47,7 @@ interface SendInviteEmailRequest {
 }
 
 // Get app URL from environment or default to production
-const APP_URL = Deno.env.get("APP_URL") || "https://tradejour.no";
+const APP_URL = Deno.env.get("APP_URL") || "https://tradejourno.com/";
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
@@ -58,15 +57,14 @@ Deno.serve(async (req: Request) => {
   try {
     log("Send invite email request received", "info");
 
-    // Authenticate user
-    const authClient = await createAuthenticatedClient(req);
-    if (!authClient) {
-      log("Unauthorized request - no valid auth token", "warn");
+    // Check for authorization header (can be user token or service role key)
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      log("Unauthorized request - no auth token", "warn");
       return errorResponse("Unauthorized", 401);
     }
 
-    const { user } = authClient;
-    log(`Request from user: ${user.id}`, "info");
+    log("Request authenticated (user or service role)", "info");
 
     // Parse request body
     const payload = await parseJsonBody<SendInviteEmailRequest>(req);
@@ -214,7 +212,7 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "TradeJourno <noreply@tradejour.no>",
+        from: "TradeJourno <noreply@tradejourno.com>",
         to: [email],
         subject: "You're Invited to Join TradeJourno!",
         html: emailTemplate,

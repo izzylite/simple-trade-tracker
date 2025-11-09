@@ -7,6 +7,7 @@ import {
   Button,
   TextField,
   useTheme,
+  useMediaQuery,
   alpha,
   Paper,
   Alert,
@@ -287,8 +288,8 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
       <Box
         sx={{
           background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-          py: 5,
-          px: 3,
+          py: { xs: 3, sm: 4, md: 5 },
+          px: { xs: 2, sm: 3 },
           textAlign: 'center'
         }}
       >
@@ -296,7 +297,7 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
         <Box
           sx={{
             margin: '0 auto',
-            mb: 3
+            mb: { xs: 2, sm: 2.5, md: 3 }
           }}
         >
           <Box
@@ -304,31 +305,54 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
             src="/android-chrome-192x192.png"
             alt="Cotex Logo"
             sx={{
-              width: 80,
-              height: 80,
-              borderRadius: '20px',
+              width: { xs: 60, sm: 70, md: 80 },
+              height: { xs: 60, sm: 70, md: 80 },
+              borderRadius: { xs: '16px', sm: '18px', md: '20px' },
               boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.3)}`,
             }}
           />
         </Box>
 
         {/* Title */}
-        <Typography variant="h4" sx={{ color: 'white', fontWeight: 700, mb: 1 }}>
+        <Typography
+          variant="h4"
+          sx={{
+            color: 'white',
+            fontWeight: 700,
+            mb: 1,
+            fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+          }}
+        >
           {title}
         </Typography>
 
         {/* Subtitle */}
-        <Typography variant="body1" sx={{ color: alpha(theme.palette.common.white, 0.9) }}>
+        <Typography
+          variant="body1"
+          sx={{
+            color: alpha(theme.palette.common.white, 0.9),
+            fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+            px: { xs: 1, sm: 0 }
+          }}
+        >
           {currentStep === 'invite' ? 'Enter your invite code to get started' : subtitle}
         </Typography>
       </Box>
 
       {/* Content Section */}
-      <Box sx={{ p: 4 }}>
+      <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
         {/* Step 1: Invite Code Verification */}
         {currentStep === 'invite' && (
           <Box>
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
+            <Typography
+              variant="subtitle2"
+              color="text.secondary"
+              sx={{
+                mb: 2,
+                textAlign: 'center',
+                fontSize: { xs: '0.8125rem', sm: '0.875rem' }
+              }}
+            >
               You need an invite code to create an account
             </Typography>
 
@@ -365,8 +389,8 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
               onClick={handleVerifyInvite}
               disabled={inviteVerifying || !inviteCode.trim()}
               sx={{
-                py: 1.5,
-                fontSize: '1rem',
+                py: { xs: 1.25, sm: 1.5 },
+                fontSize: { xs: '0.9375rem', sm: '1rem' },
                 fontWeight: 600,
                 textTransform: 'none'
               }}
@@ -382,12 +406,16 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
             </Button>
 
             {showFeatures && (
-              <Box sx={{ mt: 4 }}>
+              <Box sx={{ mt: { xs: 3, sm: 4 } }}>
                 <Divider sx={{ mb: 2 }} />
                 <Typography
                   variant="subtitle2"
                   color="text.secondary"
-                  sx={{ textAlign: 'center', mb: 2 }}
+                  sx={{
+                    textAlign: 'center',
+                    mb: 2,
+                    fontSize: { xs: '0.8125rem', sm: '0.875rem' }
+                  }}
                 >
                   What you'll get:
                 </Typography>
@@ -395,8 +423,8 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
                   sx={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 2,
-                    maxHeight: '250px',
+                    gap: { xs: 1.5, sm: 2 },
+                    maxHeight: { xs: '200px', sm: '250px', md: '300px' },
                     overflow: 'auto',
                     pr: 1,
                     ...scrollbarStyles(theme)
@@ -406,23 +434,36 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
                     <Paper
                       key={index}
                       sx={{
-                        p: 2,
+                        p: { xs: 1.5, sm: 2 },
                         display: 'flex',
-                        gap: 2,
+                        gap: { xs: 1.5, sm: 2 },
                         alignItems: 'flex-start',
                         bgcolor: alpha(theme.palette.background.default, 0.5),
                         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                        borderRadius: 2
+                        borderRadius: { xs: 1.5, sm: 2 }
                       }}
                     >
                       <Box sx={{ flexShrink: 0 }}>
                         {feature.icon}
                       </Box>
-                      <Box>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{
+                            fontWeight: 600,
+                            mb: 0.5,
+                            fontSize: { xs: '0.8125rem', sm: '0.875rem' }
+                          }}
+                        >
                           {feature.title}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                          }}
+                        >
                           {feature.description}
                         </Typography>
                       </Box>
@@ -528,8 +569,8 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
               onClick={emailAuthType === 'signin' ? handleEmailSignIn : handleEmailSignUp}
               disabled={authLoading || !email.trim() || !password.trim()}
               sx={{
-                py: 1.5,
-                fontSize: '1rem',
+                py: { xs: 1.25, sm: 1.5 },
+                fontSize: { xs: '0.9375rem', sm: '1rem' },
                 fontWeight: 600,
                 textTransform: 'none',
                 mb: 2
@@ -625,8 +666,8 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
               onClick={handleGoogleSignIn}
               disabled={authLoading}
               sx={{
-                py: 1.5,
-                fontSize: '1rem',
+                py: { xs: 1.25, sm: 1.5 },
+                fontSize: { xs: '0.9375rem', sm: '1rem' },
                 fontWeight: 600,
                 textTransform: 'none',
                 borderColor: alpha(theme.palette.divider, 0.3),
@@ -655,11 +696,25 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
               Back to Sign In
             </Button>
 
-            <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
+            <Typography
+              variant="h6"
+              sx={{
+                mb: 1,
+                fontWeight: 600,
+                fontSize: { xs: '1.125rem', sm: '1.25rem' }
+              }}
+            >
               Reset Your Password
             </Typography>
 
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                mb: 3,
+                fontSize: { xs: '0.8125rem', sm: '0.875rem' }
+              }}
+            >
               Enter your email address and we'll send you a link to reset your password.
             </Typography>
 
@@ -705,8 +760,8 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
               onClick={handlePasswordReset}
               disabled={resetLoading || !resetEmail.trim()}
               sx={{
-                py: 1.5,
-                fontSize: '1rem',
+                py: { xs: 1.25, sm: 1.5 },
+                fontSize: { xs: '0.9375rem', sm: '1rem' },
                 fontWeight: 600,
                 textTransform: 'none',
                 mb: 2
@@ -750,7 +805,13 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
         <Typography
           variant="caption"
           color="text.secondary"
-          sx={{ textAlign: 'center', mt: 3, display: 'block' }}
+          sx={{
+            textAlign: 'center',
+            mt: { xs: 2, sm: 3 },
+            display: 'block',
+            fontSize: { xs: '0.6875rem', sm: '0.75rem' },
+            px: { xs: 1, sm: 0 }
+          }}
         >
           By signing in, you agree to our Terms of Service and Privacy Policy
         </Typography>
@@ -772,6 +833,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
   showFeatures = true,
 }) => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   return (
     <Dialog
@@ -779,18 +841,27 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
       onClose={onClose}
       maxWidth="sm"
       fullWidth
+      fullScreen={isMobile}
       {...dialogProps}
       PaperProps={{
         sx: {
-          borderRadius: 3,
+          borderRadius: isMobile ? 0 : 3,
           overflow: 'hidden',
           background: theme.palette.mode === 'dark'
             ? `linear-gradient(145deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.default, 0.98)} 100%)`
             : `linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.98) 100%)`,
+          m: isMobile ? 0 : undefined,
+          maxHeight: isMobile ? '100vh' : '90vh',
         }
       }}
     >
-      <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
+      <DialogContent
+        sx={{
+          p: 0,
+          overflow: 'auto',
+          ...scrollbarStyles(theme)
+        }}
+      >
         <LoginPromptContent
           title={title}
           subtitle={subtitle}
