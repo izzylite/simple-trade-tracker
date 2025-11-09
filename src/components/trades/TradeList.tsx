@@ -10,7 +10,12 @@ import {
   Theme,
   CircularProgress,
   Checkbox,
-  Button
+  Button,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  useMediaQuery
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -23,7 +28,8 @@ import {
   Schedule as SessionIcon,
   SelectAll as SelectAllIcon,
   DeleteSweep as DeleteMultipleIcon,
-  KeyboardArrowDown as LoadMoreIcon
+  KeyboardArrowDown as LoadMoreIcon,
+  MoreVert as MoreVertIcon
 } from '@mui/icons-material';
 import { Trade } from '../../types/dualWrite';
 import { TradeListItem, TradeInfo, TradeActions } from '../StyledComponents';
@@ -84,6 +90,34 @@ const TradeList: React.FC<TradeListProps> = ({
   const theme = useTheme();
   const [selectedTradeIds, setSelectedTradeIds] = useState<string[]>([]);
   const [displayedCount, setDisplayedCount] = useState<number>(initialPageSize);
+
+  // Menu state for per-trade actions
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [menuTrade, setMenuTrade] = useState<Trade | null>(null);
+
+  // Responsive helpers
+  const isSmDown = useMediaQuery(theme.breakpoints.down('sm'));
+
+  const handleOpenMenu = (e: React.MouseEvent<HTMLElement>, trade: Trade) => {
+    e.stopPropagation();
+    setMenuAnchorEl(e.currentTarget);
+    setMenuTrade(trade);
+  };
+
+  const handleCloseMenu = () => {
+    setMenuAnchorEl(null);
+    setMenuTrade(null);
+  };
+
+  const handleEditSelected = () => {
+    if (menuTrade) onEditClick(menuTrade);
+    handleCloseMenu();
+  };
+
+  const handleDeleteSelected = () => {
+    if (menuTrade) onDeleteClick(menuTrade.id);
+    handleCloseMenu();
+  };
 
   // Reset displayed count when trades array changes (e.g., filtering, new data)
   useEffect(() => {
@@ -208,6 +242,7 @@ const TradeList: React.FC<TradeListProps> = ({
                 $type={trade.trade_type}
                 onClick={isTradeBeingDeleted(trade.id) ? undefined : () => onTradeClick(trade.id)}
                 sx={{
+                  p: { xs: 1, sm: 1.25, md: 1.5 },
                   cursor: isTradeBeingDeleted(trade.id) ? 'default' : 'pointer',
                   ...(trade.is_temporary && {
                     opacity: 0.7,
@@ -257,7 +292,8 @@ const TradeList: React.FC<TradeListProps> = ({
                         </Box>
                       )}
                       <Typography variant="body1" sx={{
-                        fontWeight: 500,
+                        fontSize: { xs: '0.95rem', sm: '1rem', md: '1.05rem' },
+                        fontWeight: 600,
                         color: trade.trade_type === 'win'
                           ? 'success.main'
                           : trade.trade_type === 'loss'
@@ -266,7 +302,7 @@ const TradeList: React.FC<TradeListProps> = ({
                       }}>
                         ${Math.abs(trade.amount).toLocaleString()}
                       </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1.5, alignItems: 'center', mt: 0.5, flexWrap: 'wrap' }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'row', gap: { xs: 0.75, sm: 1, md: 1.5 }, alignItems: 'center', mt: { xs: 0.25, sm: 0.5 }, flexWrap: 'wrap' }}>
                         {trade.images && trade.images.length > 0 && (
                           <Tooltip title={`${trade.images.length} image${trade.images.length > 1 ? 's' : ''}`}>
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -443,43 +479,46 @@ const TradeList: React.FC<TradeListProps> = ({
 
                 {!hideActions && (
                   <TradeActions>
-                    {!isTradeBeingDeleted(trade.id) && (
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEditClick(trade);
-                        }}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    )}
                     <IconButton
                       size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteClick(trade.id);
-                      }}
+                      onClick={(e) => handleOpenMenu(e, trade)}
                       disabled={isTradeBeingDeleted(trade.id)}
-                      sx={{
-                        position: 'relative',
-                        ...(isTradeBeingDeleted(trade.id) && {
-                          '&.Mui-disabled': {
-                            color: 'error.main',
-                            opacity: 0.7
-                          }
-                        })
-                      }}
+                      aria-label="More actions"
+                      aria-controls={menuTrade?.id === trade.id ? 'trade-actions-menu' : undefined}
+                      aria-haspopup="true"
                     >
                       {isTradeBeingDeleted(trade.id) ? (
-                        <CircularProgress
-                          size={16}
-                          color="error" 
-                        />
+                        <CircularProgress size={16} />
                       ) : (
-                        <DeleteIcon fontSize="small" />
+                        <MoreVertIcon fontSize="small" />
                       )}
                     </IconButton>
+                    <Menu
+                      id="trade-actions-menu"
+                      anchorEl={menuAnchorEl}
+                      open={Boolean(menuAnchorEl) && menuTrade?.id === trade.id}
+                      onClose={handleCloseMenu}
+                      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                      transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                      PaperProps={{ sx: { minWidth: 160 } }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MenuItem onClick={(e) => { e.stopPropagation(); handleEditSelected(); }}>
+                        <ListItemIcon>
+                          <EditIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText primary="Edit" />
+                      </MenuItem>
+                      <MenuItem
+                        onClick={(e) => { e.stopPropagation(); handleDeleteSelected(); }}
+                        disabled={isTradeBeingDeleted(trade.id)}
+                      >
+                        <ListItemIcon>
+                          <DeleteIcon fontSize="small" color="error" />
+                        </ListItemIcon>
+                        <ListItemText primary="Delete" />
+                      </MenuItem>
+                    </Menu>
                   </TradeActions>
                 )}
               </TradeListItem>
