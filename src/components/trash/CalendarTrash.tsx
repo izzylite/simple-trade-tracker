@@ -314,7 +314,7 @@ const CalendarTrash: React.FC = () => {
                     sx={{
                       position: 'relative',
                       overflow: 'hidden',
-                      height: 200,
+                      height: { xs: 160, sm: 200 },
                       flexShrink: 0
                     }}
                   >

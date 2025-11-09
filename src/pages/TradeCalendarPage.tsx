@@ -1366,7 +1366,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               display: 'grid',
               gridTemplateColumns: { xs: 'repeat(7, 1fr)', sm: 'repeat(8, 1fr)' },
               gap: { xs: 1, md: 1.5 },
-              minHeight: '400px'
+              minHeight: { xs: 'auto', md: '400px' }
             }}>
               {eachWeekOfInterval(
                 {

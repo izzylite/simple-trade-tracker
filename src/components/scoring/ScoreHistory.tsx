@@ -7,6 +7,8 @@ import {
   useTheme,
   Stack
 } from '@mui/material';
+import { useMediaQuery } from '@mui/material';
+
 import { alpha } from '@mui/material/styles';
 import {
   LineChart,
@@ -36,6 +38,7 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
   onPeriodChange
 }) => {
   const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Define tabs for period selection
   const periodTabs = [
@@ -133,8 +136,8 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
   }, [chartData]);
 
   const latestScore = chartData.length > 0 ? chartData[chartData.length - 1].overall : 0;
-  const scoreChange = chartData.length > 1 
-    ? latestScore - chartData[chartData.length - 2].overall 
+  const scoreChange = chartData.length > 1
+    ? latestScore - chartData[chartData.length - 2].overall
     : 0;
 
   return (
@@ -181,7 +184,7 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
         ) : (
           <>
             {/* Summary Stats */}
-            <Stack direction="row" spacing={3} mb={3}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} mb={3}>
               <Box>
                 <Typography variant="h4" sx={{ color: getScoreColor(latestScore), fontWeight: 'bold' }}>
                   {latestScore.toFixed(0)}%
@@ -191,9 +194,9 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
                 </Typography>
               </Box>
               <Box>
-                <Typography 
-                  variant="h4" 
-                  sx={{ 
+                <Typography
+                  variant="h4"
+                  sx={{
                     color: scoreChange >= 0 ? theme.palette.success.main : theme.palette.error.main,
                     fontWeight: 'bold'
                   }}
@@ -215,7 +218,7 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
             </Stack>
 
             {/* Main Chart */}
-            <Box sx={{ height: 300, mb: 2 }}>
+            <Box sx={{ height: { xs: 220, sm: 300 }, mb: 2 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
                   <defs>
@@ -260,7 +263,7 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
             <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
               Score Components
             </Typography>
-            <Box sx={{ height: 200 }}>
+            <Box sx={{ height: { xs: 160, sm: 200 } }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
                   <CartesianGrid

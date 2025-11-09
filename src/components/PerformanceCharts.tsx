@@ -176,7 +176,6 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     const calendar = calendars.find(c => c.id === calendarId);
     return calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS;
   });
-  const [comparisonTags, setComparisonTags] = useState<string[]>([]);
   const [multipleTradesDialog, setMultipleTradesDialog] = useState<{
     open: boolean;
     trades: Trade[];
@@ -337,7 +336,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
           selectedDate,
           timePeriod,
           accountBalance,
-          comparisonTags
+          [] // No comparison tags
         );
         setPerformanceData(data);
       } catch (error) {
@@ -351,7 +350,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
 
     calculatePerformanceAsync();
-  }, [calendarIds, selectedDate, timePeriod, accountBalance, comparisonTags]);
+  }, [calendarIds, selectedDate, timePeriod, accountBalance]);
 
   const handleTimePeriodChange = (newValue: TimePeriod) => {
     setTimePeriod(newValue);
@@ -404,9 +403,6 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
   // Get win/loss distribution data from async calculations
   const winLossData = performanceData?.winLossData || [];
-
-  // Get comparison win/loss data from async calculations
-  const comparisonWinLossData = performanceData?.comparisonWinLossData || null;
 
   // Get daily summary data from async calculations
   const dailySummaryData = performanceData?.dailySummaryData || [];
@@ -674,12 +670,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               <Suspense fallback={<ShimmerLoader variant="chart" height={chartHeights.large} />}>
                 <WinLossDistribution
                   winLossData={winLossData}
-                  comparisonWinLossData={comparisonWinLossData}
-                  allTags={allTags}
-                  comparisonTags={comparisonTags}
-                  setComparisonTags={setComparisonTags}
                   onPieClick={handlePieClick}
-                  tagStats={tagStats}
                 />
               </Suspense>
             </Box>

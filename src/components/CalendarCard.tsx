@@ -197,7 +197,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
         sx={{
           position: 'relative',
           overflow: 'hidden',
-          height: 200,
+          height: { xs: 160, sm: 200 },
           flexShrink: 0
         }}
       >

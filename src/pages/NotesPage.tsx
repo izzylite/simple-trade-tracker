@@ -19,6 +19,7 @@ import {
   DialogActions,
   Button,
   useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import { Add as AddIcon, SmartToy as SmartToyIcon } from '@mui/icons-material';
 
@@ -46,6 +47,7 @@ const NotesPage: React.FC<NotesPageProps> = ({ onToggleTheme, mode, onMenuClick 
   const navigate = useNavigate();
   const { user } = useAuth();
   const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [notes, setNotes] = useState<Note[]>([]);
 
@@ -199,23 +201,23 @@ const NotesPage: React.FC<NotesPageProps> = ({ onToggleTheme, mode, onMenuClick 
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
 
 
-    <Box sx={{ pt: 4, pb: 4, pl: 0, pr: 4, ...(scrollbarStyles(theme) as any) }}>
+    <Box sx={{ pt: { xs: 2, sm: 4 }, pb: { xs: 2, sm: 4 }, px: { xs: 2, sm: 4 }, ...(scrollbarStyles(theme) as any) }}>
           {/* Title/Subtitle and Tabs - Horizontal Layout */}
-            <Box sx={{ pt: 4, pb: 4, pl: 0, pr: 4 }}>
+            <Box sx={{ pt: { xs: 2, sm: 4 }, pb: { xs: 2, sm: 4 }, pl: 0, pr: { xs: 2, sm: 4 } }}>
             {/* Title and Subtitle */}
-            <Box sx={{ mb: 4, ml: 8, mr: 8 }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Box sx={{ mb: { xs: 2, sm: 3, md: 4 }, mx: { xs: 0, sm: 4, md: 8 } }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" sx={{ mb: { xs: 1.5, sm: 1 } }}>
                 <Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+                  <Typography variant={isXs ? 'h5' : 'h4'} sx={{ fontWeight: 700, mb: { xs: 0.5, sm: 1 } }}>
                     My Notes
                   </Typography>
-                  <Typography variant="body1" color="text.secondary">
+                  <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
                     Capture your thoughts, ideas, and trade insights in one place
                   </Typography>
                 </Box>
                 <RoundedTabs
                   tabs={tabs}
-                  size="large"
+                  size={isXs ? 'small' : 'large'}
                   activeTab={activeTab}
                   onTabChange={handleTabChange}
                 />
@@ -229,7 +231,7 @@ const NotesPage: React.FC<NotesPageProps> = ({ onToggleTheme, mode, onMenuClick 
             <TabPanel value={activeTab} index={0}>
               {/* Pinned notes section */}
               {pinnedNotes.length > 0 && (
-                <Box sx={{ mb: 4, ml: 8, mr: 8 }}>
+                <Box sx={{ mb: { xs: 2, sm: 3, md: 4 }, mx: { xs: 0, sm: 4, md: 8 } }}>
                   <Typography
                     variant="subtitle2"
                     sx={{
@@ -271,7 +273,7 @@ const NotesPage: React.FC<NotesPageProps> = ({ onToggleTheme, mode, onMenuClick 
 
               {/* Recently visited section */}
               {recentNotes.length > 0 && (
-                <Box sx={{ mb: 4, ml: 8, mr: 8 }}>
+                <Box sx={{ mb: { xs: 2, sm: 3, md: 4 }, mx: { xs: 0, sm: 4, md: 8 } }}>
                   <Typography
                     variant="subtitle2"
                     sx={{
@@ -326,7 +328,7 @@ const NotesPage: React.FC<NotesPageProps> = ({ onToggleTheme, mode, onMenuClick 
                     <Box
                       onClick={handleNewNote}
                       sx={{
-                        height: 310,
+                        height: { xs: 280, sm: 310 },
                         border: '2px dashed',
                         borderColor: 'divider',
                         borderRadius: 2,
@@ -354,7 +356,7 @@ const NotesPage: React.FC<NotesPageProps> = ({ onToggleTheme, mode, onMenuClick 
 
               {/* All notes (excluding recent) */}
               {otherUnpinnedNotes.length > 0 && (
-                <Box sx={{ mb: 4, ml: 8, mr: 8 }}>
+                <Box sx={{ mb: { xs: 2, sm: 3, md: 4 }, mx: { xs: 0, sm: 4, md: 8 } }}>
                   <Typography
                     variant="subtitle2"
                     sx={{
@@ -413,7 +415,7 @@ const NotesPage: React.FC<NotesPageProps> = ({ onToggleTheme, mode, onMenuClick 
               )}
 
               {loading && (
-                <Box sx={{ ml: 8, mr: 8 }}>
+                <Box sx={{ mx: { xs: 0, sm: 4, md: 8 } }}>
                   <Typography
                     variant="subtitle2"
                     sx={{
@@ -487,7 +489,7 @@ const NotesPage: React.FC<NotesPageProps> = ({ onToggleTheme, mode, onMenuClick 
             {/* Archived Tab */}
             <TabPanel value={activeTab} index={1}>
               {loading ? (
-                <Box sx={{ ml: 8, mr: 8 }}>
+                <Box sx={{ mx: { xs: 0, sm: 4, md: 8 } }}>
                   <Box
                     sx={{
                       display: 'grid',
@@ -531,9 +533,8 @@ const NotesPage: React.FC<NotesPageProps> = ({ onToggleTheme, mode, onMenuClick 
                 <Box
                   sx={{
                     textAlign: 'center',
-                    py: 8,
-                    ml: 8,
-                    mr: 8,
+                    py: { xs: 4, sm: 8 },
+                    mx: { xs: 0, sm: 4, md: 8 },
                   }}
                 >
                   <Typography variant="h6" color="text.secondary" gutterBottom>
@@ -554,8 +555,7 @@ const NotesPage: React.FC<NotesPageProps> = ({ onToggleTheme, mode, onMenuClick 
                       lg: 'repeat(5, 1fr)',
                     },
                     gap: 2,
-                    ml: 8,
-                    mr: 8,
+                    mx: { xs: 0, sm: 4, md: 8 },
                   }}
                 >
                   {archivedNotesSorted.map((note) => (
@@ -594,8 +594,8 @@ const NotesPage: React.FC<NotesPageProps> = ({ onToggleTheme, mode, onMenuClick 
             onClick={() => setIsAIChatOpen(true)}
             sx={{
               position: 'fixed',
-              bottom: 96,
-              right: 24,
+              bottom: { xs: 88, sm: 96 },
+              right: { xs: 16, sm: 24 },
               zIndex: 1200
             }}
           >
@@ -611,8 +611,8 @@ const NotesPage: React.FC<NotesPageProps> = ({ onToggleTheme, mode, onMenuClick 
           onClick={handleNewNote}
           sx={{
             position: 'fixed',
-            bottom: 24,
-            right: 24,
+            bottom: { xs: 16, sm: 24 },
+            right: { xs: 16, sm: 24 },
           }}
         >
           <AddIcon />

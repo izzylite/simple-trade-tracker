@@ -36,6 +36,8 @@ import { EconomicEvent } from '../types/economicCalendar';
 import { formatCurrency } from '../utils/formatters';
 import { economicCalendarService } from '../services/economicCalendarService';
 import { TradeRepository } from '../services/repository/repositories/TradeRepository';
+import { useRecentTrades } from '../hooks/useRecentTrades';
+import { useUpcomingEconomicEvents } from '../hooks/useUpcomingEconomicEvents';
 
 import Shimmer from '../components/Shimmer';
 import CalendarCard from '../components/CalendarCard';
@@ -56,8 +58,8 @@ import { createNewTradeData } from './TradeCalendarPage';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import { v4 as uuidv4 } from 'uuid';
 import { DuplicateCalendarDialog } from '../components/dialogs/DuplicateCalendarDialog';
-import PerformanceCharts from '../components/PerformanceCharts';
-import { Close as CloseIcon } from '@mui/icons-material';
+
+
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 
 interface HomeProps {
@@ -97,15 +99,21 @@ const Home: React.FC<HomeProps> = ({
   const theme = useTheme();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [economicEvents, setEconomicEvents] = useState<EconomicEvent[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(false);
+
+  // Use custom hooks for data fetching with SWR caching
+  const { economicEvents, isLoading: loadingEvents } = useUpcomingEconomicEvents({
+    impacts: ['High', 'Medium'],
+    refreshInterval: 300000, // Refresh every 5 minutes
+  });
+  const { recentTrades, isLoading: loadingTrades } = useRecentTrades(user?.uid, calendars, {
+    limit: 5,
+  });
+
   const [economicCalendarOpen, setEconomicCalendarOpen] = useState(false);
   const [isCreateCalendarDialogOpen, setIsCreateCalendarDialogOpen] = useState(false);
   const [isCreatingCalendar, setIsCreatingCalendar] = useState(false);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
-  const [showPerformanceDialog, setShowPerformanceDialog] = useState(false);
-  const [performanceTrades, setPerformanceTrades] = useState<Trade[]>([]);
-  const [loadingPerformanceTrades, setLoadingPerformanceTrades] = useState(false);
+
 
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
@@ -138,26 +146,7 @@ const Home: React.FC<HomeProps> = ({
       .slice(0, limit);
   }, [calendars, isLargeScreen]);
 
-  // Fetch trades when performance dialog opens
-  useEffect(() => {
-    const fetchTrades = async () => {
-      if (!showPerformanceDialog || !user?.uid) return;
 
-      setLoadingPerformanceTrades(true);
-      try {
-        const tradeRepository = new TradeRepository();
-        const trades = await tradeRepository.findByUserId(user.uid);
-        setPerformanceTrades(trades);
-      } catch (error) {
-        logger.error('Error fetching trades for performance dialog:', error);
-        setPerformanceTrades([]);
-      } finally {
-        setLoadingPerformanceTrades(false);
-      }
-    };
-
-    fetchTrades();
-  }, [showPerformanceDialog, user?.uid]);
 
   // Calendar action handlers - open dialogs for edit/duplicate/delete
   const handleEditCalendar = (calendar: CalendarWithUIState) => {
@@ -269,85 +258,7 @@ const Home: React.FC<HomeProps> = ({
     };
   }, [calendars]);
 
-  // State for recent trades
-  const [recentTrades, setRecentTrades] = useState<(Trade & { calendarName: string })[]>([]);
-  const [loadingTrades, setLoadingTrades] = useState(false);
 
-  // Fetch recent trades from Supabase
-  useEffect(() => {
-    const fetchRecentTrades = async () => {
-      if (!user?.uid) return;
-        if (recentTrades.length > 0) return;
-
-      setLoadingTrades(true);
-      try {
-        const tradeRepository = new TradeRepository();
-        // Fetch trades ordered by trade_date (descending) with limit of 6
-        const allTrades = await tradeRepository.findByUserId(user.uid, {
-          limit: 5,
-          orderBy: 'trade_date',
-          ascending: false
-        });
-
-        // Map trades with calendar names
-        const tradesWithCalendarNames = allTrades.map(trade => {
-          const calendar = calendars.find(cal => cal.id === trade.calendar_id);
-          return {
-            ...trade,
-            calendarName: calendar?.name || 'Unknown Calendar'
-          };
-        });
-        
-        setRecentTrades(tradesWithCalendarNames);
-      } catch (error) {
-        logger.error('Error fetching recent trades:', error);
-      } finally {
-        setLoadingTrades(false);
-      }
-    };
-
-    fetchRecentTrades();
-  }, [user?.uid, calendars]);
-
-  // Fetch economic events for current month
-  useEffect(() => {
-    const fetchEconomicEvents = async () => {
-      setLoadingEvents(true);
-      try {
-        const now = new Date();
-        const today = format(now, 'yyyy-MM-dd');
-
-        const events = await economicCalendarService.fetchEvents(
-          {
-            start: today,
-            end: today
-          },
-          {
-            impacts: ['High', 'Medium']
-          }
-        );
-
-        // Filter to show only unreleased events (future events that haven't happened yet)
-        const currentTime = now.getTime();
-        const upcomingEvents = events.filter(event =>
-          new Date(event.time_utc).getTime() > currentTime
-        );
-
-        // Sort in ascending order (soonest unreleased event first)
-        const sortedEvents = upcomingEvents.sort((a, b) =>
-          new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime()
-        );
-
-        setEconomicEvents(sortedEvents);
-      } catch (error) {
-        logger.error('Error fetching economic events:', error);
-      } finally {
-        setLoadingEvents(false);
-      }
-    };
-
-    fetchEconomicEvents();
-  }, []);
 
   const handleCalendarClick = (calendarId: string) => {
     navigate(`/calendar/${calendarId}`);
@@ -437,8 +348,7 @@ const Home: React.FC<HomeProps> = ({
     const newTradeWithId = trade.id ? trade : { ...trade, id: uuidv4() };
     await onAddTrade(selectedCalendar.id, newTradeWithId);
 
-    // Update recent trades for the dashboard
-    setRecentTrades(prev => [{...newTradeWithId, calendarName: selectedCalendar.name}, ...prev.slice(0, 4)]);
+    // Note: Recent trades will be automatically refreshed by SWR on next focus/revalidation
   };
 
   const handleUpdateTradeProperty = async (
@@ -471,20 +381,7 @@ const Home: React.FC<HomeProps> = ({
     setTradesForDate([]);
   };
 
-  const handleQuickActionClick = (path: string) => {
-    if (!user) {
-      setShowLoginDialog(true);
-      return;
-    }
 
-    // Handle performance action with dialog instead of navigation
-    if (path === '/performance') {
-      setShowPerformanceDialog(true);
-      return;
-    }
-
-    navigate(path);
-  };
 
   const handleLoginDialogClose = () => {
     setShowLoginDialog(false);
@@ -871,21 +768,24 @@ const Home: React.FC<HomeProps> = ({
               </CardContent>
             </Card>
 
-            {/* Check Performance */}
+            {/* Notes */}
             <Card
               sx={{
                 borderRadius: 2,
-                border: `2px dashed ${alpha(theme.palette.success.main, 0.3)}`,
+                border: `2px dashed ${alpha(theme.palette.warning.main, 0.3)}`,
                 bgcolor: 'transparent',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 '&:hover': {
-                  borderColor: theme.palette.success.main,
-                  bgcolor: alpha(theme.palette.success.main, 0.05),
+                  borderColor: theme.palette.warning.main,
+                  bgcolor: alpha(theme.palette.warning.main, 0.05),
                   transform: 'translateY(-2px)'
                 }
               }}
-              onClick={() => handleQuickActionClick('/performance')}
+              onClick={() => {
+                if (!user) { setShowLoginDialog(true); return; }
+                navigate('/notes/new');
+              }}
             >
               <CardContent sx={{
                 textAlign: 'center',
@@ -897,7 +797,7 @@ const Home: React.FC<HomeProps> = ({
                     width: { xs: 40, sm: 48, md: 56 },
                     height: { xs: 40, sm: 48, md: 56 },
                     borderRadius: 2,
-                    bgcolor: alpha(theme.palette.success.main, 0.1),
+                    bgcolor: alpha(theme.palette.warning.main, 0.1),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -905,9 +805,9 @@ const Home: React.FC<HomeProps> = ({
                     mb: { xs: 1.5, sm: 2 }
                   }}
                 >
-                  <TrendingUp sx={{
+                  <EditIcon sx={{
                     fontSize: { xs: 24, sm: 28, md: 32 },
-                    color: theme.palette.success.main
+                    color: theme.palette.warning.main
                   }} />
                 </Box>
                 <Typography
@@ -918,14 +818,14 @@ const Home: React.FC<HomeProps> = ({
                     fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' }
                   }}
                 >
-                  Performance
+                  Notes
                 </Typography>
                 <Typography
                   variant="caption"
                   color="text.secondary"
                   sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
                 >
-                  View analytics & charts
+                  Create and manage notes
                 </Typography>
               </CardContent>
             </Card>
@@ -1188,7 +1088,7 @@ const Home: React.FC<HomeProps> = ({
               <Box sx={{ px: 2, pb: 2, flex: 1, overflowY: 'auto', ...scrollbarStyles(theme) }}>
                 <EconomicEventShimmer count={5} />
               </Box>
-            ) : economicEvents.length === 0 ? (
+            ) : !economicEvents || economicEvents.length === 0 ? (
               <Box sx={{
                 textAlign: 'center',
                 py: 6,
@@ -1323,7 +1223,7 @@ const Home: React.FC<HomeProps> = ({
                   </Card>
                 ))}
               </Box>
-            ) : recentTrades.length === 0 ? (
+            ) : !recentTrades || recentTrades.length === 0 ? (
               <Box sx={{
                 textAlign: 'center',
                 py: 6,
@@ -1378,7 +1278,7 @@ const Home: React.FC<HomeProps> = ({
         <AIChatDrawer
           open={isAIChatOpen}
           onClose={() => setIsAIChatOpen(false)}
-          trades={performanceTrades}
+          trades={[]}
           calendar={calendars[0]}
           onOpenGalleryMode={() => {}}
           onUpdateTradeProperty={(tradeId, updateCallback) =>
@@ -1499,56 +1399,7 @@ const Home: React.FC<HomeProps> = ({
         </DialogActions>
       </Dialog>
 
-      {/* Performance Dialog */}
-      <Dialog
-        {...dialogProps}
-        open={showPerformanceDialog}
-        onClose={() => setShowPerformanceDialog(false)}
-        maxWidth="xl"
-        fullWidth
-        PaperProps={{
-          sx: {
-            background: theme.palette.background.paper,
-            borderRadius: 2
-          }
-        }}
-      >
-        <DialogTitle
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            pb: 1
-          }}
-        >
-          Performance Analytics
-          <IconButton
-            onClick={() => setShowPerformanceDialog(false)}
-            sx={{
-              color: 'text.secondary',
-              '&:hover': {
-                color: 'text.primary',
-                backgroundColor: alpha(theme.palette.primary.main, 0.1)
-              }
-            }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent
-          sx={{
-            p: 0,
-            overflow: 'auto',
-            ...scrollbarStyles(theme)
-          }}
-        >
-          <PerformanceCharts
-            showCalendarSelector={true}
-            trades={performanceTrades}
-            calendars={calendars}
-          />
-        </DialogContent>
-      </Dialog>
+
 
       {/* Login Dialog */}
       <LoginDialog

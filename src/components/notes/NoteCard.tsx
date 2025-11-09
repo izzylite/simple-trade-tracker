@@ -15,8 +15,7 @@ import {
   Menu,
   MenuItem,
   ListItemIcon,
-  ListItemText,
-  Tooltip
+  ListItemText
 } from '@mui/material';
 import {
   MoreVert as MoreVertIcon,
@@ -102,7 +101,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, onClick, onPin, onArch
       {/* Cover image or placeholder */}
       <Box
         sx={{
-          height: 140,
+          height: { xs: 120, sm: 140 },
           width: '100%',
           backgroundImage: note.cover_image ? `url(${note.cover_image})` : 'none',
           backgroundColor: note.cover_image ? 'transparent' : alpha(theme.palette.divider, 0.1),

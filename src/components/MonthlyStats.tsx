@@ -18,7 +18,9 @@ import {
   Menu,
   MenuItem,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import {
   TrendingUp,
@@ -70,6 +72,10 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const menuOpen = Boolean(menuAnchorEl);
   const [showImportDialog, setShowImportDialog] = useState(false);
+
+  const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const monthTrades = trades.filter(trade =>
@@ -219,14 +225,14 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
       <Paper
         elevation={2}
         sx={{
-          p: 2,
+          p: { xs: 1.5, sm: 2 },
           borderRadius: 2,
           position: 'relative',
           width: '100%',
-          pb: { xs: 5, sm: 2.5 },
+          pb: { xs: 4, sm: 2.5 },
           overflow: 'hidden',
           height: '100%',
-          minHeight: '320px'
+          minHeight: { xs: '280px', sm: '320px' }
         }}
       >
         <Box sx={{
@@ -234,22 +240,19 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, pl: 0.5 }}>
+          <Typography variant={isXs ? 'subtitle1' : 'h6'} sx={{ mb: { xs: 1, sm: 2 }, fontWeight: 600, pl: 0.5 }}>
             Monthly Performance
           </Typography>
-            
+
 
           <Box sx={{
-            position: { xs: 'absolute', sm: 'static' },
-            bottom: 0,
-            left: 0,
-            right: 0,
+            position: 'static',
             display: 'flex',
             gap: 1,
-            justifyContent: { xs: 'center', sm: 'flex-end' },
-            mb: 2,
+            justifyContent: 'flex-end',
+            mb: 0,
             flex: 1,
-            alignItems: 'flex-start'
+            alignItems: 'center'
           }}>
             <input
               type="file"
@@ -334,17 +337,17 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
         <Box sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-          gap: 1.5, 
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
+          gap: { xs: 1, sm: 1.25, md: 1.5 },
         }}>
           {/* Monthly P&L Card */}
           <Box sx={{
-            p: 2,
+            p: { xs: 1.25, sm: 2 },
             borderRadius: 2,
             bgcolor: theme => alpha(theme.palette.background.default, 0.5),
             display: 'flex',
             flexDirection: 'column',
-            gap: 0.5
+            gap: { xs: 0.25, sm: 0.5 }
           }}>
             <Box sx={{
               display: 'flex',
@@ -352,20 +355,20 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               gap: 1,
               mb: 0.5
             }}>
-              <TrendingUp sx={{ fontSize: '1.2rem', color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.secondary' }} />
-              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+              <TrendingUp sx={{ fontSize: { xs: '1rem', sm: '1.2rem' }, color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.secondary' }} />
+              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: { xs: '0.9rem', sm: '1rem' } }}>
                 Monthly P&L
-              
+
               </Typography>
             </Box>
             <Typography
-              variant="h5"
+              variant={isXs ? 'h6' : 'h5'}
               sx={{
                 fontWeight: 700,
                 color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.primary',
                 display: 'flex',
                 alignItems: 'baseline',
-                gap: 0.5
+                gap: { xs: 0.25, sm: 0.5 }
               }}
             >
               {formatCurrency(netAmountForThisMonth)}
@@ -376,7 +379,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
                 <Typography
                   component="span"
                   sx={{
-                    fontSize: '1rem',
+                    fontSize: { xs: '0.875rem', sm: '1rem' },
                     color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.primary',
                     fontWeight: 600,
                     cursor: 'help'
@@ -406,7 +409,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
                 </Box>
                 <Box sx={{
                   width: '100%',
-                  height: '8px',
+                  height: { xs: '6px', sm: '8px' },
                   bgcolor: theme => alpha(theme.palette.divider, 0.5),
                   borderRadius: '4px',
                   overflow: 'hidden'
@@ -424,12 +427,12 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
           {/* Win Rate Card */}
           <Box sx={{
-            p: 2,
+            p: { xs: 1.25, sm: 2 },
             borderRadius: 2,
             bgcolor: theme => alpha(theme.palette.background.default, 0.5),
             display: 'flex',
             flexDirection: 'column',
-            gap: 0.5
+            gap: { xs: 0.25, sm: 0.5 }
           }}>
             <Box sx={{
               display: 'flex',
@@ -437,15 +440,15 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               gap: 1,
               mb: 0.5
             }}>
-              <EmojiEvents sx={{ fontSize: '1.2rem', color: parseFloat(winRate) > 50 ? 'success.main' : 'text.secondary' }} />
-              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+              <EmojiEvents sx={{ fontSize: { xs: '1rem', sm: '1.2rem' }, color: parseFloat(winRate) > 50 ? 'success.main' : 'text.secondary' }} />
+              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: { xs: '0.9rem', sm: '1rem' } }}>
                 Win Rate
               </Typography>
             </Box>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: parseFloat(winRate) > 50 ? 'success.main' : 'text.primary' }}>
+            <Typography variant={isXs ? 'h6' : 'h5'} sx={{ fontWeight: 700, color: parseFloat(winRate) > 50 ? 'success.main' : 'text.primary' }}>
               {winRate}%
             </Typography>
-            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary', mt: 0.5 }}>
+            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary', mt: 0.5, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
               {winCount} Wins / {lossCount} Losses
             </Typography>
             <Box sx={{
@@ -455,13 +458,13 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               gap: 1
             }}>
               <Box sx={{
-                height: '10px',
+                height: { xs: '6px', sm: '10px' },
                 bgcolor: 'success.main',
                 borderRadius: '5px',
                 flex: winCount || 1
               }} />
               <Box sx={{
-                height: '10px',
+                height: { xs: '6px', sm: '10px' },
                 bgcolor: 'error.main',
                 borderRadius: '5px',
                 flex: lossCount || 1
@@ -471,12 +474,12 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
           {/* Total Trades Card */}
           <Box sx={{
-            p: 2,
+            p: { xs: 1.25, sm: 2 },
             borderRadius: 2,
             bgcolor: theme => alpha(theme.palette.background.default, 0.5),
             display: 'flex',
             flexDirection: 'column',
-            gap: 0.5
+            gap: { xs: 0.25, sm: 0.5 }
           }}>
             <Box sx={{
               display: 'flex',
@@ -484,22 +487,22 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               gap: 1,
               mb: 0.5
             }}>
-              <CalendarMonth sx={{ fontSize: '1.2rem', color: 'text.secondary' }} />
-              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+              <CalendarMonth sx={{ fontSize: { xs: '1rem', sm: '1.2rem' }, color: 'text.secondary' }} />
+              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: { xs: '0.9rem', sm: '1rem' } }}>
                 Trading Activity
               </Typography>
             </Box>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
+            <Typography variant={isXs ? 'h6' : 'h5'} sx={{ fontWeight: 700, color: 'text.primary' }}>
               {monthTrades.length} Trade{monthTrades.length === 1 ? '' : 's'}
             </Typography>
-            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary', mt: 0.5 }}>
+            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary', mt: 0.5, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
               {monthTrades.length > 0 ? (monthTrades.length / 30 * 100).toFixed(0) : 0}% of Month Active
             </Typography>
           </Box>
 
           {/* Starting Capital Card */}
           <Box sx={{
-            p: 1.5,
+            p: { xs: 1, sm: 1.5 },
             borderRadius: 2,
             bgcolor: theme => alpha(theme.palette.background.default, 0.5),
             display: 'flex',
@@ -516,7 +519,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
           {/* Best Day Card */}
           <Box sx={{
-            p: 1.5,
+            p: { xs: 1, sm: 1.5 },
             borderRadius: 2,
             bgcolor: theme => alpha(theme.palette.background.default, 0.5),
             display: 'flex',
@@ -537,7 +540,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
           {/* Profit Factor Card */}
           <Box sx={{
-            p: 1.5,
+            p: { xs: 1, sm: 1.5 },
             borderRadius: 2,
             bgcolor: theme => alpha(theme.palette.background.default, 0.5),
             display: 'flex',

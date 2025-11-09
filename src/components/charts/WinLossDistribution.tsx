@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   PieChart,
   Pie,
@@ -7,34 +7,19 @@ import {
   Legend,
   Tooltip
 } from 'recharts';
-import { Box, Paper, Typography, useTheme, Button } from '@mui/material';
+import { Box, Paper, Typography, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { PieChart as PieChartIcon, DonutLarge as DonutLargeIcon } from '@mui/icons-material';
-import { getTagColor } from '../../utils/tagColors';
-
-import TagFilterDialog from '../TagFilterDialog';
 
 interface WinLossDistributionProps {
   winLossData: any[];
-  comparisonWinLossData?: any[] | null;
-  allTags: string[];
-  comparisonTags: string[];
-  setComparisonTags: (tags: string[]) => void;
   onPieClick?: (category: string) => void;
-  tagStats?: { tag: string; total_trades: number }[];
 }
 
 const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
   winLossData,
-  comparisonWinLossData,
-  allTags,
-  comparisonTags,
-  setComparisonTags,
-  onPieClick,
-  tagStats = []
+  onPieClick
 }) => {
   const theme = useTheme();
-  const [comparisonTagsDialogOpen, setComparisonTagsDialogOpen] = useState(false);
 
   // Add a style element to remove focus outlines from SVG elements
   React.useEffect(() => {
@@ -96,61 +81,7 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
     labelFontWeight: 500
   };
 
-  // Generate tag distribution data when in tag distribution mode
-  const generateTagDistributionData = () => {
-    if (!comparisonTags || comparisonTags.length === 0) return [];
 
-    // If we don't have any win/loss data, we can't generate tag distribution
-    if (!comparisonWinLossData || !comparisonWinLossData.some(d => d.value > 0)) {
-      return [];
-    }
-
-    // Create a map to store the count for each tag
-    const tagCounts = new Map<string, number>();
-
-    // Use the tagStats from the parent component if available
-    if (tagStats && tagStats.length > 0) {
-      // Filter to only include the selected comparison tags
-      const filteredTagStats = tagStats.filter(stat => comparisonTags.includes(stat.tag));
-
-      // If we have stats for the selected tags, use them
-      if (filteredTagStats.length > 0) {
-        filteredTagStats.forEach(stat => {
-          tagCounts.set(stat.tag, stat.total_trades);
-        });
-      } else {
-        // Fallback if we don't have stats for the selected tags
-        comparisonTags.forEach(tag => {
-          // Use a hash of the tag name to generate a consistent value
-          const hash = tag.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-          // Generate a value between 1 and 10 based on the hash
-          const value = (hash % 10) + 1;
-          tagCounts.set(tag, value);
-        });
-      }
-    } else {
-      // Fallback if we don't have any tag stats
-      comparisonTags.forEach(tag => {
-        // Use a hash of the tag name to generate a consistent value
-        const hash = tag.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        // Generate a value between 1 and 10 based on the hash
-        const value = (hash % 10) + 1;
-        tagCounts.set(tag, value);
-      });
-    }
-
-    // Convert to the format needed for the pie chart
-    return Array.from(tagCounts.entries())
-      .map(([tag, count]) => ({
-        name: tag,
-        value: count
-      }));
-  };
-
-  // Get the appropriate data based on whether tags are selected
-  const chartData = comparisonTags.length > 0
-    ? generateTagDistributionData()
-    : winLossData;
 
   return (
     <Paper
@@ -171,62 +102,15 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
         pb: 1.5,
       }}>
         <Typography variant="h6" sx={{
-
           display: 'flex',
           alignItems: 'center',
           gap: 1
         }}>
-          {comparisonTags.length > 0 ? (
-            <>
-
-              Tag Distribution
-            </>
-          ) : (
-            <>
-
-              Win/Loss Distribution
-            </>
-          )}
+          Win/Loss Distribution
         </Typography>
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={() => setComparisonTagsDialogOpen(true)}
-          sx={{ textTransform: 'none' }}
-        >
-          {comparisonTags.length > 0 ? `Compare: ${comparisonTags.length} tags` : 'Compare Tags'}
-        </Button>
-        <TagFilterDialog
-          open={comparisonTagsDialogOpen}
-          onClose={() => setComparisonTagsDialogOpen(false)}
-          title="Select Tags to Compare"
-          allTags={allTags}
-          selectedTags={comparisonTags}
-          onTagsChange={(tags) => setComparisonTags(tags)}
-          showApplyButton={true}
-          showClearButton={true}
-        />
       </Box>
       <Box sx={{ flex: 1, minHeight: 300 }} className="win-loss-chart-container">
-        {/* Show message when no data is available */}
-        {comparisonTags.length > 0 && chartData.length === 0 ? (
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            flexDirection: 'column',
-            gap: 2
-          }}>
-            <Typography variant="body1" color="text.secondary">
-              No trades found with the selected tags
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Try selecting different tags for comparison
-            </Typography>
-          </Box>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%">
             <PieChart
               style={{ outline: 'none' }}
               tabIndex={-1}
@@ -244,22 +128,20 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
                         <Typography
                           variant="body2"
                           sx={{
-                            color: comparisonTags.length > 0
-                              ? getTagColor(data.name)
-                              : data.name === 'Wins'
-                                ? COLORS.win
-                                : data.name === 'Losses'
-                                  ? COLORS.loss
-                                  : data.name === 'Breakeven'
-                                    ? COLORS.breakEven
-                                    : COLORS.zero,
+                            color: data.name === 'Wins'
+                              ? COLORS.win
+                              : data.name === 'Losses'
+                                ? COLORS.loss
+                                : data.name === 'Breakeven'
+                                  ? COLORS.breakEven
+                                  : COLORS.zero,
                             fontWeight: 'bold'
                           }}
                         >
                           {data.value} trade{data.value !== 1 ? 's' : ''}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {(data.value / chartData.reduce((sum, item) => sum + item.value, 0) * 100).toFixed(1)}% of total
+                          {(data.value / winLossData.reduce((sum, item) => sum + item.value, 0) * 100).toFixed(1)}% of total
                         </Typography>
                         {onPieClick && (
                           <Typography variant="body2" sx={{ color: theme.palette.primary.main, fontSize: '0.75rem', mt: 0.5 }}>
@@ -273,7 +155,7 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
                 }}
               />
               <Pie
-                data={chartData}
+                data={winLossData}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
@@ -301,19 +183,12 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
                 }}
                 tabIndex={-1}
               >
-                {chartData.map((entry, index) => {
-                  // Determine the fill color based on whether we're showing tags or win/loss
-                  let fillColor;
-                  if (comparisonTags.length > 0) {
-                    // For tag distribution, use the tag's color from the tagColors utility
-                    fillColor = getTagColor(entry.name);
-                  } else {
-                    // For win/loss distribution, use the predefined colors
-                    fillColor = entry.name === 'Wins' ? COLORS.win :
-                               entry.name === 'Losses' ? COLORS.loss :
-                               entry.name === 'Breakeven' ? COLORS.breakEven :
-                               COLORS.zero;
-                  }
+                {winLossData.map((entry, index) => {
+                  // For win/loss distribution, use the predefined colors
+                  const fillColor = entry.name === 'Wins' ? COLORS.win :
+                                    entry.name === 'Losses' ? COLORS.loss :
+                                    entry.name === 'Breakeven' ? COLORS.breakEven :
+                                    COLORS.zero;
 
                   return (
                     <Cell
@@ -343,42 +218,36 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
               />
             </PieChart>
           </ResponsiveContainer>
+      </Box>
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        mt: 2,
+        pt: 1.5,
+        flexDirection: 'column',
+        alignItems: 'center',
+        marginTop: 'auto'
+      }}>
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+          Showing win/loss distribution for all trades
+        </Typography>
+        {onPieClick && (
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5,
+            mt: 0.5,
+            bgcolor: alpha(theme.palette.primary.main, 0.08),
+            px: 1.5,
+            py: 0.5,
+            borderRadius: 1
+          }}>
+            <Typography variant="caption" color="primary" sx={{ fontWeight: 500 }}>
+              Click on a segment to view trades
+            </Typography>
+          </Box>
         )}
       </Box>
-      {/* Only show this message when we're displaying a chart */}
-      {!(comparisonTags.length > 0 && chartData.length === 0) && (
-        <Box sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          mt: 2,
-          pt: 1.5,
-          flexDirection: 'column',
-          alignItems: 'center',
-          marginTop: 'auto'
-        }}>
-          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-            {comparisonTags.length > 0
-              ? 'Showing distribution of selected tags'
-              : 'Showing win/loss distribution for all trades'}
-          </Typography>
-          {onPieClick && (
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.5,
-              mt: 0.5,
-              bgcolor: alpha(theme.palette.primary.main, 0.08),
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 1
-            }}>
-              <Typography variant="caption" color="primary" sx={{ fontWeight: 500 }}>
-                Click on a segment to view trades
-              </Typography>
-            </Box>
-          )}
-        </Box>
-      )}
     </Paper>
   );
 };

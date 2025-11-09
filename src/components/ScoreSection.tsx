@@ -12,6 +12,8 @@ import {
   IconButton,
   CircularProgress
 } from '@mui/material';
+import { useMediaQuery } from '@mui/material';
+
 import { alpha } from '@mui/material/styles';
 import { Close } from '@mui/icons-material';
 import { Trade, Calendar } from '../types/dualWrite';
@@ -52,6 +54,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
   allTags
 }) => {
   const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.down('sm'));
   const [activeTab, setActiveTab] = useState(0);
   const scorePeriod = 'monthly';
   const [historyPeriod, setHistoryPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
@@ -175,7 +178,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
 
     calculateMultiPeriodScores();
   }, [trades, selectedDate, selectedTags, settings]);
- 
+
 
 
 
@@ -261,8 +264,8 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
 
   if (trades.length === 0) {
     return (
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
+      <Paper sx={{ p: { xs: 2, sm: 3 } }}>
+        <Typography variant={isXs ? 'subtitle1' : 'h6'} gutterBottom>
           📊 Trading Score
         </Typography>
         <Alert severity="info">
@@ -275,8 +278,8 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
 
   if (trades.length < settings.thresholds.minTradesForScore) {
     return (
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
+      <Paper sx={{ p: { xs: 2, sm: 3 } }}>
+        <Typography variant={isXs ? 'subtitle1' : 'h6'} gutterBottom>
           📊 Trading Score
         </Typography>
         <Alert severity="warning">
@@ -302,8 +305,8 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
           : alpha(theme.palette.common.black, 0.1)}`
       }}
     >
-      <Box sx={{ px: 3, pt: 3}}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
+      <Box sx={{ px: { xs: 2, sm: 3 }, pt: { xs: 2, sm: 3 } }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" mb={{ xs: 2, sm: 3 }}>
           <Typography
             variant="h6"
             sx={{
@@ -322,7 +325,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
         </Stack>
       </Box>
 
-      <Box sx={{ px: 3, pb: 3 }}>
+      <Box sx={{ px: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 3 } }}>
         {/* Overview Tab */}
         <TabPanel value={activeTab} index={0}>
           <Stack spacing={4}>
@@ -520,6 +523,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
         onClose={handleCloseBreakdownModal}
         maxWidth="lg"
         fullWidth
+        fullScreen={isXs}
         sx={{
           '& .MuiDialog-paper': {
             backgroundColor: theme.palette.mode === 'dark'

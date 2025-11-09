@@ -13,11 +13,13 @@ import {
   IconButton,
   Tooltip,
   TextField,
-  CircularProgress
+  CircularProgress,
+  Button
 } from '@mui/material';
 import {
   PushPin as PinIcon,
-  PushPinOutlined as PinOutlinedIcon
+  PushPinOutlined as PinOutlinedIcon,
+  ViewCarousel as GalleryIcon
 } from '@mui/icons-material';
 import { EconomicEvent } from '../../types/economicCalendar';
 import { Trade } from '../../types/dualWrite';
@@ -178,6 +180,15 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     });
   };
 
+  // Handle gallery mode for event trades
+  const handleEventGalleryMode = () => {
+    if (onOpenGalleryMode && eventTrades.length > 0) {
+      const title = `${event.event_name} - All Trades (${eventTrades.length} trades)`;
+      onOpenGalleryMode(eventTrades, eventTrades[0].id, title);
+      onClose();
+    }
+  };
+
   // Get impact color
   const getImpactColor = (impact: string) => {
     switch (impact) {
@@ -202,6 +213,24 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     const win_rate = denom > 0 ? Math.round((wins / denom) * 100) : 0;
     return { total, wins, losses, breakevens, win_rate };
   }, [eventTrades]);
+
+  // Dialog actions with gallery mode button
+  const dialogActions = onOpenGalleryMode && eventTrades.length > 0 && !isReadOnly ? (
+    <Button
+      onClick={handleEventGalleryMode}
+      variant="contained"
+      size="large"
+      startIcon={<GalleryIcon />}
+      sx={{
+        textTransform: 'none',
+        fontWeight: 600,
+        borderRadius: 1.5,
+        px: 3
+      }}
+    >
+      Gallery View
+    </Button>
+  ) : undefined;
 
   return (
     <BaseDialog
@@ -280,6 +309,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
       }
       maxWidth="sm"
       fullWidth
+      actions={dialogActions}
       hideFooterCancelButton
     >
       <Box>

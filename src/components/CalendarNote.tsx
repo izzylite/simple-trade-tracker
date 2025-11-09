@@ -204,7 +204,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
               sx={{
                 position: 'relative',
                 overflow: 'hidden',
-                height: 200,
+                height: { xs: 160, sm: 200 },
                 backgroundImage: `url(${heroImageUrl})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',

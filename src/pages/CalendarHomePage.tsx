@@ -31,7 +31,8 @@ import {
   Tabs,
   Tab,
   Alert,
-  Chip
+  Chip,
+  useMediaQuery
 } from '@mui/material';
 
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
@@ -148,6 +149,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   const [expandedCalendars, setExpandedCalendars] = useState<{[key: string]: boolean}>({});
   const [menuAnchorEl, setMenuAnchorEl] = useState<{[key: string]: HTMLElement | null}>({});
   const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [selectedCalendarForCharts, setSelectedCalendarForCharts] = useState<CalendarWithUIState | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
@@ -506,20 +508,20 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     <Box sx={{
       minHeight: '100vh',
       bgcolor: 'custom.pageBackground',
-      pl: 4
+      pl: 0
     }}>
 
 
 
-      <Box sx={{ pt: 4, pb: 4, pl: 0, pr: 4 }}>
+      <Box sx={{ pt: { xs: 2, sm: 4 }, pb: { xs: 2, sm: 4 }, px: { xs: 2, sm: 4 } }}>
         {/* Header Section */}
-        <Box sx={{ mb: 4 , ml: 8, mr: 8}}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+        <Box sx={{ mb: { xs: 2, sm: 3, md: 4 }, mx: { xs: 0, sm: 4, md: 8 } }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" sx={{ mb: { xs: 1.5, sm: 1 } }}>
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+              <Typography variant={isXs ? 'h5' : 'h4'} sx={{ fontWeight: 700, mb: { xs: 0.5, sm: 1 } }}>
                 My Calendars
               </Typography>
-              <Typography variant="body1" color="text.secondary">
+              <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
                 Manage your trading journals and view performance
               </Typography>
             </Box>
@@ -530,13 +532,13 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
               ]}
               activeTab={activeTab}
               onTabChange={(_, newValue) => setActiveTab(newValue)}
-              size="large"
+              size={isXs ? 'small' : 'large'}
             />
           </Stack>
         </Box>
 
         {/* Content */}
-        <Box sx={{ pb: 6 }}>
+        <Box sx={{ pb: { xs: 4, sm: 6 } }}>
         {user ? (
           <>
             {/* Calendars Tab Content */}
@@ -549,7 +551,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  py: 8,
+                  py: { xs: 4, sm: 8 },
                   bgcolor: 'background.paper',
                   borderRadius: 2,
                   boxShadow: 1
@@ -640,7 +642,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      py: 8,
+                      py: { xs: 4, sm: 8 },
                       bgcolor: 'background.paper',
                       borderRadius: 2,
                       boxShadow: 1
@@ -682,7 +684,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                           md: 'repeat(2, 1fr)',
                           lg: 'repeat(3, 1fr)'
                         },
-                        gap: 3
+                        gap: { xs: 2, md: 3 }
                       }}
                     >
                       {trashCalendars.map((calendar) => {
@@ -1236,8 +1238,8 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
             onClick={() => setIsAIChatOpen(true)}
             sx={{
               position: 'fixed',
-              bottom: 120,
-              right: 32,
+              bottom: { xs: 88, sm: 120 },
+              right: { xs: 16, sm: 32 },
               zIndex: 1200
             }}
           >
@@ -1254,10 +1256,10 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
           onClick={() => setIsCreateDialogOpen(true)}
           sx={{
             position: 'fixed',
-            bottom: 32,
-            right: 32,
-            width: 64,
-            height: 64,
+            bottom: { xs: 16, sm: 32 },
+            right: { xs: 16, sm: 32 },
+            width: { xs: 56, sm: 64 },
+            height: { xs: 56, sm: 64 },
             boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`,
             '&:hover': {
               boxShadow: `0 12px 32px ${alpha(theme.palette.primary.main, 0.5)}`,
@@ -1266,7 +1268,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
             transition: 'all 0.3s ease',
           }}
         >
-          <AddIcon sx={{ fontSize: 32 }} />
+          <AddIcon sx={{ fontSize: { xs: 28, sm: 32 } }} />
         </Fab>
       )}
     </Box>

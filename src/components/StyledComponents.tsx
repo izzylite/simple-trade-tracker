@@ -20,7 +20,9 @@ export const StyledCalendarDay = styled(Box, {
   borderRadius: theme.shape.borderRadius,
   transition: 'all 0.1s ease-in-out',
   opacity: $isCurrentMonth ? 1 : 0.4,
-  minHeight: theme.breakpoints.down('md') ? '80px' : '100px',
+  minHeight: '100px',
+  [theme.breakpoints.down('md')]: { minHeight: '84px' },
+  [theme.breakpoints.down('sm')]: { minHeight: '60px', padding: theme.spacing(0.75) },
   backgroundColor:
     $dayStatus === 'win'
       ? alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.2 : 0.4)

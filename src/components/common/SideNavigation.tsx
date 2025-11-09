@@ -12,12 +12,13 @@ import {
   alpha,
   Chip,
   IconButton,
-  Tooltip
+  Tooltip,
+  useMediaQuery
 } from '@mui/material';
 import {
   Home as HomeIcon,
-  CalendarToday as CalendarIcon,
-  Note as NoteIcon,
+  CalendarMonth as CalendarIcon,
+  Notes as EditIcon,
   People as CommunityIcon,
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon
@@ -47,6 +48,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const isSmDown = useMediaQuery(theme.breakpoints.down('sm'));
 
   const navigationItems: NavigationItem[] = [
     {
@@ -64,7 +66,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
     {
       id: 'notes',
       label: 'Notes',
-      icon: <NoteIcon />,
+      icon: <EditIcon />,
       path: '/notes'
     },
     {
@@ -81,8 +83,10 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
       return;
     }
     navigate(item.path);
-    // Auto-collapse the drawer when navigating
-    if (!collapsed) {
+    // Close overlay drawer on small screens; otherwise auto-collapse if expanded
+    if (isSmDown) {
+      onClose();
+    } else if (!collapsed) {
       onToggleCollapse();
     }
   };
@@ -94,26 +98,27 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
     return location.pathname.startsWith(path);
   };
 
-  const drawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED;
+  const effectiveCollapsed = isSmDown ? false : collapsed;
+  const drawerWidth = effectiveCollapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED;
 
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Logo/Brand Section */}
       <Box
         sx={{
-          p: collapsed ? 2 : 3,
+          p: effectiveCollapsed ? 2 : 3,
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           maxHeight: 65,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'flex-start',
+          justifyContent: effectiveCollapsed ? 'center' : 'flex-start',
           gap: 2,
           transition: theme.transitions.create(['padding', 'justify-content'], {
             duration: theme.transitions.duration.shorter,
           })
         }}
       >
-        {collapsed ? (
+        {effectiveCollapsed ? (
           <IconButton
             onClick={onToggleCollapse}
             sx={{
@@ -135,10 +140,10 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
                 width: 48,
                 height: 48,
                 borderRadius: 2,
-                opacity: collapsed ? 0 : 1,
+                opacity: effectiveCollapsed ? 0 : 1,
                 transition: theme.transitions.create('opacity', {
                   duration: theme.transitions.duration.shorter,
-                  delay: collapsed ? 0 : theme.transitions.duration.shorter,
+                  delay: effectiveCollapsed ? 0 : theme.transitions.duration.shorter,
                 })
               }}
             />
@@ -155,11 +160,11 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
                   backgroundClip: 'text',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
-                  opacity: collapsed ? 0 : 1,
-                  visibility: collapsed ? 'hidden' : 'visible',
+                  opacity: effectiveCollapsed ? 0 : 1,
+                  visibility: effectiveCollapsed ? 'hidden' : 'visible',
                   transition: theme.transitions.create(['opacity', 'visibility'], {
                     duration: 800, // Slower fade-in (800ms)
-                    delay: collapsed ? 0 : 800, // Delay after drawer is fully expanded (800ms)
+                    delay: effectiveCollapsed ? 0 : 800, // Delay after drawer is fully expanded (800ms)
                   })
                 }}
               >
@@ -169,11 +174,12 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
             <IconButton
               onClick={onToggleCollapse}
               sx={{
+                display: { xs: 'none', sm: 'inline-flex' },
                 color: 'primary.main',
-                opacity: collapsed ? 0 : 1,
+                opacity: effectiveCollapsed ? 0 : 1,
                 transition: theme.transitions.create('opacity', {
                   duration: theme.transitions.duration.shorter,
-                  delay: collapsed ? 0 : theme.transitions.duration.shorter,
+                  delay: effectiveCollapsed ? 0 : theme.transitions.duration.shorter,
                 }),
                 '&:hover': {
                   bgcolor: alpha(theme.palette.primary.main, 0.1)
@@ -187,7 +193,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
       </Box>
 
       {/* Navigation Items */}
-      <List sx={{ flex: 1, pt: 2, px: collapsed ? 1 : 1.5 }}>
+      <List sx={{ flex: 1, pt: 2, px: effectiveCollapsed ? 1 : 1.5 }}>
         {navigationItems.map((item) => {
           const active = isActive(item.path);
           const navButton = (
@@ -197,8 +203,8 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
               sx={{
                 borderRadius: 2,
                 py: 1.5,
-                px: collapsed ? 0 : 2,
-                justifyContent: collapsed ? 'center' : 'flex-start',
+                px: effectiveCollapsed ? 0 : 2,
+                justifyContent: effectiveCollapsed ? 'center' : 'flex-start',
                 bgcolor: active ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
                 color: active ? theme.palette.primary.main : theme.palette.text.primary,
                 transition: theme.transitions.create(['padding', 'justify-content'], {
@@ -216,7 +222,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
             >
               <ListItemIcon
                 sx={{
-                  minWidth: collapsed ? 'auto' : 40,
+                  minWidth: effectiveCollapsed ? 'auto' : 40,
                   color: active ? theme.palette.primary.main : theme.palette.text.secondary,
                   justifyContent: 'center',
                   transition: theme.transitions.create('min-width', {
@@ -226,7 +232,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
               >
                 {item.icon}
               </ListItemIcon>
-              {!collapsed && (
+              {!effectiveCollapsed && (
                 <>
                   <ListItemText
                     primary={item.label}
@@ -262,7 +268,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
 
           return (
             <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
-              {collapsed ? (
+              {effectiveCollapsed ? (
                 <Tooltip title={item.label} placement="right" arrow>
                   {navButton}
                 </Tooltip>
@@ -275,7 +281,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
       </List>
 
       {/* Footer Section */}
-      {!collapsed && (
+      {!effectiveCollapsed && (
         <Box
           sx={{
             p: 2,
@@ -292,8 +298,10 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
 
   return (
     <Drawer
-      variant="permanent"
-      open={open}
+      variant={isSmDown ? 'temporary' : 'permanent'}
+      open={isSmDown ? open : true}
+      onClose={onClose}
+      ModalProps={{ keepMounted: true }}
       sx={{
         width: drawerWidth,
         flexShrink: 0,
