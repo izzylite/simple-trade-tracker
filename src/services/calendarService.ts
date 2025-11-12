@@ -150,9 +150,10 @@ export const createCalendar = async (
 export const updateCalendar = async (
   calendarId: string,
   updates: Partial<Calendar>
-): Promise<void> => {
+): Promise<Calendar> => {
   try {
-    await calendarRepository.update(calendarId, updates);
+    const result = await calendarRepository.update(calendarId, updates);
+    return result.data!;
   } catch (error) {
     logger.error('Error updating calendar:', error);
     throw error;
@@ -272,24 +273,15 @@ export const getTrade = async (calendarId: string, tradeId: string): Promise<Tra
 export const addTrade = async (
   calendarId: string,
   trade: Omit<Trade, 'id' | 'created_at' | 'updated_at'>
-): Promise<CalendarStats> => {
+): Promise<Trade> => {
   try {
     // Create the trade
-    await tradeRepository.create({
+   const result = await tradeRepository.create({
       ...trade,
       calendar_id: calendarId
     });
-
-    // Get calendar with auto-calculated stats from database
-    const calendar = await getCalendar(calendarId);
-    if (!calendar) {
-      throw new Error('Calendar not found');
-    }
-
-    // Stats are automatically calculated by Supabase triggers
-    const stats = getCalendarStats(calendar);
-
-    return stats;
+ 
+    return result.data!;
   } catch (error) {
     logger.error('Error adding trade:', error);
     throw error;
@@ -299,41 +291,16 @@ export const addTrade = async (
 /**
  * Update a trade
  */
-export const updateTrade = async (
-  calendarId: string,
-  tradeId: string,
-  cachedTrades: Trade[] = [],
+export const updateTrade = async ( 
+  trade: Trade,
   updateCallback: (trade: Trade) => Trade
-): Promise<[CalendarStats, Trade[]] | undefined> => {
-  try {
-    // Get the trade
-    const trade = await getTrade(calendarId, tradeId);
-    if (!trade) {
-      logger.error('Trade not found');
-      return undefined;
-    }
-
+): Promise<Trade | null> => {
+  try { 
     // Apply updates
     const updatedTrade = updateCallback(trade);
-
     // Update in database
-    await tradeRepository.update(tradeId, updatedTrade);
-
-    // Get updated trades list
-    const allTrades = cachedTrades.length > 0 ?
-      cachedTrades.map(t => t.id === tradeId ? updatedTrade : t) :
-      await getAllTrades(calendarId);
-
-    // Get calendar with auto-calculated stats from database
-    const calendar = await getCalendar(calendarId);
-    if (!calendar) {
-      throw new Error('Calendar not found');
-    }
-
-    // Stats are automatically calculated by Supabase triggers
-    const stats = getCalendarStats(calendar);
-
-    return [stats, allTrades];
+    await tradeRepository.update(trade.id, updatedTrade);
+    return updatedTrade;
   } catch (error) {
     logger.error('Error updating trade:', error);
     throw error;
@@ -343,24 +310,13 @@ export const updateTrade = async (
 /**
  * Delete a trade
  */
-export const deleteTrade = async (
-  calendarId: string,
+export const deleteTrade = async ( 
   tradeId: string
-): Promise<CalendarStats> => {
+): Promise<void> => {
   try {
     // Delete the trade
     await tradeRepository.delete(tradeId);
-
-    // Get calendar with auto-calculated stats from database
-    const calendar = await getCalendar(calendarId);
-    if (!calendar) {
-      throw new Error('Calendar not found');
-    }
-
-    // Stats are automatically calculated by Supabase triggers
-    const stats = getCalendarStats(calendar);
-
-    return stats;
+   
   } catch (error) {
     logger.error('Error deleting trade:', error);
     throw error;
@@ -371,112 +327,54 @@ export const deleteTrade = async (
 // =====================================================
 // UTILITY FUNCTIONS
 // =====================================================
-
-/**
- * Clear all trades for a specific month
- */
-export const clearMonthTrades = async (
-  calendarId: string,
-  year: number,
-  month: number
-): Promise<void> => {
-  try {
-    const allTrades = await getAllTrades(calendarId);
-    const tradesToDelete = allTrades.filter(trade => {
-      const tradeDate = new Date(trade.trade_date);
-      return tradeDate.getFullYear() === year && tradeDate.getMonth() === month;
-    });
-
-    // Delete trades
-    for (const trade of tradesToDelete) {
-      await tradeRepository.delete(trade.id);
-    }
-
-    // Stats are not stored, they are calculated on-demand when needed
-    // No need to recalculate here
-  } catch (error) {
-    logger.error('Error clearing month trades:', error);
-    throw error;
-  }
-};
+ 
 
 /**
  * Import trades into a calendar
  */
 export const importTrades = async (
   calendarId: string,
-  trades: Trade[]
-): Promise<void> => {
+  existingTrade: Trade[],
+  importedTrades: Partial<Trade>[]
+): Promise<Trade[]> => {
   try {
-    // Create all trades
-    // Note: Economic events are automatically fetched by TradeRepository.createInSupabase()
-    for (const trade of trades) {
-      // Normalize pair tags to lowercase format (pair:<PAIR>)
-      // This ensures getRelevantCurrenciesFromTags() can extract currencies
-      let tags = trade.tags || [];
-
-      // Check if any tag looks like a pair tag and normalize it
-      tags = tags.map(tag => {
-        // Match tags like "Pair:EURUSD", "pair:EURUSD", "PAIR:EURUSD"
-        const pairMatch = tag.match(/^pair:(.+)$/i);
-        if (pairMatch) {
-          return `pair:${pairMatch[1]}`;  // Normalize to lowercase "pair:"
-        }
-        return tag;
-      });
-
-      // Also check if (trade as any).pair exists (in case it's passed as a property)
-      const pairValue = (trade as any).pair;
-      if (pairValue) {
-        const pairTag = `pair:${pairValue}`;
-        if (!tags.some(t => t.toLowerCase() === pairTag.toLowerCase())) {
-          tags = [...tags, pairTag];
-          logger.log(`📌 Added pair tag "${pairTag}" for imported trade`);
-        }
-      }
-
-      // Create the trade with normalized tags
-      // TradeRepository will automatically fetch economic events based on these tags
-      await tradeRepository.create({
-        ...trade,
-        calendar_id: calendarId,
-        tags
-      });
+    if (importedTrades.length === 0) {
+      logger.log('No trades to import');
+      return [];
     }
 
-    // Stats are not stored, they are calculated on-demand when needed
+    logger.log(`📥 Importing ${importedTrades.length} trades...`);
+
+    // Step 1: Delete all existing trades for this calendar using bulk delete
+    const deleteResult = await tradeRepository.bulkDelete(existingTrade);
+
+    if (!deleteResult.success) {
+      throw new Error(deleteResult.error?.message || 'Failed to delete existing trades');
+    }
+
+    // Step 2: Import new trades using bulk create
+    logger.log(`📤 Creating ${importedTrades.length} new trades...`);
+    const result = await tradeRepository.bulkCreate(calendarId, importedTrades);
+
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Bulk import failed');
+    }
+
+    logger.log(`✅ Successfully imported ${result.data?.length || 0} trades`);
+
+    return result.data || [];
   } catch (error) {
     logger.error('Error importing trades:', error);
     throw error;
   }
 };
+ 
 
-/**
- * Update a tag across all trades in a calendar
- */
-export const updateTag = async (
-  calendarId: string,
-  oldTag: string,
-  newTag: string
-): Promise<{ success: boolean; tradesUpdated: number }> => {
-  try {
-    const allTrades = await getAllTrades(calendarId);
-    const tradesToUpdate = allTrades.filter(trade =>
-      trade.tags && trade.tags.includes(oldTag)
-    );
-
-    for (const trade of tradesToUpdate) {
-      const updatedTags = trade.tags!.map(tag => tag === oldTag ? newTag : tag);
-      await tradeRepository.update(trade.id, { tags: updatedTags });
-    }
-
-    return { success: true, tradesUpdated: tradesToUpdate.length };
-  } catch (error) {
-    logger.error('Error updating tag:', error);
-    throw error;
-  }
+export const getTradeRepository = () => {
+  return tradeRepository;
 };
 
+ 
 /**
  * Generate a unique image ID
  */
@@ -490,24 +388,30 @@ export const generateImageId = (): string => {
  * This is a re-export for backward compatibility
  */
 export { uploadTradeImage } from './supabaseStorageService';
-
+ 
 /**
- * Update calendar with callback (for complex updates)
+ * Calculate calendar statistics with optional trades parameter
+ * When trades are provided, returns calculated stats WITHOUT updating the database
+ * When trades are not provided, calculates and updates stats in the database
+ *
+ * @param calendarId - Calendar ID to calculate stats for
+ * @param trades - Optional array of trades to use for calculation
+ * @returns Promise with calculated stats (when trades provided) or void (when updating database)
+ *
+ * @example
+ * ```typescript
+ * // Calculate and update stats in database (default behavior)
+ * await calculateCalendarStats(calendarId);
+ *
+ * // Calculate stats with hypothetical trades (returns stats, does NOT update database)
+ * const updatedTrades = trades.map(t => ({ ...t, amount: newAmount }));
+ * const stats = await calculateCalendarStats(calendarId, updatedTrades);
+ * console.log(stats.total_pnl, stats.win_rate);
+ * ```
  */
-export const onUpdateCalendar = async (
+export const calculateCalendarStats = async (
   calendarId: string,
-  updateCallback: (calendar: Calendar) => Partial<Calendar>
-): Promise<void> => {
-  try {
-    const calendar = await getCalendar(calendarId);
-    if (!calendar) {
-      throw new Error('Calendar not found');
-    }
-
-    const updates = updateCallback(calendar);
-    await updateCalendar(calendarId, updates);
-  } catch (error) {
-    logger.error('Error updating calendar with callback:', error);
-    throw error;
-  }
+  trades?: Trade[]
+): Promise<any> => {
+  return calendarRepository.calculateStats(calendarId, trades);
 };

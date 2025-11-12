@@ -32,7 +32,7 @@ import {
   ExpandLess
 } from '@mui/icons-material';
 import { format, isValid } from 'date-fns';
-import { Calendar, CalendarWithUIState } from '../types/calendar';
+import { Calendar } from '../types/calendar';
 import { CalendarStats } from '../services/calendarService';
 import ShareButton from './sharing/ShareButton';
 
@@ -49,16 +49,16 @@ const safeFormatDate = (date: Date | undefined | null, formatStr: string, fallba
 };
 
 interface CalendarCardProps {
-  calendar: CalendarWithUIState;
+  calendar: Calendar;
   stats: CalendarStats;
   isExpanded?: boolean;
   onToggleExpand?: (e: React.MouseEvent, calendarId: string) => void;
   onCalendarClick: (calendarId: string) => void;
-  onViewCharts: (e: React.MouseEvent, calendar: CalendarWithUIState) => void;
-  onEditCalendar: (calendar: CalendarWithUIState) => void;
-  onDuplicateCalendar: (calendar: CalendarWithUIState) => void;
+  onViewCharts: (e: React.MouseEvent, calendar: Calendar) => void;
+  onEditCalendar: (calendar: Calendar) => void;
+  onDuplicateCalendar: (calendar: Calendar) => void;
   onDeleteCalendar: (calendarId: string) => void;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: CalendarWithUIState) => Calendar) => Promise<Calendar | undefined>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
   formatCurrency: (amount: number) => string;
 }
 

@@ -45,7 +45,7 @@ interface TagManagementDrawerProps {
   onClose: () => void;
   allTags: string[];
   calendarId: string;
-  onTagUpdated?: (oldTag: string, newTag: string) => void;
+  onTagUpdated?: (oldTag: string, newTag: string) => Promise<{ success: boolean; tradesUpdated: number }>;
   requiredTagGroups?: string[];
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
   // Read-only mode for shared calendars
@@ -378,6 +378,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
           calendarId={calendarId}
           onSuccess={handleTagEditSuccess}
           onDelete={handleTagDelete}
+          onTagUpdated={onTagUpdated}
         />
       )}
     </UnifiedDrawer>

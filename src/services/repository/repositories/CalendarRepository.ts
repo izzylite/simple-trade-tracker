@@ -7,7 +7,7 @@ import {
   AbstractBaseRepository,
   RepositoryConfig
 } from './BaseRepository';
-import { Calendar } from '../../../types/dualWrite';
+import { Calendar, Trade } from '../../../types/dualWrite';
 import { logger } from '../../../utils/logger';
 
 // Supabase imports
@@ -158,7 +158,7 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
       ...updates,
       updated_at: new Date()
     };
-    if(!updatesWithTimestamp.dynamic_risk_enabled){
+    if(updatesWithTimestamp.dynamic_risk_enabled === false){
       updatesWithTimestamp.profit_threshold_percentage = 0;
       updatesWithTimestamp.increased_risk_percentage = 0;
     }
@@ -219,6 +219,69 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
     } catch (error) {
       logger.error('Error finding trash calendars by user ID:', error);
       return [];
+    }
+  }
+
+  /**
+   * Calculate calendar statistics with optional trades parameter
+   * When trades are provided, returns calculated stats WITHOUT updating the database
+   * When trades are not provided, calculates and updates stats in the database
+   *
+   * @param calendarId - Calendar ID to calculate stats for
+   * @param trades - Optional array of trades to use for calculation
+   * @returns Promise with calculated stats (when trades provided) or void (when updating database)
+   *
+   * @example
+   * ```typescript
+   * // Calculate and update stats in database (default behavior)
+   * await calendarRepository.calculateStats(calendarId);
+   *
+   * // Calculate stats with hypothetical trades (returns stats, does NOT update database)
+   * const updatedTrades = trades.map(t => ({ ...t, amount: newAmount }));
+   * const stats = await calendarRepository.calculateStats(calendarId, updatedTrades);
+   * console.log(stats.total_pnl, stats.win_rate);
+   * ```
+   */
+  async calculateStats(calendarId: string, trades?: Trade[]): Promise<any> {
+    try {
+      // Ensure session is valid
+      await supabaseAuthService.ensureValidSession();
+
+      if (trades && trades.length > 0) {
+        // Use get_calendar_stats to calculate without updating database
+        logger.log(`📊 Calculating hypothetical stats for calendar ${calendarId} with ${trades.length} trades`);
+
+        const { data, error } = await supabase.rpc('get_calendar_stats', {
+          p_calendar_id: calendarId,
+          p_trades: trades // Pass as array, Supabase will convert to JSONB
+        });
+
+        if (error) {
+          logger.error('Error calculating calendar stats:', error);
+          throw error;
+        }
+
+        logger.log(`✅ Hypothetical stats calculated for calendar ${calendarId}`, JSON.stringify(data, null, 2));
+        return data;
+      } else {
+        // Use calculate_calendar_stats to update database
+        logger.log(`📊 Calculating and updating stats for calendar ${calendarId}`);
+
+        const { error } = await supabase.rpc('calculate_calendar_stats', {
+          p_calendar_id: calendarId
+        });
+
+        if (error) {
+          logger.error('Error calculating calendar stats:', error);
+          throw error;
+        }
+
+        logger.log(`✅ Stats calculated and updated for calendar ${calendarId}`);
+        return undefined;
+      }
+    } catch (error) {
+      logger.error('Error calculating calendar stats:', error);
+      throw error;
     }
   }
 

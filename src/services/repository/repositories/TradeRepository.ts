@@ -5,7 +5,8 @@
 
 import {
   AbstractBaseRepository,
-  RepositoryConfig
+  RepositoryConfig,
+  RepositoryResult
 } from './BaseRepository';
 import { Trade } from '../../../types/dualWrite';
 import { logger } from '../../../utils/logger';
@@ -318,6 +319,327 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
   // =====================================================
   // SUPABASE OPERATIONS
   // =====================================================
+ 
+  async bulkDelete(
+    trades: Trade[],
+    batchSize: number = 50
+  ): Promise<RepositoryResult<number>> {
+    return await this.withRetryAndErrorHandling(async () => {
+      // Ensure session is valid before bulk delete
+      await supabaseAuthService.ensureValidSession();
+ 
+
+      const tradeIds = trades?.map(t => t.id) || [];
+
+      if (tradeIds.length === 0) {
+        logger.log(`ℹ️ No existing trades to delete`);
+        return {
+          success: true,
+          data: 0,
+          timestamp: new Date(),
+          operation: 'bulkDelete'
+        };
+      }
+
+      logger.log(`🗑️ Found ${tradeIds.length} existing trades to delete`);
+
+      // Delete in batches to avoid timeout
+      const totalBatches = Math.ceil(tradeIds.length / batchSize);
+      let totalDeleted = 0;
+
+      for (let i = 0; i < tradeIds.length; i += batchSize) {
+        const batch = tradeIds.slice(i, i + batchSize);
+        const batchNumber = Math.floor(i / batchSize) + 1;
+
+        logger.log(`🗑️ Deleting batch ${batchNumber}/${totalBatches} (${batch.length} trades)...`);
+
+        const { error: deleteError } = await supabase
+          .from('trades')
+          .delete()
+          .in('id', batch);
+
+        if (deleteError) {
+          logger.error(`Error deleting batch ${batchNumber}:`, deleteError);
+          throw deleteError;
+        }
+
+        totalDeleted += batch.length;
+        logger.log(`✅ Deleted batch ${batchNumber}/${totalBatches} (${batch.length} trades)`);
+
+        // Small delay between batches
+        if (batchNumber < totalBatches) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      logger.log(`✅ Deleted ${totalDeleted} existing trades in ${totalBatches} batches`);
+
+      return {
+        success: true,
+        data: totalDeleted,
+        timestamp: new Date(),
+        operation: 'bulkDelete'
+      };
+    }, 'bulkDelete', `Bulk deleting trades for calendar`);
+  }
+
+  /**
+   * Efficiently bulk create multiple trades in batched database operations
+   * Processes trades in batches to avoid payload size limits and timeouts
+   *
+   * @param calendar_id - Calendar ID for all trades
+   * @param trades - Array of trade data to create (partial trades)
+   * @param batchSize - Number of trades to create per batch (default: 25)
+   * @returns RepositoryResult with created trades
+   *
+   * @example
+   * ```typescript
+   * const newTrades = [
+   *   { amount: 100, trade_type: 'win', ... },
+   *   { amount: -50, trade_type: 'loss', ... }
+   * ];
+   * const result = await tradeRepository.bulkCreate('cal1', newTrades);
+   * ```
+   */
+  async bulkCreate(
+    calendar_id : string,
+    trades: Partial<Trade>[],
+    batchSize: number = 25
+  ): Promise<RepositoryResult<Trade[]>> {
+    return await this.withRetryAndErrorHandling(async () => {
+      if (trades.length === 0) {
+        return {
+          success: true,
+          data: [],
+          timestamp: new Date(),
+          operation: 'bulkCreate'
+        };
+      }
+
+      // Ensure session is valid before bulk create
+      await supabaseAuthService.ensureValidSession();
+
+      // Get current user from Supabase Auth
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      const now = new Date();
+ 
+      const tradesForCreate = trades.map(trade => ({
+        id: trade.id || crypto.randomUUID(),
+        calendar_id: calendar_id,
+        user_id: user.id, // Use authenticated user's ID for RLS
+        name: trade.name,
+        trade_type: trade.trade_type,
+        trade_date: (trade.trade_date || now).toISOString(), 
+        session: trade.session,
+        amount: trade.amount,
+        entry_price: trade.entry_price ?? null,
+        exit_price: trade.exit_price ?? null,
+        stop_loss: trade.stop_loss ?? null,
+        take_profit: trade.take_profit ?? null,
+        risk_to_reward: trade.risk_to_reward ?? null,
+        partials_taken: trade.partials_taken ?? null,
+        tags: trade.tags || [],
+        notes: trade.notes || '',
+        images: trade.images || [],
+        economic_events: trade.economic_events || [],
+        is_temporary: trade.is_temporary ?? false,
+        is_pinned: trade.is_pinned ?? false,
+        share_link: trade.share_link ?? null,
+        is_shared: trade.is_shared ?? false,
+        shared_at: trade.shared_at ? trade.shared_at.toISOString() : null, 
+        created_at: now.toISOString(),
+        updated_at: now.toISOString()
+      }));
+
+      // Process trades in batches to avoid payload size limits
+      const allCreatedTrades: Trade[] = [];
+      const failedBatches: number[] = [];
+      const totalBatches = Math.ceil(tradesForCreate.length / batchSize);
+
+      logger.log(`📦 Processing ${tradesForCreate.length} trades in ${totalBatches} batches of ${batchSize}...`);
+
+      for (let i = 0; i < tradesForCreate.length; i += batchSize) {
+        const batch = tradesForCreate.slice(i, i + batchSize);
+        const batchNumber = Math.floor(i / batchSize) + 1;
+
+        logger.log(`📤 Inserting batch ${batchNumber}/${totalBatches} (${batch.length} trades)...`);
+
+        try {
+          const { data, error } = await supabase
+            .from('trades')
+            .insert(batch)
+            .select();
+
+          if (error) {
+            logger.error(`❌ Error creating batch ${batchNumber}:`, error);
+            failedBatches.push(batchNumber);
+
+            // Try to process remaining batches instead of failing completely
+            logger.log(`⚠️ Skipping batch ${batchNumber}, continuing with next batch...`);
+            continue;
+          }
+
+          // Transform the results back to Trade objects
+          const batchCreatedTrades = data ? data.map(item => transformSupabaseTrade(item)) : [];
+          allCreatedTrades.push(...batchCreatedTrades);
+
+          logger.log(`✅ Batch ${batchNumber}/${totalBatches} created (${batchCreatedTrades.length} trades)`);
+
+          // Add a small delay between batches to avoid overwhelming the server
+          if (batchNumber < totalBatches) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } catch (batchError) {
+          logger.error(`❌ Exception in batch ${batchNumber}:`, batchError);
+          failedBatches.push(batchNumber);
+          logger.log(`⚠️ Skipping batch ${batchNumber}, continuing with next batch...`);
+        }
+      }
+
+      if (failedBatches.length > 0) {
+        logger.warn(`⚠️ ${failedBatches.length} batches failed: ${failedBatches.join(', ')}`);
+        logger.log(`✅ Successfully created ${allCreatedTrades.length} trades (${failedBatches.length * batchSize} trades failed)`);
+      } else {
+        logger.log(`✅ Successfully bulk created ${allCreatedTrades.length} trades in ${totalBatches} batches`);
+      }
+
+      return {
+        success: true,
+        data: allCreatedTrades,
+        timestamp: new Date(),
+        operation: 'bulkCreate'
+      };
+    }, 'bulkCreate', `Bulk creating ${trades.length} trades`);
+  }
+
+  /**
+   * Efficiently bulk update multiple trades in batched database operations
+   * Processes trades in batches to avoid payload size limits and timeouts
+   *
+   * @param trades - Array of complete Trade objects to update
+   * @param batchSize - Number of trades to update per batch (default: 25)
+   * @returns RepositoryResult with updated trades
+   *
+   * @example
+   * ```typescript
+   * const updatedTrades = trades.map(trade => ({
+   *   ...trade,
+   *   tags: [...trade.tags, 'new-tag']
+   * }));
+   * const result = await tradeRepository.bulkUpdate(updatedTrades);
+   * ```
+   */
+  async bulkUpdate(trades: Trade[], batchSize: number = 25): Promise<RepositoryResult<Trade[]>> {
+    return await this.withRetryAndErrorHandling(async () => {
+      if (trades.length === 0) {
+        return {
+          success: true,
+          data: [],
+          timestamp: new Date(),
+          operation: 'bulkUpdate'
+        };
+      }
+
+      // Ensure session is valid before bulk update
+      await supabaseAuthService.ensureValidSession();
+
+      // Prepare trades for update - convert Date objects to ISO strings
+      const tradesForUpdate = trades.map(trade => ({
+        id: trade.id,
+        calendar_id: trade.calendar_id,
+        user_id: trade.user_id,
+        name: trade.name,
+        trade_type: trade.trade_type,
+        trade_date: trade.trade_date.toISOString(),
+        session: trade.session,
+        amount: trade.amount,
+        entry_price: trade.entry_price ?? null,
+        exit_price: trade.exit_price ?? null,
+        stop_loss: trade.stop_loss ?? null,
+        take_profit: trade.take_profit ?? null,
+        risk_to_reward: trade.risk_to_reward ?? null,
+        partials_taken: trade.partials_taken ?? null,
+        tags: trade.tags || [],
+        notes: trade.notes || '',
+        images: trade.images || [],
+        economic_events: trade.economic_events || [],
+        is_temporary: trade.is_temporary ?? false,
+        is_pinned: trade.is_pinned ?? false,
+        share_link: trade.share_link ?? null,
+        is_shared: trade.is_shared ?? false,
+        shared_at: trade.shared_at ? trade.shared_at.toISOString() : null,
+        share_id: trade.share_id ?? null,
+        updated_at: new Date().toISOString()
+      }));
+
+      // Process trades in batches to avoid payload size limits
+      const allUpdatedTrades: Trade[] = [];
+      const failedBatches: number[] = [];
+      const totalBatches = Math.ceil(tradesForUpdate.length / batchSize);
+
+      logger.log(`📦 Processing ${tradesForUpdate.length} trades in ${totalBatches} batches of ${batchSize}...`);
+
+      for (let i = 0; i < tradesForUpdate.length; i += batchSize) {
+        const batch = tradesForUpdate.slice(i, i + batchSize);
+        const batchNumber = Math.floor(i / batchSize) + 1;
+
+        logger.log(`📤 Updating batch ${batchNumber}/${totalBatches} (${batch.length} trades)...`);
+
+        try {
+          const { data, error } = await supabase
+            .from('trades')
+            .upsert(batch, {
+              onConflict: 'id',
+              ignoreDuplicates: false
+            })
+            .select();
+
+          if (error) {
+            logger.error(`❌ Error updating batch ${batchNumber}:`, error);
+            failedBatches.push(batchNumber);
+
+            // Try to process remaining batches instead of failing completely
+            logger.log(`⚠️ Skipping batch ${batchNumber}, continuing with next batch...`);
+            continue;
+          }
+
+          // Transform the results back to Trade objects
+          const batchUpdatedTrades = data ? data.map(item => transformSupabaseTrade(item)) : [];
+          allUpdatedTrades.push(...batchUpdatedTrades);
+
+          logger.log(`✅ Batch ${batchNumber}/${totalBatches} updated (${batchUpdatedTrades.length} trades)`);
+
+          // Add a small delay between batches to avoid overwhelming the server
+          if (batchNumber < totalBatches) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } catch (batchError) {
+          logger.error(`❌ Exception in batch ${batchNumber}:`, batchError);
+          failedBatches.push(batchNumber);
+          logger.log(`⚠️ Skipping batch ${batchNumber}, continuing with next batch...`);
+        }
+      }
+
+      if (failedBatches.length > 0) {
+        logger.warn(`⚠️ ${failedBatches.length} batches failed: ${failedBatches.join(', ')}`);
+        logger.log(`✅ Successfully updated ${allUpdatedTrades.length} trades (${failedBatches.length * batchSize} trades failed)`);
+      } else {
+        logger.log(`✅ Successfully bulk updated ${allUpdatedTrades.length} trades in ${totalBatches} batches`);
+      }
+
+      return {
+        success: true,
+        data: allUpdatedTrades,
+        timestamp: new Date(),
+        operation: 'bulkUpdate'
+      };
+    }, 'bulkUpdate', `Bulk updating ${trades.length} trades`);
+  }
 
   /**
    * Fetch economic events for a trade based on its date, session, and tags
@@ -403,14 +725,8 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     if (!result.tradeId) {
       throw new Error('Failed to create trade');
     }
-
-    // Fetch and return the created trade
-    const createdTrade = await this.findById(result.tradeId);
-    if (!createdTrade) {
-      throw new Error('Trade created but not found');
-    }
-
-    return createdTrade;
+ 
+    return completeTrade;
   }
 
   protected async updateInSupabase(id: string, updates: Partial<Trade>): Promise<Trade> {
@@ -462,14 +778,9 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     if (!result.success) {
       throw new Error('Failed to update trade');
     }
+ 
 
-    // Fetch and return the updated trade
-    const updatedTrade = await this.findById(id);
-    if (!updatedTrade) {
-      throw new Error('Trade updated but not found');
-    }
-
-    return updatedTrade;
+    return result.trade;
   }
 
   protected async deleteInSupabase(id: string): Promise<boolean> {
@@ -600,34 +911,13 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     tradeId: string,
     calendarId: string,
     trade: Trade,
-  ): Promise<{ success: boolean; tagsUpdated: boolean }> {
+  ): Promise<{ success: boolean; tagsUpdated: boolean, trade: Trade }> {
     try {
-      // Prepare trade updates for the transactional function
-      // Note: Numeric values are passed as numbers, not strings
-      const tradeUpdates = {
-        name: trade.name,
-        trade_type: trade.trade_type,
-        trade_date: trade.trade_date.toISOString(),
-        session: trade.session,
-        amount: trade.amount,
-        entry_price: trade.entry_price ?? null,
-        exit_price: trade.exit_price ?? null,
-        stop_loss: trade.stop_loss ?? null,
-        take_profit: trade.take_profit ?? null,
-        risk_to_reward: trade.risk_to_reward ?? null,
-        partials_taken: trade.partials_taken,
-        notes: trade.notes,
-        tags: trade.tags || [],
-        images: trade.images || [],
-        economic_events: trade.economic_events || [],
-        is_temporary: trade.is_temporary,
-        is_pinned: trade.is_pinned,
-      };
-
+       
       // Call the transactional PostgreSQL function
       const { data, error } = await supabase.rpc("update_trade_with_tags", {
         p_trade_id: tradeId,
-        p_trade_updates: tradeUpdates,
+        p_trade_updates: {...trade, trade_date: trade.trade_date.toISOString()},
         p_calendar_id: calendarId,
       });
 
@@ -646,6 +936,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
       return {
         success: data.success,
         tagsUpdated: data.tags_updated,
+        trade
       };
     } catch (error) {
       logger.error("Error updating trade with tags:", error);

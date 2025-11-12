@@ -65,7 +65,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Calendar, CalendarWithUIState } from '../types/calendar';
+import { Calendar } from '../types/calendar';
 import { formatCurrency } from '../utils/formatters';
 import { dialogProps } from '../styles/dialogStyles';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
@@ -89,20 +89,9 @@ import {
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import { Trade } from '../types/dualWrite';
 import { TradeRepository } from '../services/repository/repositories/TradeRepository';
+import { CalendarManagementProps } from '../App';
 
-interface CalendarHomeProps {
-  calendars: CalendarWithUIState[];
-  onCreateCalendar: (name: string, account_balance: number, max_daily_drawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamic_risk_enabled?: boolean, increased_risk_percentage?: number, profit_threshold_percentage?: number, heroImageUrl?: string, heroImageAttribution?: any, heroImagePosition?: string) => void;
-  onDuplicateCalendar: (sourceCalendarId: string, newName: string, includeContent?: boolean) => void;
-  onDeleteCalendar: (id: string) => void;
-  onUpdateCalendar: (id: string, updates: Partial<Calendar>) => void;
-  onToggleTheme: () => void;
-  mode: 'light' | 'dark';
-  onMenuClick: () => void;
-  isLoading?: boolean;
-
-  loadAllTrades?: (calendarId: string) => Promise<void>;
-}
+interface CalendarHomeProps extends CalendarManagementProps {}
 
 export const CalendarHome: React.FC<CalendarHomeProps> = ({
   calendars,
@@ -111,7 +100,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   onDeleteCalendar,
   onUpdateCalendar,
   isLoading: externalLoading,
-  loadAllTrades
+  onMenuClick
 }) => {
   const { user, signInWithGoogle, signOut } = useAuth();
   const location = useLocation();
@@ -126,7 +115,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDuplicateOptionsDialogOpen, setIsDuplicateOptionsDialogOpen] = useState(false);
   const [calendarToDelete, setCalendarToDelete] = useState<string | null>(null);
-  const [calendarToEdit, setCalendarToEdit] = useState<CalendarWithUIState | null>(null);
+  const [calendarToEdit, setCalendarToEdit] = useState<Calendar | null>(null);
 
   // Trash states
   const [trashCalendars, setTrashCalendars] = useState<TrashCalendar[]>([]);
@@ -141,7 +130,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     action: 'restore',
     calendar: null
   });
-  const [calendarToDuplicate, setCalendarToDuplicate] = useState<CalendarWithUIState | null>(null);
+  const [calendarToDuplicate, setCalendarToDuplicate] = useState<Calendar | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
@@ -151,12 +140,12 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const [selectedCalendarForCharts, setSelectedCalendarForCharts] = useState<CalendarWithUIState | null>(null);
+  const [selectedCalendarForCharts, setSelectedCalendarForCharts] = useState<Calendar | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [isDateDialogOpen, setIsDateDialogOpen] = useState(false);
   const [currentTimePeriod, setCurrentTimePeriod] = useState<'month' | 'year' | 'all'>('month');
-  // Track which calendars we've attempted to load trades for
-  const [loadAttempted, setLoadAttempted] = useState<{[key: string]: boolean}>({});
+  // Trades for the selected calendar
+  const [calendarTrades, setCalendarTrades] = useState<Trade[]>([]);
 
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
@@ -241,7 +230,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   useEffect(() => {
     if (selectedCalendarForCharts && calendars.length > 0) {
       const updatedCalendar = calendars.find(c => c.id === selectedCalendarForCharts.id);
-      if (updatedCalendar && updatedCalendar.cachedTrades.length > 0) {
+      if (updatedCalendar) {
         setSelectedCalendarForCharts(updatedCalendar);
       }
     }
@@ -304,28 +293,20 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
 
 
   const handleCalendarClick = async (calendarId: string) => {
-    // Load all trades for the calendar if loadAllTrades is provided
-    if (loadAllTrades) {
-      const calendar = calendars.find(c => c.id === calendarId);
-      if (calendar && calendar.loadedYears.length === 0 && !loadAttempted[calendarId]) {
-        // Mark that we've attempted to load trades for this calendar
-        setLoadAttempted(prev => ({ ...prev, [calendarId]: true }));
-        await loadAllTrades(calendarId);
-      }
-    }
-
+    // Simply navigate to the calendar page
+    // The calendar page will handle loading trades via useCalendarTrades hook
     navigate(`/calendar/${calendarId}`);
   };
 
 
 
   // Menu item handlers that don't need event parameter
-  const handleEditCalendar = (calendar: CalendarWithUIState) => {
+  const handleEditCalendar = (calendar: Calendar) => {
     setCalendarToEdit(calendar);
     setIsEditDialogOpen(true);
   };
 
-  const handleDuplicateCalendar = (calendar: CalendarWithUIState) => {
+  const handleDuplicateCalendar = (calendar: Calendar) => {
     setCalendarToDuplicate(calendar);
     setIsDuplicateOptionsDialogOpen(true);
   };
@@ -391,25 +372,20 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     action();
   };
 
-  const handleViewCharts = async (e: React.MouseEvent, calendar: CalendarWithUIState) => {
+  const handleViewCharts = async (e: React.MouseEvent, calendar: Calendar) => {
     e.stopPropagation();
 
-    // First, set the calendar to show the dialog immediately
+    // Set the calendar to show the dialog
     setSelectedCalendarForCharts(calendar);
 
-    // Then load all trades for the calendar if needed
-    if (loadAllTrades && (calendar.loadedYears.length === 0 || calendar.cachedTrades.length === 0)) {
-      // Mark that we've attempted to load trades for this calendar
-      setLoadAttempted(prev => ({ ...prev, [calendar.id]: true }));
-
-      // Load the trades
-      await loadAllTrades(calendar.id);
-
-      // After loading, update with the latest calendar data that includes the trades
-      const updatedCalendar = calendars.find(c => c.id === calendar.id);
-      if (updatedCalendar) {
-        setSelectedCalendarForCharts(updatedCalendar);
-      }
+    // Fetch trades for the calendar
+    try {
+      const tradeRepository = new TradeRepository();
+      const trades = await tradeRepository.findByCalendarId(calendar.id);
+      setCalendarTrades(trades);
+    } catch (error) {
+      logger.error('Error fetching trades for calendar:', error);
+      setCalendarTrades([]);
     }
   };
 
@@ -431,7 +407,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   };
 
   // Create a wrapper function for calendar updates that matches the expected signature
-  const handleUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: CalendarWithUIState) => Calendar): Promise<Calendar | undefined> => {
+  const handleUpdateCalendarProperty = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<Calendar | undefined> => {
     const calendar = calendars.find(c => c.id === calendarId);
     if (!calendar) return;
 
@@ -445,7 +421,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   };
 
   // Create a wrapper function for sharing-related calendar updates
-  const handleUpdateCalendarPropertyForSharing = async (calendarId: string, updateCallback: (calendar: CalendarWithUIState) => Calendar): Promise<Calendar | undefined> => {
+  const handleUpdateCalendarPropertyForSharing = async (calendarId: string, updateCallback: (calendar: Calendar) => Calendar): Promise<Calendar | undefined> => {
     const calendar = calendars.find(c => c.id === calendarId);
     if (!calendar) return undefined;
 
@@ -465,7 +441,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   const availableMonths = useMemo(() => {
     if (!selectedCalendarForCharts) return [];
 
-    const trades = selectedCalendarForCharts.cachedTrades || [];
+    const trades = calendarTrades || [];
     if (trades.length === 0) return [new Date()];
 
     const dates = trades.map(trade => new Date(trade.trade_date));
@@ -483,7 +459,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     }
 
     return months;
-  }, [selectedCalendarForCharts]);
+  }, [calendarTrades]);
 
 
 
@@ -997,7 +973,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                 ...scrollbarStyles(theme)
               }}>
                 {selectedCalendarForCharts && (
-                  isLoading || (loadAllTrades && selectedCalendarForCharts.cachedTrades.length === 0) ? (
+                  isLoading || calendarTrades.length === 0 ? (
                     <Box sx={{
                       display: 'flex',
                       flexDirection: 'column',
@@ -1012,7 +988,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                     </Box>
                   ) : (
                     <PerformanceCharts
-                      trades={selectedCalendarForCharts.cachedTrades || []}
+                      trades={calendarTrades || []}
                       selectedDate={selectedMonth}
                       accountBalance={selectedCalendarForCharts.account_balance}
                       monthlyTarget={selectedCalendarForCharts.monthly_target ?? undefined}
@@ -1060,7 +1036,7 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
                   setIsDateDialogOpen(false);
                 }}
                 initialDate={selectedMonth}
-                trades={selectedCalendarForCharts.cachedTrades || []}
+                trades={calendarTrades || []}
                 accountBalance={selectedCalendarForCharts.account_balance}
                 monthlyTarget={selectedCalendarForCharts.monthly_target ?? undefined}
                 yearlyTarget={selectedCalendarForCharts.yearly_target}

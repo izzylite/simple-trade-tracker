@@ -287,7 +287,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     channelName: `trade-economic-events-${trade.id}`,
     enabled: showEconomicEvents && tradeDateIsToday,
     onChannelCreated: (channel) => {
-      // Configure the channel BEFORE it subscribes
+      // Configure the channel before it subscribes
       channel.on(
         'postgres_changes',
         {
@@ -323,8 +323,6 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     onError: (error) => {
       logger.error(`❌ Economic events subscription error:`, error);
     },
-    maxReconnectAttempts: 3,
-    reconnectDelay: 2000,
   });
 
   useEffect(() => {

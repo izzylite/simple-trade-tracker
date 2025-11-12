@@ -48,7 +48,7 @@ import { ImportMappingDialog } from './import/ImportMappingDialog';
 interface MonthlyStatsProps {
   trades: Trade[];
   accountBalance: number;
-  onImportTrades?: (trades: Trade[]) => Promise<void>;
+  onImportTrades?: (trades: Partial<Trade>[]) => Promise<void>;
   onDeleteTrade?: (id: string) => void;
   currentDate?: Date;
   monthlyTarget?: number;
@@ -173,22 +173,12 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   const handleImportComplete = async (importedTrades: Partial<Trade>[]) => {
     if (!onImportTrades) return;
 
-    try {
-      // Add required fields that might be missing
-      const completeTrades = importedTrades.map(trade => ({
-        ...trade,
-        id: trade.id || crypto.randomUUID(),
-        calendar_id: trade.calendar_id || '',
-        user_id: trade.user_id || '',
-        created_at: trade.created_at || new Date(),
-        updated_at: trade.updated_at || new Date()
-      })) as Trade[];
-
+    try { 
       // Wait for import to complete before closing dialog
-      await onImportTrades(completeTrades);
+      await onImportTrades(importedTrades);
 
       // Show success message
-      setSnackbarMessage(`Successfully imported ${completeTrades.length} trades`);
+      setSnackbarMessage(`Successfully imported ${importedTrades.length} trades`);
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
 

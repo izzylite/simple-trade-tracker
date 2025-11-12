@@ -553,6 +553,17 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
 
               {currentStep === 2 && validationSummary && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {/* Warning about deleting existing trades */}
+                  <Alert severity="warning" sx={{ mb: 1 }}>
+                    <Typography variant="body2" fontWeight={600} gutterBottom>
+                      ⚠️ Important: Importing will replace all existing trades
+                    </Typography>
+                    <Typography variant="body2">
+                      All current trades in this calendar will be permanently deleted before importing the new trades.
+                      This action cannot be undone. Make sure you have a backup if needed.
+                    </Typography>
+                  </Alert>
+
                   <ValidationSummary summary={validationSummary} />
 
                   {validationSummary.conversions.length > 0 && (

@@ -110,50 +110,20 @@ import { EconomicEvent } from '../types/economicCalendar';
 import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
+import { useCalendarTrades } from '../hooks/useCalendarTrades';
+import * as calendarService from '../services/calendarService';
 
 interface TradeCalendarProps {
-  trades: Trade[];
-  accountBalance: number;
-  maxDailyDrawdown: number;
-  weeklyTarget?: number;
-  monthly_target?: number;
-  yearlyTarget?: number;
-  dynamicRiskSettings: DynamicRiskSettings;
-  requiredTagGroups?: string[];
-  allTags?: string[]; // Add allTags prop to receive calendar.tags
-  onAddTrade?: (trade: Trade) => Promise<void>;
-  onEditTrade?: (trade: Trade) => Promise<void>;
-  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
+  // Trade CRUD operations now handled internally via useCalendarTrades hook
+  // All calendar data is now passed via the calendar object
+  // All handlers are now internal - no external callbacks needed
+
+  calendar: Calendar;
+  setLoading: (loading: boolean, loadingAction?: "loading" | "importing" | "exporting") => void
   onToggleTheme: () => void;
   mode: 'light' | 'dark';
   // Read-only mode for shared calendars
   isReadOnly?: boolean;
-
-  onImageUpload?: (tradeId: string, image: TradeImage, add: boolean) => Promise<void>;
-  onDeleteTrades?: (tradeIds: string[]) => Promise<void>;
-  onAccountBalanceChange: (balance: number) => void;
-  onTagUpdated?: (oldTag: string, newTag: string) => void;
-  onImportTrades?: (trades: Trade[]) => Promise<void>;
-  calendarName?: string,
-  calendarNote?: string;
-  heroImageUrl?: string;
-  heroImageAttribution?: ImageAttribution;
-
-  calendarDayNotes?: Map<string, string>;
-  // Score settings
-  scoreSettings?: import('../types/score').ScoreSettings;
-  onClearMonthTrades: (month: number, year: number) => void;
-
-
-  // Pre-calculated statistics
-  totalPnL?: number;
-  // Dynamic risk toggle
-  onToggleDynamicRisk?: (useActualAmounts: boolean) => void;
-  // Loading state
-  isLoadingTrades?: boolean;
-  // Calendar data for economic events filtering
-  calendar?: Calendar
 }
 
 
@@ -388,41 +358,93 @@ const TagFilter: React.FC<TagFilterProps> = ({ allTags, selectedTags, onTagsChan
 
 export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement => {
   const {
-    trades,
-    accountBalance,
-    maxDailyDrawdown,
-    weeklyTarget,
-    monthly_target,
-    yearlyTarget,
-    dynamicRiskSettings,
-    requiredTagGroups,
-    allTags: propAllTags, // Receive calendar.tags from parent
-    onAddTrade,
-    onTagUpdated,
-    onUpdateTradeProperty,
-    onDeleteTrades,
-    onUpdateCalendarProperty,
-    onAccountBalanceChange,
-    onImportTrades,
-    calendarName,
-    calendarNote,
-    heroImageUrl,
-    heroImageAttribution,
-    calendarDayNotes,
-    // Score settings
-    scoreSettings,
-    onClearMonthTrades,
-
-    // Pre-calculated statistics
-    totalPnL,
-    // Dynamic risk toggle
-    onToggleDynamicRisk,
-    // Loading state
-    isLoadingTrades = false,
-    calendar,
-    // Read-only mode
+    calendar: selectedCalendar,
+    setLoading,
+    onToggleTheme,
+    mode,
     isReadOnly = false
   } = props;
+
+
+
+  const { calendarId } = useParams();
+
+  // Fetch trades using custom hook - this now handles all trade CRUD operations
+  const {
+    trades,
+    calendar: hookCalendar,
+    isLoading: isLoadingTrades,
+    addTrade: handleAddTrade,
+    deleteTrades: handleDeleteTrades,
+    handleUpdateTradeProperty,
+    onTagUpdated: handleTagUpdated,
+    handleToggleDynamicRisk,
+    handleImportTrades: hookHandleImportTrades,
+    handleAccountBalanceChange,
+    handleClearMonthTrades,
+    handleUpdateCalendarProperty,
+  } = useCalendarTrades({
+    calendarId,
+    selectedCalendar,
+    setLoading,
+    enableRealtime: !isReadOnly, // Disable real-time for read-only mode
+  });
+
+  // Use hook calendar if available, otherwise fall back to selectedCalendar
+  const calendar = hookCalendar || selectedCalendar;
+
+ // Extract calendar fields for easier access
+ 
+  const accountBalance = calendar.account_balance;
+  const maxDailyDrawdown = calendar.max_daily_drawdown;
+  const weeklyTarget = calendar.weekly_target;
+  const monthly_target = calendar.monthly_target;
+  const yearlyTarget = calendar.yearly_target;
+  const requiredTagGroups = calendar.required_tag_groups;
+  const calendarName = calendar.name;
+  const calendarNote = calendar.note;
+  const heroImageUrl = calendar.hero_image_url;
+  const heroImageAttribution = calendar.hero_image_attribution;
+  const scoreSettings = calendar.score_settings;
+  const totalPnL = calendar.total_pnl;
+
+  const dynamicRiskSettings: DynamicRiskSettings = {
+    account_balance: calendar.account_balance,
+    risk_per_trade: calendar.risk_per_trade,
+    dynamic_risk_enabled: calendar.dynamic_risk_enabled,
+    increased_risk_percentage: calendar.increased_risk_percentage,
+    profit_threshold_percentage: calendar.profit_threshold_percentage
+  };
+
+  const calendarDayNotes = calendar.days_notes
+    ? Object.entries(calendar.days_notes).reduce((map, [k, v]) => map.set(k, v), new Map<string, string>())
+    : new Map<string, string>();
+
+
+
+
+
+
+
+  // Wrapper for import trades handler to pass setLoading
+  const handleImportTrades = useCallback(async (importedTrades: Partial<Trade>[]) => {
+    try {
+      await hookHandleImportTrades(importedTrades);
+    } catch (error) {
+      console.error('Error importing trades:', error);
+      throw error;
+    }
+  }, [hookHandleImportTrades]);
+
+  // Wrapper for update calendar property to match the expected signature
+  // The hook version doesn't need calendarId since it uses the calendar from hook state
+  const onUpdateCalendarProperty = useCallback(async (
+    _calendarId: string,
+    updateCallback: (calendar: Calendar) => Calendar
+  ): Promise<Calendar | undefined> => {
+    return await handleUpdateCalendarProperty(updateCallback);
+  }, [handleUpdateCalendarProperty]);
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isDayNotesDialogOpen, setIsDayNotesDialogOpen] = useState<string | null>(null);
@@ -492,7 +514,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       onClick: handleToggleNoteExpand,
       tooltip: isNoteExpanded ? 'Hide description' : 'Show description'
     },
-    ...((onUpdateCalendarProperty && !isReadOnly) ? [{
+    ...((!isReadOnly) ? [{
       key: 'image',
       icon: <ImageIcon fontSize="small" />,
       onClick: () => setIsImagePickerOpen(true),
@@ -507,7 +529,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   const theme = useTheme();
   const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
-  const { calendarId } = useParams();
 
   // Breadcrumb items
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -686,10 +707,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
-  // Use calendar.tags from props, fallback to extracting from trades if not available
+  // Use calendar.tags, fallback to extracting from trades if not available
   const allTags = useMemo(() => {
-    if (propAllTags && propAllTags.length > 0) {
-      return propAllTags;
+    if (calendar.tags && calendar.tags.length > 0) {
+      return calendar.tags;
     }
 
     // Fallback: extract from trades (for backwards compatibility)
@@ -700,10 +721,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       }
     });
     return Array.from(tagSet).sort();
-  }, [propAllTags, trades]);
+  }, [calendar.tags, trades]);
 
   // Filter trades based on selected tags
-  const filteredTrades = useMemo(() => {
+  const filteredTrades = useMemo(() => { 
     if (selectedTags.length === 0) {
       return trades; // No filtering if no tags selected
     }
@@ -725,15 +746,18 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   // Calculate total profit based on filtered trades or use pre-calculated value
   const totalProfit = useMemo(() => {
-
-
     // If no tag filtering is applied and pre-calculated totalPnL is available, use it
     if (selectedTags.length === 0 && totalPnL !== undefined) {
+      console.log('📊 Using pre-calculated totalPnL:', totalPnL, 'from calendar');
       return totalPnL;
     }
     // Otherwise calculate from filtered trades
-    return filteredTrades.length > 0 ? filteredTrades.reduce((sum, trade) => sum + trade.amount, 0) : 0;
+    const calculated = filteredTrades.length > 0 ? filteredTrades.reduce((sum, trade) => sum + trade.amount, 0) : 0;
+    console.log('📊 Calculated totalProfit from', filteredTrades.length, 'filtered trades:', calculated);
+    return calculated;
   }, [filteredTrades, selectedTags, totalPnL]);
+
+  console.log('📈 TradeCalendarPage rendered - totalProfit:', totalProfit, 'trades:', trades.length, 'calendar.total_pnl:', totalPnL);
 
   const calendarDays = useMemo(() => {
     const days: Date[] = [];
@@ -788,10 +812,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setDeletingTradeIds(prev => [...prev, ...tradesToDelete]);
 
     try {
-      // Use the new onDeleteTrades callback to actually delete trades from database
-      if (onDeleteTrades) {
-        await onDeleteTrades(tradesToDelete);
-      }
+      // Delete trades using the hook handler
+      await handleDeleteTrades(tradesToDelete);
 
       // Show success message
       const successMessage = tradesToDelete.length === 1
@@ -846,9 +868,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     if (!isDynamicRiskToggled) {
       // Reset to use actual amounts set to false before adding any trade
       setIsDynamicRiskToggled(true);
-      if (onToggleDynamicRisk) {
-        onToggleDynamicRisk(true);
-      }
+      handleToggleDynamicRisk(true);
       return;
     }
     const trades = filteredTrades.filter(trade => isSameDay(new Date(trade.trade_date), trade_date));
@@ -864,11 +884,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setSelectedDate(trade_date);
   };
 
-
-  const handleAddTrade = onAddTrade ? async (trade: Trade) => {
-    await onAddTrade(trade);
-  } : undefined;
-
+ 
 
 
 
@@ -1016,15 +1032,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               <AccountStats
                 balance={accountBalance}
                 totalProfit={totalProfit}
-                onChange={onAccountBalanceChange}
+                onChange={handleAccountBalanceChange}
                 trades={filteredTrades}
                 risk_per_trade={dynamicRiskSettings?.risk_per_trade}
                 dynamicRiskSettings={dynamicRiskSettings}
                 onToggleDynamicRisk={(useActualAmounts) => {
                   setIsDynamicRiskToggled(useActualAmounts);
-                  if (onToggleDynamicRisk) {
-                    onToggleDynamicRisk(useActualAmounts);
-                  }
+                  handleToggleDynamicRisk(useActualAmounts);
                 }}
                 isDynamicRiskToggled={isDynamicRiskToggled}
                 isReadOnly={isReadOnly}
@@ -1036,10 +1050,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               <MonthlyStats
                 trades={filteredTrades}
                 accountBalance={accountBalance}
-                onImportTrades={onImportTrades}
+                onImportTrades={handleImportTrades}
                 currentDate={currentDate}
                 monthlyTarget={monthly_target}
-                onClearMonthTrades={onClearMonthTrades}
+                onClearMonthTrades={handleClearMonthTrades}
                 isReadOnly={isReadOnly}
               />
 
@@ -1511,16 +1525,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             monthly_target={monthly_target}
             calendarId={calendarId!!}
             scoreSettings={scoreSettings}
-            onUpdateTradeProperty={isReadOnly ? undefined : onUpdateTradeProperty}
+            onUpdateTradeProperty={isReadOnly ? undefined : handleUpdateTradeProperty}
             onUpdateCalendarProperty={isReadOnly ? undefined : onUpdateCalendarProperty}
             dynamicRiskSettings={dynamicRiskSettings}
             allTags={allTags}
             onEditTrade={isReadOnly ? undefined : (trade) => {
               // Use the same edit handler as in DayDialog
-              if (props.onUpdateTradeProperty) {
-                setNewTrade(() => (createEditTradeData(trade)));
-                setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
-              }
+              setNewTrade(() => (createEditTradeData(trade)));
+              setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
             }}
             onDeleteTrade={isReadOnly ? undefined : (tradeId) => {
               // Use the same delete handler as in DayDialog
@@ -1550,7 +1562,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           }}
           date={selectedDate || new Date()}
           trades={selectedDate ? tradesForSelectedDay : []}
-          onUpdateTradeProperty={isReadOnly ? undefined : onUpdateTradeProperty}
+          onUpdateTradeProperty={isReadOnly ? undefined : handleUpdateTradeProperty}
           onDeleteTrade={isReadOnly ? () => { } : handleDeleteClick}
           onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
           calendarId={calendarId!!}
@@ -1590,15 +1602,15 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             trade_date={showAddForm?.trade_date || new Date()}
             trades={showAddForm?.trade_date ? tradesForSelectedDay : []}
             onAddTrade={handleAddTrade}
-            onTagUpdated={onTagUpdated}
+            onTagUpdated={handleTagUpdated}
             newMainTrade={newTrade}
             setNewMainTrade={prev => setNewTrade(prev(newTrade!!))}
-            onUpdateTradeProperty={onUpdateTradeProperty}
-            onDeleteTrades={onDeleteTrades}
+            onUpdateTradeProperty={handleUpdateTradeProperty}
+            onDeleteTrades={handleDeleteTrades}
             calendar_id={calendarId!!}
             setZoomedImage={setZoomedImage}
             account_balance={accountBalance}
-            onAccountBalanceChange={onAccountBalanceChange}
+            onAccountBalanceChange={handleAccountBalanceChange}
             allTrades={trades}
             tags={allTags}
             dynamicRiskSettings={dynamicRiskSettings}
@@ -1653,7 +1665,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onClose={() => setIsTagManagementDrawerOpen(false)}
           allTags={allTags}
           calendarId={calendarId!!}
-          onTagUpdated={onTagUpdated}
+          onTagUpdated={handleTagUpdated}
           requiredTagGroups={requiredTagGroups}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
           isReadOnly={isReadOnly}
@@ -1665,7 +1677,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onClose={() => setIsTagManagementDialogOpen(false)}
           allTags={allTags}
           calendarId={calendarId!!}
-          onTagUpdated={onTagUpdated}
+          onTagUpdated={handleTagUpdated}
           requiredTagGroups={requiredTagGroups}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
         />
@@ -1794,13 +1806,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             openGalleryMode(allTrades, trade.id, title);
           }}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
-          onUpdateTradeProperty={isReadOnly ? undefined : onUpdateTradeProperty}
+          onUpdateTradeProperty={isReadOnly ? undefined : handleUpdateTradeProperty}
           onEditTrade={isReadOnly ? undefined : (trade) => {
             // Use the same edit handler as in DayDialog
-            if (props.onUpdateTradeProperty) {
-              setNewTrade(() => (createEditTradeData(trade)));
-              setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
-            }
+            setNewTrade(() => (createEditTradeData(trade)));
+            setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
           }}
           onDeleteTrade={isReadOnly ? undefined : handleDeleteClick}
           onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
@@ -1815,7 +1825,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onClose={closeGalleryMode}
           trades={galleryMode.trades}
           initialTradeId={galleryMode.initialTradeId}
-          onUpdateTradeProperty={onUpdateTradeProperty}
+          onUpdateTradeProperty={handleUpdateTradeProperty}
           setZoomedImage={setZoomedImage}
           title={galleryMode.title}
           calendarId={calendarId}
@@ -1844,13 +1854,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         onUpdateCalendarProperty={onUpdateCalendarProperty}
         onOpenGalleryMode={openGalleryMode}
         payload={economicCalendarUpdatedEvent}
-        onUpdateTradeProperty={isReadOnly ? undefined : onUpdateTradeProperty}
+        onUpdateTradeProperty={isReadOnly ? undefined : handleUpdateTradeProperty}
         onEditTrade={isReadOnly ? undefined : (trade) => {
           // Use the same edit handler as in DayDialog
-          if (props.onUpdateTradeProperty) {
-            setNewTrade(() => (createEditTradeData(trade)));
-            setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
-          }
+          setNewTrade(() => (createEditTradeData(trade)));
+          setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
         }}
         onDeleteTrade={isReadOnly ? undefined : handleDeleteClick}
         onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
@@ -1865,13 +1873,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         trades={trades}
         calendar={calendar!}
         onOpenGalleryMode={openGalleryMode}
-        onUpdateTradeProperty={isReadOnly ? undefined : onUpdateTradeProperty}
+        onUpdateTradeProperty={isReadOnly ? undefined : handleUpdateTradeProperty}
         onEditTrade={isReadOnly ? undefined : (trade) => {
           // Use the same edit handler as in DayDialog
-          if (props.onUpdateTradeProperty) {
-            setNewTrade(() => (createEditTradeData(trade)));
-            setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
-          }
+          setNewTrade(() => (createEditTradeData(trade)));
+          setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
         }}
         onDeleteTrade={isReadOnly ? undefined : handleDeleteClick}
         onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}

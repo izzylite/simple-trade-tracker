@@ -24,7 +24,7 @@ interface TagsInputProps {
   allTags: string[];
   onTagsChange: (event: React.SyntheticEvent, value: string[]) => void;
   calendarId: string;
-  onTagUpdated?: (oldTag: string, newTag: string) => void;
+  onTagUpdated?: (oldTag: string, newTag: string) => Promise<{ success: boolean; tradesUpdated: number }>;
 }
 
 const TagsInput: React.FC<TagsInputProps> = ({
@@ -172,6 +172,7 @@ const TagsInput: React.FC<TagsInputProps> = ({
           calendarId={calendarId}
           onSuccess={handleTagEditSuccess}
           onDelete={handleTagDelete}
+          onTagUpdated={onTagUpdated}
         />
       )}
 

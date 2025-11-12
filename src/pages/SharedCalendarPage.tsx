@@ -47,6 +47,8 @@ const SharedCalendarPage: React.FC = () => {
   const [calendarData, setCalendarData] = useState<SharedCalendarData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingTrades, setIsLoadingTrades] = useState<boolean>(false);
+  const [loadingAction, setLoadingAction] = useState<'loading' | 'importing' | 'exporting'>('loading');
 
   // Update theme mode in localStorage when it changes
   useEffect(() => {
@@ -55,6 +57,14 @@ const SharedCalendarPage: React.FC = () => {
 
   const handleToggleTheme = () => {
     setMode(prevMode => prevMode === 'light' ? 'dark' : 'light');
+  };
+
+  const handleSetLoading = (
+    loading: boolean,
+    action: 'loading' | 'importing' | 'exporting' = 'loading'
+  ) => {
+    setIsLoadingTrades(loading);
+    setLoadingAction(action);
   };
 
   // Handle back navigation
@@ -266,33 +276,10 @@ const SharedCalendarPage: React.FC = () => {
 
         {/* Calendar Content - Using TradeCalendar in read-only mode */}
         <TradeCalendar
-          trades={calendarData.trades}
-          accountBalance={calendarData.calendar.account_balance}
-          maxDailyDrawdown={calendarData.calendar.max_daily_drawdown}
-          weeklyTarget={calendarData.calendar.weekly_target}
-          monthly_target={calendarData.calendar.monthly_target}
-          yearlyTarget={calendarData.calendar.yearly_target}
-          dynamicRiskSettings={{
-            account_balance: calendarData.calendar.account_balance,
-            dynamic_risk_enabled: calendarData.calendar.dynamic_risk_enabled || false,
-            risk_per_trade: calendarData.calendar.risk_per_trade || 0,
-            increased_risk_percentage: calendarData.calendar.increased_risk_percentage || 0,
-            profit_threshold_percentage: calendarData.calendar.profit_threshold_percentage || 0
-          }}
-          requiredTagGroups={calendarData.calendar.required_tag_groups}
-          allTags={calendarData.calendar.tags}
-          calendarName={`${calendarData.calendar.name} - Shared Calendar`}
-          calendarNote={calendarData.calendar.note}
-          heroImageUrl={calendarData.calendar.hero_image_url}
-          heroImageAttribution={calendarData.calendar.hero_image_attribution}
-          calendarDayNotes={calendarData.calendar.days_notes ? Object.entries(calendarData.calendar.days_notes).reduce((map, [k, v]) => map.set(k, v), new Map<string, string>()) : new Map<string, string>()}
-          scoreSettings={calendarData.calendar.score_settings}
-          onClearMonthTrades={() => { }} // No-op for read-only
-          totalPnL={calendarData.calendar.total_pnl}
-          onAccountBalanceChange={() => { }} // No-op for read-only
+          calendar={calendarData.calendar}
+          setLoading={handleSetLoading}
           onToggleTheme={handleToggleTheme}
           mode={mode}
-          calendar={calendarData.calendar}
           isReadOnly={true} // Enable read-only mode for shared calendars
         />
 

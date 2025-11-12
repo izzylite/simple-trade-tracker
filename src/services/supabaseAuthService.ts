@@ -4,8 +4,7 @@
  */
 
 import { supabase } from '../config/supabase';
-import { logger } from '../utils/logger';
-import { userMigrationService } from './userMigrationService';
+import { logger } from '../utils/logger'; 
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 
 export interface SupabaseUser {
@@ -203,12 +202,7 @@ class SupabaseAuthService {
 
       const isNewUser = !existingUser;
 
-      // Handle user migration if needed
-      const migrationResult = await userMigrationService.handleUserSignIn(
-        user.id,
-        user.email!,
-        displayName
-      );
+      
 
       // Determine auth provider
       const provider = user.app_metadata?.provider || 'email';
@@ -236,10 +230,7 @@ class SupabaseAuthService {
       } else {
         logger.info('User upserted successfully');
 
-        // Log migration status
-        if (migrationResult.migrated) {
-          logger.info(`User migration completed for ${user.email}`);
-        }
+       
 
         // Consume pending invite code if this is a new user
         if (isNewUser) {

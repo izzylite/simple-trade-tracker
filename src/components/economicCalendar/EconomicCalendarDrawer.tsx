@@ -396,15 +396,14 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   // Memoize realtime subscription callbacks to prevent unnecessary recreations
   const handleChannelCreated = useCallback((channel: any) => {
     // Configure the channel BEFORE it subscribes
+    // Listen for INSERT, UPDATE, DELETE events via broadcast
     channel.on(
-      'postgres_changes',
+      'broadcast',
       {
         event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-        schema: 'public',
-        table: 'economic_events'
       },
       async (payload: any) => {
-        logger.log(`🔄 Economic event ${payload.eventType}:`, payload);
+        logger.log(`🔄 Economic event ${payload.event}:`, payload);
 
         // Refetch events when any change occurs in the date range
         // This ensures we get fresh data without complex state management
@@ -439,7 +438,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     logger.error(`❌ Economic events subscription error:`, error);
   }, []);
 
-  // Subscribe to economic events changes with automatic reconnection
+  // Subscribe to economic events changes
   // Edge functions update events in real-time (scraping, updates from APIs)
   const { createChannel, cleanupChannel } = useRealtimeSubscription({
     channelName: `economic-events`,
@@ -447,8 +446,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     onChannelCreated: handleChannelCreated,
     onSubscribed: handleSubscribed,
     onError: handleError,
-    maxReconnectAttempts: 3,
-    reconnectDelay: 2000,
   });
 
   // Track if we've already set up the subscription for this drawer open

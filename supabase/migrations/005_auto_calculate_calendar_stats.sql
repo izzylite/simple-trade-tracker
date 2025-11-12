@@ -9,9 +9,12 @@
 -- FUNCTION: calculate_calendar_stats
 -- =====================================================
 -- Calculates all statistics for a calendar based on its trades
+-- SECURITY DEFINER allows the function to bypass RLS when updating calendar stats
+-- This is necessary for realtime subscriptions to receive UPDATE events from triggers
 CREATE OR REPLACE FUNCTION calculate_calendar_stats(p_calendar_id UUID)
 RETURNS void
 LANGUAGE plpgsql
+SECURITY DEFINER
 AS $$
 DECLARE
   v_calendar RECORD;

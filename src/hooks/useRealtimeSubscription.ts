@@ -92,14 +92,26 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
    * IMPORTANT: The channel is configured but NOT subscribed yet.
    * Caller must configure event listeners, then call .subscribe()
    */
-  const createChannel = useCallback(() => {
+  const createChannel = useCallback(async () => {
     if (!enabled) {
       return null;
     }
 
     logger.log(`📡 Creating realtime channel: ${channelName}`);
 
-    const channel = supabase.channel(channelName);
+    // Set auth for Realtime Authorization (required for private channels and broadcast)
+    const session = await supabase.auth.getSession();
+    if (session.data.session?.access_token) {
+      await supabase.realtime.setAuth(session.data.session.access_token);
+      logger.log(`🔐 Set realtime auth for ${channelName}`);
+    }
+
+    // Create channel with private config for broadcast authorization
+    const channel = supabase.channel(channelName, {
+      config: {
+        private: true, // Required for realtime.broadcast_changes()
+      },
+    });
 
     // Allow caller to configure the channel (add event listeners) BEFORE subscribing
     if (onChannelCreated) {
@@ -210,16 +222,26 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
   }, [enabled, channelName, attemptReconnect]);
 
   /**
-   * Cleanup on unmount
+   * Create channel automatically when enabled
+   * This ensures channels are created without requiring manual createChannel() calls
    */
   useEffect(() => {
+    if (!enabled) return;
+
+    // Create channel if it doesn't exist
+    if (!channelRef.current) {
+      createChannel();
+    }
+
+    // Cleanup only on unmount or when channelName/enabled changes
     return () => {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
       cleanupChannel();
     };
-  }, [cleanupChannel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelName, enabled]);
 
   return {
     channel: channelRef.current,

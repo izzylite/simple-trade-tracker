@@ -36,7 +36,7 @@ interface FormDialogProps {
   account_balance: number;
 
   onAddTrade?: (trade: Trade & { id?: string }) => Promise<void>;
-  onTagUpdated?: (oldTag: string, newTag: string) => void;
+  onTagUpdated?: (oldTag: string, newTag: string) => Promise<{ success: boolean; tradesUpdated: number }>;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
   onDeleteTrades?: (tradeIds: string[]) => Promise<void>;
   onAccountBalanceChange?: (balance: number) => void;
@@ -344,7 +344,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     return trade.trade_type === 'loss' ? -Math.abs(amount) : Math.abs(amount);
   };
 
-  const createFinalTradeData = async (newTrade: NewTradeForm, trade_date: Date) => {
+  const createFinalTradeData =   (newTrade: NewTradeForm, trade_date: Date) : Trade => {
     let finalAmount = calculateFinalAmount(newTrade);
     logger.log(`trade final amount ${finalAmount}`)
 
@@ -689,7 +689,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
       });
 
-      // Update Firebase document if we have a temporary trade ID
+      // Update document if we have a temporary trade ID
       if (effectiveCalendarId && tradeId) {
         try {
           // Use transaction to add the image to the trade
@@ -844,7 +844,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   };
 
   // Handle tag updates from the edit dialog
-  const handleTagUpdated = (oldTag: string, newTag: string) => {
+  const handleTagUpdated = async (oldTag: string, newTag: string) => {
     // Update the tags in the current form if needed
     if (newTrade && newTrade.tags.includes(oldTag)) {
       setNewTrade(prev => {
@@ -858,8 +858,10 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
     // Update the cached trades list
     if (onTagUpdated) {
-      onTagUpdated(oldTag, newTag);
+      return await onTagUpdated(oldTag, newTag);
     }
+
+    return { success: true, tradesUpdated: 0 };
   };
 
   const hasPendingUploads = (): boolean => newTrade!.pending_images.some(img =>
@@ -934,7 +936,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       }
       setIsSubmitting(true);
       // Prepare data
-      let tradeData = await createFinalTradeData(newTrade!, trade_date);
+      let tradeData =  createFinalTradeData(newTrade!, trade_date);
 
       try {
         // Update the temporary trade with the final data

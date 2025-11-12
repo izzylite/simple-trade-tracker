@@ -13,12 +13,12 @@ import {
   alpha
 } from '@mui/material';
 import { ContentCopy as CopyIcon } from '@mui/icons-material';
-import { CalendarWithUIState } from '../../types/calendar';
+import { Calendar } from '../../types/calendar';
 import { dialogProps } from '../../styles/dialogStyles';
 
 interface DuplicateCalendarDialogProps {
   open: boolean;
-  calendar: CalendarWithUIState | null;
+  calendar: Calendar | null;
   isDuplicating: boolean;
   onClose: () => void;
   onDuplicate: (withContent: boolean) => void;

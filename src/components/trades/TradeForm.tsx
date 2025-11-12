@@ -96,7 +96,7 @@ interface TradeFormProps {
   calculateAmountFromRiskToReward: (rr: number, cumulativePnL: number) => number;
   calendarId: string;
   requiredTagGroups?: string[];
-  onTagUpdated?: (oldTag: string, newTag: string) => void;
+  onTagUpdated?: (oldTag: string, newTag: string) => Promise<{ success: boolean; tradesUpdated: number }>;
   onNameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onAmountChange: (amount: number) => void;
   onTypeChange: (e: any) => void;

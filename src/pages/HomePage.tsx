@@ -30,7 +30,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { format, startOfMonth, endOfMonth, isSameDay } from 'date-fns';
-import { CalendarWithUIState, Calendar } from '../types/calendar';
+import { Calendar } from '../types/calendar';
 import { Trade } from '../types/dualWrite';
 import { EconomicEvent } from '../types/economicCalendar';
 import { formatCurrency } from '../utils/formatters';
@@ -52,35 +52,13 @@ import EconomicEventShimmer from '../components/economicCalendar/EconomicEventSh
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { dialogProps } from '../styles/dialogStyles';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
-import TradeFormDialog from '../components/trades/TradeFormDialog';
-import { NewTradeForm } from '../components/trades/TradeForm';
-import { createNewTradeData } from './TradeCalendarPage';
-import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
-import { v4 as uuidv4 } from 'uuid';
 import { DuplicateCalendarDialog } from '../components/dialogs/DuplicateCalendarDialog';
 
 
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
+import { CalendarManagementProps } from '../App';
 
-interface HomeProps {
-  calendars: CalendarWithUIState[];
-  onToggleTheme: () => void;
-  mode: 'light' | 'dark';
-  onMenuClick: () => void;
-  isLoading?: boolean;
-  onCreateCalendar: (name: string, account_balance: number, max_daily_drawdown: number, weeklyTarget?: number, monthlyTarget?: number, yearlyTarget?: number, riskPerTrade?: number, dynamic_risk_enabled?: boolean, increased_risk_percentage?: number, profit_threshold_percentage?: number, heroImageUrl?: string, heroImageAttribution?: any, heroImagePosition?: string) => void;
-  onDuplicateCalendar: (sourceCalendarId: string, newName: string, includeContent?: boolean) => void;
-  onDeleteCalendar: (id: string) => void;
-  onUpdateCalendar: (id: string, updates: Partial<Calendar>) => void;
-  onUpdateStateCalendar: (id: string, updates: Partial<CalendarWithUIState>) => void;
-  loadAllTrades?: (calendarId: string) => Promise<void>;
-
-  // Trade handlers from App.tsx
-  onAddTrade: (calendarId: string, trade: Trade) => Promise<void>;
-  onUpdateTradeProperty: (calendarId: string, tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
-  onDeleteTrades: (calendarId: string, tradeIds: string[]) => Promise<void>;
-  onTagUpdated: (calendarId: string, oldTag: string, newTag: string) => Promise<void>;
-}
+interface HomeProps extends CalendarManagementProps {}
 
 const Home: React.FC<HomeProps> = ({
   calendars,
@@ -89,12 +67,7 @@ const Home: React.FC<HomeProps> = ({
   onDuplicateCalendar,
   onDeleteCalendar,
   onUpdateCalendar,
-  onUpdateStateCalendar,
-  loadAllTrades,
-  onAddTrade,
-  onUpdateTradeProperty,
-  onDeleteTrades,
-  onTagUpdated
+  onMenuClick
 }) => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -118,11 +91,7 @@ const Home: React.FC<HomeProps> = ({
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
 
-  // Trade form state
-  const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
-  const [selectedCalendarId, setSelectedCalendarId] = useState<string>('');
-  const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
-  const [tradesForDate, setTradesForDate] = useState<Trade[]>([]);
+  // Image zoom state
   const [zoomedImage, setZoomedImage] = useState<string>('');
 
   // Calendar dialog states
@@ -130,8 +99,8 @@ const Home: React.FC<HomeProps> = ({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDuplicateOptionsDialogOpen, setIsDuplicateOptionsDialogOpen] = useState(false);
   const [calendarToDelete, setCalendarToDelete] = useState<string | null>(null);
-  const [calendarToEdit, setCalendarToEdit] = useState<CalendarWithUIState | null>(null);
-  const [calendarToDuplicate, setCalendarToDuplicate] = useState<CalendarWithUIState | null>(null);
+  const [calendarToEdit, setCalendarToEdit] = useState<Calendar | null>(null);
+  const [calendarToDuplicate, setCalendarToDuplicate] = useState<Calendar | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
 
@@ -149,12 +118,12 @@ const Home: React.FC<HomeProps> = ({
 
 
   // Calendar action handlers - open dialogs for edit/duplicate/delete
-  const handleEditCalendar = (calendar: CalendarWithUIState) => {
+  const handleEditCalendar = (calendar: Calendar) => {
     setCalendarToEdit(calendar);
     setIsEditDialogOpen(true);
   };
 
-  const handleDuplicateCalendar = (calendar: CalendarWithUIState) => {
+  const handleDuplicateCalendar = (calendar: Calendar) => {
     setCalendarToDuplicate(calendar);
     setIsDuplicateOptionsDialogOpen(true);
   };
@@ -167,7 +136,7 @@ const Home: React.FC<HomeProps> = ({
   // Update calendar property handler for share button
   const handleUpdateCalendarProperty = async (
     calendarId: string,
-    updateCallback: (calendar: CalendarWithUIState) => Calendar
+    updateCallback: (calendar: Calendar) => Calendar
   ): Promise<Calendar | undefined> => {
     const targetCalendar = calendars.find(c => c.id === calendarId);
     if (!targetCalendar) {
@@ -321,67 +290,12 @@ const Home: React.FC<HomeProps> = ({
     if (calendars.length === 0) {
       return; // Button should be disabled, but just in case
     }
-    setNewTrade(createNewTradeData());
-    setIsTradeFormOpen(true);
-  };
-
-  // Get selected calendar data
-  const selectedCalendar = useMemo(() => {
-    return calendars.find(c => c.id === selectedCalendarId);
-  }, [calendars, selectedCalendarId]);
-
-  // Update trades for selected date when calendar changes
-  useEffect(() => {
-    if (selectedCalendarId && selectedCalendar) {
-      const today = new Date();
-      const todayTrades = selectedCalendar.cachedTrades.filter(trade =>
-        isSameDay(new Date(trade.trade_date), today)
-      );
-      setTradesForDate(todayTrades);
+    // Navigate to the first calendar to add a trade
+    const firstCalendar = calendars[0];
+    if (firstCalendar) {
+      navigate(`/calendar/${firstCalendar.id}`);
     }
-  }, [selectedCalendarId, selectedCalendar]);
-
-  // Trade handlers - wrapper functions that call the handlers from App.tsx
-  const handleAddTrade = async (trade: Trade) => {
-    if (!selectedCalendar) return;
-
-    const newTradeWithId = trade.id ? trade : { ...trade, id: uuidv4() };
-    await onAddTrade(selectedCalendar.id, newTradeWithId);
-
-    // Note: Recent trades will be automatically refreshed by SWR on next focus/revalidation
   };
-
-  const handleUpdateTradeProperty = async (
-    tradeId: string,
-    updateCallback: (trade: Trade) => Trade,
-    createIfNotExists?: (tradeId: string) => Trade
-  ): Promise<Trade | undefined> => {
-    if (!selectedCalendar) return undefined;
-    return onUpdateTradeProperty(selectedCalendar.id, tradeId, updateCallback, createIfNotExists);
-  };
-
-  const handleDeleteTrades = async (tradeIds: string[]): Promise<void> => {
-    if (!selectedCalendar) return;
-    return onDeleteTrades(selectedCalendar.id, tradeIds);
-  };
-
-  const handleTagUpdated = async (oldTag: string, newTag: string) => {
-    if (!selectedCalendar) return;
-    return onTagUpdated(selectedCalendar.id, oldTag, newTag);
-  };
-
-  const handleCalendarChange = (calendarId: string) => {
-    setSelectedCalendarId(calendarId);
-  };
-
-  const handleTradeFormClose = () => {
-    setIsTradeFormOpen(false);
-    setSelectedCalendarId('');
-    setNewTrade(null);
-    setTradesForDate([]);
-  };
-
-
 
   const handleLoginDialogClose = () => {
     setShowLoginDialog(false);
@@ -1281,14 +1195,12 @@ const Home: React.FC<HomeProps> = ({
           trades={[]}
           calendar={calendars[0]}
           onOpenGalleryMode={() => {}}
-          onUpdateTradeProperty={(tradeId, updateCallback) =>
-            onUpdateTradeProperty(calendars[0].id, tradeId, updateCallback)
-          }
+          onUpdateTradeProperty={() => Promise.resolve(undefined)}
           onEditTrade={() => {}}
           onDeleteTrade={() => {}}
           onDeleteMultipleTrades={() => {}}
           onZoomImage={setZoomedImage}
-          onUpdateCalendarProperty={handleUpdateCalendarProperty}
+          onUpdateCalendarProperty={() => Promise.resolve(undefined)}
           isReadOnly={false}
         />
       )}
@@ -1302,37 +1214,6 @@ const Home: React.FC<HomeProps> = ({
         mode="create"
         title="Create New Calendar"
         submitButtonText="Create"
-      />
-
-      {/* Trade Form Dialog */}
-      <TradeFormDialog
-        open={isTradeFormOpen}
-        onClose={handleTradeFormClose}
-        onCancel={handleTradeFormClose}
-        newMainTrade={newTrade}
-        setNewMainTrade={(prev) => setNewTrade(prev(newTrade!))}
-        trade_date={new Date()}
-        trades={tradesForDate}
-        account_balance={selectedCalendar?.account_balance || 0}
-        showForm={{ open: isTradeFormOpen, editTrade: null, createTempTrade: false }}
-        onAddTrade={handleAddTrade}
-        onTagUpdated={handleTagUpdated}
-        onUpdateTradeProperty={handleUpdateTradeProperty}
-        onDeleteTrades={handleDeleteTrades}
-        setZoomedImage={(url) => setZoomedImage(url)}
-        allTrades={selectedCalendar?.cachedTrades || []}
-        dynamicRiskSettings={{
-          account_balance: selectedCalendar?.account_balance || 0,
-          risk_per_trade: selectedCalendar?.risk_per_trade || 0,
-          dynamic_risk_enabled: selectedCalendar?.dynamic_risk_enabled || false,
-          increased_risk_percentage: selectedCalendar?.increased_risk_percentage || 0,
-          profit_threshold_percentage: selectedCalendar?.profit_threshold_percentage || 0
-        }}
-        tags={selectedCalendar?.tags || []}
-        requiredTagGroups={selectedCalendar?.required_tag_groups || []}
-        calendars={calendars}
-        onCalendarChange={handleCalendarChange}
-        selectedCalendarId={selectedCalendarId}
       />
 
       {/* Edit Calendar Dialog */}

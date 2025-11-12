@@ -9,7 +9,6 @@
 import useSWR from 'swr';
 import * as calendarService from '../services/calendarService';
 import type { Calendar } from '../types/dualWrite';
-import type { CalendarWithUIState } from '../types/calendar';
 
 interface UseCalendarsOptions {
   /**
@@ -46,12 +45,8 @@ export function useCalendars(
     async () => {
       if (!userId) return null;
       const calendars = await calendarService.getUserCalendars(userId);
-      // Convert Calendar[] to CalendarWithUIState[]
-      return calendars.map((cal): CalendarWithUIState => ({
-        ...cal,
-        cachedTrades: [],
-        loadedYears: []
-      }));
+      // Return calendars directly
+      return calendars;
     },
     {
       // Automatically refetch when tab regains focus (solves Chrome freezing)

@@ -10,10 +10,10 @@ import {
   CircularProgress
 } from '@mui/material';
 import { Delete as DeleteIcon } from '@mui/icons-material';
-import * as calendarService from '../services/calendarService';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../utils/tagColors';
 import { BaseDialog } from './common';
 import { logger } from '../utils/logger';
+import { supabase } from '../config/supabase';
 
 interface TagEditDialogProps {
   open: boolean;
@@ -22,6 +22,7 @@ interface TagEditDialogProps {
   calendarId: string;
   onSuccess?: (oldTag: string, newTag: string, tradesUpdated: number) => void;
   onDelete?: (deletedTag: string, tradesUpdated: number) => void;
+  onTagUpdated?: (oldTag: string, newTag: string) => Promise<{ success: boolean; tradesUpdated: number }>;
 }
 
 const TagEditDialog: React.FC<TagEditDialogProps> = ({
@@ -30,7 +31,8 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
   tag,
   calendarId,
   onSuccess,
-  onDelete
+  onDelete,
+  onTagUpdated
 }) => {
   const theme = useTheme();
   const [newTag, setNewTag] = useState(tag);
@@ -62,17 +64,40 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
     setError(null);
 
     try {
-      tag = tag.trim();
-      const result = await calendarService.updateTag(calendarId, tag, newTag);
+      const trimmedTag = tag.trim();
+      const trimmedNewTag = newTag.trim();
 
-      if (result.success) {
+      // Use onTagUpdated handler if provided, otherwise call Supabase Edge Function directly
+      if (onTagUpdated) {
+        const result = await onTagUpdated(trimmedTag, trimmedNewTag);
         if (onSuccess) {
-          onSuccess(tag, newTag, result.tradesUpdated);
+          onSuccess(trimmedTag, trimmedNewTag, result?.tradesUpdated || 0);
         }
-        onClose();
       } else {
-        setError('Failed to update tag');
+        // Call Supabase Edge Function directly
+        const { data, error: invokeError } = await supabase.functions.invoke('update-tag', {
+          body: {
+            calendar_id: calendarId,
+            old_tag: trimmedTag,
+            new_tag: trimmedNewTag
+          }
+        });
+
+        if (invokeError) {
+          throw invokeError;
+        }
+
+        if (data && data.success) {
+          if (onSuccess) {
+            onSuccess(trimmedTag, trimmedNewTag, data.tradesUpdated || 0);
+          }
+        } else {
+          setError('Failed to update tag');
+          return;
+        }
       }
+
+      onClose();
     } catch (error) {
       logger.error('Error updating tag:', error);
       setError(error instanceof Error ? error.message : 'An unknown error occurred');
@@ -107,15 +132,35 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
     setError(null);
 
     try {
-      // Call the cloud function with empty string to delete the tag
-      const result = await calendarService.updateTag(calendarId, tag, '');
+      const trimmedTag = tag.trim();
 
-      if (result.success) {
-        onDelete(tag, result.tradesUpdated);
-        onClose();
+      // Use onTagUpdated handler if provided (pass empty string to delete), otherwise call Supabase Edge Function directly
+      if (onTagUpdated) {
+        const result = await onTagUpdated(trimmedTag, '');
+        onDelete(trimmedTag, result?.tradesUpdated || 0);
       } else {
-        setError('Failed to delete tag');
+        // Call Supabase Edge Function directly with empty string to delete the tag
+        const { data, error: invokeError } = await supabase.functions.invoke('update-tag', {
+          body: {
+            calendar_id: calendarId,
+            old_tag: trimmedTag,
+            new_tag: ''
+          }
+        });
+
+        if (invokeError) {
+          throw invokeError;
+        }
+
+        if (data && data.success) {
+          onDelete(trimmedTag, data.tradesUpdated || 0);
+        } else {
+          setError('Failed to delete tag');
+          return;
+        }
       }
+
+      onClose();
     } catch (error) {
       logger.error('Error deleting tag:', error);
       setError(error instanceof Error ? error.message : 'An unknown error occurred');
