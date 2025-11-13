@@ -20,6 +20,7 @@ import {
   parseTradeType,
   ConversionResult
 } from './typeConverters';
+import { formatTagWithCapitalizedGroup } from './tagColors';
 
 /**
  * Field metadata for all Trade fields
@@ -244,7 +245,9 @@ export function mapRowToTrade(
       if (value && String(value).trim()) {
         if (!trade.tags) trade.tags = [];
         const tagValue = `${fileColumn}:${String(value).trim()}`;
-        trade.tags.push(tagValue);
+        // Capitalize the group name
+        const formattedTag = formatTagWithCapitalizedGroup(tagValue);
+        trade.tags.push(formattedTag);
       }
       continue;
     }

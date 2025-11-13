@@ -14,7 +14,7 @@ import { BaseDialog } from '../common';
 import * as calendarService from '../../services/calendarService';
 import { DayHeader, TradeForm, NewTradeForm } from './';
 import { v4 as uuidv4 } from 'uuid';
-import { PendingImage } from './TradeForm';
+import { DEFAULT_PAIRS_TAG_GROUP, PendingImage } from './TradeForm';
 import { GridImage, GridPendingImage } from './ImageGrid';
 import { createNewTradeData } from '../../pages/TradeCalendarPage';
 import {
@@ -25,6 +25,7 @@ import {
 } from '../../utils/dynamicRiskUtils';
 import { error, log, logger } from '../../utils/logger';
 import { validateFiles, FILE_SIZE_LIMITS } from '../../utils/fileValidation';
+import { formatTagsWithCapitalizedGroups } from '../../utils/tagColors';
 
 interface FormDialogProps {
   open: boolean;
@@ -430,7 +431,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   };
 
   const handleTagsChange = (_event: React.SyntheticEvent, newValue: string[]) => {
-    setNewTrade(prev => ({ ...prev!, tags: newValue }));
+    // Capitalize tag groups before saving
+    const formattedTags = formatTagsWithCapitalizedGroups(newValue);
+    setNewTrade(prev => ({ ...prev!, tags: formattedTags }));
   };
 
 
@@ -872,8 +875,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   const validateRequiredTagGroups = (tags: string[]): { valid: boolean; missingGroups: string[] } => {
     // Automatically add "pair" to required tag groups if not already present
     const effectiveRequiredGroups = [...(requiredTagGroups || [])];
-    if (!effectiveRequiredGroups.includes('pair')) {
-      effectiveRequiredGroups.push('pair');
+    if (!effectiveRequiredGroups.includes(DEFAULT_PAIRS_TAG_GROUP)) {
+      effectiveRequiredGroups.push(DEFAULT_PAIRS_TAG_GROUP);
     }
 
     if (effectiveRequiredGroups.length === 0) {
@@ -993,6 +996,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       // Validate form
       if (!newTrade!.amount) {
         throw new Error('Amount is required');
+      }
+      if (!newTrade!.session) {
+        throw new Error('Session is required');
       }
 
       // Validate required tag groups

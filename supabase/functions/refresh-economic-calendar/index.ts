@@ -237,12 +237,12 @@ interface RefreshPayload {
         return eventDate === targetDate && currencies.includes(event.currency as string);
       });
       if (hasSpecificEvents) {
-        const requestedEventIds = requestedEvents.map((e) => (e as Record<string, unknown>).id);
-        foundEvents = allEventsForDate.filter((event) => requestedEventIds.includes(event.id));
+        const requestedEventIds = requestedEvents.map((e) => (e as Record<string, unknown>).external_id);
+        foundEvents = allEventsForDate.filter((event) => requestedEventIds.includes(event.external_id));
         log(`📊 Found ${foundEvents.length}/${requestedEvents.length} requested events in ${allEventsForDate.length} total events`);
         let hasUpdates = false;
         for (const foundEvent of foundEvents) {
-          const originalEvent = requestedEvents.find((e) => (e as Record<string, unknown>).id === foundEvent.id);
+          const originalEvent = requestedEvents.find((e) => (e as Record<string, unknown>).external_id === foundEvent.external_id);
           if (originalEvent && foundEvent.actual !== (originalEvent as Record<string, unknown>).actual) {
             hasUpdates = true;
             log(`✅ Event updated: ${foundEvent.event}`);

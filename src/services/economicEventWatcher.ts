@@ -299,7 +299,6 @@ class EconomicEventWatcher {
     if (watched) {
       clearTimeout(watched.timeoutId);
       this.watchedEventGroups.delete(watchKey);
-      logger.log(`🛑 Stopped watching events for calendar: ${calendarId}`);
     }
 
     // Clear the event queue for this calendar
@@ -415,7 +414,7 @@ class EconomicEventWatcher {
 
       // Transform events for the edge function - it expects 'id' to be the external_id for matching
       const transformedEvents = events.map(event => ({
-        id: event.external_id || event.id, // Use external_id for matching with scraped events
+        external_id: event.external_id, // Use external_id for matching with scraped events
         event: event.event_name,
         currency: event.currency,
         actual: event.actual_value,

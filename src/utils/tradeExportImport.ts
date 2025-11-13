@@ -2,6 +2,7 @@ import { Trade } from '../types/dualWrite';
 import { format, parse } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { error, warn } from './logger';
+import { formatTagsWithCapitalizedGroups } from './tagColors';
 
 // Helper function to prepare trade data for export
 const prepareTradeDataForExport = (trades: Trade[], initial_balance: number = 0) => {
@@ -379,6 +380,9 @@ const parseTradeData = (jsonData: any[]): Trade[] => {
         }
       }
     }
+
+    // Capitalize tag groups
+    tags = formatTagsWithCapitalizedGroups(tags);
 
     // Determine the trade type based on amount or Type column
     let tradeType: 'win' | 'loss' | 'breakeven';

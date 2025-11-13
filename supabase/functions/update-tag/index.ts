@@ -10,7 +10,7 @@
  */  
 import { createAuthenticatedClient, errorResponse, successResponse, handleCors, log, parseJsonBody } from '../_shared/supabase.ts';
 import type { AuthenticatedRequest } from '../_shared/supabase.ts';
-import { updateTradeTagsWithGroupNameChange, extractTagsFromTrades } from '../_shared/utils.ts';
+import { updateTradeTagsWithGroupNameChange, extractTagsFromTrades, formatTagWithCapitalizedGroup } from '../_shared/utils.ts';
 import type { Calendar, Trade, UpdateTagRequest } from '../_shared/types.ts';
 
 /**
@@ -184,7 +184,10 @@ import type { Calendar, Trade, UpdateTagRequest } from '../_shared/types.ts';
     }
     const { calendar_id: calendarId, old_tag: rawOldTag, new_tag: rawNewTag } = payload;
     const oldTag = typeof rawOldTag === 'string' ? rawOldTag.trim() : rawOldTag as string;
-    const newTag = typeof rawNewTag === 'string' ? rawNewTag.trim() : rawNewTag as string;
+    // Capitalize the group name in newTag
+    const newTag = typeof rawNewTag === 'string'
+      ? formatTagWithCapitalizedGroup(rawNewTag.trim())
+      : rawNewTag as string;
     // Validate required parameters
     if (!calendarId || !oldTag || newTag === undefined || newTag === null) {
       return errorResponse('Missing required parameters: calendarId, oldTag, or newTag', 400);

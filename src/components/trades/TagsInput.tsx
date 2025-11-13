@@ -90,7 +90,7 @@ const TagsInput: React.FC<TagsInputProps> = ({
         multiple
         freeSolo
         options={allTags}
-        value={tags}
+        value={tags || []}
         onChange={handleTagsChangeWithValidation}
         slotProps={{
           listbox: {
@@ -100,14 +100,18 @@ const TagsInput: React.FC<TagsInputProps> = ({
           }
         }}
         renderTags={(value, getTagProps) =>
-          value.map((option, index) => (
-            <Chip
-              label={formatTagForDisplay(option, false)}
-              {...getTagProps({ index })}
-              sx={getTagChipStyles(option, theme)}
-              title={isGroupedTag(option) ? `Group: ${getTagGroup(option)}` : undefined}
-            />
-          ))
+          value.map((option, index) => {
+            const { key, ...otherProps } = getTagProps({ index });
+            return (
+              <Chip
+                key={key}
+                label={formatTagForDisplay(option, false)}
+                {...otherProps}
+                sx={getTagChipStyles(option, theme)}
+                title={isGroupedTag(option) ? `Group: ${getTagGroup(option)}` : undefined}
+              />
+            );
+          })
         }
         renderOption={(props, option) => {
           const { key, ...restProps } = props;

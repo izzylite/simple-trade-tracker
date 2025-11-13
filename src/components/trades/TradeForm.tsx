@@ -37,7 +37,7 @@ import {
 import { Currency } from '../../types/economicCalendar';
 import { CURRENCY_PAIRS } from '../../services/tradeEconomicEventService';
 
-
+export const DEFAULT_PAIRS_TAG_GROUP ="Class"
 export interface NewTradeForm {
   id: string;
   name: string;
@@ -157,14 +157,14 @@ const TradeForm: React.FC<TradeFormProps> = ({
   const theme = useTheme();
 
   const tagsWithPairs = useMemo(() => {
-    return Array.from(new Set([...allTags, ...CURRENCY_PAIRS.map(pair => `pair:${pair}`)]));
+    return Array.from(new Set([...allTags, ...CURRENCY_PAIRS.map(pair => `${DEFAULT_PAIRS_TAG_GROUP}:${pair}`)]));
   }, [allTags]);
 
   // Automatically add "pair" to required tag groups if not already present
   const effectiveRequiredTagGroups = useMemo(() => {
     const groups = [...requiredTagGroups];
-    if (!groups.includes('pair')) {
-      groups.push('pair');
+    if (!groups.includes(DEFAULT_PAIRS_TAG_GROUP)) {
+      groups.push(DEFAULT_PAIRS_TAG_GROUP);
     }
     return groups;
   }, [requiredTagGroups]);
@@ -277,11 +277,14 @@ const TradeForm: React.FC<TradeFormProps> = ({
               fullWidth
             />
           )}
-          renderOption={(props, option) => (
-            <Box component="li" {...props}>
-              <Typography variant="body2">{option}</Typography>
-            </Box>
-          )}
+          renderOption={(props, option) => {
+            const { key, ...otherProps } = props;
+            return (
+              <Box component="li" key={key} {...otherProps}>
+                <Typography variant="body2">{option}</Typography>
+              </Box>
+            );
+          }}
           sx={{
             '& .MuiAutocomplete-option': {
               fontSize: '0.875rem',
@@ -432,8 +435,10 @@ const TradeForm: React.FC<TradeFormProps> = ({
           onChange={handleRiskToRewardChange}
           fullWidth
           type="number"
+          slotProps={{
+            htmlInput: { min: 0, step: 0.1 }
+          }}
           sx={{
-            '& input': { min: 0, step: 0.1 },
             // Hide number input spinners for Chrome, Safari, Edge, Opera
             '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': {
               WebkitAppearance: 'none',
@@ -447,13 +452,14 @@ const TradeForm: React.FC<TradeFormProps> = ({
         />
       </FormField>
       <FormField>
-        <FormControl fullWidth>
-          <InputLabel id="session-label">Session</InputLabel>
+        <FormControl fullWidth required>
+          <InputLabel id="session-label">Session *</InputLabel>
           <Select
             labelId="session-label"
             value={newTrade.session}
             onChange={onSessionChange}
-            label="Session"
+            label="Session *"
+            required
           >
             <MenuItem value="">None</MenuItem>
             <MenuItem value="Asia">Asia</MenuItem>

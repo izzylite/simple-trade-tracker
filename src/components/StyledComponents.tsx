@@ -252,7 +252,9 @@ export const FormField = styled(Box)(({ theme }) => ({
 }));
 
 // Trade list item styled component
-export const TradeListItem = styled(Box)<{ $type?: 'win' | 'loss' | 'breakeven' }>(({ theme, $type }) => ({
+export const TradeListItem = styled(Box, {
+  shouldForwardProp: (prop) => prop !== '$type'
+})<{ $type?: 'win' | 'loss' | 'breakeven' }>(({ theme, $type }) => ({
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',

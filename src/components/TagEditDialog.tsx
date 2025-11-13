@@ -10,7 +10,7 @@ import {
   CircularProgress
 } from '@mui/material';
 import { Delete as DeleteIcon } from '@mui/icons-material';
-import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../utils/tagColors';
+import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup, formatTagWithCapitalizedGroup } from '../utils/tagColors';
 import { BaseDialog } from './common';
 import { logger } from '../utils/logger';
 import { supabase } from '../config/supabase';
@@ -65,39 +65,24 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
 
     try {
       const trimmedTag = tag.trim();
-      const trimmedNewTag = newTag.trim();
+      // Capitalize the group name before submitting
+      const trimmedNewTag = formatTagWithCapitalizedGroup(newTag.trim());
 
-      // Use onTagUpdated handler if provided, otherwise call Supabase Edge Function directly
       if (onTagUpdated) {
+        // Use the provided onTagUpdated callback
         const result = await onTagUpdated(trimmedTag, trimmedNewTag);
-        if (onSuccess) {
-          onSuccess(trimmedTag, trimmedNewTag, result?.tradesUpdated || 0);
-        }
-      } else {
-        // Call Supabase Edge Function directly
-        const { data, error: invokeError } = await supabase.functions.invoke('update-tag', {
-          body: {
-            calendar_id: calendarId,
-            old_tag: trimmedTag,
-            new_tag: trimmedNewTag
-          }
-        });
 
-        if (invokeError) {
-          throw invokeError;
-        }
-
-        if (data && data.success) {
+        if (result.success) {
           if (onSuccess) {
-            onSuccess(trimmedTag, trimmedNewTag, data.tradesUpdated || 0);
+            onSuccess(trimmedTag, trimmedNewTag, result.tradesUpdated || 0);
           }
+          onClose();
         } else {
           setError('Failed to update tag');
-          return;
         }
+      } else {
+        setError('No tag update handler provided');
       }
-
-      onClose();
     } catch (error) {
       logger.error('Error updating tag:', error);
       setError(error instanceof Error ? error.message : 'An unknown error occurred');
@@ -134,33 +119,19 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
     try {
       const trimmedTag = tag.trim();
 
-      // Use onTagUpdated handler if provided (pass empty string to delete), otherwise call Supabase Edge Function directly
       if (onTagUpdated) {
+        // Use the provided onTagUpdated callback with empty string to delete
         const result = await onTagUpdated(trimmedTag, '');
-        onDelete(trimmedTag, result?.tradesUpdated || 0);
-      } else {
-        // Call Supabase Edge Function directly with empty string to delete the tag
-        const { data, error: invokeError } = await supabase.functions.invoke('update-tag', {
-          body: {
-            calendar_id: calendarId,
-            old_tag: trimmedTag,
-            new_tag: ''
-          }
-        });
 
-        if (invokeError) {
-          throw invokeError;
-        }
-
-        if (data && data.success) {
-          onDelete(trimmedTag, data.tradesUpdated || 0);
+        if (result.success) {
+          onDelete(trimmedTag, result.tradesUpdated || 0);
+          onClose();
         } else {
           setError('Failed to delete tag');
-          return;
         }
+      } else {
+        setError('No tag update handler provided');
       }
-
-      onClose();
     } catch (error) {
       logger.error('Error deleting tag:', error);
       setError(error instanceof Error ? error.message : 'An unknown error occurred');

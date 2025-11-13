@@ -75,6 +75,43 @@ export const getTagName = (tag: string): string => {
 };
 
 /**
+ * Capitalizes the first letter of a string
+ * @param str The string to capitalize
+ * @returns The capitalized string
+ */
+const capitalizeFirstLetter = (str: string): string => {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
+/**
+ * Formats a tag by capitalizing the group name (if it's a grouped tag)
+ * @param tag The tag to format (e.g., "strategy:Volume" or "breakout")
+ * @returns The formatted tag with capitalized group (e.g., "Strategy:Volume" or "breakout")
+ */
+export const formatTagWithCapitalizedGroup = (tag: string): string => {
+  if (!tag) return tag;
+
+  if (isGroupedTag(tag)) {
+    const parts = tag.split(':');
+    const group = capitalizeFirstLetter(parts[0].trim());
+    const tagName = parts[1]?.trim() || '';
+    return `${group}:${tagName}`;
+  }
+
+  return tag;
+};
+
+/**
+ * Formats an array of tags by capitalizing all group names
+ * @param tags Array of tags to format
+ * @returns Array of formatted tags with capitalized groups
+ */
+export const formatTagsWithCapitalizedGroups = (tags: string[]): string[] => {
+  return tags.map(formatTagWithCapitalizedGroup);
+};
+
+/**
  * Gets a consistent color for a tag
  * For grouped tags, the color is based on the group name
  * @param tag The tag name

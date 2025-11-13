@@ -7,11 +7,37 @@ import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import type { Trade,  TagUpdateResult } from './types.ts'
 
 /**
+ * Capitalizes the first letter of a string
+ */
+function capitalizeFirstLetter(str: string): string {
+  if (!str) return str
+  return str.charAt(0).toUpperCase() + str.slice(1)
+}
+
+/**
+ * Formats a tag by capitalizing the group name (if it's a grouped tag)
+ * @param tag The tag to format (e.g., "strategy:Volume" or "breakout")
+ * @returns The formatted tag with capitalized group (e.g., "Strategy:Volume" or "breakout")
+ */
+export function formatTagWithCapitalizedGroup(tag: string): string {
+  if (!tag) return tag
+
+  if (tag.includes(':')) {
+    const parts = tag.split(':')
+    const group = capitalizeFirstLetter(parts[0].trim())
+    const tagName = parts[1]?.trim() || ''
+    return `${group}:${tagName}`
+  }
+
+  return tag
+}
+
+/**
  * Extract unique tags from an array of trades
  */
 export function extractTagsFromTrades(trades: Trade[]): string[] {
   const tagSet = new Set<string>()
-  
+
   trades.forEach(trade => {
     if (trade.tags && Array.isArray(trade.tags)) {
       trade.tags.forEach(tag => {
@@ -21,7 +47,7 @@ export function extractTagsFromTrades(trades: Trade[]): string[] {
       })
     }
   })
-  
+
   return Array.from(tagSet).sort()
 }
 

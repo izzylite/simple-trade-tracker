@@ -747,18 +747,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Calculate total profit based on filtered trades or use pre-calculated value
   const totalProfit = useMemo(() => {
     // If no tag filtering is applied and pre-calculated totalPnL is available, use it
-    if (selectedTags.length === 0 && totalPnL !== undefined) {
-      console.log('📊 Using pre-calculated totalPnL:', totalPnL, 'from calendar');
+    if (selectedTags.length === 0 && totalPnL !== undefined) { 
       return totalPnL;
     }
-    // Otherwise calculate from filtered trades
-    const calculated = filteredTrades.length > 0 ? filteredTrades.reduce((sum, trade) => sum + trade.amount, 0) : 0;
-    console.log('📊 Calculated totalProfit from', filteredTrades.length, 'filtered trades:', calculated);
-    return calculated;
+    // Otherwise calculate from filtered trades 
+    return filteredTrades.length > 0 ? filteredTrades.reduce((sum, trade) => sum + trade.amount, 0) : 0;
   }, [filteredTrades, selectedTags, totalPnL]);
 
-  console.log('📈 TradeCalendarPage rendered - totalProfit:', totalProfit, 'trades:', trades.length, 'calendar.total_pnl:', totalPnL);
-
+  
   const calendarDays = useMemo(() => {
     const days: Date[] = [];
     const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -1602,9 +1598,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             trade_date={showAddForm?.trade_date || new Date()}
             trades={showAddForm?.trade_date ? tradesForSelectedDay : []}
             onAddTrade={handleAddTrade}
-            onTagUpdated={handleTagUpdated}
             newMainTrade={newTrade}
             setNewMainTrade={prev => setNewTrade(prev(newTrade!!))}
+            onTagUpdated={handleTagUpdated}
             onUpdateTradeProperty={handleUpdateTradeProperty}
             onDeleteTrades={handleDeleteTrades}
             calendar_id={calendarId!!}

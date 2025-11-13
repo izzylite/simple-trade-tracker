@@ -59,15 +59,13 @@ export const useEconomicEventWatcher = ({
   }, []);
 
   const startWatching = useCallback(() => {
-    if (calendarId && isActive) {
-      log(`🔍 Starting economic event watching for calendar: ${calendarId}`);
+    if (calendarId && isActive) { 
       economicEventWatcher.startWatching(calendarId, economic_calendar_filters);
     }
   }, [calendarId, economic_calendar_filters, isActive]);
 
   const stopWatching = useCallback(() => {
-    if (calendarId) {
-      log(`🛑 Stopping economic event watching for calendar: ${calendarId}`);
+    if (calendarId) { 
       economicEventWatcher.stopWatching(calendarId);
     }
   }, [calendarId]);
