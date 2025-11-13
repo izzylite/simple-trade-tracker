@@ -44,18 +44,27 @@ export class PerformanceCalculationService {
       // Normalize calendarIds to array
       const calendarIdsArray = Array.isArray(calendarIds) ? calendarIds : [calendarIds];
 
+      // Convert selectedDate to noon UTC to avoid timezone issues
+      // This ensures that date_trunc('month', ...) works correctly regardless of timezone
+      const dateAtNoonUTC = new Date(Date.UTC(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        12, 0, 0, 0
+      ));
+
       // Call appropriate RPC function based on number of calendars
       const { data, error } = calendarIdsArray.length === 1
         ? await supabase.rpc('calculate_performance_metrics', {
             p_calendar_id: calendarIdsArray[0],
             p_time_period: timePeriod,
-            p_selected_date: selectedDate.toISOString(),
+            p_selected_date: dateAtNoonUTC.toISOString(),
             p_comparison_tags: comparisonTags
           })
         : await supabase.rpc('calculate_performance_metrics_multi', {
             p_calendar_ids: calendarIdsArray,
             p_time_period: timePeriod,
-            p_selected_date: selectedDate.toISOString(),
+            p_selected_date: dateAtNoonUTC.toISOString(),
             p_comparison_tags: comparisonTags
           });
 
@@ -144,6 +153,14 @@ export class PerformanceCalculationService {
       // Normalize calendarIds to array
       const calendarIdsArray = Array.isArray(calendarIds) ? calendarIds : [calendarIds];
 
+      // Convert selectedDate to noon UTC to avoid timezone issues
+      const dateAtNoonUTC = new Date(Date.UTC(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        12, 0, 0, 0
+      ));
+
       // Call appropriate RPC function based on number of calendars
       const { data, error } = calendarIdsArray.length === 1
         ? await supabase.rpc('calculate_tag_performance', {
@@ -151,14 +168,14 @@ export class PerformanceCalculationService {
             p_primary_tags: primaryTags,
             p_secondary_tags: secondaryTags,
             p_time_period: timePeriod,
-            p_selected_date: selectedDate.toISOString()
+            p_selected_date: dateAtNoonUTC.toISOString()
           })
         : await supabase.rpc('calculate_tag_performance_multi', {
             p_calendar_ids: calendarIdsArray,
             p_primary_tags: primaryTags,
             p_secondary_tags: secondaryTags,
             p_time_period: timePeriod,
-            p_selected_date: selectedDate.toISOString()
+            p_selected_date: dateAtNoonUTC.toISOString()
           });
 
       if (error) {
@@ -193,6 +210,14 @@ export class PerformanceCalculationService {
       // Normalize calendarIds to array
       const calendarIdsArray = Array.isArray(calendarIds) ? calendarIds : [calendarIds];
 
+      // Convert selectedDate to noon UTC to avoid timezone issues
+      const dateAtNoonUTC = new Date(Date.UTC(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        12, 0, 0, 0
+      ));
+
       // Call appropriate RPC function based on number of calendars
       const { data, error } = calendarIdsArray.length === 1
         ? await supabase.rpc('calculate_economic_event_correlations', {
@@ -200,14 +225,14 @@ export class PerformanceCalculationService {
             p_selected_currency: selectedCurrency,
             p_selected_impact: selectedImpact,
             p_time_period: timePeriod,
-            p_selected_date: selectedDate.toISOString()
+            p_selected_date: dateAtNoonUTC.toISOString()
           })
         : await supabase.rpc('calculate_economic_event_correlations_multi', {
             p_calendar_ids: calendarIdsArray,
             p_selected_currency: selectedCurrency,
             p_selected_impact: selectedImpact,
             p_time_period: timePeriod,
-            p_selected_date: selectedDate.toISOString()
+            p_selected_date: dateAtNoonUTC.toISOString()
           });
 
       if (error) {

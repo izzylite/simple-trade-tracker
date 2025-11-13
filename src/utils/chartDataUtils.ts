@@ -30,6 +30,17 @@ export interface SessionStats {
   pnl_percentage: number;
 }
 
+export const getNormalizedDate = (selectedDate: Date) => {
+  // Convert selectedDate to noon UTC to avoid timezone issues
+        // This ensures that date_trunc('month', ...) works correctly regardless of timezone
+        return new Date(Date.UTC(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth(),
+          selectedDate.getDate(),
+          12, 0, 0, 0
+        ));
+};
+
 // Function to filter trades based on selected time period
 export const getFilteredTrades = (trades: Trade[], selectedDate: Date, period: TimePeriod): Trade[] => {
   switch (period) {

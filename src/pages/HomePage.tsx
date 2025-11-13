@@ -1290,6 +1290,15 @@ const Home: React.FC<HomeProps> = ({
         subtitle="Please sign in to access this feature"
         showFeatures={true}
       />
+
+      {/* Login Dialog */}
+      <LoginDialog
+        open={showLoginDialog}
+        onClose={handleLoginDialogClose}
+        title="TradeJourno"
+        subtitle="Please sign in to access this feature"
+        showFeatures={true}
+      />
     </Box>
   );
 };

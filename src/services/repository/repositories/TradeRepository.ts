@@ -17,15 +17,14 @@ import { supabaseAuthService } from '../../supabaseAuthService';
 
 
 // Storage imports
-import { uploadTradeImage, optimizeImage } from '../../supabaseStorageService';
+import { uploadTradeImage } from '../../supabaseStorageService';
 import { TradeImage } from '../../../components/trades/TradeForm';
 
 // Economic events imports
 import { tradeEconomicEventService, getRelevantCurrenciesFromTags } from '../../tradeEconomicEventService';
 import { TradeEconomicEvent } from '../../../types/dualWrite';
 
-// Re-export optimizeImage for convenience
-export { optimizeImage };
+ 
 
 /**
  * Safely parse a date value, returning a valid Date or fallback

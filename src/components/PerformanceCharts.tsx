@@ -7,7 +7,7 @@ import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import ScoreSection from './ScoreSection';
 import RoundedTabs from './common/RoundedTabs';
 import { logger } from '../utils/logger';
-import { getFilteredTrades } from '../utils/chartDataUtils';
+import { getFilteredTrades, getNormalizedDate } from '../utils/chartDataUtils';
 import {
   performanceCalculationService,
   PerformanceCalculationResult,
@@ -99,6 +99,17 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   // Use props directly - no internal fetching
   const trades = tradesProp || [];
   const calendars = calendarsProp || [];
+
+  // Debug logging for props
+  useEffect(() => {
+    logger.debug('PerformanceCharts - Props received:', {
+      tradesCount: trades.length,
+      calendarsCount: calendars.length,
+      calendarIdsProp,
+      selectedDateProp: selectedDateProp?.toISOString(),
+      timePeriod
+    });
+  }, [trades.length, calendars.length, calendarIdsProp.join(','), selectedDateProp, timePeriod]);
 
   // Create a stable selectedDate - only create new Date() once on mount
   const [defaultDate] = useState(() => new Date());
@@ -247,6 +258,14 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   useEffect(() => {
     // Don't calculate if no calendars are selected
     if (calendarIds.length === 0) {
+      logger.warn('PerformanceCharts - No calendar IDs provided, skipping chart data calculation');
+      setChartData([]);
+      setIsCalculatingChartData(false);
+      return;
+    }
+
+    if (!calendarIds[0]) {
+      logger.error('PerformanceCharts - Calendar ID is undefined or null:', calendarIds);
       setChartData([]);
       setIsCalculatingChartData(false);
       return;
@@ -255,23 +274,28 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     const calculateChartDataAsync = async () => {
       setIsCalculatingChartData(true);
       try {
+        // Convert selectedDate to noon UTC to avoid timezone issues
+        // This ensures that date_trunc('month', ...) works correctly regardless of timezone
+        const dateAtNoonUTC = getNormalizedDate(selectedDate);
+
         // Call appropriate RPC function based on number of calendars
         const { data, error } = calendarIds.length === 1
           ? await supabase.rpc('calculate_chart_data', {
             p_calendar_id: calendarIds[0],
             p_time_period: timePeriod,
-            p_selected_date: selectedDate.toISOString()
+            p_selected_date: dateAtNoonUTC.toISOString()
           })
           : await supabase.rpc('calculate_chart_data_multi', {
             p_calendar_ids: calendarIds,
             p_time_period: timePeriod,
-            p_selected_date: selectedDate.toISOString()
+            p_selected_date: dateAtNoonUTC.toISOString()
           });
 
         if (error) {
           logger.error('Error calling calculate_chart_data RPC:', error);
           throw error;
         }
+ 
 
         // Pre-process trades by date for O(1) lookup instead of O(n) filtering
         const tradesByDate = new Map<string, Trade[]>();
@@ -304,7 +328,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             fullDate: itemDate
           };
         });
-
+ 
 
         setChartData(transformedData);
       } catch (error) {
@@ -384,8 +408,16 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   ];
 
   const filteredTrades = useMemo(() => {
-    return getFilteredTrades(trades, selectedDate, timePeriod);
-  }, [trades, selectedDate, timePeriod]);
+    const filtered = getFilteredTrades(trades, selectedDate, timePeriod);
+    logger.debug('PerformanceCharts - Filtered trades:', {
+      totalTrades: trades.length,
+      filteredCount: filtered.length,
+      selectedDate: selectedDate.toISOString(),
+      timePeriod,
+      calendarIds
+    });
+    return filtered;
+  }, [trades, selectedDate, timePeriod, calendarIds]);
 
   // Get performance data from async calculations
   const riskRewardStats = performanceData?.riskRewardStats || { average: 0, max: 0, data: [] };

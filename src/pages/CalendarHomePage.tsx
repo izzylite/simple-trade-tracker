@@ -383,6 +383,22 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
       const tradeRepository = new TradeRepository();
       const trades = await tradeRepository.findByCalendarId(calendar.id);
       setCalendarTrades(trades);
+
+      // If there are trades, set selected month to the most recent trade's month
+      // Otherwise, keep the current selectedMonth
+      if (trades.length > 0) {
+        const mostRecentTrade = trades.reduce((latest, trade) => {
+          return new Date(trade.trade_date) > new Date(latest.trade_date) ? trade : latest;
+        });
+        setSelectedMonth(new Date(mostRecentTrade.trade_date));
+      }
+
+      logger.debug('CalendarHomePage - Fetched trades for charts:', {
+        calendarId: calendar.id,
+        calendarName: calendar.name,
+        tradesCount: trades.length,
+        selectedMonth: trades.length > 0 ? new Date(trades[0].trade_date).toISOString() : 'No trades'
+      });
     } catch (error) {
       logger.error('Error fetching trades for calendar:', error);
       setCalendarTrades([]);
@@ -444,19 +460,21 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
     const trades = calendarTrades || [];
     if (trades.length === 0) return [new Date()];
 
-    const dates = trades.map(trade => new Date(trade.trade_date));
-    const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
-    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+    // Get unique months that actually have trades
+    const monthsWithTrades = new Set<string>();
+    trades.forEach(trade => {
+      const tradeDate = new Date(trade.trade_date);
+      const monthKey = `${tradeDate.getFullYear()}-${tradeDate.getMonth()}`;
+      monthsWithTrades.add(monthKey);
+    });
 
-    // Create an array of months between min and max date
-    const months: Date[] = [];
-    let currentDate = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
-    const endDate = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
-
-    while (currentDate <= endDate) {
-      months.push(new Date(currentDate));
-      currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
-    }
+    // Convert to array of Date objects and sort
+    const months = Array.from(monthsWithTrades)
+      .map(monthKey => {
+        const [year, month] = monthKey.split('-').map(Number);
+        return new Date(year, month, 1);
+      })
+      .sort((a, b) => b.getTime() - a.getTime()); // Sort descending (most recent first)
 
     return months;
   }, [calendarTrades]);
@@ -1213,8 +1231,8 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
             onClick={() => setIsAIChatOpen(true)}
             sx={{
               position: 'fixed',
-              bottom: { xs: 88, sm: 120 },
-              right: { xs: 16, sm: 32 },
+              bottom: { xs: 88, sm: 96 },
+              right: { xs: 16, sm: 24 },
               zIndex: 1200
             }}
           >
@@ -1231,10 +1249,8 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
           onClick={() => setIsCreateDialogOpen(true)}
           sx={{
             position: 'fixed',
-            bottom: { xs: 16, sm: 32 },
-            right: { xs: 16, sm: 32 },
-            width: { xs: 56, sm: 64 },
-            height: { xs: 56, sm: 64 },
+            bottom: { xs: 16, sm: 24 },
+            right: { xs: 16, sm: 24 },
             boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`,
             '&:hover': {
               boxShadow: `0 12px 32px ${alpha(theme.palette.primary.main, 0.5)}`,
