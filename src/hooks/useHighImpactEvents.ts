@@ -1,6 +1,6 @@
 /**
  * Custom hook for fetching and caching high-impact economic events
- * Optimized to prevent excessive Firebase queries
+ * Optimized to prevent excessive database queries
  */
 
 import { useState, useEffect } from 'react';

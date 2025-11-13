@@ -14,7 +14,7 @@ import { BaseDialog } from '../common';
 import * as calendarService from '../../services/calendarService';
 import { DayHeader, TradeForm, NewTradeForm } from './';
 import { v4 as uuidv4 } from 'uuid';
-import { DEFAULT_PAIRS_TAG_GROUP, PendingImage } from './TradeForm';
+import { DEFAULT_PAIRS_TAG_GROUP, PendingImage, TradeImage } from './TradeForm';
 import { GridImage, GridPendingImage } from './ImageGrid';
 import { createNewTradeData } from '../../pages/TradeCalendarPage';
 import {
@@ -175,7 +175,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     setIsCreatingEmptyTrade(true);
     // Create a temporary trade object to display in the UI
 
-    // Create an empty trade in Firebase
+    // Create an empty trade
     try {
       if (effectiveCalendarId && onAddTrade) {
 
@@ -637,7 +637,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       }));
 
       // Upload the image with progress tracking
-      const uploadedImage = await calendarService.uploadTradeImage(
+      const uploadedImage : TradeImage = await calendarService.uploadTradeImage(
         effectiveCalendarId!,
         image.id!!,
         image.file,
@@ -1073,8 +1073,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             }))
           ];
 
-          // Debug what's being saved to Firebase
-          // logger.log("Saving images to Firebase with layout info in handleEditSubmit:",
+          // Debug what's being saved
+          // logger.log("Saving images with layout info in handleEditSubmit:",
           //   updatedImages.map(img => ({ id: img.id, row: img.row, column: img.column, column_width: img.column_width })));
 
           await handleUpdateTradeProperty(editingTrade.id, (trade) => {

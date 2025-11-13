@@ -37,7 +37,7 @@ import {
 import { Currency } from '../../types/economicCalendar';
 import { CURRENCY_PAIRS } from '../../services/tradeEconomicEventService';
 
-export const DEFAULT_PAIRS_TAG_GROUP ="Class"
+export const DEFAULT_PAIRS_TAG_GROUP ="Pairs"
 export interface NewTradeForm {
   id: string;
   name: string;

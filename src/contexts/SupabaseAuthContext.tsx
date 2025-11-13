@@ -22,24 +22,7 @@ interface SupabaseAuthContextType {
   ensureValidSession: () => Promise<boolean>;
 }
 
-// Firebase-compatible interface for easy migration
-interface FirebaseCompatibleUser {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-}
 
-interface FirebaseCompatibleAuthContextType {
-  user: FirebaseCompatibleUser | null;
-  loading: boolean;
-  signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (email: string, password: string, displayName?: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<void>;
-  updatePassword: (newPassword: string) => Promise<void>;
-}
 
 const SupabaseAuthContext = createContext<SupabaseAuthContextType | undefined>(undefined);
 
@@ -169,61 +152,8 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   );
 };
 
-// Firebase-compatible context for easy migration
-const FirebaseCompatibleAuthContext = createContext<FirebaseCompatibleAuthContextType | undefined>(undefined);
+// Export useAuth as an alias for useSupabaseAuth for backward compatibility
+export const useAuth = useSupabaseAuth;
 
-export const useAuth = () => {
-  const context = useContext(FirebaseCompatibleAuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return (
-    <SupabaseAuthProvider>
-      <FirebaseCompatibleAuthProvider>
-        {children}
-      </FirebaseCompatibleAuthProvider>
-    </SupabaseAuthProvider>
-  );
-};
-
-const FirebaseCompatibleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const {
-    user: supabaseUser,
-    loading,
-    signInWithGoogle,
-    signInWithEmail,
-    signUpWithEmail,
-    signOut,
-    requestPasswordReset,
-    updatePassword
-  } = useSupabaseAuth();
-
-  // Convert Supabase user to Firebase-compatible format
-  const user: FirebaseCompatibleUser | null = supabaseUser ? {
-    uid: supabaseUser.id,
-    email: supabaseUser.email,
-    displayName: supabaseUser.displayName,
-    photoURL: supabaseUser.photoURL,
-  } : null;
-
-  const value: FirebaseCompatibleAuthContextType = {
-    user,
-    loading,
-    signInWithGoogle,
-    signInWithEmail,
-    signUpWithEmail,
-    signOut,
-    requestPasswordReset,
-    updatePassword,
-  };
-
-  return (
-    <FirebaseCompatibleAuthContext.Provider value={value}>
-      {children}
-    </FirebaseCompatibleAuthContext.Provider>
-  );
-};
+// Export AuthProvider as an alias for SupabaseAuthProvider
+export const AuthProvider = SupabaseAuthProvider;

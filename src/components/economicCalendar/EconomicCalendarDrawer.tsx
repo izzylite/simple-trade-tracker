@@ -58,7 +58,6 @@ import { Calendar } from '../../types/calendar';
 import { Trade, TradeEconomicEvent } from '../../types/trade';
 import { economicCalendarService } from '../../services/economicCalendarService';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
-// import { QueryDocumentSnapshot } from 'firebase/firestore'; // Removed - migrating to Supabase
 import EconomicEventListItem from './EconomicEventListItem';
 import EconomicCalendarFilters from './EconomicCalendarFilters';
 import EconomicEventDetailDialog from './EconomicEventDetailDialog';

@@ -1,7 +1,6 @@
 /**
  * Supabase Storage Service
  * Handles file upload, download, and deletion operations using Supabase Storage
- * Replaces Firebase Storage functionality
  */
 
 import { supabase } from '../config/supabase';
@@ -173,48 +172,11 @@ export const createSignedUrl = async (
   }
 };
 
-/**
- * Delete a file from Supabase Storage
- */
-export const deleteFile = async (
-  bucketName: string,
-  filePath: string
-): Promise<{ data: any; error: any }> => {
-  try {
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .remove([filePath]);
-
-    return { data, error };
-  } catch (error) {
-    logger.error('Error deleting file from Supabase Storage:', error);
-    return { data: null, error };
-  }
-};
-
-/**
- * List files in a directory
- */
-export const listFiles = async (
-  bucketName: string,
-  path: string = '',
-  options: { limit?: number; offset?: number; search?: string } = {}
-): Promise<{ data: any; error: any }> => {
-  try {
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .list(path, options);
-
-    return { data, error };
-  } catch (error) {
-    logger.error('Error listing files from Supabase Storage:', error);
-    return { data: null, error };
-  }
-};
+ 
 
 /**
  * Upload a trade image with progress tracking
- * This is a specialized function for trade images that matches the Firebase implementation
+ * This is a specialized function for trade images
  */
 export const uploadTradeImage = async (
   calendarId: string,
@@ -233,7 +195,7 @@ export const uploadTradeImage = async (
       throw new Error('User not authenticated');
     }
 
-    // Create the file path following the same structure as Firebase
+    // Create the file path
     const filePath = `users/${user.id}/trade-images/${filename}`;
 
     // Upload the file with progress tracking
@@ -259,7 +221,7 @@ export const uploadTradeImage = async (
       throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
     }
 
-    // Return the image details in the same format as Firebase
+    // Return the image details
     return {
       url: signedUrlData.signedUrl,
       id: filename,
@@ -273,65 +235,8 @@ export const uploadTradeImage = async (
     throw error;
   }
 };
-
-/**
- * Get a signed URL for a trade image
- * This is needed because trade images are stored in a private bucket
- */
-export const getTradeImageUrl = async (
-  filename: string,
-  expiresIn: number = 3600
-): Promise<string | null> => {
-  try {
-    // Get current user from Supabase Auth
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      logger.error('User not authenticated for image access');
-      return null;
-    }
-
-    const filePath = `users/${user.id}/trade-images/${filename}`;
-    const { data, error } = await createSignedUrl('trade-images', filePath, expiresIn);
-
-    if (error) {
-      logger.error('Error creating signed URL for trade image:', error);
-      return null;
-    }
-
-    return data.signedUrl;
-  } catch (error) {
-    logger.error('Error getting trade image URL:', error);
-    return null;
-  }
-};
-
-/**
- * Delete a trade image
- */
-export const deleteTradeImage = async (filename: string): Promise<boolean> => {
-  try {
-    // Get current user from Supabase Auth
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      throw new Error('User not authenticated');
-    }
-
-    const filePath = `users/${user.id}/trade-images/${filename}`;
-    const { error } = await deleteFile('trade-images', filePath);
-
-    if (error) {
-      logger.error('Error deleting trade image:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    logger.error('Error deleting trade image:', error);
-    return false;
-  }
-};
+ 
+ 
 
 /**
  * Optimize image before upload (client-side)

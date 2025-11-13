@@ -218,7 +218,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     // Use calendar from hook state
     if (!calendar) return;
 
-    // If using actual amounts, reload the original trades from Firestore
+    // If using actual amounts, reload the original trades from the database
     if (useActualAmounts) {
       console.log("Resetting to actual trade amounts...");
       // Reload all trades for the calendar to get the original values

@@ -9,11 +9,11 @@ import type { User, Session, AuthError } from '@supabase/supabase-js';
 
 export interface SupabaseUser {
   id: string;
+  uid: string; // Alias for id to maintain backward compatibility
   email: string;
   displayName: string | null;
   photoURL: string | null;
   provider: string;
-  firebaseUid?: string; // For migration compatibility
 }
 
 export interface AuthState {
@@ -56,14 +56,23 @@ class SupabaseAuthService {
 
       // Listen for auth changes
       // Following Supabase best practices for handling all auth events
-      supabase.auth.onAuthStateChange(async (event, session) => {
+      // IMPORTANT: Using setTimeout for async operations to prevent deadlock when switching browser tabs
+      // See: https://github.com/orgs/supabase/discussions/19058
+      supabase.auth.onAuthStateChange((event, session) => {
         logger.info('Auth state changed:', event);
 
+        // Update auth state immediately (synchronously) to prevent UI delays
+        // Only defer async database operations to prevent deadlock
         switch (event) {
           case 'SIGNED_IN':
             if (session?.user) {
               this.logSessionDetails(session, 'Sign in');
-              await this.handleUserSignIn(session.user, session);
+              // Update auth state immediately
+              this.updateAuthState(session);
+              // Defer async database operations
+              setTimeout(async () => {
+                await this.handleUserSignIn(session.user, session);
+              }, 0);
             }
             break;
 
@@ -287,11 +296,11 @@ class SupabaseAuthService {
   private mapSupabaseUser(user: User): SupabaseUser {
     return {
       id: user.id,
+      uid: user.id, // Alias for backward compatibility
       email: user.email!,
       displayName: user.user_metadata?.full_name || user.user_metadata?.name || user.user_metadata?.display_name || null,
       photoURL: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
-      provider: user.app_metadata?.provider || 'email',
-      firebaseUid: user.id // For migration compatibility
+      provider: user.app_metadata?.provider || 'email'
     };
   }
 

@@ -58,12 +58,12 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
           // If it's already a Date object
           if (timestamp instanceof Date) return timestamp;
 
-          // If it's a Firestore Timestamp object with toDate method
+          // If it's a Timestamp object with toDate method
           if (timestamp.toDate && typeof timestamp.toDate === 'function') {
             return timestamp.toDate();
           }
 
-          // If it's a serialized Firestore Timestamp with _seconds
+          // If it's a serialized Timestamp with _seconds
           if (timestamp._seconds !== undefined) {
             return new Date(timestamp._seconds * 1000 + (timestamp._nanoseconds || 0) / 1000000);
           }
