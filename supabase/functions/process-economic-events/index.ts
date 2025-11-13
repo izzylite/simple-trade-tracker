@@ -400,9 +400,6 @@ Deno.serve(async (req: Request) => {
   try {
     log('Process economic events request received')
 
-    // This function can be called by users or other functions
-    // No authentication required - it's a data processing function
-
     // Parse request body
     const payload = await parseJsonBody<ProcessEventsPayload>(req)
     if (!payload) {
@@ -455,7 +452,8 @@ Deno.serve(async (req: Request) => {
       existing_count: existing,
       inserted_count: inserted,
       upserted_count: upserted,
-      message: `Processed ${events.length} events; upserted=${upserted}, existing=${existing}, inserted=${inserted}`
+      message: `Processed ${events.length} events; upserted=${upserted}, existing=${existing}, inserted=${inserted}`,
+      events: majorCurrencyEvents // Include the actual events in the response
     }
 
     log('Economic events processing completed', 'info', {
@@ -465,7 +463,8 @@ Deno.serve(async (req: Request) => {
       parsed_total: response.parsed_total,
       existing_count: response.existing_count,
       inserted_count: response.inserted_count,
-      upserted_count: response.upserted_count
+      upserted_count: response.upserted_count,
+      events_count: majorCurrencyEvents.length
     })
 
     return successResponse(response)

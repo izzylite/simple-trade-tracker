@@ -116,15 +116,15 @@ async function parseJsonBody(req: Request): Promise<unknown> {
     log(`✅ Response received: ${response.status}, content length: ${html.length}`);
     // Call the process-economic-events function to parse the HTML
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    if (!supabaseUrl || !serviceRoleKey) {
-      throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    if (!supabaseUrl || !anonKey) {
+      throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY');
     }
     const processResponse = await fetch(`${supabaseUrl}/functions/v1/process-economic-events`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceRoleKey}`
+        'Authorization': `Bearer ${anonKey}`
       },
       body: JSON.stringify({
         htmlContent: html
@@ -238,11 +238,13 @@ interface RefreshPayload {
       });
       if (hasSpecificEvents) {
         const requestedEventIds = requestedEvents.map((e) => (e as Record<string, unknown>).external_id);
-        foundEvents = allEventsForDate.filter((event) => requestedEventIds.includes(event.external_id));
+        // Events from MyFXBook have 'id' field, not 'external_id'
+        foundEvents = allEventsForDate.filter((event) => requestedEventIds.includes(event.id || event.external_id));
         log(`📊 Found ${foundEvents.length}/${requestedEvents.length} requested events in ${allEventsForDate.length} total events`);
         let hasUpdates = false;
         for (const foundEvent of foundEvents) {
-          const originalEvent = requestedEvents.find((e) => (e as Record<string, unknown>).external_id === foundEvent.external_id);
+          const eventId = foundEvent.id || foundEvent.external_id;
+          const originalEvent = requestedEvents.find((e) => (e as Record<string, unknown>).external_id === eventId);
           if (originalEvent && foundEvent.actual !== (originalEvent as Record<string, unknown>).actual) {
             hasUpdates = true;
             log(`✅ Event updated: ${foundEvent.event}`);

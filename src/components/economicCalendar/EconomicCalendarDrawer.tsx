@@ -392,7 +392,36 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     }
   }, [dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming, open, viewType, pageSize, startDate, endDate]);
 
-  // Memoize realtime subscription callbacks to prevent unnecessary recreations
+  // Stabilize the refetch callback to prevent recreating it on every filter change
+  // This prevents accumulating multiple broadcast listeners
+  const refetchCallbackRef = useRef<(() => Promise<void>) | null>(null);
+
+  // Update the callback ref whenever dependencies change
+  useEffect(() => {
+    refetchCallbackRef.current = async () => {
+      try {
+        const result = await economicCalendarService.fetchEventsPaginated(
+          dateRange,
+          { pageSize, offset: 0 }, // Reset to first page
+          {
+            currencies: appliedCurrencies,
+            impacts: appliedImpacts,
+            onlyUpcoming: appliedOnlyUpcoming
+          }
+        );
+
+        if (result.events) {
+          setEvents(result.events);
+          setHasMore(result.hasMore);
+          setOffset(result.events.length);
+        }
+      } catch (error) {
+        logger.error('Error refetching events after realtime update:', error);
+      }
+    };
+  }, [dateRange, pageSize, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming]);
+
+  // Memoize channel creation callback - stable reference to prevent recreation
   const handleChannelCreated = useCallback((channel: any) => {
     // Configure the channel BEFORE it subscribes
     // Listen for INSERT, UPDATE, DELETE events via broadcast
@@ -404,30 +433,13 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       async (payload: any) => {
         logger.log(`🔄 Economic event ${payload.event}:`, payload);
 
-        // Refetch events when any change occurs in the date range
-        // This ensures we get fresh data without complex state management
-        try {
-          const result = await economicCalendarService.fetchEventsPaginated(
-            dateRange,
-            { pageSize, offset: 0 }, // Reset to first page
-            {
-              currencies: appliedCurrencies,
-              impacts: appliedImpacts,
-              onlyUpcoming: appliedOnlyUpcoming
-            }
-          );
-
-          if (result.events) {
-            setEvents(result.events);
-            setHasMore(result.hasMore);
-            setOffset(result.events.length);
-          }
-        } catch (error) {
-          logger.error('Error refetching events after realtime update:', error);
+        // Call the current refetch logic via the ref
+        if (refetchCallbackRef.current) {
+          await refetchCallbackRef.current();
         }
       }
     );
-  }, [dateRange, pageSize, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming]);
+  }, []); // Empty dependencies - callback never recreates
 
   const handleSubscribed = useCallback(() => {
     logger.log(`✅ Economic events subscription active for ${dateRange.start} to ${dateRange.end}`);
@@ -439,45 +451,14 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
   // Subscribe to economic events changes
   // Edge functions update events in real-time (scraping, updates from APIs)
-  const { createChannel, cleanupChannel } = useRealtimeSubscription({
+  // The hook automatically manages channel creation/cleanup based on the 'enabled' prop
+  useRealtimeSubscription({
     channelName: `economic-events`,
     enabled: open && !!dateRange.start && !!dateRange.end,
     onChannelCreated: handleChannelCreated,
     onSubscribed: handleSubscribed,
     onError: handleError,
   });
-
-  // Track if we've already set up the subscription for this drawer open
-  const subscriptionSetupRef = useRef(false);
-
-  useEffect(() => {
-    if (!open) {
-      // Explicitly cleanup when drawer closes
-      cleanupChannel();
-      subscriptionSetupRef.current = false;
-      return;
-    }
-
-    // Only set up subscription once per drawer open
-    if (!subscriptionSetupRef.current) {
-      // Create and subscribe to the channel
-      // The channel is configured via onChannelCreated callback before subscribing
-      // Note: The subscription listens to ALL events in the table, filters are applied during refetch
-      logger.log('🔄 Setting up economic events realtime subscription');
-      createChannel();
-      subscriptionSetupRef.current = true;
-    }
-
-    // Cleanup when drawer closes or component unmounts
-    return () => {
-      if (!open) {
-        logger.log('🧹 Cleaning up economic events realtime subscription');
-        cleanupChannel();
-        subscriptionSetupRef.current = false;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]); // Only depend on 'open' to prevent infinite loop
 
   // Load more events function
   const loadMoreEvents = useCallback(async () => {
