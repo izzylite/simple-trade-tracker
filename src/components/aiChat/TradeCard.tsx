@@ -117,7 +117,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
       }}
       onClick={onClick}
     >
-      <CardContent sx={{ p: 2, pt: 0, '&:last-child': { pb: 1 } }}>
+      <CardContent sx={{ p: 2, pt: 1, '&:last-child': { pb: 1 } }}>
         <Stack spacing={1}>
           {/* Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
