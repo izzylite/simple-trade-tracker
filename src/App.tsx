@@ -25,6 +25,7 @@ import AppHeader from './components/common/AppHeader';
 
 // Lazy load page components from pages directory
 const Home = lazy(() => import('./pages/HomePage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
 const CalendarHome = lazy(() => import('./pages/CalendarHomePage').then(module => ({ default: module.CalendarHome })));
 const TradeCalendar = lazy(() => import('./pages/TradeCalendarPage').then(module => ({ default: module.TradeCalendar })));
 const SharedTradePage = lazy(() => import('./pages/SharedTradePage'));
@@ -258,6 +259,7 @@ function AppContent() {
             action={loadingAction}
           />
           <Routes>
+            <Route path="/about" element={<AboutPage />} />
             <Route
               path="/"
               element={

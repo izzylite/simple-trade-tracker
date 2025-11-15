@@ -13,13 +13,15 @@ import {
   Chip,
   IconButton,
   Tooltip,
-  useMediaQuery
+  useMediaQuery,
+  Button
 } from '@mui/material';
 import {
   Home as HomeIcon,
   CalendarMonth as CalendarIcon,
   Notes as EditIcon,
   People as CommunityIcon,
+  InfoOutlined as AboutIcon,
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon
 } from '@mui/icons-material';
@@ -68,6 +70,12 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
       label: 'Notes',
       icon: <EditIcon />,
       path: '/notes'
+    },
+    {
+      id: 'about',
+      label: 'About',
+      icon: <AboutIcon />,
+      path: '/about'
     },
     {
       id: 'community',
@@ -288,7 +296,90 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
             borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`
           }}
         >
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
+          <Box
+            sx={{
+              borderRadius: 2,
+              p: 1.5,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.12)} 0%, ${alpha(
+                theme.palette.secondary.main,
+                0.16
+              )} 100%)`,
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
+            }}
+          >
+            <Box
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: 2,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Box
+                component="img"
+                src="/discord-icon-svgrepo-com.svg"
+                alt="Discord icon"
+                sx={{ width: 22, height: 22, display: 'block' }}
+              />
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.7
+                }}
+              >
+                Discord lounge
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontSize: '0.8rem', 
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden'
+                }}
+              >
+                Join the community.
+              </Typography>
+            </Box>
+            <Button
+              component="a"
+              href="https://discord.gg/9Dt2fNVpr"
+              target="_blank"
+              rel="noopener noreferrer"
+              size="small"
+              variant="contained"
+              sx={{
+                fontWeight: 700,
+                textTransform: 'none',
+                borderRadius: 999,
+                px: 2.2,
+                py: 0.5,
+                boxShadow: 'none',
+                bgcolor: '#5865F2',
+                '&:hover': {
+                  bgcolor: '#4752C4',
+                  boxShadow: theme.shadows[4],
+                  transform: 'translateY(-1px)'
+                }
+              }}
+            >
+              Join
+            </Button>
+          </Box>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: 'block', textAlign: 'center', mt: 1.5 }}
+          >
             © 2025 JournoTrades
           </Typography>
         </Box>
