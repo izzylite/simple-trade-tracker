@@ -148,7 +148,7 @@ const PasswordResetPage: React.FC = () => {
           <Box
             component="img"
             src="/android-chrome-192x192.png"
-            alt="TradeJourno Logo"
+            alt="JournoTrades Logo"
             sx={{
               width: 60,
               height: 60,

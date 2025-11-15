@@ -1286,7 +1286,7 @@ const Home: React.FC<HomeProps> = ({
       <LoginDialog
         open={showLoginDialog}
         onClose={handleLoginDialogClose}
-        title="TradeJourno"
+        title="JournoTrades"
         subtitle="Please sign in to access this feature"
         showFeatures={true}
       />
@@ -1295,7 +1295,7 @@ const Home: React.FC<HomeProps> = ({
       <LoginDialog
         open={showLoginDialog}
         onClose={handleLoginDialogClose}
-        title="TradeJourno"
+        title="JournoTrades"
         subtitle="Please sign in to access this feature"
         showFeatures={true}
       />

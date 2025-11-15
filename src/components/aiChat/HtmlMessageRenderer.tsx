@@ -303,7 +303,8 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
                 sx={{
                   color: textColor,
                   whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word'
+                  wordBreak: 'break-word',
+                  overflowWrap: 'anywhere'
                 }}
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(segment.content) }}
               />

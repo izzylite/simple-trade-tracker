@@ -27,7 +27,7 @@ SUPABASE_ANON_KEY=your-anon-key-here
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 
 # Application Configuration
-APP_BASE_URL=https://tradejourno.com
+APP_BASE_URL=https://journotrades.com
 
 # External API Keys (if needed)
 MYFXBOOK_API_KEY=your-myfxbook-api-key-if-needed

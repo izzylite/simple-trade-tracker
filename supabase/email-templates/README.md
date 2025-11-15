@@ -1,6 +1,6 @@
-# TradeJourno Email Templates
+# JournoTrades Email Templates
 
-Branded email templates for TradeJourno authentication emails.
+Branded email templates for JournoTrades authentication emails.
 
 ## 📋 Quick Setup Guide
 
@@ -34,14 +34,14 @@ The script will:
    - Select "Confirm signup" from dropdown
    - Copy content from [`confirm-signup.html`](./confirm-signup.html)
    - Replace `[YOUR-PROJECT-ID]` with your actual Supabase project ID
-   - Update the **Subject line**: `Welcome to TradeJourno - Confirm Your Email`
+   - Update the **Subject line**: `Welcome to JournoTrades - Confirm Your Email`
    - Click "Save"
 
 3. **Reset Password Template**
    - Select "Reset Password" from dropdown
    - Copy content from [`reset-password.html`](./reset-password.html)
    - Replace `[YOUR-PROJECT-ID]` with your actual Supabase project ID
-   - Update the **Subject line**: `Reset Your TradeJourno Password`
+   - Update the **Subject line**: `Reset Your JournoTrades Password`
    - Click "Save"
 
 ### Step 3: Test Your Templates
@@ -62,30 +62,30 @@ The script will:
 ## 📧 Available Templates
 
 ### 1. Confirm Signup (`confirm-signup.html`)
-- **Subject**: Welcome to TradeJourno - Confirm Your Email
+- **Subject**: Welcome to JournoTrades - Confirm Your Email
 - **Purpose**: Sent when user creates an account with email/password
 - **Features**:
-  - TradeJourno logo
+  - JournoTrades logo
   - Branded gradient header
   - Clear call-to-action button
   - Alternative confirmation link
   - Professional footer
 
 ### 2. Reset Password (`reset-password.html`)
-- **Subject**: Reset Your TradeJourno Password
+- **Subject**: Reset Your JournoTrades Password
 - **Purpose**: Sent when user requests password reset
 - **Features**:
-  - TradeJourno logo
+  - JournoTrades logo
   - Security notice (60-minute expiry)
   - Clear call-to-action button
   - Alternative reset link
   - Professional footer
 
 ### 3. Invite User (`invite-user.html`)
-- **Subject**: You're Invited to Join TradeJourno!
+- **Subject**: You're Invited to Join JournoTrades!
 - **Purpose**: Sent programmatically when admin invites new users
 - **Features**:
-  - TradeJourno logo
+  - JournoTrades logo
   - Prominent invite code display
   - Feature highlights (Trading Journal, Performance Analytics, Economic Calendar, AI Assistant, Risk Management)
   - Dynamic expiry notice based on uses and expiration
@@ -97,7 +97,7 @@ The script will:
 
 ### Changing Colors
 
-The templates use TradeJourno's brand colors:
+The templates use JournoTrades's brand colors:
 - **Primary Blue**: `#1976d2`
 - **Secondary Purple**: `#9c27b0`
 - **Background**: `#f5f5f5`
@@ -207,4 +207,4 @@ console.log('Email sent:', data.emailId);
 
 - [Supabase Email Templates Docs](https://supabase.com/docs/guides/auth/auth-email-templates)
 - [Email Template Variables](https://supabase.com/docs/reference/cli/config#auth.email)
-- [TradeJourno Documentation](../README.md)
+- [JournoTrades Documentation](../README.md)

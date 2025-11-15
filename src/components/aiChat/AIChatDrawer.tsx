@@ -6,7 +6,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
-  TextField,
   IconButton,
   Button,
   Typography,
@@ -41,7 +40,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 import ChatMessage from './ChatMessage';
 import Shimmer from '../Shimmer';
-import TagMentionInput from './TagMentionInput';
+import AIChatMentionInput from './AIChatMentionInput';
 import {
   ChatMessage as ChatMessageType,
   ChatError,
@@ -95,7 +94,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const theme = useTheme();
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<any>(null);
   const conversationRepo = useRef(new ConversationRepository()).current;
 
   // Prevent body scroll when drawer is open to fix mention dialog positioning
@@ -116,9 +115,10 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   // State
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [inputMessage, setInputMessage] = useState('');
+
+
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [error, setError] = useState<ChatError | null>(null);
   const [toolExecutionStatus, setToolExecutionStatus] = useState<string>('');
 
   // Conversation management state
@@ -229,7 +229,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     setMessages([]);
     setCurrentConversationId(null);
     setIsAtMessageLimit(false);
-    setError(null);
     setShowHistoryView(false); // Slide back to chat view
     logger.log('Started new conversation');
   };
@@ -239,7 +238,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     setMessages(conversation.messages as ChatMessageType[]);
     setCurrentConversationId(conversation.id);
     setIsAtMessageLimit(conversation.message_count >= MESSAGE_LIMIT);
-    setError(null);
     setShowHistoryView(false); // Go back to chat view
     logger.log('Loaded conversation:', conversation.id);
   };
@@ -290,8 +288,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     const messageText = inputMessage.trim();
     if (!messageText || isLoading) return;
 
-    // Clear error and input
-    setError(null);
+    // Clear input
     setInputMessage('');
 
     // Add user message
@@ -327,7 +324,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       let citations: any[] | undefined;
       let embeddedTrades: any | undefined;
       let embeddedEvents: any | undefined;
-      let success = false;
       let toolCallsInProgress: string[] = [];
 
       for await (const event of supabaseAIChatService.sendMessageStreaming(
@@ -395,7 +391,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             break;
 
           case 'done':
-            success = event.data.success;
             messageHtml = event.data.messageHtml || '';
             logger.log('AI response streaming complete');
             break;
@@ -442,8 +437,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         retryable: true
       };
 
-      setError(chatError);
-
       // Add or update error message
       const errorMessage: ChatMessageType = {
         id: aiMessageId,
@@ -477,10 +470,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     }
   };
 
-  const handleRetry = () => {
-    setError(null);
-    // Simply clear the error - the next message will regenerate context
-  };
 
   const handleMessageRetry = useCallback(async (messageId: string) => {
     // Find the message to retry
@@ -598,7 +587,7 @@ What would you like to know about your trading?`,
       ]
     },
     {
-      category: "Pattern Discovery", 
+      category: "Pattern Discovery",
       questions: [
         "Find my most profitable trading patterns",
         "Show me trades similar to my best EUR/USD wins",
@@ -822,7 +811,7 @@ What would you like to know about your trading?`,
                   <ChatMessage
                     key={message.id}
                     message={message}
-                    showTimestamp={true} 
+                    showTimestamp={true}
                     onRetry={handleMessageRetry}
                     isLatestMessage={index === displayMessages.length - 1}
                     enableAnimation={index > 0}
@@ -1016,7 +1005,7 @@ What would you like to know about your trading?`,
                 <Box sx={{
                   display: 'flex',
                   gap: 1,
-                  alignItems: 'flex-end',
+                  alignItems: 'center',
                   backgroundColor: 'background.paper',
                   borderRadius: 3,
                   p: 1,
@@ -1024,31 +1013,19 @@ What would you like to know about your trading?`,
                   borderColor: 'divider',
                   '&:focus-within': {
                     borderColor: 'primary.main',
-                    boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}`
+                    boxShadow: `0 0 0 1px ${alpha(theme.palette.primary.main, 0.15)}`
                   }
                 }}>
-                  <TagMentionInput
+                  <AIChatMentionInput
+                    ref={inputRef}
                     value={inputMessage}
                     onChange={setInputMessage}
                     onKeyDown={handleKeyPress}
-                    placeholder="Ask me about your trading performance... (use @tag to mention tags)"
+                    placeholder="(use @tag to mention tags)"
                     disabled={isLoading || isAtMessageLimit}
                     allTags={calendar.tags || []}
-                    multiline
                     maxRows={4}
-                    variant="standard"
-                    InputProps={{
-                      disableUnderline: true,
-                      sx: {
-                        fontSize: '0.95rem',
-                        lineHeight: 1.4
-                      }
-                    }}
-                    sx={{
-                      '& .MuiInputBase-input': {
-                        padding: '8px 0'
-                      }
-                    }}
+                    sx={{ flex: 1, minWidth: 0, fontSize: '0.95rem', lineHeight: 1.4 }}
                   />
                   <IconButton
                     onClick={handleSendMessage}
@@ -1089,7 +1066,7 @@ What would you like to know about your trading?`,
                     opacity: 0.7
                   }}
                 >
-                  Press Enter to send • Shift+Enter for new line • Type @ to mention tags
+                  Enter to send • Shift+Enter newline • @ for tags
                 </Typography>
               </Box>
               </Box>
@@ -1142,7 +1119,7 @@ What would you like to know about your trading?`,
                                 intensity="low"
                                 sx={{ mb: 0.5 }}
                               />
-                             
+
 
                               {/* Date */}
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

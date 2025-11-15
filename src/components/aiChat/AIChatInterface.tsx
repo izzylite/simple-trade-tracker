@@ -302,7 +302,7 @@ const AIChatInterface: React.FC<AIChatInterfaceProps> = ({
               value={inputMessage}
               onChange={onInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="Ask me about your trading performance... (use @tag to mention tags)"
+              placeholder="(use @tag to mention tags)"
               disabled={isLoading || disabled}
               allTags={allTags}
               multiline

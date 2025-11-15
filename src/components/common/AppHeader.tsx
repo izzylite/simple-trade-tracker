@@ -134,7 +134,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             <Box
               component="img"
               src="/android-chrome-192x192.png"
-              alt="TradeJourno Logo"
+              alt="JournoTrades Logo"
               className="logo-img"
               sx={{
                 width: 32,
@@ -158,7 +158,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 transition: 'all 0.2s'
               }}
             >
-              TradeJourno
+              JournoTrades
             </Typography>
           </Box>
           <Box sx={{ flexGrow: 1 }} />

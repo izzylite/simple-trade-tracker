@@ -1,10 +1,10 @@
-# TradeJourno
+# JournoTrades
 
 **AI-Powered Trading Journal** - Track, analyze, and improve your trading performance with intelligent insights.
 
 ## 🚀 Overview
 
-TradeJourno is a comprehensive trading journal application designed to help traders track their performance, analyze patterns, and make data-driven decisions. Built with modern web technologies and powered by AI, it provides deep insights into your trading behavior.
+JournoTrades is a comprehensive trading journal application designed to help traders track their performance, analyze patterns, and make data-driven decisions. Built with modern web technologies and powered by AI, it provides deep insights into your trading behavior.
 
 ## ✨ Key Features
 
@@ -70,8 +70,8 @@ TradeJourno is a comprehensive trading journal application designed to help trad
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/tradejourno.git
-   cd tradejourno
+   git clone https://github.com/yourusername/journotrades.git
+   cd journotrades
    ```
 
 2. **Install dependencies**
@@ -161,28 +161,28 @@ The app is configured for Vercel hosting with SPA routing via `vercel.json` (all
 
 2) Domain and DNS (Namecheap)
 - In Vercel → Project → Settings → Domains:
-  - Add `tradejourno.com` and `www.tradejourno.com`
-  - Set `tradejourno.com` as Primary domain
-- In Namecheap → Advanced DNS for `tradejourno.com`:
+  - Add `journotrades.com` and `www.journotrades.com`
+  - Set `journotrades.com` as Primary domain
+- In Namecheap → Advanced DNS for `journotrades.com`:
   - A record: Host `@` → `76.76.21.21`
   - CNAME: Host `www` → `cname.vercel-dns.com`
 
 3) Supabase Auth URLs
 - Supabase Dashboard → Authentication → URL Configuration:
-  - Site URL: `https://tradejourno.com`
+  - Site URL: `https://journotrades.com`
   - Additional Redirect URLs:
-    - `https://tradejourno.com/auth/callback`
+    - `https://journotrades.com/auth/callback`
     - `https://YOUR-PROJECT.vercel.app/auth/callback` (add after first Vercel deploy for previews)
 
 4) Post-deploy verification
 - Deep links render (e.g., `/calendar/:id`, `/auth/callback`)
 - Google sign-in returns to `/auth/callback` on your domain and completes
-- If any edge function builds absolute URLs, set `APP_BASE_URL` to `https://tradejourno.com` in its environment
+- If any edge function builds absolute URLs, set `APP_BASE_URL` to `https://journotrades.com` in its environment
 
 ## 📦 Project Structure
 
 ```
-tradejourno/
+journotrades/
 ├── public/              # Static files
 ├── src/
 │   ├── components/      # React components
@@ -221,4 +221,4 @@ For support, please open an issue on GitHub.
 
 ---
 
-**TradeJourno** - Your trading journey, intelligently tracked.
+**JournoTrades** - Your trading journey, intelligently tracked.

@@ -246,6 +246,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             borderBottomRightRadius: isUser ? 4 : 4,
             position: 'relative',
             maxWidth: '100%',
+            wordBreak: 'break-word',
+            overflowWrap: 'anywhere',
             boxShadow: isUser
               ? '0 2px 8px rgba(0,0,0,0.1)'
               : '0 1px 4px rgba(0,0,0,0.05)',

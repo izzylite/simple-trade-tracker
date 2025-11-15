@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, forwardRef } from 'react';
 import {
   TextField,
   Paper,
@@ -30,6 +30,9 @@ interface TagMentionInputProps {
   placeholder?: string;
   disabled?: boolean;
   allTags: string[];
+  // Optional: external control of selected mention tags as chips
+  tags?: string[];
+  onTagsChange?: (tags: string[]) => void;
   multiline?: boolean;
   maxRows?: number;
   variant?: 'standard' | 'outlined' | 'filled';
@@ -44,24 +47,31 @@ interface MentionState {
   mentionStartPosition: number;
 }
 
-const TagMentionInput: React.FC<TagMentionInputProps> = ({
+const TagMentionInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, TagMentionInputProps>(({
   value,
   onChange,
   onKeyDown,
   placeholder,
   disabled,
   allTags,
+  tags,
+  onTagsChange,
   multiline = false,
   maxRows = 4,
   variant = 'standard',
   InputProps,
   sx
-}) => {
+}, forwardedRef) => {
   const theme = useTheme();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const internalRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const selectedItemRef = useRef<HTMLLIElement>(null);
+
+  // Forward the ref to the parent
+  const inputRef = internalRef;
+
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  
+
   const [mentionState, setMentionState] = useState<MentionState>({
     isOpen: false,
     searchTerm: '',
@@ -69,12 +79,36 @@ const TagMentionInput: React.FC<TagMentionInputProps> = ({
     mentionStartPosition: 0
   });
 
+  // Chip (mention tags) state: use external control if provided, otherwise internal state
+  const [internalTags, setInternalTags] = useState<string[]>([]);
+  const selectedTags = (typeof tags !== 'undefined') ? tags : internalTags;
+  const setSelectedTags = (onTagsChange ?? setInternalTags);
+  const removeTag = (tag: string) => setSelectedTags(selectedTags.filter(t => t !== tag));
+
+  useEffect(() => {
+    if (typeof forwardedRef === 'function') {
+      forwardedRef(internalRef.current);
+    } else if (forwardedRef) {
+      (forwardedRef as React.MutableRefObject<HTMLInputElement | HTMLTextAreaElement | null>).current = internalRef.current;
+    }
+  });
+
+  // Auto-scroll selected item into view
+  useEffect(() => {
+    if (selectedItemRef.current && mentionState.isOpen) {
+      selectedItemRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+      });
+    }
+  }, [selectedIndex, mentionState.isOpen]);
+
   // Filter tags based on search term
   const filteredTags = useMemo(() => {
     if (!mentionState.searchTerm) return allTags;
-    
+
     const searchLower = mentionState.searchTerm.toLowerCase();
-    return allTags.filter(tag => 
+    return allTags.filter(tag =>
       tag.toLowerCase().includes(searchLower) ||
       formatTagForDisplay(tag).toLowerCase().includes(searchLower) ||
       (isGroupedTag(tag) && getTagGroup(tag).toLowerCase().includes(searchLower))
@@ -82,7 +116,7 @@ const TagMentionInput: React.FC<TagMentionInputProps> = ({
   }, [allTags, mentionState.searchTerm]);
 
   // Handle input change and detect @ mentions
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const newValue = event.target.value;
     const cursorPos = event.target.selectionStart || 0;
 
@@ -127,48 +161,64 @@ const TagMentionInput: React.FC<TagMentionInputProps> = ({
         case 'ArrowDown':
           event.preventDefault();
           setSelectedIndex(prev => (prev + 1) % filteredTags.length);
-          break;
+          return; // Don't call parent handler
         case 'ArrowUp':
           event.preventDefault();
           setSelectedIndex(prev => (prev - 1 + filteredTags.length) % filteredTags.length);
-          break;
+          return; // Don't call parent handler
         case 'Enter':
         case 'Tab':
           event.preventDefault();
           insertTag(filteredTags[selectedIndex]);
-          break;
+          return; // Don't call parent handler - prevents form submission
         case 'Escape':
           event.preventDefault();
           closeMentions();
-          break;
+          return; // Don't call parent handler
         default:
           // Let other keys pass through to trigger input change
           break;
       }
     }
-    
-    // Call parent onKeyDown if provided
+
+    // Call parent onKeyDown only if we didn't handle it above
     onKeyDown?.(event);
   };
 
-  // Insert selected tag into input
+  // Insert selected tag as a chip (remove the typed @mention text including the @ symbol)
   const insertTag = (tag: string) => {
+    // Find the end of the mention text by looking for the next space or end of string
+    // Start from position after the @ symbol
+    const textAfterAt = value.substring(mentionState.mentionStartPosition + 1);
+    const spaceIndex = textAfterAt.indexOf(' ');
+
+    // Calculate where the mention ends (either at space or end of string)
+    const mentionEndPosition = spaceIndex === -1
+      ? value.length
+      : mentionState.mentionStartPosition + 1 + spaceIndex;
+
+    // Get text before the @ and after the mention
     const beforeMention = value.substring(0, mentionState.mentionStartPosition);
-    const afterCursor = value.substring(mentionState.cursorPosition);
-    const tagText = `@${tag}`;
-    
-    const newValue = beforeMention + tagText + ' ' + afterCursor;
+    const afterMention = value.substring(mentionEndPosition);
+
+    // Combine and clean up extra spaces
+    const newValue = (beforeMention + afterMention).replace(/\s{2,}/g, ' ').trim();
     onChange(newValue);
-    
-    // Set cursor position after inserted tag
+
+    // Add to selected tag chips
+    if (!selectedTags.includes(tag)) {
+      setSelectedTags([...selectedTags, tag]);
+    }
+
+    // Restore caret position
     setTimeout(() => {
       if (inputRef.current) {
-        const newCursorPos = beforeMention.length + tagText.length + 1;
+        const newCursorPos = beforeMention.length;
         inputRef.current.setSelectionRange(newCursorPos, newCursorPos);
         inputRef.current.focus();
       }
     }, 0);
-    
+
     closeMentions();
   };
 
@@ -194,21 +244,57 @@ const TagMentionInput: React.FC<TagMentionInputProps> = ({
   return (
     <ClickAwayListener onClickAway={handleClickAway}>
       <Box sx={{ position: 'relative', width: '100%' }}>
-        <TextField
-          ref={inputRef}
-          fullWidth
-          multiline={multiline}
-          maxRows={maxRows}
-          placeholder={placeholder}
-          value={value}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          variant={variant}
-          InputProps={InputProps}
-          sx={sx}
-        />
-        
+        <Box
+          onClick={() => inputRef.current?.focus()}
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: 0.5,
+            px: 1,
+            py: 0.5,
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 1,
+            backgroundColor: 'background.paper',
+            '&:focus-within': {
+              borderColor: 'primary.main',
+              boxShadow: `${alpha(theme.palette.primary.main, 0.12)} 0 0 0 2px`
+            }
+          }}
+        >
+          {selectedTags.map(tag => (
+            <Chip
+              key={tag}
+              label={formatTagForDisplay(tag, true)}
+              size="small"
+              onDelete={() => removeTag(tag)}
+              sx={{ ...getTagChipStyles(tag, theme), height: 22, fontSize: '0.75rem' }}
+            />
+          ))}
+          <TextField
+            inputRef={inputRef}
+            multiline={multiline}
+            maxRows={maxRows}
+            placeholder={placeholder}
+            value={value}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            disabled={disabled}
+            variant={variant}
+            InputProps={InputProps}
+            sx={{
+              flex: 1,
+              minWidth: 120,
+              width: 'auto',
+              m: 0,
+              '& .MuiInputBase-root': { p: 0, width: 'auto' },
+              '& .MuiInputBase-input': { py: 0.5 },
+              ...sx
+            }}
+          />
+        </Box>
+
         {/* Mention Dropdown */}
         <Popper
           open={mentionState.isOpen}
@@ -255,7 +341,7 @@ const TagMentionInput: React.FC<TagMentionInputProps> = ({
                 Select a tag to mention ({filteredTags.length} available)
               </Typography>
             </Box>
-            
+
             <List
               sx={{
                 maxHeight: 160,
@@ -274,7 +360,11 @@ const TagMentionInput: React.FC<TagMentionInputProps> = ({
                 </ListItem>
               ) : (
                 filteredTags.map((tag, index) => (
-                  <ListItem key={tag} disablePadding>
+                  <ListItem
+                    key={tag}
+                    disablePadding
+                    ref={index === selectedIndex ? selectedItemRef : null}
+                  >
                     <ListItemButton
                       selected={index === selectedIndex}
                       onClick={() => handleTagClick(tag)}
@@ -315,6 +405,8 @@ const TagMentionInput: React.FC<TagMentionInputProps> = ({
       </Box>
     </ClickAwayListener>
   );
-};
+});
+
+TagMentionInput.displayName = 'TagMentionInput';
 
 export default TagMentionInput;

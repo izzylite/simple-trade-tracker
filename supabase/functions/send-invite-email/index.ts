@@ -47,7 +47,7 @@ interface SendInviteEmailRequest {
 }
 
 // Get app URL from environment or default to production
-const APP_URL = Deno.env.get("APP_URL") || "https://tradejourno.com/";
+const APP_URL = Deno.env.get("APP_URL") || "https://journotrades.com/";
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
@@ -99,16 +99,16 @@ Deno.serve(async (req: Request) => {
 
     // Load email template
     const emailTemplate = `
-      <!-- User Invite Template for TradeJourno -->
+      <!-- User Invite Template for JournoTrades -->
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
         <!-- Header with Gradient Background -->
         <div style="background: linear-gradient(135deg, #1976d2 0%, #9c27b0 100%); padding: 40px 20px; text-align: center;">
           <img
             src="https://gwubzauelilziaqnsfac.supabase.co/storage/v1/object/public/app-resources/Icons/android-chrome-512x512.png"
-            alt="TradeJourno"
+            alt="JournoTrades"
             style="width: 80px; height: 80px; border-radius: 20px; margin: 0 auto 20px; display: block; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);"
           />
-          <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">You're Invited to TradeJourno!</h1>
+          <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">You're Invited to JournoTrades!</h1>
         </div>
 
         <!-- Content Section -->
@@ -116,7 +116,7 @@ Deno.serve(async (req: Request) => {
           <h2 style="color: #333333; margin-top: 0; font-size: 22px; font-weight: 600;">Join the Trading Community</h2>
 
           <p style="color: #666666; line-height: 1.6; font-size: 16px; margin: 20px 0;">
-            You've been invited to join <strong>TradeJourno</strong> - the professional trading journal that helps traders track, analyze, and improve their performance.
+            You've been invited to join <strong>JournoTrades</strong> - the professional trading journal that helps traders track, analyze, and improve their performance.
           </p>
 
           <!-- Invite Code Display -->
@@ -184,14 +184,14 @@ Deno.serve(async (req: Request) => {
           <!-- Footer -->
           <p style="color: #666666; font-size: 15px; margin: 20px 0 0 0;">
             Welcome aboard!<br>
-            <strong>The TradeJourno Team</strong>
+            <strong>The JournoTrades Team</strong>
           </p>
         </div>
 
         <!-- Footer Bar -->
         <div style="background: #e0e0e0; padding: 20px; text-align: center;">
           <p style="color: #666666; font-size: 12px; margin: 0;">
-            © 2024 TradeJourno. All rights reserved.
+            © 2024 JournoTrades. All rights reserved.
           </p>
         </div>
       </div>
@@ -212,9 +212,9 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "TradeJourno <noreply@tradejourno.com>",
+        from: "JournoTrades <noreply@journotrades.com>",
         to: [email],
-        subject: "You're Invited to Join TradeJourno!",
+        subject: "You're Invited to Join JournoTrades!",
         html: emailTemplate,
       }),
     });

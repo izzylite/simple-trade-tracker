@@ -122,6 +122,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
                     margin: 0,
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
+                    overflowWrap: 'anywhere',
                     fontFamily: 'inherit'
                   }}
                 >
@@ -157,7 +158,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
               mb: 1.5,
               lineHeight: 1.6,
               whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word'
+              wordBreak: 'break-word',
+              overflowWrap: 'anywhere'
             }}
           >
             {children}

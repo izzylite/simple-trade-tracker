@@ -135,7 +135,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
             <Box
               component="img"
               src="/android-chrome-192x192.png"
-              alt="TradeJourno Logo"
+              alt="JournoTrades Logo"
               sx={{
                 width: 48,
                 height: 48,
@@ -168,7 +168,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
                   })
                 }}
               >
-                TradeJourno
+                JournoTrades
               </Typography>
             </Box>
             <IconButton
@@ -289,7 +289,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
           }}
         >
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
-            © 2025 TradeJourno
+            © 2025 JournoTrades
           </Typography>
         </Box>
       )}
