@@ -34,7 +34,8 @@ import {
   History as HistoryIcon,
   ArrowBack as ArrowBackIcon,
   Delete as DeleteIcon,
-  Schedule as ScheduleIcon
+  Schedule as ScheduleIcon,
+  Stop as StopIcon
 } from '@mui/icons-material';
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
@@ -96,6 +97,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<any>(null);
   const conversationRepo = useRef(new ConversationRepository()).current;
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const cancelRequestedRef = useRef(false);
+  const activeRequestRef = useRef<{ userId: string; aiId: string } | null>(null);
 
   // Prevent body scroll when drawer is open to fix mention dialog positioning
   useEffect(() => {
@@ -115,7 +119,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   // State
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [inputMessage, setInputMessage] = useState('');
-
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -142,11 +146,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
 
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom whenever messages change
   const scrollToBottom = useCallback(() => {
-    if(messages.length > 0) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
   }, []);
 
   // Note: No longer using embeddings - using smart keyword filtering instead
@@ -288,19 +290,61 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     const messageText = inputMessage.trim();
     if (!messageText || isLoading) return;
 
+    cancelRequestedRef.current = false;
+
+    let baseHistory: ChatMessageType[];
+    let userMessage: ChatMessageType;
+
+    // Determine whether this is a new message or an edit of an existing user message
+    if (editingMessageId) {
+      const messageIndex = messages.findIndex(
+        msg => msg.id === editingMessageId && msg.role === 'user'
+      );
+
+      if (messageIndex === -1) {
+        // Fallback: treat as a new message if something went wrong
+        baseHistory = messages;
+        userMessage = {
+          id: uuidv4(),
+          role: 'user',
+          content: messageText,
+          timestamp: new Date(),
+          status: 'sent'
+        };
+
+        setMessages(prev => [...prev, userMessage]);
+      } else {
+        baseHistory = messages.slice(0, messageIndex);
+        const originalMessage = messages[messageIndex];
+
+        userMessage = {
+          ...originalMessage,
+          content: messageText,
+          timestamp: new Date(),
+          status: 'sent'
+        };
+
+        const updatedMessages = [...baseHistory, userMessage];
+        setMessages(updatedMessages);
+      }
+
+      setEditingMessageId(null);
+    } else {
+      baseHistory = messages;
+      userMessage = {
+        id: uuidv4(),
+        role: 'user',
+        content: messageText,
+        timestamp: new Date(),
+        status: 'sent'
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+    }
+
     // Clear input
     setInputMessage('');
 
-    // Add user message
-    const userMessage: ChatMessageType = {
-      id: uuidv4(),
-      role: 'user',
-      content: messageText,
-      timestamp: new Date(),
-      status: 'sent'
-    };
-
-    setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     setIsTyping(true);
     setToolExecutionStatus(''); // Clear any previous tool status
@@ -308,6 +352,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     // Track AI message ID (don't add placeholder yet - wait for first chunk or tool call)
     const aiMessageId = uuidv4();
     let aiMessageAdded = false;
+
+    activeRequestRef.current = { userId: userMessage.id, aiId: aiMessageId };
 
     try {
       if (!user) {
@@ -317,6 +363,14 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       if (!calendar.id) {
         throw new Error('Calendar ID is required');
       }
+
+      // Cancel any previous streaming request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
 
       // Stream message from Supabase AI agent
       let accumulatedText = '';
@@ -329,9 +383,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       for await (const event of supabaseAIChatService.sendMessageStreaming(
         messageText,
         user.uid,
-        calendar.id,
-        messages,
-        calendar.tags || []
+        calendar,
+        baseHistory,
+        abortController.signal
       )) {
         switch (event.type) {
           case 'text_chunk':
@@ -400,6 +454,11 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         }
       }
 
+      // If request was cancelled, or we didn't receive any content (e.g. cancelled before first chunk), skip creating a message
+      if (cancelRequestedRef.current || (!aiMessageAdded && !accumulatedText)) {
+        return;
+      }
+
       // Update or add final message with all data
       const finalMessage: ChatMessageType = {
         id: aiMessageId,
@@ -424,10 +483,21 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       }
 
       // Auto-save conversation after successful message exchange
-      const updatedMessages = [...messages, userMessage, finalMessage];
-      await saveCurrentConversation(updatedMessages);
+      const conversationMessages = [...baseHistory, userMessage, finalMessage];
+      await saveCurrentConversation(conversationMessages);
 
     } catch (error) {
+      const isAbortError =
+        typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        (error as any).name === 'AbortError';
+
+      if (isAbortError || cancelRequestedRef.current) {
+        logger.log('AI chat request cancelled by user');
+        return;
+      }
+
       logger.error('Error sending message to Supabase AI agent:', error);
 
       const chatError: ChatError = {
@@ -457,11 +527,52 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         setMessages(prev => [...prev, errorMessage]);
       }
     } finally {
+      abortControllerRef.current = null;
+      activeRequestRef.current = null;
+      cancelRequestedRef.current = false;
       setIsLoading(false);
       setIsTyping(false);
       setToolExecutionStatus(''); // Clear tool status
     }
   };
+
+  const handleCancelRequest = () => {
+    const active = activeRequestRef.current;
+
+    if (!abortControllerRef.current && !active) {
+      return;
+    }
+
+    cancelRequestedRef.current = true;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    if (active) {
+      setMessages(prev =>
+        prev.filter(msg => msg.id !== active.userId && msg.id !== active.aiId)
+      );
+      activeRequestRef.current = null;
+    }
+
+    setIsLoading(false);
+    setIsTyping(false);
+    setToolExecutionStatus('');
+  };
+
+  const handleEditMessage = (messageId: string) => {
+    const messageToEdit = messages.find(msg => msg.id === messageId);
+    if (!messageToEdit || messageToEdit.role !== 'user') return;
+
+    setInputMessage(messageToEdit.content);
+    setEditingMessageId(messageId);
+
+    // Focus the input so the user can continue typing immediately
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -494,8 +605,10 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       const updatedMessages = messages.slice(0, userMessageIndex + 1);
       setMessages(updatedMessages);
 
-      // Set loading state
+      // Set loading and typing state so the user sees the "AI is thinking..." indicator
       setIsLoading(true);
+      setIsTyping(true);
+      setToolExecutionStatus('');
 
       if (!user) {
         throw new Error('User not authenticated');
@@ -509,9 +622,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       const response = await supabaseAIChatService.sendMessage(
         userMessage.content,
         user.uid,
-        calendar.id,
-        updatedMessages,
-        calendar.tags || []
+        calendar,
+        updatedMessages
       );
 
       if (!response.success) {
@@ -550,6 +662,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setIsTyping(false);
       setToolExecutionStatus(''); // Clear tool status
     }
   }, [messages, user, calendar, trades]);
@@ -815,7 +928,7 @@ What would you like to know about your trading?`,
                     onRetry={handleMessageRetry}
                     isLatestMessage={index === displayMessages.length - 1}
                     enableAnimation={index > 0}
-                    onTradeClick={(tradeId,contextTrades) => {
+                    onTradeClick={(tradeId, contextTrades) => {
                       if (onOpenGalleryMode) {
                         // Find the clicked trade
                         const clickedTrade = contextTrades.find(t => t.id === tradeId);
@@ -832,6 +945,7 @@ What would you like to know about your trading?`,
                       setSelectedEvent(event);
                       setEventDetailDialogOpen(true);
                     }}
+                    onEdit={handleEditMessage}
                   />
                 ))}
 
@@ -1028,17 +1142,29 @@ What would you like to know about your trading?`,
                     sx={{ flex: 1, minWidth: 0, fontSize: '0.95rem', lineHeight: 1.4 }}
                   />
                   <IconButton
-                    onClick={handleSendMessage}
-                    disabled={!inputMessage.trim() || isLoading || isAtMessageLimit}
+                    onClick={isLoading ? handleCancelRequest : handleSendMessage}
+                    disabled={(!inputMessage.trim() && !isLoading) || isAtMessageLimit}
                     size="small"
                     sx={{
-                      backgroundColor: inputMessage.trim() && !isLoading ? 'primary.main' : 'action.disabledBackground',
-                      color: inputMessage.trim() && !isLoading ? 'primary.contrastText' : 'action.disabled',
+                      backgroundColor: isLoading
+                        ? 'error.main'
+                        : inputMessage.trim()
+                          ? 'primary.main'
+                          : 'action.disabledBackground',
+                      color: isLoading
+                        ? 'error.contrastText'
+                        : inputMessage.trim()
+                          ? 'primary.contrastText'
+                          : 'action.disabled',
                       width: 36,
                       height: 36,
                       transition: 'all 0.2s ease-in-out',
                       '&:hover': {
-                        backgroundColor: inputMessage.trim() && !isLoading ? 'primary.dark' : 'action.disabledBackground',
+                        backgroundColor: isLoading
+                          ? 'error.dark'
+                          : inputMessage.trim()
+                            ? 'primary.dark'
+                            : 'action.disabledBackground',
                         transform: inputMessage.trim() && !isLoading ? 'scale(1.05)' : 'none'
                       },
                       '&:disabled': {
@@ -1048,7 +1174,7 @@ What would you like to know about your trading?`,
                     }}
                   >
                     {isLoading ? (
-                      <CircularProgress size={18} color="inherit" />
+                      <StopIcon sx={{ fontSize: 18 }} />
                     ) : (
                       <SendIcon sx={{ fontSize: 18 }} />
                     )}

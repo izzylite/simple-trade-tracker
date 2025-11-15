@@ -1,6 +1,6 @@
 /**
  * Event Card Component for AI Chat
- * Displays economic event details with dynamic fetching and shimmer loading
+ * Displays economic event details with dynamic fetching
  */
 
 import React, { useState, useEffect } from 'react';
@@ -10,8 +10,7 @@ import {
   Typography,
   Chip,
   useTheme,
-  alpha,
-  Skeleton
+  alpha
 } from '@mui/material';
 import {
   Check as CheckIcon,
@@ -32,53 +31,23 @@ interface EventCardProps {
   onClick?: (event: EconomicEvent) => void;
 }
 
-// Shimmer component for loading state
-const EventCardShimmer: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
-  const theme = useTheme();
-  
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: compact ? 1.5 : 2,
-        border: '1px solid',
-        borderColor: alpha(theme.palette.divider, 0.3),
-        borderRadius: 2,
-        backgroundColor: alpha(theme.palette.background.paper, 0.8),
-        minHeight: compact ? 80 : 100
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
-        {/* Flag and Currency Shimmer */}
-        <Box sx={{ minWidth: 32, mt: 0.25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-          <Skeleton variant="rectangular" width={20} height={15} sx={{ borderRadius: 0.5 }} />
-          <Skeleton variant="text" width={32} height={16} />
-        </Box>
+// Helper function to format numeric values with commas
+const formatEventValue = (value: string): string => {
+  if (!value) return value;
 
-        {/* Content Shimmer */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, width: '100%', flex: 1 }}>
-          {/* First Row */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-            <Skeleton variant="text" width={80} height={16} />
-            <Box sx={{ flex: 1 }} />
-            <Skeleton variant="rectangular" width={40} height={20} sx={{ borderRadius: 1 }} />
-          </Box>
+  // Try to parse as number
+  const numericValue = parseFloat(value.replace(/[^\d.-]/g, ''));
 
-          {/* Event Name */}
-          <Skeleton variant="text" width="70%" height={20} />
+  if (isNaN(numericValue)) return value;
 
-          {/* Values Row */}
-          {!compact && (
-            <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-              <Skeleton variant="text" width={60} height={16} />
-              <Skeleton variant="text" width={60} height={16} />
-              <Skeleton variant="text" width={60} height={16} />
-            </Box>
-          )}
-        </Box>
-      </Box>
-    </Paper>
-  );
+  // Format with commas and preserve original suffix (%, K, M, etc.)
+  const suffix = value.replace(/[0-9.-]/g, '').trim();
+  const formatted = numericValue.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
+
+  return suffix ? `${formatted}${suffix}` : formatted;
 };
 
 // Helper function to get impact color
@@ -146,20 +115,17 @@ const EventCard: React.FC<EventCardProps> = ({
 }) => {
   const theme = useTheme();
   const [event, setEvent] = useState<EconomicEvent | null>(eventData || null);
-  const [loading, setLoading] = useState(!eventData); // Skip loading if data provided
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Skip fetching if event data was provided
     if (eventData) {
       setEvent(eventData);
-      setLoading(false);
       return;
     }
 
     const fetchEvent = async () => {
       try {
-        setLoading(true);
         setError(null);
 
         // Fetch event by ID from economic calendar service
@@ -173,18 +139,11 @@ const EventCard: React.FC<EventCardProps> = ({
       } catch (err) {
         logger.error('Failed to fetch economic event:', err);
         setError('Failed to load event');
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchEvent();
   }, [eventId, eventData]);
-
-  // Show shimmer while loading
-  if (loading) {
-    return <EventCardShimmer compact={compact} />;
-  }
 
   // Show error state
   if (error || !event) {
@@ -230,9 +189,9 @@ const EventCard: React.FC<EventCardProps> = ({
       }}
       onClick={() => onClick?.(event)}
     >
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, width: '100%' }}>
         {/* Flag and Currency */}
-        <Box sx={{ minWidth: 32, mt: 0.25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+        <Box sx={{ minWidth: 32, maxWidth: 32, mt: 0.25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, alignSelf: 'flex-start' }}>
           {event.flag_url && (
             <img
               src={event.flag_url}
@@ -240,6 +199,9 @@ const EventCard: React.FC<EventCardProps> = ({
               style={{
                 width: 20,
                 height: 15,
+                maxHeight: 15,
+                minHeight: 15,
+                display: 'block',
                 borderRadius: 2,
                 objectFit: 'cover',
                 border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
@@ -259,7 +221,7 @@ const EventCard: React.FC<EventCardProps> = ({
         </Box>
 
         {/* Content Container */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, width: '100%', flex: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column',   width: '100%', flex: 1 }}>
           {/* First Row: Time | Status | Impact Badge */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
             {/* Time */}
@@ -315,8 +277,7 @@ const EventCard: React.FC<EventCardProps> = ({
             fontWeight: 600,
             fontSize: compact ? '0.85rem' : '0.9rem',
             color: 'text.primary',
-            lineHeight: 1.3,
-            mb: compact ? 0 : 0.5
+            lineHeight: 1.3
           }}>
             {event.event_name}
           </Typography>
@@ -327,10 +288,10 @@ const EventCard: React.FC<EventCardProps> = ({
               {event.actual_value && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
-                    Actual:
+                    A:
                   </Typography>
                   <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
-                    {event.actual_value}
+                    {formatEventValue(event.actual_value)}
                   </Typography>
                   {trendInfo && trendInfo.icon}
                 </Box>
@@ -339,10 +300,10 @@ const EventCard: React.FC<EventCardProps> = ({
               {event.forecast_value && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
-                    Forecast:
+                    F:
                   </Typography>
                   <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
-                    {event.forecast_value}
+                    {formatEventValue(event.forecast_value)}
                   </Typography>
                 </Box>
               )}
@@ -350,10 +311,10 @@ const EventCard: React.FC<EventCardProps> = ({
               {event.previous_value && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
-                    Previous:
+                    P:
                   </Typography>
                   <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
-                    {event.previous_value}
+                    {formatEventValue(event.previous_value)}
                   </Typography>
                 </Box>
               )}

@@ -361,7 +361,6 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
         borderTop: `1px solid ${theme.palette.divider}`,
 
         backgroundColor: 'custom.pageBackground',
-        mb: 1,
         width: '100%'
       }}>
         <Stack spacing={{ xs: 2, sm: 3 }}> {/* Reduced spacing on mobile */}
@@ -380,7 +379,9 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 <Typography variant="h6" color="text.primary" sx={{
                   display: 'block',
                   fontWeight: 700,
-                  fontSize: { xs: '1.1rem', sm: '1.25rem' } // Smaller on mobile
+                  fontSize: { xs: '1.1rem', sm: '1.25rem' }, // Smaller on mobile
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word'
                 }}>
                   📈 {trade.name}
                 </Typography>
@@ -438,7 +439,12 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
           <Box sx={{ width: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
               <ListAltIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-              <Typography variant="subtitle2" color="text.primary" sx={{ fontWeight: 700, fontSize: '0.9rem' }}>
+              <Typography variant="subtitle2" color="text.primary" sx={{
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                wordBreak: 'break-word',
+                overflowWrap: 'break-word'
+              }}>
                 Properties
               </Typography>
             </Box>
@@ -877,7 +883,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               )}
 
               {/* Tags Section */}
-              <Box sx={{ mb: { xs: 1.5, sm: 2 } }}>
+              <Box>
                 <Box sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -890,7 +896,9 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                     <CategoryIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                     <Typography variant="subtitle2" color="text.primary" sx={{
                       fontWeight: 600,
-                      fontSize: { xs: '0.85rem', sm: '0.9rem' } // Smaller on mobile
+                      fontSize: { xs: '0.85rem', sm: '0.9rem' }, // Smaller on mobile
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word'
                     }}>
                       Tags
                     </Typography>
@@ -922,7 +930,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               </Box>
 
               {/* Economic Events Section */}
-              <Box sx={{ mb: { xs: 1.5, sm: 2 } }}>
+              <Box>
                 <Box sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -936,9 +944,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                     <Typography variant="subtitle2" color="text.primary" sx={{
                       fontWeight: 600,
                       fontSize: { xs: '0.8rem', sm: '0.9rem' }, // Smaller on mobile
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: { xs: 'nowrap', sm: 'normal' } // Prevent wrapping on mobile
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word'
                     }}>
                       Economic Events ({format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'MMM d, yyyy')})
                     </Typography>
@@ -1151,10 +1158,6 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               </Box>
             </Stack>
           </Box>
-
-
-
-
         </Stack>
       </Box>
     </AnimatedDropdown>

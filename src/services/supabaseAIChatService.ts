@@ -107,6 +107,28 @@ class SupabaseAIChatService {
     return { processedMessage, tagContext };
   }
 
+  private getCurrentDayNote(calendar: Calendar): string | undefined {
+    if (!calendar.days_notes) {
+      return undefined;
+    }
+
+    const dayKey = new Date().toLocaleDateString('en-US', { weekday: 'short' });
+    const note = calendar.days_notes[dayKey];
+
+    if (!note || !note.trim()) {
+      return undefined;
+    }
+
+    return note.trim();
+  }
+
+  private buildCalendarContext(calendar: Calendar) {
+    return {
+      ...calendar,
+      daily_note: this.getCurrentDayNote(calendar),
+    };
+  }
+
   /**
    * Send a message to the AI Trading Agent with streaming support
    * Yields SSE events as they arrive
@@ -114,12 +136,14 @@ class SupabaseAIChatService {
   async *sendMessageStreaming(
     message: string,
     userId: string,
-    calendarId: string,
+    calendar: Calendar,
     conversationHistory: ChatMessageType[] = [],
-    availableTags: string[] = []
+    signal?: AbortSignal
   ): AsyncGenerator<SSEEvent, void, unknown> {
     try {
       logger.log(`Sending streaming message to AI agent: "${message.substring(0, 50)}..."`);
+
+      const availableTags = calendar.tags || [];
 
       // Process @tag mentions
       const { processedMessage, tagContext } = this.processTagMentions(message, availableTags);
@@ -149,9 +173,11 @@ class SupabaseAIChatService {
         body: JSON.stringify({
           message: finalMessage,
           userId,
-          calendarId,
+          calendarId: calendar.id,
           conversationHistory: formattedHistory,
-        })
+          calendarContext: this.buildCalendarContext(calendar),
+        }),
+        signal
       });
 
       if (!response.ok) {
@@ -216,8 +242,22 @@ class SupabaseAIChatService {
 
       logger.log('Streaming complete');
     } catch (error) {
+      const isAbortError =
+        typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        (error as any).name === 'AbortError';
+
+      if (isAbortError || signal?.aborted) {
+        logger.log('AI streaming request aborted by caller');
+        return;
+      }
+
       logger.error('Error in sendMessageStreaming:', error);
-      yield { type: 'error', data: { error: error instanceof Error ? error.message : 'Unknown error' } };
+      yield {
+        type: 'error',
+        data: { error: error instanceof Error ? error.message : 'Unknown error' }
+      };
     }
   }
 
@@ -241,12 +281,13 @@ class SupabaseAIChatService {
   async sendMessage(
     message: string,
     userId: string,
-    calendarId: string,
-    conversationHistory: ChatMessageType[] = [],
-    availableTags: string[] = []
+    calendar: Calendar,
+    conversationHistory: ChatMessageType[] = []
   ): Promise<AgentResponse> {
     try {
       logger.log(`Sending message to Supabase AI agent: "${message.substring(0, 50)}..."`);
+
+      const availableTags = calendar.tags || [];
 
       // Process @tag mentions
       const { processedMessage, tagContext } = this.processTagMentions(message, availableTags);
@@ -265,8 +306,9 @@ class SupabaseAIChatService {
           body: {
             message: finalMessage,
             userId,
-            calendarId,
+            calendarId: calendar.id,
             conversationHistory: formattedHistory,
+            calendarContext: this.buildCalendarContext(calendar),
           },
         }
       );

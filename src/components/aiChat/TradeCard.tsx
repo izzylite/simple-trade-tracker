@@ -110,16 +110,15 @@ const TradeCard: React.FC<TradeCardProps> = ({
         border: '1px solid',
         borderColor: alpha(getTradeTypeColorValue(), 0.2),
         backgroundColor: alpha(getTradeTypeColorValue(), 0.05),
-        '&:hover': onClick ? {
-          transform: 'translateY(-2px)',
+        '&:hover': onClick ? { 
           boxShadow: `0 4px 12px ${alpha(getTradeTypeColorValue(), 0.2)}`,
           borderColor: getTradeTypeColorValue()
         } : {}
       }}
       onClick={onClick}
     >
-      <CardContent sx={{ p: 2, pt: 2, '&:last-child': { pb: 2 } }}>
-        <Stack spacing={1.5}>
+      <CardContent sx={{ p: 2, pt: 0, '&:last-child': { pb: 1 } }}>
+        <Stack spacing={1}>
           {/* Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <Box sx={{ flex: 1 }}>
@@ -211,20 +210,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
           {showTags && trade.tags && trade.tags.length > 0 && (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
               {Object.entries(groupedTags).map(([group, groupTags]) => (
-                <Tooltip
-                  key={group}
-                  title={
-                    <Box sx={{ p: 0.5 }}>
-                      {groupTags.map(tag => (
-                        <Typography key={tag} variant="body2">
-                          {formatTagForDisplay(tag, true)}
-                        </Typography>
-                      ))}
-                    </Box>
-                  }
-                  arrow
-                >
-                  <Chip
+                <Chip
                     label={`${group}${groupTags.length > 1 ? ` (${groupTags.length})` : ''}`}
                     size="small"
                     sx={{
@@ -234,7 +220,6 @@ const TradeCard: React.FC<TradeCardProps> = ({
                       '& .MuiChip-label': { px: 1 }
                     }}
                   />
-                </Tooltip>
               ))}
             </Box>
           )}

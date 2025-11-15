@@ -15,6 +15,7 @@ import DOMPurify from 'dompurify';
 import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 import TradeCard from './TradeCard';
 import EventCard from './EventCard';
+import ExpandableCardList from './ExpandableCardList';
 import type { Trade } from '../../types/trade';
 import type { EconomicEvent } from '../../types/economicCalendar';
 
@@ -168,7 +169,6 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
         const index = Array.from(images).indexOf(target as HTMLImageElement);
 
         if (index !== -1) {
-
           const isAIChart = imageUrls[index]?.includes('quickchart.io');
           setImageZoomProp({
             selectetdImageIndex: index,
@@ -205,6 +205,105 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
 
     return () => clearTimeout(timeoutId);
   }, [sanitizedHtml]);
+
+  const renderContentSegments = () => {
+    const nodes: React.ReactNode[] = [];
+    let currentTradeNodes: React.ReactNode[] = [];
+
+    const flushTrades = () => {
+      if (currentTradeNodes.length === 0) return;
+
+      nodes.push(
+        <ExpandableCardList
+          key={`trade-list-${nodes.length}`}
+          items={currentTradeNodes}
+          itemType="trades"
+        />
+      );
+
+      currentTradeNodes = [];
+    };
+
+    const hasTextContent = (htmlSegment: string) => {
+      const textOnly = htmlSegment
+        .replace(/<[^>]*>/g, '')
+        .replace(/&nbsp;/gi, ' ')
+        .trim();
+      return textOnly.length > 0;
+    };
+
+    contentSegments.forEach((segment, index) => {
+      if (segment.type === 'trade' && segment.id && embeddedTrades?.[segment.id]) {
+        const trade = embeddedTrades[segment.id];
+        const contextTrades = Object.values(embeddedTrades);
+
+        currentTradeNodes.push(
+          <Box key={`trade-${index}`} sx={{ my: 1 }}>
+            <TradeCard
+              trade={trade}
+              showTags={true}
+              onClick={() => onTradeClick?.(trade.id, contextTrades)}
+            />
+          </Box>
+        );
+
+        return;
+      }
+
+      if (segment.type === 'html') {
+        const hasText = hasTextContent(segment.content);
+
+        // Only flush trades when this HTML has actual text content (e.g. section headers).
+        // Decorative HTML like <br> or empty <p> tags should not split trade groups.
+        if (hasText) {
+          flushTrades();
+        }
+
+        // Skip rendering segments that have no visible text content to avoid
+        // large blank gaps between sections.
+        if (!hasText) {
+          return;
+        }
+
+        nodes.push(
+          <Typography
+            key={`html-${index}`}
+            component="div"
+            sx={{
+              color: textColor,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              overflowWrap: 'anywhere'
+            }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(segment.content) }}
+          />
+        );
+        return;
+      }
+
+      if (segment.type === 'event' && segment.id && embeddedEvents?.[segment.id]) {
+        // Events should be rendered as their own block, separate from any trade group
+        flushTrades();
+
+        const event = embeddedEvents[segment.id];
+        nodes.push(
+          <Box key={`event-${index}`} sx={{ my: 1 }}>
+            <EventCard
+              eventId={segment.id}
+              eventData={event}
+              onClick={onEventClick}
+              compact={false}
+            />
+          </Box>
+        );
+      }
+    });
+
+    // Flush any remaining trades at the end
+    flushTrades();
+
+    return nodes;
+  };
 
   return (
     <>
@@ -294,48 +393,7 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
         }}
       >
         {/* Render segments (HTML and cards mixed) */}
-        {contentSegments.map((segment, index) => {
-          if (segment.type === 'html') {
-            return (
-              <Typography
-                key={`html-${index}`}
-                component="div"
-                sx={{
-                  color: textColor,
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  overflowWrap: 'anywhere'
-                }}
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(segment.content) }}
-              />
-            );
-          } else if (segment.type === 'trade' && segment.id && embeddedTrades?.[segment.id]) {
-            const trade = embeddedTrades[segment.id];
-            const contextTrades = Object.values(embeddedTrades);
-            return (
-              <Box key={`trade-${index}`} sx={{ my: 1 }}>
-                <TradeCard
-                  trade={trade}
-                  showTags={contextTrades.length <= 5}
-                  onClick={() => onTradeClick?.(trade.id, contextTrades)}
-                />
-              </Box>
-            );
-          } else if (segment.type === 'event' && segment.id && embeddedEvents?.[segment.id]) {
-            const event = embeddedEvents[segment.id];
-            return (
-              <Box key={`event-${index}`} sx={{ my: 1 }}>
-                <EventCard
-                  eventId={segment.id}
-                  eventData={event}
-                  onClick={onEventClick}
-                  compact={true}
-                />
-              </Box>
-            );
-          }
-          return null;
-        })}
+        {renderContentSegments()}
       </Box>
 
       {/* Image Zoom Dialog */}

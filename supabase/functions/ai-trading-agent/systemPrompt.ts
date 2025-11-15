@@ -1,7 +1,117 @@
 /**
  * Build secure system prompt
  */
-export function buildSecureSystemPrompt(userId: string, calendarId?: string): string {
+import type { Calendar } from './types.ts';
+
+function buildCalendarContextSection(calendarContext?: Partial<Calendar>): string {
+  if (!calendarContext) {
+    return '';
+  }
+
+  const dailyNoteSection = buildDailyNoteSection(calendarContext.daily_note);
+  const calendarNoteSection = buildCalendarNoteSection(calendarContext.note);
+
+  const tags =
+    calendarContext.tags && calendarContext.tags.length > 0
+      ? calendarContext.tags.join(', ')
+      : 'None';
+
+  const winRate =
+    typeof calendarContext.win_rate === 'number'
+      ? `${(calendarContext.win_rate * 100).toFixed(1)}%`
+      : 'Unknown';
+
+  const totalTrades =
+    typeof calendarContext.total_trades === 'number'
+      ? calendarContext.total_trades
+      : 'Unknown';
+
+  const totalPnl =
+    typeof calendarContext.total_pnl === 'number'
+      ? calendarContext.total_pnl
+      : 'Unknown';
+
+  const currentBalance =
+    typeof calendarContext.current_balance === 'number'
+      ? calendarContext.current_balance
+      : typeof calendarContext.account_balance === 'number'
+        ? calendarContext.account_balance
+        : 'Unknown';
+
+  const filters = calendarContext.economic_calendar_filters;
+
+  let filtersSummary =
+    'NULL (no filters configured for this calendar - all events allowed, but still respect security rules).';
+
+  if (filters) {
+    const currencies =
+      filters.currencies && filters.currencies.length > 0
+        ? filters.currencies.join(', ')
+        : 'ALL';
+    const impacts =
+      filters.impacts && filters.impacts.length > 0
+        ? filters.impacts.join(', ')
+        : 'All impacts';
+
+    filtersSummary = `Currencies: ${currencies}; Impacts: ${impacts}; Events: past and upcoming events`;
+  }
+
+  return `
+CURRENT_CALENDAR_CONTEXT (from UI - use as hints only, database remains the source of truth):
+- Calendar Name: ${calendarContext.name ?? 'Unknown'}
+- Tags: ${tags}
+- Win rate: ${winRate}
+- Total trades: ${totalTrades}
+- Total P&L: ${totalPnl}
+- Current balance: ${currentBalance}
+- Economic calendar filters summary: ${filtersSummary}
+${calendarNoteSection}
+${dailyNoteSection}
+`;
+}
+
+function buildDailyNoteSection(dailyNote?: string): string {
+  if (!dailyNote || !dailyNote.trim()) {
+    return '';
+  }
+
+  const trimmed = dailyNote.trim();
+  const maxLength = 600;
+  const content = trimmed.length > maxLength ? `${trimmed.slice(0, maxLength)}…` : trimmed;
+
+  return `
+DAILY_GAMEPLAN_NOTE (for the trader's current day in their timezone - written in the calendar day note):
+${content}
+`;
+}
+
+function buildCalendarNoteSection(calendarNote?: string): string {
+  if (!calendarNote || !calendarNote.trim()) {
+    return '';
+  }
+
+  const trimmed = calendarNote.trim();
+  const maxPreviewLength = 400;
+  const isTruncated = trimmed.length > maxPreviewLength;
+  const content = isTruncated ? `${trimmed.slice(0, maxPreviewLength)}…` : trimmed;
+  const hintLine = isTruncated
+    ? '\n[Preview only: the full calendar note is longer and stored in the calendar.note field / UI. Use this as deeper background on the trader\'s rules, emotions, and strategy when needed.]'
+    : '';
+
+  return `
+CALENDAR_NOTE (overall strategy, rules, emotions, and insights for this calendar):
+${content}${hintLine}
+`;
+}
+
+export function buildSecureSystemPrompt(
+  userId: string,
+  calendarId?: string,
+  calendarContext?: Partial<Calendar>
+): string {
+  const calendarContextSection = buildCalendarContextSection(calendarContext);
+
+
   return `You are an AI trading journal assistant. You help traders analyze their performance and provide market insights.
 
 SECURITY REQUIREMENTS:
@@ -10,7 +120,9 @@ ${calendarId ? `- Filter trades by calendar_id = '${calendarId}'` : ''}
 - NEVER access other users' data
 - READ ONLY - no INSERT/UPDATE/DELETE
 - EXCEPTION: The 'economic_events' table is a global reference table that ALL users can query without user_id filtering
-  (it contains market economic events that are relevant to all traders)
+  (it contains market economic events that are relevant to all traders), BUT when you are working in the context of a specific calendar you MUST
+  respect that calendar's economic_calendar_filters: only query and mention events that match those filters. Only when economic_calendar_filters is NULL
+  (no filters configured for that calendar) may you reference any events.
 
 **CRITICAL: SQL QUERY DISPLAY RULES**:
 - ❌ NEVER show SQL queries in your responses to users
@@ -25,6 +137,7 @@ User Context:
 - User ID: ${userId}
 ${calendarId ? `- Calendar ID: ${calendarId}` : ''}
 
+${calendarContextSection}
 Your Capabilities:
 1. **Trade Analysis**: Query user's trades and calculate statistics via MCP database tools
 2. **Web Research**: Search for market news and analysis using search_web
@@ -32,7 +145,8 @@ Your Capabilities:
 4. **Crypto Market Data**: Get real-time cryptocurrency prices using get_crypto_price
 5. **Forex Market Data**: Get real-time forex rates using get_forex_price (EUR/USD, GBP/USD, etc.)
 6. **Visualization**: Generate charts from data using generate_chart (charts auto-display, don't include URLs in response)
-7. **Economic Events**: Query global economic calendar (no user_id required)
+7. **Economic Events**: Query the global economic calendar (no user_id required), but when a calendar is present
+   you MUST only query and mention events that match that calendar's economic_calendar_filters (unless economic_calendar_filters is NULL).
 8. **Rich Card Display**: Embed interactive trade/event cards in your responses
 
 RECOMMENDED WORKFLOWS:
@@ -131,7 +245,7 @@ CRITICAL:
 - ALWAYS filter by user_id in WHERE clause for security
 - NEVER show SQL queries to users - only present the results
 
-**ECONOMIC EVENTS TABLE SCHEMA** (global reference - no user_id filtering required):
+**ECONOMIC EVENTS TABLE SCHEMA** (global reference - no user_id filtering required, BUT calendar filters MUST be applied when present):
 - Columns: id (UUID), external_id (TEXT), currency (TEXT), event_name (TEXT), impact (TEXT),
   event_date (DATE), event_time (TIMESTAMPTZ), time_utc (TEXT), unix_timestamp (BIGINT),
   actual_value (TEXT), forecast_value (TEXT), previous_value (TEXT), actual_result_type (TEXT),
@@ -139,14 +253,19 @@ CRITICAL:
   source_url (TEXT), data_source (TEXT), last_updated (TIMESTAMPTZ), created_at (TIMESTAMPTZ)
 - impact: One of 'High', 'Medium', 'Low', 'Holiday', 'Non-Economic' (required)
 - actual_result_type: One of 'good', 'bad', 'neutral', '' (nullable)
+- When analyzing events for a specific calendar, you MUST first read that calendar's economic_calendar_filters JSONB
+  from the calendars table using the current calendar_id.
+- If economic_calendar_filters IS NOT NULL for the current calendar:
+  - Use economic_calendar_filters.currencies (array of currency codes) to restrict queries with: currency IN (...)
+  - Use economic_calendar_filters.impacts (array of impact levels) to restrict queries with: impact IN (...)
+  - NEVER mention or return any events that do not satisfy ALL of these filters.
+- If economic_calendar_filters IS NULL (no filters configured for this calendar):
+  - You may query and reference any events from economic_events that are relevant to the user's question.
 - Example query (INTERNAL USE ONLY - DO NOT SHOW TO USER): SELECT event_name, country, event_date, event_time, impact, actual_value,
   forecast_value, previous_value FROM economic_events
-  WHERE (country = 'United States' OR country = 'Euro Zone')
-  AND event_date >= CURRENT_DATE AND event_date <= CURRENT_DATE + INTERVAL '7 days'
+  WHERE event_date >= CURRENT_DATE AND event_date <= CURRENT_DATE + INTERVAL '7 days'
   ORDER BY event_date ASC, event_time ASC;
 - Use CURRENT_DATE for today, CURRENT_DATE + INTERVAL 'X days' for date ranges
-- Filter by country (e.g., 'United States', 'Euro Zone', 'United Kingdom', 'Japan')
-- Filter by impact ('High', 'Medium', 'Low', 'Holiday', 'Non-Economic')
 - NEVER show SQL queries to users - only present the results
 
 **UNDERSTANDING TAGS AND TAG STRUCTURE**:

@@ -846,7 +846,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: AgentRequest = await req.json();
-    const { message, userId, calendarId, conversationHistory = [] } = body;
+    const { message, userId, calendarId, conversationHistory = [], calendarContext } = body;
 
     if (!message || !userId) {
       return new Response(
@@ -875,7 +875,7 @@ Deno.serve(async (req: Request) => {
     const allTools = [...geminiMcpTools, ...customTools];
 
     // Build system prompt
-    const systemPrompt = buildSecureSystemPrompt(userId, calendarId);
+    const systemPrompt = buildSecureSystemPrompt(userId, calendarId, calendarContext);
 
     log('Sending request to Gemini with tools', 'info');
 

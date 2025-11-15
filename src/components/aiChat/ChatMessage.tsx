@@ -27,7 +27,8 @@ import {
   CheckCircle as CheckIcon,
   Error as ErrorIcon,
   Schedule as ScheduleIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
 import { ChatMessage as ChatMessageType } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
@@ -37,22 +38,24 @@ import { logger } from '../../utils/logger';
 
 interface ChatMessageProps {
   message: ChatMessageType;
-  showTimestamp?: boolean; 
+  showTimestamp?: boolean;
   onRetry?: (messageId: string) => void;
   isLatestMessage?: boolean;
   enableAnimation?: boolean;
   onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void;
   onEventClick?: (event: EconomicEvent) => void;
+  onEdit?: (messageId: string) => void;
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
-  showTimestamp = true, 
+  showTimestamp = true,
   onRetry,
   isLatestMessage = false,
   enableAnimation = true,
   onTradeClick,
-  onEventClick
+  onEventClick,
+  onEdit
 }) => {
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
@@ -358,20 +361,41 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               </Tooltip>
             )}
 
-            <Tooltip title={copied ? 'Copied!' : 'Copy message'}>
-              <IconButton
-                size="small"
-                onClick={handleCopy}
-                sx={{
-                  backgroundColor: alpha(theme.palette.background.paper, 0.8),
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.background.paper, 0.9)
-                  }
-                }}
-              >
-                {copied ? <CheckIcon sx={{ fontSize: 16 }} /> : <CopyIcon sx={{ fontSize: 16 }} />}
-              </IconButton>
-            </Tooltip>
+            {/* Edit button for user messages */}
+            {isUser && onEdit && (
+              <Tooltip title="Edit message">
+                <IconButton
+                  size="small"
+                  onClick={() => onEdit(message.id)}
+                  sx={{
+                    backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.background.paper, 0.9)
+                    }
+                  }}
+                >
+                  <EditIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            {/* Copy button for assistant/system messages */}
+            {!isUser && (
+              <Tooltip title={copied ? 'Copied!' : 'Copy message'}>
+                <IconButton
+                  size="small"
+                  onClick={handleCopy}
+                  sx={{
+                    backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.background.paper, 0.9)
+                    }
+                  }}
+                >
+                  {copied ? <CheckIcon sx={{ fontSize: 16 }} /> : <CopyIcon sx={{ fontSize: 16 }} />}
+                </IconButton>
+              </Tooltip>
+            )}
           </Box>
         </Paper>
 

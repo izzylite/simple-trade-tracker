@@ -143,8 +143,9 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       }}
       PaperProps={{
         sx: {
-          height: '90vh',
           maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
           backgroundColor: theme.palette.background.default
         }
       }}
@@ -159,7 +160,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         backgroundColor: theme.palette.background.paper
       }}>
         {/* Navigation and Title */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
           {/* Previous Button */}
           <Tooltip title="Previous trade (←)">
             <span>
@@ -179,11 +180,15 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           </Tooltip>
 
           {/* Title and Counter */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1, minWidth: 0 }}>
+            <Typography variant="h6" sx={{
+              fontWeight: 600,
+              wordBreak: 'break-word',
+              overflowWrap: 'break-word'
+            }}>
               {title}
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
               <Chip
                 size="small"
                 label={`${currentIndex + 1} of ${trades.length}`}
@@ -195,7 +200,10 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
               />
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word'
+                }}>
                   {format(new Date(currentTrade.trade_date), 'MMM d, yyyy')}
                 </Typography>
               </Box>
@@ -240,7 +248,6 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       <Box
         ref={scrollContainerRef}
         sx={{
-          flex: 1,
           overflow: 'auto',
           ...scrollbarStyles(theme)
         }}

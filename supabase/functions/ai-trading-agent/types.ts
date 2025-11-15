@@ -106,6 +106,12 @@ export interface PinnedEvent {
   notes?: string;
 }
 
+export interface EconomicCalendarFilterSettings {
+  currencies?: string[];
+  impacts?: string[];
+  onlyUpcomingEvents?: boolean;
+}
+
 export interface Calendar {
   id: string;
   user_id: string;
@@ -132,8 +138,11 @@ export interface Calendar {
   note?: string;
   hero_image_url?: string;
   days_notes?: Record<string, string>;
+  /** Optional derived field for AI context: current day's gameplan note, provided from the UI. Not stored in the database. */
+  daily_note?: string;
 
   // Settings
+  economic_calendar_filters?: EconomicCalendarFilterSettings;
   pinned_events?: PinnedEvent[];
 
   // Calculated statistics
@@ -175,6 +184,7 @@ export interface AgentRequest {
   userId: string;
   calendarId?: string;
   conversationHistory?: ConversationMessage[];
+  calendarContext?: Partial<Calendar>;
 }
 
 export interface ConversationMessage {

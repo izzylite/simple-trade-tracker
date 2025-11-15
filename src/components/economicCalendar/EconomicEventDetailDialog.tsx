@@ -236,6 +236,9 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     <BaseDialog
       open={open}
       onClose={onClose}
+      sx={{
+        zIndex: 1450 // Higher than AI Chat Drawer (1400)
+      }}
       title={
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
           {event.flag_url && (
