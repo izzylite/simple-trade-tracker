@@ -44,6 +44,37 @@ const createTagMentionComponent = () => {
   return TagMentionEntity;
 };
 
+const createNoteMentionComponent = () => {
+  const NoteMentionEntity = ({ contentState, entityKey }: any) => {
+    const theme = useTheme();
+    const { noteTitle } = contentState.getEntity(entityKey).getData() as { noteTitle: string };
+
+    return (
+      <Chip
+        size="small"
+        label={noteTitle}
+        contentEditable={false}
+        onMouseDown={(e) => e.preventDefault()}
+        sx={{
+          height: 22,
+          fontSize: '0.75rem',
+          userSelect: 'none',
+          verticalAlign: 'middle',
+          display: 'inline-flex',
+          backgroundColor: alpha(theme.palette.info.main, 0.1),
+          color: theme.palette.info.main,
+          border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
+          '&:hover': {
+            backgroundColor: alpha(theme.palette.info.main, 0.2)
+          }
+        }}
+      />
+    );
+  };
+  (NoteMentionEntity as any).displayName = 'NoteMentionEntity';
+  return NoteMentionEntity;
+};
+
 const AtSymbolHidden = ({ children }: any) => (
   <span style={{ opacity: 0 }}>{children}</span>
 );
@@ -62,6 +93,19 @@ const createMentionDecorator = () =>
         );
       },
       component: createTagMentionComponent()
+    },
+    {
+      // Render note mentions as chips
+      strategy: (block, callback, contentState) => {
+        block.findEntityRanges(
+          ch => {
+            const k = ch.getEntity();
+            return !!k && contentState.getEntity(k).getType() === 'NOTE_MENTION';
+          },
+          (start, end) => callback(start, end)
+        );
+      },
+      component: createNoteMentionComponent()
     },
     {
       // Hide stray '@' characters that are not followed by mention text
@@ -94,8 +138,96 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const moveCursorToEndOnNextUpdate = useRef(false);
 
-  useImperativeHandle(ref, () => ({ focus: () => editorRef.current && (editorRef.current as any).focus?.() }));
+  useImperativeHandle(ref, () => ({
+    focus: () => editorRef.current && (editorRef.current as any).focus?.(),
+    moveCursorToEnd: () => {
+      // Set flag to move cursor to end on next value update
+      moveCursorToEndOnNextUpdate.current = true;
+
+      // Also try to move it immediately if possible
+      const currentContent = editorStateRef.current.getCurrentContent();
+      const lastBlock = currentContent.getLastBlock();
+      const lastBlockKey = lastBlock.getKey();
+      const length = lastBlock.getLength();
+
+      const selection = SelectionState.createEmpty(lastBlockKey).merge({
+        anchorOffset: length,
+        focusOffset: length
+      }) as SelectionState;
+
+      const newState = EditorState.forceSelection(editorStateRef.current, selection);
+      setEditorState(newState);
+
+      // Focus after setting selection
+      setTimeout(() => {
+        (editorRef.current as any)?.focus?.();
+      }, 0);
+    },
+    insertNote: (noteTitle: string) => {
+      const state = editorStateRef.current;
+      const selection = state.getSelection();
+      const content = state.getCurrentContent();
+      const blockKey = selection.getStartKey();
+
+      // Add a space before if needed
+      let newContent = content;
+      const offset = selection.getStartOffset();
+      const block = content.getBlockForKey(blockKey);
+      const text = block.getText();
+
+      if (offset > 0 && !/\s/.test(text[offset - 1])) {
+        const spaceSelection = SelectionState.createEmpty(blockKey).merge({
+          anchorOffset: offset,
+          focusOffset: offset
+        }) as SelectionState;
+        newContent = Modifier.insertText(newContent, spaceSelection, ' ');
+      }
+
+      // Insert the note token text
+      const noteToken = `note:${noteTitle}`;
+      const insertOffset = offset + (offset > 0 && !/\s/.test(text[offset - 1]) ? 1 : 0);
+      const insertSelection = SelectionState.createEmpty(blockKey).merge({
+        anchorOffset: insertOffset,
+        focusOffset: insertOffset
+      }) as SelectionState;
+      newContent = Modifier.insertText(newContent, insertSelection, noteToken);
+
+      // Create entity and apply it
+      newContent = newContent.createEntity('NOTE_MENTION', 'IMMUTABLE', { noteTitle });
+      const entityKey = newContent.getLastCreatedEntityKey();
+
+      const entityRange = SelectionState.createEmpty(blockKey).merge({
+        anchorOffset: insertOffset,
+        focusOffset: insertOffset + noteToken.length
+      }) as SelectionState;
+      newContent = Modifier.applyEntity(newContent, entityRange, entityKey);
+
+      // Add trailing space
+      const afterNote = SelectionState.createEmpty(blockKey).merge({
+        anchorOffset: insertOffset + noteToken.length,
+        focusOffset: insertOffset + noteToken.length
+      }) as SelectionState;
+      newContent = Modifier.insertText(newContent, afterNote, ' ');
+
+      // Update state and move cursor
+      let newState = EditorState.push(state, newContent, 'insert-characters');
+      const cursorPosition = SelectionState.createEmpty(blockKey).merge({
+        anchorOffset: insertOffset + noteToken.length + 1,
+        focusOffset: insertOffset + noteToken.length + 1
+      }) as SelectionState;
+      newState = EditorState.forceSelection(newState, cursorPosition);
+
+      setEditorState(newState);
+      onChange(newState.getCurrentContent().getPlainText());
+
+      // Focus editor
+      setTimeout(() => {
+        (editorRef.current as any)?.focus?.();
+      }, 0);
+    }
+  }));
 
   useEffect(() => {
     // keep external value in sync if it changes from outside
@@ -103,12 +235,30 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
     console.log('useEffect - value prop:', value, 'current text:', currentText);
     if (value !== currentText) {
       console.log('useEffect - recreating editor state from value:', value);
-      setEditorState(
-        EditorState.createWithContent(
-          ContentState.createFromText(value || ''),
-          createMentionDecorator()
-        )
-      );
+      const newContent = ContentState.createFromText(value || '');
+      let newState = EditorState.createWithContent(newContent, createMentionDecorator());
+
+      // If we should move cursor to end, do it now
+      if (moveCursorToEndOnNextUpdate.current) {
+        const lastBlock = newContent.getLastBlock();
+        const lastBlockKey = lastBlock.getKey();
+        const length = lastBlock.getLength();
+
+        const selection = SelectionState.createEmpty(lastBlockKey).merge({
+          anchorOffset: length,
+          focusOffset: length
+        }) as SelectionState;
+
+        newState = EditorState.forceSelection(newState, selection);
+        moveCursorToEndOnNextUpdate.current = false;
+
+        // Focus the editor
+        setTimeout(() => {
+          (editorRef.current as any)?.focus?.();
+        }, 0);
+      }
+
+      setEditorState(newState);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
@@ -169,11 +319,25 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
         const text = block.getText();
         if (text[offset - 1] === ' ' && offset > 1) {
           const ekBeforeSpace = block.getEntityAt(offset - 2);
-          if (ekBeforeSpace && content.getEntity(ekBeforeSpace).getType() === 'TAG_MENTION') { e.preventDefault(); handleRemoveEntity(ekBeforeSpace, true); return; }
+          if (ekBeforeSpace) {
+            const entityType = content.getEntity(ekBeforeSpace).getType();
+            if (entityType === 'TAG_MENTION' || entityType === 'NOTE_MENTION') {
+              e.preventDefault();
+              handleRemoveEntity(ekBeforeSpace, true);
+              return;
+            }
+          }
         }
 
         const ek = block.getEntityAt(offset - 1);
-        if (ek && content.getEntity(ek).getType() === 'TAG_MENTION') { e.preventDefault(); handleRemoveEntity(ek); return; }
+        if (ek) {
+          const entityType = content.getEntity(ek).getType();
+          if (entityType === 'TAG_MENTION' || entityType === 'NOTE_MENTION') {
+            e.preventDefault();
+            handleRemoveEntity(ek);
+            return;
+          }
+        }
       }
     }
     onKeyDown?.(e);

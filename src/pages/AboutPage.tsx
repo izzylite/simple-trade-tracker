@@ -181,7 +181,7 @@ const AboutPage: React.FC = () => {
             </Typography>
             <Typography variant="body1" sx={{ ...paragraphSx, mb: 0, fontStyle: 'italic' }}>
               Note: AI outputs are analytical insights based on your data, not financial advice.
-            </Typography>
+            </Typography>zz
           </Section>
         </Stack>
 

@@ -24,7 +24,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogContentText,
-  DialogActions
+  DialogActions,
+  Popper,
+  Paper
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -36,7 +38,8 @@ import {
   Delete as DeleteIcon,
   Schedule as ScheduleIcon,
   Stop as StopIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Notes as NotesIcon
 } from '@mui/icons-material';
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
@@ -61,6 +64,7 @@ import ApiKeySettingsDialog from './ApiKeySettingsDialog';
 import NoteEditorDialog from '../notes/NoteEditorDialog';
 import { Note } from '../../types/note';
 import { hasApiKey } from '../../services/apiKeyStorage';
+import * as notesService from '../../services/notesService';
 
 interface AIChatDrawerProps {
   open: boolean;
@@ -146,6 +150,11 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   // Note editor dialog state
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
+
+  // Notes context popup state
+  const [notesAnchorEl, setNotesAnchorEl] = useState<HTMLElement | null>(null);
+  const [availableNotes, setAvailableNotes] = useState<Note[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
 
   // API Key settings dialog state
   const [apiKeySettingsOpen, setApiKeySettingsOpen] = useState(false);
@@ -682,6 +691,54 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
     // Focus the input so the user can continue typing immediately
     setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  const handleOpenNotesContext = async (event: React.MouseEvent<HTMLElement>) => {
+    if (!user || isReadOnly) return;
+
+    if (notesAnchorEl) {
+      handleCloseNotesContext();
+      return;
+    }
+
+    setNotesAnchorEl(event.currentTarget);
+
+    if (availableNotes.length > 0 || notesLoading) {
+      return;
+    }
+
+    try {
+      setNotesLoading(true);
+
+      const notes = calendar?.id
+        ? await notesService.getCalendarNotes(calendar.id)
+        : await notesService.getUserNotes(user.uid);
+
+      const sortedNotes = [...notes].sort((a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      );
+
+      setAvailableNotes(sortedNotes.filter(note => !note.is_archived));
+    } catch (error) {
+      logger.error('Error loading notes for AI context:', error);
+    } finally {
+      setNotesLoading(false);
+    }
+  };
+
+  const handleCloseNotesContext = () => {
+    setNotesAnchorEl(null);
+  };
+
+  const handleInsertNoteContext = (note: Note) => {
+    const title = note.title || 'Untitled';
+
+    // Use the insertNote method to create a note entity chip
+    if (inputRef.current?.insertNote) {
+      inputRef.current.insertNote(title);
+    }
+
+    handleCloseNotesContext();
   };
 
 
@@ -1297,6 +1354,34 @@ What would you like to know about your trading?`,
                     sx={{ flex: 1, minWidth: 0, fontSize: '0.95rem', lineHeight: 1.4 }}
                   />
                   <IconButton
+                    aria-label="Insert note context"
+                    onClick={handleOpenNotesContext}
+                    disabled={isReadOnly || !user}
+                    size="small"
+                    sx={{
+                      backgroundColor: 'background.default',
+                      color: 'text.secondary',
+                      width: 32,
+                      height: 32,
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.06),
+                        borderColor: 'primary.main',
+                        color: 'primary.main'
+                      },
+                      '&:disabled': {
+                        backgroundColor: 'action.disabledBackground',
+                        color: 'action.disabled',
+                        borderColor: 'action.disabledBackground'
+                      }
+                    }}
+                  >
+                    <NotesIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                  <IconButton
                     onClick={isLoading ? handleCancelRequest : handleSendMessage}
                     disabled={(!inputMessage.trim() && !isLoading) || isAtMessageLimit}
                     size="small"
@@ -1347,9 +1432,93 @@ What would you like to know about your trading?`,
                     opacity: 0.7
                   }}
                 >
-                  Enter to send • Shift+Enter newline • @ for tags
+                  {'Enter to send • Shift+Enter newline • @ for tags • Notes button inserts note:{title}'}
                 </Typography>
               </Box>
+
+              {notesAnchorEl && (
+                <Popper
+                  open={Boolean(notesAnchorEl)}
+                  anchorEl={notesAnchorEl}
+                  placement="top-end"
+                  disablePortal
+                  sx={{ zIndex: 1600 }}
+                >
+                  <Paper
+                    elevation={8}
+                    sx={{
+                      maxWidth: 360,
+                      maxHeight: 320,
+                      overflow: 'hidden',
+                      borderRadius: 2,
+                      boxShadow: theme.shadows[8]
+                    }}
+                  >
+                    <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        Add Context
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Select a note to insert into your message.
+                      </Typography>
+                    </Box>
+                    <Box
+                      sx={{
+                        maxHeight: 250,
+                        overflow: 'auto',
+                        ...scrollbarStyles(theme)
+                      }}
+                    >
+                      {notesLoading ? (
+                        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CircularProgress size={16} />
+                          <Typography variant="body2" color="text.secondary">
+                            Loading notes...
+                          </Typography>
+                        </Box>
+                      ) : availableNotes.length === 0 ? (
+                        <Box sx={{ p: 2 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            No notes found yet.
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <List dense sx={{ p: 0 }}>
+                          {availableNotes.map(note => (
+                            <ListItemButton
+                              key={note.id}
+                              onClick={() => handleInsertNoteContext(note)}
+                              sx={{
+                                px: 1.5,
+                                py: 1,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'flex-start'
+                              }}
+                            >
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                                <NotesIcon sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    fontWeight: 600,
+                                    flex: 1,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  {note.title || 'Untitled'}
+                                </Typography>
+                              </Box>
+                            </ListItemButton>
+                          ))}
+                        </List>
+                      )}
+                    </Box>
+                  </Paper>
+                </Popper>
+              )}
               </Box>
               {/* End Chat View */}
 

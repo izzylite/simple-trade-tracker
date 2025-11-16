@@ -153,7 +153,7 @@ export const generateChartTool: GeminiFunctionDeclaration = {
  */
 export const createNoteTool: GeminiFunctionDeclaration = {
   name: 'create_note',
-  description: 'Create a new note for the user in their trading calendar. Use this to save trading strategies, insights, lessons learned, or game plans. Notes are persistent and can be referenced later. Content should be in plain text format. Optionally, you can set up reminders for the note.',
+  description: 'Create a new note for the user in their trading calendar. Use this to save trading strategies, insights, lessons learned, or game plans. Notes are persistent and can be referenced later. Content should be in plain text format. User ID and Calendar ID are automatically provided from context.',
   parameters: {
     type: 'object',
     properties: {
@@ -164,14 +164,6 @@ export const createNoteTool: GeminiFunctionDeclaration = {
       content: {
         type: 'string',
         description: 'Note content in plain text format. Use clear paragraphs and line breaks for readability. Do not use HTML tags.'
-      },
-      user_id: {
-        type: 'string',
-        description: 'User ID (provided in context)'
-      },
-      calendar_id: {
-        type: 'string',
-        description: 'Calendar ID (provided in context)'
       },
       reminder_type: {
         type: 'string',
@@ -191,7 +183,7 @@ export const createNoteTool: GeminiFunctionDeclaration = {
         description: 'Array of day abbreviations for weekly reminders. Only used when reminder_type is "weekly". Example: ["Mon", "Wed", "Fri"]'
       }
     },
-    required: ['title', 'content', 'user_id', 'calendar_id']
+    required: ['title', 'content']
   }
 };
 
@@ -261,18 +253,10 @@ export const deleteNoteTool: GeminiFunctionDeclaration = {
  */
 export const searchNotesTool: GeminiFunctionDeclaration = {
   name: 'search_notes',
-  description: 'Search and retrieve notes from the user\'s trading calendar. Use this to understand user strategies, insights, and game plans. Returns both user-created and AI-created notes.',
+  description: 'Search and retrieve notes from the user\'s trading calendar. Use this to understand user strategies, insights, and game plans. Returns both user-created and AI-created notes. User ID and Calendar ID are automatically provided from context.',
   parameters: {
     type: 'object',
     properties: {
-      user_id: {
-        type: 'string',
-        description: 'User ID (provided in context)'
-      },
-      calendar_id: {
-        type: 'string',
-        description: 'Calendar ID (provided in context)'
-      },
       search_query: {
         type: 'string',
         description: 'Optional search query to filter notes by title or content. Leave empty to get all notes.'
@@ -282,7 +266,7 @@ export const searchNotesTool: GeminiFunctionDeclaration = {
         description: 'Whether to include archived notes. Default is false.'
       }
     },
-    required: ['user_id', 'calendar_id']
+    required: []
   }
 };
 
@@ -877,14 +861,14 @@ export async function executeCustomTool(
         if (!supabase) {
           return 'Supabase client not available for note creation';
         }
-        const userId = (context.userId || typeof args.user_id === 'string' ? args.user_id : '') as string;
-        const calendarId = (context.calendarId || typeof args.calendar_id === 'string' ? args.calendar_id : '') as string;
+        const userId = context.userId || '';
+        const calendarId = context.calendarId || '';
         const title = typeof args.title === 'string' ? args.title : '';
         const content = typeof args.content === 'string' ? args.content : '';
         const reminderType = typeof args.reminder_type === 'string' ? args.reminder_type : undefined;
         const reminderDate = typeof args.reminder_date === 'string' ? args.reminder_date : undefined;
         const reminderDays = Array.isArray(args.reminder_days) ? args.reminder_days : undefined;
-        
+
         return await createNote(supabase, userId, calendarId, title, content, reminderType, reminderDate, reminderDays);
       }
 
@@ -913,8 +897,8 @@ export async function executeCustomTool(
         if (!supabase) {
           return 'Supabase client not available for note search';
         }
-        const userId = typeof args.user_id === 'string' ? args.user_id : context.userId || '';
-        const calendarId = typeof args.calendar_id === 'string' ? args.calendar_id : context.calendarId || '';
+        const userId = context.userId || '';
+        const calendarId = context.calendarId || '';
         const searchQuery = typeof args.search_query === 'string' ? args.search_query : undefined;
         const includeArchived = typeof args.include_archived === 'boolean' ? args.include_archived : false;
         return await searchNotes(supabase, userId, calendarId, searchQuery, includeArchived);
