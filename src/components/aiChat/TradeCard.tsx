@@ -101,6 +101,13 @@ const TradeCard: React.FC<TradeCardProps> = ({
     return groups;
   }, {} as Record<string, string[]>) || {};
 
+  // Limit to first 5 tag groups
+  const MAX_VISIBLE_TAGS = 5;
+  const tagEntries = Object.entries(groupedTags);
+  const visibleTags = tagEntries.slice(0, MAX_VISIBLE_TAGS);
+  const remainingTagsCount = tagEntries.length - MAX_VISIBLE_TAGS;
+  const hasMoreTags = remainingTagsCount > 0;
+
   return (
     <Card
       sx={{
@@ -209,8 +216,21 @@ const TradeCard: React.FC<TradeCardProps> = ({
           {/* Tags */}
           {showTags && trade.tags && trade.tags.length > 0 && (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {Object.entries(groupedTags).map(([group, groupTags]) => (
-                <Chip
+              {visibleTags.map(([group, groupTags]) => (
+                <Tooltip
+                  key={group}
+                  title={
+                    <Box sx={{ p: 0.5 }}>
+                      {groupTags.map(tag => (
+                        <Typography key={tag} variant="body2">
+                          {formatTagForDisplay(tag, true)}
+                        </Typography>
+                      ))}
+                    </Box>
+                  }
+                  arrow
+                >
+                  <Chip
                     label={`${group}${groupTags.length > 1 ? ` (${groupTags.length})` : ''}`}
                     size="small"
                     sx={{
@@ -220,7 +240,28 @@ const TradeCard: React.FC<TradeCardProps> = ({
                       '& .MuiChip-label': { px: 1 }
                     }}
                   />
+                </Tooltip>
               ))}
+
+              {/* Show +N chip if there are more tags */}
+              {hasMoreTags && (
+                 <Chip
+                    label={`+${remainingTagsCount}`}
+                    size="small"
+                    sx={{
+                      height: '20px',
+                      backgroundColor: theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.1)'
+                        : 'rgba(0, 0, 0, 0.08)',
+                      color: 'text.secondary',
+                      fontWeight: 600,
+                      border: '1px dashed',
+                      borderColor: 'divider',
+                      fontSize: '0.7rem',
+                      '& .MuiChip-label': { px: 1 }
+                    }}
+                  />
+              )}
             </Box>
           )}
 

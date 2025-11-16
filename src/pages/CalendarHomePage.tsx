@@ -499,15 +499,24 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
 
 
   return (
-    <Box sx={{
-      minHeight: '100vh',
-      bgcolor: 'custom.pageBackground',
-      pl: 0
-    }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: 'custom.pageBackground',
+      }}
+    >
 
 
 
-      <Box sx={{ pt: { xs: 2, sm: 4 }, pb: { xs: 2, sm: 4 }, px: { xs: 2, sm: 4 } }}>
+      <Box
+        sx={{
+          pt: { xs: 2, sm: 4 },
+          pb: { xs: 2, sm: 4 },
+          px: { xs: 2, sm: 4 },
+          maxWidth: '1400px',
+          mx: 'auto',
+        }}
+      >
         {/* Header Section */}
         <Box sx={{ mb: { xs: 2, sm: 3, md: 4 }, mx: { xs: 0, sm: 4, md: 8 } }}>
           <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" sx={{ mb: { xs: 1.5, sm: 1 } }}>

@@ -138,8 +138,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
               className="logo-img"
               sx={{
                 width: 32,
-                height: 32,
-                ml: 2,
+                height: 32, 
                 borderRadius: 1,
                 transition: 'transform 0.2s'
               }}

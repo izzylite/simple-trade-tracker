@@ -32,14 +32,14 @@ import {
   Info as InfoIcon,
   LocalOffer as TagIcon,
   Search as SearchIcon,
-  ViewCarousel as GalleryIcon,
   Event as EventIcon,
   SmartToy as AIIcon,
   Home as HomeIcon,
   CalendarToday as CalendarIcon,
   Image as ImageIcon,
   ExpandLess,
-  ExpandMore
+  ExpandMore,
+  Notes as NotesIcon
 
 } from '@mui/icons-material';
 import {
@@ -58,7 +58,7 @@ import {
   isToday
 } from 'date-fns';
 import { formatCurrency } from '../utils/formatters';
-import CalendarNote from '../components/CalendarNote';
+import CalendarSummary from '../components/CalendarSammary';
 import { Trade } from '../types/trade';
 import DayDialog from '../components/trades/DayDialog';
 import SelectDateDialog from '../components/SelectDateDialog';
@@ -85,7 +85,7 @@ import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
 
 import Breadcrumbs, { BreadcrumbItem, BreadcrumbButton } from '../components/common/Breadcrumbs';
 import { NewTradeForm, TradeImage } from '../components/trades/TradeForm';
-import DayNotesDialog from '../components/DayNotesDialog';
+import GamePlanDialog from '../components/GamePlanDialog';
 import { Calendar } from '../types/calendar';
 import MonthlyStats from '../components/MonthlyStats';
 import AccountStats from '../components/AccountStats';
@@ -97,6 +97,7 @@ import ShareButton from '../components/sharing/ShareButton';
 
 import { ImagePickerDialog, ImageAttribution } from '../components/heroImage';
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
+import NotesDrawer from '../components/notes/NotesDrawer';
 
 import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 
@@ -328,7 +329,7 @@ const TagFilter: React.FC<TagFilterProps> = ({ allTags, selectedTags, onTagsChan
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
         >
-          {selectedTags.length > 0 ? `${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''}` : 'Filter'}
+          {selectedTags.length > 0 ? `${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''}` : 'Search & Filter'}
         </Button>
       </Tooltip>
 
@@ -501,6 +502,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+
+  // Notes drawer state
+  const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
 
   // Economic event notification state
   // Notification stack state (moved from App.tsx)
@@ -936,19 +940,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     });
   };
 
-  const handleMonthlyGalleryMode = () => {
-    // Filter trades to only include those from the current month
-    const monthTrades = filteredTrades.filter(trade =>
-      isSameMonth(new Date(trade.trade_date), currentDate)
-    );
-
-    if (monthTrades.length > 0) {
-      const monthName = format(currentDate, 'MMMM yyyy');
-      const title = `${monthName} - Monthly Trades (${monthTrades.length} trades)`;
-      openGalleryMode(monthTrades, monthTrades[0].id, title);
-    }
-  };
-
 
 
   return (
@@ -972,7 +963,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       {/* Breadcrumbs */}
       <Breadcrumbs items={breadcrumbItems} buttons={breadcrumbButtons} rightContent={breadcrumbRightContent} />
 
-      <CalendarNote
+      <CalendarSummary
         calendarNote={calendarNote || ''}
         calendarId={calendarId!!}
         title={calendarName}
@@ -1051,6 +1042,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 monthlyTarget={monthly_target}
                 onClearMonthTrades={handleClearMonthTrades}
                 isReadOnly={isReadOnly}
+                onOpenGalleryMode={openGalleryMode}
               />
 
             </Box>
@@ -1153,67 +1145,66 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 flexWrap: 'wrap',
                 width: { xs: '100%', sm: 'auto' }
               }}>
-                <Button
-                  startIcon={<Today sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                  onClick={handleTodayClick}
-                  variant="contained"
-                  size="small"
-                  sx={{
-                    flex: { xs: 1, sm: 'none' },
-                    minWidth: { xs: 'auto', sm: '100px' },
-                    borderRadius: 2,
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-                    py: { xs: 0.75, sm: 1 },
-                    px: { xs: 1.5, sm: 2 },
-                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
-                    '&:hover': {
-                      transform: 'translateY(-1px)',
-                      boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`
-                    },
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                  }}
-                >
-                  Today
-                </Button>
+                {/* Only show Today button when not viewing current month */}
+                {!isSameMonth(currentDate, new Date()) && (
+                  <Button
+                    startIcon={<Today sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
+                    onClick={handleTodayClick}
+                    variant="contained"
+                    size="small"
+                    sx={{
+                      flex: { xs: 1, sm: 'none' },
+                      minWidth: { xs: 'auto', sm: '100px' },
+                      borderRadius: 2,
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                      py: { xs: 0.75, sm: 1 },
+                      px: { xs: 1.5, sm: 2 },
+                      boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                      '&:hover': {
+                        transform: 'translateY(-1px)',
+                        boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`
+                      },
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                  >
+                    Today
+                  </Button>
+                )}
 
-                {(() => {
-                  const monthTrades = filteredTrades.filter(trade =>
-                    isSameMonth(new Date(trade.trade_date), currentDate)
-                  );
-                  return monthTrades.length > 0;
-                })() && (
-                    <Tooltip title="View all trades for this month in gallery mode" arrow>
-                      <Button
-                        startIcon={<GalleryIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                        onClick={handleMonthlyGalleryMode}
-                        variant="outlined"
-                        size="small"
-                        sx={{
-                          flex: { xs: 1, sm: 'none' },
-                          minWidth: { xs: 'auto', sm: '120px' },
-                          borderRadius: 2,
-                          fontWeight: 600,
-                          textTransform: 'none',
-                          fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-                          py: { xs: 0.75, sm: 1 },
-                          px: { xs: 1.5, sm: 2 },
-                          borderColor: alpha(theme.palette.primary.main, 0.3),
-                          color: 'primary.main',
-                          '&:hover': {
-                            borderColor: 'primary.main',
-                            bgcolor: alpha(theme.palette.primary.main, 0.1),
-                            transform: 'translateY(-1px)',
-                            boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`
-                          },
-                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                        }}
-                      >
-                        Gallery
-                      </Button>
-                    </Tooltip>
-                  )}
+                {/* Notes Button - Moved from FAB */}
+                {!isReadOnly && (
+                  <Tooltip title="Notes for this calendar" arrow>
+                    <Button
+                      startIcon={<NotesIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
+                      onClick={() => setIsNotesDrawerOpen(true)}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        flex: { xs: 1, sm: 'none' },
+                        minWidth: { xs: 'auto', sm: '100px' },
+                        borderRadius: 2,
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                        py: { xs: 0.75, sm: 1 },
+                        px: { xs: 1.5, sm: 2 },
+                        borderColor: alpha(theme.palette.text.secondary, 0.3),
+                        color: 'text.secondary',
+                        '&:hover': {
+                          borderColor: 'info.main',
+                          bgcolor: alpha(theme.palette.info.main, 0.1),
+                          color: 'info.main',
+                          transform: 'translateY(-1px)'
+                        },
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                    >
+                      Notes
+                    </Button>
+                  </Tooltip>
+                )}
               </Box>
 
               {/* Secondary Actions Group */}
@@ -1617,7 +1608,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
         {/* Day Notes Dialog */}
         {isDayNotesDialogOpen && !isReadOnly && (
-          <DayNotesDialog
+          <GamePlanDialog
             open={!!isDayNotesDialogOpen}
             onClose={() => {
               setIsDayNotesDialogOpen(null);
@@ -1727,7 +1718,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         </Snackbar>
 
 
-
         {/* AI Chat FAB - Hidden in read-only mode */}
         {!isReadOnly && (
           <Tooltip title="AI Trading Assistant" placement="left">
@@ -1778,7 +1768,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           <SearchDrawer
             open={isSearchDrawerOpen}
             onClose={() => setIsSearchDrawerOpen(false)}
-            calendarId={calendar.id}
+            trades={trades}
             allTags={allTags}
             selectedTags={selectedTags}
             onTagsChange={handleTagsChange}
@@ -1880,6 +1870,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         onZoomImage={setZoomedImage}
         onUpdateCalendarProperty={onUpdateCalendarProperty}
         isReadOnly={isReadOnly}
+      />
+
+      {/* Notes Drawer */}
+      <NotesDrawer
+        open={isNotesDrawerOpen}
+        onClose={() => setIsNotesDrawerOpen(false)}
+        calendarId={calendarId}
       />
 
 

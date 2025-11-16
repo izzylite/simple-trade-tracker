@@ -32,8 +32,6 @@ const SharedTradePage = lazy(() => import('./pages/SharedTradePage'));
 const SharedCalendarPage = lazy(() => import('./pages/SharedCalendarPage'));
 const AuthCallback = lazy(() => import('./pages/AuthCallbackPage'));
 const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
-const NotesPage = lazy(() => import('./pages/NotesPage'));
-const NoteEditorPage = lazy(() => import('./pages/NoteEditorPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 // const SupabaseAuthTest = lazy(() => import('./components/auth/SupabaseAuthTest')); // Commented out - for testing only
 
@@ -328,35 +326,6 @@ function AppContent() {
             <Route
               path="/auth/reset-password"
               element={<PasswordResetPage />}
-            />
-            <Route
-              path="/notes"
-              element={
-                <ProtectedRoute
-                  title="Access Trading Notes"
-                  subtitle="Sign in to create and manage your trading notes"
-                >
-                  <NotesPage
-                    onToggleTheme={toggleColorMode}
-                    mode={mode}
-                    onMenuClick={() => setDrawerOpen(true)}
-                  />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/notes/:noteId"
-              element={
-                <ProtectedRoute
-                  title="Edit Note"
-                  subtitle="Sign in to edit your note"
-                >
-                  <NoteEditorPage
-                    onToggleTheme={toggleColorMode}
-                    mode={mode}
-                  />
-                </ProtectedRoute>
-              }
             />
             <Route
               path="/community"

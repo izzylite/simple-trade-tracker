@@ -22,7 +22,7 @@ interface DayNotesDialogProps {
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
 }
 
-const DayNotesDialog: React.FC<DayNotesDialogProps> = ({
+const GamePlanDialog: React.FC<DayNotesDialogProps> = ({
   open,
   onClose,
   day,
@@ -110,7 +110,7 @@ const DayNotesDialog: React.FC<DayNotesDialogProps> = ({
         <EventNoteIcon />
       </Box>
       <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
-        Notes for {dayFullName}
+        {dayFullName} Game plan
       </Typography>
     </Box>
   );
@@ -128,7 +128,7 @@ const DayNotesDialog: React.FC<DayNotesDialogProps> = ({
       hideFooterCancelButton={false}
       cancelButtonText="Cancel"
       cancelButtonAction={onClose}
-      primaryButtonText={isSaving ? 'Saving...' : 'Save Notes'}
+      primaryButtonText={isSaving ? 'Saving...' : 'Save Game Plan'}
       primaryButtonAction={hasChanges ? handleSave : undefined}
       isSubmitting={isSaving}
       contentSx={{
@@ -144,8 +144,9 @@ const DayNotesDialog: React.FC<DayNotesDialogProps> = ({
         <RichTextEditor
           value={currentNotes}
           onChange={handleNotesChange}
-          placeholder="Add notes for this day..."
+          placeholder="Add game plan for this day. This will aid your AI assistant in providing context-aware insights..."
           minHeight={300}
+          maxLength={1024}
           calendarId={calendarId}
           trades={trades}
           onOpenGalleryMode={onOpenGalleryMode}
@@ -155,4 +156,4 @@ const DayNotesDialog: React.FC<DayNotesDialogProps> = ({
   );
 };
 
-export default DayNotesDialog;
+export default GamePlanDialog;

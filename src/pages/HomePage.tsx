@@ -35,8 +35,7 @@ import { Trade } from '../types/dualWrite';
 import { EconomicEvent } from '../types/economicCalendar';
 import { formatCurrency } from '../utils/formatters';
 import { economicCalendarService } from '../services/economicCalendarService';
-import { TradeRepository } from '../services/repository/repositories/TradeRepository';
-import { useRecentTrades } from '../hooks/useRecentTrades';
+import { TradeWithCalendarName, useRecentTrades } from '../hooks/useRecentTrades';
 import { useUpcomingEconomicEvents } from '../hooks/useUpcomingEconomicEvents';
 
 import Shimmer from '../components/Shimmer';
@@ -53,10 +52,14 @@ import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { dialogProps } from '../styles/dialogStyles';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
 import { DuplicateCalendarDialog } from '../components/dialogs/DuplicateCalendarDialog';
-
-
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
+import TradeFormDialog from '../components/trades/TradeFormDialog';
+import { NewTradeForm } from '../components/trades';
+import { createNewTradeData } from './TradeCalendarPage';
+import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
+import * as calendarService from '../services/calendarService';
 import { CalendarManagementProps } from '../App';
+import NotesDrawer from '../components/notes/NotesDrawer';
 
 interface HomeProps extends CalendarManagementProps {}
 
@@ -78,7 +81,7 @@ const Home: React.FC<HomeProps> = ({
     impacts: ['High', 'Medium'],
     refreshInterval: 300000, // Refresh every 5 minutes
   });
-  const { recentTrades, isLoading: loadingTrades } = useRecentTrades(user?.uid, calendars, {
+  const { recentTrades: recentTrades_, isLoading: loadingTrades } = useRecentTrades(user?.uid, calendars, {
     limit: 5,
   });
 
@@ -87,9 +90,16 @@ const Home: React.FC<HomeProps> = ({
   const [isCreatingCalendar, setIsCreatingCalendar] = useState(false);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
 
-
+  // Trade creation dialog state
+  const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
+  const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
+  const [selectedTradeCalendarId, setSelectedTradeCalendarId] = useState<string>('');
+  const [recentTrades, setRecentTrades] = useState< TradeWithCalendarName[] | undefined>([]);
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+
+  // Notes drawer state
+  const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
 
   // Image zoom state
   const [zoomedImage, setZoomedImage] = useState<string>('');
@@ -106,6 +116,10 @@ const Home: React.FC<HomeProps> = ({
 
   // Check if screen is large (xl breakpoint = 1536px+)
   const isLargeScreen = useMediaQuery(theme.breakpoints.up('xl'));
+
+  useEffect(()=> {
+    setRecentTrades(recentTrades_)
+  }, recentTrades_)
 
   // Get recently updated calendars (top 2 for large screens, top 1 for smaller screens)
   const recentCalendars = useMemo(() => {
@@ -227,7 +241,32 @@ const Home: React.FC<HomeProps> = ({
     };
   }, [calendars]);
 
+  const selectedTradeCalendar = useMemo(() => {
+    if (!calendars.length || !selectedTradeCalendarId) return null;
+    return calendars.find(c => c.id === selectedTradeCalendarId) || null;
+  }, [calendars, selectedTradeCalendarId]);
 
+  const tradesForTradeDialog = useMemo(() => {
+    if (!selectedTradeCalendar) return [];
+    return recentTrades?.filter(trade => trade.calendar_id === selectedTradeCalendar.id) || [];
+  }, [recentTrades, selectedTradeCalendar]);
+
+  const dynamicRiskSettingsForTrade: DynamicRiskSettings = useMemo(() => {
+    if (!selectedTradeCalendar) {
+      return { account_balance: 0 };
+    }
+    return {
+      account_balance: selectedTradeCalendar.account_balance,
+      risk_per_trade: selectedTradeCalendar.risk_per_trade,
+      dynamic_risk_enabled: selectedTradeCalendar.dynamic_risk_enabled,
+      increased_risk_percentage: selectedTradeCalendar.increased_risk_percentage,
+      profit_threshold_percentage: selectedTradeCalendar.profit_threshold_percentage
+    };
+  }, [selectedTradeCalendar]);
+
+  const tagsForTradeDialog = selectedTradeCalendar?.tags || [];
+  const requiredTagGroupsForTradeDialog = selectedTradeCalendar?.required_tag_groups || [];
+  const accountBalanceForTradeDialog = selectedTradeCalendar?.account_balance ?? 0;
 
   const handleCalendarClick = (calendarId: string) => {
     navigate(`/calendar/${calendarId}`);
@@ -282,6 +321,23 @@ const Home: React.FC<HomeProps> = ({
     }
   };
 
+  const handleTradeCalendarChange = (calendarId: string) => {
+    setSelectedTradeCalendarId(calendarId);
+  };
+
+  const handleAddTradeFromHome = async (trade: Trade & { id?: string }) => {
+    const calendarId = trade.calendar_id || selectedTradeCalendar?.id || selectedTradeCalendarId;
+    if (!calendarId) {
+      throw new Error('Calendar ID is required');
+    }
+    await calendarService.addTrade(calendarId, { ...trade, calendar_id: calendarId });
+    const calendarName = selectedTradeCalendar?.name || '';
+    const tradeWithCalendarName: TradeWithCalendarName = { ...trade, calendarName };
+    setRecentTrades(prev => {
+      return [tradeWithCalendarName, ...(prev || [])];
+    });
+  };
+
   const handleCreateTrade = () => {
     if (!user) {
       setShowLoginDialog(true);
@@ -290,11 +346,31 @@ const Home: React.FC<HomeProps> = ({
     if (calendars.length === 0) {
       return; // Button should be disabled, but just in case
     }
-    // Navigate to the first calendar to add a trade
-    const firstCalendar = calendars[0];
-    if (firstCalendar) {
-      navigate(`/calendar/${firstCalendar.id}`);
+    // Do not preselect calendar; user must choose one in the dialog
+    setSelectedTradeCalendarId('');
+    setNewTrade(createNewTradeData());
+    setIsTradeFormOpen(true);
+  };
+
+  const handleTradeFormClose = () => {
+    if (newTrade && newTrade.pending_images) {
+      newTrade.pending_images.forEach(image => {
+        URL.revokeObjectURL(image.preview);
+      });
+      setNewTrade(null);
     }
+    setIsTradeFormOpen(false);
+  };
+
+  const handleTradeFormCancel = () => {
+    setIsTradeFormOpen(false);
+  };
+
+  const handleSetNewMainTrade = (updater: (trade: NewTradeForm) => NewTradeForm | null) => {
+    setNewTrade(prev => {
+      const base = prev ?? createNewTradeData();
+      return updater(base);
+    });
   };
 
   const handleLoginDialogClose = () => {
@@ -302,19 +378,23 @@ const Home: React.FC<HomeProps> = ({
   };
 
   return (
-    <Box sx={{
-      minHeight: '100vh',
-      bgcolor: 'custom.pageBackground',
-      pl: { xs: 2, sm: 3, md: 4 }
-    }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: 'custom.pageBackground',
+      }}
+    >
 
 
-      <Box sx={{
-        pt: { xs: 2, sm: 3, md: 4 },
-        pb: { xs: 2, sm: 3, md: 4 },
-        pl: 0,
-        pr: { xs: 2, sm: 3, md: 4 }
-      }}>
+      <Box
+        sx={{
+          pt: { xs: 2, sm: 3, md: 4 },
+          pb: { xs: 2, sm: 3, md: 4 },
+          px: { xs: 2, sm: 3, md: 4 },
+          maxWidth: '1400px',
+          mx: 'auto',
+        }}
+      >
         {/* Header Section */}
         <Box sx={{ mb: { xs: 3, sm: 4 } }}>
           <Typography
@@ -698,7 +778,7 @@ const Home: React.FC<HomeProps> = ({
               }}
               onClick={() => {
                 if (!user) { setShowLoginDialog(true); return; }
-                navigate('/notes/new');
+                setIsNotesDrawerOpen(true);
               }}
             >
               <CardContent sx={{
@@ -894,12 +974,12 @@ const Home: React.FC<HomeProps> = ({
               </Box>
             ) : (
               <Box sx={{
-                px: 2,
+                px: 1,
                 pb: 2,
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'row',
-                gap: 2
+                gap: 1
               }}>
                 {recentCalendars.map((calendar) => {
                   // Extract stats from calendar object (stats are auto-calculated by Supabase)
@@ -1187,21 +1267,46 @@ const Home: React.FC<HomeProps> = ({
         />
       )}
 
-      {/* AI Chat Drawer */}
+      {/* AI Chat Drawer - works without calendar for general queries */}
+      <AIChatDrawer
+        open={isAIChatOpen}
+        onClose={() => setIsAIChatOpen(false)}
+        onOpenGalleryMode={() => {}}
+        onUpdateTradeProperty={() => Promise.resolve(undefined)}
+        onDeleteMultipleTrades={() => {}}
+        onZoomImage={setZoomedImage}
+        onUpdateCalendarProperty={() => Promise.resolve(undefined)}
+        isReadOnly={false}
+      />
+
+      {/* Notes Drawer - multi-calendar view with calendar picker */}
+      <NotesDrawer
+        open={isNotesDrawerOpen}
+        onClose={() => setIsNotesDrawerOpen(false)}
+        showCalendarPicker={true}
+      />
+
+      {/* Trade Form Dialog - calendar selection mode */}
       {calendars.length > 0 && (
-        <AIChatDrawer
-          open={isAIChatOpen}
-          onClose={() => setIsAIChatOpen(false)}
-          trades={[]}
-          calendar={calendars[0]}
-          onOpenGalleryMode={() => {}}
-          onUpdateTradeProperty={() => Promise.resolve(undefined)}
-          onEditTrade={() => {}}
-          onDeleteTrade={() => {}}
-          onDeleteMultipleTrades={() => {}}
-          onZoomImage={setZoomedImage}
-          onUpdateCalendarProperty={() => Promise.resolve(undefined)}
-          isReadOnly={false}
+        <TradeFormDialog
+          open={isTradeFormOpen}
+          onClose={handleTradeFormClose}
+          newMainTrade={newTrade || undefined}
+          trade_date={new Date()}
+          showForm={{ open: isTradeFormOpen, editTrade: undefined, createTempTrade: false }}
+          trades={tradesForTradeDialog}
+          account_balance={accountBalanceForTradeDialog}
+          onAddTrade={handleAddTradeFromHome}
+          setZoomedImage={setZoomedImage}
+          setNewMainTrade={handleSetNewMainTrade}
+          onCancel={handleTradeFormCancel}
+          allTrades={tradesForTradeDialog}
+          dynamicRiskSettings={dynamicRiskSettingsForTrade}
+          tags={tagsForTradeDialog}
+          requiredTagGroups={requiredTagGroupsForTradeDialog}
+          calendars={calendars}
+          onCalendarChange={handleTradeCalendarChange}
+          selectedCalendarId={selectedTradeCalendarId}
         />
       )}
 

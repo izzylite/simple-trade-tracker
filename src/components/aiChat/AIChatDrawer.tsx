@@ -35,7 +35,8 @@ import {
   ArrowBack as ArrowBackIcon,
   Delete as DeleteIcon,
   Schedule as ScheduleIcon,
-  Stop as StopIcon
+  Stop as StopIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
@@ -56,12 +57,14 @@ import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
 import EconomicEventDetailDialog from '../economicCalendar/EconomicEventDetailDialog';
+import ApiKeySettingsDialog from './ApiKeySettingsDialog';
+import { hasApiKey } from '../../services/apiKeyStorage';
 
 interface AIChatDrawerProps {
   open: boolean;
   onClose: () => void;
-  trades: Trade[];
-  calendar: Calendar;
+  trades?: Trade[];
+  calendar?: Calendar;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
   // Trade operation callbacks for EconomicEventDetailDialog
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
@@ -138,8 +141,106 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
   const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
 
+  // API Key settings dialog state
+  const [apiKeySettingsOpen, setApiKeySettingsOpen] = useState(false);
+
   const chatConfig = {
     autoScroll: true
+  };
+
+  /**
+   * Parse quota/API key errors from Gemini API and return user-friendly message
+   */
+  const parseQuotaError = (errorMessage: string): { isQuotaError: boolean; userMessage: string; retryDelay?: string } => {
+    // Try to extract error details from JSON if present
+    let errorCode = '';
+    let errorReason = '';
+
+    try {
+      // Check if error message contains JSON (from edge function)
+      const jsonMatch = errorMessage.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const errorJson = JSON.parse(jsonMatch[0]);
+        if (errorJson.error) {
+          errorCode = String(errorJson.error.code || '');
+          errorReason = errorJson.error.details?.[0]?.reason || '';
+        }
+      }
+    } catch {
+      // If JSON parsing fails, use the original message
+    }
+
+    // Check if it's an API key error
+    const isApiKeyError = errorMessage.toLowerCase().includes('api key expired') ||
+                          errorMessage.toLowerCase().includes('api key invalid') ||
+                          errorMessage.toLowerCase().includes('api_key_invalid') ||
+                          errorReason === 'API_KEY_INVALID' ||
+                          errorCode === '400';
+
+    // Check if it's a quota/rate limit error
+    const isQuotaError = errorMessage.toLowerCase().includes('quota') ||
+                         errorMessage.includes('429') ||
+                         errorMessage.toUpperCase().includes('RESOURCE_EXHAUSTED') ||
+                         errorMessage.toLowerCase().includes('rate limit');
+
+    if (!isQuotaError && !isApiKeyError) {
+      return { isQuotaError: false, userMessage: errorMessage };
+    }
+
+    // Extract retry delay if available
+    const retryMatch = errorMessage.match(/retry in (\d+\.?\d*)\s*s/i) ||
+                       errorMessage.match(/retryDelay["\s:]+(\d+)s/i);
+    const retryDelay = retryMatch ? retryMatch[1] : undefined;
+
+    // Check if user has their own API key
+    const userHasApiKey = hasApiKey();
+
+    let userMessage = '';
+
+    if (isApiKeyError) {
+      userMessage = '⚠️ **API Key Error**\n\n';
+
+      if (userHasApiKey) {
+        userMessage += 'Your Gemini API key has expired or is invalid.\n\n';
+        userMessage += '**What you can do:**\n';
+        userMessage += '• Go to [Google AI Studio](https://aistudio.google.com/app/apikey)\n';
+        userMessage += '• Generate a new API key\n';
+        userMessage += '• Click the ⚙️ Settings button above to update your key\n';
+      } else {
+        userMessage += 'The shared API key has expired.\n\n';
+        userMessage += '**Solution: Use Your Own API Key**\n';
+        userMessage += '• Click the ⚙️ Settings button above\n';
+        userMessage += '• Add your free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)\n';
+        userMessage += '• Get unlimited usage with your own quota\n';
+      }
+    } else {
+      // Quota error
+      userMessage = '⚠️ **API Quota Exceeded**\n\n';
+
+      if (userHasApiKey) {
+        userMessage += 'Your Gemini API key has reached its quota limit.\n\n';
+        userMessage += '**What you can do:**\n';
+        userMessage += '• Wait for your quota to reset (usually 24 hours)\n';
+        userMessage += '• Check your usage at [Google AI Studio](https://aistudio.google.com/app/apikey)\n';
+        userMessage += '• Upgrade to a paid plan for higher limits\n';
+        if (retryDelay) {
+          const seconds = Math.ceil(parseFloat(retryDelay));
+          userMessage += `\n*You can retry in ${seconds} seconds*`;
+        }
+      } else {
+        userMessage += 'The shared API key has reached its quota limit.\n\n';
+        userMessage += '**Solution: Use Your Own API Key**\n';
+        userMessage += '• Click the ⚙️ Settings button above\n';
+        userMessage += '• Add your free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)\n';
+        userMessage += '• Get unlimited usage with your own quota\n';
+        if (retryDelay) {
+          const seconds = Math.ceil(parseFloat(retryDelay));
+          userMessage += `\n*Or wait ${seconds} seconds to retry with the shared key*`;
+        }
+      }
+    }
+
+    return { isQuotaError: true, userMessage, retryDelay };
   };
 
   const MESSAGE_LIMIT = 50;
@@ -174,19 +275,19 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     setIsAtMessageLimit(messages.length >= MESSAGE_LIMIT);
   }, [messages.length, MESSAGE_LIMIT]);
 
-  // Load conversations when drawer opens
+  // Load conversations when drawer opens (only if calendar is provided)
   useEffect(() => {
-    if (open && calendar.id && user) {
+    if (open && calendar?.id && user) {
       loadConversations();
     }
-  }, [open, calendar.id, user]);
+  }, [open, calendar?.id, user]);
 
   // =====================================================
   // CONVERSATION MANAGEMENT FUNCTIONS
   // =====================================================
 
   const loadConversations = async () => {
-    if (!calendar.id) return;
+    if (!calendar?.id) return;
 
     setLoadingConversations(true);
     try {
@@ -200,7 +301,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   };
 
   const saveCurrentConversation = async (updatedMessages: ChatMessageType[]) => {
-    if (!user || !calendar.id || updatedMessages.length === 0) return;
+    if (!user || !calendar?.id || updatedMessages.length === 0) return;
 
     try {
       const result = await conversationRepo.saveConversation(
@@ -360,10 +461,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         throw new Error('User not authenticated');
       }
 
-      if (!calendar.id) {
-        throw new Error('Calendar ID is required');
-      }
-
       // Cancel any previous streaming request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -500,10 +597,13 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
       logger.error('Error sending message to Supabase AI agent:', error);
 
+      const errorDetails = error instanceof Error ? error.message : 'Unknown error';
+      const quotaErrorInfo = parseQuotaError(errorDetails);
+
       const chatError: ChatError = {
-        type: 'network_error',
-        message: 'Failed to send message',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        type: quotaErrorInfo.isQuotaError ? 'rate_limit' : 'network_error',
+        message: quotaErrorInfo.isQuotaError ? 'API Quota Exceeded' : 'Failed to send message',
+        details: errorDetails,
         retryable: true
       };
 
@@ -511,7 +611,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       const errorMessage: ChatMessageType = {
         id: aiMessageId,
         role: 'assistant',
-        content: 'Sorry, I encountered an error processing your message. Please try again.',
+        content: quotaErrorInfo.isQuotaError
+          ? quotaErrorInfo.userMessage
+          : 'Sorry, I encountered an error processing your message. Please try again.',
         timestamp: new Date(),
         status: 'error',
         error: chatError.message
@@ -614,10 +716,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         throw new Error('User not authenticated');
       }
 
-      if (!calendar.id) {
-        throw new Error('Calendar ID is required');
-      }
-
       // Regenerate the response using Supabase AI agent
       const response = await supabaseAIChatService.sendMessage(
         userMessage.content,
@@ -649,14 +747,19 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     } catch (error) {
       logger.error('Error regenerating message:', error);
 
+      const errorDetails = error instanceof Error ? error.message : 'Unknown error';
+      const quotaErrorInfo = parseQuotaError(errorDetails);
+
       // Add error message
       const errorMessage: ChatMessageType = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: 'Sorry, I encountered an error while regenerating the response. Please try again.',
+        content: quotaErrorInfo.isQuotaError
+          ? quotaErrorInfo.userMessage
+          : 'Sorry, I encountered an error while regenerating the response. Please try again.',
         timestamp: new Date(),
         status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: quotaErrorInfo.isQuotaError ? 'API Quota Exceeded' : errorDetails
       };
 
       setMessages(prev => [...prev, errorMessage]);
@@ -672,16 +775,24 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
 
   const getWelcomeMessage = (): ChatMessageType => {
-    const contextSummary = trades.length > 0
+    const contextSummary = (trades && trades.length > 0)
       ? `I can see you have ${trades.length} trades. `
+      : '';
+
+    const calendarInfo = calendar
+      ? `You're working with the "${calendar.name}" calendar. `
+      : 'You can ask me about your trading performance across all your calendars. ';
+
+    const historyNote = !calendar
+      ? '\n\n📝 Note: Conversation history is only available when working with a specific calendar.'
       : '';
 
     return {
       id: 'welcome',
       role: 'assistant',
-      content: `👋 Hello! I'm your AI trading analyst. ${contextSummary}I can help you analyze your trading performance, identify patterns, and provide insights to improve your trading.
+      content: `👋 Hello! I'm your AI trading analyst. ${calendarInfo}${contextSummary}I can help you analyze your trading performance, identify patterns, and provide insights to improve your trading.
 
-💡 I'll analyze your trading data to give you focused and accurate insights!
+💡 I'll analyze your trading data to give you focused and accurate insights!${historyNote}
 
 What would you like to know about your trading?`,
       timestamp: new Date(),
@@ -830,9 +941,11 @@ What would you like to know about your trading?`,
                   color: 'text.secondary',
                   fontSize: '0.75rem'
                 }}>
-                  {trades.length > 0
-                    ? `${trades.length} trades ready`
-                    : 'Ready for trading analysis...'
+                  {calendar
+                    ? (trades && trades.length > 0
+                      ? `${trades.length} trades in ${calendar.name}`
+                      : `${calendar.name} - Ready for analysis`)
+                    : 'Ready for trading analysis across all calendars'
                   }
                 </Typography>
               </Box>
@@ -840,31 +953,49 @@ What would you like to know about your trading?`,
 
             {/* Right side - Action buttons */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Tooltip title="New Chat">
-                <IconButton
-                  size="small"
-                  onClick={handleNewChat}
-                  disabled={messages.length === 0}
-                  sx={{
-                    color: 'primary.main',
-                    '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.1) },
-                    '&:disabled': { color: 'text.disabled' }
-                  }}
-                >
-                  <NewChatIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
+              {/* Conversation features only available when calendar is provided */}
+              {calendar && (
+                <>
+                  <Tooltip title="New Chat">
+                    <IconButton
+                      size="small"
+                      onClick={handleNewChat}
+                      disabled={messages.length === 0}
+                      sx={{
+                        color: 'primary.main',
+                        '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.1) },
+                        '&:disabled': { color: 'text.disabled' }
+                      }}
+                    >
+                      <NewChatIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
 
-              <Tooltip title={showHistoryView ? "Back to Chat" : "Conversation History"}>
+                  <Tooltip title={showHistoryView ? "Back to Chat" : "Conversation History"}>
+                    <IconButton
+                      size="small"
+                      onClick={() => setShowHistoryView(!showHistoryView)}
+                      sx={{
+                        color: showHistoryView ? 'primary.main' : 'text.secondary',
+                        '&:hover': { backgroundColor: alpha(theme.palette.action.hover, 0.5) }
+                      }}
+                    >
+                      {showHistoryView ? <ArrowBackIcon fontSize="small" /> : <HistoryIcon fontSize="small" />}
+                    </IconButton>
+                  </Tooltip>
+                </>
+              )}
+
+              <Tooltip title="API Key Settings">
                 <IconButton
                   size="small"
-                  onClick={() => setShowHistoryView(!showHistoryView)}
+                  onClick={() => setApiKeySettingsOpen(true)}
                   sx={{
-                    color: showHistoryView ? 'primary.main' : 'text.secondary',
+                    color: 'text.secondary',
                     '&:hover': { backgroundColor: alpha(theme.palette.action.hover, 0.5) }
                   }}
                 >
-                  {showHistoryView ? <ArrowBackIcon fontSize="small" /> : <HistoryIcon fontSize="small" />}
+                  <SettingsIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
 
@@ -1135,9 +1266,9 @@ What would you like to know about your trading?`,
                     value={inputMessage}
                     onChange={setInputMessage}
                     onKeyDown={handleKeyPress}
-                    placeholder="(use @tag to mention tags)"
+                    placeholder={calendar ? "(use @tag to mention tags)" : "Ask me anything about your trading..."}
                     disabled={isLoading || isAtMessageLimit}
-                    allTags={calendar.tags || []}
+                    allTags={calendar?.tags || []}
                     maxRows={4}
                     sx={{ flex: 1, minWidth: 0, fontSize: '0.95rem', lineHeight: 1.4 }}
                   />
@@ -1388,7 +1519,7 @@ What would you like to know about your trading?`,
       </Box>
 
       {/* Economic Event Detail Dialog */}
-      {selectedEvent && (
+      {selectedEvent && calendar && (
         <EconomicEventDetailDialog
           open={eventDetailDialogOpen}
           onClose={() => {
@@ -1396,7 +1527,7 @@ What would you like to know about your trading?`,
             setSelectedEvent(null);
           }}
           event={selectedEvent}
-          trades={trades}
+          trades={trades || []}
           onUpdateTradeProperty={onUpdateTradeProperty}
           onEditTrade={onEditTrade}
           onDeleteTrade={onDeleteTrade}
@@ -1440,6 +1571,12 @@ What would you like to know about your trading?`,
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* API Key Settings Dialog */}
+      <ApiKeySettingsDialog
+        open={apiKeySettingsOpen}
+        onClose={() => setApiKeySettingsOpen(false)}
+      />
     </>
   );
 };

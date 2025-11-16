@@ -185,6 +185,7 @@ export interface AgentRequest {
   calendarId?: string;
   conversationHistory?: ConversationMessage[];
   calendarContext?: Partial<Calendar>;
+  userApiKey?: string; // User's own Gemini API key (optional)
 }
 
 export interface ConversationMessage {

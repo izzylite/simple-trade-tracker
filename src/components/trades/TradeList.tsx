@@ -413,10 +413,36 @@ const TradeList: React.FC<TradeListProps> = ({
                       }
                     });
 
+                    // Limit to first 5 items (groups + ungrouped tags)
+                    const MAX_VISIBLE_ITEMS = 5;
+                    const groupEntries = Object.entries(tagGroups);
+                    const totalItems = groupEntries.length + ungroupedTags.length;
+                    const hasMore = totalItems > MAX_VISIBLE_ITEMS;
+
+                    // Calculate how many groups and ungrouped tags to show
+                    let visibleGroups = groupEntries;
+                    let visibleUngroupedTags = ungroupedTags;
+                    let remainingCount = 0;
+
+                    if (hasMore) {
+                      const availableSlots = MAX_VISIBLE_ITEMS;
+                      if (groupEntries.length >= availableSlots) {
+                        // Show only groups
+                        visibleGroups = groupEntries.slice(0, availableSlots);
+                        remainingCount = totalItems - availableSlots;
+                        visibleUngroupedTags = [];
+                      } else {
+                        // Show all groups and some ungrouped tags
+                        const remainingSlots = availableSlots - groupEntries.length;
+                        visibleUngroupedTags = ungroupedTags.slice(0, remainingSlots);
+                        remainingCount = totalItems - (groupEntries.length + remainingSlots);
+                      }
+                    }
+
                     return (
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
                         {/* Display one chip per group with tooltip */}
-                        {Object.entries(tagGroups).map(([group, groupTags]) => (
+                        {visibleGroups.map(([group, groupTags]) => (
                           <Tooltip
                             key={group}
                             title={
@@ -447,7 +473,7 @@ const TradeList: React.FC<TradeListProps> = ({
                         ))}
 
                         {/* Display ungrouped tags normally */}
-                        {ungroupedTags.map((tag, tagIndex) => (
+                        {visibleUngroupedTags.map((tag, tagIndex) => (
                           <Chip
                             key={tagIndex}
                             label={formatTagForDisplay(tag)}
@@ -462,6 +488,58 @@ const TradeList: React.FC<TradeListProps> = ({
                             }}
                           />
                         ))}
+
+                        {/* Show +N chip if there are more tags */}
+                        {hasMore && remainingCount > 0 && (
+                          <Tooltip
+                            title={
+                              <Box sx={{ p: 0.5 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                  {remainingCount} more tag{remainingCount > 1 ? 's' : ''}
+                                </Typography>
+                                {/* Show remaining groups */}
+                                {groupEntries.slice(visibleGroups.length).map(([group, groupTags]) => (
+                                  <Box key={group} sx={{ mb: 0.5 }}>
+                                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                                      {group}:
+                                    </Typography>
+                                    {groupTags.map(tag => (
+                                      <Typography key={tag} variant="body2" sx={{ ml: 1 }}>
+                                        {formatTagForDisplay(tag, true)}
+                                      </Typography>
+                                    ))}
+                                  </Box>
+                                ))}
+                                {/* Show remaining ungrouped tags */}
+                                {ungroupedTags.slice(visibleUngroupedTags.length).map(tag => (
+                                  <Typography key={tag} variant="body2">
+                                    {formatTagForDisplay(tag)}
+                                  </Typography>
+                                ))}
+                              </Box>
+                            }
+                            arrow
+                          >
+                            <Chip
+                              label={`+${remainingCount}`}
+                              size="small"
+                              sx={{
+                                height: '20px',
+                                backgroundColor: theme.palette.mode === 'dark'
+                                  ? 'rgba(255, 255, 255, 0.1)'
+                                  : 'rgba(0, 0, 0, 0.08)',
+                                color: 'text.secondary',
+                                fontWeight: 600,
+                                border: '1px dashed',
+                                borderColor: 'divider',
+                                '& .MuiChip-label': {
+                                  px: 1,
+                                  fontSize: '0.7rem'
+                                }
+                              }}
+                            />
+                          </Tooltip>
+                        )}
                       </Box>
                     );
                   })()}

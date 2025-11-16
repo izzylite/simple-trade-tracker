@@ -5,9 +5,12 @@
 
 import { Note, CreateNoteInput, UpdateNoteInput } from '../types/note';
 import { logger } from '../utils/logger';
-import { NoteRepository } from './repository/repositories/NoteRepository';
+import { NoteRepository, NoteQueryOptions, NoteQueryResult } from './repository/repositories/NoteRepository';
 
 const noteRepository = new NoteRepository();
+
+// Re-export types for convenience
+export type { NoteQueryOptions, NoteQueryResult };
 
 /**
  * Get all notes for a user
@@ -18,6 +21,48 @@ export const getUserNotes = async (userId: string): Promise<Note[]> => {
   } catch (error) {
     logger.error('Error getting user notes:', error);
     return [];
+  }
+};
+
+/**
+ * Query notes for a user with filtering, search, and pagination
+ */
+export const queryUserNotes = async (
+  userId: string,
+  options: NoteQueryOptions = {}
+): Promise<NoteQueryResult> => {
+  try {
+    return await noteRepository.queryByUserId(userId, options);
+  } catch (error) {
+    logger.error('Error querying user notes:', error);
+    return { notes: [], total: 0, hasMore: false };
+  }
+};
+
+/**
+ * Get all notes for a calendar
+ */
+export const getCalendarNotes = async (calendarId: string): Promise<Note[]> => {
+  try {
+    return await noteRepository.findByCalendarId(calendarId);
+  } catch (error) {
+    logger.error('Error getting calendar notes:', error);
+    return [];
+  }
+};
+
+/**
+ * Query notes for a calendar with filtering, search, and pagination
+ */
+export const queryCalendarNotes = async (
+  calendarId: string,
+  options: NoteQueryOptions = {}
+): Promise<NoteQueryResult> => {
+  try {
+    return await noteRepository.queryByCalendarId(calendarId, options);
+  } catch (error) {
+    logger.error('Error querying calendar notes:', error);
+    return { notes: [], total: 0, hasMore: false };
   }
 };
 
@@ -147,6 +192,24 @@ export const unpinNote = async (noteId: string): Promise<void> => {
     }
   } catch (error) {
     logger.error('Error unpinning note:', error);
+    throw error;
+  }
+};
+
+/**
+ * Move a note to a different calendar
+ */
+export const moveNoteToCalendar = async (
+  noteId: string,
+  calendarId: string
+): Promise<void> => {
+  try {
+    const success = await noteRepository.moveNoteToCalendar(noteId, calendarId);
+    if (!success) {
+      throw new Error('Failed to move note to calendar');
+    }
+  } catch (error) {
+    logger.error('Error moving note to calendar:', error);
     throw error;
   }
 };

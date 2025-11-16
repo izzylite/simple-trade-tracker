@@ -1,0 +1,509 @@
+/**
+ * NotesDrawer Component
+ * Drawer for viewing and managing notes for a calendar or across all calendars
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Box,
+  Typography,
+  TextField,
+  InputAdornment,
+  Button,
+  useTheme,
+  alpha,
+  Stack,
+  IconButton,
+  Skeleton,
+  CircularProgress,
+  MenuItem,
+  Select,
+  FormControl,
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  Add as AddIcon,
+  Notes as NotesIcon,
+  Clear as ClearIcon,
+} from '@mui/icons-material';
+
+import UnifiedDrawer from '../common/UnifiedDrawer';
+import RoundedTabs from '../common/RoundedTabs';
+import NoteListItem from './NoteListItem';
+import NoteEditorDialog from './NoteEditorDialog';
+import { Note } from '../../types/note';
+import { Calendar } from '../../types/calendar';
+import * as notesService from '../../services/notesService';
+import { logger } from '../../utils/logger';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { CalendarRepository } from '../../services/repository/repositories/CalendarRepository';
+import { scrollbarStyles } from '../../styles/scrollbarStyles';
+
+interface NotesDrawerProps {
+  open: boolean;
+  onClose: () => void;
+  calendarId?: string; // If provided, filter to calendar; otherwise show all
+  showCalendarPicker?: boolean; // Show calendar selection for new notes (HomePage)
+  onNoteClick?: (note: Note) => void;
+}
+
+type TabValue = 'all' | 'pinned' | 'archived';
+
+/**
+ * Shimmer loading component for note list items
+ */
+const NoteListItemShimmer: React.FC = () => {
+  const theme = useTheme();
+
+  return (
+    <Box
+      sx={{
+        borderRadius: 2,
+        mb: 0.5,
+        py: 1.5,
+        px: 2,
+        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+      }}
+    >
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          {/* Title */}
+          <Skeleton variant="text" width="60%" height={20} sx={{ mb: 0.5 }} />
+
+          {/* Content preview */}
+          <Skeleton variant="text" width="100%" height={16} sx={{ mb: 0.3 }} />
+          <Skeleton variant="text" width="80%" height={16} sx={{ mb: 0.5 }} />
+
+          {/* Date */}
+          <Skeleton variant="text" width="30%" height={14} />
+        </Box>
+
+        <Skeleton
+          variant="rectangular"
+          width={60}
+          height={60}
+          sx={{ borderRadius: 1.5, flexShrink: 0 }}
+        />
+      </Stack>
+    </Box>
+  );
+};
+
+const NotesDrawer: React.FC<NotesDrawerProps> = ({
+  open,
+  onClose,
+  calendarId,
+  showCalendarPicker = false,
+  onNoteClick
+}) => {
+  const theme = useTheme();
+  const { user } = useAuth();
+
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [calendars, setCalendars] = useState<Calendar[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabValue>('all');
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<Note | undefined>();
+  const [selectedCalendarForNew, setSelectedCalendarForNew] = useState<string | undefined>(calendarId);
+  const [selectedCalendarFilter, setSelectedCalendarFilter] = useState<string>('all'); // For filtering notes by calendar
+  const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+
+  const NOTES_PER_PAGE = 20;
+
+  // Load notes when drawer opens or filters change
+  useEffect(() => {
+    if (open) { 
+      // Reset and load fresh data
+      setOffset(0);
+      loadNotes(true);
+      if (showCalendarPicker) {
+        loadCalendars();
+      }
+    }
+  }, [open, calendarId, showCalendarPicker, activeTab, selectedCalendarFilter]);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (!open || searchQuery == null) return;
+
+    const timeout = setTimeout(() => {
+      // Reset and load with search
+      setOffset(0);
+      loadNotes(true);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
+  const loadNotes = useCallback(async (reset: boolean = false) => {
+    if (!user?.uid) return;
+
+    try {
+      if (reset) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
+      // Determine filter options based on active tab
+      const queryOptions: notesService.NoteQueryOptions = {
+        limit: NOTES_PER_PAGE,
+        offset: reset ? 0 : offset,
+        searchQuery: (searchQuery || "").trim() || undefined,
+      };
+
+      // Apply tab-specific filters
+      if (activeTab === 'pinned') {
+        queryOptions.isPinned = true;
+        queryOptions.isArchived = false;
+      } else if (activeTab === 'archived') {
+        queryOptions.isArchived = true;
+      } else {
+        // 'all' tab - exclude archived notes
+        queryOptions.isArchived = false;
+      }
+
+      // Query notes
+      let result: notesService.NoteQueryResult;
+      // Use calendarId prop if provided (calendar-specific view)
+      // Otherwise use selectedCalendarFilter from dropdown (multi-calendar view)
+      const effectiveCalendarId = calendarId || (selectedCalendarFilter !== 'all' ? selectedCalendarFilter : undefined);
+
+      if (effectiveCalendarId) {
+        result = await notesService.queryCalendarNotes(effectiveCalendarId, queryOptions);
+      } else {
+        result = await notesService.queryUserNotes(user.uid, queryOptions);
+      }
+
+      // Update state
+      if (reset) {
+        setNotes(result.notes);
+        setOffset(result.notes.length);
+      } else {
+        setNotes(prev => [...prev, ...result.notes]);
+        setOffset(prev => prev + result.notes.length);
+      }
+      setHasMore(result.hasMore);
+      setTotal(result.total);
+    } catch (error) {
+      logger.error('Error loading notes:', error);
+      setNotes([]);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [user?.uid, calendarId, activeTab, searchQuery, offset, selectedCalendarFilter]);
+
+  const loadCalendars = async () => {
+    if (!user?.uid) return;
+
+    try {
+      const calendarRepo = new CalendarRepository();
+      const userCalendars = await calendarRepo.findByUserId(user.uid);
+      setCalendars(userCalendars);
+    } catch (error) {
+      logger.error('Error loading calendars:', error);
+      setCalendars([]);
+    }
+  };
+
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    const tabValues: TabValue[] = ['all', 'pinned', 'archived'];
+    setActiveTab(tabValues[newValue]);
+  };
+
+  const handleNewNote = () => {
+    if (showCalendarPicker && !calendarId) {
+      // In multi-calendar view, require a calendar to be selected
+      if (selectedCalendarFilter === 'all') {
+        // No calendar selected - do nothing
+        logger.warn('Please select a calendar to create a note');
+        return;
+      }
+      // Use the selected calendar from dropdown
+      setSelectedCalendarForNew(selectedCalendarFilter);
+      setSelectedNote(undefined);
+      setEditorOpen(true);
+    } else {
+      // In single-calendar view, use the provided calendarId
+      setSelectedCalendarForNew(calendarId);
+      setSelectedNote(undefined);
+      setEditorOpen(true);
+    }
+  };
+
+  const handleNoteClick = (note: Note) => {
+    setSelectedNote(note);
+    setSelectedCalendarForNew(note.calendar_id);
+    setEditorOpen(true);
+    if (onNoteClick) onNoteClick(note);
+  };
+
+  const handleEditorClose = () => {
+    setEditorOpen(false);
+    setSelectedNote(undefined);
+  };
+
+  const handlePin = async (note: Note) => {
+    if (!note) return;
+
+    try {
+      setNotes(prev => prev.map(n => n.id === note.id ? { ...n, is_pinned: !n.is_pinned } : n));
+      if (note.is_pinned) {
+        await notesService.unpinNote(note.id);
+      } else {
+        await notesService.pinNote(note.id);
+      }
+    } catch (error) {
+      logger.error('Error toggling pin:', error);
+      loadNotes(true);
+    }
+  };
+
+  const handleArchive = async (note: Note) => {
+    try {
+      if (!note) return; 
+      if (note.is_archived)
+        await notesService.unarchiveNote(note.id);
+      else
+        await notesService.archiveNote(note.id);
+      setNotes(prev => prev.filter(n => n.id !== note.id));
+    } catch (error) {
+      logger.error('Error archiving note:', error);
+      loadNotes(true);
+    }
+  };
+
+
+  const handleLoadMore = () => {
+    loadNotes(false);
+  };
+
+  
+
+  // Get calendar for note (for multi-calendar view)
+  const getCalendarForNote = (note: Note): Calendar | undefined => {
+    return calendars.find(c => c.id === note.calendar_id);
+  };
+
+  // Header actions
+  const headerActions = (
+    <Button
+      variant="contained"
+      size="small"
+      startIcon={<AddIcon />}
+      onClick={handleNewNote}
+      disabled={showCalendarPicker && (calendars.length === 0 || selectedCalendarFilter === 'all')}
+      sx={{
+        borderRadius: 2,
+        textTransform: 'none',
+        fontWeight: 600,
+      }}
+    >
+      New Note
+    </Button>
+  );
+
+  return (
+    <>
+      <UnifiedDrawer
+        open={open}
+        onClose={onClose}
+        title="Notes"
+        icon={<NotesIcon />}
+        headerActions={headerActions}
+        width={{ xs: '100%', sm: 450 }}
+        headerVariant="enhanced"
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          {/* Calendar Dropdown - only show in multi-calendar view */}
+          {showCalendarPicker && !calendarId && (
+            <Box sx={{ p: 2, pb: 1 }}>
+              <FormControl fullWidth size="small">
+                <Select
+                  value={selectedCalendarFilter}
+                  onChange={(e) => setSelectedCalendarFilter(e.target.value)}
+                  displayEmpty
+                  sx={{
+                    borderRadius: 1,
+                    bgcolor: alpha(theme.palette.background.paper, 0.5),
+                  }}
+                >
+                  <MenuItem value="all">
+                    <Typography variant="body2" color="text.secondary">
+                      All Calendars
+                    </Typography>
+                  </MenuItem>
+                  {calendars.map((calendar) => (
+                    <MenuItem key={calendar.id} value={calendar.id}>
+                      <Typography variant="body2">{calendar.name}</Typography>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          )}
+
+          {/* Tabs */}
+          <Box sx={{ p: 2, pb: 1, pt: showCalendarPicker && !calendarId ? 0 : 2 }}>
+            <RoundedTabs
+              tabs={[
+                { label: 'All' },
+                { label: 'Pinned' },
+                { label: 'Archived' },
+              ]}
+              activeTab={['all', 'pinned', 'archived'].indexOf(activeTab)}
+              onTabChange={handleTabChange}
+              size="small"
+              fullWidth
+            />
+          </Box>
+
+          {/* Search */}
+          <Box sx={{ px: 2, pb: 2 }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search notes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: 'text.secondary' }} />
+                  </InputAdornment>
+                ),
+                endAdornment: searchQuery && (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      onClick={() => setSearchQuery('')}
+                      edge="end"
+                    >
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+                sx: {
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.background.paper, 0.5),
+                },
+              }}
+            />
+          </Box>
+
+          {/* Notes List */}
+          <Box
+            sx={{
+              flex: 1,
+              overflowY: 'auto',
+              px: 2,
+              pb: 2,
+              ...scrollbarStyles(theme),
+            }}
+          >
+            {loading ? (
+              <Box>
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <NoteListItemShimmer key={index} />
+                ))}
+              </Box>
+            ) : notes.length === 0 ? (
+              <Stack spacing={2} alignItems="center" sx={{ py: 8, textAlign: 'center' }}>
+                <NotesIcon sx={{ fontSize: 64, color: 'text.disabled' }} />
+                <Typography variant="h6" color="text.secondary">
+                  {searchQuery
+                    ? 'No notes found'
+                    : activeTab === 'pinned'
+                      ? 'No pinned notes'
+                      : activeTab === 'archived'
+                        ? 'No archived notes'
+                        : 'No notes yet'}
+                </Typography>
+                <Typography variant="body2" color="text.disabled">
+                  {searchQuery
+                    ? 'Try a different search term'
+                    : activeTab === 'all'
+                      ? 'Create your first note to get started'
+                      : ''}
+                </Typography>
+                {!searchQuery && activeTab === 'all' && (
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={handleNewNote}
+                    sx={{ mt: 2 }}
+                  >
+                    Create Note
+                  </Button>
+                )}
+              </Stack>
+            ) : (
+              <>
+                <Box>
+                  {notes.map((note) => (
+                    <NoteListItem
+                      key={note.id}
+                      note={note}
+                      onClick={handleNoteClick}
+                      onPin={handlePin}
+                      onArchive={handleArchive}
+                      onUnarchive={handleArchive}
+                      calendar={getCalendarForNote(note)}
+                      showCalendarBadge={showCalendarPicker && !calendarId}
+                    />
+                  ))}
+                </Box>
+
+                {/* Load More Button */}
+                {hasMore && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 1 }}>
+                    <Button
+                      variant="outlined"
+                      onClick={handleLoadMore}
+                      disabled={loadingMore}
+                      sx={{
+                        borderRadius: 2,
+                        textTransform: 'none',
+                        minWidth: 120,
+                      }}
+                    >
+                      {loadingMore ? (
+                        <>
+                          <CircularProgress size={16} sx={{ mr: 1 }} />
+                          Loading...
+                        </>
+                      ) : (
+                        `Load More (${total - notes.length} remaining)`
+                      )}
+                    </Button>
+                  </Box>
+                )}
+              </>
+            )}
+          </Box>
+        </Box>
+      </UnifiedDrawer>
+
+      {/* Note Editor Dialog */}
+      {editorOpen && selectedCalendarForNew && (
+        <NoteEditorDialog
+          open={editorOpen}
+          onClose={handleEditorClose}
+          note={selectedNote}
+          calendarId={selectedCalendarForNew}
+          onSave={(note: Note, isCreated?: boolean) => isCreated? setNotes(prev => [note, ...prev]) :
+             setNotes(prev => prev.map(n => (n.id === note.id ? note : n)))}
+          onDelete={(noteId: string) => setNotes(prev => prev.filter(n => n.id !== noteId))}
+        />
+      )}
+    </>
+  );
+};
+
+export default NotesDrawer;

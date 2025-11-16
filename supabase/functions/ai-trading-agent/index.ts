@@ -840,13 +840,8 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
-    if (!googleApiKey) {
-      throw new Error('GOOGLE_API_KEY not configured');
-    }
-
     const body: AgentRequest = await req.json();
-    const { message, userId, calendarId, conversationHistory = [], calendarContext } = body;
+    const { message, userId, calendarId, conversationHistory = [], calendarContext, userApiKey } = body;
 
     if (!message || !userId) {
       return new Response(
@@ -854,6 +849,20 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Use user's API key if provided, otherwise fall back to server key
+    const googleApiKey = userApiKey || Deno.env.get('GOOGLE_API_KEY');
+    if (!googleApiKey) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'No API key available. Please configure your Gemini API key in settings.'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    log(`Processing request for user ${userId} (using ${userApiKey ? 'user' : 'server'} API key)`, 'info');
 
     log(`Processing request for user ${userId}`, 'info');
 

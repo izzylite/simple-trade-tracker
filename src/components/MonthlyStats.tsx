@@ -33,7 +33,8 @@ import {
   ShowChart,
   Balance,
   MoreVert,
-  Delete
+  Delete,
+  ViewCarousel as GalleryIcon
 } from '@mui/icons-material';
 import { Trade } from '../types/dualWrite';
 import { exportTrades } from '../utils/tradeExportImport';
@@ -55,6 +56,8 @@ interface MonthlyStatsProps {
   onClearMonthTrades?: (month: number, year: number) => void;
   // Read-only mode for shared calendars
   isReadOnly?: boolean;
+  // Gallery mode handler
+  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
 }
 
 
@@ -66,7 +69,8 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   currentDate = new Date(),
   monthlyTarget,
   onClearMonthTrades,
-  isReadOnly = false
+  isReadOnly = false,
+  onOpenGalleryMode
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -210,6 +214,15 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
     setSnackbarOpen(false);
   };
 
+  // Handle gallery mode
+  const handleMonthlyGalleryMode = () => {
+    if (monthTrades.length > 0 && onOpenGalleryMode) {
+      const monthName = format(currentDate, 'MMMM yyyy');
+      const title = `${monthName} - Monthly Trades (${monthTrades.length} trades)`;
+      onOpenGalleryMode(monthTrades, monthTrades[0].id, title);
+    }
+  };
+
   return (
     <>
       <Paper
@@ -240,7 +253,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
             display: 'flex',
             gap: 1,
             justifyContent: 'flex-end',
-            mb: 0,
+            mb: 2,
             flex: 1,
             alignItems: 'center'
           }}>
@@ -251,6 +264,28 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               id="import-file"
               onChange={handleFileSelect}
             />
+            {/* Gallery Button - Moved from TradeCalendarPage */}
+            {monthTrades.length > 0 && onOpenGalleryMode && (
+              <Tooltip title="View all trades for this month in gallery mode" arrow>
+                <IconButton
+                  onClick={handleMonthlyGalleryMode}
+                  size="small"
+                  sx={{
+                    color: 'primary.main',
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderColor: alpha(theme.palette.primary.main, 0.3),
+                    '&:hover': {
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      color: 'primary.main',
+                      borderColor: 'primary.main'
+                    }
+                  }}
+                >
+                  <GalleryIcon />
+                </IconButton>
+              </Tooltip>
+            )}
             <Tooltip title="More options">
               <IconButton
                 onClick={handleMenuOpen}

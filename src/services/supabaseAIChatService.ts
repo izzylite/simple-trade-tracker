@@ -9,11 +9,13 @@ import { logger } from '../utils/logger';
 import type { Trade } from '../types/trade';
 import type { Calendar } from '../types/calendar';
 import type { ChatMessage as ChatMessageType } from '../types/aiChat';
+import { getApiKey } from './apiKeyStorage';
 
 export interface AgentResponse {
   success: boolean;
   message: string;
   messageHtml?: string;
+  error?: string; // Error message from edge function
   citations?: Array<{
     id: string;
     title: string;
@@ -136,30 +138,30 @@ class SupabaseAIChatService {
   async *sendMessageStreaming(
     message: string,
     userId: string,
-    calendar: Calendar,
+    calendar: Calendar | undefined,
     conversationHistory: ChatMessageType[] = [],
     signal?: AbortSignal
   ): AsyncGenerator<SSEEvent, void, unknown> {
     try {
       logger.log(`Sending streaming message to AI agent: "${message.substring(0, 50)}..."`);
 
-      const availableTags = calendar.tags || [];
+      const availableTags = calendar?.tags || [];
 
       // Process @tag mentions
       const { processedMessage, tagContext } = this.processTagMentions(message, availableTags);
       const finalMessage = processedMessage + tagContext;
 
-      // Get auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
+      // Get valid auth token with auto-refresh
+      const session = await this.getValidSession();
 
       // Convert conversation history
       const formattedHistory = conversationHistory.map(msg => ({
         role: msg.role as 'user' | 'assistant',
         content: msg.content
       }));
+
+      // Get user's API key from localStorage (if available)
+      const userApiKey = getApiKey();
 
       // Call edge function with streaming
       const url = this.getFunctionUrl() + '?stream=true'; // Use query param for streaming
@@ -173,16 +175,33 @@ class SupabaseAIChatService {
         body: JSON.stringify({
           message: finalMessage,
           userId,
-          calendarId: calendar.id,
+          calendarId: calendar?.id,
           conversationHistory: formattedHistory,
-          calendarContext: this.buildCalendarContext(calendar),
+          calendarContext: calendar ? this.buildCalendarContext(calendar) : undefined,
+          userApiKey: userApiKey || undefined, // Send user's API key if available
         }),
         signal
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`AI agent error: ${response.status} - ${errorText}`);
+
+        // Try to parse error response as JSON to get detailed error message
+        let detailedError = errorText;
+        try {
+          const errorJson = JSON.parse(errorText);
+          // Extract the error field from AgentResponse
+          if (errorJson.error) {
+            detailedError = errorJson.error;
+          } else if (errorJson.message) {
+            detailedError = errorJson.message;
+          }
+        } catch {
+          // If not JSON, use the raw text
+        }
+
+        // Throw error with the detailed message (will be parsed by parseQuotaError in component)
+        throw new Error(detailedError);
       }
 
       if (!response.body) {
@@ -276,18 +295,65 @@ class SupabaseAIChatService {
   }
 
   /**
+   * Get valid auth session with automatic refresh if needed
+   */
+  private async getValidSession() {
+    // Try to get current session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      logger.error('Session error:', sessionError);
+      throw new Error('Failed to get authentication session');
+    }
+
+    if (!session) {
+      // No session - try to refresh
+      logger.log('No active session, attempting to refresh...');
+      const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+
+      if (refreshError || !refreshedSession) {
+        logger.error('Session refresh failed:', refreshError);
+        throw new Error('Authentication required. Please sign in again.');
+      }
+
+      logger.log('Session refreshed successfully');
+      return refreshedSession;
+    }
+
+    // Check if token is about to expire (within 5 minutes)
+    const expiresAt = session.expires_at;
+    if (expiresAt) {
+      const expiresInSeconds = expiresAt - Math.floor(Date.now() / 1000);
+      if (expiresInSeconds < 300) { // Less than 5 minutes
+        logger.log('Token expiring soon, refreshing...');
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+
+        if (refreshError || !refreshedSession) {
+          logger.warn('Token refresh failed, using existing session:', refreshError);
+          return session; // Fall back to existing session
+        }
+
+        logger.log('Token refreshed successfully');
+        return refreshedSession;
+      }
+    }
+
+    return session;
+  }
+
+  /**
    * Send a message to the AI Trading Agent edge function (non-streaming)
    */
   async sendMessage(
     message: string,
     userId: string,
-    calendar: Calendar,
+    calendar: Calendar | undefined,
     conversationHistory: ChatMessageType[] = []
   ): Promise<AgentResponse> {
     try {
       logger.log(`Sending message to Supabase AI agent: "${message.substring(0, 50)}..."`);
 
-      const availableTags = calendar.tags || [];
+      const availableTags = calendar?.tags || [];
 
       // Process @tag mentions
       const { processedMessage, tagContext } = this.processTagMentions(message, availableTags);
@@ -299,28 +365,56 @@ class SupabaseAIChatService {
         content: msg.content
       }));
 
-      // Call edge function
-      const { data, error } = await supabase.functions.invoke<AgentResponse>(
-        this.FUNCTION_NAME,
+      // Get user's API key from localStorage (if available)
+      const userApiKey = getApiKey();
+
+      // Get valid auth token with auto-refresh
+      const session = await this.getValidSession();
+
+      // Call edge function using fetch (not supabase.functions.invoke) to get detailed error messages
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/${this.FUNCTION_NAME}`,
         {
-          body: {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
             message: finalMessage,
             userId,
-            calendarId: calendar.id,
+            calendarId: calendar?.id,
             conversationHistory: formattedHistory,
-            calendarContext: this.buildCalendarContext(calendar),
-          },
+            calendarContext: calendar ? this.buildCalendarContext(calendar) : undefined,
+            userApiKey: userApiKey || undefined,
+          }),
         }
       );
 
-      if (error) {
-        logger.error('Edge function error:', error);
-        throw new Error(`AI agent error: ${error.message}`);
+      // Parse response
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        // Try to parse error response as JSON to get detailed error message
+        let detailedError = responseText;
+        try {
+          const errorJson = JSON.parse(responseText);
+          // Extract the error field from AgentResponse
+          if (errorJson.error) {
+            detailedError = errorJson.error;
+          } else if (errorJson.message) {
+            detailedError = errorJson.message;
+          }
+        } catch {
+          // If not JSON, use the raw text
+        }
+
+        // Throw error with the detailed message (will be parsed by parseQuotaError in component)
+        throw new Error(detailedError);
       }
 
-      if (!data) {
-        throw new Error('No response from AI agent');
-      }
+      // Parse successful response
+      const data: AgentResponse = JSON.parse(responseText);
 
       if (!data.success && !data.message) {
         throw new Error('AI agent returned empty response');

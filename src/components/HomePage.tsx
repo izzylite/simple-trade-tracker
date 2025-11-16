@@ -61,10 +61,10 @@ interface FeatureCardProps {
   color?: string;
 }
 
-const FeatureCard: React.FC<FeatureCardProps> = ({ 
-  icon, 
-  title, 
-  description, 
+const FeatureCard: React.FC<FeatureCardProps> = ({
+  icon,
+  title,
+  description,
   delay = 0,
   color = 'primary.main'
 }) => {
@@ -124,12 +124,12 @@ interface StatCardProps {
   delay?: number;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ 
-  icon, 
-  value, 
-  label, 
-  color, 
-  delay = 0 
+const StatCard: React.FC<StatCardProps> = ({
+  icon,
+  value,
+  label,
+  color,
+  delay = 0
 }) => {
   const [isVisible, setIsVisible] = useState(false);
 
@@ -258,11 +258,21 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleTheme, mode }) => {
   ];
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'custom.pageBackground' }}>
-       
-      
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: 'custom.pageBackground',
+        maxWidth: '1400px',
+        mx: 'auto',
+        px: { xs: 2, sm: 3, md: 4 },
+      }}
+    >
+
+
+
+
       {/* Hero Section */}
-      <Container maxWidth="lg" sx={{ pt: 12, pb: 8, position: 'relative' }}>
+      <Container maxWidth={false} sx={{ pt: 12, pb: 8, position: 'relative' }}>
         {/* Floating background elements */}
         <Box
           sx={{
@@ -330,7 +340,7 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleTheme, mode }) => {
               color="text.secondary"
               sx={{ mb: 4, maxWidth: 600, mx: 'auto', lineHeight: 1.6 }}
             >
-              The most comprehensive trading journal and analytics platform. 
+              The most comprehensive trading journal and analytics platform.
               Track, analyze, and improve your trading performance with advanced insights.
             </Typography>
             <Stack
@@ -402,7 +412,7 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleTheme, mode }) => {
 
       {/* Features Section */}
       <Box sx={{ bgcolor: 'background.paper', py: 10 }}>
-        <Container maxWidth="lg">
+        <Container maxWidth={false}>
           <Box sx={{ textAlign: 'center', mb: 8 }}>
             <Typography
               variant="h3"
@@ -443,7 +453,7 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleTheme, mode }) => {
       </Box>
 
       {/* Benefits Section */}
-      <Container maxWidth="lg" sx={{ py: 10 }}>
+      <Container maxWidth={false} sx={{ py: 10 }}>
         <Box
           sx={{
             display: 'flex',
@@ -575,6 +585,8 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleTheme, mode }) => {
                           Risk/Reward
                         </Typography>
                       </Box>
+
+
                     </Box>
                   </Stack>
                 </Paper>
@@ -655,7 +667,7 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleTheme, mode }) => {
 
       {/* Footer */}
       <Box sx={{ bgcolor: 'background.paper', py: 4, borderTop: 1, borderColor: 'divider' }}>
-        <Container maxWidth="lg">
+        <Container maxWidth="md">
           <Typography variant="body2" color="text.secondary" align="center">
             © 2024 Trade Tracker. Built for traders, by traders.
           </Typography>

@@ -410,7 +410,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
               onZoomedImage={onZoomImage || (() => {})}
               onUpdateTradeProperty={onUpdateTradeProperty}
               onOpenGalleryMode={onOpenGalleryMode}
-              hideActions={isReadOnly}
+              hideActions={isReadOnly? false : onEditTrade === undefined || onDeleteTrade === undefined}
               calendarId={calendarId}
               calendar={calendar}
             />

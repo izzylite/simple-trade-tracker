@@ -209,21 +209,12 @@ export const uploadTradeImage = async (
       throw new Error(`Upload failed: ${error.message}`);
     }
 
-    // Since this is a private bucket, we need to create a signed URL
-    // Create a signed URL that expires in 24 hours (86400 seconds)
-    const { data: signedUrlData, error: signedUrlError } = await createSignedUrl(
-      'trade-images',
-      filePath,
-      86400
-    );
-
-    if (signedUrlError) {
-      throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
-    }
+    // Since this bucket is public, we can use a stable public URL
+    const publicUrl = getPublicUrl('trade-images', filePath);
 
     // Return the image details
     return {
-      url: signedUrlData.signedUrl,
+      url: publicUrl,
       id: filename,
       calendar_id: calendarId,
       width,

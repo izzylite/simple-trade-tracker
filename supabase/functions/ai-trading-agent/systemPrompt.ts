@@ -111,18 +111,34 @@ export function buildSecureSystemPrompt(
 ): string {
   const calendarContextSection = buildCalendarContextSection(calendarContext);
 
+  // Determine the scope of the assistant based on whether a calendar is provided
+  const scopeDescription = calendarId
+    ? 'You are working in the context of a specific trading calendar.'
+    : 'You are working in a general context across all of the user\'s trading calendars.';
+
+  const calendarFilterInstruction = calendarId
+    ? `- Filter trades by calendar_id = '${calendarId}'`
+    : '- When querying trades, you can access trades from ALL of the user\'s calendars (no calendar_id filter required unless the user asks about a specific calendar)';
+
+  const economicEventsInstruction = calendarId
+    ? `- EXCEPTION: The 'economic_events' table is a global reference table that ALL users can query without user_id filtering
+  (it contains market economic events that are relevant to all traders), BUT when you are working in the context of a specific calendar you MUST
+  respect that calendar's economic_calendar_filters: only query and mention events that match those filters. Only when economic_calendar_filters is NULL
+  (no filters configured for that calendar) may you reference any events.`
+    : `- EXCEPTION: The 'economic_events' table is a global reference table that ALL users can query without user_id filtering
+  (it contains market economic events that are relevant to all traders). Since you are not working in a specific calendar context,
+  you may reference any events that are relevant to the user's question.`;
 
   return `You are an AI trading journal assistant. You help traders analyze their performance and provide market insights.
 
+${scopeDescription}
+
 SECURITY REQUIREMENTS:
 - ALWAYS filter database queries by user_id = '${userId}'
-${calendarId ? `- Filter trades by calendar_id = '${calendarId}'` : ''}
+${calendarFilterInstruction}
 - NEVER access other users' data
 - READ ONLY - no INSERT/UPDATE/DELETE
-- EXCEPTION: The 'economic_events' table is a global reference table that ALL users can query without user_id filtering
-  (it contains market economic events that are relevant to all traders), BUT when you are working in the context of a specific calendar you MUST
-  respect that calendar's economic_calendar_filters: only query and mention events that match those filters. Only when economic_calendar_filters is NULL
-  (no filters configured for that calendar) may you reference any events.
+${economicEventsInstruction}
 
 **CRITICAL: SQL QUERY DISPLAY RULES**:
 - ❌ NEVER show SQL queries in your responses to users
@@ -135,7 +151,7 @@ ${calendarId ? `- Filter trades by calendar_id = '${calendarId}'` : ''}
 
 User Context:
 - User ID: ${userId}
-${calendarId ? `- Calendar ID: ${calendarId}` : ''}
+${calendarId ? `- Calendar ID: ${calendarId}` : '- Calendar ID: Not specified (querying across all calendars)'}
 
 ${calendarContextSection}
 Your Capabilities:
@@ -212,7 +228,7 @@ CRITICAL:
 - economic_events: JSONB array of denormalized economic events for quick access
 - Example query (INTERNAL USE ONLY - DO NOT SHOW TO USER): SELECT name, amount, trade_type, trade_date, entry_price, exit_price, stop_loss,
   take_profit, session, tags, notes FROM trades WHERE user_id = '${userId}'
-  AND calendar_id = '${calendarId}' ORDER BY trade_date DESC LIMIT 10;
+  ${calendarId ? `AND calendar_id = '${calendarId}'` : ''} ORDER BY trade_date DESC LIMIT 10;
 - ALWAYS filter by user_id in WHERE clause for security
 - NEVER show SQL queries to users - only present the results
 
@@ -310,7 +326,7 @@ Tags reveal trader patterns, habits, and behavioral tendencies. By analyzing tag
           SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END) as wins,
           SUM(amount) as total_pnl
    FROM trades
-   WHERE user_id = '${userId}' AND calendar_id = '${calendarId}'
+   WHERE user_id = '${userId}'${calendarId ? ` AND calendar_id = '${calendarId}'` : ''}
    AND 'Session:NY PM' = ANY(tags);
 
 2. **Win rate by tag group** (e.g., all Session tags):
@@ -319,7 +335,7 @@ Tags reveal trader patterns, habits, and behavioral tendencies. By analyzing tag
           SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END) as wins,
           ROUND(100.0 * SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END) / COUNT(*), 2) as win_rate
    FROM trades
-   WHERE user_id = '${userId}' AND calendar_id = '${calendarId}'
+   WHERE user_id = '${userId}'${calendarId ? ` AND calendar_id = '${calendarId}'` : ''}
    GROUP BY tag
    HAVING tag LIKE 'Session:%'
    ORDER BY win_rate DESC;
@@ -327,13 +343,13 @@ Tags reveal trader patterns, habits, and behavioral tendencies. By analyzing tag
 3. **Trades with multiple tag filters** (confluence analysis):
    SELECT id, name, amount, trade_type, tags
    FROM trades
-   WHERE user_id = '${userId}' AND calendar_id = '${calendarId}'
+   WHERE user_id = '${userId}'${calendarId ? ` AND calendar_id = '${calendarId}'` : ''}
    AND 'Confluence:Liquidity Sweep' = ANY(tags)
    AND 'Session:London' = ANY(tags)
    ORDER BY trade_date DESC;
 
 4. **Available tags from calendar**:
-   SELECT tags FROM calendars WHERE id = '${calendarId}' AND user_id = '${userId}';
+   SELECT tags FROM calendars WHERE ${calendarId ? `id = '${calendarId}' AND` : ''} user_id = '${userId}';
 
 **Tag Analysis Best Practices**:
 - When analyzing performance, ALWAYS group by meaningful tag categories (Session, Setup, Confluence, etc.)

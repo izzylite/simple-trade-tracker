@@ -66,12 +66,6 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
       path: '/calendars'
     },
     {
-      id: 'notes',
-      label: 'Notes',
-      icon: <EditIcon />,
-      path: '/notes'
-    },
-    {
       id: 'about',
       label: 'About',
       icon: <AboutIcon />,
@@ -91,12 +85,8 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
       return;
     }
     navigate(item.path);
-    // Close overlay drawer on small screens; otherwise auto-collapse if expanded
-    if (isMdDown) {
-      onClose();
-    } else if (!collapsed) {
-      onToggleCollapse();
-    }
+    // Close overlay drawer after navigation on all screen sizes
+    onClose();
   };
 
   const isActive = (path: string) => {
@@ -106,7 +96,8 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
     return location.pathname.startsWith(path);
   };
 
-  const effectiveCollapsed = isMdDown ? false : collapsed;
+  const isOverlayDrawer = true;
+  const effectiveCollapsed = isOverlayDrawer ? false : (isMdDown ? false : collapsed);
   const drawerWidth = effectiveCollapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED;
 
   const drawerContent = (
@@ -389,16 +380,12 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
 
   return (
     <Drawer
-      variant={isMdDown ? 'temporary' : 'permanent'}
-      open={isMdDown ? open : true}
+      variant="temporary"
+      open={open}
       onClose={onClose}
       ModalProps={{ keepMounted: true }}
       sx={{
-        width: drawerWidth,
-        flexShrink: 0,
-        transition: theme.transitions.create('width', {
-          duration: theme.transitions.duration.shorter,
-        }),
+        zIndex: 1200, // Lower than other drawers (1300+)
         '& .MuiDrawer-paper': {
           width: drawerWidth,
           boxSizing: 'border-box',
@@ -407,7 +394,8 @@ const SideNavigation: React.FC<SideNavigationProps> = ({ open, onClose, collapse
           transition: theme.transitions.create('width', {
             duration: theme.transitions.duration.shorter,
           }),
-          overflowX: 'hidden'
+          overflowX: 'hidden',
+          zIndex: 1200 // Lower than other drawers (1300+)
         }
       }}
     >

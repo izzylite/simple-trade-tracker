@@ -52,7 +52,7 @@ interface CalendarNoteDataProps {
   isReadOnly?: boolean;
 }
 
-const CalendarNote: React.FC<CalendarNoteDataProps> = ({
+const CalendarSummary: React.FC<CalendarNoteDataProps> = ({
   calendarNote,
   onUpdateCalendarProperty,
   calendarId,
@@ -274,8 +274,9 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
           <RichTextEditor
             value={editedData}
             onChange={isReadOnly ? () => { } : setEditedData}
-            placeholder="Enter a description about your calendar, trading strategy, plans, or mindset..."
+            placeholder="Write about your trading strategy, plans, emotions, or mindset etc... This will aid your AI assistant in providing context-aware insights..."
             minHeight={300}
+            maxLength={5000}
             calendarId={calendarId}
             trades={trades}
             onOpenGalleryMode={onOpenGalleryMode}
@@ -385,6 +386,7 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
                     hideCharacterCount={true}
                     minHeight={50}
                     maxHeight={400}
+                    maxLength={5000}
                     calendarId={calendarId}
                     trades={trades}
                     onOpenGalleryMode={onOpenGalleryMode}
@@ -400,4 +402,4 @@ const CalendarNote: React.FC<CalendarNoteDataProps> = ({
   );
 };
 
-export default CalendarNote;
+export default CalendarSummary;

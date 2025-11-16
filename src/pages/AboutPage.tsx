@@ -151,14 +151,12 @@ const AboutPage: React.FC = () => {
               color="text.secondary"
               sx={{ maxWidth: 800, fontWeight: 400, lineHeight: 1.6 }}
             >
-              Your complete trading journal and analytics workspace. Track trades, analyze
-              performance, understand market events, and work with an AI assistant built around your
-              real trading data.
+              A trading journal and analytics workspace to track trades, analyze performance, and gain insights from your data.
             </Typography>
             <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="center" sx={{ mt: 2 }}>
               <Chip
                 icon={<Speed />}
-                label="Fast Analytics"
+                label="Analytics"
                 color="primary"
                 variant="outlined"
                 sx={{ fontWeight: 600 }}
@@ -214,9 +212,7 @@ const AboutPage: React.FC = () => {
             color="text.secondary"
             sx={{ mb: 4, textAlign: 'center', maxWidth: 700, mx: 'auto', lineHeight: 1.7 }}
           >
-            From detailed trade logging to AI-powered insights, JournoTrades gives you the complete toolkit
-            to analyze, improve, and succeed.
-            Calendars organize your year, trades fill the days, and analytics tie everything into a clear story.
+            From detailed trade logging to AI-powered insights, JournoTrades provides the tools to analyze and improve your trading.
           </Typography>
         </Box>
 
@@ -237,10 +233,7 @@ const AboutPage: React.FC = () => {
             gradient
           >
             <Typography variant="body2" sx={{ ...paragraphSx, mb: 2 }}>
-              Calendars are top-level containers for your trades, stats, tags and notes. Use them to
-              represent a trading year, a prop firm account, or a specific strategy. Each calendar
-              tracks performance, risk, targets, and provides deep analytics to help you understand
-              your trading edge.
+              Calendars are containers for your trades, stats, and notes. Use them to represent a trading year, a prop firm account, or a specific strategy. Each calendar tracks performance, risk, and targets.
             </Typography>
             
             <Box
@@ -263,16 +256,7 @@ const AboutPage: React.FC = () => {
                     Calendar notes & game plans
                   </Typography>
                   <Typography variant="body2" sx={paragraphSx}>
-                    - Each calendar has a dedicated long-form note where you can document your overall
-                    strategy, trading rules, psychology notes, and account-specific context.
-                  </Typography>
-                  <Typography variant="body2" sx={paragraphSx}>
-                    - Use calendar notes to write your game plan: entry criteria, risk rules, session
-                    preferences, and emotional guidelines.
-                  </Typography>
-                  <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
-                    - The AI assistant reads your calendar note to provide context-aware insights and
-                    remind you of your own rules when analyzing trades.
+                    Each calendar has a dedicated note for your strategy, rules, and game plan. The AI assistant uses this note to provide context-aware insights.
                   </Typography>
                 </CardContent>
               </Card>
@@ -290,9 +274,7 @@ const AboutPage: React.FC = () => {
                     Daily notes
                   </Typography>
                   <Typography variant="body2" sx={paragraphSx}>
-                    - Click on any day in the calendar to add a daily note capturing your mindset, market
-                    observations, or session review or game plan. Daily notes help you organize your ideas
-                    and prepare for each trading day.
+                    Click on any day to add a daily note for your mindset, market observations, or session review.
                   </Typography>
                 </CardContent>
               </Card>
@@ -310,12 +292,7 @@ const AboutPage: React.FC = () => {
                     Dynamic risk adjustment
                   </Typography>
                   <Typography variant="body2" sx={paragraphSx}>
-                    - JournoTrades supports dynamic risk per trade based on your recent performance.
-                  </Typography>
-                  <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
-                    - Toggle dynamic risk on to automatically adjust position sizing when you're in a
-                    winning or losing streak, helping you protect capital during drawdowns and scale up
-                    during hot streaks.
+                    Enable dynamic risk to automatically adjust your position sizing based on recent performance, helping protect capital during drawdowns and scale up during winning streaks.
                   </Typography>
                 </CardContent>
               </Card>
@@ -333,14 +310,7 @@ const AboutPage: React.FC = () => {
                     Performance analytics & score analysis
                   </Typography>
                   <Typography variant="body2" sx={paragraphSx}>
-                    - <strong>Trade Score Analysis:</strong> Each trade receives a score based on rule
-                    adherence, risk management, and execution quality. Scores help you identify which
-                    trades followed your plan (high score) versus emotional or impulsive trades (low
-                    score).
-                  </Typography>
-                  <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
-                    - Use score filters to review only high-scoring trades and understand what "A+ setups"
-                    look like, or analyze low-scoring trades to spot recurring mistakes.
+                    Each trade is scored based on rule adherence and risk management. Use scores to identify your best setups and recurring mistakes.
                   </Typography>
                 </CardContent>
               </Card>
@@ -355,10 +325,7 @@ const AboutPage: React.FC = () => {
             gradient
           >
             <Typography variant="body2" sx={{ ...paragraphSx, mb: 2 }}>
-              Trades live inside a calendar and appear on the trading calendar view. Each trade
-              stores direction, size, PnL, screenshots, notes and tags. JournoTrades gives you
-              complete control over your trade data with import, export, sharing, and advanced
-              organization features.
+              Log your trades with direction, size, PnL, screenshots, notes, and tags. You can import, export, and share your trade data.
             </Typography>
  
 
@@ -382,15 +349,7 @@ const AboutPage: React.FC = () => {
                     Importing & exporting trades
                   </Typography>
                   <Typography variant="body2" sx={paragraphSx}>
-                    - <strong>Import:</strong> Open a calendar, scroll to the Monthly Performance card,
-                    click the three-dot menu, and choose "Import Trades". Select a .csv or .xlsx file and
-                    use the mapping dialog to match columns to fields like date, instrument, result, amount
-                    and tags.
-                  </Typography>
-                  <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
-                    - <strong>Export:</strong> Export your trades to CSV format for backup, analysis in
-                    external tools, or migration. Use the export option from the calendar menu to download
-                    all trades with full metadata including tags, notes, and performance metrics.
+                    Import trades from .csv or .xlsx files, and export your data to CSV for backup or external analysis.
                   </Typography>
                 </CardContent>
               </Card>
@@ -408,16 +367,7 @@ const AboutPage: React.FC = () => {
                     Group tags & required tag groups
                   </Typography>
                   <Typography variant="body2" sx={paragraphSx}>
-                    - Tags follow a "Group:Tag" pattern (for example, "Setup:Breakout" or "Session:London")
-                    so you can see patterns by category.
-                  </Typography>
-                  <Typography variant="body2" sx={paragraphSx}>
-                    - Use the Tags button in the calendar toolbar to manage tags and required tag groups
-                    (for example, always require a Setup and Session tag).
-                  </Typography>
-                  <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
-                    - Filter trades with the tag filter button to review only specific setups, conditions or
-                    sessions.
+                    Organize trades with tags like "Setup:Breakout". Manage tags and create required groups to ensure consistent logging.
                   </Typography>
                 </CardContent>
               </Card>
@@ -435,9 +385,7 @@ const AboutPage: React.FC = () => {
                     Gallery mode for screenshots
                   </Typography>
                   <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
-                    - View all trade screenshots in gallery mode to visually review your setups, entries,
-                    and exits. Gallery mode lets you quickly scan through chart images without opening
-                    individual trades, making pattern recognition and visual review much faster.
+                    Use the gallery mode to visually review all your trade screenshots at once, making it easier to spot patterns.
                   </Typography>
                 </CardContent>
               </Card>
@@ -455,10 +403,7 @@ const AboutPage: React.FC = () => {
                     Sharing trades
                   </Typography>
                   <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
-                    - Generate shareable links for individual trades to discuss setups with mentors, share
-                    wins (or lessons) with your trading community, or get feedback. Shared trades display
-                    all details including screenshots, tags, notes, and performance metrics in a clean,
-                    read-only view.
+                    Generate shareable links for individual trades to discuss setups with mentors or your trading community.
                   </Typography>
                 </CardContent>
               </Card>
@@ -472,8 +417,7 @@ const AboutPage: React.FC = () => {
             gradient
           >
             <Typography variant="body2" sx={{ ...paragraphSx, mb: 2 }}>
-              JournoTrades integrates economic events so you can see how high-impact news aligns with
-              your trades.
+              See how high-impact news aligns with your trades with the integrated economic calendar.
             </Typography>
 
             <Typography variant="body2" sx={subsectionTitleSx}>
@@ -499,8 +443,7 @@ const AboutPage: React.FC = () => {
             gradient
           >
             <Typography variant="body2" sx={{ ...paragraphSx, mb: 2 }}>
-              Notes let you store playbooks, checklists and reviews outside of individual trades. You
-              can also attach a long-form note to each calendar.
+              Store playbooks, checklists, and reviews in a dedicated notes section. You can also attach a detailed note to each calendar.
             </Typography>
 
             <Typography variant="body2" sx={subsectionTitleSx}>
@@ -530,10 +473,7 @@ const AboutPage: React.FC = () => {
             gradient
           >
           <Typography variant="body2" sx={{ ...paragraphSx, mb: 2 }}>
-            The AI assistant is a context-aware trading analyst that understands your specific
-            trading style, rules, and performance patterns. It can search trades, analyze
-            statistics, read your notes, and correlate economic events to help you identify what's
-            working, what's not, and why.
+            The AI assistant understands your trading style, rules, and performance. It can search trades, analyze stats, read your notes, and correlate economic events to help you find your edge.
           </Typography>
 
           <Typography variant="body2" sx={subsectionTitleSx}>
@@ -559,40 +499,13 @@ const AboutPage: React.FC = () => {
           </Typography>
 
           <Typography variant="body2" sx={subsectionTitleSx}>
-            Why detailed calendar notes matter
+            Why Detailed Notes Matter
           </Typography>
           <Typography variant="body2" sx={paragraphSx}>
-            The AI assistant reads your calendar note to understand the context of your trading
-            account. A well-written calendar note acts as your trading plan and rulebook, helping
-            the AI provide personalized insights instead of generic advice. The more detailed your
-            note, the better the AI can understand your trading style and provide relevant insights.
+            The AI assistant reads your calendar and trade notes to provide personalized insights. A well-written note with your trading plan and rules will improve the AI's analysis.
           </Typography>
           <Typography variant="body2" sx={paragraphSx}>
-            <strong>What to include in your calendar note:</strong>
-          </Typography>
-          <Typography variant="body2" sx={paragraphSx}>
-            - Your trading strategy and edge (e.g., "I trade breakouts on EUR/USD during London
-            session using 15-minute timeframe")
-          </Typography>
-          <Typography variant="body2" sx={paragraphSx}>
-            - Entry and exit rules (e.g., "Only enter after 3 consecutive higher highs with RSI
-            above 50")
-          </Typography>
-          <Typography variant="body2" sx={paragraphSx}>
-            - Risk management rules (e.g., "Max 2% risk per trade, reduce to 1% after 3 consecutive
-            losses")
-          </Typography>
-          <Typography variant="body2" sx={paragraphSx}>
-            - Session preferences and restrictions (e.g., "Avoid trading during Asian session, no
-            trades 30 minutes before major news")
-          </Typography>
-          <Typography variant="body2" sx={paragraphSx}>
-            - Psychological guidelines (e.g., "If feeling emotional or tired, skip trading for the
-            day")
-          </Typography>
-          <Typography variant="body2" sx={{ ...paragraphSx, mb: 1.5 }}>
-            - Account goals and targets (e.g., "Prop firm challenge: reach 10% profit without
-            exceeding 5% drawdown")
+            Include details like your strategy, rules for entry and exit, risk management, session preferences, and psychological guidelines.
           </Typography>
            
 
@@ -622,7 +535,7 @@ const AboutPage: React.FC = () => {
             color="text.secondary"
             sx={{ mb: 4, textAlign: 'center', maxWidth: 700, mx: 'auto' }}
           >
-            Follow these steps to get the most out of JournoTrades
+            Follow these steps to get the most out of the platform.
           </Typography>
 
           <Card
@@ -711,8 +624,7 @@ const AboutPage: React.FC = () => {
                     Join Our Community
                   </Typography>
                   <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.7 }}>
-                    Connect with fellow traders, share strategies, get support, and help shape the future
-                    of JournoTrades on Discord.
+                    Connect with fellow traders, share strategies, and get support on our Discord.
                   </Typography>
                 </Box>
               </Box>
@@ -749,4 +661,3 @@ const AboutPage: React.FC = () => {
 };
 
 export default AboutPage;
-
