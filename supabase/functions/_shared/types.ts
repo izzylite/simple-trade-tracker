@@ -42,7 +42,6 @@ export interface Calendar {
   note?: string
   hero_image_url?: string
   hero_image_attribution?: Record<string, unknown>
-  days_notes?: Record<string, unknown>
   score_settings?: Record<string, unknown>
   economic_calendar_filters?: Record<string, unknown>
   pinned_events?: Record<string, unknown>[]

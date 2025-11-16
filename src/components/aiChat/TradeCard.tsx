@@ -217,20 +217,8 @@ const TradeCard: React.FC<TradeCardProps> = ({
           {showTags && trade.tags && trade.tags.length > 0 && (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
               {visibleTags.map(([group, groupTags]) => (
-                <Tooltip
-                  key={group}
-                  title={
-                    <Box sx={{ p: 0.5 }}>
-                      {groupTags.map(tag => (
-                        <Typography key={tag} variant="body2">
-                          {formatTagForDisplay(tag, true)}
-                        </Typography>
-                      ))}
-                    </Box>
-                  }
-                  arrow
-                >
-                  <Chip
+                <Chip
+                    key={group}
                     label={`${group}${groupTags.length > 1 ? ` (${groupTags.length})` : ''}`}
                     size="small"
                     sx={{
@@ -240,7 +228,6 @@ const TradeCard: React.FC<TradeCardProps> = ({
                       '& .MuiChip-label': { px: 1 }
                     }}
                   />
-                </Tooltip>
               ))}
 
               {/* Show +N chip if there are more tags */}

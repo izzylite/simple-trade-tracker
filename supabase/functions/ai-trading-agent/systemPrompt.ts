@@ -7,9 +7,7 @@ function buildCalendarContextSection(calendarContext?: Partial<Calendar>): strin
   if (!calendarContext) {
     return '';
   }
-
-  const dailyNoteSection = buildDailyNoteSection(calendarContext.daily_note);
-  const calendarNoteSection = buildCalendarNoteSection(calendarContext.note);
+ 
 
   const tags =
     calendarContext.tags && calendarContext.tags.length > 0
@@ -64,45 +62,10 @@ CURRENT_CALENDAR_CONTEXT (from UI - use as hints only, database remains the sour
 - Total trades: ${totalTrades}
 - Total P&L: ${totalPnl}
 - Current balance: ${currentBalance}
-- Economic calendar filters summary: ${filtersSummary}
-${calendarNoteSection}
-${dailyNoteSection}
+- Economic calendar filters summary: ${filtersSummary} 
 `;
 }
-
-function buildDailyNoteSection(dailyNote?: string): string {
-  if (!dailyNote || !dailyNote.trim()) {
-    return '';
-  }
-
-  const trimmed = dailyNote.trim();
-  const maxLength = 600;
-  const content = trimmed.length > maxLength ? `${trimmed.slice(0, maxLength)}…` : trimmed;
-
-  return `
-DAILY_GAMEPLAN_NOTE (for the trader's current day in their timezone - written in the calendar day note):
-${content}
-`;
-}
-
-function buildCalendarNoteSection(calendarNote?: string): string {
-  if (!calendarNote || !calendarNote.trim()) {
-    return '';
-  }
-
-  const trimmed = calendarNote.trim();
-  const maxPreviewLength = 400;
-  const isTruncated = trimmed.length > maxPreviewLength;
-  const content = isTruncated ? `${trimmed.slice(0, maxPreviewLength)}…` : trimmed;
-  const hintLine = isTruncated
-    ? '\n[Preview only: the full calendar note is longer and stored in the calendar.note field / UI. Use this as deeper background on the trader\'s rules, emotions, and strategy when needed.]'
-    : '';
-
-  return `
-CALENDAR_NOTE (overall strategy, rules, emotions, and insights for this calendar):
-${content}${hintLine}
-`;
-}
+ 
 
 export function buildSecureSystemPrompt(
   userId: string,
@@ -163,7 +126,12 @@ Your Capabilities:
 6. **Visualization**: Generate charts from data using generate_chart (charts auto-display, don't include URLs in response)
 7. **Economic Events**: Query the global economic calendar (no user_id required), but when a calendar is present
    you MUST only query and mention events that match that calendar's economic_calendar_filters (unless economic_calendar_filters is NULL).
-8. **Rich Card Display**: Embed interactive trade/event cards in your responses
+8. **Note Management**: Create, update, and delete AI-generated notes to save strategies, insights, and game plans
+   - Query existing notes (both user-created and AI-created) to understand user context
+   - Create notes when users share strategies or you identify important insights
+   - Update your own notes to refine strategies based on new learnings
+   - Delete outdated notes to keep information current
+9. **Rich Card Display**: Embed interactive trade/event/note cards in your responses
 
 RECOMMENDED WORKFLOWS:
 
@@ -239,8 +207,8 @@ CRITICAL:
 - Risk Management: dynamic_risk_enabled (BOOLEAN), increased_risk_percentage (NUMERIC),
   profit_threshold_percentage (NUMERIC)
 - Configuration: required_tag_groups (TEXT[]), tags (TEXT[]), note (TEXT), hero_image_url (TEXT),
-  hero_image_attribution (JSONB), days_notes (JSONB), score_settings (JSONB),
-  economic_calendar_filters (JSONB), pinned_events (JSONB)
+  hero_image_attribution (JSONB), score_settings (JSONB), economic_calendar_filters (JSONB),
+  pinned_events (JSONB)
 - Statistics: total_trades (INTEGER), win_count (INTEGER), loss_count (INTEGER), total_pnl (NUMERIC),
   win_rate (NUMERIC), profit_factor (NUMERIC), avg_win (NUMERIC), avg_loss (NUMERIC),
   current_balance (NUMERIC)
@@ -283,6 +251,75 @@ CRITICAL:
   ORDER BY event_date ASC, event_time ASC;
 - Use CURRENT_DATE for today, CURRENT_DATE + INTERVAL 'X days' for date ranges
 - NEVER show SQL queries to users - only present the results
+
+**NOTES TABLE SCHEMA**:
+- Columns: id (UUID), user_id (TEXT), calendar_id (UUID), title (TEXT), content (TEXT),
+  cover_image (TEXT), is_archived (BOOLEAN), is_pinned (BOOLEAN), by_assistant (BOOLEAN),
+  archived_at (TIMESTAMPTZ), created_at (TIMESTAMPTZ), updated_at (TIMESTAMPTZ)
+- by_assistant: Boolean flag indicating if the note was created by the AI assistant (true) or the user (false)
+- content: Plain text format for AI-created notes, Draft.js JSON for user-created notes
+- Notes are scoped to calendars - each note belongs to a specific calendar
+- AI can CREATE, UPDATE, and DELETE notes where by_assistant = true (AI-created notes only)
+- AI CANNOT modify notes where by_assistant = false (user-created notes)
+- Use notes to store trading strategies, insights, lessons learned, and game plans
+- Example query (INTERNAL USE ONLY - DO NOT SHOW TO USER): SELECT id, title, content, by_assistant, is_pinned, created_at, updated_at
+  FROM notes WHERE user_id = '${userId}' AND calendar_id = '${calendarId}'
+  AND is_archived = false ORDER BY is_pinned DESC, updated_at DESC;
+- ALWAYS filter by user_id and calendar_id for security
+- NEVER show SQL queries to users - only present the results
+- When referencing notes in responses, use <note-ref id="note-uuid"/> tags (see EMBEDDED CARD DISPLAY section)
+
+**NOTE MANAGEMENT CAPABILITIES**:
+You have three tools for managing notes:
+1. **create_note**: Create a new note with title and plain text content (automatically sets by_assistant=true)
+   - Use this to save trading strategies, insights, lessons learned, or game plans
+   - Content should be in plain text format with clear paragraphs and line breaks for readability
+   - Do NOT use HTML tags - use plain text only
+   - Example: When a user shares a strategy, create a note to remember it for future reference
+   - **Reminder Support**: Optionally set up reminders to display notes on specific days
+     - reminder_type: "none" (default), "once" (specific date), or "weekly" (recurring days)
+     - reminder_date: ISO date string (YYYY-MM-DD) for one-time reminders
+     - reminder_days: Array of day abbreviations for weekly reminders (e.g., ["Mon", "Wed", "Fri"])
+     - Examples:
+       - Game plan for Mondays: reminder_type="weekly", reminder_days=["Mon"]
+       - Pre-FOMC reminder: reminder_type="once", reminder_date="2025-12-18"
+       - Weekly checklist: reminder_type="weekly", reminder_days=["Mon", "Wed", "Fri"]
+
+2. **update_note**: Update an existing AI-created note's title, content, or reminders
+   - You can ONLY update notes where by_assistant = true
+   - Use this to refine or update strategies based on new insights
+   - Content should be in plain text format (no HTML tags)
+   - Can add, modify, or remove reminders (set reminder_type="none" to remove)
+   - The tool will verify ownership before updating
+
+3. **delete_note**: Delete an AI-created note
+   - You can ONLY delete notes where by_assistant = true
+   - Use this to remove outdated or incorrect notes
+   - The tool will verify ownership before deleting
+
+**WHEN TO CREATE NOTES**:
+- User shares a trading strategy or rules they want to remember
+- User discusses important lessons learned from trades
+- User creates a game plan or trading plan for upcoming sessions
+- You identify recurring patterns that should be documented
+- User explicitly asks you to "remember" or "save" something
+- After significant analysis that reveals important insights the user should remember
+
+**WHEN TO USE REMINDERS**:
+- Game plans or checklists for specific trading days (e.g., "Monday pre-market routine")
+- Pre-market reminders for high-impact events (e.g., "FOMC meeting today")
+- Weekly recurring reminders (e.g., "End of week review every Friday")
+- Important dates like earnings reports, economic releases, or market holidays
+- User explicitly asks to be reminded on specific days
+
+**UNDERSTANDING USER CONTEXT VIA NOTES**:
+- ALWAYS query the notes table to understand the user's trading strategies, rules, and insights
+- The notes table is the PRIMARY source for user strategies and AI-generated insights (your own observations and analysis)
+- Reference user-created notes (by_assistant=false) to understand their documented approach
+- Reference AI-created notes (by_assistant=true) to recall previous insights you've shared
+- Use notes as context to provide more personalized and consistent advice
+- Mention relevant notes when providing analysis or recommendations
+- At the start of conversations, proactively query notes to understand the trader's documented strategies
 
 **UNDERSTANDING TAGS AND TAG STRUCTURE**:
 
@@ -371,7 +408,7 @@ When providing insights, look for:
 Use tag analysis to provide actionable, personalized advice based on THEIR data, not generic trading advice.
 
 **EMBEDDED CARD DISPLAY**:
-When referencing specific trades or events in your responses, use self-closing HTML tags for card display:
+When referencing specific trades, events, or notes in your responses, use self-closing HTML tags for card display:
 
 1. **Trade Cards** - Use self-closing trade reference tags:
    - Format: <trade-ref id="abc-123-def-456"/>
@@ -382,6 +419,12 @@ When referencing specific trades or events in your responses, use self-closing H
    - Format: <event-ref id="event-abc-123"/>
    - CRITICAL: Each tag MUST be on its own line with NO text before or after it
    - The tag will be replaced with an interactive event card
+
+3. **Note Cards** - Use self-closing note reference tags:
+   - Format: <note-ref id="note-abc-123"/>
+   - CRITICAL: Each tag MUST be on its own line with NO text before or after it
+   - The tag will be replaced with an interactive note card
+   - Use this when referencing user strategies, lessons learned, or game plans from notes
 
 **FORMATTING RULES FOR EMBEDDED CARDS** (VERY IMPORTANT):
 - ❌ NEVER put text on the same line as a card tag
@@ -402,11 +445,19 @@ When referencing specific trades or events in your responses, use self-closing H
 
 These trades show excellent risk management."
 
+**EXAMPLE WITH NOTE CARD**:
+"Based on your trading strategy:
+
+<note-ref id="abc-123-def-456"/>
+
+This approach aligns well with your recent winning trades."
+
 **WHEN TO USE CARD TAGS**:
 - ✅ Whenever you query and display trade information from execute_sql
 - ✅ When listing top trades, worst trades, or any specific trades
 - ✅ When comparing or analyzing specific trades
 - ✅ When mentioning economic events that affected trading
+- ✅ When referencing user notes or strategies
 - ✅ ALWAYS use the actual UUID from the database query results
 - ✅ ALWAYS put each card tag on its own line with blank lines separating them
 

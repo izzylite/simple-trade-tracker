@@ -28,6 +28,31 @@ export interface EconomicEvent {
   unix_timestamp?: number;
 }
 
+// Note Types
+export type ReminderType = 'none' | 'once' | 'weekly';
+export type DayAbbreviation = 'Sun' | 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat';
+
+export interface Note {
+  id: string;
+  user_id: string;
+  calendar_id: string;
+  title: string;
+  content: string; // HTML format for AI-created notes, Draft.js JSON for user-created notes
+  cover_image: string | null;
+  is_archived: boolean;
+  is_pinned: boolean;
+  by_assistant: boolean;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+
+  // Reminder fields
+  reminder_type?: ReminderType;
+  reminder_date?: string | null; // ISO date string for one-time reminders
+  reminder_days?: DayAbbreviation[]; // For weekly reminders
+  is_reminder_active?: boolean;
+}
+
 // Trade Types
 export interface TradeEconomicEvent {
   name: string;
@@ -137,9 +162,6 @@ export interface Calendar {
   // Notes and media
   note?: string;
   hero_image_url?: string;
-  days_notes?: Record<string, string>;
-  /** Optional derived field for AI context: current day's gameplan note, provided from the UI. Not stored in the database. */
-  daily_note?: string;
 
   // Settings
   economic_calendar_filters?: EconomicCalendarFilterSettings;
@@ -217,9 +239,11 @@ export interface AgentResponse {
   trades?: Trade[];
   calendars?: Calendar[];
   economicEvents?: EconomicEvent[];
-  // Embedded data for inline references (trade_id:xxx, event_id:xxx)
+  notes?: Note[];
+  // Embedded data for inline references (trade_id:xxx, event_id:xxx, note_id:xxx)
   embeddedTrades?: Record<string, Trade>;
   embeddedEvents?: Record<string, EconomicEvent>;
+  embeddedNotes?: Record<string, Note>;
   metadata: {
     functionCalls: ToolCall[];
     tokenUsage?: number;

@@ -18,6 +18,7 @@ import { supabaseAuthService } from '../../supabaseAuthService';
 export interface NoteQueryOptions {
   isPinned?: boolean;
   isArchived?: boolean;
+  byAssistant?: boolean;
   searchQuery?: string;
   limit?: number;
   offset?: number;
@@ -114,6 +115,7 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
       const {
         isPinned,
         isArchived,
+        byAssistant,
         searchQuery,
         limit = 20,
         offset = 0
@@ -131,6 +133,9 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
       }
       if (isArchived !== undefined) {
         query = query.eq('is_archived', isArchived);
+      }
+      if (byAssistant !== undefined) {
+        query = query.eq('by_assistant', byAssistant);
       }
 
       // Apply search (search in title and content)
@@ -193,6 +198,7 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
       const {
         isPinned,
         isArchived,
+        byAssistant,
         searchQuery,
         limit = 20,
         offset = 0
@@ -210,6 +216,9 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
       }
       if (isArchived !== undefined) {
         query = query.eq('is_archived', isArchived);
+      }
+      if (byAssistant !== undefined) {
+        query = query.eq('by_assistant', byAssistant);
       }
 
       // Apply search (search in title and content)
@@ -399,6 +408,70 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
     } catch (error) {
       logger.error('Exception unpinning note:', error);
       return false;
+    }
+  }
+
+  // REMINDER OPERATIONS
+
+  /**
+   * Find reminder notes for a specific day of the week
+   * Returns active weekly reminders that match the given day
+   */
+  async findRemindersByDay(calendarId: string, dayAbbreviation: string): Promise<Note[]> {
+    try {
+      await supabaseAuthService.ensureValidSession();
+
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('calendar_id', calendarId)
+        .eq('reminder_type', 'weekly')
+        .eq('is_reminder_active', true)
+        .eq('is_archived', false)
+        .contains('reminder_days', [dayAbbreviation])
+        .order('created_at', { ascending: false }); // Most recent first
+
+      if (error) {
+        logger.error('Error finding reminders by day:', error);
+        return [];
+      }
+
+      return data ? data.map(item => transformSupabaseNote(item)) : [];
+    } catch (error) {
+      logger.error('Exception finding reminders by day:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Find reminder notes for a specific date (one-time reminders)
+   * Returns active one-time reminders that match the given date
+   */
+  async findRemindersByDate(calendarId: string, date: Date): Promise<Note[]> {
+    try {
+      await supabaseAuthService.ensureValidSession();
+
+      const dateStr = date.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('calendar_id', calendarId)
+        .eq('reminder_type', 'once')
+        .eq('is_reminder_active', true)
+        .eq('is_archived', false)
+        .eq('reminder_date', dateStr)
+        .order('created_at', { ascending: false }); // Most recent first
+
+      if (error) {
+        logger.error('Error finding reminders by date:', error);
+        return [];
+      }
+
+      return data ? data.map(item => transformSupabaseNote(item)) : [];
+    } catch (error) {
+      logger.error('Exception finding reminders by date:', error);
+      return [];
     }
   }
 

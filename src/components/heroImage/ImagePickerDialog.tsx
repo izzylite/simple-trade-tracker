@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Dialog,
-  DialogTitle,
   DialogContent,
   Box,
   IconButton,
@@ -13,10 +12,11 @@ import {
   CardMedia,
   CardActionArea,
   useTheme,
-  alpha,
   Link,
-  Chip
+  Chip,
+  DialogTitle
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
   Close as CloseIcon,
   Search as SearchIcon,
@@ -25,6 +25,8 @@ import {
 import Shimmer from '../Shimmer';
 import { unsplashCache, UnsplashImage } from '../../services/unsplashCache';
 import { logger } from '../../utils/logger';
+import { getDialogProps } from '../../utils/dialogUtils';
+import { scrollbarStyles } from '../../styles/scrollbarStyles';
 
 
 
@@ -55,6 +57,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
   const [images, setImages] = useState<UnsplashImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [isFromCache, setIsFromCache] = useState(false);
+  const dialogBaseProps = getDialogProps(theme);
 
   const UNSPLASH_ACCESS_KEY = process.env.REACT_APP_UNSPLASH_ACCESS_KEY;
 
@@ -227,77 +230,61 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
       onClose={onClose}
       maxWidth="lg"
       fullWidth
-      slotProps={{
-        paper: {
-          sx: {
-            borderRadius: 1.5,
-            maxHeight: '90vh',
-            background: (theme) => theme.palette.mode === 'dark'
-              ? `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.default, 0.98)} 100%)`
-              : `linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.98) 100%)`,
-            backdropFilter: 'blur(10px)',
-            border: '1px solid',
-            borderColor: 'divider',
-            boxShadow: (theme) => `0 20px 40px ${alpha(theme.palette.primary.main, 0.1)}`
-          }
-        }
+      {...dialogBaseProps}
+      sx={{
+        ...(dialogBaseProps.sx || {}),
+        zIndex: (theme) => theme.zIndex.modal + 200, // Ensure it's above the AIChatDrawer
       }}
     >
-      <DialogTitle sx={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        pb: 2,
-        pt: 3,
-        px: 3,
-        background: (theme) => `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.primary.light, 0.05)} 100%)`,
-        borderBottom: '1px solid',
-        borderColor: 'divider'
-      }}>
-        <Box>
-          <Typography variant="h5" sx={{
-            fontWeight: 700,
-            background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-            backgroundClip: 'text',
-            WebkitBackgroundClip: 'text',
-            color: 'transparent',
-            mb: 0.5
-          }}>
+      <DialogTitle
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          py: 2,
+          px: 2.5,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
             {title}
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Choose from thousands of high-quality images
+            Choose a clean cover image from curated Unsplash photos
           </Typography>
         </Box>
         <IconButton
           onClick={onClose}
           size="small"
           sx={{
-            bgcolor: 'background.paper',
-            border: '1px solid',
-            borderColor: 'divider',
+            color: 'text.secondary',
             '&:hover': {
-              bgcolor: 'error.main',
-              color: 'white',
-              borderColor: 'error.main'
-            }
+              bgcolor: alpha(theme.palette.error.main, 0.08),
+              color: 'error.main',
+            },
           }}
         >
           <CloseIcon />
         </IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ pt: 3, px: 3, overflow: 'hidden' }}>
+      <DialogContent sx={{ pt: 2, px: 2.5 }}>
         {/* Search */}
-        <Box sx={{
-          display: 'flex',
-          gap: 2,
-          my: 3, 
-
-        }}>
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 1.5,
+            mt: 1,
+            mb: 2,
+            alignItems: 'center',
+            flexDirection: { xs: 'column', sm: 'row' }
+          }}
+        >
           <TextField
             fullWidth
-            size="medium"
+            size="small"
             placeholder="Search for trading charts, financial markets, business..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -306,10 +293,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
               input: {
                 startAdornment: <SearchIcon sx={{ mr: 1.5, color: 'primary.main' }} />,
                 sx: {
-                  borderRadius: 1,
-                  '&:hover': {
-                    borderColor: 'primary.main'
-                  }
+                  borderRadius: 1
                 }
               }
             }}
@@ -320,8 +304,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
               bgcolor: 'background.paper',
               borderRadius: 1,
               border: '1px solid',
-              borderColor: 'divider',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+              borderColor: 'divider'
             }}
           />
           <Button
@@ -449,36 +432,21 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
         </Box>
 
         {/* Images Grid */}
-        <Box sx={{
-          maxHeight: '450px',
-          overflow: 'auto',
-          scrollbarWidth: 'thin',
-          borderRadius: 1,
-          border: '1px solid',
-          borderColor: 'divider',
-          bgcolor: 'background.paper',
-          p: 2,
-          '&::-webkit-scrollbar': {
-            width: '8px',
-          },
-          '&::-webkit-scrollbar-track': {
-            background: (theme) => theme.palette.mode === 'dark'
-              ? 'rgba(255,255,255,0.05)'
-              : 'rgba(0,0,0,0.05)',
-            borderRadius: '4px',
-          },
-          '&::-webkit-scrollbar-thumb': {
-            background: (theme) => theme.palette.mode === 'dark'
-              ? `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.6)} 0%, ${alpha(theme.palette.primary.light, 0.6)} 100%)`
-              : `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-            borderRadius: '4px',
-            '&:hover': {
-              background: (theme) => theme.palette.mode === 'dark'
-                ? `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.8)} 0%, ${alpha(theme.palette.primary.light, 0.8)} 100%)`
-                : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`
-            }
-          }
-        }}>
+        <Box
+          sx={{
+            maxHeight: 380,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            borderRadius: 1,
+            border: `1px solid ${theme.palette.divider}`,
+            bgcolor:
+              theme.palette.mode === 'dark'
+                ? alpha(theme.palette.background.paper, 0.9)
+                : alpha(theme.palette.background.default, 0.9),
+            p: 1.5,
+            ...scrollbarStyles(theme)
+          }}
+        >
           {loading ? (
             <Box
               sx={{
@@ -520,16 +488,16 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
                   key={image.id}
                   sx={{
                     borderRadius: 1,
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
                     cursor: 'pointer',
                     position: 'relative',
                     overflow: 'hidden',
                     border: '1px solid',
-                    borderColor: 'divider',
+                    borderColor: alpha(theme.palette.divider, 0.7),
                     '&:hover': {
-                      transform: 'translateY(-4px) scale(1.02)',
-                      boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
-                      borderColor: 'primary.main',
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+                      borderColor: theme.palette.primary.main,
                       '& .image-overlay': {
                         opacity: 1
                       }
@@ -547,12 +515,11 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
                   >
                     <CardMedia
                       component="img"
-                      height="140"
+                      height="120"
                       image={image.urls.small}
                       alt={image.alt_description || 'Cover image'}
                       sx={{
-                        objectFit: 'cover',
-                        transition: 'transform 0.3s ease'
+                        objectFit: 'cover'
                       }}
                     />
 
@@ -561,17 +528,14 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
                       className="image-overlay"
                       sx={{
                         position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: (theme) => `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.9)} 0%, ${alpha(theme.palette.primary.light, 0.9)} 100%)`,
+                        inset: 0,
+                        backgroundColor: alpha(theme.palette.common.black, 0.4),
                         opacity: 0,
-                        transition: 'opacity 0.3s ease',
+                        transition: 'opacity 0.2s ease',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: 'white'
+                        color: 'common.white'
                       }}
                     >
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>

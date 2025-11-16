@@ -3,7 +3,7 @@
  * Direct HTTP calls to both Gemini API and Supabase MCP (no SDKs)
  */
 
-import { corsHeaders, handleCors, log } from '../_shared/supabase.ts';
+import { corsHeaders, handleCors, log, createServiceClient } from '../_shared/supabase.ts';
 import { formatErrorResponse, formatResponseWithHtmlAndCitations } from './formatters.ts';
 import type { AgentRequest, ToolCall } from './types.ts';
 import {
@@ -11,7 +11,7 @@ import {
   getAllCustomTools,
   executeCustomTool
 } from './tools.ts';
-import { fetchEmbeddedData } from './embedDataFetcher.ts';
+import { fetchEmbeddedData, type EmbeddedData } from './embedDataFetcher.ts';
 import { buildSecureSystemPrompt } from "./systemPrompt.ts";
 
 /**
@@ -538,11 +538,15 @@ function handleStreamingRequest(
           }
 
           // Execute all tools in parallel
-          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart'];
+          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes'];
+          const supabaseClient = createServiceClient();
           const executionPromises = result.functionCalls.map(async (call) => {
             try {
               const result = customToolNames.includes(call.name)
-                ? await executeCustomTool(call.name, call.args)
+                ? await executeCustomTool(call.name, call.args, {
+                  userId,
+                  calendarId: _calendarId
+                }, supabaseClient)
                 : await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
               return { call, result, success: true };
             } catch (error) {
@@ -623,9 +627,13 @@ function handleStreamingRequest(
           let functionResult: string;
 
           // Execute tool (custom or MCP)
-          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart'];
+          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes'];
+          const supabaseClient = createServiceClient();
           if (customToolNames.includes(call.name)) {
-            functionResult = await executeCustomTool(call.name, call.args);
+            functionResult = await executeCustomTool(call.name, call.args, {
+                  userId,
+                  calendarId: _calendarId
+                }, supabaseClient);
           } else {
             functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
           }
@@ -758,7 +766,7 @@ function handleStreamingRequest(
       // Fetch embedded data
       const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
       if (serviceKey) {
-        const embeddedData = await fetchEmbeddedData(
+        const embeddedData: EmbeddedData = await fetchEmbeddedData(
           finalText || '',
           supabaseUrl,
           serviceKey,
@@ -767,12 +775,14 @@ function handleStreamingRequest(
 
         const embeddedTrades = Object.fromEntries(embeddedData.trades);
         const embeddedEvents = Object.fromEntries(embeddedData.events);
+        const embeddedNotes = Object.fromEntries(embeddedData.notes);
 
         // Send embedded data if available
-        if (Object.keys(embeddedTrades).length > 0 || Object.keys(embeddedEvents).length > 0) {
+        if (Object.keys(embeddedTrades).length > 0 || Object.keys(embeddedEvents).length > 0 || Object.keys(embeddedNotes).length > 0) {
           await sendSSE(writer, 'embedded_data', {
             embeddedTrades: Object.keys(embeddedTrades).length > 0 ? embeddedTrades : undefined,
-            embeddedEvents: Object.keys(embeddedEvents).length > 0 ? embeddedEvents : undefined
+            embeddedEvents: Object.keys(embeddedEvents).length > 0 ? embeddedEvents : undefined,
+            embeddedNotes: Object.keys(embeddedNotes).length > 0 ? embeddedNotes : undefined
           });
         }
       }
@@ -968,10 +978,14 @@ Deno.serve(async (req: Request) => {
       let functionResult: string;
 
       // Check if it's a custom tool (from tools.ts)
-      const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart'];
+      const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes'];
+      const supabaseClient = createServiceClient();
       if (customToolNames.includes(call.name)) {
         // Execute custom tool
-        functionResult = await executeCustomTool(call.name, call.args);
+        functionResult = await executeCustomTool(call.name, call.args, {
+                  userId,
+                  calendarId
+                }, supabaseClient);
         functionCalls.push({ name: call.name, args: call.args, result: functionResult });
       } else {
         // Execute MCP tool via HTTP
@@ -1060,7 +1074,7 @@ Deno.serve(async (req: Request) => {
       throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
     }
 
-    const embeddedData = await fetchEmbeddedData(
+    const embeddedData: EmbeddedData = await fetchEmbeddedData(
       finalText || '',
       supabaseUrl,
       serviceKey,
@@ -1070,8 +1084,9 @@ Deno.serve(async (req: Request) => {
     // Convert Maps to objects for JSON serialization
     const embeddedTrades = Object.fromEntries(embeddedData.trades);
     const embeddedEvents = Object.fromEntries(embeddedData.events);
+    const embeddedNotes = Object.fromEntries(embeddedData.notes);
 
-    log(`Fetched ${embeddedData.trades.size} embedded trades and ${embeddedData.events.size} embedded events`, 'info');
+    log(`Fetched ${embeddedData.trades.size} embedded trades, ${embeddedData.events.size} embedded events, and ${embeddedData.notes.size} embedded notes`, 'info');
 
     const formattedResponse = {
       success: !!finalText,
@@ -1080,6 +1095,7 @@ Deno.serve(async (req: Request) => {
       citations,
       embeddedTrades: Object.keys(embeddedTrades).length > 0 ? embeddedTrades : undefined,
       embeddedEvents: Object.keys(embeddedEvents).length > 0 ? embeddedEvents : undefined,
+      embeddedNotes: Object.keys(embeddedNotes).length > 0 ? embeddedNotes : undefined,
       metadata: {
         functionCalls,
         model: 'gemini-2.5-pro-preview-03-25',

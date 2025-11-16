@@ -25,6 +25,7 @@ export interface AgentResponse {
   }>;
   embeddedTrades?: Record<string, any>;
   embeddedEvents?: Record<string, any>;
+  embeddedNotes?: Record<string, any>;
   metadata?: {
     functionCalls: Array<{
       name: string;
@@ -109,25 +110,9 @@ class SupabaseAIChatService {
     return { processedMessage, tagContext };
   }
 
-  private getCurrentDayNote(calendar: Calendar): string | undefined {
-    if (!calendar.days_notes) {
-      return undefined;
-    }
-
-    const dayKey = new Date().toLocaleDateString('en-US', { weekday: 'short' });
-    const note = calendar.days_notes[dayKey];
-
-    if (!note || !note.trim()) {
-      return undefined;
-    }
-
-    return note.trim();
-  }
-
   private buildCalendarContext(calendar: Calendar) {
     return {
       ...calendar,
-      daily_note: this.getCurrentDayNote(calendar),
     };
   }
 
@@ -288,7 +273,7 @@ class SupabaseAIChatService {
     if (data.name && data.args !== undefined) return 'tool_call';
     if (data.name && data.result !== undefined) return 'tool_result';
     if (data.citations) return 'citation';
-    if (data.embeddedTrades || data.embeddedEvents) return 'embedded_data';
+    if (data.embeddedTrades || data.embeddedEvents || data.embeddedNotes) return 'embedded_data';
     if (data.success !== undefined || data.messageHtml !== undefined) return 'done';
     if (data.error) return 'error';
     return 'text_chunk';
@@ -445,6 +430,7 @@ class SupabaseAIChatService {
       citations: response.citations,
       embeddedTrades: response.embeddedTrades,
       embeddedEvents: response.embeddedEvents,
+      embeddedNotes: response.embeddedNotes,
       timestamp: new Date(),
       status: 'received'
     };

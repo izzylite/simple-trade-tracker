@@ -20,6 +20,8 @@ import {
   Archive as ArchiveIcon,
   Unarchive as UnarchiveIcon,
   PushPinOutlined as PinOutlinedIcon,
+  NotificationsActive as ReminderIcon,
+  SmartToy as AIIcon,
 } from '@mui/icons-material';
 import { convertFromRaw } from 'draft-js';
 import { Note } from '../../types/note';
@@ -109,12 +111,26 @@ export const NoteListItem: React.FC<NoteListItemProps> = ({
       }}
     >
       <Box sx={{ flex: 1, minWidth: 0, mr: 1 }}>
-        {/* Title row with pin indicator and calendar badge */}
+        {/* Title row with pin indicator, reminder badge, AI badge, and calendar badge */}
         <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.5 }}>
           {note.is_pinned && (
             <PinIcon
               fontSize="small"
               sx={{ color: 'primary.main', fontSize: '0.9rem' }}
+            />
+          )}
+          {note.is_reminder_active && note.reminder_type && note.reminder_type !== 'none' && (
+            <ReminderIcon
+              fontSize="small"
+              sx={{ color: 'info.main', fontSize: '0.9rem' }}
+              titleAccess={`${note.reminder_type === 'weekly' ? 'Weekly' : 'One-time'} reminder`}
+            />
+          )}
+          {note.by_assistant && (
+            <AIIcon
+              fontSize="small"
+              sx={{ color: 'primary.main', fontSize: '0.9rem' }}
+              titleAccess="AI-generated note"
             />
           )}
           <Typography

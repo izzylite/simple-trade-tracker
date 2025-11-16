@@ -58,6 +58,8 @@ import { logger } from '../../utils/logger';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
 import EconomicEventDetailDialog from '../economicCalendar/EconomicEventDetailDialog';
 import ApiKeySettingsDialog from './ApiKeySettingsDialog';
+import NoteEditorDialog from '../notes/NoteEditorDialog';
+import { Note } from '../../types/note';
 import { hasApiKey } from '../../services/apiKeyStorage';
 
 interface AIChatDrawerProps {
@@ -140,6 +142,10 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   // Economic event detail dialog state
   const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
   const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
+
+  // Note editor dialog state
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [noteEditorOpen, setNoteEditorOpen] = useState(false);
 
   // API Key settings dialog state
   const [apiKeySettingsOpen, setApiKeySettingsOpen] = useState(false);
@@ -475,6 +481,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       let citations: any[] | undefined;
       let embeddedTrades: any | undefined;
       let embeddedEvents: any | undefined;
+      let embeddedNotes: any | undefined;
       let toolCallsInProgress: string[] = [];
 
       for await (const event of supabaseAIChatService.sendMessageStreaming(
@@ -539,6 +546,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           case 'embedded_data':
             embeddedTrades = event.data.embeddedTrades;
             embeddedEvents = event.data.embeddedEvents;
+            embeddedNotes = event.data.embeddedNotes;
             break;
 
           case 'done':
@@ -565,6 +573,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         citations,
         embeddedTrades,
         embeddedEvents,
+        embeddedNotes,
         timestamp: new Date(),
         status: 'received'
       };
@@ -737,6 +746,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         citations: response.citations,
         embeddedTrades: response.embeddedTrades,
         embeddedEvents: response.embeddedEvents,
+        embeddedNotes: response.embeddedNotes,
         timestamp: new Date(),
         status: 'received'
       };
@@ -1075,6 +1085,20 @@ What would you like to know about your trading?`,
                       logger.log('Economic event clicked:', event);
                       setSelectedEvent(event);
                       setEventDetailDialogOpen(true);
+                    }}
+                    onNoteClick={async (noteId) => {
+                      logger.log('Note clicked:', noteId);
+                      // Find the note from embedded notes in messages
+                      const note = messages
+                        .flatMap(m => m.embeddedNotes ? Object.values(m.embeddedNotes) : [])
+                        .find(n => n.id === noteId);
+
+                      if (note) {
+                        setSelectedNote(note);
+                        setNoteEditorOpen(true);
+                      } else {
+                        logger.warn('Note not found in embedded notes:', noteId);
+                      }
                     }}
                     onEdit={handleEditMessage}
                   />
@@ -1577,6 +1601,53 @@ What would you like to know about your trading?`,
         open={apiKeySettingsOpen}
         onClose={() => setApiKeySettingsOpen(false)}
       />
+
+      {/* Note Editor Dialog */}
+      {noteEditorOpen && selectedNote && calendar && (
+        <NoteEditorDialog
+          open={noteEditorOpen}
+          onClose={() => {
+            setNoteEditorOpen(false);
+            setSelectedNote(null);
+          }}
+          note={selectedNote}
+          calendarId={calendar.id}
+          onSave={(updatedNote) => {
+            // Update the note in embedded notes across all messages
+            setMessages(prevMessages =>
+              prevMessages.map(msg => {
+                if (msg.embeddedNotes && msg.embeddedNotes[updatedNote.id]) {
+                  return {
+                    ...msg,
+                    embeddedNotes: {
+                      ...msg.embeddedNotes,
+                      [updatedNote.id]: updatedNote
+                    }
+                  };
+                }
+                return msg;
+              })
+            );
+          }}
+          onDelete={(noteId) => {
+            // Remove the note from embedded notes across all messages
+            setMessages(prevMessages =>
+              prevMessages.map(msg => {
+                if (msg.embeddedNotes && msg.embeddedNotes[noteId]) {
+                  const { [noteId]: _, ...remainingNotes } = msg.embeddedNotes;
+                  return {
+                    ...msg,
+                    embeddedNotes: remainingNotes
+                  };
+                }
+                return msg;
+              })
+            );
+            setNoteEditorOpen(false);
+            setSelectedNote(null);
+          }}
+        />
+      )}
     </>
   );
 };

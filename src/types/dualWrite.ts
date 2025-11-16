@@ -147,11 +147,9 @@ export interface Calendar extends BaseEntity {
   required_tag_groups?: string[];
   tags?: string[];
 
-  // Notes and media
-  note?: string;
+  // Media
   hero_image_url?: string;
   hero_image_attribution?: ImageAttribution;
-  days_notes?: Record<string, string>; // JSONB in Supabase
 
   // Settings
   score_settings?: ScoreSettings;

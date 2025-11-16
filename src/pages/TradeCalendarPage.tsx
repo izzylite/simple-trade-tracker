@@ -37,8 +37,6 @@ import {
   Home as HomeIcon,
   CalendarToday as CalendarIcon,
   Image as ImageIcon,
-  ExpandLess,
-  ExpandMore,
   Notes as NotesIcon
 
 } from '@mui/icons-material';
@@ -58,7 +56,6 @@ import {
   isToday
 } from 'date-fns';
 import { formatCurrency } from '../utils/formatters';
-import CalendarSummary from '../components/CalendarSammary';
 import { Trade } from '../types/trade';
 import DayDialog from '../components/trades/DayDialog';
 import SelectDateDialog from '../components/SelectDateDialog';
@@ -85,7 +82,6 @@ import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
 
 import Breadcrumbs, { BreadcrumbItem, BreadcrumbButton } from '../components/common/Breadcrumbs';
 import { NewTradeForm, TradeImage } from '../components/trades/TradeForm';
-import GamePlanDialog from '../components/GamePlanDialog';
 import { Calendar } from '../types/calendar';
 import MonthlyStats from '../components/MonthlyStats';
 import AccountStats from '../components/AccountStats';
@@ -98,6 +94,7 @@ import ShareButton from '../components/sharing/ShareButton';
 import { ImagePickerDialog, ImageAttribution } from '../components/heroImage';
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import NotesDrawer from '../components/notes/NotesDrawer';
+import CalendarDayReminder from '../components/CalendarDayReminder';
 
 import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 
@@ -394,8 +391,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Use hook calendar if available, otherwise fall back to selectedCalendar
   const calendar = hookCalendar || selectedCalendar;
 
- // Extract calendar fields for easier access
- 
+  // Extract calendar fields for easier access
+
   const accountBalance = calendar.account_balance;
   const maxDailyDrawdown = calendar.max_daily_drawdown;
   const weeklyTarget = calendar.weekly_target;
@@ -403,7 +400,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const yearlyTarget = calendar.yearly_target;
   const requiredTagGroups = calendar.required_tag_groups;
   const calendarName = calendar.name;
-  const calendarNote = calendar.note;
   const heroImageUrl = calendar.hero_image_url;
   const heroImageAttribution = calendar.hero_image_attribution;
   const scoreSettings = calendar.score_settings;
@@ -416,13 +412,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     increased_risk_percentage: calendar.increased_risk_percentage,
     profit_threshold_percentage: calendar.profit_threshold_percentage
   };
-
-  const calendarDayNotes = calendar.days_notes
-    ? Object.entries(calendar.days_notes).reduce((map, [k, v]) => map.set(k, v), new Map<string, string>())
-    : new Map<string, string>();
-
-
-
 
 
 
@@ -448,7 +437,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [isDayNotesDialogOpen, setIsDayNotesDialogOpen] = useState<string | null>(null);
   const [isMonthSelectorOpen, setIsMonthSelectorOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
@@ -492,12 +480,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
   // Economic calendar drawer state
-  // Calendar note expand state (controlled via breadcrumbs)
-  const [isNoteExpanded, setIsNoteExpanded] = useState(false);
-  const handleToggleNoteExpand = useCallback(() => {
-    setIsNoteExpanded(prev => !prev);
-  }, []);
-
   const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(false);
 
   // AI Chat drawer state
@@ -511,13 +493,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [notifications, setNotifications] = useState<EconomicEvent[]>([]);
   const [removingNotifications, setRemovingNotifications] = useState<Set<string>>(new Set());
   const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null>(null);
-  const breadcrumbButtons: BreadcrumbButton[] = [ 
-    {
-      key: 'expand',
-      icon: isNoteExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />,
-      onClick: handleToggleNoteExpand,
-      tooltip: isNoteExpanded ? 'Hide description' : 'Show description'
-    },
+  const breadcrumbButtons: BreadcrumbButton[] = [
     ...((!isReadOnly) ? [{
       key: 'image',
       icon: <ImageIcon fontSize="small" />,
@@ -527,7 +503,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   ];
 
   const breadcrumbRightContent = (!isReadOnly && calendar && onUpdateCalendarProperty) ? (
-    <ShareButton type="calendar"  item={calendar} onUpdateItemProperty={onUpdateCalendarProperty} size="small" />
+    <ShareButton type="calendar" item={calendar} onUpdateItemProperty={onUpdateCalendarProperty} size="small" />
   ) : null;
 
 
@@ -728,7 +704,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   }, [calendar.tags, trades]);
 
   // Filter trades based on selected tags
-  const filteredTrades = useMemo(() => { 
+  const filteredTrades = useMemo(() => {
     if (selectedTags.length === 0) {
       return trades; // No filtering if no tags selected
     }
@@ -751,14 +727,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Calculate total profit based on filtered trades or use pre-calculated value
   const totalProfit = useMemo(() => {
     // If no tag filtering is applied and pre-calculated totalPnL is available, use it
-    if (selectedTags.length === 0 && totalPnL !== undefined) { 
+    if (selectedTags.length === 0 && totalPnL !== undefined) {
       return totalPnL;
     }
-    // Otherwise calculate from filtered trades 
+    // Otherwise calculate from filtered trades
     return filteredTrades.length > 0 ? filteredTrades.reduce((sum, trade) => sum + trade.amount, 0) : 0;
   }, [filteredTrades, selectedTags, totalPnL]);
 
-  
+
   const calendarDays = useMemo(() => {
     const days: Date[] = [];
     const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -884,7 +860,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setSelectedDate(trade_date);
   };
 
- 
+
 
 
 
@@ -951,39 +927,77 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       {/* Floating Month Navigation */}
       <FloatingMonthNavigation
         currentDate={currentDate}
-        isVisible={showFloatingMonthNav && !isNoteExpanded}
+        isVisible={showFloatingMonthNav}
         onPrevMonth={handlePrevMonth}
         onNextMonth={handleNextMonth}
         onMonthClick={handleMonthClick}
         onTodayClick={handleTodayClick}
       />
 
+ {/* Hero Image Banner */}
+      {heroImageUrl && (
+        <Box
+          sx={{
+            position: 'relative',
+            height: { xs: 140, sm: 180, md: 220 }, 
+            overflow: 'hidden',
+            borderRadius: 0,
+          }}
+        >
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${heroImageUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                inset: 0,
+                background: (theme: Theme) =>
+                  `linear-gradient(180deg, ${alpha(theme.palette.common.black, 0.25)} 0%, ${alpha(theme.palette.common.black, 0.8)} 100%)`,
+              },
+            }}
+          />
 
+          {heroImageAttribution && (
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: { xs: 6, sm: 8 },
+                right: { xs: 8, sm: 12 },
+                zIndex: 1,
+                px: 1,
+                py: 0.5,
+                borderRadius: 0.75,
+                bgcolor: (theme: Theme) => alpha(theme.palette.common.black, 0.7),
+                color: 'common.white',
+              }}
+            >
+              <Typography variant="caption" sx={{ fontSize: '0.7rem' }}>
+                Photo by {heroImageAttribution.photographer} on Unsplash
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      )}
 
       {/* Breadcrumbs */}
       <Breadcrumbs items={breadcrumbItems} buttons={breadcrumbButtons} rightContent={breadcrumbRightContent} />
 
-      <CalendarSummary
-        calendarNote={calendarNote || ''}
-        calendarId={calendarId!!}
-        title={calendarName}
-        onUpdateCalendarProperty={isReadOnly ? undefined : onUpdateCalendarProperty}
-        heroImageUrl={heroImageUrl}
-        heroImageAttribution={heroImageAttribution}
-        onOpenImagePicker={isReadOnly ? undefined : handleOpenImagePicker}
-        onRemoveHeroImage={isReadOnly ? undefined : handleRemoveHeroImage}
-        trades={trades}
-        onOpenGalleryMode={openGalleryMode}
-        calendarDayNotes={calendarDayNotes || new Map()}
-        setIsDayNotesDialogOpen={isReadOnly ? undefined : setIsDayNotesDialogOpen}
-        calendar={calendar}
-        showImageButton={false}
-        showShareButton={false}
-        showExpandToggle={false}
-        expanded={isNoteExpanded}
-        onToggleExpand={handleToggleNoteExpand}
-        isReadOnly={isReadOnly}
-      />
+    
+     
+
+  {/* Calendar Day Reminder */}
+      {calendarId && (
+        <CalendarDayReminder
+          calendarId={calendarId}
+          trades={filteredTrades}
+          onOpenGalleryMode={openGalleryMode}
+        />
+      )}
 
       {/* Main Content Container */}
       <Box sx={{
@@ -1295,6 +1309,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             </Box>
           </Box>
 
+
+
           {/* Calendar Grid Container */}
           <Box sx={{
             display: 'flex',
@@ -1308,60 +1324,25 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               gap: { xs: 1, md: 1.5 },
               mb: { xs: 1, md: 2 }
             }}>
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Week'].map((day, index) => {
-                const hasNotes = index < 7 && calendarDayNotes && calendarDayNotes.has(day) && calendarDayNotes.get(day)?.trim() !== '';
-
-                return (
-                  <WeekdayHeader
-                    key={day}
-                    onClick={() => {
-                      if (index < 7 && !isReadOnly) {
-                        setIsDayNotesDialogOpen(day);
-                      }
-                    }}
-                    sx={{
-                      display: index === 7 ? { xs: 'none', sm: 'flex' } : 'flex',
-                      cursor: index < 7 && !isReadOnly ? 'pointer' : 'default',
-                      position: 'relative',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      p: { xs: 1, md: 1.5 },
-                      fontWeight: 600,
-                      fontSize: { xs: '0.875rem', md: '1rem' },
-                      color: 'text.secondary',
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      '&:hover': index < 7 && !isReadOnly ? {
-                        color: 'primary.main'
-                      } : {}
-                    }}
-                  >
-                    {day}
-                    {hasNotes && (
-                      <Tooltip
-                        title={isReadOnly ? "This day has notes." : "This day has notes. Click to view or edit."}
-                        placement="top"
-                        arrow
-                      >
-                        <Box
-                          sx={{
-                            position: 'absolute',
-                            right: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1rem',
-                            color: 'secondary.main'
-                          }}
-                        >
-                          <InfoIcon fontSize="inherit" sx={{
-                            color: theme.palette.info.main
-                          }} />
-                        </Box>
-                      </Tooltip>
-                    )}
-                  </WeekdayHeader>
-                );
-              })}
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Week'].map((day, index) => (
+                <WeekdayHeader
+                  key={day}
+                  sx={{
+                    display: index === 7 ? { xs: 'none', sm: 'flex' } : 'flex',
+                    cursor: 'default',
+                    position: 'relative',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    p: { xs: 1, md: 1.5 },
+                    fontWeight: 600,
+                    fontSize: { xs: '0.875rem', md: '1rem' },
+                    color: 'text.secondary',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  }}
+                >
+                  {day}
+                </WeekdayHeader>
+              ))}
             </Box>
             {/* Enhanced Calendar Grid */}
             <Box sx={{
@@ -1602,22 +1583,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             tags={allTags}
             dynamicRiskSettings={dynamicRiskSettings}
             requiredTagGroups={requiredTagGroups}
-            onOpenGalleryMode={openGalleryMode}
-          />
-        )}
-
-        {/* Day Notes Dialog */}
-        {isDayNotesDialogOpen && !isReadOnly && (
-          <GamePlanDialog
-            open={!!isDayNotesDialogOpen}
-            onClose={() => {
-              setIsDayNotesDialogOpen(null);
-            }}
-            notes={calendarDayNotes && isDayNotesDialogOpen ? (calendarDayNotes.get(isDayNotesDialogOpen) || '') : ''}
-            day={isDayNotesDialogOpen}
-            calendarId={calendarId!!}
-            onUpdateCalendarProperty={onUpdateCalendarProperty}
-            trades={trades}
             onOpenGalleryMode={openGalleryMode}
           />
         )}

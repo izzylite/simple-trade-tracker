@@ -70,6 +70,16 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
     }
   };
 
+  const getDomainFromUrl = (url: string): string => {
+    try {
+      const parsedUrl = new URL(url);
+      return parsedUrl.hostname.replace(/^www\./, '');
+    } catch {
+      return url;
+    }
+  };
+
+
   const handleOpenUrl = (url: string) => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
@@ -122,8 +132,8 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
           sx={{
             display: 'flex',
             flexDirection: 'column',
-            gap: 1,
-            mt: 1,
+            gap: 0.75,
+            mt: 0.75,
             pl: 1
           }}
         >
@@ -132,96 +142,105 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
               key={citation.id}
               variant="outlined"
               sx={{
-                p: 1.5,
-                backgroundColor: alpha(theme.palette.background.paper, 0.5),
-                border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-                borderRadius: 1.5,
-                transition: 'all 0.2s',
+                px: 1,
+                py: 0.75,
+                borderRadius: 1,
+                backgroundColor: alpha(theme.palette.background.paper, 0.6),
+                border: `1px solid ${alpha(theme.palette.divider, 0.7)}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                transition: 'all 0.15s ease',
                 '&:hover': {
-                  backgroundColor: alpha(theme.palette.action.hover, 0.3),
-                  borderColor: theme.palette.primary.main
+                  backgroundColor: alpha(theme.palette.action.hover, 0.4),
+                  borderColor: alpha(theme.palette.primary.main, 0.8)
                 }
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                {/* Citation Number */}
-                <Box
+              {/* Index badge */}
+              <Box
+                sx={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: '999px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                  color: 'primary.main',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  flexShrink: 0
+                }}
+              >
+                {index + 1}
+              </Box>
+
+              {/* Main content */}
+              <Box
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  cursor: 'pointer'
+                }}
+                onClick={() => handleOpenUrl(citation.url)}
+              >
+                <Typography
+                  variant="body2"
                   sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                    color: 'primary.main',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    flexShrink: 0
+                    fontWeight: 500,
+                    color: 'text.primary',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  {index + 1}
-                </Box>
-
-                {/* Citation Content */}
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  {/* Title and Tool Badge */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: 500,
-                        color: 'text.primary',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        flex: 1
-                      }}
-                    >
-                      {citation.title}
-                    </Typography>
-                    <Chip
-                      label={getToolLabel(citation.toolName || '')}
-                      size="small"
-                      color={getToolColor(citation.toolName || '')}
-                      variant="outlined"
-                      sx={{
-                        height: 20,
-                        fontSize: '0.65rem',
-                        flexShrink: 0
-                      }}
-                    />
-                  </Box>
-
-                  {/* URL */}
-                  <Link
-                    href={citation.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleOpenUrl(citation.url);
-                    }}
+                  {getDomainFromUrl(citation.url)}
+                </Typography>
+                {(citation.title || citation.url) && (
+                  <Typography
+                    variant="caption"
                     sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      fontSize: '0.75rem',
-                      color: 'primary.main',
-                      textDecoration: 'none',
-                      '&:hover': {
-                        textDecoration: 'underline'
-                      },
+                      display: 'block',
+                      color: 'text.secondary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
                     }}
                   >
-                    {citation.url}
-                    <OpenInNewIcon sx={{ fontSize: 12, flexShrink: 0 }} />
-                  </Link>
-                </Box>
+                    {citation.title || citation.url}
+                  </Typography>
+                )}
               </Box>
+
+              {/* Tool tag */}
+              {citation.toolName && (
+                <Chip
+                  label={getToolLabel(citation.toolName)}
+                  size="small"
+                  color={getToolColor(citation.toolName)}
+                  variant="outlined"
+                  sx={{
+                    height: 22,
+                    fontSize: '0.65rem',
+                    flexShrink: 0,
+                    borderRadius: 999
+                  }}
+                />
+              )}
+
+              {/* Open in new tab */}
+              <Tooltip title="Open in new tab">
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenUrl(citation.url);
+                  }}
+                >
+                  <OpenInNewIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
             </Paper>
           ))}
         </Box>

@@ -18,6 +18,11 @@ import {
   Alert,
   Button,
   useMediaQuery,
+  ToggleButtonGroup,
+  ToggleButton,
+  Chip,
+  Divider,
+  Collapse,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -27,14 +32,21 @@ import {
   Archive as ArchiveIcon,
   Unarchive as UnarchiveIcon,
   Delete as DeleteIcon,
+  NotificationsActive as ReminderIcon,
+  NotificationsOff as NoReminderIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 import RichTextEditor from '../common/RichTextEditor';
 import ImagePickerDialog from '../heroImage/ImagePickerDialog';
 import ConfirmationDialog from '../common/ConfirmationDialog';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
 import * as notesService from '../../services/notesService';
-import { Note } from '../../types/note';
+import { Note, ReminderType, DayAbbreviation } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
 
@@ -68,6 +80,15 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Reminder states
+  const [reminderType, setReminderType] = useState<ReminderType>('none');
+  const [reminderDate, setReminderDate] = useState<Date | null>(null);
+  const [reminderDays, setReminderDays] = useState<DayAbbreviation[]>([]);
+  const [isReminderActive, setIsReminderActive] = useState(false);
+  const [isReminderExpanded, setIsReminderExpanded] = useState(false);
+
+  const allDays: DayAbbreviation[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
   // Initialize note data when dialog opens
   useEffect(() => {
     if (open) {
@@ -77,12 +98,26 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         setTitle(initialNote.title);
         setContent(initialNote.content);
         setCoverImage(initialNote.cover_image);
+
+        // Initialize reminder states
+        setReminderType(initialNote.reminder_type || 'none');
+        setReminderDate(initialNote.reminder_date || null);
+        setReminderDays(initialNote.reminder_days || []);
+        setIsReminderActive(initialNote.is_reminder_active || false);
+        setIsReminderExpanded(initialNote.is_reminder_active || false);
       } else {
         // Creating new note - reset to defaults
         setNote(null);
         setTitle('');
         setContent('');
         setCoverImage(null);
+
+        // Reset reminder states
+        setReminderType('none');
+        setReminderDate(null);
+        setReminderDays([]);
+        setIsReminderActive(false);
+        setIsReminderExpanded(false);
       }
     }
   }, [open, initialNote]);
@@ -99,13 +134,17 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           title,
           content,
           cover_image: coverImage,
+          reminder_type: reminderType,
+          reminder_date: reminderDate,
+          reminder_days: reminderDays,
+          is_reminder_active: isReminderActive,
         });
 
         // Reload to get updated data
         const updatedNote = await notesService.getNote(note.id);
         if (updatedNote) {
           setNote(updatedNote);
-          if (onSave) onSave(updatedNote,false);
+          if (onSave) onSave(updatedNote, false);
         }
       } else {
         // Create new note
@@ -115,6 +154,10 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           title,
           content,
           cover_image: coverImage,
+          reminder_type: reminderType,
+          reminder_date: reminderDate,
+          reminder_days: reminderDays,
+          is_reminder_active: isReminderActive,
         });
         setNote(newNote);
         if (onSave) onSave(newNote, true);
@@ -133,15 +176,21 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       const hasNonEmptyTitle = title && title.trim() !== '';
       const hasNonEmptyContent = content && content.trim() !== '';
       const hasCoverImage = coverImage !== null;
+      const hasReminder = reminderType !== 'none' && isReminderActive;
 
-      return hasNonEmptyTitle || hasNonEmptyContent || hasCoverImage;
+      return hasNonEmptyTitle || hasNonEmptyContent || hasCoverImage || hasReminder;
     } else {
       // For existing notes, check if anything changed
       const titleChanged = title !== note.title;
       const contentChanged = content !== note.content;
       const coverImageChanged = coverImage !== note.cover_image;
+      const reminderTypeChanged = reminderType !== (note.reminder_type || 'none');
+      const reminderDateChanged = reminderDate !== (note.reminder_date || null);
+      const reminderDaysChanged = JSON.stringify(reminderDays) !== JSON.stringify(note.reminder_days || []);
+      const reminderActiveChanged = isReminderActive !== (note.is_reminder_active || false);
 
-      return titleChanged || contentChanged || coverImageChanged;
+      return titleChanged || contentChanged || coverImageChanged || reminderTypeChanged ||
+        reminderDateChanged || reminderDaysChanged || reminderActiveChanged;
     }
   };
 
@@ -239,6 +288,34 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
     setDeleteConfirmOpen(false);
   };
 
+  // Reminder handlers
+  const handleReminderTypeChange = (event: React.MouseEvent<HTMLElement>, newType: ReminderType | null) => {
+    if (newType !== null) {
+      setReminderType(newType);
+      setIsReminderActive(newType !== 'none');
+
+      // Clear fields based on type
+      if (newType === 'none') {
+        setReminderDate(null);
+        setReminderDays([]);
+      } else if (newType === 'once') {
+        setReminderDays([]);
+      } else if (newType === 'weekly') {
+        setReminderDate(null);
+      }
+    }
+  };
+
+  const handleToggleDay = (day: DayAbbreviation) => {
+    setReminderDays(prev => {
+      if (prev.includes(day)) {
+        return prev.filter(d => d !== day);
+      } else {
+        return [...prev, day];
+      }
+    });
+  };
+
   return (
     <>
       <Dialog
@@ -246,7 +323,9 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         onClose={handleClose}
         fullScreen={fullScreen}
         maxWidth="md"
-        fullWidth
+        sx={{
+        zIndex: (theme) => theme.zIndex.modal + 100, // Ensure it's above the AIChatDrawer
+      }}
         PaperProps={{
           sx: {
             height: fullScreen ? '100%' : '90vh',
@@ -373,6 +452,125 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               </Box>
             </Box>
           )}
+            {/* Reminder Sub-Header */}
+            <Box
+              onClick={() => setIsReminderExpanded(!isReminderExpanded)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                px: 3,
+                py: 1.5,
+                bgcolor: alpha(theme.palette.info.main, 0.04),
+                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  bgcolor: alpha(theme.palette.info.main, 0.08),
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {isReminderActive ? (
+                  <ReminderIcon sx={{ color: 'info.main', fontSize: '1.1rem' }} />
+                ) : (
+                  <NoReminderIcon sx={{ color: 'text.secondary', fontSize: '1.1rem' }} />
+                )}
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={600}
+                  sx={{ color: isReminderActive ? 'info.main' : 'text.secondary' }}
+                >
+                  Reminder
+                </Typography>
+                {isReminderActive && reminderType !== 'none' && (
+                  <Typography variant="caption" color="text.secondary">
+                    {reminderType === 'weekly'
+                      ? `${reminderDays.length} day${reminderDays.length !== 1 ? 's' : ''}`
+                      : 'One-time'
+                    }
+                  </Typography>
+                )}
+              </Box>
+              <IconButton size="small" sx={{ color: 'text.secondary' }}>
+                {isReminderExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </IconButton>
+            </Box>
+
+            {/* Collapsible Reminder Content */}
+            <Collapse in={isReminderExpanded}>
+              <Box sx={{ px: 3, py: 2, bgcolor: alpha(theme.palette.info.main, 0.02) }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Set a reminder to display this note on specific days. Perfect for game plans, daily routines, or weekly trading strategies.
+                </Typography>
+
+                {/* Reminder Type Selector */}
+              <ToggleButtonGroup
+                value={reminderType}
+                exclusive
+                onChange={handleReminderTypeChange}
+                size="small"
+                sx={{ mb: 2 }}
+              >
+                <ToggleButton value="none">
+                  <NoReminderIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
+                  None
+                </ToggleButton>
+                <ToggleButton value="once">
+                  Once
+                </ToggleButton>
+                <ToggleButton value="weekly">
+                  Weekly
+                </ToggleButton>
+              </ToggleButtonGroup>
+
+              {/* One-time Reminder Date Picker */}
+              {reminderType === 'once' && (
+                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <DatePicker
+                    label="Reminder Date"
+                    value={reminderDate}
+                    onChange={(newDate) => setReminderDate(newDate)}
+                    slotProps={{
+                      textField: {
+                        fullWidth: true,
+                        size: 'small',
+                      },
+                    }}
+                  />
+                </LocalizationProvider>
+              )}
+
+              {/* Weekly Reminder Day Selector */}
+              {reminderType === 'weekly' && (
+                <Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Select days to show this reminder:
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {allDays.map((day) => (
+                      <Chip
+                        key={day}
+                        label={day}
+                        onClick={() => handleToggleDay(day)}
+                        color={reminderDays.includes(day) ? 'primary' : 'default'}
+                        variant={reminderDays.includes(day) ? 'filled' : 'outlined'}
+                        sx={{
+                          fontWeight: reminderDays.includes(day) ? 600 : 400,
+                          cursor: 'pointer',
+                        }}
+                      />
+                    ))}
+                  </Box>
+                  {reminderDays.length === 0 && (
+                    <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                      Please select at least one day
+                    </Typography>
+                  )}
+                </Box>
+              )}
+              </Box>
+            </Collapse>
 
           {/* Content Area */}
           <Box
@@ -398,6 +596,8 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               </Alert>
             )}
 
+          
+
             {/* Title */}
             <TextField
               value={title}
@@ -415,7 +615,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                   },
                 },
               }}
-              sx={{ mb: 2 }}
+              sx={{ mb: 3, mt: 3 }}
             />
 
             {/* Content */}

@@ -91,6 +91,7 @@ export const createNote = async (noteInput: CreateNoteInput): Promise<Note> => {
       is_archived: false,
       is_pinned: false,
       archived_at: null,
+      by_assistant: noteInput.by_assistant ?? false,
     };
     const result = await noteRepository.create(noteData);
     if (!result.success || !result.data) {
@@ -210,6 +211,76 @@ export const moveNoteToCalendar = async (
     }
   } catch (error) {
     logger.error('Error moving note to calendar:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get reminder notes for a specific day of the week
+ * Returns notes that should be shown as reminders for the given day
+ */
+export const getReminderNotesForDay = async (
+  calendarId: string,
+  dayAbbreviation: string
+): Promise<Note[]> => {
+  try {
+    return await noteRepository.findRemindersByDay(calendarId, dayAbbreviation);
+  } catch (error) {
+    logger.error('Error getting reminder notes for day:', error);
+    return [];
+  }
+};
+
+/**
+ * Get reminder notes for a specific date (one-time reminders)
+ */
+export const getReminderNotesForDate = async (
+  calendarId: string,
+  date: Date
+): Promise<Note[]> => {
+  try {
+    return await noteRepository.findRemindersByDate(calendarId, date);
+  } catch (error) {
+    logger.error('Error getting reminder notes for date:', error);
+    return [];
+  }
+};
+
+/**
+ * Set a reminder on a note
+ */
+export const setNoteReminder = async (
+  noteId: string,
+  reminderType: string,
+  reminderDate?: Date | null,
+  reminderDays?: string[]
+): Promise<void> => {
+  try {
+    await noteRepository.update(noteId, {
+      reminder_type: reminderType as any,
+      reminder_date: reminderDate,
+      reminder_days: reminderDays as any,
+      is_reminder_active: reminderType !== 'none',
+    });
+  } catch (error) {
+    logger.error('Error setting note reminder:', error);
+    throw error;
+  }
+};
+
+/**
+ * Clear a note's reminder
+ */
+export const clearNoteReminder = async (noteId: string): Promise<void> => {
+  try {
+    await noteRepository.update(noteId, {
+      reminder_type: 'none' as any,
+      reminder_date: null,
+      reminder_days: [] as any,
+      is_reminder_active: false,
+    });
+  } catch (error) {
+    logger.error('Error clearing note reminder:', error);
     throw error;
   }
 };

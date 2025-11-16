@@ -1,7 +1,7 @@
 /**
  * HTML Message Renderer Component
  * Safely renders HTML-formatted messages with proper styling
- * Supports inline trade and event cards via HTML tags: <trade-ref id="xxx"/> and <event-ref id="xxx"/>
+ * Supports inline trade, event, and note cards via HTML tags: <trade-ref id="xxx"/>, <event-ref id="xxx"/>, <note-ref id="xxx"/>
  */
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
@@ -15,9 +15,11 @@ import DOMPurify from 'dompurify';
 import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 import TradeCard from './TradeCard';
 import EventCard from './EventCard';
+import { NoteListItem } from '../notes/NoteListItem';
 import ExpandableCardList from './ExpandableCardList';
 import type { Trade } from '../../types/trade';
 import type { EconomicEvent } from '../../types/economicCalendar';
+import type { Note } from '../../types/note';
 
 interface HtmlMessageRendererProps {
   html: string;
@@ -25,8 +27,10 @@ interface HtmlMessageRendererProps {
   // Embedded data for inline card replacement
   embeddedTrades?: Record<string, Trade>;
   embeddedEvents?: Record<string, EconomicEvent>;
+  embeddedNotes?: Record<string, Note>;
   onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void;
   onEventClick?: (event: EconomicEvent) => void;
+  onNoteClick?: (noteId: string) => void;
 }
 
 const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
@@ -34,8 +38,10 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
   textColor = 'text.primary',
   embeddedTrades,
   embeddedEvents,
+  embeddedNotes,
   onTradeClick,
-  onEventClick
+  onEventClick,
+  onNoteClick
 }) => {
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,17 +50,17 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
 
   // Parse HTML into segments with inline cards
   const contentSegments = useMemo(() => {
-    if (!embeddedTrades && !embeddedEvents) {
+    if (!embeddedTrades && !embeddedEvents && !embeddedNotes) {
       // No inline cards needed, return single HTML segment
       return [{ type: 'html' as const, content: html }];
     }
 
-    const segments: Array<{ type: 'html' | 'trade' | 'event'; content: string; id?: string }> = [];
+    const segments: Array<{ type: 'html' | 'trade' | 'event' | 'note'; content: string; id?: string }> = [];
     let lastIndex = 0;
     let workingHtml = html;
 
-    // Find all inline references (HTML tags: <trade-ref id="xxx"/> or <trade-ref id="xxx"></trade-ref>)
-    const references: Array<{ type: 'trade' | 'event'; id: string; index: number; length: number }> = [];
+    // Find all inline references (HTML tags: <trade-ref id="xxx"/>, <event-ref id="xxx"/>, <note-ref id="xxx"/>)
+    const references: Array<{ type: 'trade' | 'event' | 'note'; id: string; index: number; length: number }> = [];
 
     // Find trade reference tags (self-closing or with closing tag)
     const tradePattern = /<trade-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/trade-ref>)?/g;
@@ -79,6 +85,20 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
         references.push({
           type: 'event',
           id: eventId,
+          index: match.index,
+          length: match[0].length
+        });
+      }
+    }
+
+    // Find note reference tags
+    const notePattern = /<note-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/note-ref>)?/g;
+    while ((match = notePattern.exec(workingHtml)) !== null) {
+      const noteId = match[1];
+      if (embeddedNotes?.[noteId]) {
+        references.push({
+          type: 'note',
+          id: noteId,
           index: match.index,
           length: match[0].length
         });
@@ -117,7 +137,7 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
     }
 
     return segments.length > 0 ? segments : [{ type: 'html' as const, content: html }];
-  }, [html, embeddedTrades, embeddedEvents]);
+  }, [html, embeddedTrades, embeddedEvents, embeddedNotes]);
 
   // Sanitize HTML segments
   const sanitizeHtml = (htmlContent: string) => {
@@ -293,6 +313,21 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
               eventData={event}
               onClick={onEventClick}
               compact={false}
+            />
+          </Box>
+        );
+      }
+
+      if (segment.type === 'note' && segment.id && embeddedNotes?.[segment.id]) {
+        // Notes should be rendered as their own block, separate from any trade group
+        flushTrades();
+
+        const note = embeddedNotes[segment.id];
+        nodes.push(
+          <Box key={`note-${index}`} sx={{ my: 1 }}>
+            <NoteListItem
+              note={note}
+              onClick={() => onNoteClick?.(segment.id!)}
             />
           </Box>
         );

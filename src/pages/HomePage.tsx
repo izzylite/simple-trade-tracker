@@ -119,7 +119,7 @@ const Home: React.FC<HomeProps> = ({
 
   useEffect(()=> {
     setRecentTrades(recentTrades_)
-  }, recentTrades_)
+  }, [recentTrades_])
 
   // Get recently updated calendars (top 2 for large screens, top 1 for smaller screens)
   const recentCalendars = useMemo(() => {

@@ -44,6 +44,7 @@ interface ChatMessageProps {
   enableAnimation?: boolean;
   onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void;
   onEventClick?: (event: EconomicEvent) => void;
+  onNoteClick?: (noteId: string) => void;
   onEdit?: (messageId: string) => void;
 }
 
@@ -55,6 +56,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   enableAnimation = true,
   onTradeClick,
   onEventClick,
+  onNoteClick,
   onEdit
 }) => {
   const theme = useTheme();
@@ -288,8 +290,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 html={message.messageHtml}
                 embeddedTrades={message.embeddedTrades}
                 embeddedEvents={message.embeddedEvents}
+                embeddedNotes={message.embeddedNotes}
                 onTradeClick={onTradeClick}
                 onEventClick={onEventClick}
+                onNoteClick={onNoteClick}
               />
             ) : isAssistant && enableAnimation && isLatestMessage ? (
               <AnimatedText

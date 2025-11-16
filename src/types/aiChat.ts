@@ -27,6 +27,7 @@ export interface ChatMessage {
   // Embedded data for inline references (fetched from backend)
   embeddedTrades?: Record<string, any>; // Trade objects keyed by ID
   embeddedEvents?: Record<string, any>; // Event objects keyed by ID
+  embeddedNotes?: Record<string, any>; // Note objects keyed by ID
 }
 
 // Serializable version for database storage (timestamp as ISO string)

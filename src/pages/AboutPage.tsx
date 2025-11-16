@@ -15,83 +15,53 @@ import {
 import {
   CalendarMonth,
   ShowChart,
-  Event,
-  NoteAlt,
   SmartToy,
-  TrendingUp,
-  Speed,
-  EmojiEvents
+  TrendingUp
 } from '@mui/icons-material';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 
-interface SectionCardProps {
+interface SectionProps {
   icon: React.ReactNode;
   title: string;
   subtitle?: string;
   children: React.ReactNode;
-  gradient?: boolean;
 }
 
-const SectionCard: React.FC<SectionCardProps> = ({ icon, title, subtitle, children, gradient }) => {
+const Section: React.FC<SectionProps> = ({ icon, title, subtitle, children }) => {
   const theme = useTheme();
 
   return (
-    <Card
-      sx={{
-        borderRadius: 3,
-        height: '100%',
-        transition: 'all 0.3s ease-in-out',
-        '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: theme.shadows[8]
-        },
-        ...(gradient &&
-          (theme.palette.mode === 'light'
-            ? {
-                background: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)',
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`
-              }
-            : {
-                background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(
-                  theme.palette.secondary.main,
-                  0.08
-                )} 100%)`,
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
-              }))
-      }}
-    >
-      <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
-        <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ mb: 2 }}>
-          <Box
-            sx={{
-              width: 48,
-              height: 48,
-              borderRadius: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-              color: 'primary.contrastText',
-              flexShrink: 0,
-              boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
-            }}
-          >
-            {icon}
-          </Box>
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-              {title}
+    <Box>
+      <Stack direction="row" spacing={2.5} alignItems="flex-start" sx={{ mb: 2.5 }}>
+        <Box
+          sx={{
+            width: 56,
+            height: 56,
+            borderRadius: 2.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+            color: 'primary.contrastText',
+            flexShrink: 0,
+            boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+          }}
+        >
+          {icon}
+        </Box>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+            {title}
+          </Typography>
+          {subtitle && (
+            <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>
+              {subtitle}
             </Typography>
-            {subtitle && (
-              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                {subtitle}
-              </Typography>
-            )}
-          </Box>
-        </Stack>
-        <Box sx={{ mt: 1.5 }}>{children}</Box>
-      </CardContent>
-    </Card>
+          )}
+        </Box>
+      </Stack>
+      <Box sx={{ pl: { xs: 0, sm: '72px' } }}>{children}</Box>
+    </Box>
   );
 };
 
@@ -99,19 +69,10 @@ const AboutPage: React.FC = () => {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const subsectionTitleSx = {
-    fontWeight: 700,
-    mb: 0.75,
-    mt: 1.75,
-    fontSize: '0.75rem',
-    letterSpacing: 0.12,
-    textTransform: 'uppercase' as const,
-    color: theme.palette.text.secondary
-  };
-
   const paragraphSx = {
-    mb: 1,
-    lineHeight: 1.7
+    mb: 1.5,
+    lineHeight: 1.7,
+    fontSize: '1rem'
   };
 
   return (
@@ -121,405 +82,111 @@ const AboutPage: React.FC = () => {
         sx={{
           background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.08)} 100%)`,
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          py: { xs: 4, sm: 6 },
+          py: { xs: 5, sm: 8 },
           px: { xs: 2, sm: 3 }
         }}
       >
-        <Container maxWidth="lg">
-          <Stack spacing={2} alignItems="center" textAlign="center">
+        <Container maxWidth="md">
+          <Stack spacing={2.5} alignItems="center" textAlign="center">
             <Box
               sx={{
-                width: { xs: 60, sm: 80 },
-                height: { xs: 60, sm: 80 },
+                width: { xs: 64, sm: 72 },
+                height: { xs: 64, sm: 72 },
                 borderRadius: 3,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
                 color: 'primary.contrastText',
-                boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`,
-                mb: 1
+                boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`
               }}
             >
-              <TrendingUp sx={{ fontSize: { xs: 32, sm: 42 } }} />
+              <TrendingUp sx={{ fontSize: { xs: 36, sm: 40 } }} />
             </Box>
-            <Typography variant={isXs ? 'h4' : 'h3'} sx={{ fontWeight: 800, mb: 1 }}>
-              About JournoTrades
+            <Typography variant={isXs ? 'h4' : 'h3'} sx={{ fontWeight: 800 }}>
+              JournoTrades
             </Typography>
             <Typography
-              variant={isXs ? 'body1' : 'h6'}
+              variant={isXs ? 'h6' : 'h5'}
               color="text.secondary"
-              sx={{ maxWidth: 800, fontWeight: 400, lineHeight: 1.6 }}
+              sx={{ maxWidth: 600, fontWeight: 400, lineHeight: 1.7 }}
             >
-              A trading journal and analytics workspace to track trades, analyze performance, and gain insights from your data.
+              Track your trades, organize your strategy, and let AI uncover insights from your data.
             </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="center" sx={{ mt: 2 }}>
-              <Chip
-                icon={<Speed />}
-                label="Analytics"
-                color="primary"
-                variant="outlined"
-                sx={{ fontWeight: 600 }}
-              />
-              <Chip
-                icon={<SmartToy />}
-                label="AI-Powered"
-                color="secondary"
-                variant="outlined"
-                sx={{ fontWeight: 600 }}
-              />
-              <Chip
-                icon={<EmojiEvents />}
-                label="Performance Tracking"
-                color="success"
-                variant="outlined"
-                sx={{ fontWeight: 600 }}
-              />
-            </Stack>
           </Stack>
         </Container>
       </Box>
 
       {/* Main Content */}
-      <Box
+      <Container
+        maxWidth="md"
         sx={{
-          pt: { xs: 4, sm: 6 },
-          pb: { xs: 5, sm: 8 },
-          px: { xs: 2, sm: 4 },
-          maxWidth: 1100,
-          mx: 'auto',
-          width: '100%',
+          pt: { xs: 5, sm: 7 },
+          pb: { xs: 6, sm: 9 },
           ...(scrollbarStyles(theme) as any)
         }}
       >
-
-        
-
-        {/* Features Overview Section */}
-        <Box>
-          <Divider sx={{ mb: 4 }}>
-            <Chip label="Core Features" size="small" />
-          </Divider>
-
-          <Typography
-            variant={isXs ? 'h5' : 'h4'}
-            sx={{ fontWeight: 700, mb: 1, textAlign: 'center' }}
-          >
-            Everything You Need to Master Trading
-          </Typography>
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{ mb: 4, textAlign: 'center', maxWidth: 700, mx: 'auto', lineHeight: 1.7 }}
-          >
-            From detailed trade logging to AI-powered insights, JournoTrades provides the tools to analyze and improve your trading.
-          </Typography>
-        </Box>
-
-        
-        
-
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
-            gap: { xs: 3, sm: 4 }
-          }}
-        >
-          <SectionCard
+        <Stack spacing={5}>
+          {/* Calendars Section */}
+          <Section
             icon={<CalendarMonth fontSize="large" />}
             title="Calendars"
-            subtitle="Organise your trading year and accounts"
-            gradient
+            subtitle="Organize your trading accounts and strategies"
           >
-            <Typography variant="body2" sx={{ ...paragraphSx, mb: 2 }}>
-              Calendars are containers for your trades, stats, and notes. Use them to represent a trading year, a prop firm account, or a specific strategy. Each calendar tracks performance, risk, and targets.
+            <Typography variant="body1" sx={paragraphSx}>
+              Calendars are containers for your trades and performance data. Create a calendar for each trading year, prop firm account, or strategy you want to track separately.
             </Typography>
-            
-            <Box
-              sx={{
-                display: 'grid',
-                gap: 2,
-                gridTemplateColumns: { xs: '1fr', sm: '1fr', md: '1fr' }
-              }}
-            >
-              <Card
-                sx={{
-                  borderRadius: 2,
-                  border: 1,
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper'
-                }}
-              >
-                <CardContent sx={{ py: 2, px: 2.25 }}>
-                  <Typography variant="body2" sx={subsectionTitleSx}>
-                    Calendar notes & game plans
-                  </Typography>
-                  <Typography variant="body2" sx={paragraphSx}>
-                    Each calendar has a dedicated note for your strategy, rules, and game plan. The AI assistant uses this note to provide context-aware insights.
-                  </Typography>
-                </CardContent>
-              </Card>
+            <Typography variant="body1" sx={paragraphSx}>
+              Each calendar tracks your balance, risk settings, profit targets, and performance statistics. Add daily notes to any day on the calendar to record your mindset, market observations, or session reviews.
+            </Typography>
+            <Typography variant="body1" sx={{ ...paragraphSx, mb: 0 }}>
+              Enable dynamic risk adjustment to automatically scale your position sizing based on recent performance, protecting capital during drawdowns and growing during winning streaks.
+            </Typography>
+          </Section>
 
-              <Card
-                sx={{
-                  borderRadius: 2,
-                  border: 1,
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper'
-                }}
-              >
-                <CardContent sx={{ py: 2, px: 2.25 }}>
-                  <Typography variant="body2" sx={subsectionTitleSx}>
-                    Daily notes
-                  </Typography>
-                  <Typography variant="body2" sx={paragraphSx}>
-                    Click on any day to add a daily note for your mindset, market observations, or session review.
-                  </Typography>
-                </CardContent>
-              </Card>
-
-              <Card
-                sx={{
-                  borderRadius: 2,
-                  border: 1,
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper'
-                }}
-              >
-                <CardContent sx={{ py: 2, px: 2.25 }}>
-                  <Typography variant="body2" sx={subsectionTitleSx}>
-                    Dynamic risk adjustment
-                  </Typography>
-                  <Typography variant="body2" sx={paragraphSx}>
-                    Enable dynamic risk to automatically adjust your position sizing based on recent performance, helping protect capital during drawdowns and scale up during winning streaks.
-                  </Typography>
-                </CardContent>
-              </Card>
-
-              <Card
-                sx={{
-                  borderRadius: 2,
-                  border: 1,
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper'
-                }}
-              >
-                <CardContent sx={{ py: 2, px: 2.25 }}>
-                  <Typography variant="body2" sx={subsectionTitleSx}>
-                    Performance analytics & score analysis
-                  </Typography>
-                  <Typography variant="body2" sx={paragraphSx}>
-                    Each trade is scored based on rule adherence and risk management. Use scores to identify your best setups and recurring mistakes.
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Box>
-
-          </SectionCard>
-
-          <SectionCard
+          {/* Trades Section */}
+          <Section
             icon={<ShowChart fontSize="large" />}
-            title="Trades & Tags"
-            subtitle="Record, import, export and share your trading history"
-            gradient
+            title="Trades"
+            subtitle="Log and analyze every trade"
           >
-            <Typography variant="body2" sx={{ ...paragraphSx, mb: 2 }}>
-              Log your trades with direction, size, PnL, screenshots, notes, and tags. You can import, export, and share your trade data.
+            <Typography variant="body1" sx={paragraphSx}>
+              Record your trades with all the details that matter: direction, instrument, size, entry and exit prices, PnL, screenshots, and detailed notes.
             </Typography>
- 
-
-            <Box
-              sx={{
-                display: 'grid',
-                gap: 2,
-                gridTemplateColumns: { xs: '1fr', sm: '1fr', md: '1fr' }
-              }}
-            >
-              <Card
-                sx={{
-                  borderRadius: 2,
-                  border: 1,
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper'
-                }}
-              >
-                <CardContent sx={{ py: 2, px: 2.25 }}>
-                  <Typography variant="body2" sx={subsectionTitleSx}>
-                    Importing & exporting trades
-                  </Typography>
-                  <Typography variant="body2" sx={paragraphSx}>
-                    Import trades from .csv or .xlsx files, and export your data to CSV for backup or external analysis.
-                  </Typography>
-                </CardContent>
-              </Card>
-
-              <Card
-                sx={{
-                  borderRadius: 2,
-                  border: 1,
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper'
-                }}
-              >
-                <CardContent sx={{ py: 2, px: 2.25 }}>
-                  <Typography variant="body2" sx={subsectionTitleSx}>
-                    Group tags & required tag groups
-                  </Typography>
-                  <Typography variant="body2" sx={paragraphSx}>
-                    Organize trades with tags like "Setup:Breakout". Manage tags and create required groups to ensure consistent logging.
-                  </Typography>
-                </CardContent>
-              </Card>
-
-              <Card
-                sx={{
-                  borderRadius: 2,
-                  border: 1,
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper'
-                }}
-              >
-                <CardContent sx={{ py: 2, px: 2.25 }}>
-                  <Typography variant="body2" sx={subsectionTitleSx}>
-                    Gallery mode for screenshots
-                  </Typography>
-                  <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
-                    Use the gallery mode to visually review all your trade screenshots at once, making it easier to spot patterns.
-                  </Typography>
-                </CardContent>
-              </Card>
-
-              <Card
-                sx={{
-                  borderRadius: 2,
-                  border: 1,
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper'
-                }}
-              >
-                <CardContent sx={{ py: 2, px: 2.25 }}>
-                  <Typography variant="body2" sx={subsectionTitleSx}>
-                    Sharing trades
-                  </Typography>
-                  <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
-                    Generate shareable links for individual trades to discuss setups with mentors or your trading community.
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Box>
-          </SectionCard>
-
-          <SectionCard
-            icon={<Event fontSize="large" />}
-            title="Economic Events"
-            subtitle="Context from the macro calendar"
-            gradient
-          >
-            <Typography variant="body2" sx={{ ...paragraphSx, mb: 2 }}>
-              See how high-impact news aligns with your trades with the integrated economic calendar.
+            <Typography variant="body1" sx={paragraphSx}>
+              Organize trades with tags like "Setup:Breakout" or "Session:London". Create required tag groups to ensure you log consistent information for every trade.
             </Typography>
+            <Typography variant="body1" sx={paragraphSx}>
+              Import trades from CSV or Excel files, export your data for backup, and use gallery mode to review all your trade screenshots at once.
+            </Typography>
+            <Typography variant="body1" sx={{ ...paragraphSx, mb: 0 }}>
+              Each trade is scored based on rule adherence and risk management, helping you identify your best setups and recurring mistakes.
+            </Typography>
+          </Section>
 
-            <Typography variant="body2" sx={subsectionTitleSx}>
-              How to use the economic calendar
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 0.25 }}>
-              - From the Home dashboard or calendar page, open the Economic Calendar drawer to see
-              upcoming events.
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 0.25 }}>
-              - Filter by impact (High/Medium/Low) and currency to match your trading focus.
-            </Typography>
-            <Typography variant="body2">
-              - When reviewing trades, compare entries and exits against nearby events to understand
-              how news affected execution and volatility.
-            </Typography>
-          </SectionCard>
-
-          <SectionCard
-            icon={<NoteAlt fontSize="large" />}
-            title="Notes"
-            subtitle="Capture rules, reviews and ideas"
-            gradient
-          >
-            <Typography variant="body2" sx={{ ...paragraphSx, mb: 2 }}>
-              Store playbooks, checklists, and reviews in a dedicated notes section. You can also attach a detailed note to each calendar.
-            </Typography>
-
-            <Typography variant="body2" sx={subsectionTitleSx}>
-              Ways to use notes
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 0.25 }}>
-              - Use the Notes entry in the side navigation to open your note library.
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 0.25 }}>
-              - Create new notes for strategies, weekly reviews or psychology work, and pin the most
-              important ones.
-            </Typography>
-            <Typography variant="body2">
-              - Use calendar notes to describe the overall plan, rules and context for that trading
-              year or account.
-            </Typography>
-          </SectionCard>
-
-
-        </Box>
-
-        <Box sx={{ mt: { xs: 4, sm: 6 } }}>
-          <SectionCard
+          {/* AI Assistant Section */}
+          <Section
             icon={<SmartToy fontSize="large" />}
             title="AI Assistant"
-            subtitle="Your personal trading analyst powered by your own data"
-            gradient
+            subtitle="Your personal trading analyst"
           >
-          <Typography variant="body2" sx={{ ...paragraphSx, mb: 2 }}>
-            The AI assistant understands your trading style, rules, and performance. It can search trades, analyze stats, read your notes, and correlate economic events to help you find your edge.
-          </Typography>
-
-          <Typography variant="body2" sx={subsectionTitleSx}>
-            What the AI assistant can do
-          </Typography>
-          <Typography variant="body2" sx={paragraphSx}>
-            - Search and filter trades
-          </Typography>
-          <Typography variant="body2" sx={paragraphSx}>
-            - Calculate custom statistics
-          </Typography>
-          <Typography variant="body2" sx={paragraphSx}>
-            - Analyze patterns and correlations
-          </Typography>
-          <Typography variant="body2" sx={paragraphSx}>
-            - Review economic event impact
-          </Typography>
-          <Typography variant="body2" sx={paragraphSx}>
-            - Visualize your data and generate charts
-          </Typography>
-          <Typography variant="body2" sx={{ ...paragraphSx, mb: 1.5 }}>
-            - Read and reference your notes
-          </Typography>
-
-          <Typography variant="body2" sx={subsectionTitleSx}>
-            Why Detailed Notes Matter
-          </Typography>
-          <Typography variant="body2" sx={paragraphSx}>
-            The AI assistant reads your calendar and trade notes to provide personalized insights. A well-written note with your trading plan and rules will improve the AI's analysis.
-          </Typography>
-          <Typography variant="body2" sx={paragraphSx}>
-            Include details like your strategy, rules for entry and exit, risk management, session preferences, and psychological guidelines.
-          </Typography>
-           
-
-
-          <Typography variant="body2">
-            - Remember that AI outputs are analytical insights based on your data, not financial
-            advice. Use the AI to understand your performance, not to predict future market
-            movements.
-          </Typography>
-        </SectionCard>
-        </Box>
+            <Typography variant="body1" sx={paragraphSx}>
+              The AI assistant reads your trades, calendar notes, and performance data to provide personalized insights about your trading.
+            </Typography>
+            <Typography variant="body1" sx={paragraphSx}>
+              Ask questions in plain language: "Show me my best performing setups", "Why am I losing on Fridays?", or "Compare my long vs short trades". The AI will search your data, calculate statistics, and explain patterns it finds.
+            </Typography>
+            <Typography variant="body1" sx={paragraphSx}>
+              It can generate charts, analyze correlations, and help you understand what's working and what's not. The more detailed your trade notes and calendar game plan, the better the AI can help you.
+            </Typography>
+            <Typography variant="body1" sx={{ ...paragraphSx, mb: 0, fontStyle: 'italic' }}>
+              Note: AI outputs are analytical insights based on your data, not financial advice.
+            </Typography>
+          </Section>
+        </Stack>
 
         {/* Workflow Section */}
-        <Box sx={{ mt: { xs: 5, sm: 7 } }}>
+        <Box sx={{ mt: { xs: 6, sm: 8 } }}>
           <Divider sx={{ mb: 4 }}>
             <Chip label="Getting Started" size="small" />
           </Divider>
@@ -528,14 +195,14 @@ const AboutPage: React.FC = () => {
             variant={isXs ? 'h5' : 'h4'}
             sx={{ fontWeight: 700, mb: 1, textAlign: 'center' }}
           >
-            Your Journey to Better Trading
+            How to Get Started
           </Typography>
           <Typography
             variant="body1"
             color="text.secondary"
-            sx={{ mb: 4, textAlign: 'center', maxWidth: 700, mx: 'auto' }}
+            sx={{ mb: 4, textAlign: 'center', maxWidth: 600, mx: 'auto', lineHeight: 1.7 }}
           >
-            Follow these steps to get the most out of the platform.
+            Follow these simple steps to start improving your trading.
           </Typography>
 
           <Card
@@ -548,10 +215,10 @@ const AboutPage: React.FC = () => {
             <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
               <Stack spacing={2.5}>
                 {[
-                  'Create a calendar for your account, set balance, drawdown and targets.',
-                  'Import external trades from CSV or Excel or manually add your trades.',
-                  'Review monthly performance and economic events to understand context.',
-                  'Use the AI assistant to surface patterns, weaknesses and opportunities.'
+                  'Create a calendar and set your starting balance, risk limits, and profit targets.',
+                  'Log your trades manually or import them from CSV or Excel files.',
+                  'Review your performance statistics and identify patterns in your trading.',
+                  'Ask the AI assistant questions to uncover insights and improve your edge.'
                 ].map((step, index) => (
                   <Stack key={step} direction="row" spacing={2} alignItems="flex-start">
                     <Box
@@ -655,7 +322,7 @@ const AboutPage: React.FC = () => {
             </CardContent>
           </Card>
         </Box>
-      </Box>
+      </Container>
     </Box>
   );
 };

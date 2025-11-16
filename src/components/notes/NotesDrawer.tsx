@@ -25,6 +25,8 @@ import {
   Add as AddIcon,
   Notes as NotesIcon,
   Clear as ClearIcon,
+  SmartToy as AIIcon,
+  Person as PersonIcon,
 } from '@mui/icons-material';
 
 import UnifiedDrawer from '../common/UnifiedDrawer';
@@ -103,12 +105,13 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<TabValue>('all');
   const [editorOpen, setEditorOpen] = useState(false);
   const [selectedNote, setSelectedNote] = useState<Note | undefined>();
   const [selectedCalendarForNew, setSelectedCalendarForNew] = useState<string | undefined>(calendarId);
   const [selectedCalendarFilter, setSelectedCalendarFilter] = useState<string>('all'); // For filtering notes by calendar
+  const [creatorFilter, setCreatorFilter] = useState<'assistant' | 'me'>('me'); // Filter by creator
   const [hasMore, setHasMore] = useState(false);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -117,7 +120,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
 
   // Load notes when drawer opens or filters change
   useEffect(() => {
-    if (open) { 
+    if (open) {
       // Reset and load fresh data
       setOffset(0);
       loadNotes(true);
@@ -125,11 +128,11 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
         loadCalendars();
       }
     }
-  }, [open, calendarId, showCalendarPicker, activeTab, selectedCalendarFilter]);
+  }, [open, calendarId, showCalendarPicker, activeTab, selectedCalendarFilter, creatorFilter]);
 
   // Debounced search effect
   useEffect(() => {
-    if (!open || searchQuery == null) return;
+    if (!open) return;
 
     const timeout = setTimeout(() => {
       // Reset and load with search
@@ -168,6 +171,13 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
         queryOptions.isArchived = false;
       }
 
+      // Apply creator filter
+      if (creatorFilter === 'assistant') {
+        queryOptions.byAssistant = true;
+      } else if (creatorFilter === 'me') {
+        queryOptions.byAssistant = false;
+      }
+
       // Query notes
       let result: notesService.NoteQueryResult;
       // Use calendarId prop if provided (calendar-specific view)
@@ -197,7 +207,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [user?.uid, calendarId, activeTab, searchQuery, offset, selectedCalendarFilter]);
+  }, [user?.uid, calendarId, activeTab, searchQuery, offset, selectedCalendarFilter, creatorFilter]);
 
   const loadCalendars = async () => {
     if (!user?.uid) return;
@@ -364,14 +374,15 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
             />
           </Box>
 
-          {/* Search */}
-          <Box sx={{ px: 2, pb: 2 }}>
+          {/* Search and Filter Row */}
+          <Box sx={{ px: 2, pb: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
+            {/* Search - takes remaining space */}
             <TextField
-              fullWidth
               size="small"
               placeholder="Search notes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              sx={{ flex: 1 }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -395,6 +406,30 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
                 },
               }}
             />
+
+            {/* Creator Filter - compact */}
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <Select
+                value={creatorFilter}
+                onChange={(e) => setCreatorFilter(e.target.value as 'assistant' | 'me')}
+                sx={{
+                  borderRadius: 1,
+                }}
+              >
+                <MenuItem value="me">
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <PersonIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+                    <Typography variant="body2">My Notes</Typography>
+                  </Stack>
+                </MenuItem>
+                <MenuItem value="assistant">
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <AIIcon sx={{ fontSize: '1rem', color: 'primary.main' }} />
+                    <Typography variant="body2">AI Assistant</Typography>
+                  </Stack>
+                </MenuItem>
+              </Select>
+            </FormControl>
           </Box>
 
           {/* Notes List */}
