@@ -145,16 +145,16 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
 
     try {
       // Check if trade exists in cached trades first
-      let existingTrade = trades.find((t) =>
-        t.id === tradeId
-      );
+      
+      let existingTrade = await calendarService.getTrade(calendar.id, tradeId); 
       // If trade doesn't exist and we have a create function, create it
-      if (!existingTrade && createIfNotExists) {
+      if (!existingTrade && createIfNotExists) { 
         // Create in database with all updates already applied
         const finalTrade = await calendarService.addTrade(
           calendar.id,
           updateCallback(createIfNotExists(tradeId)),
-        );
+        ); 
+         
         setTrades(prevTrades => [...prevTrades, finalTrade]);
         return finalTrade;
       }

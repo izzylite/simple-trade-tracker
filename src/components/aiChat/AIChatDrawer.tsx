@@ -26,7 +26,10 @@ import {
   DialogContentText,
   DialogActions,
   Popper,
-  Paper
+  Paper,
+  TextField,
+  InputAdornment,
+  ClickAwayListener
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -39,7 +42,8 @@ import {
   Schedule as ScheduleIcon,
   Stop as StopIcon,
   Settings as SettingsIcon,
-  Notes as NotesIcon
+  Notes as NotesIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
@@ -142,6 +146,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const [isAtMessageLimit, setIsAtMessageLimit] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
+  const [historySearchQuery, setHistorySearchQuery] = useState<string>('');
 
   // Economic event detail dialog state
   const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
@@ -162,6 +167,35 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const chatConfig = {
     autoScroll: true
   };
+
+  // Filter conversations based on search query
+  const filteredConversations = React.useMemo(() => {
+    if (!historySearchQuery.trim()) {
+      return conversations;
+    }
+
+    const query = historySearchQuery.toLowerCase();
+    return conversations.filter(conversation => {
+      // Search in title
+      if (conversation.title?.toLowerCase().includes(query)) {
+        return true;
+      }
+      // Search in preview
+      if ((conversation as any).preview?.toLowerCase().includes(query)) {
+        return true;
+      }
+      // Search in message content
+      if (conversation.messages && Array.isArray(conversation.messages)) {
+        const foundInMessages = conversation.messages.some(message =>
+          message.content?.toLowerCase().includes(query)
+        );
+        if (foundInMessages) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }, [conversations, historySearchQuery]);
 
   /**
    * Parse quota/API key errors from Gemini API and return user-friendly message
@@ -1437,87 +1471,89 @@ What would you like to know about your trading?`,
               </Box>
 
               {notesAnchorEl && (
-                <Popper
-                  open={Boolean(notesAnchorEl)}
-                  anchorEl={notesAnchorEl}
-                  placement="top-end"
-                  disablePortal
-                  sx={{ zIndex: 1600 }}
-                >
-                  <Paper
-                    elevation={8}
-                    sx={{
-                      maxWidth: 360,
-                      maxHeight: 320,
-                      overflow: 'hidden',
-                      borderRadius: 2,
-                      boxShadow: theme.shadows[8]
-                    }}
+                <ClickAwayListener onClickAway={() => setNotesAnchorEl(null)}>
+                  <Popper
+                    open={Boolean(notesAnchorEl)}
+                    anchorEl={notesAnchorEl}
+                    placement="top-end"
+                    disablePortal
+                    sx={{ zIndex: 1600 }}
                   >
-                    <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                        Add Context
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Select a note to insert into your message.
-                      </Typography>
-                    </Box>
-                    <Box
+                    <Paper
+                      elevation={8}
                       sx={{
-                        maxHeight: 250,
-                        overflow: 'auto',
-                        ...scrollbarStyles(theme)
+                        maxWidth: 360,
+                        maxHeight: 320,
+                        overflow: 'hidden',
+                        borderRadius: 2,
+                        boxShadow: theme.shadows[8]
                       }}
                     >
-                      {notesLoading ? (
-                        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <CircularProgress size={16} />
-                          <Typography variant="body2" color="text.secondary">
-                            Loading notes...
-                          </Typography>
-                        </Box>
-                      ) : availableNotes.length === 0 ? (
-                        <Box sx={{ p: 2 }}>
-                          <Typography variant="body2" color="text.secondary">
-                            No notes found yet.
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <List dense sx={{ p: 0 }}>
-                          {availableNotes.map(note => (
-                            <ListItemButton
-                              key={note.id}
-                              onClick={() => handleInsertNoteContext(note)}
-                              sx={{
-                                px: 1.5,
-                                py: 1,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'flex-start'
-                              }}
-                            >
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                                <NotesIcon sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
-                                <Typography
-                                  variant="body2"
-                                  sx={{
-                                    fontWeight: 600,
-                                    flex: 1,
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap'
-                                  }}
-                                >
-                                  {note.title || 'Untitled'}
-                                </Typography>
-                              </Box>
-                            </ListItemButton>
-                          ))}
-                        </List>
-                      )}
-                    </Box>
-                  </Paper>
-                </Popper>
+                      <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          Add Context
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Select a note to insert into your message.
+                        </Typography>
+                      </Box>
+                      <Box
+                        sx={{
+                          maxHeight: 250,
+                          overflow: 'auto',
+                          ...scrollbarStyles(theme)
+                        }}
+                      >
+                        {notesLoading ? (
+                          <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <CircularProgress size={16} />
+                            <Typography variant="body2" color="text.secondary">
+                              Loading notes...
+                            </Typography>
+                          </Box>
+                        ) : availableNotes.length === 0 ? (
+                          <Box sx={{ p: 2 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              No notes found yet.
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <List dense sx={{ p: 0 }}>
+                            {availableNotes.map(note => (
+                              <ListItemButton
+                                key={note.id}
+                                onClick={() => handleInsertNoteContext(note)}
+                                sx={{
+                                  px: 1.5,
+                                  py: 1,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'flex-start'
+                                }}
+                              >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                                  <NotesIcon sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 600,
+                                      maxWidth: 200,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    {note.title || 'Untitled'}
+                                  </Typography>
+                                </Box>
+                              </ListItemButton>
+                            ))}
+                          </List>
+                        )}
+                      </Box>
+                    </Paper>
+                  </Popper>
+                </ClickAwayListener>
               )}
               </Box>
               {/* End Chat View */}
@@ -1530,6 +1566,36 @@ What would you like to know about your trading?`,
                 flexDirection: 'column',
                 overflow: 'hidden'
               }}>
+                {/* Search Bar */}
+                <Box sx={{ p: 2, pb: 1 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Search conversations..."
+                    value={historySearchQuery}
+                    onChange={(e) => setHistorySearchQuery(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                        '&:hover': {
+                          backgroundColor: theme.palette.background.paper,
+                        },
+                        '&.Mui-focused': {
+                          backgroundColor: theme.palette.background.paper,
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+
                 {/* History Content */}
                 <Box sx={{
                   flex: 1,
@@ -1587,15 +1653,15 @@ What would you like to know about your trading?`,
                         </React.Fragment>
                       ))}
                     </List>
-                  ) : conversations.length === 0 ? (
+                  ) : filteredConversations.length === 0 ? (
                     <Box sx={{ p: 3 }}>
                       <Alert severity="info">
-                        No conversation history yet. Start chatting with the AI to create your first conversation!
+                        {historySearchQuery.trim() ? `No conversations found matching "${historySearchQuery}"` : 'No conversation history yet. Start chatting with the AI to create your first conversation!'}
                       </Alert>
                     </Box>
                   ) : (
                     <List sx={{ p: 0 }}>
-                      {conversations.map((conversation, index) => (
+                      {filteredConversations.map((conversation, index) => (
                         <React.Fragment key={conversation.id}>
                           <ListItem disablePadding>
                             <ListItemButton

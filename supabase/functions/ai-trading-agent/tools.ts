@@ -153,7 +153,7 @@ export const generateChartTool: GeminiFunctionDeclaration = {
  */
 export const createNoteTool: GeminiFunctionDeclaration = {
   name: 'create_note',
-  description: 'Create a new note for the user in their trading calendar. Use this to save trading strategies, insights, lessons learned, or game plans. Notes are persistent and can be referenced later. Content should be in plain text format. User ID and Calendar ID are automatically provided from context.',
+  description: 'Create a new note for the user in their trading calendar. Use this to save trading strategies, insights, lessons learned, or game plans. IMPORTANT: Also use this to maintain YOUR OWN AGENT MEMORY by creating a special note titled "Trading Agent Memory - [Calendar Name]" with tag "AGENT_MEMORY" that stores discovered patterns, user preferences, and lessons learned across sessions. This memory note should be created after identifying 3+ significant patterns and updated incrementally. Content should be in plain text format. User ID and Calendar ID are automatically provided from context.',
   parameters: {
     type: 'object',
     properties: {
@@ -164,6 +164,11 @@ export const createNoteTool: GeminiFunctionDeclaration = {
       content: {
         type: 'string',
         description: 'Note content in plain text format. Use clear paragraphs and line breaks for readability. Do not use HTML tags.'
+      },
+      tags: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Array of tags for categorizing the note. Common tags: "AGENT_MEMORY" (for AI persistent memory), "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED". REQUIRED: Use "AGENT_MEMORY" tag for memory notes.'
       },
       reminder_type: {
         type: 'string',
@@ -192,7 +197,7 @@ export const createNoteTool: GeminiFunctionDeclaration = {
  */
 export const updateNoteTool: GeminiFunctionDeclaration = {
   name: 'update_note',
-  description: 'Update an existing AI-created note. You can only update notes that you created (by_assistant=true). Use this to refine strategies or update insights. You can also add/modify/remove reminders.',
+  description: 'Update an existing AI-created note. You can only update notes that you created (by_assistant=true). Use this to refine strategies or update insights. IMPORTANT: Use this to update your "Trading Agent Memory" note incrementally by appending new discoveries (don\'t rewrite the entire memory). You can also add/modify/remove tags and reminders.',
   parameters: {
     type: 'object',
     properties: {
@@ -207,6 +212,11 @@ export const updateNoteTool: GeminiFunctionDeclaration = {
       content: {
         type: 'string',
         description: 'New content in plain text format (optional - only include if changing). Use clear paragraphs and line breaks for readability. Do not use HTML tags.'
+      },
+      tags: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Updated array of tags (optional - only include if changing). Common tags: "AGENT_MEMORY", "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED".'
       },
       reminder_type: {
         type: 'string',
@@ -253,13 +263,18 @@ export const deleteNoteTool: GeminiFunctionDeclaration = {
  */
 export const searchNotesTool: GeminiFunctionDeclaration = {
   name: 'search_notes',
-  description: 'Search and retrieve notes from the user\'s trading calendar. Use this to understand user strategies, insights, and game plans. Returns both user-created and AI-created notes. User ID and Calendar ID are automatically provided from context.',
+  description: 'Search and retrieve notes from the user\'s trading calendar. CRITICAL: At the START of EVERY session, search with tags: ["AGENT_MEMORY"] to retrieve your persistent memory about this trader (discovered patterns, preferences, lessons learned). Use this memory to provide personalized analysis. Also use this to understand user strategies, insights, and game plans. Returns both user-created and AI-created notes. User ID and Calendar ID are automatically provided from context.',
   parameters: {
     type: 'object',
     properties: {
       search_query: {
         type: 'string',
         description: 'Optional search query to filter notes by title or content. Leave empty to get all notes.'
+      },
+      tags: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Optional array of tags to filter notes. Use ["AGENT_MEMORY"] to retrieve AI memory notes. If provided, only notes with ALL specified tags will be returned.'
       },
       include_archived: {
         type: 'boolean',
@@ -554,7 +569,8 @@ export async function createNote(
   content: string,
   reminderType?: string,
   reminderDate?: string,
-  reminderDays?: string[]
+  reminderDays?: string[],
+  tags?: string[]
 ): Promise<string> {
   try {
     log(`Creating note: ${title}`, 'info');
@@ -569,7 +585,8 @@ export async function createNote(
       is_pinned: false,
       cover_image: null,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      tags: tags || []
     };
 
     // Add reminder fields if provided
@@ -617,7 +634,8 @@ export async function updateNote(
   content?: string,
   reminderType?: string,
   reminderDate?: string,
-  reminderDays?: string[]
+  reminderDays?: string[],
+  tags?: string[]
 ): Promise<string> {
   try {
     log(`Updating note: ${noteId}`, 'info');
@@ -652,6 +670,11 @@ export async function updateNote(
 
     if (content !== undefined) {
       updateData.content = content;
+    }
+
+    // Handle tags update
+    if (tags !== undefined) {
+      updateData.tags = tags;
     }
 
     // Handle reminder fields
@@ -753,7 +776,8 @@ export async function searchNotes(
   userId: string,
   calendarId: string,
   searchQuery?: string,
-  includeArchived: boolean = false
+  includeArchived: boolean = false,
+  tags?: string[]
 ): Promise<string> {
   try {
     log(`Searching notes for user ${userId} in calendar ${calendarId}`, 'info');
@@ -761,13 +785,21 @@ export async function searchNotes(
     // Build the query
     let query = supabase
       .from('notes')
-      .select('id, title, content, by_assistant, is_pinned, is_archived, created_at, updated_at, reminder_type, reminder_date, reminder_days')
+      .select('id, title, content, by_assistant, is_pinned, is_archived, created_at, updated_at, reminder_type, reminder_date, reminder_days, tags')
       .eq('user_id', userId)
       .eq('calendar_id', calendarId);
 
     // Filter by archived status
     if (!includeArchived) {
       query = query.eq('is_archived', false);
+    }
+
+    // Apply tag filter if provided
+    if (tags && tags.length > 0) {
+      // Filter notes that contain ALL specified tags
+      for (const tag of tags) {
+        query = query.contains('tags', [tag]);
+      }
     }
 
     // Apply search filter if provided
@@ -789,6 +821,8 @@ export async function searchNotes(
     if (!notes || notes.length === 0) {
       return searchQuery
         ? `No notes found matching "${searchQuery}".`
+        : tags && tags.length > 0
+        ? `No notes found with tags: ${tags.join(', ')}.`
         : 'No notes found in this calendar.';
     }
 
@@ -868,8 +902,9 @@ export async function executeCustomTool(
         const reminderType = typeof args.reminder_type === 'string' ? args.reminder_type : undefined;
         const reminderDate = typeof args.reminder_date === 'string' ? args.reminder_date : undefined;
         const reminderDays = Array.isArray(args.reminder_days) ? args.reminder_days : undefined;
+        const tags = Array.isArray(args.tags) ? args.tags : undefined;
 
-        return await createNote(supabase, userId, calendarId, title, content, reminderType, reminderDate, reminderDays);
+        return await createNote(supabase, userId, calendarId, title, content, reminderType, reminderDate, reminderDays, tags);
       }
 
       case 'update_note': {
@@ -882,7 +917,8 @@ export async function executeCustomTool(
         const reminderType = typeof args.reminder_type === 'string' ? args.reminder_type : undefined;
         const reminderDate = typeof args.reminder_date === 'string' ? args.reminder_date : undefined;
         const reminderDays = Array.isArray(args.reminder_days) ? args.reminder_days : undefined;
-        return await updateNote(supabase, noteId, title, content, reminderType, reminderDate, reminderDays);
+        const tags = Array.isArray(args.tags) ? args.tags : undefined;
+        return await updateNote(supabase, noteId, title, content, reminderType, reminderDate, reminderDays, tags);
       }
 
       case 'delete_note': {
@@ -901,7 +937,8 @@ export async function executeCustomTool(
         const calendarId = context.calendarId || '';
         const searchQuery = typeof args.search_query === 'string' ? args.search_query : undefined;
         const includeArchived = typeof args.include_archived === 'boolean' ? args.include_archived : false;
-        return await searchNotes(supabase, userId, calendarId, searchQuery, includeArchived);
+        const tags = Array.isArray(args.tags) ? args.tags : undefined;
+        return await searchNotes(supabase, userId, calendarId, searchQuery, includeArchived, tags);
       }
 
       default:

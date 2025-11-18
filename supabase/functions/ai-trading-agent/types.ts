@@ -51,6 +51,9 @@ export interface Note {
   reminder_date?: string | null; // ISO date string for one-time reminders
   reminder_days?: DayAbbreviation[]; // For weekly reminders
   is_reminder_active?: boolean;
+
+  // Tags
+  tags?: string[]; // Array of tags for categorization and filtering
 }
 
 // Trade Types

@@ -108,8 +108,7 @@ import { EconomicEvent } from '../types/economicCalendar';
 import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
-import { useCalendarTrades } from '../hooks/useCalendarTrades';
-import * as calendarService from '../services/calendarService';
+import { useCalendarTrades } from '../hooks/useCalendarTrades'; 
 
 interface TradeCalendarProps {
   // Trade CRUD operations now handled internally via useCalendarTrades hook

@@ -531,8 +531,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       // First, ensure the trade exists in the database and is in the cached trades
       const trade = await handleUpdateTradeProperty(newTrade!.id!!, (trade) => {
         // Calculate row and column for new images
-        const existingImages = trade.images || [];
-
+        const existingImages = trade.images || []; 
         // Find the highest row value to place new images below existing ones
         let maxRow = -1;
 
@@ -567,7 +566,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         (tradeid: string) => {
           // setIsCreatingEmptyTrade(true);
           // Create a temporary trade object if it doesnt exist
-          // Note: Economic events will be added later via async update
+          // Note: Economic events will be added later via async update 
           const currentDate = new Date();
           const tradeDate = newTrade!.trade_date || trade_date;
           const finalAmount = calculateFinalAmount(newTrade!);
@@ -611,11 +610,6 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           };
         })
       }
-      // if (isCreatingEmptyTrade){
-      //    setIsCreatingEmptyTrade(false);
-      // }
-
-
 
       for (const image of newPendingImages) {
         await startImageUpload(image, newTrade!.id!!, pending_images);
