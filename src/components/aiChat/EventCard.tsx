@@ -10,14 +10,16 @@ import {
   Typography,
   Chip,
   useTheme,
-  alpha
+  alpha,
+  Tooltip
 } from '@mui/material';
 import {
   Check as CheckIcon,
   HourglassEmpty as HourglassEmptyIcon,
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
-  Remove as NeutralIcon
+  Remove as NeutralIcon,
+  ShowChart as TradeIcon
 } from '@mui/icons-material';
 import { format, parseISO, isAfter } from 'date-fns';
 import { EconomicEvent } from '../../types/economicCalendar';
@@ -29,6 +31,7 @@ interface EventCardProps {
   eventData?: EconomicEvent; // Optional: pre-fetched event data from backend
   compact?: boolean;
   onClick?: (event: EconomicEvent) => void;
+  tradeCount?: number; // Number of trades associated with this event
 }
 
 // Helper function to format numeric values with commas
@@ -111,7 +114,8 @@ const EventCard: React.FC<EventCardProps> = ({
   eventId,
   eventData,
   compact = false,
-  onClick
+  onClick,
+  tradeCount = 0
 }) => {
   const theme = useTheme();
   const [event, setEvent] = useState<EconomicEvent | null>(eventData || null);
@@ -251,6 +255,39 @@ const EventCard: React.FC<EventCardProps> = ({
 
             {/* Spacer */}
             <Box sx={{ flex: 1 }} />
+
+            {/* Trade Count Badge */}
+            {tradeCount > 0 && (
+              <Tooltip
+                title={`You've traded this event ${tradeCount} time${tradeCount > 1 ? 's' : ''}`}
+                arrow
+                placement="top"
+              >
+                <Chip
+                  icon={<TradeIcon sx={{ fontSize: '0.7rem !important', color: 'white !important' }} />}
+                  label={tradeCount}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.9),
+                    color: 'white',
+                    minWidth: 40,
+                    borderRadius: 1,
+                    cursor: 'pointer',
+                    '& .MuiChip-label': {
+                      px: 0.5,
+                      py: 0.25
+                    },
+                    '& .MuiChip-icon': {
+                      ml: 0.5,
+                      mr: -0.25
+                    }
+                  }}
+                />
+              </Tooltip>
+            )}
 
             {/* Impact Badge */}
             <Chip

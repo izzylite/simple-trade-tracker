@@ -46,6 +46,7 @@ interface ChatMessageProps {
   onEventClick?: (event: EconomicEvent) => void;
   onNoteClick?: (noteId: string) => void;
   onEdit?: (messageId: string) => void;
+  trades?: Trade[]; // All trades for calculating event trade counts
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -57,7 +58,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   onTradeClick,
   onEventClick,
   onNoteClick,
-  onEdit
+  onEdit,
+  trades = []
 }) => {
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
@@ -294,6 +296,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 onTradeClick={onTradeClick}
                 onEventClick={onEventClick}
                 onNoteClick={onNoteClick}
+                trades={trades}
               />
             ) : isAssistant && enableAnimation && isLatestMessage ? (
               <AnimatedText

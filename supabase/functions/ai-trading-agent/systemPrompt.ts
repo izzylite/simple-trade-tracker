@@ -185,6 +185,39 @@ DATABASE TABLES (query via MCP execute_sql):
   - impact: 'High', 'Medium', 'Low', 'Holiday', 'Non-Economic'
   - Global table (no user_id) - respect calendar's economic_calendar_filters when present
 
+QUERYING TRADES BY ECONOMIC EVENTS:
+CRITICAL: Event names in trades have dates removed during storage (e.g., "CPI m/m Oct25" → "CPI m/m")
+trades.economic_events is JSONB array: [{"name": "CPI m/m", "impact": "High", "currency": "USD", "time_utc": "..."}]
+
+Correct query pattern for "Have we traded CPI events?":
+\`\`\`sql
+SELECT t.*, event_item->>'name' as event_name
+FROM trades t,
+jsonb_array_elements(t.economic_events) as event_item
+WHERE t.user_id = 'USER_ID'
+  AND t.calendar_id = 'CALENDAR_ID'
+  AND event_item->>'name' ILIKE '%CPI%'
+ORDER BY t.trade_date DESC;
+\`\`\`
+
+Match by name + impact + currency (more precise):
+\`\`\`sql
+SELECT t.*, event_item
+FROM trades t,
+jsonb_array_elements(t.economic_events) as event_item
+WHERE t.user_id = 'USER_ID'
+  AND t.calendar_id = 'CALENDAR_ID'
+  AND event_item->>'name' ILIKE '%Non-Farm%'
+  AND event_item->>'impact' = 'High'
+  AND event_item->>'currency' = 'USD';
+\`\`\`
+
+Key points:
+- Use ILIKE with % wildcards for partial matching (handles date variations)
+- Use jsonb_array_elements() to search within the array
+- Event names are cleaned: "CPI m/m (Oct)", "CPI m/m Sep", "CPI m/m Oct25" all become "CPI m/m"
+- Match on impact + currency for precision
+
 - **notes**: User notes (id, user_id, calendar_id, title, content, by_assistant, is_pinned, tags[], created_at, updated_at)
   - by_assistant: true = AI-created (can modify), false = user-created (read-only)
   - tags[]: Array for filtering ('TagName' = ANY(tags))

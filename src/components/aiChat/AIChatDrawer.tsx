@@ -752,7 +752,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       );
 
-      setAvailableNotes(sortedNotes.filter(note => !note.is_archived));
+      setAvailableNotes(sortedNotes.filter(note => !note.is_archived && !note.by_assistant));
     } catch (error) {
       logger.error('Error loading notes for AI context:', error);
     } finally {
@@ -1192,6 +1192,7 @@ What would you like to know about your trading?`,
                       }
                     }}
                     onEdit={handleEditMessage}
+                    trades={trades}
                   />
                 ))}
 

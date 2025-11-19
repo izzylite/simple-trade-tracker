@@ -20,6 +20,8 @@ import ExpandableCardList from './ExpandableCardList';
 import type { Trade } from '../../types/trade';
 import type { EconomicEvent } from '../../types/economicCalendar';
 import type { Note } from '../../types/note';
+import { TradeEconomicEvent } from '../../types/dualWrite';
+import { eventMatchV3 } from '../../utils/eventNameUtils';
 
 interface HtmlMessageRendererProps {
   html: string;
@@ -31,6 +33,7 @@ interface HtmlMessageRendererProps {
   onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void;
   onEventClick?: (event: EconomicEvent) => void;
   onNoteClick?: (noteId: string) => void;
+  trades?: Trade[]; // All trades for calculating event trade counts
 }
 
 const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
@@ -41,12 +44,37 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
   embeddedNotes,
   onTradeClick,
   onEventClick,
-  onNoteClick
+  onNoteClick,
+  trades = []
 }) => {
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const [imageZoomProp, setImageZoomProp] = useState<ImageZoomProp | null>(null);
+
+  // Calculate trade count for each embedded event
+  const eventTradeCountMap = useMemo(() => {
+    const countMap = new Map<string, number>();
+
+    if (!embeddedEvents || trades.length === 0) {
+      return countMap;
+    }
+
+    Object.entries(embeddedEvents).forEach(([eventId, event]) => {
+      const tradeCount = trades.filter(trade => {
+        if (!trade.economic_events || trade.economic_events.length === 0) {
+          return false;
+        }
+        return trade.economic_events.some((tradeEvent: TradeEconomicEvent) => {
+          return eventMatchV3(tradeEvent, event);
+        });
+      }).length;
+
+      countMap.set(eventId, tradeCount);
+    });
+
+    return countMap;
+  }, [embeddedEvents, trades]);
 
   // Parse HTML into segments with inline cards
   const contentSegments = useMemo(() => {
@@ -306,6 +334,7 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
         flushTrades();
 
         const event = embeddedEvents[segment.id];
+        const tradeCount = eventTradeCountMap.get(segment.id) || 0;
         nodes.push(
           <Box key={`event-${index}`} sx={{ my: 1 }}>
             <EventCard
@@ -313,6 +342,7 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
               eventData={event}
               onClick={onEventClick}
               compact={false}
+              tradeCount={tradeCount}
             />
           </Box>
         );

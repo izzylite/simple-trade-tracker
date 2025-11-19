@@ -271,7 +271,7 @@ async function callGemini(
   conversationHistory: Array<{ role: string; content: string }>,
   tools: GeminiFunctionDeclaration[]
 ): Promise<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> } }> {
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-03-25:generateContent?key=${apiKey}`;
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   // Build contents array
   const contents = [
@@ -333,7 +333,7 @@ async function callGeminiStreaming(
   tools: GeminiFunctionDeclaration[],
   writer: WritableStreamDefaultWriter
 ): Promise<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> }; functionCalls?: Array<{ name: string; args: Record<string, unknown> }> }> {
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-03-25:streamGenerateContent?alt=sse&key=${apiKey}`;
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
 
   // Build contents array
   const contents = [
@@ -673,7 +673,7 @@ function handleStreamingRequest(
 
         // Call Gemini again with updated conversation - need to use direct API call
         // since we have conversationContents in Gemini format already
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-03-25:streamGenerateContent?alt=sse&key=${googleApiKey}`;
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${googleApiKey}`;
 
         const requestBody = {
           contents: conversationContents,
@@ -793,7 +793,7 @@ function handleStreamingRequest(
         messageHtml,
         metadata: {
           functionCalls,
-          model: 'gemini-2.5-pro-preview-03-25',
+          model: 'gemini-2.5-flash',
           timestamp: new Date().toISOString(),
           turnCount
         }
@@ -1016,7 +1016,8 @@ Deno.serve(async (req: Request) => {
       });
 
       // Call Gemini again with updated conversation history
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-03-25:generateContent?key=${googleApiKey}`;
+      // CONSERVATIVE: const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleApiKey}`
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleApiKey}`;
       const requestBody = {
         contents: conversationContents,
         tools: allTools.length > 0 ? [{ function_declarations: allTools }] : undefined,
@@ -1098,7 +1099,7 @@ Deno.serve(async (req: Request) => {
       embeddedNotes: Object.keys(embeddedNotes).length > 0 ? embeddedNotes : undefined,
       metadata: {
         functionCalls,
-        model: 'gemini-2.5-pro-preview-03-25',
+        model: 'gemini-2.5-flash',
         timestamp: new Date().toISOString(),
       }
     };
@@ -1113,7 +1114,7 @@ Deno.serve(async (req: Request) => {
           message: 'Security validation failed',
           metadata: {
             functionCalls: [],
-            model: 'gemini-2.5-pro-preview-03-25',
+            model: 'gemini-2.5-flash',
             timestamp: new Date().toISOString()
           },
           error: 'Data leak detected',
@@ -1133,7 +1134,7 @@ Deno.serve(async (req: Request) => {
 
     const errorResponse = formatErrorResponse(
       error instanceof Error ? error : new Error('Unknown error'),
-      'gemini-2.5-pro-preview-03-25'
+      'gemini-2.5-flash'
     );
 
     return new Response(JSON.stringify(errorResponse), {

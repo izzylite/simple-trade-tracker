@@ -175,7 +175,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       
       return result;
     } catch (error) {
-      console.error("Error updating trade:", error);
+      logger.error("Error updating trade:", error);
       throw error;
     }
   };
@@ -220,7 +220,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
 
     // If using actual amounts, reload the original trades from the database
     if (useActualAmounts) {
-      console.log("Resetting to actual trade amounts...");
+      logger.log("Resetting to actual trade amounts...");
       // Reload all trades for the calendar to get the original values
       fetchTrades()
       return;
@@ -232,7 +232,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         return;
       }
 
-      console.log(
+      logger.log(
         "Recalculating ALL trades based on risk to reward to show potential...",
       );
 
@@ -277,7 +277,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
           calendar.account_balance,
           cumulativePnL,
         );
-  console.log(`Effective risk for ${trade.name}: ${effectiveRisk}   risk amount: ${riskAmount}`);
+  logger.log(`Effective risk for ${trade.name}: ${effectiveRisk}   risk amount: ${riskAmount}`);
         // Calculate new amount based on trade type and risk to reward
         let newAmount = 0;
         if (trade.trade_type === "win") {
@@ -326,7 +326,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       const result = await calendarService.importTrades(calendar.id,trades, importedTrades);
       setTrades(result);
     } catch (error) {
-      console.error("Error importing trades:", error); 
+      logger.error("Error importing trades:", error); 
       throw error;
     } finally { 
       setIsLoading(false);
@@ -449,7 +449,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       // Update local calendar state
       setCalendar(prev => prev ? { ...prev, account_balance: newBalance } : prev);
     } catch (error) {
-      console.error('Error updating account balance:', error);
+      logger.error('Error updating account balance:', error);
       throw error;
     }
   }, [calendar, calendarId]);
@@ -477,7 +477,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       // Stats are automatically recalculated by Supabase triggers after clearMonthTrades
       // No need to manually calculate or update stats
     } catch (error) {
-      console.error('Error clearing month trades:', error);
+      logger.error('Error clearing month trades:', error);
     }
 
 
@@ -502,7 +502,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         return updatedCalendar;
       }
     } catch (error) {
-      console.error('Error updating calendar:', error);
+      logger.error('Error updating calendar:', error);
       throw error;
     }
     return undefined;
@@ -601,7 +601,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       const newGroup = newTag && newTag.includes(":")
         ? newTag.split(":")[0]
         : null;
-      console.log(`Updated required tag groups ${requiredGroups}`);
+      logger.log(`Updated required tag groups ${requiredGroups}`);
       if (oldGroup && newGroup && oldGroup !== newGroup) {
         // Group name changed, update it in requiredTagGroups
         return requiredGroups.map((group) =>
