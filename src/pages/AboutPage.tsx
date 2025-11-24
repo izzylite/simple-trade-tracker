@@ -16,7 +16,10 @@ import {
   CalendarMonth,
   ShowChart,
   SmartToy,
-  TrendingUp
+  TrendingUp,
+  Event,
+  BarChart,
+  Security
 } from '@mui/icons-material';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 
@@ -181,7 +184,58 @@ const AboutPage: React.FC = () => {
             </Typography>
             <Typography variant="body1" sx={{ ...paragraphSx, mb: 0, fontStyle: 'italic' }}>
               Note: AI outputs are analytical insights based on your data, not financial advice.
-            </Typography>zz
+            </Typography>
+          </Section>
+
+          {/* Economic Calendar Section */}
+          <Section
+            icon={<Event fontSize="large" />}
+            title="Economic Calendar"
+            subtitle="Stay ahead of market-moving events"
+          >
+            <Typography variant="body1" sx={paragraphSx}>
+              Track high-impact economic events directly on your trading calendar. Never be caught off guard by NFP or FOMC again.
+            </Typography>
+            <Typography variant="body1" sx={paragraphSx}>
+              Filter events by currency and importance to focus on what matters to your trading pairs. The calendar automatically highlights events that might impact your open positions.
+            </Typography>
+            <Typography variant="body1" sx={{ ...paragraphSx, mb: 0 }}>
+              See exactly which events were active during your trades to understand how news impacts your performance and execution.
+            </Typography>
+          </Section>
+
+          {/* Performance Analytics Section */}
+          <Section
+            icon={<BarChart fontSize="large" />}
+            title="Performance Analytics"
+            subtitle="Deep dive into your trading metrics"
+          >
+            <Typography variant="body1" sx={paragraphSx}>
+              Visualize your progress with interactive charts showing equity curves, daily PnL, and win rates over time.
+            </Typography>
+            <Typography variant="body1" sx={paragraphSx}>
+              Analyze your performance by time of day, day of week, or specific tags to find your sweet spots and eliminate leaks in your game.
+            </Typography>
+            <Typography variant="body1" sx={{ ...paragraphSx, mb: 0 }}>
+              Monitor key metrics like Profit Factor, Average R:R, and Expectancy to ensure your edge is sustainable and scalable.
+            </Typography>
+          </Section>
+
+          {/* Data Privacy Section */}
+          <Section
+            icon={<Security fontSize="large" />}
+            title="Data Privacy & Security"
+            subtitle="Your data belongs to you"
+          >
+            <Typography variant="body1" sx={paragraphSx}>
+              Your trading data is stored securely in your own Supabase database. We prioritize your privacy and data ownership.
+            </Typography>
+            <Typography variant="body1" sx={paragraphSx}>
+              We do not have access to your brokerage accounts or funds. This is a journaling tool, not a trading execution platform.
+            </Typography>
+            <Typography variant="body1" sx={{ ...paragraphSx, mb: 0 }}>
+              You can export your data at any time in standard formats or delete your account completely if you choose to leave.
+            </Typography>
           </Section>
         </Stack>
 

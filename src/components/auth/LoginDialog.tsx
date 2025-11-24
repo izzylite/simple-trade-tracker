@@ -98,12 +98,7 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
       icon: <Note sx={{ fontSize: 28, color: 'warning.main' }} />,
       title: 'Notes',
       description: 'Capture your thoughts, ideas, and trade insights'
-    },
-    {
-      icon: <TrendingUp sx={{ fontSize: 28, color: 'success.main' }} />,
-      title: 'Track Performance',
-      description: 'Monitor your trading performance with detailed analytics'
-    },
+    }, 
     {
       icon: <Analytics sx={{ fontSize: 28, color: 'info.main' }} />,
       title: 'Advanced Analytics',

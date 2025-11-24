@@ -60,10 +60,17 @@ async function uploadViaXHR(
       if (upsert) xhr.setRequestHeader('x-upsert', 'true');
 
       if (xhr.upload && onProgress) {
+        let lastUpdate = 0;
         xhr.upload.onprogress = (e) => {
           if (!e.lengthComputable) return;
-          const percentage = Math.round((e.loaded / e.total) * 100);
-          onProgress({ loaded: e.loaded, total: e.total, percentage });
+          
+          const now = Date.now();
+          // Throttle updates to every 100ms to prevent UI freezing
+          if (now - lastUpdate >= 100 || e.loaded === e.total) {
+            const percentage = Math.round((e.loaded / e.total) * 100);
+            onProgress({ loaded: e.loaded, total: e.total, percentage });
+            lastUpdate = now;
+          }
         };
       }
 
@@ -110,20 +117,20 @@ export const uploadFile = async (
       upsert = false
     } = options;
 
-    // Prefer real progress via REST + XHR when available
-    if (typeof window !== 'undefined' && typeof XMLHttpRequest !== 'undefined' && onProgress) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-      if (accessToken && SUPABASE_URL) {
-        return await uploadViaXHR(
-          bucketName,
-          filePath,
-          file,
-          { contentType, cacheControl, upsert, accessToken },
-          onProgress
-        );
-      }
-    }
+    // // Prefer real progress via REST + XHR when available
+    // if (typeof window !== 'undefined' && typeof XMLHttpRequest !== 'undefined' && onProgress) {
+    //   const { data: sessionData } = await supabase.auth.getSession();
+    //   const accessToken = sessionData?.session?.access_token;
+    //   if (accessToken && SUPABASE_URL) {
+    //     return await uploadViaXHR(
+    //       bucketName,
+    //       filePath,
+    //       file,
+    //       { contentType, cacheControl, upsert, accessToken },
+    //       onProgress
+    //     );
+    //   }
+    // }
 
     // Fallback to supabase-js upload (no native progress)
     const { data, error } = await supabase.storage

@@ -531,7 +531,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       // First, ensure the trade exists in the database and is in the cached trades
       const trade = await handleUpdateTradeProperty(newTrade!.id!!, (trade) => {
         // Calculate row and column for new images
-        const existingImages = trade.images || []; 
+        const existingImages = trade.images || [];
         // Find the highest row value to place new images below existing ones
         let maxRow = -1;
 
@@ -611,16 +611,61 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         })
       }
 
-      for (const image of newPendingImages) {
-        await startImageUpload(image, newTrade!.id!!, pending_images);
+      // Upload all images in parallel
+      const uploadPromises = newPendingImages.map(image =>
+        uploadImageAndTrackProgress(image, newTrade!.id!!, pending_images)
+      );
+
+      // Wait for all uploads to complete (success or fail)
+      const uploadedResults = await Promise.all(uploadPromises);
+
+      // Filter out successful uploads (non-null)
+      const successfulUploads = uploadedResults.filter((img): img is TradeImage => img !== null);
+
+      // If we have successful uploads, perform ONE batch update to the database
+      if (successfulUploads.length > 0 && effectiveCalendarId && newTrade!.id!!) {
+        try {
+          await handleUpdateTradeProperty(newTrade!.id!!, (trade) => {
+            const existingImages = trade.images || [];
+            
+            // Create a map of updated images for O(1) lookup
+            const updatedImagesMap = new Map(successfulUploads.map(img => [img.id, img]));
+
+            // Map over existing images: if it's one of the successfully uploaded ones, update it
+            const mergedImages = existingImages.map(existingImg => {
+              if (updatedImagesMap.has(existingImg.id)) {
+                const updatedImg = updatedImagesMap.get(existingImg.id)!;
+                return {
+                  ...updatedImg,
+                  // Preserve layout info (should already be in updatedImg but safety check)
+                  row: existingImg.row !== undefined ? existingImg.row : updatedImg.row,
+                  column: existingImg.column !== undefined ? existingImg.column : updatedImg.column,
+                  column_width: existingImg.column_width !== undefined ? existingImg.column_width : updatedImg.column_width
+                };
+              }
+              return existingImg;
+            });
+
+            return {
+              ...trade,
+              images: mergedImages
+            };
+          });
+          logger.log(`Updated trade with ${successfulUploads.length} uploaded images`);
+        } catch (updateError) {
+          logger.error('Error batch updating trade with new images:', updateError);
+          showErrorSnackbar('Failed to save images to trade. They are uploaded but not saved to the trade.');
+        }
       }
-    }
-    catch (error) {
-      logger.error('Error creating empty trade:', error);
+
+    } catch (error) {
+      logger.error('Error processing image uploads:', error);
     }
   };
-  // Function to start uploading an image
-  const startImageUpload = async (image: PendingImage, tradeId: string, pending_images: PendingImage[]): Promise<void> => {
+
+  // Function to upload a single image, track progress, update local state, AND return the uploaded image object
+  // Does NOT update the database directly
+  const uploadImageAndTrackProgress = async (image: PendingImage, tradeId: string, pending_images: PendingImage[]): Promise<TradeImage | null> => {
     try {
       // Update progress to show upload has started
       setNewTrade(prev => ({
@@ -631,7 +676,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       }));
 
       // Upload the image with progress tracking
-      const uploadedImage : TradeImage = await calendarService.uploadTradeImage(
+      const uploadedImage: TradeImage = await calendarService.uploadTradeImage(
         effectiveCalendarId!,
         image.id!!,
         image.file,
@@ -682,50 +727,12 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           pending_images: newPendingImages,
           uploaded_images: [...newUploadedImages, updatedImage]
         };
-
-
       });
 
-      // Update document if we have a temporary trade ID
-      if (effectiveCalendarId && tradeId) {
-        try {
-          // Use transaction to add the image to the trade
+      return updatedImage;
 
-          await handleUpdateTradeProperty(tradeId, (trade) => {
-            // Find the existing image in the trade to preserve any layout information
-            const existingImage = trade.images?.find(img => img.id === updatedImage.id);
-
-            // Create the updated image with layout information
-            const finalUpdatedImage = {
-              ...updatedImage,
-              // Preserve existing layout information if available
-              row: existingImage?.row !== undefined ? existingImage.row : updatedImage.row,
-              column: existingImage?.column !== undefined ? existingImage.column : updatedImage.column,
-              column_width: existingImage?.column_width !== undefined ? existingImage.column_width : updatedImage.column_width
-            };
-
-            return {
-              ...trade,
-              images: (trade.images || [finalUpdatedImage]).map(img =>
-                img.id === finalUpdatedImage.id ? finalUpdatedImage : img)
-            };
-          });
-
-
-
-        } catch (updateError) {
-          logger.error('Error updating trade with new image:', updateError);
-
-          // Show error message to the user
-          showErrorSnackbar(updateError instanceof Error ?
-            `Failed to save image to trade: ${updateError.message}` :
-            'Failed to save image to trade. The image is saved locally but may be lost if you refresh the page.');
-
-          // Continue execution - we'll still have the image in local state
-        }
-      }
     } catch (error) {
-      logger.error('Error uploading image:', error);
+      logger.error(`Error uploading image ${image.id}:`, error);
 
       // Update UI to show upload failed
       setNewTrade(prev => ({
@@ -734,6 +741,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           img.id === image.id ? { ...img, upload_progress: -1 } : img
         )
       }));
+
+      return null;
     }
   };
 
@@ -1254,4 +1263,3 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 };
 
 export default TradeFormDialog;
-

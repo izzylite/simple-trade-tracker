@@ -134,7 +134,7 @@ Memory note structure:
 - ACTIVE FOCUS: Current goals, things to watch for next session
 
 If no memory note exists:
-- Do a DEEP observation of the calendar,trades and user notes then Create one after identifying significant patterns
+- Do a DEEP observation analysis of the calendar, ALL trades and notes for that calendar then Create one after identifying significant patterns
 - Title: "Memory"
 - Tags: ["AGENT_MEMORY"] (REQUIRED for easy retrieval)
 - Pin it for visibility
@@ -170,6 +170,7 @@ AUTONOMY RULES:
 - After price data + one good search result, respond immediately
 - Never call same tool twice with identical arguments
 - Always generate response with available data - don't wait for perfect information
+- Whenever listing trades, notes or events, ALWAYS use card display. see CARD DISPLAY SECTION
 
 DATABASE TABLES (query via MCP execute_sql):
 - **trades**: Trade records (id, calendar_id, user_id, name, amount, trade_type, trade_date, entry_price, exit_price, stop_loss, take_profit, session, tags[], notes, images JSONB, economic_events JSONB)

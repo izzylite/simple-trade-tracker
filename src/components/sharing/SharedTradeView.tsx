@@ -192,11 +192,7 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
       />
 
       {/* Footer */}
-      <Box sx={{ mt: 3, textAlign: 'center' }}>
-        <Typography variant="caption" color="text.secondary">
-          Powered by Trade Tracker
-        </Typography>
-      </Box>
+       
     </Box>
   );
 };
