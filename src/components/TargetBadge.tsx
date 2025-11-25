@@ -21,12 +21,11 @@ const TargetBadge: React.FC<TargetBadgeProps> = ({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      bgcolor:  isMet ? alpha(theme.palette.success.main, 0.9) : alpha(theme.palette.primary.main, 0.1),
-      color:  isMet ? 'white' : 'primary.main',
+      bgcolor: isMet ? alpha(theme.palette.success.main, 0.9) : alpha(theme.palette.primary.main, 0.1),
+      color: isMet ? 'white' : 'primary.main',
       borderRadius: '12px',
       width: 'auto',
       height: 22,
-      ml: 1,
       px: 0.8,
       border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
     }}>
@@ -36,7 +35,7 @@ const TargetBadge: React.FC<TargetBadgeProps> = ({
         <Flag sx={{ fontSize: '0.875rem', mr: 0.3 }} />
       )}
       <Typography variant="caption" sx={{ fontWeight: 600, fontSize: isMet ? '0.5rem' : '0.7rem' }}>
-        {Math.max(progress, 0).toFixed(0)}%
+        {Math.min(Math.max(progress, 0), 100).toFixed(0)}%
       </Typography>
     </Box>
   );

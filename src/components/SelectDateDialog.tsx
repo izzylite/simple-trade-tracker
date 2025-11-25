@@ -292,238 +292,238 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
         pb: { xs: '12px', sm: '16px', md: '24px' },
         ...scrollbarStyles(theme)
       }}>
-         <Paper elevation={0} sx={{
-        px: { xs: 2, sm: 2.5, md: 3 },
-        py: { xs: 1.5, sm: 2, md: 2 },
-        mb: 2,
-        borderRadius: 2,
-        bgcolor: theme => alpha(theme.palette.background.default, 0.5),
-        border: '1px solid',
-        borderColor: theme => theme.palette.divider,
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        <Box sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          mb: { xs: 2, sm: 2.25, md: 2.5 },
-          pl: 1
+        <Paper elevation={0} sx={{
+          px: { xs: 2, sm: 2.5, md: 3 },
+          py: { xs: 1.5, sm: 2, md: 2 },
+          mb: 2,
+          borderRadius: 2,
+          bgcolor: theme => alpha(theme.palette.background.default, 0.5),
+          border: '1px solid',
+          borderColor: theme => theme.palette.divider,
+          position: 'relative',
+          overflow: 'hidden',
         }}>
-          <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.5 }}>
-          <Typography
-            variant="h6"
-            sx={{
-              color: 'text.primary',
-              fontSize: { xs: '1rem', sm: '1.05rem', md: '1.1rem' },
-              fontWeight: 600
-            }}
-          >
-            Yearly Statistics
-          </Typography>
-          {yearlyTargetProgress && (
-              <TargetBadge
-              progress={yearlyTargetProgress.rawProgress}
-              isMet={yearlyTargetProgress.isMet}
-              tooltipText={`${yearlyTargetProgress.isMet ? 'Yearly target achieved' : 'Progress towards yearly target'}: ${yearlyTargetProgress.rawProgress.toFixed(0)}%`}
-            />
-            )}
-          </Box>
-
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 1,
-              bgcolor: theme => alpha(theme.palette.success.light, 0.1),
-              py: 0.75,
-              px: 1.5,
-              borderRadius: 1,
-              border: '1px solid',
-              borderColor: 'success.light'
-            }}>
-              <Typography variant="body2" sx={{
-                fontSize: '0.85rem',
-                fontWeight: 500,
-                color: 'text.secondary'
-              }}>
-                Best Month:
-              </Typography>
-              <Typography variant="body2" sx={{
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                color: 'success.main'
-              }}>
-                {bestMonth.name} (${bestMonth.pnl.toLocaleString()})
-              </Typography>
-            </Box>
-
-
-          </Box>
-
-        </Box>
-
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: { xs: 2, sm: 3, md: 4 }, width: '100%' }}>
-          <Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
-              <Box sx={{
-                p: 0.7,
-                borderRadius: 1,
-                bgcolor: theme => alpha(theme.palette.primary.main, 0.1),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mb: 1
-              }}>
-                <TrendingUp sx={{
-                  fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem' },
-                  color: 'primary.main'
-                }} />
-              </Box>
-              <Typography variant="body1" sx={{
-                fontSize: '1rem',
-                fontWeight: 600,
-                color: 'text.primary',
-                textAlign: 'center'
-              }}>
-                Yearly P&L
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            mb: { xs: 2, sm: 2.25, md: 2.5 },
+            pl: 1
+          }}>
+            <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.5 }}>
               <Typography
-                variant="h5"
+                variant="h6"
                 sx={{
-                  fontWeight: 700,
-                  fontSize: { xs: '1.35rem', sm: '1.4rem', md: '1.5rem' },
-                  color: theme => {
-                    if (yearlyPnL > 0) return theme.palette.success.main;
-                    if (yearlyPnL < 0) return theme.palette.error.main;
-                    return theme.palette.mode === 'dark' ? 'grey.300' : 'text.primary';
-                  },
-                  textAlign: 'center'
+                  color: 'text.primary',
+                  fontSize: { xs: '1rem', sm: '1.05rem', md: '1.1rem' },
+                  fontWeight: 600
                 }}
               >
-                ${Math.abs(yearlyPnL).toLocaleString()}
+                Yearly Statistics
               </Typography>
+              {yearlyTargetProgress && (
+                <TargetBadge
+                  progress={yearlyTargetProgress.rawProgress}
+                  isMet={yearlyTargetProgress.isMet}
+                  tooltipText={`${yearlyTargetProgress.isMet ? 'Yearly target achieved' : 'Progress towards yearly target'}: ${yearlyTargetProgress.rawProgress.toFixed(0)}%`}
+                />
+              )}
+            </Box>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <Box sx={{
                 display: 'flex',
-                flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 0.5,
+                gap: 1,
+                bgcolor: theme => alpha(theme.palette.success.light, 0.1),
+                py: 0.75,
+                px: 1.5,
+                borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'success.light'
               }}>
                 <Typography variant="body2" sx={{
+                  fontSize: '0.85rem',
                   fontWeight: 500,
-                  color: 'text.secondary',
-                  fontSize: { xs: '0.85rem', sm: '0.9rem' },
-                  textAlign: 'center'
+                  color: 'text.secondary'
                 }}>
-                  Growth
+                  Best Month:
                 </Typography>
                 <Typography variant="body2" sx={{
+                  fontSize: '0.85rem',
                   fontWeight: 700,
-                  color: theme => {
-                    if (yearlyPnL > 0) return theme.palette.success.main;
-                    if (yearlyPnL < 0) return theme.palette.error.main;
-                    return theme.palette.mode === 'dark' ? 'grey.300' : 'text.primary';
-                  },
-                  fontSize: '1rem',
-                  textAlign: 'center'
+                  color: 'success.main'
                 }}>
-                  {yearlyGrowthPercentage}%
+                  {bestMonth.name} (${bestMonth.pnl.toLocaleString()})
                 </Typography>
               </Box>
+
+
             </Box>
+
           </Box>
-          <Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
-              <Box sx={{
-                p: 0.7,
-                borderRadius: 1,
-                bgcolor: theme => alpha(theme.palette.success.main, 0.1),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mb: 1
-              }}>
-                <EmojiEvents sx={{
-                  fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem' },
-                  color: 'success.main'
-                }} />
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: { xs: 2, sm: 3, md: 4 }, width: '100%' }}>
+            <Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
+                <Box sx={{
+                  p: 0.7,
+                  borderRadius: 1,
+                  bgcolor: theme => alpha(theme.palette.primary.main, 0.1),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mb: 1
+                }}>
+                  <TrendingUp sx={{
+                    fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem' },
+                    color: 'primary.main'
+                  }} />
+                </Box>
+                <Typography variant="body1" sx={{
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  color: 'text.primary',
+                  textAlign: 'center'
+                }}>
+                  Yearly P&L
+                </Typography>
               </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: { xs: '1.35rem', sm: '1.4rem', md: '1.5rem' },
+                    color: theme => {
+                      if (yearlyPnL > 0) return theme.palette.success.main;
+                      if (yearlyPnL < 0) return theme.palette.error.main;
+                      return theme.palette.mode === 'dark' ? 'grey.300' : 'text.primary';
+                    },
+                    textAlign: 'center'
+                  }}
+                >
+                  ${Math.abs(yearlyPnL).toLocaleString()}
+                </Typography>
+                <Box sx={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 0.5,
+                }}>
+                  <Typography variant="body2" sx={{
+                    fontWeight: 500,
+                    color: 'text.secondary',
+                    fontSize: { xs: '0.85rem', sm: '0.9rem' },
+                    textAlign: 'center'
+                  }}>
+                    Growth
+                  </Typography>
+                  <Typography variant="body2" sx={{
+                    fontWeight: 700,
+                    color: theme => {
+                      if (yearlyPnL > 0) return theme.palette.success.main;
+                      if (yearlyPnL < 0) return theme.palette.error.main;
+                      return theme.palette.mode === 'dark' ? 'grey.300' : 'text.primary';
+                    },
+                    fontSize: '1rem',
+                    textAlign: 'center'
+                  }}>
+                    {yearlyGrowthPercentage}%
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+            <Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
+                <Box sx={{
+                  p: 0.7,
+                  borderRadius: 1,
+                  bgcolor: theme => alpha(theme.palette.success.main, 0.1),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mb: 1
+                }}>
+                  <EmojiEvents sx={{
+                    fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem' },
+                    color: 'success.main'
+                  }} />
+                </Box>
+                <Typography variant="body1" sx={{
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  color: 'text.primary',
+                  textAlign: 'center'
+                }}>
+                  Win Rate
+                </Typography>
+              </Box>
+              <Typography variant="h5" sx={{
+                fontWeight: 700,
+                fontSize: { xs: '1.35rem', sm: '1.4rem', md: '1.5rem' },
+                color: parseFloat(yearlyWinRate) > 50 ? 'success.main' : 'text.primary',
+                textAlign: 'center'
+              }}>
+                {yearlyWinRate}%
+              </Typography>
               <Typography variant="body1" sx={{
+                fontWeight: 500,
                 fontSize: '1rem',
-                fontWeight: 600,
+                color: 'text.secondary',
+                mt: 0.5,
+                textAlign: 'center'
+              }}>
+                {yearlyWinCount} Ws / {yearlyLossCount} Ls
+              </Typography>
+            </Box>
+            <Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
+                <Box sx={{
+                  p: 0.7,
+                  borderRadius: 1,
+                  bgcolor: theme => alpha(theme.palette.info.main, 0.1),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mb: 1
+                }}>
+                  <CalendarMonth sx={{
+                    fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem' },
+                    color: 'info.main'
+                  }} />
+                </Box>
+                <Typography variant="body1" sx={{
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  color: 'text.primary',
+                  textAlign: 'center'
+                }}>
+                  Total Trades
+                </Typography>
+              </Box>
+              <Typography variant="h5" sx={{
+                fontWeight: 700,
+                fontSize: { xs: '1.35rem', sm: '1.4rem', md: '1.5rem' },
                 color: 'text.primary',
                 textAlign: 'center'
               }}>
-                Win Rate
+                {yearTrades.length}
               </Typography>
-            </Box>
-            <Typography variant="h5" sx={{
-              fontWeight: 700,
-              fontSize: { xs: '1.35rem', sm: '1.4rem', md: '1.5rem' },
-              color: parseFloat(yearlyWinRate) > 50 ? 'success.main' : 'text.primary',
-              textAlign: 'center'
-            }}>
-              {yearlyWinRate}%
-            </Typography>
-            <Typography variant="body1" sx={{
-              fontWeight: 500,
-              fontSize: '1rem',
-              color: 'text.secondary',
-              mt: 0.5,
-              textAlign: 'center'
-            }}>
-              {yearlyWinCount} Ws / {yearlyLossCount} Ls
-            </Typography>
-          </Box>
-          <Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
-              <Box sx={{
-                p: 0.7,
-                borderRadius: 1,
-                bgcolor: theme => alpha(theme.palette.info.main, 0.1),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mb: 1
-              }}>
-                <CalendarMonth sx={{
-                  fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem' },
-                  color: 'info.main'
-                }} />
-              </Box>
               <Typography variant="body1" sx={{
+                fontWeight: 500,
                 fontSize: '1rem',
-                fontWeight: 600,
-                color: 'text.primary',
+                color: 'text.secondary',
+                mt: 0.5,
                 textAlign: 'center'
               }}>
-                Total Trades
+                Trades this year
               </Typography>
             </Box>
-            <Typography variant="h5" sx={{
-              fontWeight: 700,
-              fontSize: { xs: '1.35rem', sm: '1.4rem', md: '1.5rem' },
-              color: 'text.primary',
-              textAlign: 'center'
-            }}>
-              {yearTrades.length}
-            </Typography>
-            <Typography variant="body1" sx={{
-              fontWeight: 500,
-              fontSize: '1rem',
-              color: 'text.secondary',
-              mt: 0.5,
-              textAlign: 'center'
-            }}>
-              Trades this year
-            </Typography>
           </Box>
-        </Box>
-      </Paper>
+        </Paper>
         <Typography
           variant="h6"
           sx={{
@@ -597,7 +597,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                   }
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5, mr: 1 }}>
                   <Typography
                     variant="h6"
                     sx={{
@@ -606,7 +606,10 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                           ? theme.palette.primary.main
                           : theme.palette.text.primary,
                       fontWeight: 700,
-                      fontSize: { xs: '1rem', sm: '1.05rem', md: '1.1rem' }
+                      fontSize: { xs: '1rem', sm: '1.05rem', md: '1.1rem' },
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
                     }}
                   >
                     {month}
