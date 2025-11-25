@@ -183,10 +183,7 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({ trade_date, trades, mo
     }}>
       <Stack spacing={0.5} sx={{ alignItems: 'center', p: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <TrendingUp sx={{
-            fontSize: '1rem',
-            color: netAmount > 0 ? 'success.main' : netAmount < 0 ? 'error.main' : 'text.secondary'
-          }} />
+
           <Typography
             variant="caption"
             sx={{
@@ -211,25 +208,27 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({ trade_date, trades, mo
           {formatCurrency(netAmount)}
         </Typography>
 
-        <Typography
-          variant="body2"
-          sx={{
-            color: netAmount > 0 ? 'success.main' : netAmount < 0 ? 'error.main' : 'text.secondary',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            textAlign: 'center'
-          }}
-        >
-          {percentage}%
-        </Typography>
+        <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+          <Typography
+            variant="body2"
+            sx={{
+              color: netAmount > 0 ? 'success.main' : netAmount < 0 ? 'error.main' : 'text.secondary',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              textAlign: 'center'
+            }}
+          >
+            {percentage}%
+          </Typography>
 
-        {weeklyTarget && (
-          <TargetBadge
-            progress={parseFloat(targetProgress)}
-            isMet={isTargetMet}
-            tooltipText={`${isTargetMet ? 'Weekly target achieved' : 'Progress towards weekly target'}: ${targetProgress}%`}
-          />
-        )}
+          {weeklyTarget && (
+            <TargetBadge
+              progress={parseFloat(targetProgress)}
+              isMet={isTargetMet}
+              tooltipText={`${isTargetMet ? 'Weekly target achieved' : 'Progress towards weekly target'}: ${targetProgress}%`}
+            />
+          )}
+        </Stack>
 
         <Typography
           variant="caption"
