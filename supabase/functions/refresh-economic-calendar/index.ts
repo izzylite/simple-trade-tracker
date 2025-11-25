@@ -5,77 +5,84 @@
  * Manually refreshes economic calendar data for specific dates/currencies
  * by fetching from MyFXBook API and updating the database
  */
-  import { createClient } from "supabase";
+import { createClient } from "supabase";
 
 // CORS headers
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE'
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE",
 };
 
 // Utility functions
 function createServiceClient() {
-  const url = Deno.env.get('SUPABASE_URL');
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) {
-    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
   }
   return createClient(url, key);
 }
 
 function errorResponse(message: string, status = 400): Response {
-  return new Response(JSON.stringify({
-    success: false,
-    error: message
-  }), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      ...corsHeaders
-    }
-  });
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: message,
+    }),
+    {
+      status,
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders,
+      },
+    },
+  );
 }
 
 function successResponse(data: unknown, message?: string): Response {
-  return new Response(JSON.stringify({
-    success: true,
-    data,
-    ...(message && {
-      message
-    })
-  }), {
-    headers: {
-      'Content-Type': 'application/json',
-      ...corsHeaders
-    }
-  });
+  return new Response(
+    JSON.stringify({
+      success: true,
+      data,
+      ...(message && {
+        message,
+      }),
+    }),
+    {
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders,
+      },
+    },
+  );
 }
 
 function handleCors(req: Request): Response | null {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: corsHeaders
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: corsHeaders,
     });
   }
   return null;
 }
 
-function log(message: string, level: string = 'info', context?: unknown): void {
+function log(message: string, level: string = "info", context?: unknown): void {
   const timestamp = new Date().toISOString();
   const logMessage = `[${timestamp}] ${message}`;
   if (context) {
-    if (level === 'error') {
+    if (level === "error") {
       console.error(logMessage, context);
-    } else if (level === 'warn') {
+    } else if (level === "warn") {
       console.warn(logMessage, context);
     } else {
       console.log(logMessage, context);
     }
   } else {
-    if (level === 'error') {
+    if (level === "error") {
       console.error(logMessage);
-    } else if (level === 'warn') {
+    } else if (level === "warn") {
       console.warn(logMessage);
     } else {
       console.log(logMessage);
@@ -87,65 +94,87 @@ async function parseJsonBody(req: Request): Promise<unknown> {
   try {
     return await req.json();
   } catch (error) {
-    log('Failed to parse JSON body', 'error', error);
+    log("Failed to parse JSON body", "error", error);
     return null;
   }
 }
 /**
  * Fetch weekly economic calendar data from MyFXBook
- */ async function fetchFromMyFXBookWeekly(): Promise<Record<string, unknown>[]> {
+ */ async function fetchFromMyFXBookWeekly(): Promise<
+  Record<string, unknown>[]
+> {
   try {
-    log('🔄 Fetching weekly economic calendar from MyFXBook...');
-    const url = 'https://www.myfxbook.com/forex-economic-calendar';
+    log("🔄 Fetching weekly economic calendar from MyFXBook...");
+    const url = "https://www.myfxbook.com/forex-economic-calendar";
     log(`📡 Fetching URL: ${url}`);
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Cache-Control': 'no-cache'
-      }
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept":
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Cache-Control": "no-cache",
+      },
     });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     const html = await response.text();
-    log(`✅ Response received: ${response.status}, content length: ${html.length}`);
+    log(
+      `✅ Response received: ${response.status}, content length: ${html.length}`,
+    );
     // Call the process-economic-events function to parse the HTML
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     if (!supabaseUrl || !anonKey) {
-      throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY');
+      throw new Error("Missing SUPABASE_URL or SUPABASE_ANON_KEY");
     }
-    const processResponse = await fetch(`${supabaseUrl}/functions/v1/process-economic-events`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${anonKey}`
+    const processResponse = await fetch(
+      `${supabaseUrl}/functions/v1/process-economic-events`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify({
+          htmlContent: html,
+        }),
       },
-      body: JSON.stringify({
-        htmlContent: html
-      })
-    });
+    );
     if (!processResponse.ok) {
-      throw new Error(`Process function failed: ${await processResponse.text()}`);
+      throw new Error(
+        `Process function failed: ${await processResponse.text()}`,
+      );
     }
-    const processResult = await processResponse.json() as Record<string, unknown>;
-    const stats = (processResult.data as Record<string, unknown>) || processResult;
-    const extracted = (stats.parsed_total as number) ?? ((stats.events as Record<string, unknown>[])?.length || 0);
-    log(`🎯 Successfully extracted ${extracted} events from MyFXBook (upserted=${stats.upserted_count ?? 0}, existing=${stats.existing_count ?? 0})`);
+    const processResult = await processResponse.json() as Record<
+      string,
+      unknown
+    >;
+    const stats = (processResult.data as Record<string, unknown>) ||
+      processResult;
+    const extracted = (stats.parsed_total as number) ??
+      ((stats.events as Record<string, unknown>[])?.length || 0);
+    log(
+      `🎯 Successfully extracted ${extracted} events from MyFXBook (upserted=${
+        stats.upserted_count ?? 0
+      }, existing=${stats.existing_count ?? 0})`,
+    );
     return (stats.events as Record<string, unknown>[]) || [];
   } catch (error) {
-    log('❌ Error fetching from MyFXBook:', 'error', error);
+    log("❌ Error fetching from MyFXBook:", "error", error);
     throw error;
   }
 }
 /**
  * Update events in database
- */ async function updateEventsInDatabase(events: Record<string, unknown>[]): Promise<number> {
+ */ async function updateEventsInDatabase(
+  events: Record<string, unknown>[],
+): Promise<number> {
   try {
     if (events.length === 0) {
       return 0;
@@ -155,19 +184,29 @@ async function parseJsonBody(req: Request): Promise<unknown> {
     let updatedCount = 0;
     for (const e of events) {
       const normalizeImpact = (impact: unknown): string => {
-        const i = (impact as string || '').toLowerCase();
-        if (i === 'high') return 'High';
-        if (i === 'medium') return 'Medium';
-        if (i === 'low') return 'Low';
-        return 'Low';
+        const i = (impact as string || "").toLowerCase();
+        if (i === "high") return "High";
+        if (i === "medium") return "Medium";
+        if (i === "low") return "Low";
+        return "Low";
       };
+      // Skip events with missing required fields
+      if (!e.event_name || !e.currency) {
+        log(
+          `Skipping event ${e.external_id} - missing event_name or currency`,
+          "warn",
+        );
+        continue;
+      }
       const row = {
-        external_id: e.id,
+        external_id: e.external_id,
         currency: e.currency,
-        event_name: e.event,
+        event_name: e.event_name,
         impact: normalizeImpact(e.impact),
-        event_date: e.date,
-        event_time: e.time_utc ? new Date(e.time_utc as string).toISOString() : null,
+        event_date: e.event_date || e.date,
+        event_time: e.time_utc
+          ? new Date(e.time_utc as string).toISOString()
+          : null,
         time_utc: e.time_utc ?? null,
         unix_timestamp: e.unix_timestamp ?? null,
         actual_value: e.actual ?? null,
@@ -176,15 +215,18 @@ async function parseJsonBody(req: Request): Promise<unknown> {
         country: e.country ?? null,
         flag_code: e.flag_code ?? null,
         flag_url: e.flag_url ?? null,
-        source_url: 'https://www.myfxbook.com/forex-economic-calendar',
-        data_source: e.source ?? 'myfxbook',
-        last_updated: new Date().toISOString()
+        source_url: "https://www.myfxbook.com/forex-economic-calendar",
+        data_source: e.source ?? "myfxbook",
+        last_updated: new Date().toISOString(),
       };
-      const { data, error } = await supabase.from('economic_events').upsert(row, {
-        onConflict: 'external_id'
-      }).select('external_id');
+      const { data, error } = await supabase.from("economic_events").upsert(
+        row,
+        {
+          onConflict: "external_id",
+        },
+      ).select("external_id");
       if (error) {
-        log(`Error updating event ${e.id}`, 'error', error);
+        log(`Error updating event ${e.external_id}`, "error", error);
       } else {
         updatedCount += (data as Record<string, unknown>[])?.length || 0;
       }
@@ -192,7 +234,7 @@ async function parseJsonBody(req: Request): Promise<unknown> {
     log(`Updated ${updatedCount} events in database`);
     return updatedCount;
   } catch (error) {
-    log('Error updating events in database', 'error', error);
+    log("Error updating events in database", "error", error);
     throw error;
   }
 }
@@ -209,21 +251,34 @@ interface RefreshPayload {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
   try {
-    log('Refresh economic calendar request received');
+    log("Refresh economic calendar request received");
     // Parse request body
     const payload = await parseJsonBody(req) as RefreshPayload;
     if (!payload) {
-      return errorResponse('Invalid JSON payload', 400);
+      return errorResponse("Invalid JSON payload", 400);
     }
     const { targetDate, currencies, events: requestedEvents } = payload;
     // Validate required parameters
     if (!targetDate || !currencies || !Array.isArray(currencies)) {
-      return errorResponse('Missing required parameters: targetDate and currencies array', 400);
+      return errorResponse(
+        "Missing required parameters: targetDate and currencies array",
+        400,
+      );
     }
     const hasSpecificEvents = requestedEvents && requestedEvents.length > 0;
-    log(`🔄 Refreshing economic calendar for date: ${targetDate}, currencies: ${currencies.join(', ')}`);
+    log(
+      `🔄 Refreshing economic calendar for date: ${targetDate}, currencies: ${
+        currencies.join(", ")
+      }`,
+    );
     if (hasSpecificEvents) {
-      log(`🎯 Looking for ${requestedEvents.length} specific event(s): ${requestedEvents.map((e) => (e as Record<string, unknown>).event).join(', ')}`);
+      log(
+        `🎯 Looking for ${requestedEvents.length} specific event(s): ${
+          requestedEvents.map((e) => (e as Record<string, unknown>).event).join(
+            ", ",
+          )
+        }`,
+      );
     }
     let updated = false;
     let count = 0;
@@ -233,19 +288,33 @@ interface RefreshPayload {
     while (!updated && count < maxRetries) {
       const freshEvents = await fetchFromMyFXBookWeekly();
       allEventsForDate = freshEvents.filter((event) => {
-        const eventDate = new Date(event.time_utc as string).toISOString().split('T')[0];
-        return eventDate === targetDate && currencies.includes(event.currency as string);
+        const eventDate =
+          new Date(event.time_utc as string).toISOString().split("T")[0];
+        return eventDate === targetDate &&
+          currencies.includes(event.currency as string);
       });
       if (hasSpecificEvents) {
-        const requestedEventIds = requestedEvents.map((e) => (e as Record<string, unknown>).external_id);
+        const requestedEventIds = requestedEvents.map((e) =>
+          (e as Record<string, unknown>).external_id
+        );
         // Events from MyFXBook have 'id' field, not 'external_id'
-        foundEvents = allEventsForDate.filter((event) => requestedEventIds.includes(event.id || event.external_id));
-        log(`📊 Found ${foundEvents.length}/${requestedEvents.length} requested events in ${allEventsForDate.length} total events`);
+        foundEvents = allEventsForDate.filter((event) =>
+          requestedEventIds.includes(event.id || event.external_id)
+        );
+        log(
+          `📊 Found ${foundEvents.length}/${requestedEvents.length} requested events in ${allEventsForDate.length} total events`,
+        );
         let hasUpdates = false;
         for (const foundEvent of foundEvents) {
           const eventId = foundEvent.id || foundEvent.external_id;
-          const originalEvent = requestedEvents.find((e) => (e as Record<string, unknown>).external_id === eventId);
-          if (originalEvent && foundEvent.actual !== (originalEvent as Record<string, unknown>).actual) {
+          const originalEvent = requestedEvents.find((e) =>
+            (e as Record<string, unknown>).external_id === eventId
+          );
+          if (
+            originalEvent &&
+            foundEvent.actual !==
+              (originalEvent as Record<string, unknown>).actual
+          ) {
             hasUpdates = true;
             log(`✅ Event updated: ${foundEvent.event}`);
           }
@@ -275,11 +344,13 @@ interface RefreshPayload {
       currencies,
       requestedEvents: requestedEvents || [],
       hasSpecificEvents,
-      message: hasSpecificEvents ? `Updated ${updatedCount} events for ${targetDate}. Found ${foundEvents.length}/${requestedEvents.length} requested events.` : `Updated ${updatedCount} events for ${targetDate}.`
+      message: hasSpecificEvents
+        ? `Updated ${updatedCount} events for ${targetDate}. Found ${foundEvents.length}/${requestedEvents.length} requested events.`
+        : `Updated ${updatedCount} events for ${targetDate}.`,
     };
     return successResponse(response);
   } catch (error) {
-    log('Error refreshing economic calendar', 'error', error);
-    return errorResponse('Internal server error', 500);
+    log("Error refreshing economic calendar", "error", error);
+    return errorResponse("Internal server error", 500);
   }
 });

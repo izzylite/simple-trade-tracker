@@ -62,9 +62,13 @@ function normalizeImpact(impact?: string): string {
   return 'Low'
 }
 
-export function mapEventToDbRow(e: EconomicEvent): EconomicEventDBRow {
+export function mapEventToDbRow(e: EconomicEvent): EconomicEventDBRow | null {
+  // Skip events with missing required fields
+  if (!e.event_name || !e.currency || !e.external_id) {
+    return null
+  }
   return {
-    external_id: e.id,
+    external_id: e.external_id,
     currency: e.currency,
     event_name: e.event_name,
     impact: normalizeImpact(e.impact),
@@ -348,7 +352,8 @@ async function storeEventsInDatabase(events: EconomicEvent[]): Promise<{ upserte
       const batch = events.slice(i, i + batchSize)
 
       // Prepare DB rows and external_ids, de-duplicate by external_id within batch
-      const rowsAll: EconomicEventDBRow[] = batch.map(mapEventToDbRow)
+      // Filter out null values from invalid events
+      const rowsAll = batch.map(mapEventToDbRow).filter((r): r is EconomicEventDBRow => r !== null)
       const uniqueMap = new Map<string, EconomicEventDBRow>()
       for (const r of rowsAll) uniqueMap.set(r.external_id, r)
       const rows = Array.from(uniqueMap.values())
