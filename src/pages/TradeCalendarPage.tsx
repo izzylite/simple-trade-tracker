@@ -108,7 +108,7 @@ import { EconomicEvent } from '../types/economicCalendar';
 import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
-import { useCalendarTrades } from '../hooks/useCalendarTrades'; 
+import { useCalendarTrades } from '../hooks/useCalendarTrades';
 
 interface TradeCalendarProps {
   // Trade CRUD operations now handled internally via useCalendarTrades hook
@@ -140,30 +140,29 @@ interface WeeklyPnLProps {
 
 
 
-const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ trade_date, trades, monthStart, weekIndex, currentMonth, accountBalance, weeklyTarget, sx }) => {
+const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({ trade_date, trades, monthStart, weekIndex, currentMonth, accountBalance, weeklyTarget, sx }) => {
   const theme = useTheme();
   const weekStart = startOfWeek(trade_date, { weekStartsOn: 0 });
-  const weekEnd = endOfWeek(trade_date, { weekStartsOn: 0 });
 
-  const weekTrades = trades.filter(trade =>
+  const weekTrades = useMemo(() => trades.filter(trade =>
     isSameWeek(new Date(trade.trade_date), weekStart, { weekStartsOn: 0 }) &&
     new Date(trade.trade_date).getMonth() === currentMonth
-  );
+  ), [trades, weekStart, currentMonth]);
 
 
   // Calculate net amount for the week
-  const netAmount = weekTrades.reduce((sum, trade) => sum + trade.amount, 0);
+  const netAmount = useMemo(() => weekTrades.reduce((sum, trade) => sum + trade.amount, 0), [weekTrades]);
 
   // Calculate percentage loss/gain relative to account value at start of week (excluding current week trades)
-  const percentage = trades
+  const percentage = useMemo(() => trades
     ? calculatePercentageOfValueAtDate(netAmount, accountBalance, trades, weekStart).toFixed(1)
-    : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0';
+    : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0', [trades, netAmount, accountBalance, weekStart]);
 
 
   // Calculate target progress using centralized function
-  const targetProgressValue = weeklyTarget && weeklyTarget > 0
+  const targetProgressValue = useMemo(() => weeklyTarget && weeklyTarget > 0
     ? calculateTargetProgress(weekTrades, accountBalance, weeklyTarget, weekStart, trades)
-    : 0;
+    : 0, [weeklyTarget, weekTrades, accountBalance, weekStart, trades]);
   const targetProgress = targetProgressValue.toFixed(0);
   const isTargetMet = weeklyTarget ? parseFloat(percentage) >= weeklyTarget : false;
 
@@ -246,7 +245,7 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = ({ trade_date, trades, monthStart, w
       </Stack>
     </CalendarCell>
   );
-};
+});
 
 
 
@@ -352,6 +351,122 @@ const TagFilter: React.FC<TagFilterProps> = ({ allTags, selectedTags, onTagsChan
     </Box>
   );
 };
+
+interface CalendarDayCellProps {
+  day: Date;
+  dayTrades: Trade[];
+  accountBalance: number;
+  maxDailyDrawdown?: number;
+  dynamicRiskSettings: DynamicRiskSettings;
+  allTrades: Trade[];
+  currentDate: Date;
+  monthlyHighImpactEvents: Map<string, boolean>;
+  onDayClick: (day: Date) => void;
+  isMdDown: boolean;
+}
+
+const CalendarDayCell = React.memo(({
+  day,
+  dayTrades,
+  accountBalance,
+  maxDailyDrawdown,
+  dynamicRiskSettings,
+  allTrades,
+  currentDate,
+  monthlyHighImpactEvents,
+  onDayClick,
+  isMdDown
+}: CalendarDayCellProps) => {
+  const theme = useTheme();
+
+  const dayStats = useMemo(() => calculateDayStats(
+    dayTrades,
+    accountBalance,
+    maxDailyDrawdown || 0,
+    dynamicRiskSettings,
+    allTrades,
+    day
+  ), [dayTrades, accountBalance, maxDailyDrawdown, dynamicRiskSettings, allTrades, day]);
+
+  const isCurrentMonth = isSameMonth(day, currentDate);
+  const isCurrentDay = isToday(day);
+  const dayDateString = format(day, 'yyyy-MM-dd');
+  const hasHighImpactEvents = monthlyHighImpactEvents.get(dayDateString) || false;
+
+  return (
+    <CalendarCell>
+      <StyledCalendarDay
+        onClick={() => onDayClick(day)}
+        $isCurrentMonth={isCurrentMonth}
+        $isCurrentDay={isCurrentDay}
+        $dayStatus={dayStats.status}
+      >
+        <DayNumber $isCurrentMonth={isCurrentMonth}>
+          {format(day, 'd')}
+        </DayNumber>
+
+        {hasHighImpactEvents && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              width: 8,
+              height: 8,
+              m: 1,
+              borderRadius: '50%',
+              bgcolor: 'error.main',
+              border: `2px solid ${alpha(theme.palette.background.paper, 0.8)}`,
+              boxShadow: `0 0 0 1px ${alpha(theme.palette.error.main, 0.3)}`
+            }}
+          />
+        )}
+
+        {dayTrades.length > 0 && (
+          <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 0.5
+          }}>
+            {!isMdDown && (
+              <TradeAmount $dayStatus={dayStats.status}>
+                {formatCurrency(Math.abs(dayStats.netAmount))}
+              </TradeAmount>
+            )}
+            <TradeCount>
+              {dayTrades.length} trade{dayTrades.length !== 1 ? 's' : ''}
+            </TradeCount>
+            <Typography
+              variant="caption"
+              sx={{
+                color: dayStats.status === 'win' ? 'success.main' :
+                  dayStats.status === 'loss' ? 'error.main' : 'text.secondary',
+                fontSize: '0.75rem',
+                fontWeight: 500
+              }}
+            >
+              {dayStats.percentage}%
+            </Typography>
+            {dayStats.isDrawdownViolation && (
+              <Typography
+                variant="caption"
+                sx={{
+                  color: 'error.main',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase'
+                }}
+              >
+                VIOLATED
+              </Typography>
+            )}
+          </Box>
+        )}
+      </StyledCalendarDay>
+    </CalendarCell>
+  );
+});
 
 export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement => {
   const {
@@ -714,12 +829,27 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   }, [trades, selectedTags]);
 
 
+  // Optimize trade lookup by pre-grouping trades by date
+  // This changes the complexity from O(Days * Trades) to O(Trades) + O(Days)
+  const tradesByDay = useMemo(() => {
+    const map = new Map<string, Trade[]>();
+    filteredTrades.forEach(trade => {
+      const dateKey = format(new Date(trade.trade_date), 'yyyy-MM-dd');
+      if (!map.has(dateKey)) {
+        map.set(dateKey, []);
+      }
+      map.get(dateKey)?.push(trade);
+    });
+    return map;
+  }, [filteredTrades]);
+
   const tradesForSelectedDay = useMemo(() => {
     if (!selectedDate) {
       return [];
     }
-    return filteredTrades.filter(trade => isSameDay(new Date(trade.trade_date), selectedDate));
-  }, [selectedDate, filteredTrades]);
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    return tradesByDay.get(dateKey) || [];
+  }, [selectedDate, tradesByDay]);
 
 
 
@@ -818,10 +948,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   };
 
 
-  const handleDayClick = (trade_date: Date) => {
+  const handleDayClick = useCallback((trade_date: Date) => {
     // In read-only mode, only allow viewing existing trades
     if (isReadOnly) {
-      const trades = filteredTrades.filter(trade => isSameDay(new Date(trade.trade_date), trade_date));
+      const dateKey = format(trade_date, 'yyyy-MM-dd');
+      const trades = tradesByDay.get(dateKey) || [];
       if (trades.length > 0) {
         setSelectedDate(trade_date);
       }
@@ -846,7 +977,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       handleToggleDynamicRisk(true);
       return;
     }
-    const trades = filteredTrades.filter(trade => isSameDay(new Date(trade.trade_date), trade_date));
+
+    const dateKey = format(trade_date, 'yyyy-MM-dd');
+    const trades = tradesByDay.get(dateKey) || [];
+
     if (trades.length === 0) {
       setNewTrade(createNewTradeData);
       setShowAddForm({ open: true, trade_date: trade_date, showDayDialogWhenDone: true });
@@ -854,7 +988,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     else {
       setSelectedDate(trade_date);
     }
-  };
+  }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk]);
   const handleDayChange = (trade_date: Date) => {
     setSelectedDate(trade_date);
   };
@@ -933,12 +1067,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         onTodayClick={handleTodayClick}
       />
 
- {/* Hero Image Banner */}
+      {/* Hero Image Banner */}
       {heroImageUrl && (
         <Box
           sx={{
             position: 'relative',
-            height: { xs: 140, sm: 180, md: 220 }, 
+            height: { xs: 140, sm: 180, md: 220 },
             overflow: 'hidden',
             borderRadius: 0,
           }}
@@ -986,10 +1120,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       {/* Breadcrumbs */}
       <Breadcrumbs items={breadcrumbItems} buttons={breadcrumbButtons} rightContent={breadcrumbRightContent} />
 
-    
-     
 
-  {/* Calendar Day Reminder */}
+
+
+      {/* Calendar Day Reminder */}
       {calendarId && (
         <CalendarDayReminder
           calendarId={calendarId}
@@ -1365,100 +1499,23 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 return (
                   <React.Fragment key={weekStart.toISOString()}>
                     {weekDays.map((day) => {
-                      const dayTrades = filteredTrades.filter(trade => isSameDay(new Date(trade.trade_date), day));
-                      const dayStats = calculateDayStats(
-                        dayTrades,
-                        accountBalance,
-                        maxDailyDrawdown,
-                        dynamicRiskSettings,
-                        filteredTrades,
-                        day
-                      );
-                      const isCurrentMonth = isSameMonth(day, currentDate);
-                      const isCurrentDay = isToday(day);
-
-                      // Check if this day has high-impact economic events
-                      const dayDateString = format(day, 'yyyy-MM-dd');
-                      const hasHighImpactEvents = monthlyHighImpactEvents.get(dayDateString) || false;
+                      const dateKey = format(day, 'yyyy-MM-dd');
+                      const dayTrades = tradesByDay.get(dateKey) || [];
 
                       return (
-                        <CalendarCell key={day.toISOString()}>
-                          <StyledCalendarDay
-                            onClick={() => handleDayClick(day)}
-                            $isCurrentMonth={isCurrentMonth}
-                            $isCurrentDay={isCurrentDay}
-                            $dayStatus={dayStats.status}
-
-                          >
-                            <DayNumber $isCurrentMonth={isCurrentMonth}>
-                              {format(day, 'd')}
-                            </DayNumber>
-
-                            {/* Red dot indicator for high-impact economic events */}
-                            {hasHighImpactEvents && (
-                              <Box
-                                sx={{
-                                  position: 'absolute',
-                                  top: 4,
-                                  right: 4,
-                                  width: 8,
-                                  height: 8,
-                                  m: 1,
-                                  borderRadius: '50%',
-                                  bgcolor: 'error.main',
-                                  border: `2px solid ${alpha(theme.palette.background.paper, 0.8)}`,
-                                  boxShadow: `0 0 0 1px ${alpha(theme.palette.error.main, 0.3)}`
-                                }}
-                              />
-
-                            )}
-
-                            {dayTrades.length > 0 && (
-                              //  <AnimatedPulse>
-
-                              // </AnimatedPulse>
-                              <Box sx={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: 0.5
-                              }}>
-                                {!isMdDown && (
-                                  <TradeAmount $dayStatus={dayStats.status}>
-                                    {formatCurrency(Math.abs(dayStats.netAmount))}
-                                  </TradeAmount>
-                                )}
-                                <TradeCount>
-                                  {dayTrades.length} trade{dayTrades.length !== 1 ? 's' : ''}
-                                </TradeCount>
-                                <Typography
-                                  variant="caption"
-                                  sx={{
-                                    color: dayStats.status === 'win' ? 'success.main' :
-                                      dayStats.status === 'loss' ? 'error.main' : 'text.secondary',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 500
-                                  }}
-                                >
-                                  {dayStats.percentage}%
-                                </Typography>
-                                {dayStats.isDrawdownViolation && (
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      color: 'error.main',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 700,
-                                      textTransform: 'uppercase'
-                                    }}
-                                  >
-                                    VIOLATED
-                                  </Typography>
-                                )}
-                              </Box>
-                            )}
-                          </StyledCalendarDay>
-                        </CalendarCell>
+                        <CalendarDayCell
+                          key={day.toISOString()}
+                          day={day}
+                          dayTrades={dayTrades}
+                          accountBalance={accountBalance}
+                          maxDailyDrawdown={maxDailyDrawdown}
+                          dynamicRiskSettings={dynamicRiskSettings}
+                          allTrades={filteredTrades}
+                          currentDate={currentDate}
+                          monthlyHighImpactEvents={monthlyHighImpactEvents}
+                          onDayClick={handleDayClick}
+                          isMdDown={isMdDown}
+                        />
                       );
                     })}
 

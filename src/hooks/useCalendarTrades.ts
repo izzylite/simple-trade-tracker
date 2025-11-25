@@ -13,9 +13,9 @@ import { logger } from "../utils/logger";
 import {
   calculateEffectiveRiskPercentage,
   calculateRiskAmount,
-  DynamicRiskSettings
-} from '../utils/dynamicRiskUtils';
-import { supabase } from '../config/supabase';
+  DynamicRiskSettings,
+} from "../utils/dynamicRiskUtils";
+import { supabase } from "../config/supabase";
 export interface UseCalendarTradesOptions {
   /**
    * Calendar ID to fetch trades for
@@ -23,9 +23,9 @@ export interface UseCalendarTradesOptions {
   calendarId: string | undefined;
   selectedCalendar?: Calendar | null;
   setLoading: (
-      loading: boolean,
-      loadingAction: "loading" | "importing" | "exporting",
-    ) => void;
+    loading: boolean,
+    loadingAction: "loading" | "importing" | "exporting",
+  ) => void;
 
   /**
    * Whether to enable real-time subscriptions
@@ -38,14 +38,14 @@ export interface UseCalendarTradesOptions {
  * Custom hook to fetch and manage trades for a calendar with real-time updates
  */
 export function useCalendarTrades(options: UseCalendarTradesOptions) {
-  const { calendarId,selectedCalendar, enableRealtime = true, setLoading} = options;
+  const { calendarId, selectedCalendar, enableRealtime = true, setLoading } =
+    options;
 
   const [trades, setTrades] = useState<Trade[]>([]);
   const [calendar, setCalendar] = useState<Calendar | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
   const loadAttemptedRef = useRef<boolean>(false);
- 
 
   /**
    * Fetch all trades for the calendar
@@ -63,7 +63,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     try {
       const [allTrades, calendar] = await Promise.all([
         calendarService.getAllTrades(calendarId),
-        calendarService.getCalendar(calendarId)
+        calendarService.getCalendar(calendarId),
       ]);
       setCalendar(calendar);
       setTrades(allTrades);
@@ -83,7 +83,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
   }, [calendarId]);
 
   useEffect(() => {
-     setLoading(isLoading, "loading");
+    setLoading(isLoading, "loading");
   }, [isLoading]);
 
   /**
@@ -100,7 +100,6 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       if (calendarId) {
         loadAttemptedRef.current = false;
       }
- 
     };
   }, [calendarId, fetchTrades]);
 
@@ -113,9 +112,8 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         throw new Error("Calendar ID is required");
       }
 
-      // Optimistic update
-      const optimisticTrades = [...trades, trade];
-      setTrades(optimisticTrades);
+      // Optimistic update using functional state update
+      setTrades((prev) => [...prev, trade]);
 
       try {
         await calendarService.addTrade(calendarId, trade);
@@ -123,56 +121,54 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         // Real-time subscription will handle the update
       } catch (err) {
         // Revert optimistic update on error
-        setTrades(trades);
+        setTrades((prev) => prev.filter((t) => t.id !== trade.id));
         logger.error("Error adding trade:", err);
         throw err;
       }
     },
-    [calendarId, trades],
+    [calendarId], // Removed 'trades' dependency
   );
 
-   
-
-  const handleUpdateTradeProperty = async ( 
+  const handleUpdateTradeProperty = async (
     tradeId: string,
     updateCallback: (trade: Trade) => Trade,
     createIfNotExists?: (tradeId: string) => Trade,
   ): Promise<Trade | undefined> => {
-    // Find the calendar from state 
+    // Find the calendar from state
     if (!calendar) {
       throw new Error(`Calendar with ID ${calendarId} not found`);
     }
 
     try {
       // Check if trade exists in cached trades first
-      
-      let existingTrade = await calendarService.getTrade(calendar.id, tradeId); 
+
+      let existingTrade = await calendarService.getTrade(calendar.id, tradeId);
       // If trade doesn't exist and we have a create function, create it
-      if (!existingTrade && createIfNotExists) { 
+      if (!existingTrade && createIfNotExists) {
         // Create in database with all updates already applied
         const finalTrade = await calendarService.addTrade(
           calendar.id,
           updateCallback(createIfNotExists(tradeId)),
-        ); 
-         
-        setTrades(prevTrades => [...prevTrades, finalTrade]);
+        );
+
+        setTrades((prevTrades) => [...prevTrades, finalTrade]);
         return finalTrade;
       }
       if (!existingTrade) {
         throw new Error(`Trade with ID ${tradeId} not found`);
       }
       // Normal update flow for existing trades
-      const result = await calendarService.updateTrade( 
+      const result = await calendarService.updateTrade(
         existingTrade,
         updateCallback,
       );
       if (!result) {
         return undefined;
       }
-      setTrades(prevTrades => prevTrades.map(trade =>
-        trade.id === tradeId ? result : trade
-      ));
-      
+      setTrades((prevTrades) =>
+        prevTrades.map((trade) => trade.id === tradeId ? result : trade)
+      );
+
       return result;
     } catch (error) {
       logger.error("Error updating trade:", error);
@@ -189,9 +185,14 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         throw new Error("Calendar ID is required");
       }
 
-      // Optimistic update
-      const optimisticTrades = trades.filter((t) => !tradeIds.includes(t.id));
-      setTrades(optimisticTrades); 
+      // Store previous trades for rollback
+      let previousTrades: Trade[] = [];
+
+      // Optimistic update using functional state update
+      setTrades((prev) => {
+        previousTrades = prev;
+        return prev.filter((t) => !tradeIds.includes(t.id));
+      });
 
       try {
         // Delete trades one by one
@@ -202,14 +203,13 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         // Real-time subscription will handle the update
       } catch (err) {
         // Revert optimistic update on error
-        setTrades(trades);
+        setTrades(previousTrades);
         logger.error("Error deleting trades:", err);
         throw err;
       }
     },
-    [calendarId, trades],
+    [calendarId], // Removed 'trades' dependency
   );
-
 
   // Function to handle dynamic risk toggle
   const handleToggleDynamicRisk = useCallback(async (
@@ -222,7 +222,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     if (useActualAmounts) {
       logger.log("Resetting to actual trade amounts...");
       // Reload all trades for the calendar to get the original values
-      fetchTrades()
+      fetchTrades();
       return;
     }
 
@@ -271,13 +271,15 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
           updatedTrades, // ✅ Use recalculated trades, not original
           dynamicRiskSettings,
         );
-        
+
         const riskAmount = calculateRiskAmount(
           effectiveRisk,
           calendar.account_balance,
           cumulativePnL,
         );
-  logger.log(`Effective risk for ${trade.name}: ${effectiveRisk}   risk amount: ${riskAmount}`);
+        logger.log(
+          `Effective risk for ${trade.name}: ${effectiveRisk}   risk amount: ${riskAmount}`,
+        );
         // Calculate new amount based on trade type and risk to reward
         let newAmount = 0;
         if (trade.trade_type === "win") {
@@ -297,7 +299,10 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       }
 
       // Calculate stats with hypothetical trades (does NOT update database)
-      const stats = await calendarService.calculateCalendarStats(calendar.id, updatedTrades);
+      const stats = await calendarService.calculateCalendarStats(
+        calendar.id,
+        updatedTrades,
+      );
 
       // Update the calendar state with recalculated trades and the hypothetical stats
       setTrades(updatedTrades);
@@ -314,7 +319,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
   }, [calendar, trades, fetchTrades]);
 
   const handleImportTrades = useCallback(async (
-    importedTrades: Partial<Trade>[]
+    importedTrades: Partial<Trade>[],
   ) => {
     if (!calendar) {
       throw new Error(`Calendar with ID ${calendarId} not found`);
@@ -323,16 +328,20 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     try {
       // Show loading indicator
       setIsLoading(true);
-      const result = await calendarService.importTrades(calendar.id,trades, importedTrades);
+      const result = await calendarService.importTrades(
+        calendar.id,
+        trades,
+        importedTrades,
+      );
       setTrades(result);
     } catch (error) {
-      logger.error("Error importing trades:", error); 
+      logger.error("Error importing trades:", error);
       throw error;
-    } finally { 
+    } finally {
       setIsLoading(false);
     }
   }, [calendar, calendarId]);
- 
+
   /**
    * Subscribe to calendar changes with real-time updates using Broadcast
    */
@@ -340,7 +349,9 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     channelName: `calendar-${calendarId}`,
     enabled: enableRealtime && !!calendarId,
     onChannelCreated: (channel) => {
-      logger.log(`🔧 Setting up calendar broadcast subscription for calendar-${calendarId}`);
+      logger.log(
+        `🔧 Setting up calendar broadcast subscription for calendar-${calendarId}`,
+      );
 
       // Listen for ALL broadcast events to debug
       channel.on(
@@ -349,11 +360,14 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
           event: "*", // Listen to all events
         },
         (payload: any) => {
-          logger.log(`� Broadcast event received on calendar-${calendarId}:`, payload);
+          logger.log(
+            `� Broadcast event received on calendar-${calendarId}:`,
+            payload,
+          );
           // The payload structure from realtime.broadcast_changes is:
           // { event: "UPDATE", type: "broadcast", payload: { record: {...}, old_record: {...}, ... } }
           if (payload.event === "UPDATE" && payload.payload?.record) {
-            const updatedCalendarData = payload.payload.record as Calendar; 
+            const updatedCalendarData = payload.payload.record as Calendar;
             // Update local calendar state with new data
             setCalendar(updatedCalendarData);
           }
@@ -361,10 +375,15 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       );
     },
     onSubscribed: () => {
-      logger.log(`✅ Calendar broadcast subscription ACTIVE for calendar-${calendarId}`);
+      logger.log(
+        `✅ Calendar broadcast subscription ACTIVE for calendar-${calendarId}`,
+      );
     },
     onError: (error) => {
-      logger.error(`❌ Calendar broadcast subscription ERROR for calendar-${calendarId}:`, error);
+      logger.error(
+        `❌ Calendar broadcast subscription ERROR for calendar-${calendarId}:`,
+        error,
+      );
     },
   });
 
@@ -431,10 +450,15 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       );
     },
     onSubscribed: () => {
-      logger.log(`✅ Trade broadcast subscription ACTIVE for calendar-${calendarId}`);
+      logger.log(
+        `✅ Trade broadcast subscription ACTIVE for calendar-${calendarId}`,
+      );
     },
     onError: (error) => {
-      logger.error(`❌ Trade broadcast subscription ERROR for calendar-${calendarId}:`, error);
+      logger.error(
+        `❌ Trade broadcast subscription ERROR for calendar-${calendarId}:`,
+        error,
+      );
     },
   });
 
@@ -445,64 +469,74 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     }
 
     try {
-      await calendarService.updateCalendar(calendar.id, { account_balance: newBalance });
+      await calendarService.updateCalendar(calendar.id, {
+        account_balance: newBalance,
+      });
       // Update local calendar state
-      setCalendar(prev => prev ? { ...prev, account_balance: newBalance } : prev);
+      setCalendar((prev) =>
+        prev ? { ...prev, account_balance: newBalance } : prev
+      );
     } catch (error) {
-      logger.error('Error updating account balance:', error);
+      logger.error("Error updating account balance:", error);
       throw error;
     }
   }, [calendar, calendarId]);
 
   // Handler for clearing month trades
-  const handleClearMonthTrades = useCallback(async (month: number, year: number) => {
- if (!calendar) {
-      throw new Error(`Calendar with ID ${calendarId} not found`);
-    }
-    try {
-      const tradesToKeep = trades.filter((trade: Trade) => {
-        const tradeDate = new Date(trade.trade_date);
-        return tradeDate.getMonth() !== month || tradeDate.getFullYear() !== year;
-      });
+  const handleClearMonthTrades = useCallback(
+    async (month: number, year: number) => {
+      if (!calendar) {
+        throw new Error(`Calendar with ID ${calendarId} not found`);
+      }
+      try {
+        const tradesToKeep = trades.filter((trade: Trade) => {
+          const tradeDate = new Date(trade.trade_date);
+          return tradeDate.getMonth() !== month ||
+            tradeDate.getFullYear() !== year;
+        });
 
-       const tradesToDelete = trades.filter(trade => {
-      const tradeDate = new Date(trade.trade_date);
-      return tradeDate.getFullYear() === year && tradeDate.getMonth() === month;
-    });
+        const tradesToDelete = trades.filter((trade) => {
+          const tradeDate = new Date(trade.trade_date);
+          return tradeDate.getFullYear() === year &&
+            tradeDate.getMonth() === month;
+        });
 
-      // First update the local state with just the trades
-      setTrades(tradesToKeep); 
-      await calendarService.getTradeRepository().bulkDelete(tradesToDelete);
+        // First update the local state with just the trades
+        setTrades(tradesToKeep);
+        await calendarService.getTradeRepository().bulkDelete(tradesToDelete);
 
-      // Stats are automatically recalculated by Supabase triggers after clearMonthTrades
-      // No need to manually calculate or update stats
-    } catch (error) {
-      logger.error('Error clearing month trades:', error);
-    }
-
-
-  }, [calendar, calendarId, fetchTrades]);
+        // Stats are automatically recalculated by Supabase triggers after clearMonthTrades
+        // No need to manually calculate or update stats
+      } catch (error) {
+        logger.error("Error clearing month trades:", error);
+      }
+    },
+    [calendar, calendarId, fetchTrades],
+  );
 
   /**
    * Handler for updating calendar properties
    */
   const handleUpdateCalendarProperty = useCallback(async (
-    updateCallback: (calendar: Calendar) => Calendar
+    updateCallback: (calendar: Calendar) => Calendar,
   ): Promise<Calendar | undefined> => {
     if (!calendar) {
       throw new Error(`Calendar with ID ${calendarId} not found`);
     }
 
-    try { 
-      const updatedCalendar = await calendarService.updateCalendar(calendar.id, updateCallback(calendar));
- 
+    try {
+      const updatedCalendar = await calendarService.updateCalendar(
+        calendar.id,
+        updateCallback(calendar),
+      );
+
       if (updatedCalendar) {
         // Update local calendar state
         setCalendar(updatedCalendar);
         return updatedCalendar;
       }
     } catch (error) {
-      logger.error('Error updating calendar:', error);
+      logger.error("Error updating calendar:", error);
       throw error;
     }
     return undefined;
@@ -517,52 +551,57 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     newTag: string,
   ): Promise<{ success: boolean; tradesUpdated: number }> => {
     if (!calendarId) {
-      logger.error('Cannot update tag: calendarId is undefined');
+      logger.error("Cannot update tag: calendarId is undefined");
       return { success: false, tradesUpdated: 0 };
     }
 
     try {
       // Optimistically update the UI
-      
 
-      logger.log(`🏷️ Updating tag via edge function: "${oldTag}" → "${newTag}"`); 
+      logger.log(
+        `🏷️ Updating tag via edge function: "${oldTag}" → "${newTag}"`,
+      );
 
       // Call Supabase Edge Function to update tag
-      const { data, error: invokeError } = await supabase.functions.invoke('update-tag', {
-        body: {
-          calendar_id: calendarId,
-          old_tag: oldTag,
-          new_tag: newTag
-        }
-      });
+      const { data, error: invokeError } = await supabase.functions.invoke(
+        "update-tag",
+        {
+          body: {
+            calendar_id: calendarId,
+            old_tag: oldTag,
+            new_tag: newTag,
+          },
+        },
+      );
 
       if (invokeError) {
-        logger.error('Edge function error:', invokeError);   
+        logger.error("Edge function error:", invokeError);
         throw invokeError;
       }
- 
 
       if (data && data.success) {
-        logger.log(`✅ Tag updated successfully: ${data.tradesUpdated} trades affected`);
+        logger.log(
+          `✅ Tag updated successfully: ${data.tradesUpdated} trades affected`,
+        );
         // Real-time subscription will handle the UI update via broadcast
         return { success: true, tradesUpdated: data.tradesUpdated || 0 };
       } else {
-        logger.error('Tag update failed:', data?.message || 'Unknown error');
-        logger.error('Full response data:', data);
+        logger.error("Tag update failed:", data?.message || "Unknown error");
+        logger.error("Full response data:", data);
         return { success: false, tradesUpdated: 0 };
       }
     } catch (error) {
-      logger.error('Error updating tag:', error);
+      logger.error("Error updating tag:", error);
       return { success: false, tradesUpdated: 0 };
     }
   }, [calendarId]);
 
   function tagUpdateUIState(oldTag: string, newTag: string) {
-     // Use calendar from hook state
+    // Use calendar from hook state
     if (!calendar) {
       throw new Error(`Calendar with ID ${calendarId} not found`);
     }
-    logger.log(`Updating trades for tag change: ${oldTag} -> ${newTag}`); 
+    logger.log(`Updating trades for tag change: ${oldTag} -> ${newTag}`);
     // Helper function to update tags in an array, handling group name changes
     const updateTagsWithGroupNameChange = (tags: string[]) => {
       // Check if this is a group name change
@@ -671,7 +710,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         return updateTradeTagsWithGroupNameChange(trade);
       },
     );
-    setTrades(updatedCachedTrades)
+    setTrades(updatedCachedTrades);
     // Update local state immediately
     setCalendar({
       ...calendar,
