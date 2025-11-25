@@ -62,7 +62,7 @@ import EconomicEventListItem from './EconomicEventListItem';
 import EconomicCalendarFilters from './EconomicCalendarFilters';
 import EconomicEventDetailDialog from './EconomicEventDetailDialog';
 import EconomicEventShimmer from './EconomicEventShimmer';
-import { log,error, logger, warn } from '../../utils/logger';
+import { log, error, logger, warn } from '../../utils/logger';
 import { cleanEventNameForPinning, isEventPinned, eventMatchV3 } from '../../utils/eventNameUtils';
 import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
 import { supabase } from '../../config/supabase';
@@ -70,7 +70,7 @@ import { supabase } from '../../config/supabase';
 type ViewType = 'day' | 'week' | 'month';
 
 // Available currencies and impacts
-const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF','NZD'];
+const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD'];
 const IMPACTS: ImpactLevel[] = ['High', 'Medium', 'Low'];
 
 // Interface for saved filter settings
@@ -157,19 +157,19 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [pinningEventId, setPinningEventId] = useState<string | null>(null);
 
-  
+
 
   // Handle real-time event updates
   useEffect(() => {
     if (payload) {
       log(`📊 Updating event in Economic Calendar: ${payload.updatedEvents.join(', ')}`);
-      const events : EconomicEvent[] = payload.allEvents || []
-       
+      const events: EconomicEvent[] = payload.allEvents || []
+
       // Find and update the specific event in the current events list
       setEvents(prevEvents => {
         if (!payload) return prevEvents;
-        
-        let changed = false; 
+
+        let changed = false;
         // Replace any matching events with the updated ones
         const newEvents = prevEvents.map(event => {
           const idx = events.findIndex(e => e.id === event.id);
@@ -345,52 +345,70 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   }, [viewType, currentDate, startDate, endDate]);
 
   // Fetch events when date range or filters change
-  useEffect(() => {
-    const fetchEvents = async () => {
+  // Fetch events callback
+  const fetchEventsCallback = useCallback(async (isLoadMore = false) => {
+    if (loading || (isLoadMore && loadingMore)) return;
+
+    const currentOffset = isLoadMore ? offset : 0;
+
+    if (!isLoadMore) {
       setLoading(true);
       setError(null);
-      setEvents([]); // Clear existing events
-      setOffset(0); // Reset pagination
+    } else {
+      setLoadingMore(true);
+    }
 
-      try {
-        log(`🔄 Fetching ${viewType} events for ${dateRange.start} to ${dateRange.end}`);
-        log(`🔍 Applied filters - Currencies: [${appliedCurrencies.join(', ')}], Impacts: [${appliedImpacts.join(', ')}], OnlyUpcoming: ${appliedOnlyUpcoming}`);
+    try {
+      log(`🔄 ${isLoadMore ? 'Loading more' : 'Fetching'} ${viewType} events for ${dateRange.start} to ${dateRange.end}`);
 
-        const result = await economicCalendarService.fetchEventsPaginated(
-          dateRange,
-          { pageSize, offset: 0 },
-          {
-            currencies: appliedCurrencies,
-            impacts: appliedImpacts,
-            onlyUpcoming: appliedOnlyUpcoming
-          }
-        );
+      const result = await economicCalendarService.fetchEventsPaginated(
+        dateRange,
+        { pageSize, offset: currentOffset },
+        {
+          currencies: appliedCurrencies,
+          impacts: appliedImpacts,
+          onlyUpcoming: appliedOnlyUpcoming
+        }
+      );
 
+      if (isLoadMore) {
+        setEvents(prev => [...prev, ...result.events]);
+      } else {
         setEvents(result.events);
-        setHasMore(result.hasMore);
-        setOffset(result.offset || pageSize);
-        log(`✅ Fetched ${result.events.length} events (hasMore: ${result.hasMore})`);
+      }
 
+      setHasMore(result.hasMore);
+      setOffset(result.offset || currentOffset + pageSize);
+
+      if (!isLoadMore) {
         // Debug: Log unique currencies and impacts in results
         const uniqueCurrencies = Array.from(new Set(result.events.map(e => e.currency)));
         const uniqueImpacts = Array.from(new Set(result.events.map(e => e.impact)));
         log(`📊 Results contain - Currencies: [${uniqueCurrencies.join(', ')}], Impacts: [${uniqueImpacts.join(', ')}]`);
+      }
 
-      } catch (err) {
-        logger.error('❌ Error fetching events:', err);
+    } catch (err) {
+      logger.error('❌ Error fetching events:', err);
+      if (!isLoadMore) {
         setError('Failed to load economic events');
         setEvents([]);
-        setHasMore(false);
-        setOffset(0);
-      } finally {
-        setLoading(false);
       }
-    };
-
-    if (open) {
-      fetchEvents();
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
     }
-  }, [dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming, open, viewType, pageSize, startDate, endDate]);
+  }, [dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming, viewType, pageSize, offset, loading, loadingMore]);
+
+  // Initial fetch and filter changes
+  useEffect(() => {
+    // Only fetch if we haven't loaded events yet, or if filters/date changed
+    // We use a ref to track if it's the initial mount to avoid double fetching if strict mode
+    fetchEventsCallback(false);
+  }, [dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming, viewType, pageSize]);
+
+  // We removed 'open' from dependencies to prevent refetching on toggle
+  // But we might want to fetch on FIRST open if we want lazy loading. 
+  // For now, we rely on the effect above running on mount/update.
 
   // Stabilize the refetch callback to prevent recreating it on every filter change
   // This prevents accumulating multiple broadcast listeners
@@ -461,35 +479,12 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   });
 
   // Load more events function
-  const loadMoreEvents = useCallback(async () => {
-    if (!hasMore || loadingMore) return;
-
-    setLoadingMore(true);
-
-    try {
-      log('🔄 Loading more events...');
-
-      const result = await economicCalendarService.fetchEventsPaginated(
-        dateRange,
-        { pageSize, offset },
-        {
-          currencies: appliedCurrencies,
-          impacts: appliedImpacts,
-          onlyUpcoming: appliedOnlyUpcoming
-        }
-      );
-
-      setEvents(prev => [...prev, ...result.events]);
-      setHasMore(result.hasMore);
-      setOffset(result.offset || offset + pageSize);
-      log(`✅ Loaded ${result.events.length} more events (hasMore: ${result.hasMore})`);
-
-    } catch (err) {
-      logger.error('❌ Error loading more events:', err);
-    } finally {
-      setLoadingMore(false);
+  // Load more events function
+  const loadMoreEvents = useCallback(() => {
+    if (hasMore && !loadingMore && !loading) {
+      fetchEventsCallback(true);
     }
-  }, [hasMore, loadingMore, dateRange, pageSize, offset, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming]);
+  }, [hasMore, loadingMore, loading, fetchEventsCallback]);
 
   // Infinite scroll handler
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
@@ -514,7 +509,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     // Clear custom date range when navigating
     setStartDate(null);
     setEndDate(null);
-    
+
     switch (viewType) {
       case 'day':
         setCurrentDate(prev => addDays(prev, -1));
@@ -532,7 +527,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     // Clear custom date range when navigating
     setStartDate(null);
     setEndDate(null);
-    
+
     switch (viewType) {
       case 'day':
         setCurrentDate(prev => addDays(prev, 1));
@@ -667,7 +662,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           pinned_events: currentPinnedEvents.filter(pinnedEvent =>
             // Use event_id for exact matching if available, fallback to name matching
             pinnedEvent.event_id ? pinnedEvent.event_id !== event.id :
-            pinnedEvent.event.toLowerCase() !== cleanEventNameForPinning(event.event_name).toLowerCase()
+              pinnedEvent.event.toLowerCase() !== cleanEventNameForPinning(event.event_name).toLowerCase()
           )
         };
       });
@@ -684,6 +679,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       anchor="right"
       open={open}
       onClose={onClose}
+      ModalProps={{ keepMounted: true }} // Keep the drawer mounted to preserve state and avoid refetching
       sx={{
         zIndex: 1300,
         '& .MuiDrawer-paper': {
@@ -824,8 +820,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                   <FilterIcon sx={{ color: 'primary.main', fontSize: 20 }} />
                 </Box>
                 <Box>
-                  <Typography variant="subtitle2" sx={{ 
-                    fontWeight: 600, 
+                  <Typography variant="subtitle2" sx={{
+                    fontWeight: 600,
                     color: 'primary.main',
                     mb: 0.5
                   }}>
@@ -957,96 +953,96 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
             </Box>
           ) : (
 
-              <Box>
-                {groupEventsByDate(events).map((dayGroup, dayIndex) => (
-                  <Box key={dayGroup.date}>
-                    {/* Sticky Date Header */}
-                    <Box sx={{
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 10,
-                      background: alpha(theme.palette.background.paper, 0.95),
-                      backdropFilter: 'blur(10px)',
-                      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                      px: 3,
-                      py: 1.5
+            <Box>
+              {groupEventsByDate(events).map((dayGroup, dayIndex) => (
+                <Box key={dayGroup.date}>
+                  {/* Sticky Date Header */}
+                  <Box sx={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                    background: alpha(theme.palette.background.paper, 0.95),
+                    backdropFilter: 'blur(10px)',
+                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    px: 3,
+                    py: 1.5
+                  }}>
+                    <Typography variant="subtitle2" sx={{
+                      fontWeight: 600,
+                      color: 'primary.main',
+                      fontSize: '0.875rem'
                     }}>
-                      <Typography variant="subtitle2" sx={{
-                        fontWeight: 600,
-                        color: 'primary.main',
-                        fontSize: '0.875rem'
-                      }}>
-                        {getDateHeader(dayGroup.date)}
-                      </Typography>
-                    </Box>
-
-                    {/* Events for this day */}
-                    <Box>
-                      {dayGroup.events.map((event, eventIndex) => {
-                        const uniqueKey = `${event.id}-${eventIndex}`;
-                        const tradeCount = eventTradeCountMap.get(event.id) || 0;
-                        return (
-                          <React.Fragment key={uniqueKey}>
-                            <EconomicEventListItem
-                              px={2.5}
-                              py={1.5}
-                              event={event}
-                              pinnedEvents={calendar?.pinned_events || []}
-                              onPinEvent={handlePinEvent}
-                              onUnpinEvent={handleUnpinEvent}
-                              isPinning={pinningEventId === event.id}
-                              tradeCount={tradeCount}
-                              onClick={(event) => {
-                                logger.log('Economic event clicked:', event);
-                                setSelectedEvent(event);
-                                setEventDetailDialogOpen(true);
-                              }}
-                            />
-                            {eventIndex < dayGroup.events.length - 1 && <Divider sx={{ ml: 3 }} />}
-                          </React.Fragment>
-                        );
-                      })}
-                    </Box>
-                  </Box>
-                ))}
-
-                {/* Load More Button */}
-                {hasMore && (
-                  <Box sx={{ p: 3 }}>
-                    <Button
-                      onClick={loadMoreEvents}
-                      disabled={loadingMore}
-                      variant="outlined"
-                      fullWidth
-                      startIcon={loadingMore ? <CircularProgress size={16} /> : undefined}
-                      sx={{
-                        borderRadius: 2,
-                        py: 1.5,
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        borderColor: alpha(theme.palette.primary.main, 0.3),
-                        color: 'primary.main',
-                        '&:hover': {
-                          borderColor: 'primary.main',
-                          backgroundColor: alpha(theme.palette.primary.main, 0.04),
-                        }
-                      }}
-                    >
-                      {loadingMore ? 'Loading more events...' : `Load more events`}
-                    </Button>
-                  </Box>
-                )}
-
-                {/* End of results indicator */}
-                {!hasMore && events.length > 0 && !loading && (
-                  <Box sx={{ p: 3, textAlign: 'center' }}>
-                    <Typography variant="caption" color="text.secondary">
-                      No more events to load
+                      {getDateHeader(dayGroup.date)}
                     </Typography>
                   </Box>
-                )}
-              </Box>
-            )}
+
+                  {/* Events for this day */}
+                  <Box>
+                    {dayGroup.events.map((event, eventIndex) => {
+                      const uniqueKey = `${event.id}-${eventIndex}`;
+                      const tradeCount = eventTradeCountMap.get(event.id) || 0;
+                      return (
+                        <React.Fragment key={uniqueKey}>
+                          <EconomicEventListItem
+                            px={2.5}
+                            py={1.5}
+                            event={event}
+                            pinnedEvents={calendar?.pinned_events || []}
+                            onPinEvent={handlePinEvent}
+                            onUnpinEvent={handleUnpinEvent}
+                            isPinning={pinningEventId === event.id}
+                            tradeCount={tradeCount}
+                            onClick={(event) => {
+                              logger.log('Economic event clicked:', event);
+                              setSelectedEvent(event);
+                              setEventDetailDialogOpen(true);
+                            }}
+                          />
+                          {eventIndex < dayGroup.events.length - 1 && <Divider sx={{ ml: 3 }} />}
+                        </React.Fragment>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              ))}
+
+              {/* Load More Button */}
+              {hasMore && (
+                <Box sx={{ p: 3 }}>
+                  <Button
+                    onClick={loadMoreEvents}
+                    disabled={loadingMore}
+                    variant="outlined"
+                    fullWidth
+                    startIcon={loadingMore ? <CircularProgress size={16} /> : undefined}
+                    sx={{
+                      borderRadius: 2,
+                      py: 1.5,
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      borderColor: alpha(theme.palette.primary.main, 0.3),
+                      color: 'primary.main',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        backgroundColor: alpha(theme.palette.primary.main, 0.04),
+                      }
+                    }}
+                  >
+                    {loadingMore ? 'Loading more events...' : `Load more events`}
+                  </Button>
+                </Box>
+              )}
+
+              {/* End of results indicator */}
+              {!hasMore && events.length > 0 && !loading && (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="caption" color="text.secondary">
+                    No more events to load
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
         </Box>
 
         {/* Footer */}
