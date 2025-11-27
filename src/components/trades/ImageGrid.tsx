@@ -745,27 +745,14 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                         aspectRatio: pendingImg?.width && pendingImg?.height ? `${pendingImg.width}/${pendingImg.height}` : '16/9', // Default aspect ratio
                                     }}
                                 >
-                                {/* Progress Indicator.upload_progress == 0 means preparing, > 0 means uploading, -1 or undefined means default  */}
+                                {/* Progress Indicator - shows during upload */}
                                 {pendingImg?.upload_progress !== undefined && pendingImg.upload_progress >= 0 && pendingImg.upload_progress < 100 && (
                                     <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 2 }}>
-                                        <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                                            <CircularProgress variant={pendingImg.upload_progress === 0 ? 'indeterminate' : 'determinate'} value={pendingImg.upload_progress} size={80} sx={{ color: 'white' }} />
-                                            <Box
-                                                sx={{
-                                                    top: 0,
-                                                    left: 0,
-                                                    bottom: 0,
-                                                    right: 0,
-                                                    position: 'absolute',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                }}
-                                            >
-                                                <Typography variant="caption" component="div" sx={{ color: 'white', fontSize: `${pendingImg.upload_progress === 0 ? '0.55rem' : undefined}`, fontWeight: 'bold' }}>
-                                                    {pendingImg.upload_progress === 0 ? 'Preparing...' : `${Math.round(pendingImg.upload_progress)}%`}
-                                                </Typography>
-                                            </Box>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                            <CircularProgress size={48} sx={{ color: 'white' }} />
+                                            <Typography variant="caption" component="div" sx={{ color: 'white', fontWeight: 'bold' }}>
+                                                Uploading...
+                                            </Typography>
                                         </Box>
                                     </Box>
                                 )}

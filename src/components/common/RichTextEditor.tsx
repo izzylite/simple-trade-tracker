@@ -31,7 +31,8 @@ import {
   ArrowDropDown,
   Palette,
   Link,
-  FormatClear
+  FormatClear,
+  Image as ImageIcon
 } from '@mui/icons-material';
 import { Editor, EditorState, convertToRaw } from 'draft-js';
 import 'draft-js/dist/Draft.css';
@@ -72,6 +73,9 @@ import {
   handleLinkDialogClose
 } from './RichTextEditor/utils/linkDialogUtils';
 import { createDecorator } from './RichTextEditor/utils/decoratorUtils';
+import { insertImage, removeImageBlock } from './RichTextEditor/utils/imageUtils';
+import ImageBlock from './RichTextEditor/components/ImageBlock';
+import ImageUploadDialog from './RichTextEditor/components/ImageUploadDialog';
 
 export interface RichTextEditorProps {
   value?: string;
@@ -132,6 +136,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
 
   // Update editor state when value prop changes (for controlled component behavior)
   useEffect(() => {
@@ -338,7 +343,44 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     // }, 0);
   };
 
+  // Image handlers
+  const handleImageClick = () => {
+    setImageDialogOpen(true);
+  };
 
+  const handleImageInsert = (src: string, alt?: string) => {
+    const newState = insertImage(editorState, src, alt);
+    handleEditorChange(newState);
+    setImageDialogOpen(false);
+    setTimeout(() => editorRef.current?.focus(), 100);
+  };
+
+  const handleImageRemove = (blockKey: string) => {
+    const newState = removeImageBlock(editorState, blockKey);
+    handleEditorChange(newState);
+  };
+
+  // Block renderer for atomic blocks (images)
+  const blockRendererFn = (contentBlock: any) => {
+    if (contentBlock.getType() === 'atomic') {
+      const contentState = editorState.getCurrentContent();
+      const entityKey = contentBlock.getEntityAt(0);
+      if (entityKey) {
+        const entity = contentState.getEntity(entityKey);
+        if (entity.getType() === 'IMAGE') {
+          return {
+            component: ImageBlock,
+            editable: false,
+            props: {
+              onRemove: handleImageRemove,
+              readOnly: disabled,
+            },
+          };
+        }
+      }
+    }
+    return null;
+  };
 
   // Create style map using utility
   const styleMap = createStyleMap(theme, TEXT_COLORS, BACKGROUND_COLORS);
@@ -1018,6 +1060,18 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                         <Link fontSize="small" />
                     </ToggleButton>
                  </Tooltip>
+                 <Tooltip title="Insert Image" placement="top">
+                    <IconButton
+                        size="small"
+                        onClick={handleImageClick}
+                        onMouseDown={handleToolbarInteraction}
+                        onTouchStart={handleToolbarInteraction}
+                        disabled={disabled}
+                        aria-label="Insert Image"
+                    >
+                        <ImageIcon fontSize="small" />
+                    </IconButton>
+                 </Tooltip>
                  <Tooltip title="Clear Formatting (Ctrl+Shift+X)" placement="top">
                     <IconButton
                         size="small"
@@ -1163,6 +1217,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             placeholder={placeholder}
             customStyleMap={styleMap}
             blockStyleFn={blockStyleFn}
+            blockRendererFn={blockRendererFn}
             handleKeyCommand={handleKeyCommandWrapper}
             keyBindingFn={keyBindingFn}
             readOnly={disabled}
@@ -1252,6 +1307,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         </DialogActions>
       </Dialog>
 
+      {/* Image Upload Dialog */}
+      <ImageUploadDialog
+        open={imageDialogOpen}
+        onClose={() => setImageDialogOpen(false)}
+        onImageInsert={handleImageInsert}
+      />
 
       {/* Helper text and character count */}
       {(helperText || !hideCharacterCount) && (

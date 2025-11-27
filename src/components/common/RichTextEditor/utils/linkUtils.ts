@@ -43,23 +43,34 @@ export const isInternalTradeLink = (url: string): {
  * Check if current selection has a link
  */
 export const getCurrentLink = (editorState: EditorState) => {
-  const selection = editorState.getSelection();
-  const contentState = editorState.getCurrentContent();
-  const startKey = selection.getStartKey();
-  const startOffset = selection.getStartOffset();
-  const blockWithLinkAtBeginning = contentState.getBlockForKey(startKey);
-  const linkKey = blockWithLinkAtBeginning.getEntityAt(startOffset);
+  try {
+    const selection = editorState.getSelection();
+    const contentState = editorState.getCurrentContent();
+    const startKey = selection.getStartKey();
+    const startOffset = selection.getStartOffset();
+    const blockWithLinkAtBeginning = contentState.getBlockForKey(startKey);
 
-  if (linkKey) {
-    const linkInstance = contentState.getEntity(linkKey);
-    if (linkInstance.getType() === 'LINK') {
-      return {
-        entityKey: linkKey,
-        url: linkInstance.getData().url
-      };
+    // Check if block exists before calling getEntityAt
+    if (!blockWithLinkAtBeginning) {
+      return null;
     }
+
+    const linkKey = blockWithLinkAtBeginning.getEntityAt(startOffset);
+
+    if (linkKey) {
+      const linkInstance = contentState.getEntity(linkKey);
+      if (linkInstance.getType() === 'LINK') {
+        return {
+          entityKey: linkKey,
+          url: linkInstance.getData().url
+        };
+      }
+    }
+    return null;
+  } catch (error) {
+    // Return null on any error to prevent crashes
+    return null;
   }
-  return null;
 };
 
 /**
