@@ -129,17 +129,24 @@ async function parseJsonBody(req: Request): Promise<unknown> {
     );
     // Call the process-economic-events function to parse the HTML
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    if (!supabaseUrl || !anonKey) {
-      throw new Error("Missing SUPABASE_URL or SUPABASE_ANON_KEY");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
     }
+    // Get the anon key for the apikey header
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!anonKey) {
+      throw new Error("Missing SUPABASE_ANON_KEY");
+    }
+
     const processResponse = await fetch(
       `${supabaseUrl}/functions/v1/process-economic-events`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${anonKey}`,
+          "Authorization": `Bearer ${serviceRoleKey}`,
+          "apikey": anonKey,
         },
         body: JSON.stringify({
           htmlContent: html,

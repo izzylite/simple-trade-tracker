@@ -536,6 +536,9 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                         fullWidth: true,
                         size: 'small',
                       },
+                      popper: {
+                        sx: { zIndex: 2100 },
+                      },
                     }}
                   />
                 </LocalizationProvider>

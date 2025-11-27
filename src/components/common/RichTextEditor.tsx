@@ -111,6 +111,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   onOpenGalleryMode
 }) => {
   const theme = useTheme();
+  const Z_INDEX = 2000;
 
   // Refs must be declared before any useEffect that uses them
   const editorRef = useRef<Editor>(null);
@@ -379,6 +380,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         disableScrollLock={true} // Prevent scroll lock that might cause jumps
         disableAutoFocus={true} // Prevent auto focus that might cause scroll
         disableEnforceFocus={true} // Prevent focus enforcement
+        sx={{ zIndex: Z_INDEX }}
         slotProps={{
           paper: {
             onMouseDown: handleToolbarInteraction,
@@ -395,7 +397,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               boxShadow: theme.palette.mode === 'dark'
                 ? `0 8px 32px ${alpha('#000000', 0.4)}, 0 2px 8px ${alpha('#000000', 0.2)}`
                 : `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}, 0 2px 8px ${alpha('#000000', 0.1)}`,
-              zIndex: 1400,
               mt: 0.5,
             }
           }
@@ -675,6 +676,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         disableAutoFocus={true} // Prevent auto focus that might cause scroll
         disableEnforceFocus={true} // Prevent focus enforcement
         disableRestoreFocus={true} // Prevent focus restoration that might cause scroll
+        sx={{ zIndex: Z_INDEX }}
         slotProps={{
           paper: {
             onMouseDown: handleToolbarInteraction,
@@ -689,7 +691,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               boxShadow: theme.palette.mode === 'dark'
                 ? `0 8px 32px ${alpha('#000000', 0.4)}, 0 2px 8px ${alpha('#000000', 0.2)}`
                 : `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}, 0 2px 8px ${alpha('#000000', 0.1)}`,
-              zIndex: 1400,
               mt: 1,
               // Prevent any layout shifts
               position: 'fixed',
@@ -746,7 +747,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           position: 'absolute',
           top: floatingToolbarPosition.top,
           left: floatingToolbarPosition.left,
-          zIndex: 1300, // Ensure above editor content but below menus
+          zIndex: Z_INDEX, // Ensure above editor content and dialogs
         }}
         // Fade in/out via CSS animation on the Paper instead of Fade component
       >
@@ -1084,7 +1085,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               minHeight: typeof minHeight === 'number' ? `calc(${minHeight}px - ${theme.spacing(3)})` : `calc(${minHeight} - ${theme.spacing(3)})`,
               fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
               fontSize: '0.9rem', // Reduced text size
-              lineHeight: 1.3,
+              lineHeight: 1.9,
               fontWeight: 500,
               color: theme.palette.text.primary,
               position: 'relative',
@@ -1187,6 +1188,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         disableScrollLock={true}
         disableEnforceFocus={false}
         disableRestoreFocus={true}
+        sx={{ zIndex: Z_INDEX }}
       >
         <DialogTitle>{getCurrentLink(editorState) ? 'Edit Link' : 'Insert Link'}</DialogTitle>
         <DialogContent>
