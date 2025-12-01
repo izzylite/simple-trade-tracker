@@ -28,6 +28,7 @@ import Shimmer from '../../../Shimmer';
 import { uploadFile, getPublicUrl, optimizeImage } from '../../../../services/supabaseStorageService';
 import { supabase } from '../../../../config/supabase';
 import { unsplashCache, UnsplashImage } from '../../../../services/unsplashCache';
+import { FILE_SIZE_LIMITS, formatFileSize } from '../../../../utils/fileValidation';
 import { scrollbarStyles } from '../../../../styles/scrollbarStyles';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -97,6 +98,12 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       setError('Please select an image file');
+      return;
+    }
+
+    // Check file size (1MB limit)
+    if (file.size > FILE_SIZE_LIMITS.IMAGE_1MB) {
+      setError(`File size (${formatFileSize(file.size)}) exceeds the 1MB limit`);
       return;
     }
 
@@ -350,7 +357,7 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
                   Drop an image here or click to browse
                 </Typography>
                 <Typography variant="caption" color="text.disabled">
-                  Supports: JPG, PNG, GIF, WebP (max 10MB)
+                  Supports: JPG, PNG, GIF, WebP (max 1MB)
                 </Typography>
               </>
             )}

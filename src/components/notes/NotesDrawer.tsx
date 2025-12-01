@@ -3,7 +3,7 @@
  * Drawer for viewing and managing notes for a calendar or across all calendars
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -40,6 +40,7 @@ import { logger } from '../../utils/logger';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { CalendarRepository } from '../../services/repository/repositories/CalendarRepository';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import { useNotes } from '../../hooks/useNotes';
 
 interface NotesDrawerProps {
   open: boolean;
@@ -101,10 +102,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
   const theme = useTheme();
   const { user } = useAuth();
 
-  const [notes, setNotes] = useState<Note[]>([]);
   const [calendars, setCalendars] = useState<Calendar[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<TabValue>('all');
   const [editorOpen, setEditorOpen] = useState(false);
@@ -112,102 +110,34 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
   const [selectedCalendarForNew, setSelectedCalendarForNew] = useState<string | undefined>(calendarId);
   const [selectedCalendarFilter, setSelectedCalendarFilter] = useState<string>('all'); // For filtering notes by calendar
   const [creatorFilter, setCreatorFilter] = useState<'assistant' | 'me'>('me'); // Filter by creator
-  const [hasMore, setHasMore] = useState(false);
-  const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
 
-  const NOTES_PER_PAGE = 20;
+  // Use custom hook for notes management
+  const {
+    notes,
+    loading,
+    loadingMore,
+    hasMore,
+    total,
+    loadMore,
+    updateNote,
+    removeNote,
+    addNote,
+  } = useNotes({
+    userId: user?.uid,
+    calendarId,
+    isOpen: open,
+    activeTab,
+    searchQuery,
+    selectedCalendarFilter,
+    creatorFilter,
+  });
 
-  // Load notes when drawer opens or filters change
+  // Load calendars when drawer opens (for calendar picker)
   useEffect(() => {
-    if (open) {
-      // Reset and load fresh data
-      setOffset(0);
-      loadNotes(true);
-      if (showCalendarPicker) {
-        loadCalendars();
-      }
+    if (open && showCalendarPicker) {
+      loadCalendars();
     }
-  }, [open, calendarId, showCalendarPicker, activeTab, selectedCalendarFilter, creatorFilter]);
-
-  // Debounced search effect
-  useEffect(() => {
-    if (!open) return;
-
-    const timeout = setTimeout(() => {
-      // Reset and load with search
-      setOffset(0);
-      loadNotes(true);
-    }, 500); // 500ms debounce
-
-    return () => clearTimeout(timeout);
-  }, [searchQuery]);
-
-  const loadNotes = useCallback(async (reset: boolean = false) => {
-    if (!user?.uid) return;
-
-    try {
-      if (reset) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
-      }
-
-      // Determine filter options based on active tab
-      const queryOptions: notesService.NoteQueryOptions = {
-        limit: NOTES_PER_PAGE,
-        offset: reset ? 0 : offset,
-        searchQuery: (searchQuery || "").trim() || undefined,
-      };
-
-      // Apply tab-specific filters
-      if (activeTab === 'pinned') {
-        queryOptions.isPinned = true;
-        queryOptions.isArchived = false;
-      } else if (activeTab === 'archived') {
-        queryOptions.isArchived = true;
-      } else {
-        // 'all' tab - exclude archived notes
-        queryOptions.isArchived = false;
-      }
-
-      // Apply creator filter
-      if (creatorFilter === 'assistant') {
-        queryOptions.byAssistant = true;
-      } else if (creatorFilter === 'me') {
-        queryOptions.byAssistant = false;
-      }
-
-      // Query notes
-      let result: notesService.NoteQueryResult;
-      // Use calendarId prop if provided (calendar-specific view)
-      // Otherwise use selectedCalendarFilter from dropdown (multi-calendar view)
-      const effectiveCalendarId = calendarId || (selectedCalendarFilter !== 'all' ? selectedCalendarFilter : undefined);
-
-      if (effectiveCalendarId) {
-        result = await notesService.queryCalendarNotes(effectiveCalendarId, queryOptions);
-      } else {
-        result = await notesService.queryUserNotes(user.uid, queryOptions);
-      }
-
-      // Update state
-      if (reset) {
-        setNotes(result.notes);
-        setOffset(result.notes.length);
-      } else {
-        setNotes(prev => [...prev, ...result.notes]);
-        setOffset(prev => prev + result.notes.length);
-      }
-      setHasMore(result.hasMore);
-      setTotal(result.total);
-    } catch (error) {
-      logger.error('Error loading notes:', error);
-      setNotes([]);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [user?.uid, calendarId, activeTab, searchQuery, offset, selectedCalendarFilter, creatorFilter]);
+  }, [open, showCalendarPicker]);
 
   const loadCalendars = async () => {
     if (!user?.uid) return;
@@ -263,7 +193,10 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
     if (!note) return;
 
     try {
-      setNotes(prev => prev.map(n => n.id === note.id ? { ...n, is_pinned: !n.is_pinned } : n));
+      // Optimistically update UI
+      updateNote(note.id, { is_pinned: !note.is_pinned });
+
+      // Call backend
       if (note.is_pinned) {
         await notesService.unpinNote(note.id);
       } else {
@@ -271,27 +204,28 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
       }
     } catch (error) {
       logger.error('Error toggling pin:', error);
-      loadNotes(true);
+      // Revert on error
+      updateNote(note.id, { is_pinned: note.is_pinned });
     }
   };
 
   const handleArchive = async (note: Note) => {
     try {
-      if (!note) return; 
-      if (note.is_archived)
+      if (!note) return;
+
+      // Remove from UI immediately
+      removeNote(note.id);
+
+      // Call backend
+      if (note.is_archived) {
         await notesService.unarchiveNote(note.id);
-      else
+      } else {
         await notesService.archiveNote(note.id);
-      setNotes(prev => prev.filter(n => n.id !== note.id));
+      }
     } catch (error) {
       logger.error('Error archiving note:', error);
-      loadNotes(true);
+      // Could add back to list on error, but for now just log
     }
-  };
-
-
-  const handleLoadMore = () => {
-    loadNotes(false);
   };
 
   
@@ -329,6 +263,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
         headerActions={headerActions}
         width={{ xs: '100%', sm: 450 }}
         headerVariant="enhanced"
+        keepMounted={true}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           {/* Calendar Dropdown - only show in multi-calendar view */}
@@ -500,7 +435,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
                   <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 1 }}>
                     <Button
                       variant="outlined"
-                      onClick={handleLoadMore}
+                      onClick={loadMore}
                       disabled={loadingMore}
                       sx={{
                         borderRadius: 2,
@@ -532,9 +467,10 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
           onClose={handleEditorClose}
           note={selectedNote}
           calendarId={selectedCalendarForNew}
-          onSave={(note: Note, isCreated?: boolean) => isCreated? setNotes(prev => [note, ...prev]) :
-             setNotes(prev => prev.map(n => (n.id === note.id ? note : n)))}
-          onDelete={(noteId: string) => setNotes(prev => prev.filter(n => n.id !== noteId))}
+          onSave={(note: Note, isCreated?: boolean) =>
+            isCreated ? addNote(note) : updateNote(note.id, note)
+          }
+          onDelete={(noteId: string) => removeNote(noteId)}
         />
       )}
     </>

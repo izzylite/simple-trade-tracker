@@ -16,24 +16,25 @@ export interface UnifiedDrawerProps {
   open: boolean;
   onClose: () => void;
   anchor?: 'left' | 'right' | 'top' | 'bottom';
-  
+  keepMounted?: boolean; // Keep drawer mounted when closed to preserve state
+
   // Header configuration
   title: string;
   subtitle?: string;
   icon?: ReactNode;
   headerActions?: ReactNode; // Additional actions in header (badges, buttons, etc.)
-  
+
   // Content
   children: ReactNode;
-  
+
   // Styling options
   width?: { xs?: string | number; sm?: string | number };
   maxWidth?: string;
   zIndex?: number;
-  
+
   // Header styling variants
   headerVariant?: 'default' | 'enhanced'; // enhanced = gradient background with blur
-  
+
   // Custom styles
   sx?: SxProps<Theme>;
   headerSx?: SxProps<Theme>;
@@ -44,6 +45,7 @@ const UnifiedDrawer: React.FC<UnifiedDrawerProps> = ({
   open,
   onClose,
   anchor = 'right',
+  keepMounted = false,
   title,
   subtitle,
   icon,
@@ -99,6 +101,7 @@ const UnifiedDrawer: React.FC<UnifiedDrawerProps> = ({
       anchor={anchor}
       open={open}
       onClose={onClose}
+      ModalProps={{ keepMounted }}
       sx={{
         zIndex,
         '& .MuiDrawer-paper': {
