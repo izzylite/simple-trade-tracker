@@ -39,7 +39,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   FilterList as FilterIcon,
-  ListAlt as ListAltIcon
+  ListAlt as ListAltIcon,
+  SmartToy as AIIcon
 } from '@mui/icons-material';
 import { AnimatedDropdown } from './Animations';
 import { TagsDisplay } from './common';
@@ -61,6 +62,7 @@ const imageLoadCache = new Set<string>();
 interface TradeDetailExpandedProps {
   tradeData: Trade;
   isExpanded: boolean;
+  animate?: boolean;
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
@@ -68,7 +70,8 @@ interface TradeDetailExpandedProps {
   // Optional props for trade link navigation in notes
   trades?: Array<{ id: string;[key: string]: any }>;
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
-   
+  // Open AI chat for this specific trade
+  onOpenAIChat?: (trade: Trade) => void;
 }
 
 // Define shimmer animation
@@ -108,12 +111,14 @@ const getImpactColor = (impact: string, theme: any) => {
 const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   tradeData,
   isExpanded,
+  animate,
   setZoomedImage,
   onUpdateTradeProperty,
   calendarId,
   trades,
   onOpenGalleryMode,
-  economicFilter
+  economicFilter,
+  onOpenAIChat
 }) => {
   const theme = useTheme();
   const [trade, setTrade] = useState<Trade>(tradeData);
@@ -347,9 +352,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
   if (!isExpanded) return null;
 
-  return (
-    <AnimatedDropdown>
-      <Box sx={{
+  const buildContent = () =>{
+    return  <Box sx={{
         p: { xs: 1.5, sm: 2 }, // Reduced padding on mobile
         borderBottomLeftRadius: 8,
         borderBottomRightRadius: 8,
@@ -396,28 +400,47 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               width: { xs: '100%', sm: 'auto' },
               justifyContent: { xs: 'flex-end', sm: 'flex-start' }
             }}>
+              {/* AI Analysis Button */}
+              {onOpenAIChat && (
+                <Tooltip title="AI Analysis">
+                  <IconButton
+                    onClick={() => onOpenAIChat(trade)}
+                    sx={{
+                      color: 'text.secondary',
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        color: 'primary.main'
+                      }
+                    }}
+                  >
+                    <AIIcon sx={{ fontSize: 20 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
               {/* Pin Button */}
               {onUpdateTradeProperty && (
-                <IconButton
-                  onClick={handleTogglePin}
-                  disabled={isPinning}
-                  sx={{
-                    color: trade.is_pinned ? 'primary.main' : 'text.secondary',
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                      color: 'primary.main'
-                    },
-                    '&:disabled': {
-                      color: 'text.disabled'
-                    }
-                  }}
-                >
-                  {isPinning ? (
-                    <CircularProgress size={20} color="inherit" />
-                  ) : (
-                    trade.is_pinned ? <UnpinIcon sx={{ fontSize: 20 }} /> : <PinIcon sx={{ fontSize: 20 }} />
-                  )}
-                </IconButton>
+                <Tooltip title={trade.is_pinned ? 'Unpin trade' : 'Pin trade'}>
+                  <IconButton
+                    onClick={handleTogglePin}
+                    disabled={isPinning}
+                    sx={{
+                      color: trade.is_pinned ? 'primary.main' : 'text.secondary',
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        color: 'primary.main'
+                      },
+                      '&:disabled': {
+                        color: 'text.disabled'
+                      }
+                    }}
+                  >
+                    {isPinning ? (
+                      <CircularProgress size={20} color="inherit" />
+                    ) : (
+                      trade.is_pinned ? <UnpinIcon sx={{ fontSize: 20 }} /> : <PinIcon sx={{ fontSize: 20 }} />
+                    )}
+                  </IconButton>
+                </Tooltip>
               )}
               {/* Share Button */}
               {calendarId && (
@@ -430,8 +453,6 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   color="inherit"
                 />
               )}
-
-
             </Box>
           </Box>
 
@@ -1160,8 +1181,13 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
           </Box>
         </Stack>
       </Box>
+  }
+
+  return animate? (
+    <AnimatedDropdown>
+      {buildContent()}
     </AnimatedDropdown>
-  );
+  ):  buildContent()
 };
 
 export default TradeDetailExpanded;

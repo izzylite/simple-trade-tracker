@@ -5,7 +5,7 @@
  * Handles trade additions, updates, and deletions with optimistic updates.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Calendar, Trade } from "../types/dualWrite";
 import * as calendarService from "../services/calendarService";
 import { useRealtimeSubscription } from "./useRealtimeSubscription";
@@ -41,11 +41,35 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
   const { calendarId, selectedCalendar, enableRealtime = true, setLoading } =
     options;
 
-  const [trades, setTrades] = useState<Trade[]>([]);
+  // Use Map for O(1) lookups instead of array
+  const [tradesMap, setTradesMap] = useState<Map<string, Trade>>(new Map());
   const [calendar, setCalendar] = useState<Calendar | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
   const loadAttemptedRef = useRef<boolean>(false);
+
+  // useTransition for non-blocking state updates on heavy computations
+  const [, startTransition] = useTransition();
+
+  // Derive trades array from Map for backward compatibility
+  // useMemo ensures we only create new array when Map changes
+  const trades = useMemo(() => Array.from(tradesMap.values()), [tradesMap]);
+
+  // Helper to update tradesMap with O(1) operations
+  const updateTradesMap = useCallback((
+    updater: (prev: Map<string, Trade>) => Map<string, Trade>
+  ) => {
+    setTradesMap(prev => updater(prev));
+  }, []);
+
+  // Helper for bulk updates (used in heavy computations)
+  const setTradesFromArray = useCallback((tradesArray: Trade[]) => {
+    const newMap = new Map<string, Trade>();
+    for (const trade of tradesArray) {
+      newMap.set(trade.id, trade);
+    }
+    setTradesMap(newMap);
+  }, []);
 
   /**
    * Fetch all trades for the calendar
@@ -53,7 +77,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
   const fetchTrades = useCallback(async () => {
     setCalendar(selectedCalendar || null);
     if (!calendarId) {
-      setTrades([]);
+      setTradesMap(new Map());
       return;
     }
 
@@ -66,7 +90,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         calendarService.getCalendar(calendarId),
       ]);
       setCalendar(calendar);
-      setTrades(allTrades);
+      setTradesFromArray(allTrades);
       logger.log(
         `✅ Loaded ${allTrades.length} trades for calendar ${calendarId}`,
       );
@@ -76,11 +100,11 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         : new Error("Failed to fetch trades");
       logger.error("Error fetching trades:", error);
       setError(error);
-      setTrades([]);
+      setTradesMap(new Map());
     } finally {
       setIsLoading(false);
     }
-  }, [calendarId]);
+  }, [calendarId, setTradesFromArray]);
 
   useEffect(() => {
     setLoading(isLoading, "loading");
@@ -112,21 +136,29 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         throw new Error("Calendar ID is required");
       }
 
-      // Optimistic update using functional state update
-      setTrades((prev) => [...prev, trade]);
+      // Optimistic update - O(1) Map set
+      updateTradesMap(prev => {
+        const next = new Map(prev);
+        next.set(trade.id, trade);
+        return next;
+      });
 
       try {
         await calendarService.addTrade(calendarId, trade);
         logger.log(`✅ Trade added: ${trade.id}`);
         // Real-time subscription will handle the update
       } catch (err) {
-        // Revert optimistic update on error
-        setTrades((prev) => prev.filter((t) => t.id !== trade.id));
+        // Revert optimistic update on error - O(1) Map delete
+        updateTradesMap(prev => {
+          const next = new Map(prev);
+          next.delete(trade.id);
+          return next;
+        });
         logger.error("Error adding trade:", err);
         throw err;
       }
     },
-    [calendarId], // Removed 'trades' dependency
+    [calendarId, updateTradesMap],
   );
 
   const handleUpdateTradeProperty = async (
@@ -151,7 +183,12 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
           updateCallback(createIfNotExists(tradeId)),
         );
 
-        setTrades((prevTrades) => [...prevTrades, finalTrade]);
+        // O(1) Map set
+        updateTradesMap(prev => {
+          const next = new Map(prev);
+          next.set(finalTrade.id, finalTrade);
+          return next;
+        });
         return finalTrade;
       }
       if (!existingTrade) {
@@ -165,9 +202,12 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       if (!result) {
         return undefined;
       }
-      setTrades((prevTrades) =>
-        prevTrades.map((trade) => trade.id === tradeId ? result : trade)
-      );
+      // O(1) Map set instead of O(n) map
+      updateTradesMap(prev => {
+        const next = new Map(prev);
+        next.set(tradeId, result);
+        return next;
+      });
 
       return result;
     } catch (error) {
@@ -185,13 +225,17 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         throw new Error("Calendar ID is required");
       }
 
-      // Store previous trades for rollback
-      let previousTrades: Trade[] = [];
+      // Store previous map for rollback
+      let previousMap: Map<string, Trade> = new Map();
 
-      // Optimistic update using functional state update
-      setTrades((prev) => {
-        previousTrades = prev;
-        return prev.filter((t) => !tradeIds.includes(t.id));
+      // Optimistic update - O(k) where k is number of trades to delete
+      updateTradesMap(prev => {
+        previousMap = prev;
+        const next = new Map(prev);
+        for (const id of tradeIds) {
+          next.delete(id);
+        }
+        return next;
       });
 
       try {
@@ -203,12 +247,12 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         // Real-time subscription will handle the update
       } catch (err) {
         // Revert optimistic update on error
-        setTrades(previousTrades);
+        setTradesMap(previousMap);
         logger.error("Error deleting trades:", err);
         throw err;
       }
     },
-    [calendarId], // Removed 'trades' dependency
+    [calendarId, updateTradesMap],
   );
 
   // Function to handle dynamic risk toggle
@@ -305,10 +349,13 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       );
 
       // Update the calendar state with recalculated trades and the hypothetical stats
-      setTrades(updatedTrades);
-      setCalendar({
-        ...calendar,
-        ...stats,
+      // Use startTransition for this heavy update to keep UI responsive
+      startTransition(() => {
+        setTradesFromArray(updatedTrades);
+        setCalendar({
+          ...calendar,
+          ...stats,
+        });
       });
     };
 
@@ -316,7 +363,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     setIsLoading(true);
     await recalculateTrades();
     setIsLoading(false);
-  }, [calendar, trades, fetchTrades]);
+  }, [calendar, trades, fetchTrades, startTransition, setTradesFromArray]);
 
   const handleImportTrades = useCallback(async (
     importedTrades: Partial<Trade>[],
@@ -333,14 +380,14 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         trades,
         importedTrades,
       );
-      setTrades(result);
+      setTradesFromArray(result);
     } catch (error) {
       logger.error("Error importing trades:", error);
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [calendar, calendarId]);
+  }, [calendar, calendarId, trades, setTradesFromArray]);
 
   /**
    * Subscribe to calendar changes with real-time updates using Broadcast
@@ -403,10 +450,12 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         (payload: any) => {
           if (payload.payload?.record) {
             const newTrade = payload.payload.record as Trade;
-            setTrades((prevTrades) => {
-              const exists = prevTrades.some((t) => t.id === newTrade.id);
-              if (exists) return prevTrades;
-              return [...prevTrades, newTrade];
+            // O(1) Map operations instead of O(n) array operations
+            setTradesMap(prev => {
+              if (prev.has(newTrade.id)) return prev;
+              const next = new Map(prev);
+              next.set(newTrade.id, newTrade);
+              return next;
             });
             logger.log(`➕ Trade added via broadcast: ${newTrade.id}`);
           }
@@ -422,11 +471,12 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         (payload: any) => {
           if (payload.payload?.record) {
             const updatedTrade = payload.payload.record as Trade;
-            setTrades((prevTrades) =>
-              prevTrades.map((trade) =>
-                trade.id === updatedTrade.id ? updatedTrade : trade
-              )
-            );
+            // O(1) Map set instead of O(n) map
+            setTradesMap(prev => {
+              const next = new Map(prev);
+              next.set(updatedTrade.id, updatedTrade);
+              return next;
+            });
             logger.log(`✏️ Trade updated via broadcast: ${updatedTrade.id}`);
           }
         },
@@ -441,9 +491,12 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         (payload: any) => {
           if (payload.payload?.old_record) {
             const deletedTrade = payload.payload.old_record as Trade;
-            setTrades((prevTrades) =>
-              prevTrades.filter((trade) => trade.id !== deletedTrade.id)
-            );
+            // O(1) Map delete instead of O(n) filter
+            setTradesMap(prev => {
+              const next = new Map(prev);
+              next.delete(deletedTrade.id);
+              return next;
+            });
             logger.log(`🗑️ Trade deleted via broadcast: ${deletedTrade.id}`);
           }
         },
@@ -489,20 +542,22 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         throw new Error(`Calendar with ID ${calendarId} not found`);
       }
       try {
-        const tradesToKeep = trades.filter((trade: Trade) => {
-          const tradeDate = new Date(trade.trade_date);
-          return tradeDate.getMonth() !== month ||
-            tradeDate.getFullYear() !== year;
+        const tradesToDelete: Trade[] = [];
+
+        // O(n) single pass to identify trades to delete
+        setTradesMap(prev => {
+          const next = new Map<string, Trade>();
+          prev.forEach((trade, id) => {
+            const tradeDate = new Date(trade.trade_date);
+            if (tradeDate.getFullYear() === year && tradeDate.getMonth() === month) {
+              tradesToDelete.push(trade);
+            } else {
+              next.set(id, trade);
+            }
+          });
+          return next;
         });
 
-        const tradesToDelete = trades.filter((trade) => {
-          const tradeDate = new Date(trade.trade_date);
-          return tradeDate.getFullYear() === year &&
-            tradeDate.getMonth() === month;
-        });
-
-        // First update the local state with just the trades
-        setTrades(tradesToKeep);
         await calendarService.getTradeRepository().bulkDelete(tradesToDelete);
 
         // Stats are automatically recalculated by Supabase triggers after clearMonthTrades
@@ -511,7 +566,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         logger.error("Error clearing month trades:", error);
       }
     },
-    [calendar, calendarId, fetchTrades],
+    [calendar, calendarId],
   );
 
   /**
@@ -704,20 +759,25 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       return updated ? { ...trade, tags: updatedTags } : trade;
     };
 
-    // Update cached trades locally for immediate UI feedback (create new array to avoid mutation)
-    const updatedCachedTrades = trades.map(
-      (trade: Trade) => {
-        return updateTradeTagsWithGroupNameChange(trade);
-      },
-    );
-    setTrades(updatedCachedTrades);
-    // Update local state immediately
-    setCalendar({
-      ...calendar,
-      tags: updateTagsWithGroupNameChange(calendar.tags || []),
-      required_tag_groups: updateRequiredTagGroups(
-        calendar.required_tag_groups || [],
-      ),
+    // Update cached trades locally for immediate UI feedback
+    // Use startTransition for this potentially heavy update
+    startTransition(() => {
+      // Update trades using Map for O(1) individual updates
+      setTradesMap(prev => {
+        const next = new Map<string, Trade>();
+        prev.forEach((trade, id) => {
+          next.set(id, updateTradeTagsWithGroupNameChange(trade));
+        });
+        return next;
+      });
+      // Update local state immediately
+      setCalendar({
+        ...calendar,
+        tags: updateTagsWithGroupNameChange(calendar.tags || []),
+        required_tag_groups: updateRequiredTagGroups(
+          calendar.required_tag_groups || [],
+        ),
+      });
     });
   }
   return {

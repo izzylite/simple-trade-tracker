@@ -98,6 +98,26 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
 
   const allDays: DayAbbreviation[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  // Default tags with display labels and internal values (for AI compatibility)
+  const defaultTagsMap: Record<string, string> = {
+    'STRATEGY': 'Strategy',
+    'GAME_PLAN': 'Game Plan',
+    'INSIGHT': 'Insight',
+    'LESSON_LEARNED': 'Lesson Learned',
+  };
+  const defaultTags = Object.keys(defaultTagsMap);
+
+  // Helper to get display label for a tag (returns original if not a default tag)
+  const getTagDisplayLabel = (tag: string): string => {
+    return defaultTagsMap[tag] || tag;
+  };
+
+  // Helper to get internal value from display label
+  const getTagInternalValue = (displayLabel: string): string => {
+    const entry = Object.entries(defaultTagsMap).find(([_, label]) => label === displayLabel);
+    return entry ? entry[0] : displayLabel;
+  };
+
   // Initialize note data when dialog opens
   useEffect(() => {
     if (open) {
@@ -113,7 +133,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         setReminderDate(initialNote.reminder_date || null);
         setReminderDays(initialNote.reminder_days || []);
         setIsReminderActive(initialNote.is_reminder_active || false);
-        setIsReminderExpanded(initialNote.is_reminder_active || false);
+        setIsReminderExpanded(false);
 
         // Initialize tags states
         setTags(initialNote.tags || []);
@@ -147,12 +167,15 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
 
       try {
         const notes = await notesService.getUserNotes(user.uid);
-        // Extract unique tags from all notes
-        const allTags = notes.flatMap(n => n.tags || []);
+        // Extract unique tags from all notes and merge with default tags
+        const userTags = notes.flatMap(n => n.tags || []);
+        const allTags = [...defaultTags, ...userTags];
         const uniqueTags = Array.from(new Set(allTags)).sort();
         setAvailableTags(uniqueTags);
       } catch (error) {
         logger.error('Error loading available tags:', error);
+        // Still show default tags even if loading fails
+        setAvailableTags(defaultTags);
       }
     };
 
@@ -366,8 +389,10 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   // Tag handlers
   const handleAddTag = () => {
     const trimmedTag = newTagInput.trim();
-    if (trimmedTag && !tags.includes(trimmedTag)) {
-      setTags(prev => [...prev, trimmedTag]);
+    // Convert display label to internal value if it's a default tag
+    const internalValue = getTagInternalValue(trimmedTag);
+    if (internalValue && !tags.includes(internalValue)) {
+      setTags(prev => [...prev, internalValue]);
       setNewTagInput('');
     }
   };
@@ -715,7 +740,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                     {tags.map((tag) => (
                       <Chip
                         key={tag}
-                        label={tag}
+                        label={getTagDisplayLabel(tag)}
                         size="small"
                         onDelete={isTagEditingAllowed ? () => handleRemoveTag(tag) : undefined}
                         sx={{
@@ -735,6 +760,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                       freeSolo
                       size="small"
                       options={availableTags.filter(t => !tags.includes(t))}
+                      getOptionLabel={(option) => getTagDisplayLabel(option)}
                       value={null}
                       inputValue={newTagInput}
                       onInputChange={(_, value, reason) => {
@@ -745,8 +771,10 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                       onChange={(_, value) => {
                         if (value && typeof value === 'string') {
                           const trimmed = value.trim();
-                          if (trimmed && !tags.includes(trimmed)) {
-                            setTags(prev => [...prev, trimmed]);
+                          // Convert display label to internal value if it's a default tag
+                          const internalValue = getTagInternalValue(trimmed);
+                          if (internalValue && !tags.includes(internalValue)) {
+                            setTags(prev => [...prev, internalValue]);
                           }
                         }
                         setNewTagInput('');

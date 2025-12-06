@@ -72,17 +72,23 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
     loadReminderNotes();
   }, [loadReminderNotes]);
 
+  // Store callback in ref to avoid triggering effect on callback changes
+  const onReminderImageChangeRef = React.useRef(onReminderImageChange);
+  onReminderImageChangeRef.current = onReminderImageChange;
+
   // Notify parent of current note's cover image for hero image override
   useEffect(() => {
     const currentNote = reminderNotes[currentIndex];
     const coverImage = currentNote?.cover_image || null;
-    onReminderImageChange?.(coverImage);
+    onReminderImageChangeRef.current?.(coverImage);
+  }, [reminderNotes, currentIndex]);
 
-    // Cleanup: notify parent when component unmounts
+  // Separate cleanup effect that only runs on unmount
+  useEffect(() => {
     return () => {
-      onReminderImageChange?.(null);
+      onReminderImageChangeRef.current?.(null);
     };
-  }, [reminderNotes, currentIndex, onReminderImageChange]);
+  }, []);
 
   // Set up real-time subscription for reminder notes changes
   // Uses Supabase broadcast feature
@@ -437,7 +443,7 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
                 {/* Note Content Preview - Styled with RichTextEditor */}
                 <Box
                   sx={{
-                    maxHeight: 65,
+                    height: 65,
                     width: '100%',
                     overflow: 'hidden',
                     position: 'relative',

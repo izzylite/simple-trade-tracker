@@ -55,6 +55,8 @@ interface TradeListProps {
   calendarId?: string; // Calendar ID for sharing functionality
   // Optional props for trade link navigation in notes
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
+  // Open AI chat for a specific trade
+  onOpenAIChat?: (trade: Trade) => void;
   // Calendar data for economic events filtering
   calendar?: {
     economic_calendar_filters?: {
@@ -83,6 +85,7 @@ const TradeList: React.FC<TradeListProps> = ({
   deletingTradeIds = [],
   calendarId,
   onOpenGalleryMode,
+  onOpenAIChat,
   economicFilter,
   initialPageSize = 20,
   pageSize = 20
@@ -604,6 +607,7 @@ const TradeList: React.FC<TradeListProps> = ({
               {expandedTradeId === trade.id && (
                 <TradeDetailExpanded
                   tradeData={trade}
+                  animate={true}
                   isExpanded={true}
                   setZoomedImage={onZoomedImage}
                   onUpdateTradeProperty={onUpdateTradeProperty}
@@ -611,6 +615,7 @@ const TradeList: React.FC<TradeListProps> = ({
                   trades={trades}
                   onOpenGalleryMode={onOpenGalleryMode}
                   economicFilter={economicFilter}
+                  onOpenAIChat={onOpenAIChat}
                 />
               )}
             </React.Fragment>

@@ -99,7 +99,7 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
   }
 
   /**
-   * Find all conversations for a specific calendar
+   * Find all conversations for a specific calendar (calendar-level only, excludes trade-specific)
    * Ordered by most recently updated first
    */
   async findByCalendarId(calendarId: string): Promise<AIConversation[]> {
@@ -108,6 +108,7 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
         .from('ai_conversations')
         .select('*')
         .eq('calendar_id', calendarId)
+        .is('trade_id', null) // Only calendar-level conversations
         .order('updated_at', { ascending: false });
 
       if (error) {
@@ -118,6 +119,30 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
       return data ? data.map(item => transformSupabaseConversation(item)) : [];
     } catch (error) {
       logger.error('Error finding conversations by calendar ID:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Find all conversations for a specific trade
+   * Ordered by most recently updated first
+   */
+  async findByTradeId(tradeId: string): Promise<AIConversation[]> {
+    try {
+      const { data, error } = await supabase
+        .from('ai_conversations')
+        .select('*')
+        .eq('trade_id', tradeId)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        logger.error('Error finding conversations by trade ID:', error);
+        return [];
+      }
+
+      return data ? data.map(item => transformSupabaseConversation(item)) : [];
+    } catch (error) {
+      logger.error('Error finding conversations by trade ID:', error);
       return [];
     }
   }
@@ -176,11 +201,11 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
    */
   protected async createInSupabase(entity: Omit<AIConversation, 'id' | 'created_at' | 'updated_at'>): Promise<AIConversation> {
     const now = new Date();
-    
+
     // Generate title if not provided
     const title = entity.title || generateConversationTitle(entity.messages);
-    
-    const conversationData = {
+
+    const conversationData: Record<string, any> = {
       calendar_id: entity.calendar_id,
       user_id: entity.user_id,
       title: title.substring(0, 100), // Enforce max length
@@ -189,6 +214,11 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
       created_at: now,
       updated_at: now
     };
+
+    // Only include trade_id if it's set (not null/undefined)
+    if (entity.trade_id) {
+      conversationData.trade_id = entity.trade_id;
+    }
 
     const { data, error } = await supabase
       .from('ai_conversations')
@@ -268,13 +298,15 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
    * Save or update a conversation
    * If conversation has an ID, update it; otherwise create new
    * If update fails (conversation not found), create a new one
+   * @param tradeId - Optional: If provided, creates a trade-specific conversation
    */
   async saveConversation(
     conversationId: string | null,
     calendarId: string,
     userId: string,
     messages: ChatMessage[],
-    title?: string
+    title?: string,
+    tradeId?: string | null
   ): Promise<RepositoryResult<AIConversation>> {
     try {
       const conversationTitle = title || generateConversationTitle(messages);
@@ -293,6 +325,7 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
           return await this.create({
             calendar_id: calendarId,
             user_id: userId,
+            trade_id: tradeId || null,
             title: conversationTitle,
             messages,
             message_count: messages.length
@@ -305,6 +338,7 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
         return await this.create({
           calendar_id: calendarId,
           user_id: userId,
+          trade_id: tradeId || null,
           title: conversationTitle,
           messages,
           message_count: messages.length

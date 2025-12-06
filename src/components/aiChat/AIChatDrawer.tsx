@@ -1,16 +1,17 @@
 /**
  * AI Chat Bottom Sheet Component
  * Modern bottom sheet interface for AI trading analysis
+ * Uses the useAIChat hook for core AI chat functionality
+ * Uses AIChatInterface for the reusable chat UI
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   IconButton,
   Button,
   Typography,
   Alert,
-  CircularProgress,
   Tooltip,
   Divider,
   useTheme,
@@ -25,14 +26,10 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
-  Popper,
-  Paper,
   TextField,
-  InputAdornment,
-  ClickAwayListener
+  InputAdornment
 } from '@mui/material';
 import {
-  Send as SendIcon,
   SmartToy as AIIcon,
   Close as CloseIcon,
   AddComment as NewChatIcon,
@@ -40,35 +37,24 @@ import {
   ArrowBack as ArrowBackIcon,
   Delete as DeleteIcon,
   Schedule as ScheduleIcon,
-  Stop as StopIcon,
   Settings as SettingsIcon,
-  Notes as NotesIcon,
   Search as SearchIcon
 } from '@mui/icons-material';
-import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
-import ChatMessage from './ChatMessage';
 import Shimmer from '../Shimmer';
-import AIChatMentionInput from './AIChatMentionInput';
-import {
-  ChatMessage as ChatMessageType,
-  ChatError,
-  AIConversation
-} from '../../types/aiChat';
+import AIChatInterface, { AIChatInterfaceRef } from './AIChatInterface';
+import { AIConversation } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
 import { EconomicEvent } from '../../types/economicCalendar';
-import { supabaseAIChatService } from '../../services/supabaseAIChatService';
-import { ConversationRepository } from '../../services/repository/repositories/ConversationRepository';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { useAIChat } from '../../hooks/useAIChat';
 import EconomicEventDetailDialog from '../economicCalendar/EconomicEventDetailDialog';
 import ApiKeySettingsDialog from './ApiKeySettingsDialog';
 import NoteEditorDialog from '../notes/NoteEditorDialog';
 import { Note } from '../../types/note';
-import { hasApiKey } from '../../services/apiKeyStorage';
-import * as notesService from '../../services/notesService';
 
 interface AIChatDrawerProps {
   open: boolean;
@@ -107,43 +93,36 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 }) => {
   const theme = useTheme();
   const { user } = useAuth();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<any>(null);
-  const conversationRepo = useRef(new ConversationRepository()).current;
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const cancelRequestedRef = useRef(false);
-  const activeRequestRef = useRef<{ userId: string; aiId: string } | null>(null);
+  const chatInterfaceRef = useRef<AIChatInterfaceRef>(null);
 
-  // Prevent body scroll when drawer is open to fix mention dialog positioning
-  useEffect(() => {
-    if (open) {
-      // Store original overflow style
-      const originalOverflow = document.body.style.overflow;
-      // Prevent scrolling
-      document.body.style.overflow = 'hidden';
+  // Use the AI Chat hook for core functionality
+  const {
+    messages,
+    isLoading,
+    isTyping,
+    toolExecutionStatus,
+    conversations,
+    loadingConversations,
+    isAtMessageLimit,
+    sendMessage,
+    cancelRequest,
+    retryMessage,
+    setInputForEdit,
+    loadConversations,
+    selectConversation,
+    deleteConversation,
+    startNewChat,
+    setMessages,
+    getWelcomeMessage
+  } = useAIChat({
+    userId: user?.uid,
+    calendar,
+    messageLimit: 50,
+    autoSaveConversation: true
+  });
 
-      return () => {
-        // Restore original overflow when drawer closes
-        document.body.style.overflow = originalOverflow;
-      };
-    }
-  }, [open]);
-
-  // State
-  const [messages, setMessages] = useState<ChatMessageType[]>([]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
-  const [toolExecutionStatus, setToolExecutionStatus] = useState<string>('');
-
-  // Conversation management state
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-  const [conversations, setConversations] = useState<AIConversation[]>([]);
+  // Local UI state for drawer-specific features
   const [showHistoryView, setShowHistoryView] = useState(false);
-  const [loadingConversations, setLoadingConversations] = useState(false);
-  const [isAtMessageLimit, setIsAtMessageLimit] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const [historySearchQuery, setHistorySearchQuery] = useState<string>('');
@@ -156,17 +135,19 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
 
-  // Notes context popup state
-  const [notesAnchorEl, setNotesAnchorEl] = useState<HTMLElement | null>(null);
-  const [availableNotes, setAvailableNotes] = useState<Note[]>([]);
-  const [notesLoading, setNotesLoading] = useState(false);
-
   // API Key settings dialog state
   const [apiKeySettingsOpen, setApiKeySettingsOpen] = useState(false);
 
-  const chatConfig = {
-    autoScroll: true
-  };
+  // Prevent body scroll when drawer is open to fix mention dialog positioning
+  useEffect(() => {
+    if (open) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [open]);
 
   // Filter conversations based on search query
   const filteredConversations = React.useMemo(() => {
@@ -176,15 +157,12 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
     const query = historySearchQuery.toLowerCase();
     return conversations.filter(conversation => {
-      // Search in title
       if (conversation.title?.toLowerCase().includes(query)) {
         return true;
       }
-      // Search in preview
       if ((conversation as any).preview?.toLowerCase().includes(query)) {
         return true;
       }
-      // Search in message content
       if (conversation.messages && Array.isArray(conversation.messages)) {
         const foundInMessages = conversation.messages.some(message =>
           message.content?.toLowerCase().includes(query)
@@ -197,205 +175,36 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     });
   }, [conversations, historySearchQuery]);
 
-  /**
-   * Parse quota/API key errors from Gemini API and return user-friendly message
-   */
-  const parseQuotaError = (errorMessage: string): { isQuotaError: boolean; userMessage: string; retryDelay?: string } => {
-    // Try to extract error details from JSON if present
-    let errorCode = '';
-    let errorReason = '';
-
-    try {
-      // Check if error message contains JSON (from edge function)
-      const jsonMatch = errorMessage.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const errorJson = JSON.parse(jsonMatch[0]);
-        if (errorJson.error) {
-          errorCode = String(errorJson.error.code || '');
-          errorReason = errorJson.error.details?.[0]?.reason || '';
-        }
-      }
-    } catch {
-      // If JSON parsing fails, use the original message
-    }
-
-    // Check if it's an API key error
-    const isApiKeyError = errorMessage.toLowerCase().includes('api key expired') ||
-                          errorMessage.toLowerCase().includes('api key invalid') ||
-                          errorMessage.toLowerCase().includes('api_key_invalid') ||
-                          errorReason === 'API_KEY_INVALID' ||
-                          errorCode === '400';
-
-    // Check if it's a quota/rate limit error
-    const isQuotaError = errorMessage.toLowerCase().includes('quota') ||
-                         errorMessage.includes('429') ||
-                         errorMessage.toUpperCase().includes('RESOURCE_EXHAUSTED') ||
-                         errorMessage.toLowerCase().includes('rate limit');
-
-    if (!isQuotaError && !isApiKeyError) {
-      return { isQuotaError: false, userMessage: errorMessage };
-    }
-
-    // Extract retry delay if available
-    const retryMatch = errorMessage.match(/retry in (\d+\.?\d*)\s*s/i) ||
-                       errorMessage.match(/retryDelay["\s:]+(\d+)s/i);
-    const retryDelay = retryMatch ? retryMatch[1] : undefined;
-
-    // Check if user has their own API key
-    const userHasApiKey = hasApiKey();
-
-    let userMessage = '';
-
-    if (isApiKeyError) {
-      userMessage = '⚠️ **API Key Error**\n\n';
-
-      if (userHasApiKey) {
-        userMessage += 'Your Gemini API key has expired or is invalid.\n\n';
-        userMessage += '**What you can do:**\n';
-        userMessage += '• Go to [Google AI Studio](https://aistudio.google.com/app/apikey)\n';
-        userMessage += '• Generate a new API key\n';
-        userMessage += '• Click the ⚙️ Settings button above to update your key\n';
-      } else {
-        userMessage += 'The shared API key has expired.\n\n';
-        userMessage += '**Solution: Use Your Own API Key**\n';
-        userMessage += '• Click the ⚙️ Settings button above\n';
-        userMessage += '• Add your free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)\n';
-        userMessage += '• Get unlimited usage with your own quota\n';
-      }
-    } else {
-      // Quota error
-      userMessage = '⚠️ **API Quota Exceeded**\n\n';
-
-      if (userHasApiKey) {
-        userMessage += 'Your Gemini API key has reached its quota limit.\n\n';
-        userMessage += '**What you can do:**\n';
-        userMessage += '• Wait for your quota to reset (usually 24 hours)\n';
-        userMessage += '• Check your usage at [Google AI Studio](https://aistudio.google.com/app/apikey)\n';
-        userMessage += '• Upgrade to a paid plan for higher limits\n';
-        if (retryDelay) {
-          const seconds = Math.ceil(parseFloat(retryDelay));
-          userMessage += `\n*You can retry in ${seconds} seconds*`;
-        }
-      } else {
-        userMessage += 'The shared API key has reached its quota limit.\n\n';
-        userMessage += '**Solution: Use Your Own API Key**\n';
-        userMessage += '• Click the ⚙️ Settings button above\n';
-        userMessage += '• Add your free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)\n';
-        userMessage += '• Get unlimited usage with your own quota\n';
-        if (retryDelay) {
-          const seconds = Math.ceil(parseFloat(retryDelay));
-          userMessage += `\n*Or wait ${seconds} seconds to retry with the shared key*`;
-        }
-      }
-    }
-
-    return { isQuotaError: true, userMessage, retryDelay };
-  };
-
-  const MESSAGE_LIMIT = 50;
-
-
-
-  // Auto-scroll to bottom whenever messages change
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
-
-  // Note: No longer using embeddings - using smart keyword filtering instead
-
-  // Auto-scroll when messages change
-  useEffect(() => {
-    if (chatConfig.autoScroll) {
-      scrollToBottom();
-    }
-  }, [messages, scrollToBottom, chatConfig.autoScroll]);
-
-
-
   // Focus input when drawer opens
   useEffect(() => {
     if (open && !isLoading) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setTimeout(() => chatInterfaceRef.current?.focus(), 100);
     }
   }, [open, isLoading]);
-
-  // Check message limit whenever messages change
-  useEffect(() => {
-    setIsAtMessageLimit(messages.length >= MESSAGE_LIMIT);
-  }, [messages.length, MESSAGE_LIMIT]);
 
   // Load conversations when drawer opens (only if calendar is provided)
   useEffect(() => {
     if (open && calendar?.id && user) {
       loadConversations();
     }
-  }, [open, calendar?.id, user]);
+  }, [open, calendar?.id, user, loadConversations]);
 
   // =====================================================
-  // CONVERSATION MANAGEMENT FUNCTIONS
+  // UI EVENT HANDLERS (Drawer-specific)
   // =====================================================
-
-  const loadConversations = async () => {
-    if (!calendar?.id) return;
-
-    setLoadingConversations(true);
-    try {
-      const convos = await conversationRepo.findByCalendarId(calendar.id);
-      setConversations(convos);
-    } catch (error) {
-      logger.error('Error loading conversations:', error);
-    } finally {
-      setLoadingConversations(false);
-    }
-  };
-
-  const saveCurrentConversation = async (updatedMessages: ChatMessageType[]) => {
-    if (!user || !calendar?.id || updatedMessages.length === 0) return;
-
-    try {
-      const result = await conversationRepo.saveConversation(
-        currentConversationId,
-        calendar.id,
-        user.uid,
-        updatedMessages
-      );
-
-      if (result.success && result.data) {
-        setCurrentConversationId(result.data.id);
-        logger.log('Conversation saved successfully:', result.data.id);
-        // Reload conversations list
-        await loadConversations();
-      }
-    } catch (error) {
-      logger.error('Error saving conversation:', error);
-    }
-  };
 
   const handleNewChat = async () => {
-    // Save current conversation before starting new one
-    if (messages.length > 0) {
-      await saveCurrentConversation(messages);
-    }
-
-    // Clear state and start fresh
-    setMessages([]);
-    setCurrentConversationId(null);
-    setIsAtMessageLimit(false);
-    setShowHistoryView(false); // Slide back to chat view
-    logger.log('Started new conversation');
+    await startNewChat();
+    setShowHistoryView(false);
   };
 
   const handleSelectConversation = (conversation: AIConversation) => {
-    // Conversation messages are already transformed to ChatMessage type by repository
-    setMessages(conversation.messages as ChatMessageType[]);
-    setCurrentConversationId(conversation.id);
-    setIsAtMessageLimit(conversation.message_count >= MESSAGE_LIMIT);
-    setShowHistoryView(false); // Go back to chat view
-    logger.log('Loaded conversation:', conversation.id);
+    selectConversation(conversation);
+    setShowHistoryView(false);
   };
 
   const handleDeleteClick = (conversationId: string, event: React.MouseEvent) => {
-    event.stopPropagation(); // Prevent conversation selection
+    event.stopPropagation();
     setConversationToDelete(conversationId);
     setDeleteDialogOpen(true);
   };
@@ -403,23 +212,12 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const handleConfirmDelete = async () => {
     if (!conversationToDelete) return;
 
-    try {
-      const result = await conversationRepo.delete(conversationToDelete);
-      if (result.success) {
-        logger.log('Conversation deleted:', conversationToDelete);
-        // If we deleted the current conversation, start a new one
-        if (conversationToDelete === currentConversationId) {
-          handleNewChat();
-        }
-        // Reload conversations list
-        await loadConversations();
-      }
-    } catch (error) {
-      logger.error('Error deleting conversation:', error);
-    } finally {
-      setDeleteDialogOpen(false);
-      setConversationToDelete(null);
+    const success = await deleteConversation(conversationToDelete);
+    if (success) {
+      logger.log('Conversation deleted:', conversationToDelete);
     }
+    setDeleteDialogOpen(false);
+    setConversationToDelete(null);
   };
 
   const handleCancelDelete = () => {
@@ -435,517 +233,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     }
     return 'No messages';
   };
-
-  const handleSendMessage = async () => {
-    const messageText = inputMessage.trim();
-    if (!messageText || isLoading) return;
-
-    cancelRequestedRef.current = false;
-
-    let baseHistory: ChatMessageType[];
-    let userMessage: ChatMessageType;
-
-    // Determine whether this is a new message or an edit of an existing user message
-    if (editingMessageId) {
-      const messageIndex = messages.findIndex(
-        msg => msg.id === editingMessageId && msg.role === 'user'
-      );
-
-      if (messageIndex === -1) {
-        // Fallback: treat as a new message if something went wrong
-        baseHistory = messages;
-        userMessage = {
-          id: uuidv4(),
-          role: 'user',
-          content: messageText,
-          timestamp: new Date(),
-          status: 'sent'
-        };
-
-        setMessages(prev => [...prev, userMessage]);
-      } else {
-        baseHistory = messages.slice(0, messageIndex);
-        const originalMessage = messages[messageIndex];
-
-        userMessage = {
-          ...originalMessage,
-          content: messageText,
-          timestamp: new Date(),
-          status: 'sent'
-        };
-
-        const updatedMessages = [...baseHistory, userMessage];
-        setMessages(updatedMessages);
-      }
-
-      setEditingMessageId(null);
-    } else {
-      baseHistory = messages;
-      userMessage = {
-        id: uuidv4(),
-        role: 'user',
-        content: messageText,
-        timestamp: new Date(),
-        status: 'sent'
-      };
-
-      setMessages(prev => [...prev, userMessage]);
-    }
-
-    // Clear input
-    setInputMessage('');
-
-    setIsLoading(true);
-    setIsTyping(true);
-    setToolExecutionStatus(''); // Clear any previous tool status
-
-    // Track AI message ID (don't add placeholder yet - wait for first chunk or tool call)
-    const aiMessageId = uuidv4();
-    let aiMessageAdded = false;
-
-    activeRequestRef.current = { userId: userMessage.id, aiId: aiMessageId };
-
-    try {
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      // Cancel any previous streaming request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
-
-      // Stream message from Supabase AI agent
-      let accumulatedText = '';
-      let messageHtml = '';
-      let citations: any[] | undefined;
-      let embeddedTrades: any | undefined;
-      let embeddedEvents: any | undefined;
-      let embeddedNotes: any | undefined;
-      let toolCallsInProgress: string[] = [];
-
-      for await (const event of supabaseAIChatService.sendMessageStreaming(
-        messageText,
-        user.uid,
-        calendar,
-        baseHistory,
-        abortController.signal
-      )) {
-        switch (event.type) {
-          case 'text_chunk':
-            // Accumulate text
-            accumulatedText += event.data.text;
-
-            // Add AI message on first chunk
-            if (!aiMessageAdded) {
-              const newMessage: ChatMessageType = {
-                id: aiMessageId,
-                role: 'assistant',
-                content: accumulatedText,
-                timestamp: new Date(),
-                status: 'receiving'
-              };
-              setMessages(prev => [...prev, newMessage]);
-              aiMessageAdded = true;
-            } else {
-              // Update existing message
-              setMessages(prev => prev.map(msg =>
-                msg.id === aiMessageId
-                  ? { ...msg, content: accumulatedText, status: 'receiving' as const }
-                  : msg
-              ));
-            }
-            break;
-
-          case 'tool_call':
-            logger.log(`Tool called: ${event.data.name}`);
-            toolCallsInProgress.push(event.data.name);
-
-            // Update typing indicator status
-            setToolExecutionStatus(toolCallsInProgress.join(', '));
-            break;
-
-          case 'tool_result':
-            logger.log(`Tool result: ${event.data.name}`);
-            // Remove from in-progress list
-            toolCallsInProgress = toolCallsInProgress.filter(t => t !== event.data.name);
-
-            // Update typing indicator status
-            if (toolCallsInProgress.length > 0) {
-              setToolExecutionStatus(toolCallsInProgress.join(', '));
-            } else {
-              // All tools completed
-              setToolExecutionStatus('');
-            }
-            break;
-
-          case 'citation':
-            citations = event.data.citations;
-            break;
-
-          case 'embedded_data':
-            embeddedTrades = event.data.embeddedTrades;
-            embeddedEvents = event.data.embeddedEvents;
-            embeddedNotes = event.data.embeddedNotes;
-            break;
-
-          case 'done':
-            messageHtml = event.data.messageHtml || '';
-            logger.log('AI response streaming complete');
-            break;
-
-          case 'error':
-            throw new Error(event.data.error || 'Streaming error');
-        }
-      }
-
-      // If request was cancelled, or we didn't receive any content (e.g. cancelled before first chunk), skip creating a message
-      if (cancelRequestedRef.current || (!aiMessageAdded && !accumulatedText)) {
-        return;
-      }
-
-      // Update or add final message with all data
-      const finalMessage: ChatMessageType = {
-        id: aiMessageId,
-        role: 'assistant',
-        content: accumulatedText,
-        messageHtml: messageHtml,
-        citations,
-        embeddedTrades,
-        embeddedEvents,
-        embeddedNotes,
-        timestamp: new Date(),
-        status: 'received'
-      };
-
-      if (aiMessageAdded) {
-        // Update existing message
-        setMessages(prev => prev.map(msg =>
-          msg.id === aiMessageId ? finalMessage : msg
-        ));
-      } else {
-        // Add message if no text chunks were received
-        setMessages(prev => [...prev, finalMessage]);
-      }
-
-      // Auto-save conversation after successful message exchange
-      const conversationMessages = [...baseHistory, userMessage, finalMessage];
-      await saveCurrentConversation(conversationMessages);
-
-    } catch (error) {
-      const isAbortError =
-        typeof error === 'object' &&
-        error !== null &&
-        'name' in error &&
-        (error as any).name === 'AbortError';
-
-      if (isAbortError || cancelRequestedRef.current) {
-        logger.log('AI chat request cancelled by user');
-        return;
-      }
-
-      logger.error('Error sending message to Supabase AI agent:', error);
-
-      const errorDetails = error instanceof Error ? error.message : 'Unknown error';
-      const quotaErrorInfo = parseQuotaError(errorDetails);
-
-      const chatError: ChatError = {
-        type: quotaErrorInfo.isQuotaError ? 'rate_limit' : 'network_error',
-        message: quotaErrorInfo.isQuotaError ? 'API Quota Exceeded' : 'Failed to send message',
-        details: errorDetails,
-        retryable: true
-      };
-
-      // Add or update error message
-      const errorMessage: ChatMessageType = {
-        id: aiMessageId,
-        role: 'assistant',
-        content: quotaErrorInfo.isQuotaError
-          ? quotaErrorInfo.userMessage
-          : 'Sorry, I encountered an error processing your message. Please try again.',
-        timestamp: new Date(),
-        status: 'error',
-        error: chatError.message
-      };
-
-      if (aiMessageAdded) {
-        // Update existing message
-        setMessages(prev => prev.map(msg =>
-          msg.id === aiMessageId ? errorMessage : msg
-        ));
-      } else {
-        // Add error message if not already added
-        setMessages(prev => [...prev, errorMessage]);
-      }
-    } finally {
-      abortControllerRef.current = null;
-      activeRequestRef.current = null;
-      cancelRequestedRef.current = false;
-      setIsLoading(false);
-      setIsTyping(false);
-      setToolExecutionStatus(''); // Clear tool status
-    }
-  };
-
-  const handleCancelRequest = () => {
-    const active = activeRequestRef.current;
-
-    if (!abortControllerRef.current && !active) {
-      return;
-    }
-
-    cancelRequestedRef.current = true;
-
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-
-    if (active) {
-      setMessages(prev =>
-        prev.filter(msg => msg.id !== active.userId && msg.id !== active.aiId)
-      );
-      activeRequestRef.current = null;
-    }
-
-    setIsLoading(false);
-    setIsTyping(false);
-    setToolExecutionStatus('');
-  };
-
-  const handleEditMessage = (messageId: string) => {
-    const messageToEdit = messages.find(msg => msg.id === messageId);
-    if (!messageToEdit || messageToEdit.role !== 'user') return;
-
-    setInputMessage(messageToEdit.content);
-    setEditingMessageId(messageId);
-
-    // Focus the input so the user can continue typing immediately
-    setTimeout(() => inputRef.current?.focus(), 100);
-  };
-
-  const handleOpenNotesContext = async (event: React.MouseEvent<HTMLElement>) => {
-    if (!user || isReadOnly) return;
-
-    if (notesAnchorEl) {
-      handleCloseNotesContext();
-      return;
-    }
-
-    setNotesAnchorEl(event.currentTarget);
-
-    if (availableNotes.length > 0 || notesLoading) {
-      return;
-    }
-
-    try {
-      setNotesLoading(true);
-
-      const notes = calendar?.id
-        ? await notesService.getCalendarNotes(calendar.id)
-        : await notesService.getUserNotes(user.uid);
-
-      const sortedNotes = [...notes].sort((a, b) =>
-        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-      );
-
-      setAvailableNotes(sortedNotes.filter(note => !note.is_archived && !note.by_assistant));
-    } catch (error) {
-      logger.error('Error loading notes for AI context:', error);
-    } finally {
-      setNotesLoading(false);
-    }
-  };
-
-  const handleCloseNotesContext = () => {
-    setNotesAnchorEl(null);
-  };
-
-  const handleInsertNoteContext = (note: Note) => {
-    const title = note.title || 'Untitled';
-
-    // Use the insertNote method to create a note entity chip
-    if (inputRef.current?.insertNote) {
-      inputRef.current.insertNote(title);
-    }
-
-    handleCloseNotesContext();
-  };
-
-
-  const handleKeyPress = (event: React.KeyboardEvent) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-
-  const handleMessageRetry = useCallback(async (messageId: string) => {
-    // Find the message to retry
-    const messageIndex = messages.findIndex(msg => msg.id === messageId);
-    if (messageIndex === -1) return;
-
-    const messageToRetry = messages[messageIndex];
-    if (messageToRetry.role !== 'assistant') return;
-
-    // Find the user message that prompted this response
-    let userMessageIndex = messageIndex - 1;
-    while (userMessageIndex >= 0 && messages[userMessageIndex].role !== 'user') {
-      userMessageIndex--;
-    }
-
-    if (userMessageIndex < 0) return;
-
-    const userMessage = messages[userMessageIndex];
-
-    try {
-      // Remove all messages after the user message that prompted the retried response
-      const updatedMessages = messages.slice(0, userMessageIndex + 1);
-      setMessages(updatedMessages);
-
-      // Set loading and typing state so the user sees the "AI is thinking..." indicator
-      setIsLoading(true);
-      setIsTyping(true);
-      setToolExecutionStatus('');
-
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      // Regenerate the response using Supabase AI agent
-      const response = await supabaseAIChatService.sendMessage(
-        userMessage.content,
-        user.uid,
-        calendar,
-        updatedMessages
-      );
-
-      if (!response.success) {
-        throw new Error(response.message || 'Failed to get AI response');
-      }
-
-      // Add the new response with embedded data
-      const newAssistantMessage: ChatMessageType = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: response.message,
-        messageHtml: response.messageHtml,
-        citations: response.citations,
-        embeddedTrades: response.embeddedTrades,
-        embeddedEvents: response.embeddedEvents,
-        embeddedNotes: response.embeddedNotes,
-        timestamp: new Date(),
-        status: 'received'
-      };
-
-      setMessages(prev => [...prev, newAssistantMessage]);
-      logger.log('Message regenerated successfully');
-
-    } catch (error) {
-      logger.error('Error regenerating message:', error);
-
-      const errorDetails = error instanceof Error ? error.message : 'Unknown error';
-      const quotaErrorInfo = parseQuotaError(errorDetails);
-
-      // Add error message
-      const errorMessage: ChatMessageType = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: quotaErrorInfo.isQuotaError
-          ? quotaErrorInfo.userMessage
-          : 'Sorry, I encountered an error while regenerating the response. Please try again.',
-        timestamp: new Date(),
-        status: 'error',
-        error: quotaErrorInfo.isQuotaError ? 'API Quota Exceeded' : errorDetails
-      };
-
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-      setIsTyping(false);
-      setToolExecutionStatus(''); // Clear tool status
-    }
-  }, [messages, user, calendar, trades]);
-
-
-
-
-
-  const getWelcomeMessage = (): ChatMessageType => {
-    const contextSummary = (trades && trades.length > 0)
-      ? `I can see you have ${trades.length} trades. `
-      : '';
-
-    const calendarInfo = calendar
-      ? `You're working with the "${calendar.name}" calendar. `
-      : 'You can ask me about your trading performance across all your calendars. ';
-
-    const historyNote = !calendar
-      ? '\n\n📝 Note: Conversation history is only available when working with a specific calendar.'
-      : '';
-
-    return {
-      id: 'welcome',
-      role: 'assistant',
-      content: `👋 Hello! I'm your AI trading analyst. ${calendarInfo}${contextSummary}I can help you analyze your trading performance, identify patterns, and provide insights to improve your trading.
-
-💡 I'll analyze your trading data to give you focused and accurate insights!${historyNote}
-
-What would you like to know about your trading?`,
-      timestamp: new Date(),
-      status: 'received'
-    };
-  };
-
-  // Question templates for new users
-  const questionTemplates = [
-    {
-      category: "Performance Analysis",
-      questions: [
-        "What's my overall win rate by trading session?",
-        "Show me my monthly performance trends",
-        "Which tags have the highest win rates?"
-      ]
-    },
-    {
-      category: "Pattern Discovery",
-      questions: [
-        "Find my most profitable trading patterns",
-        "Show me trades similar to my best EUR/USD wins",
-        "Analyze my performance during high-impact news events"
-      ]
-    },
-    {
-      category: "Risk Management",
-      questions: [
-        "What's my average trade size by day of week?",
-        "Show me trades where I violated my risk management rules",
-        "Analyze correlation between trade session and profitability"
-      ]
-    },
-    {
-      category: "Advanced Analysis",
-      questions: [
-        "How does my trading performance vary across different sessions during high-impact economic events?",
-        "Compare my win rate on Mondays vs Fridays for scalping trades",
-        "Show me all my losing breakout trades on Tuesdays in the last 6 months"
-      ]
-    }
-  ];
-
-  const handleTemplateClick = (question: string) => {
-    setInputMessage(question);
-    // Auto-focus the input after setting the question
-    setTimeout(() => inputRef.current?.focus(), 100);
-  };
-
-  // Show welcome message and templates if no messages
-  const displayMessages = messages.length === 0 ? [getWelcomeMessage()] : messages;
-  const showTemplates = messages.length === 0;
 
 
 
@@ -1139,423 +426,50 @@ What would you like to know about your trading?`,
                 flexDirection: 'column',
                 overflow: 'hidden'
               }}>
-                {/* Messages */}
-                <Box
-                sx={{
-                  flex: 1,
-                  overflow: 'auto',
-                  p: 2,
-                  pb: 1,
-                  backgroundColor: alpha(theme.palette.background.default, 0.3),
-                  backgroundImage: `radial-gradient(circle at 20% 80%, ${alpha(theme.palette.primary.main, 0.03)} 0%, transparent 50%),
-                                   radial-gradient(circle at 80% 20%, ${alpha(theme.palette.secondary.main, 0.03)} 0%, transparent 50%)`,
-                  ...scrollbarStyles(theme)
-                }}
-              >
-                {displayMessages.map((message, index) => (
-                  <ChatMessage
-                    key={message.id}
-                    message={message}
-                    showTimestamp={true}
-                    onRetry={handleMessageRetry}
-                    isLatestMessage={index === displayMessages.length - 1}
-                    enableAnimation={index > 0}
-                    onTradeClick={(tradeId, contextTrades) => {
-                      if (onOpenGalleryMode) {
-                        // Find the clicked trade
-                        const clickedTrade = contextTrades.find(t => t.id === tradeId);
-                        if (clickedTrade) {
-                          // Open gallery mode with all trades, starting from the clicked trade
-                          onOpenGalleryMode(contextTrades, tradeId, 'AI Chat - Trade Gallery');
-                        }
-                      } else {
-                        logger.log('Trade clicked but gallery mode not available:', tradeId);
+                <AIChatInterface
+                  ref={chatInterfaceRef}
+                  messages={messages}
+                  isLoading={isLoading}
+                  isTyping={isTyping}
+                  toolExecutionStatus={toolExecutionStatus}
+                  isAtMessageLimit={isAtMessageLimit}
+                  sendMessage={sendMessage}
+                  cancelRequest={cancelRequest}
+                  retryMessage={retryMessage}
+                  setInputForEdit={setInputForEdit}
+                  startNewChat={startNewChat}
+                  setMessages={setMessages}
+                  getWelcomeMessage={getWelcomeMessage}
+                  userId={user?.uid}
+                  calendar={calendar}
+                  trades={trades}
+                  onTradeClick={(tradeId, contextTrades) => {
+                    if (onOpenGalleryMode) {
+                      const clickedTrade = contextTrades.find(t => t.id === tradeId);
+                      if (clickedTrade) {
+                        onOpenGalleryMode(contextTrades, tradeId, 'AI Chat - Trade Gallery');
                       }
-                    }}
-                    onEventClick={(event) => {
-                      logger.log('Economic event clicked:', event);
-                      setSelectedEvent(event);
-                      setEventDetailDialogOpen(true);
-                    }}
-                    onNoteClick={async (noteId) => {
-                      logger.log('Note clicked:', noteId);
-                      // Find the note from embedded notes in messages
-                      const note = messages
-                        .flatMap(m => m.embeddedNotes ? Object.values(m.embeddedNotes) : [])
-                        .find(n => n.id === noteId);
-
-                      if (note) {
-                        setSelectedNote(note);
-                        setNoteEditorOpen(true);
-                      } else {
-                        logger.warn('Note not found in embedded notes:', noteId);
-                      }
-                    }}
-                    onEdit={handleEditMessage}
-                    trades={trades}
-                  />
-                ))}
-
-                {/* Question Templates - Only show when no conversation started */}
-                {showTemplates && (
-                  <Box sx={{ mt: 3 }}>
-                    <Typography
-                      variant="h6"
-                      sx={{
-                        mb: 2,
-                        color: 'text.primary',
-                        fontWeight: 600
-                      }}
-                    >
-                      💡 Try these questions:
-                    </Typography>
-
-                    {questionTemplates.map((category, categoryIndex) => (
-                      <Box key={categoryIndex} sx={{ mb: 3 }}>
-                        <Typography
-                          variant="subtitle2"
-                          sx={{
-                            mb: 1.5,
-                            color: 'primary.main',
-                            fontWeight: 600,
-                            fontSize: '0.85rem'
-                          }}
-                        >
-                          {category.category}
-                        </Typography>
-
-                        <Box sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 1
-                        }}>
-                          {category.questions.map((question, questionIndex) => (
-                            <Button
-                              key={questionIndex}
-                              variant="outlined"
-                              size="small"
-                              onClick={() => handleTemplateClick(question)}
-                              sx={{
-                                justifyContent: 'flex-start',
-                                textAlign: 'left',
-                                py: 1.5,
-                                px: 2,
-                                borderRadius: 2,
-                                textTransform: 'none',
-                                fontSize: '0.875rem',
-                                lineHeight: 1.4,
-                                borderColor: alpha(theme.palette.primary.main, 0.3),
-                                backgroundColor: alpha(theme.palette.background.paper, 0.8),
-                                '&:hover': {
-                                  borderColor: 'primary.main',
-                                  backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                                  transform: 'translateY(-1px)',
-                                  boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.2)}`
-                                },
-                                transition: 'all 0.2s ease-in-out'
-                              }}
-                            >
-                              {question}
-                            </Button>
-                          ))}
-                        </Box>
-                      </Box>
-                    ))}
-
-                    <Box sx={{
-                      mt: 3,
-                      mb: 2,
-                      p: 2,
-                      backgroundColor: alpha(theme.palette.info.main, 0.08),
-                      borderRadius: 2,
-                      border: '1px solid',
-                      borderColor: alpha(theme.palette.info.main, 0.2)
-                    }}>
-                      <Typography
-                        variant="body2"
-                        color="info.main"
-                        sx={{ fontWeight: 500 }}
-                      >
-                        💡 Pro Tip: You can ask complex questions like "I've been struggling with my breakout strategy on Tuesdays. Can you show me all my losing trades tagged 'breakout' that occurred on a Tuesday in the last 6 months, and analyze if there were any specific economic events or market conditions that contributed to these losses?" - I'll analyze your data and provide detailed insights!
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-
-                {/* Typing Indicator */}
-                {isTyping && (
-                  <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 2,
-                    p: 2,
-                    mb: 2
-                  }}>
-                    <Box sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                      backgroundColor: alpha(theme.palette.grey[500], 0.1),
-                      borderRadius: 2,
-                      px: 2,
-                      py: 1
-                    }}>
-                      <CircularProgress
-                        size={16}
-                        thickness={4}
-                        sx={{ color: 'text.secondary' }}
-                      />
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ fontStyle: 'italic' }}
-                      >
-                        {toolExecutionStatus
-                          ? `AI is thinking... ${toolExecutionStatus}`
-                          : 'AI is thinking...'}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-
-                <div ref={messagesEndRef} />
-              </Box>
-
-              <Divider sx={{ borderColor: alpha(theme.palette.divider, 0.5) }} />
-
-              {/* Message Limit Warning */}
-              {isAtMessageLimit && (
-                <Box sx={{ p: 2, pb: 0 }}>
-                  <Alert
-                    severity="warning"
-                    action={
-                      <Button
-                        color="inherit"
-                        size="small"
-                        onClick={handleNewChat}
-                        startIcon={<NewChatIcon />}
-                        sx={{ fontWeight: 600 }}
-                      >
-                        Start New Chat
-                      </Button>
+                    } else {
+                      logger.log('Trade clicked but gallery mode not available:', tradeId);
                     }
-                    sx={{
-                      borderRadius: 2,
-                      '& .MuiAlert-message': {
-                        width: '100%'
-                      }
-                    }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      Conversation Limit Reached
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      This conversation has reached the maximum length of {MESSAGE_LIMIT} messages.
-                      Please start a new conversation to continue.
-                    </Typography>
-                  </Alert>
-                </Box>
-              )}
-
-              {/* Input Area */}
-              <Box sx={{
-                p: 2,
-                backgroundColor: alpha(theme.palette.background.paper, 0.8),
-                backdropFilter: 'blur(10px)'
-              }}>
-                <Box sx={{
-                  display: 'flex',
-                  gap: 1,
-                  alignItems: 'center',
-                  backgroundColor: 'background.paper',
-                  borderRadius: 3,
-                  p: 1,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  '&:focus-within': {
-                    borderColor: 'primary.main',
-                    boxShadow: `0 0 0 1px ${alpha(theme.palette.primary.main, 0.15)}`
-                  }
-                }}>
-                  <AIChatMentionInput
-                    ref={inputRef}
-                    value={inputMessage}
-                    onChange={setInputMessage}
-                    onKeyDown={handleKeyPress}
-                    placeholder={calendar ? "(use @tag to mention tags)" : "Ask me anything about your trading..."}
-                    disabled={isLoading || isAtMessageLimit}
-                    allTags={calendar?.tags || []}
-                    maxRows={4}
-                    sx={{ flex: 1, minWidth: 0, fontSize: '0.95rem', lineHeight: 1.4 }}
-                  />
-                  <IconButton
-                    aria-label="Insert note context"
-                    onClick={handleOpenNotesContext}
-                    disabled={isReadOnly || !user}
-                    size="small"
-                    sx={{
-                      backgroundColor: 'background.default',
-                      color: 'text.secondary',
-                      width: 32,
-                      height: 32,
-                      borderRadius: 2,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      transition: 'all 0.2s ease-in-out',
-                      '&:hover': {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.06),
-                        borderColor: 'primary.main',
-                        color: 'primary.main'
-                      },
-                      '&:disabled': {
-                        backgroundColor: 'action.disabledBackground',
-                        color: 'action.disabled',
-                        borderColor: 'action.disabledBackground'
-                      }
-                    }}
-                  >
-                    <NotesIcon sx={{ fontSize: 18 }} />
-                  </IconButton>
-                  <IconButton
-                    onClick={isLoading ? handleCancelRequest : handleSendMessage}
-                    disabled={(!inputMessage.trim() && !isLoading) || isAtMessageLimit}
-                    size="small"
-                    sx={{
-                      backgroundColor: isLoading
-                        ? 'error.main'
-                        : inputMessage.trim()
-                          ? 'primary.main'
-                          : 'action.disabledBackground',
-                      color: isLoading
-                        ? 'error.contrastText'
-                        : inputMessage.trim()
-                          ? 'primary.contrastText'
-                          : 'action.disabled',
-                      width: 36,
-                      height: 36,
-                      transition: 'all 0.2s ease-in-out',
-                      '&:hover': {
-                        backgroundColor: isLoading
-                          ? 'error.dark'
-                          : inputMessage.trim()
-                            ? 'primary.dark'
-                            : 'action.disabledBackground',
-                        transform: inputMessage.trim() && !isLoading ? 'scale(1.05)' : 'none'
-                      },
-                      '&:disabled': {
-                        backgroundColor: 'action.disabledBackground',
-                        color: 'action.disabled'
-                      }
-                    }}
-                  >
-                    {isLoading ? (
-                      <StopIcon sx={{ fontSize: 18 }} />
-                    ) : (
-                      <SendIcon sx={{ fontSize: 18 }} />
-                    )}
-                  </IconButton>
-                </Box>
-
-                {/* Helper Text */}
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{
-                    mt: 1,
-                    display: 'block',
-                    textAlign: 'center',
-                    opacity: 0.7
                   }}
-                >
-                  {'Enter to send • Shift+Enter newline • @ for tags • Notes button inserts note:{title}'}
-                </Typography>
-              </Box>
-
-              {notesAnchorEl && (
-                <ClickAwayListener onClickAway={() => setNotesAnchorEl(null)}>
-                  <Popper
-                    open={Boolean(notesAnchorEl)}
-                    anchorEl={notesAnchorEl}
-                    placement="top-end"
-                    disablePortal
-                    sx={{ zIndex: 1600 }}
-                  >
-                    <Paper
-                      elevation={8}
-                      sx={{
-                        maxWidth: 360,
-                        maxHeight: 320,
-                        overflow: 'hidden',
-                        borderRadius: 2,
-                        boxShadow: theme.shadows[8]
-                      }}
-                    >
-                      <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                          Add Context
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Select a note to insert into your message.
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          maxHeight: 250,
-                          overflow: 'auto',
-                          ...scrollbarStyles(theme)
-                        }}
-                      >
-                        {notesLoading ? (
-                          <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <CircularProgress size={16} />
-                            <Typography variant="body2" color="text.secondary">
-                              Loading notes...
-                            </Typography>
-                          </Box>
-                        ) : availableNotes.length === 0 ? (
-                          <Box sx={{ p: 2 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              No notes found yet.
-                            </Typography>
-                          </Box>
-                        ) : (
-                          <List dense sx={{ p: 0 }}>
-                            {availableNotes.map(note => (
-                              <ListItemButton
-                                key={note.id}
-                                onClick={() => handleInsertNoteContext(note)}
-                                sx={{
-                                  px: 1.5,
-                                  py: 1,
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'flex-start'
-                                }}
-                              >
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                                  <NotesIcon sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      fontWeight: 600,
-                                      maxWidth: 200,
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      whiteSpace: 'nowrap'
-                                    }}
-                                  >
-                                    {note.title || 'Untitled'}
-                                  </Typography>
-                                </Box>
-                              </ListItemButton>
-                            ))}
-                          </List>
-                        )}
-                      </Box>
-                    </Paper>
-                  </Popper>
-                </ClickAwayListener>
-              )}
+                  onEventClick={(event) => {
+                    logger.log('Economic event clicked:', event);
+                    setSelectedEvent(event);
+                    setEventDetailDialogOpen(true);
+                  }}
+                  onNoteClick={(noteId, note) => {
+                    logger.log('Note clicked:', noteId);
+                    if (note) {
+                      setSelectedNote(note);
+                      setNoteEditorOpen(true);
+                    } else {
+                      logger.warn('Note not found in embedded notes:', noteId);
+                    }
+                  }}
+                  isReadOnly={isReadOnly}
+                  messageLimit={50}
+                />
               </Box>
               {/* End Chat View */}
 

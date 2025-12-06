@@ -208,6 +208,7 @@ export interface AgentRequest {
   message: string;
   userId: string;
   calendarId?: string;
+  focusedTradeId?: string; // When analyzing a specific trade
   conversationHistory?: ConversationMessage[];
   calendarContext?: Partial<Calendar>;
   userApiKey?: string; // User's own Gemini API key (optional)

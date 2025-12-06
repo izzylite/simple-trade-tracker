@@ -26,6 +26,8 @@ interface DayDialogProps {
   calendarId: string;
   deletingTradeIds?: string[];
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
+  // Open AI chat mode for a specific trade
+  onOpenAIChatMode?: (trades: Trade[], tradeId: string, title?: string) => void;
   // Calendar data for economic events filtering and progress tracking
   calendar?: Calendar;
   // Read-only mode for shared calendars
@@ -52,6 +54,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
   calendarId,
   deletingTradeIds,
   onOpenGalleryMode,
+  onOpenAIChatMode,
   calendar,
   isReadOnly = false
 }) => {
@@ -97,6 +100,14 @@ const DayDialog: React.FC<DayDialogProps> = ({
       const title = `${format(date, 'EEEE, MMMM d, yyyy')} - ${trades.length} Trade${trades.length > 1 ? 's' : ''}`;
       onOpenGalleryMode(trades, expandedTradeId || trades[0].id, title);
       onClose(); // Close the day dialog when opening gallery mode
+    }
+  };
+
+  const handleOpenAIChat = (trade: Trade) => {
+    if (onOpenAIChatMode) {
+      const title = `AI Analysis - ${trade.name || format(date, 'MMM d, yyyy')}`;
+      onOpenAIChatMode(trades, trade.id, title);
+      onClose(); // Close the day dialog when opening AI chat
     }
   };
 
@@ -166,6 +177,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
             deletingTradeIds={deletingTradeIds}
             calendarId={calendarId}
             calendar={calendar}
+            onOpenAIChat={onOpenAIChatMode ? handleOpenAIChat : undefined}
           />
         </Box>
       </BaseDialog>

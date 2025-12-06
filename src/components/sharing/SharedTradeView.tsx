@@ -180,6 +180,7 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
       {/* Trade Details */}
       <TradeDetailExpanded
         tradeData={trade}
+        animate={false}
         isExpanded={true}
         setZoomedImage={(url: string, allImages?: string[], initialIndex?: number) => {
           setZoomedImages({

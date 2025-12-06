@@ -583,11 +583,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     trades: Trade[];
     initialTradeId?: string;
     title?: string;
+    aiOnlyMode?: boolean;
   }>({
     open: false,
     trades: [],
     initialTradeId: undefined,
-    title: undefined
+    title: undefined,
+    aiOnlyMode: false
   });
 
   // Image picker state
@@ -609,18 +611,37 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null>(null);
 
   // Hero image override from reminder notes - only applied when calendar has hero image
-  const [reminderImageOverride, setReminderImageOverride] = useState<string | null>(null);
+  // Use two layers for crossfade animation between reminder images
+  const [reminderImageA, setReminderImageA] = useState<string | null>(null);
+  const [reminderImageB, setReminderImageB] = useState<string | null>(null);
+  const [activeLayer, setActiveLayer] = useState<'A' | 'B'>('A');
+  const activeLayerRef = React.useRef<'A' | 'B'>('A');
 
-  // Callback to handle reminder note image changes
+  // Callback to handle reminder note image changes with crossfade
+  // Uses ref to avoid recreating callback and causing useEffect loops in child
   const handleReminderImageChange = useCallback((imageUrl: string | null) => {
     // Only allow override if calendar has a hero image AND note has a cover image
     // If note has no image, keep the original hero image (don't clear it)
     if (heroImageUrl && imageUrl) {
-      setReminderImageOverride(imageUrl);
+      // Set the new image on the inactive layer, then switch active layer
+      if (activeLayerRef.current === 'A') {
+        setReminderImageB(imageUrl);
+        setActiveLayer('B');
+        activeLayerRef.current = 'B';
+      } else {
+        setReminderImageA(imageUrl);
+        setActiveLayer('A');
+        activeLayerRef.current = 'A';
+      }
     } else {
-      setReminderImageOverride(null);
+      // Clear both layers when no override
+      setReminderImageA(null);
+      setReminderImageB(null);
     }
   }, [heroImageUrl]);
+
+  // Determine which hero image to display (for non-animated fallback)
+  const reminderImageOverride = activeLayer === 'A' ? reminderImageA : reminderImageB;
 
   // Determine which hero image to display
   const displayHeroImageUrl = reminderImageOverride || heroImageUrl;
@@ -1052,7 +1073,19 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       open: true,
       trades,
       initialTradeId,
-      title
+      title,
+      aiOnlyMode: false
+    });
+  };
+
+  // Open gallery in AI-only mode (hides Trade tab, shows only Assistant)
+  const openGalleryModeAI = (trades: Trade[], tradeId: string, title?: string) => {
+    setGalleryMode({
+      open: true,
+      trades,
+      initialTradeId: tradeId,
+      title,
+      aiOnlyMode: true
     });
   };
 
@@ -1061,7 +1094,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       open: false,
       trades: [],
       initialTradeId: undefined,
-      title: undefined
+      title: undefined,
+      aiOnlyMode: false
     });
   };
 
@@ -1108,16 +1142,31 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             />
           )}
 
-          {/* Override image layer with crossfade animation */}
+          {/* Override image layer A with crossfade animation */}
           <Box
             sx={{
               position: 'absolute',
               inset: 0,
-              backgroundImage: reminderImageOverride ? `url(${reminderImageOverride})` : 'none',
+              backgroundImage: reminderImageA ? `url(${reminderImageA})` : 'none',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
-              opacity: reminderImageOverride ? 1 : 0,
+              opacity: activeLayer === 'A' && reminderImageA ? 1 : 0,
+              transition: 'opacity 0.5s ease-in-out',
+              zIndex: 1,
+            }}
+          />
+
+          {/* Override image layer B with crossfade animation */}
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: reminderImageB ? `url(${reminderImageB})` : 'none',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              opacity: activeLayer === 'B' && reminderImageB ? 1 : 0,
               transition: 'opacity 0.5s ease-in-out',
               zIndex: 1,
             }}
@@ -1636,6 +1685,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           allTrades={trades} /* Pass all trades for tag suggestions */
           deletingTradeIds={deletingTradeIds}
           onOpenGalleryMode={openGalleryMode}
+          onOpenAIChatMode={isReadOnly ? undefined : openGalleryModeAI}
           calendar={calendar}
           isReadOnly={isReadOnly}
         />
@@ -1878,6 +1928,21 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           calendarId={calendarId}
           onOpenGalleryMode={openGalleryMode}
           calendar={calendar}
+          aiOnlyMode={galleryMode.aiOnlyMode}
+          onEditTrade={isReadOnly ? undefined : (trade) => {
+            setNewTrade(() => (createEditTradeData(trade)));
+            setShowAddForm({
+              open: true,
+              trade_date: new Date(trade.trade_date),
+              editTrade: trade,
+              createTempTrade: false,
+              showDayDialogWhenDone: false
+            });
+          }}
+          onDeleteTrade={isReadOnly ? undefined : (tradeId) => handleDeleteTrades([tradeId])}
+          onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
+          isReadOnly={isReadOnly}
         />
 
 

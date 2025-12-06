@@ -210,7 +210,8 @@ These show excellent risk management."
 export function buildSecureSystemPrompt(
   userId: string,
   calendarId?: string,
-  calendarContext?: Partial<Calendar>
+  calendarContext?: Partial<Calendar>,
+  focusedTradeId?: string
 ): string {
   const calendarContextSection = buildCalendarContextSection(calendarContext);
 
@@ -221,6 +222,31 @@ export function buildSecureSystemPrompt(
   const economicEventsRule = calendarId
     ? `economic_events is global (no user_id filter), BUT respect this calendar's filters.`
     : `economic_events is global (no user_id filter). Reference any relevant events.`;
+
+  // Build focus mode section if analyzing a specific trade
+  const focusModeSection = focusedTradeId ? `
+## 🎯 FOCUS MODE: Single Trade Analysis
+
+You are analyzing a SPECIFIC trade. Trade ID: ${focusedTradeId}
+
+CRITICAL INSTRUCTIONS:
+1. FIRST: Fetch this trade's full details using execute_sql:
+   SELECT * FROM trades WHERE id = '${focusedTradeId}' AND user_id = '${userId}'
+2. ALL user questions relate to THIS trade specifically
+3. If the trade has images, ALWAYS use analyze_image tool to review them
+4. Compare this trade against user's history for context when relevant
+5. Do NOT analyze unrelated trades unless explicitly asked
+6. Reference this trade with <trade-ref id="${focusedTradeId}"/> in your response
+
+Focus areas for single trade analysis:
+- Entry/exit quality and timing
+- Risk management (stop loss, take profit, R:R)
+- Tags used during the trade for finding patterns
+- Economic events that occur during the trade
+- Pattern recognition from charts
+- What worked vs what could improve
+- Similar trades from history for comparison
+` : '';
 
   // ==========================================================================
   // TIER 1: SECURITY & MEMORY GATE (Highest Priority)
@@ -312,7 +338,7 @@ TIER 3: MEMORY SYSTEM
 
 ## What to Learn
 - Performance patterns: Setups/sessions/confluences that work for THIS trader
-- Visual patterns: Chart setups, entry markers, Fibonacci usage, indicator preferences (from image analysis)
+- Visual patterns: Chart setups, entry markers, Fibonacci usage, Volume Setups, indicator preferences (from image analysis)
 - Trading style: Risk tolerance, timeframes, emotional patterns
 - User corrections: Update assumptions when corrected
 - Strategy preferences: Stated rules, entry criteria, risk management
@@ -372,5 +398,5 @@ ${CARD_DISPLAY_REFERENCE}
 `;
 
   // Assemble final prompt
-  return `${tier1}${tier2}${tier3}${tier4}`;
+  return `${tier1}${focusModeSection}${tier2}${tier3}${tier4}`;
 }

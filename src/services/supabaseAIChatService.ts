@@ -125,7 +125,8 @@ class SupabaseAIChatService {
     userId: string,
     calendar: Calendar | undefined,
     conversationHistory: ChatMessageType[] = [],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    focusedTradeId?: string
   ): AsyncGenerator<SSEEvent, void, unknown> {
     try {
       logger.log(`Sending streaming message to AI agent: "${message.substring(0, 50)}..."`);
@@ -161,6 +162,7 @@ class SupabaseAIChatService {
           message: finalMessage,
           userId,
           calendarId: calendar?.id,
+          focusedTradeId: focusedTradeId || undefined,
           conversationHistory: formattedHistory,
           calendarContext: calendar ? this.buildCalendarContext(calendar) : undefined,
           userApiKey: userApiKey || undefined, // Send user's API key if available
@@ -333,7 +335,8 @@ class SupabaseAIChatService {
     message: string,
     userId: string,
     calendar: Calendar | undefined,
-    conversationHistory: ChatMessageType[] = []
+    conversationHistory: ChatMessageType[] = [],
+    focusedTradeId?: string
   ): Promise<AgentResponse> {
     try {
       logger.log(`Sending message to Supabase AI agent: "${message.substring(0, 50)}..."`);
@@ -369,6 +372,7 @@ class SupabaseAIChatService {
             message: finalMessage,
             userId,
             calendarId: calendar?.id,
+            focusedTradeId: focusedTradeId || undefined,
             conversationHistory: formattedHistory,
             calendarContext: calendar ? this.buildCalendarContext(calendar) : undefined,
             userApiKey: userApiKey || undefined,

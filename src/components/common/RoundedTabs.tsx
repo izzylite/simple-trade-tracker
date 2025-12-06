@@ -11,6 +11,7 @@ export interface TabItem {
   label: string;
   value?: string | number;
   disabled?: boolean;
+  icon?: React.ReactElement;
 }
 
 interface TabPanelProps {
@@ -145,6 +146,8 @@ const RoundedTabs: React.FC<RoundedTabsProps> = ({
           <Tab
             key={index}
             label={tab.label}
+            icon={tab.icon}
+            iconPosition="start"
             disabled={tab.disabled}
             sx={{
               minHeight: config.minHeight - 8,
@@ -155,7 +158,12 @@ const RoundedTabs: React.FC<RoundedTabsProps> = ({
               color: 'text.secondary',
               borderRadius: config.borderRadius,
               padding: config.padding,
-              minWidth: fullWidth ? 'auto' : 'fit-content'
+              minWidth: fullWidth ? 'auto' : 'fit-content',
+              gap: 0.5,
+              '& .MuiTab-iconWrapper': {
+                marginRight: 0,
+                marginBottom: 0
+              }
             }}
           />
         ))}

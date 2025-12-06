@@ -40,6 +40,7 @@ export interface AIConversation {
   id: string;
   calendar_id: string;
   user_id: string;
+  trade_id?: string | null; // Optional: NULL = calendar-level, set = trade-specific
   title: string;
   messages: ChatMessage[]; // Transformed to ChatMessage with Date objects
   message_count: number;
@@ -52,6 +53,7 @@ export interface SerializableAIConversation {
   id: string;
   calendar_id: string;
   user_id: string;
+  trade_id?: string | null; // Optional: NULL = calendar-level, set = trade-specific
   title: string;
   messages: SerializableChatMessage[]; // Messages with string timestamps
   message_count: number;
