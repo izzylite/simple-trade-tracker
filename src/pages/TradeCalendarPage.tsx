@@ -18,6 +18,7 @@ import {
   Snackbar,
   Alert,
   Fab,
+  Fade,
 
 } from '@mui/material';
 import {
@@ -606,6 +607,24 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [notifications, setNotifications] = useState<EconomicEvent[]>([]);
   const [removingNotifications, setRemovingNotifications] = useState<Set<string>>(new Set());
   const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null>(null);
+
+  // Hero image override from reminder notes - only applied when calendar has hero image
+  const [reminderImageOverride, setReminderImageOverride] = useState<string | null>(null);
+
+  // Callback to handle reminder note image changes
+  const handleReminderImageChange = useCallback((imageUrl: string | null) => {
+    // Only allow override if calendar has a hero image AND note has a cover image
+    // If note has no image, keep the original hero image (don't clear it)
+    if (heroImageUrl && imageUrl) {
+      setReminderImageOverride(imageUrl);
+    } else {
+      setReminderImageOverride(null);
+    }
+  }, [heroImageUrl]);
+
+  // Determine which hero image to display
+  const displayHeroImageUrl = reminderImageOverride || heroImageUrl;
+
   const breadcrumbButtons: BreadcrumbButton[] = [
     ...((!isReadOnly) ? [{
       key: 'image',
@@ -1065,7 +1084,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       />
 
       {/* Hero Image Banner */}
-      {heroImageUrl && (
+      {displayHeroImageUrl && (
         <Box
           sx={{
             position: 'relative',
@@ -1074,31 +1093,55 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             borderRadius: 0,
           }}
         >
+          {/* Base hero image layer */}
+          {heroImageUrl && (
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: `url(${heroImageUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                zIndex: 0,
+              }}
+            />
+          )}
+
+          {/* Override image layer with crossfade animation */}
           <Box
             sx={{
               position: 'absolute',
               inset: 0,
-              backgroundImage: `url(${heroImageUrl})`,
+              backgroundImage: reminderImageOverride ? `url(${reminderImageOverride})` : 'none',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                inset: 0,
-                background: (theme: Theme) =>
-                  `linear-gradient(180deg, ${alpha(theme.palette.common.black, 0.25)} 0%, ${alpha(theme.palette.common.black, 0.8)} 100%)`,
-              },
+              opacity: reminderImageOverride ? 1 : 0,
+              transition: 'opacity 0.5s ease-in-out',
+              zIndex: 1,
             }}
           />
 
-          {heroImageAttribution && (
+          {/* Gradient overlay */}
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              background: (theme: Theme) =>
+                `linear-gradient(180deg, ${alpha(theme.palette.common.black, 0.25)} 0%, ${alpha(theme.palette.common.black, 0.8)} 100%)`,
+              zIndex: 2,
+            }}
+          />
+
+          {/* Only show attribution when displaying the original hero image (not an override) */}
+          <Fade in={!reminderImageOverride && !!heroImageAttribution} timeout={300}>
             <Box
               sx={{
                 position: 'absolute',
                 bottom: { xs: 6, sm: 8 },
                 right: { xs: 8, sm: 12 },
-                zIndex: 1,
+                zIndex: 3,
                 px: 1,
                 py: 0.5,
                 borderRadius: 0.75,
@@ -1107,10 +1150,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               }}
             >
               <Typography variant="caption" sx={{ fontSize: '0.7rem' }}>
-                Photo by {heroImageAttribution.photographer} on Unsplash
+                Photo by {heroImageAttribution?.photographer} on Unsplash
               </Typography>
             </Box>
-          )}
+          </Fade>
         </Box>
       )}
 
@@ -1124,8 +1167,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       {calendarId && (
         <CalendarDayReminder
           calendarId={calendarId}
-          trades={filteredTrades}
-          onOpenGalleryMode={openGalleryMode}
+          onReminderImageChange={handleReminderImageChange}
         />
       )}
 

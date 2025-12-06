@@ -87,13 +87,7 @@ const ImageBlock: React.FC<ImageBlockProps> = ({ block, contentState, blockProps
           position: 'relative',
           maxWidth: width || '100%',
           width: '100%',
-          borderRadius: 2,
-          overflow: 'hidden',
-          boxShadow: isHovered
-            ? `0 4px 20px ${alpha(theme.palette.common.black, 0.2)}`
-            : `0 2px 8px ${alpha(theme.palette.common.black, 0.1)}`,
-          transition: 'box-shadow 0.2s ease-in-out',
-          border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+          overflow: 'hidden', 
           // Ensure minimum dimensions during loading
           minHeight: isLoading ? 150 : undefined,
           minWidth: isLoading ? 200 : undefined,

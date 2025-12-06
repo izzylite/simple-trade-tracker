@@ -23,6 +23,7 @@ import {
   Chip,
   Divider,
   Collapse,
+  Autocomplete,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -93,6 +94,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   const [tags, setTags] = useState<string[]>([]);
   const [isTagsExpanded, setIsTagsExpanded] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   const allDays: DayAbbreviation[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -115,7 +117,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
 
         // Initialize tags states
         setTags(initialNote.tags || []);
-        setIsTagsExpanded((initialNote.tags?.length || 0) > 0);
+        setIsTagsExpanded(false);
       } else {
         // Creating new note - reset to defaults
         setNote(null);
@@ -137,6 +139,25 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       }
     }
   }, [open, initialNote]);
+
+  // Load available tags from user's notes
+  useEffect(() => {
+    const loadAvailableTags = async () => {
+      if (!open || !user?.uid) return;
+
+      try {
+        const notes = await notesService.getUserNotes(user.uid);
+        // Extract unique tags from all notes
+        const allTags = notes.flatMap(n => n.tags || []);
+        const uniqueTags = Array.from(new Set(allTags)).sort();
+        setAvailableTags(uniqueTags);
+      } catch (error) {
+        logger.error('Error loading available tags:', error);
+      }
+    };
+
+    loadAvailableTags();
+  }, [open, user?.uid]);
 
   const saveNote = async () => {
     if (!user?.uid) return;
@@ -710,16 +731,48 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                 {/* Add new tag input - only for user-created notes */}
                 {isTagEditingAllowed ? (
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                    <TextField
+                    <Autocomplete
+                      freeSolo
                       size="small"
-                      placeholder="Add a tag..."
-                      value={newTagInput}
-                      onChange={(e) => setNewTagInput(e.target.value)}
-                      onKeyDown={handleTagInputKeyDown}
-                      sx={{ flex: 1 }}
-                      InputProps={{
-                        sx: { borderRadius: 2 },
+                      options={availableTags.filter(t => !tags.includes(t))}
+                      value={null}
+                      inputValue={newTagInput}
+                      onInputChange={(_, value, reason) => {
+                        if (reason !== 'reset') {
+                          setNewTagInput(value);
+                        }
                       }}
+                      onChange={(_, value) => {
+                        if (value && typeof value === 'string') {
+                          const trimmed = value.trim();
+                          if (trimmed && !tags.includes(trimmed)) {
+                            setTags(prev => [...prev, trimmed]);
+                          }
+                        }
+                        setNewTagInput('');
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddTag();
+                        }
+                      }}
+                      sx={{ flex: 1 }}
+                      slotProps={{
+                        popper: {
+                          sx: { zIndex: (theme) => theme.zIndex.modal + 200 },
+                        },
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          placeholder="Add a tag..."
+                          InputProps={{
+                            ...params.InputProps,
+                            sx: { borderRadius: 2 },
+                          }}
+                        />
+                      )}
                     />
                     <IconButton
                       size="small"
@@ -749,7 +802,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                 {/* Help text for user notes */}
                 {isTagEditingAllowed && (
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                    Press Enter or click + to add a tag
+                    Type to search existing tags or create new ones
                   </Typography>
                 )}
               </Box>

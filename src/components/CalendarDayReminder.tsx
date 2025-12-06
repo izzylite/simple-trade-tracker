@@ -14,7 +14,6 @@ import {
   IconButton,
   alpha,
   useTheme,
-  Fade,
 } from '@mui/material';
 import {
   EventNote as EventNoteIcon,
@@ -25,24 +24,22 @@ import {
   ChevronRight as ChevronRightIcon,
 } from '@mui/icons-material';
 
-import RichTextEditor from './common/RichTextEditor';
 import NoteEditorDialog from './notes/NoteEditorDialog';
 import { Note, DayAbbreviation } from '../types/note';
 import { getReminderNotesForDay } from '../services/notesService';
 import { logger } from '../utils/logger';
 import { useRealtimeSubscription } from '../hooks/useRealtimeSubscription';
+import RichTextEditor from './common/RichTextEditor';
 
 interface CalendarDayReminderProps {
   calendarId: string;
-  // Optional props for trade link navigation in RichTextEditor
-  trades?: Array<{ id: string; [key: string]: any }>;
-  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
+  // Callback when reminder note's cover image changes (for hero image override)
+  onReminderImageChange?: (imageUrl: string | null) => void;
 }
 
 const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
   calendarId,
-  trades,
-  onOpenGalleryMode,
+  onReminderImageChange,
 }) => {
   const theme = useTheme();
   const [reminderNotes, setReminderNotes] = useState<Note[]>([]);
@@ -52,7 +49,6 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
     return saved === 'true';
   });
   const [editorOpen, setEditorOpen] = useState(false);
-  const [fadeIn, setFadeIn] = useState(true);
 
   // Get current day abbreviation
   const currentDayAbbr = format(new Date(), 'EEE') as DayAbbreviation;
@@ -75,6 +71,18 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
   useEffect(() => {
     loadReminderNotes();
   }, [loadReminderNotes]);
+
+  // Notify parent of current note's cover image for hero image override
+  useEffect(() => {
+    const currentNote = reminderNotes[currentIndex];
+    const coverImage = currentNote?.cover_image || null;
+    onReminderImageChange?.(coverImage);
+
+    // Cleanup: notify parent when component unmounts
+    return () => {
+      onReminderImageChange?.(null);
+    };
+  }, [reminderNotes, currentIndex, onReminderImageChange]);
 
   // Set up real-time subscription for reminder notes changes
   // Uses Supabase broadcast feature
@@ -245,19 +253,11 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
   };
 
   const handlePrevious = () => {
-    setFadeIn(false);
-    setTimeout(() => {
-      setCurrentIndex((prev) => (prev > 0 ? prev - 1 : reminderNotes.length - 1));
-      setFadeIn(true);
-    }, 150);
+    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : reminderNotes.length - 1));
   };
 
   const handleNext = () => {
-    setFadeIn(false);
-    setTimeout(() => {
-      setCurrentIndex((prev) => (prev < reminderNotes.length - 1 ? prev + 1 : 0));
-      setFadeIn(true);
-    }, 150);
+   setCurrentIndex((prev) => (prev < reminderNotes.length - 1 ? prev + 1 : 0));
   };
 
   // Don't render if no reminders for today
@@ -408,73 +408,92 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
           {!isHidden && (
             <>
               <Divider sx={{ my: 1, borderColor: theme.palette.divider, borderRadius: 1 }} />
-              <Fade in={fadeIn} timeout={300}>
+              <Box
+                onClick={handleEditNote}
+                sx={{
+                  cursor: 'pointer',
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.info.main, 0.03),
+                  },
+                  transition: 'background-color 0.2s ease',
+                  borderRadius: 1,
+                  py: 0.5,
+                }}
+              >
+                {/* Note Title */}
+                {currentNote.title && currentNote.title.trim() !== '' && (
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      fontWeight: 600,
+                      color: 'text.primary',
+                      mb: 0.5,
+                    }}
+                  >
+                    {currentNote.title}
+                  </Typography>
+                )}
+
+                {/* Note Content Preview - Styled with RichTextEditor */}
                 <Box
                   sx={{
-                    display: 'flex',
-                    maxWidth: '1400px',
-                    margin: '0 auto',
-                    flexDirection: { xs: 'column', lg: 'row' },
-                    gap: 2,
+                    maxHeight: 65,
+                    width: '100%',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    pointerEvents: 'none',
+                    boxSizing: 'border-box',
+                    // Multi-line truncation with line-clamp
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                    // Disable all scrolling
+                    '& *': {
+                      overflow: 'hidden !important',
+                      maxWidth: '100% !important',
+                    },
+                    '& .DraftEditor-root': {
+                      fontSize: '0.875rem',
+                      overflow: 'hidden',
+                      lineHeight: 1.4,
+                      width: '100%',
+                    },
+                    '& .DraftEditor-editorContainer, & .public-DraftEditor-content': {
+                      overflow: 'hidden',
+                      width: '100%',
+                    },
+                    '& .public-DraftStyleDefault-block': {
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      width: '100%',
+                    },
                   }}
                 >
-                  {/* Main Content Area */}
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    {/* Note Title */}
-                    {currentNote.title && currentNote.title.trim() !== '' && (
-                      <Typography
-                        variant="subtitle1"
-                        sx={{
-                          fontWeight: 600, 
-                          ml: 2,
-                          color: 'text.primary',
-                        }}
-                      >
-                        {currentNote.title}
-                      </Typography>
-                    )}
-
-                    {/* Note Content */}
-                    <RichTextEditor
-                      value={currentNote.content}
-                      disabled={true}
-                      hideCharacterCount={true}
-                      minHeight={50}
-                      maxHeight={400}
-                      maxLength={5000}
-                      calendarId={calendarId}
-                      trades={trades}
-                      onOpenGalleryMode={onOpenGalleryMode}
-                    />
-                  </Box>
-
-                  {/* Cover Image - Only on large screens */}
-                  {currentNote.cover_image && (
-                    <Box
-                      sx={{
-                        display: { xs: 'none', lg: 'block' },
-                        width: 280, 
-                        m:1,
-                        alignSelf: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: '100%',
-                          height: 200,
-                          borderRadius: 1,
-                          backgroundImage: `url(${currentNote.cover_image})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                          boxShadow: `0 2px 8px ${alpha(theme.palette.grey[500], 0.1)}`,
-                        }}
-                      />
-                    </Box>
-                  )}
+                  <RichTextEditor
+                    value={currentNote.content}
+                    disabled
+                    hideCharacterCount
+                    minHeight={60}
+                    maxHeight={65}
+                  />
                 </Box>
-              </Fade>
+
+                {/* View more link */}
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: 'info.main',
+                    fontWeight: 500,
+                    mt: 0.5,
+                    display: 'inline-block',
+                    '&:hover': {
+                      textDecoration: 'underline',
+                    },
+                  }}
+                >
+                  View full note →
+                </Typography>
+              </Box>
             </>
           )}
         </Box>
