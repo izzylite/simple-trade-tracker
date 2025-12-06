@@ -3,9 +3,9 @@
  * All custom tools (non-MCP) are defined and implemented here
  */
 
-import { log } from '../_shared/supabase.ts';
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import type { Note } from './types.ts';
+import { log } from "../_shared/supabase.ts";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { Note } from "./types.ts";
 
 /**
  * Gemini function declaration type
@@ -30,286 +30,352 @@ export interface GeminiFunctionDeclaration {
  * Web search tool definition
  */
 export const searchWebTool: GeminiFunctionDeclaration = {
-  name: 'search_web',
-  description: 'Search web for market news, analysis, and trading information. After getting search results, you can use scrape_url to extract more detailed content from specific URLs.',
+  name: "search_web",
+  description:
+    "Search web for market news, analysis, and trading information. After getting search results, you can use scrape_url to extract more detailed content from specific URLs.",
   parameters: {
-    type: 'object',
+    type: "object",
     properties: {
       query: {
-        type: 'string',
-        description: 'Search query'
+        type: "string",
+        description: "Search query",
       },
       type: {
-        type: 'string',
+        type: "string",
         description: 'Type: "search" or "news"',
-        enum: ['search', 'news']
-      }
+        enum: ["search", "news"],
+      },
     },
-    required: ['query']
-  }
+    required: ["query"],
+  },
 };
 
 /**
  * URL scraping tool definition
  */
 export const scrapeUrlTool: GeminiFunctionDeclaration = {
-  name: 'scrape_url',
-  description: 'Scrape and extract content from a URL to get more detailed information. Use this after search_web to get full article content. You can also use this to extract and analyze sentiment from news articles.',
+  name: "scrape_url",
+  description:
+    "Scrape and extract content from a URL to get more detailed information. Use this after search_web to get full article content. You can also use this to extract and analyze sentiment from news articles.",
   parameters: {
-    type: 'object',
+    type: "object",
     properties: {
       url: {
-        type: 'string',
-        description: 'The URL to scrape and extract content from'
-      }
+        type: "string",
+        description: "The URL to scrape and extract content from",
+      },
     },
-    required: ['url']
-  }
+    required: ["url"],
+  },
 };
 
 /**
  * Crypto price tool definition
  */
 export const getCryptoPriceTool: GeminiFunctionDeclaration = {
-  name: 'get_crypto_price',
-  description: 'Get real-time cryptocurrency price, 24h change, volume, and market cap. Use this to understand current market conditions when analyzing trades.',
+  name: "get_crypto_price",
+  description:
+    "Get real-time cryptocurrency price, 24h change, volume, and market cap. Use this to understand current market conditions when analyzing trades.",
   parameters: {
-    type: 'object',
+    type: "object",
     properties: {
       coin_id: {
-        type: 'string',
-        description: 'Coin ID (lowercase): bitcoin, ethereum, solana, cardano, ripple, dogecoin, etc. Use common names.'
-      }
+        type: "string",
+        description:
+          "Coin ID (lowercase): bitcoin, ethereum, solana, cardano, ripple, dogecoin, etc. Use common names.",
+      },
     },
-    required: ['coin_id']
-  }
+    required: ["coin_id"],
+  },
 };
 
 /**
  * Forex price tool definition
  */
 export const getForexPriceTool: GeminiFunctionDeclaration = {
-  name: 'get_forex_price',
-  description: 'Get real-time foreign exchange (forex) rates for currency pairs like EUR/USD, GBP/USD, etc. Use this for forex trading analysis.',
+  name: "get_forex_price",
+  description:
+    "Get real-time foreign exchange (forex) rates for currency pairs like EUR/USD, GBP/USD, etc. Use this for forex trading analysis.",
   parameters: {
-    type: 'object',
+    type: "object",
     properties: {
       base_currency: {
-        type: 'string',
-        description: 'Base currency code (3-letter): EUR, GBP, USD, JPY, CHF, CAD, AUD, NZD, etc.'
+        type: "string",
+        description:
+          "Base currency code (3-letter): EUR, GBP, USD, JPY, CHF, CAD, AUD, NZD, etc.",
       },
       quote_currency: {
-        type: 'string',
-        description: 'Quote currency code (3-letter): USD, EUR, GBP, JPY, CHF, CAD, AUD, NZD, etc.'
-      }
+        type: "string",
+        description:
+          "Quote currency code (3-letter): USD, EUR, GBP, JPY, CHF, CAD, AUD, NZD, etc.",
+      },
     },
-    required: ['base_currency', 'quote_currency']
-  }
+    required: ["base_currency", "quote_currency"],
+  },
 };
 
 /**
  * Chart generation tool definition
  */
 export const generateChartTool: GeminiFunctionDeclaration = {
-  name: 'generate_chart',
-  description: 'Generate a chart visualization from data. Returns HTML with an embedded image that displays inline in the chat. Use this after querying trade data via MCP tools to create visual representations like equity curves, P&L over time, or performance metrics.',
+  name: "generate_chart",
+  description:
+    "Generate a chart visualization from data. Returns HTML with an embedded image that displays inline in the chat. Use this after querying trade data via MCP tools to create visual representations like equity curves, P&L over time, or performance metrics.",
   parameters: {
-    type: 'object',
+    type: "object",
     properties: {
       chart_type: {
-        type: 'string',
-        description: 'Type of chart to generate',
-        enum: ['line', 'bar']
+        type: "string",
+        description: "Type of chart to generate",
+        enum: ["line", "bar"],
       },
       title: {
-        type: 'string',
-        description: 'Chart title'
+        type: "string",
+        description: "Chart title",
       },
       x_label: {
-        type: 'string',
-        description: 'X-axis label'
+        type: "string",
+        description: "X-axis label",
       },
       y_label: {
-        type: 'string',
-        description: 'Y-axis label'
+        type: "string",
+        description: "Y-axis label",
       },
       labels: {
-        type: 'array',
-        description: 'Array of X-axis labels (e.g., dates, times)',
-        items: { type: 'string' }
+        type: "array",
+        description: "Array of X-axis labels (e.g., dates, times)",
+        items: { type: "string" },
       },
       datasets: {
-        type: 'array',
-        description: 'Array of dataset objects with {label: string, data: array of numbers, color: string}',
-        items: { type: 'object' }
-      }
+        type: "array",
+        description:
+          "Array of dataset objects with {label: string, data: array of numbers, color: string}",
+        items: { type: "object" },
+      },
     },
-    required: ['chart_type', 'title', 'labels', 'datasets']
-  }
+    required: ["chart_type", "title", "labels", "datasets"],
+  },
 };
 
 /**
  * Create note tool definition
  */
 export const createNoteTool: GeminiFunctionDeclaration = {
-  name: 'create_note',
-  description: 'Create a new note for the user in their trading calendar. Use this to save trading strategies, insights, lessons learned, or game plans. IMPORTANT: Also use this to maintain YOUR OWN AGENT MEMORY by creating a special note titled "Trading Agent Memory - [Calendar Name]" with tag "AGENT_MEMORY" that stores discovered patterns, user preferences, and lessons learned across sessions. This memory note should be created after identifying 3+ significant patterns and updated incrementally. Content should be in plain text format. User ID and Calendar ID are automatically provided from context.',
+  name: "create_note",
+  description: `Create a new note for the user in their trading calendar.
+
+USE CASES:
+- Save trading strategies, insights, lessons learned, or game plans for the user
+- Maintain YOUR OWN AGENT MEMORY by creating a note titled "Trading Agent Memory - [Calendar Name]" with tag "AGENT_MEMORY"
+
+AGENT MEMORY: Store discovered patterns, user preferences, and lessons learned across sessions. Create after identifying significant patterns, update incrementally.
+
+Content should be in plain text format. User ID and Calendar ID are automatically provided from context.`,
   parameters: {
-    type: 'object',
+    type: "object",
     properties: {
       title: {
-        type: 'string',
-        description: 'Note title (concise and descriptive)'
+        type: "string",
+        description: "Note title (concise and descriptive)",
       },
       content: {
-        type: 'string',
-        description: 'Note content in plain text format. Use clear paragraphs and line breaks for readability. Do not use HTML tags.'
+        type: "string",
+        description:
+          "Note content in plain text format. Use clear paragraphs and line breaks for readability. Do not use HTML tags.",
       },
       tags: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Array of tags for categorizing the note. Common tags: "AGENT_MEMORY" (for AI persistent memory), "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED". REQUIRED: Use "AGENT_MEMORY" tag for memory notes.'
+        type: "array",
+        items: { type: "string" },
+        description:
+          'Categorize the note. Available: "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED", "RISK_MANAGEMENT", "PSYCHOLOGY", "GENERAL". Use "AGENT_MEMORY" ONLY for AI memory notes.',
       },
       reminder_type: {
-        type: 'string',
-        enum: ['none', 'once', 'weekly'],
-        description: 'Reminder type: "none" (no reminder), "once" (specific date), or "weekly" (recurring days)'
+        type: "string",
+        enum: ["none", "once", "weekly"],
+        description:
+          'Reminder type: "none" (no reminder), "once" (specific date), or "weekly" (recurring days)',
       },
       reminder_date: {
-        type: 'string',
-        description: 'ISO date string (YYYY-MM-DD) for one-time reminders. Only used when reminder_type is "once".'
+        type: "string",
+        description:
+          'ISO date string (YYYY-MM-DD) for one-time reminders. Only used when reminder_type is "once".',
       },
       reminder_days: {
-        type: 'array',
+        type: "array",
         items: {
-          type: 'string',
-          enum: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+          type: "string",
+          enum: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
         },
-        description: 'Array of day abbreviations for weekly reminders. Only used when reminder_type is "weekly". Example: ["Mon", "Wed", "Fri"]'
-      }
+        description:
+          'Array of day abbreviations for weekly reminders. Only used when reminder_type is "weekly". Example: ["Mon", "Wed", "Fri"]',
+      },
     },
-    required: ['title', 'content']
-  }
+    required: ["title", "content"],
+  },
 };
 
 /**
  * Update note tool definition
  */
 export const updateNoteTool: GeminiFunctionDeclaration = {
-  name: 'update_note',
-  description: 'Update an existing AI-created note. You can only update notes that you created (by_assistant=true). Use this to refine strategies or update insights. IMPORTANT: Use this to update your "Trading Agent Memory" note incrementally by appending new discoveries (don\'t rewrite the entire memory). You can also add/modify/remove tags and reminders.',
+  name: "update_note",
+  description: `Update an existing AI-created note. You can only update notes that you created (by_assistant=true).
+
+USE CASES:
+- Refine strategies or update insights
+- Update your "Trading Agent Memory" note incrementally (append new discoveries, don't rewrite entirely)
+- Add/modify/remove tags and reminders`,
   parameters: {
-    type: 'object',
+    type: "object",
     properties: {
       note_id: {
-        type: 'string',
-        description: 'ID of the note to update'
+        type: "string",
+        description: "ID of the note to update",
       },
       title: {
-        type: 'string',
-        description: 'New title (optional - only include if changing)'
+        type: "string",
+        description: "New title (optional - only include if changing)",
       },
       content: {
-        type: 'string',
-        description: 'New content in plain text format (optional - only include if changing). Use clear paragraphs and line breaks for readability. Do not use HTML tags.'
+        type: "string",
+        description:
+          "New content in plain text format (optional - only include if changing). Use clear paragraphs and line breaks for readability. Do not use HTML tags.",
       },
       tags: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Updated array of tags (optional - only include if changing). Common tags: "AGENT_MEMORY", "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED".'
+        type: "array",
+        items: { type: "string" },
+        description:
+          'Updated tags (optional). Available: "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED", "RISK_MANAGEMENT", "PSYCHOLOGY", "GENERAL", "AGENT_MEMORY".',
       },
       reminder_type: {
-        type: 'string',
-        enum: ['none', 'once', 'weekly'],
-        description: 'Reminder type: "none" (no reminder), "once" (specific date), or "weekly" (recurring days). Use "none" to remove reminders.'
+        type: "string",
+        enum: ["none", "once", "weekly"],
+        description:
+          'Reminder type: "none" (no reminder), "once" (specific date), or "weekly" (recurring days). Use "none" to remove reminders.',
       },
       reminder_date: {
-        type: 'string',
-        description: 'ISO date string (YYYY-MM-DD) for one-time reminders. Only used when reminder_type is "once".'
+        type: "string",
+        description:
+          'ISO date string (YYYY-MM-DD) for one-time reminders. Only used when reminder_type is "once".',
       },
       reminder_days: {
-        type: 'array',
+        type: "array",
         items: {
-          type: 'string',
-          enum: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+          type: "string",
+          enum: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
         },
-        description: 'Array of day abbreviations for weekly reminders. Only used when reminder_type is "weekly". Example: ["Mon", "Wed", "Fri"]'
-      }
+        description:
+          'Array of day abbreviations for weekly reminders. Only used when reminder_type is "weekly". Example: ["Mon", "Wed", "Fri"]',
+      },
     },
-    required: ['note_id']
-  }
+    required: ["note_id"],
+  },
 };
 
 /**
  * Delete note tool definition
  */
 export const deleteNoteTool: GeminiFunctionDeclaration = {
-  name: 'delete_note',
-  description: 'Delete an existing AI-created note. You can only delete notes that you created (by_assistant=true). Use this to remove outdated or incorrect notes.',
+  name: "delete_note",
+  description:
+    "Delete an existing AI-created note. You can only delete notes that you created (by_assistant=true). Use this to remove outdated or incorrect notes.",
   parameters: {
-    type: 'object',
+    type: "object",
     properties: {
       note_id: {
-        type: 'string',
-        description: 'ID of the note to delete'
-      }
+        type: "string",
+        description: "ID of the note to delete",
+      },
     },
-    required: ['note_id']
-  }
+    required: ["note_id"],
+  },
 };
 
 /**
  * Search notes tool definition
  */
 export const searchNotesTool: GeminiFunctionDeclaration = {
-  name: 'search_notes',
-  description: 'Search and retrieve notes from the user\'s trading calendar. CRITICAL: At the START of EVERY session, search with tags: ["AGENT_MEMORY"] to retrieve your persistent memory about this trader (discovered patterns, preferences, lessons learned). Use this memory to provide personalized analysis. Also use this to understand user strategies, insights, and game plans. Returns both user-created and AI-created notes. User ID and Calendar ID are automatically provided from context.',
+  name: "search_notes",
+  description: `Search and retrieve notes from the user's trading calendar.
+
+CRITICAL: At the START of EVERY session, search with tags: ["AGENT_MEMORY"] to retrieve your persistent memory about this trader.
+
+AVAILABLE TAGS (use these to filter by category):
+- "STRATEGY" - Trading strategies and methodologies
+- "GAME_PLAN" - Daily/weekly trading plans and preparation
+- "INSIGHT" - Market observations and realizations
+- "LESSON_LEARNED" - Post-trade reflections and mistakes to avoid
+- "RISK_MANAGEMENT" - Position sizing, stop loss rules, risk parameters
+- "PSYCHOLOGY" - Trading mindset, emotions, mental frameworks
+- "GENERAL" - Miscellaneous notes
+- "AGENT_MEMORY" - AI persistent memory (retrieve at session start)
+
+SMART QUERYING EXAMPLES:
+- Analyze user's risk approach: tags: ["RISK_MANAGEMENT"]
+- Review strategies before trading: tags: ["STRATEGY"]
+- Understand daily preparation: tags: ["GAME_PLAN"]
+- Learn from past mistakes: tags: ["LESSON_LEARNED"]
+- Combine with search_query for precision: tags: ["STRATEGY"], search_query: "scalping"
+
+EMBEDDED IMAGES:
+- Notes may contain embedded images (diagrams, charts, frameworks)
+- Results show: [Embedded images: url1, url2] when images exist
+- Use analyze_image tool on these URLs for visual context
+- Especially valuable for: strategy diagrams, setup examples, risk frameworks
+
+Returns both user-created and AI-created notes. User ID and Calendar ID are automatically provided from context.`,
   parameters: {
-    type: 'object',
+    type: "object",
     properties: {
       search_query: {
-        type: 'string',
-        description: 'Optional search query to filter notes by title or content. Leave empty to get all notes.'
+        type: "string",
+        description:
+          "Optional text search to filter notes by title or content. Combine with tags for precision.",
       },
       tags: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Optional array of tags to filter notes. Use ["AGENT_MEMORY"] to retrieve AI memory notes. If provided, only notes with ALL specified tags will be returned.'
+        type: "array",
+        items: { type: "string" },
+        description:
+          'Filter by category. Available: "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED", "RISK_MANAGEMENT", "PSYCHOLOGY", "GENERAL", "AGENT_MEMORY". Notes must have ALL specified tags.',
       },
       include_archived: {
-        type: 'boolean',
-        description: 'Whether to include archived notes. Default is false.'
-      }
+        type: "boolean",
+        description: "Whether to include archived notes. Default is false.",
+      },
     },
-    required: []
-  }
+    required: [],
+  },
 };
 
 /**
  * Analyze trade image tool definition
  */
 export const analyzeImageTool: GeminiFunctionDeclaration = {
-  name: 'analyze_image',
-  description: 'Analyze a trade chart image to extract insights about entries, exits, patterns, and price action. Use this when reviewing trades that have attached images. Pass the image URL from trade.images[].url field.',
+  name: "analyze_image",
+  description:
+    "Analyze a trade chart image to extract insights about entries, exits, patterns, and price action. Use this when reviewing trades that have attached images. Pass the image URL from trade.images[].url field.",
   parameters: {
-    type: 'object',
+    type: "object",
     properties: {
       image_url: {
-        type: 'string',
-        description: 'The URL of the trade image to analyze (from trade.images[].url)'
+        type: "string",
+        description:
+          "The URL of the trade image to analyze (from trade.images[].url)",
       },
       analysis_focus: {
-        type: 'string',
-        description: 'What to focus the analysis on: entry quality, exit timing, pattern identification, support/resistance, or general overview',
-        enum: ['entry', 'exit', 'patterns', 'levels', 'overview']
+        type: "string",
+        description:
+          "What to focus the analysis on: entry quality, exit timing, pattern identification, support/resistance, or general overview",
+        enum: ["entry", "exit", "patterns", "levels", "overview"],
       },
       trade_context: {
-        type: 'string',
-        description: 'Optional context about the trade (e.g., "Long EUR/USD, won 2R") to help interpret the chart'
-      }
+        type: "string",
+        description:
+          'Optional context about the trade (e.g., "Long EUR/USD, won 2R") to help interpret the chart',
+      },
     },
-    required: ['image_url']
-  }
+    required: ["image_url"],
+  },
 };
 
 /**
@@ -321,24 +387,27 @@ export const analyzeImageTool: GeminiFunctionDeclaration = {
 /**
  * Execute web search using Serper API
  */
-export async function executeWebSearch(query: string, searchType: string = 'search'): Promise<string> {
+export async function executeWebSearch(
+  query: string,
+  searchType: string = "search",
+): Promise<string> {
   try {
-    const serperApiKey = Deno.env.get('SERPER_API_KEY');
+    const serperApiKey = Deno.env.get("SERPER_API_KEY");
     if (!serperApiKey) {
-      return 'Web search not configured';
+      return "Web search not configured";
     }
 
-    const endpoint = searchType === 'news'
-      ? 'https://google.serper.dev/news'
-      : 'https://google.serper.dev/search';
+    const endpoint = searchType === "news"
+      ? "https://google.serper.dev/news"
+      : "https://google.serper.dev/search";
 
     const response = await fetch(endpoint, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'X-API-KEY': serperApiKey,
-        'Content-Type': 'application/json',
+        "X-API-KEY": serperApiKey,
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({ q: query, gl: 'us', hl: 'en', num: 10 }),
+      body: JSON.stringify({ q: query, gl: "us", hl: "en", num: 10 }),
     });
 
     if (!response.ok) {
@@ -352,7 +421,8 @@ export async function executeWebSearch(query: string, searchType: string = 'sear
     // For news endpoint: data.news
     const hasOrganic = data.organic && data.organic.length > 0;
     const hasNews = data.news && data.news.length > 0;
-    const hasKnowledge = data.knowledgeGraph && (data.knowledgeGraph.title || data.knowledgeGraph.description);
+    const hasKnowledge = data.knowledgeGraph &&
+      (data.knowledgeGraph.title || data.knowledgeGraph.description);
 
     if (!hasOrganic && !hasNews && !hasKnowledge) {
       return `⚠️ NO RESULTS FOUND for query: "${query}". Try different search terms or use your market knowledge.`;
@@ -361,28 +431,33 @@ export async function executeWebSearch(query: string, searchType: string = 'sear
     let results = `Search results for: "${query}"\n\n`;
 
     if (hasOrganic) {
-      results += 'Top Results:\n';
+      results += "Top Results:\n";
       for (const result of data.organic.slice(0, 5)) {
-        results += `\n- ${result.title}\n  ${result.snippet}\n  ${result.link}\n`;
+        results +=
+          `\n- ${result.title}\n  ${result.snippet}\n  ${result.link}\n`;
       }
     }
 
     if (hasNews) {
-      results += 'News Results:\n';
+      results += "News Results:\n";
       for (const result of data.news.slice(0, 5)) {
-        results += `\n- ${result.title}\n  ${result.snippet || result.description || ''}\n  ${result.link}\n`;
+        results += `\n- ${result.title}\n  ${
+          result.snippet || result.description || ""
+        }\n  ${result.link}\n`;
       }
     }
 
     if (hasKnowledge) {
-      const title = data.knowledgeGraph.title || '';
-      const desc = data.knowledgeGraph.description || '';
+      const title = data.knowledgeGraph.title || "";
+      const desc = data.knowledgeGraph.description || "";
       results += `\n\n${title}\n${desc}\n`;
     }
 
     return results;
   } catch (error) {
-    return `Search error: ${error instanceof Error ? error.message : 'Unknown'}`;
+    return `Search error: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
   }
 }
 
@@ -391,23 +466,23 @@ export async function executeWebSearch(query: string, searchType: string = 'sear
  */
 export async function scrapeUrl(url: string): Promise<string> {
   try {
-    const serperApiKey = Deno.env.get('SERPER_API_KEY');
+    const serperApiKey = Deno.env.get("SERPER_API_KEY");
     if (!serperApiKey) {
-      return 'URL scraping not configured (SERPER_API_KEY missing)';
+      return "URL scraping not configured (SERPER_API_KEY missing)";
     }
 
     // Validate URL
     try {
       new URL(url);
     } catch {
-      return 'Invalid URL format';
+      return "Invalid URL format";
     }
 
-    const response = await fetch('https://google.serper.dev/scrape', {
-      method: 'POST',
+    const response = await fetch("https://google.serper.dev/scrape", {
+      method: "POST",
       headers: {
-        'X-API-KEY': serperApiKey,
-        'Content-Type': 'application/json',
+        "X-API-KEY": serperApiKey,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ url }),
     });
@@ -428,14 +503,16 @@ export async function scrapeUrl(url: string): Promise<string> {
       // Limit content length to manage token usage
       const maxLength = 3000;
       const text = data.text.length > maxLength
-        ? data.text.substring(0, maxLength) + '...'
+        ? data.text.substring(0, maxLength) + "..."
         : data.text;
       result += `Content:\n${text}`;
     }
 
-    return result || 'No content extracted from URL';
+    return result || "No content extracted from URL";
   } catch (error) {
-    return `URL scraping error: ${error instanceof Error ? error.message : 'Unknown'}`;
+    return `URL scraping error: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
   }
 }
 
@@ -447,7 +524,8 @@ export async function getCryptoPrice(coinId: string): Promise<string> {
     // Normalize coin ID to lowercase
     coinId = coinId.toLowerCase().trim();
 
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`;
+    const url =
+      `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`;
 
     const response = await fetch(url);
 
@@ -463,30 +541,41 @@ export async function getCryptoPrice(coinId: string): Promise<string> {
 
     const coin = data[coinId];
     const priceChange = coin.usd_24h_change || 0;
-    const changeSymbol = priceChange >= 0 ? '📈' : '📉';
+    const changeSymbol = priceChange >= 0 ? "📈" : "📉";
 
     let result = `${coinId.toUpperCase()} Market Data:\n\n`;
-    result += `💰 Price: $${coin.usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
+    result += `💰 Price: $${
+      coin.usd.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    }\n`;
     result += `${changeSymbol} 24h Change: ${priceChange.toFixed(2)}%\n`;
     result += `📊 24h Volume: $${(coin.usd_24h_vol / 1e6).toFixed(2)}M\n`;
     result += `🏦 Market Cap: $${(coin.usd_market_cap / 1e9).toFixed(2)}B\n`;
 
     return result;
   } catch (error) {
-    return `Crypto price error: ${error instanceof Error ? error.message : 'Unknown'}`;
+    return `Crypto price error: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
   }
 }
 
 /**
  * Get forex exchange rate using Frankfurter API
  */
-export async function getForexPrice(baseCurrency: string, quoteCurrency: string): Promise<string> {
+export async function getForexPrice(
+  baseCurrency: string,
+  quoteCurrency: string,
+): Promise<string> {
   try {
     // Normalize currency codes to uppercase
     baseCurrency = baseCurrency.toUpperCase().trim();
     quoteCurrency = quoteCurrency.toUpperCase().trim();
 
-    const url = `https://api.frankfurter.app/latest?from=${baseCurrency}&to=${quoteCurrency}`;
+    const url =
+      `https://api.frankfurter.app/latest?from=${baseCurrency}&to=${quoteCurrency}`;
 
     const response = await fetch(url);
 
@@ -510,7 +599,9 @@ export async function getForexPrice(baseCurrency: string, quoteCurrency: string)
 
     return result;
   } catch (error) {
-    return `Forex rate error: ${error instanceof Error ? error.message : 'Unknown'}`;
+    return `Forex rate error: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
   }
 }
 
@@ -523,11 +614,11 @@ export async function generateChart(
   xLabel: string,
   yLabel: string,
   labels: unknown[],
-  datasets: unknown[]
+  datasets: unknown[],
 ): Promise<string> {
   try {
     // Validate chart type
-    if (!['line', 'bar'].includes(chartType)) {
+    if (!["line", "bar"].includes(chartType)) {
       return 'Invalid chart type. Use "line" or "bar".';
     }
 
@@ -536,42 +627,43 @@ export async function generateChart(
       type: chartType,
       data: {
         labels: labels,
-        datasets: datasets
+        datasets: datasets,
       },
       options: {
         title: {
           display: true,
           text: title,
-          fontSize: 16
+          fontSize: 16,
         },
         scales: {
           xAxes: [{
             scaleLabel: {
               display: !!xLabel,
-              labelString: xLabel
-            }
+              labelString: xLabel,
+            },
           }],
           yAxes: [{
             scaleLabel: {
               display: !!yLabel,
-              labelString: yLabel
-            }
-          }]
+              labelString: yLabel,
+            },
+          }],
         },
         legend: {
           display: true,
-          position: 'bottom'
-        }
-      }
+          position: "bottom",
+        },
+      },
     };
 
     // Encode chart config for URL
     const chartConfigEncoded = encodeURIComponent(JSON.stringify(chartConfig));
 
     // Generate QuickChart URL
-    const chartUrl = `https://quickchart.io/chart?c=${chartConfigEncoded}&width=800&height=400&format=png`;
+    const chartUrl =
+      `https://quickchart.io/chart?c=${chartConfigEncoded}&width=800&height=400&format=png`;
 
-    log(`Generated chart URL for: ${title}`, 'info');
+    log(`Generated chart URL for: ${title}`, "info");
 
     // Return special format that the formatter will convert to HTML with embedded image
     // Using a marker that the formatter can detect and convert to <img> tag
@@ -581,7 +673,9 @@ export async function generateChart(
 
 [CHART_IMAGE:${chartUrl}]`;
   } catch (error) {
-    return `Chart generation error: ${error instanceof Error ? error.message : 'Unknown'}`;
+    return `Chart generation error: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
   }
 }
 
@@ -597,10 +691,10 @@ export async function createNote(
   reminderType?: string,
   reminderDate?: string,
   reminderDays?: string[],
-  tags?: string[]
+  tags?: string[],
 ): Promise<string> {
   try {
-    log(`Creating note: ${title}`, 'info');
+    log(`Creating note: ${title}`, "info");
 
     const noteData: Record<string, unknown> = {
       user_id: userId,
@@ -613,41 +707,45 @@ export async function createNote(
       cover_image: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      tags: tags || []
+      tags: tags || [],
     };
 
     // Add reminder fields if provided
-    if (reminderType && reminderType !== 'none') {
+    if (reminderType && reminderType !== "none") {
       noteData.reminder_type = reminderType;
       noteData.is_reminder_active = true;
 
-      if (reminderType === 'once' && reminderDate) {
+      if (reminderType === "once" && reminderDate) {
         noteData.reminder_date = reminderDate;
-      } else if (reminderType === 'weekly' && reminderDays && reminderDays.length > 0) {
+      } else if (
+        reminderType === "weekly" && reminderDays && reminderDays.length > 0
+      ) {
         noteData.reminder_days = reminderDays;
       }
     } else {
-      noteData.reminder_type = 'none';
+      noteData.reminder_type = "none";
       noteData.is_reminder_active = false;
     }
 
     const { data, error } = await supabase
-      .from('notes')
+      .from("notes")
       .insert(noteData)
       .select()
       .single();
 
     if (error) {
-      log(`Error creating note: ${error.message}`, 'error');
+      log(`Error creating note: ${error.message}`, "error");
       return `Failed to create note: ${error.message}`;
     }
 
-    log(`Note created successfully: ${data.id}`, 'info');
+    log(`Note created successfully: ${data.id}`, "info");
 
     // Return the note ID so it can be referenced in the response
     return `Note "${title}" created successfully! [NOTE_CREATED:${data.id}]`;
   } catch (error) {
-    return `Note creation error: ${error instanceof Error ? error.message : 'Unknown'}`;
+    return `Note creation error: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
   }
 }
 
@@ -662,16 +760,16 @@ export async function updateNote(
   reminderType?: string,
   reminderDate?: string,
   reminderDays?: string[],
-  tags?: string[]
+  tags?: string[],
 ): Promise<string> {
   try {
-    log(`Updating note: ${noteId}`, 'info');
+    log(`Updating note: ${noteId}`, "info");
 
     // First, verify this is an AI-created note
     const { data: existingNote, error: fetchError } = await supabase
-      .from('notes')
-      .select('id, by_assistant, title')
-      .eq('id', noteId)
+      .from("notes")
+      .select("id, by_assistant, title")
+      .eq("id", noteId)
       .single();
 
     if (fetchError) {
@@ -688,7 +786,7 @@ export async function updateNote(
 
     // Build update object
     const updateData: Record<string, unknown> = {
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
 
     if (title !== undefined) {
@@ -708,7 +806,7 @@ export async function updateNote(
     if (reminderType !== undefined) {
       updateData.reminder_type = reminderType;
 
-      if (reminderType === 'none') {
+      if (reminderType === "none") {
         // Remove reminder
         updateData.is_reminder_active = false;
         updateData.reminder_date = null;
@@ -716,10 +814,12 @@ export async function updateNote(
       } else {
         updateData.is_reminder_active = true;
 
-        if (reminderType === 'once' && reminderDate) {
+        if (reminderType === "once" && reminderDate) {
           updateData.reminder_date = reminderDate;
           updateData.reminder_days = [];
-        } else if (reminderType === 'weekly' && reminderDays && reminderDays.length > 0) {
+        } else if (
+          reminderType === "weekly" && reminderDays && reminderDays.length > 0
+        ) {
           updateData.reminder_days = reminderDays;
           updateData.reminder_date = null;
         }
@@ -728,21 +828,23 @@ export async function updateNote(
 
     // Update the note
     const { error: updateError } = await supabase
-      .from('notes')
+      .from("notes")
       .update(updateData)
-      .eq('id', noteId)
-      .eq('by_assistant', true); // Extra safety check
+      .eq("id", noteId)
+      .eq("by_assistant", true); // Extra safety check
 
     if (updateError) {
-      log(`Error updating note: ${updateError.message}`, 'error');
+      log(`Error updating note: ${updateError.message}`, "error");
       return `Failed to update note: ${updateError.message}`;
     }
 
-    log(`Note updated successfully: ${noteId}`, 'info');
+    log(`Note updated successfully: ${noteId}`, "info");
 
     return `Note "${existingNote.title}" updated successfully!`;
   } catch (error) {
-    return `Note update error: ${error instanceof Error ? error.message : 'Unknown'}`;
+    return `Note update error: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
   }
 }
 
@@ -751,16 +853,16 @@ export async function updateNote(
  */
 export async function deleteNote(
   supabase: SupabaseClient,
-  noteId: string
+  noteId: string,
 ): Promise<string> {
   try {
-    log(`Deleting note: ${noteId}`, 'info');
+    log(`Deleting note: ${noteId}`, "info");
 
     // First, verify this is an AI-created note
     const { data: existingNote, error: fetchError } = await supabase
-      .from('notes')
-      .select('id, by_assistant, title')
-      .eq('id', noteId)
+      .from("notes")
+      .select("id, by_assistant, title")
+      .eq("id", noteId)
       .single();
 
     if (fetchError) {
@@ -777,21 +879,58 @@ export async function deleteNote(
 
     // Delete the note
     const { error: deleteError } = await supabase
-      .from('notes')
+      .from("notes")
       .delete()
-      .eq('id', noteId)
-      .eq('by_assistant', true); // Extra safety check
+      .eq("id", noteId)
+      .eq("by_assistant", true); // Extra safety check
 
     if (deleteError) {
-      log(`Error deleting note: ${deleteError.message}`, 'error');
+      log(`Error deleting note: ${deleteError.message}`, "error");
       return `Failed to delete note: ${deleteError.message}`;
     }
 
-    log(`Note deleted successfully: ${noteId}`, 'info');
+    log(`Note deleted successfully: ${noteId}`, "info");
 
     return `Note "${existingNote.title}" deleted successfully!`;
   } catch (error) {
-    return `Note deletion error: ${error instanceof Error ? error.message : 'Unknown'}`;
+    return `Note deletion error: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
+  }
+}
+
+/**
+ * Extract image URLs from Draft.js content
+ * Filters out stock/splash images (unsplash, pexels, etc.)
+ */
+function extractImagesFromContent(content: string): string[] {
+  try {
+    const rawContent = JSON.parse(content);
+    const images: string[] = [];
+
+    // Draft.js stores entities in entityMap
+    if (rawContent.entityMap) {
+      for (const key in rawContent.entityMap) {
+        const entity = rawContent.entityMap[key];
+        if (entity.type === "IMAGE" && entity.data?.src) {
+          const src = entity.data.src;
+          // Filter out stock/splash image sources
+          const isStockImage =
+            src.includes("unsplash.com") ||
+            src.includes("pexels.com") ||
+            src.includes("pixabay.com") ||
+            src.includes("stock") ||
+            src.includes("placeholder");
+
+          if (!isStockImage) {
+            images.push(src);
+          }
+        }
+      }
+    }
+    return images;
+  } catch {
+    return [];
   }
 }
 
@@ -804,44 +943,53 @@ export async function searchNotes(
   calendarId: string,
   searchQuery?: string,
   includeArchived: boolean = false,
-  tags?: string[]
+  tags?: string[],
 ): Promise<string> {
   try {
-    log(`Searching notes for user ${userId} in calendar ${calendarId}`, 'info');
+    log(
+      `Searching ${
+        tags?.length ? `tags: ${tags.join(", ")}` : "all"
+      } notes for user ${userId} in calendar ${calendarId}`,
+      "info",
+    );
 
     // Build the query
     let query = supabase
-      .from('notes')
-      .select('id, title, content, by_assistant, is_pinned, is_archived, created_at, updated_at, reminder_type, reminder_date, reminder_days, tags')
-      .eq('user_id', userId)
-      .eq('calendar_id', calendarId);
+      .from("notes")
+      .select(
+        "id, title, content, by_assistant, is_pinned, is_archived, created_at, updated_at, reminder_type, reminder_date, reminder_days, tags",
+      )
+      .eq("user_id", userId)
+      .eq("calendar_id", calendarId);
 
     // Filter by archived status
     if (!includeArchived) {
-      query = query.eq('is_archived', false);
+      query = query.eq("is_archived", false);
     }
 
     // Apply tag filter if provided
     if (tags && tags.length > 0) {
       // Filter notes that contain ALL specified tags
       for (const tag of tags) {
-        query = query.contains('tags', [tag]);
+        query = query.contains("tags", [tag]);
       }
     }
 
     // Apply search filter if provided
     if (searchQuery && searchQuery.trim()) {
-      query = query.or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`);
+      query = query.or(
+        `title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`,
+      );
     }
 
     // Order by pinned first, then by updated date
-    query = query.order('is_pinned', { ascending: false })
-                 .order('updated_at', { ascending: false });
+    query = query.order("is_pinned", { ascending: false })
+      .order("updated_at", { ascending: false });
 
     const { data: notes, error } = await query;
 
     if (error) {
-      log(`Error searching notes: ${error.message}`, 'error');
+      log(`Error searching notes: ${error.message}`, "error");
       return `Failed to search notes: ${error.message}`;
     }
 
@@ -849,23 +997,35 @@ export async function searchNotes(
       return searchQuery
         ? `No notes found matching "${searchQuery}".`
         : tags && tags.length > 0
-        ? `No notes found with tags: ${tags.join(', ')}.`
-        : 'No notes found in this calendar.';
+        ? `No notes found with tags: ${tags.join(", ")}.`
+        : "No notes found in this calendar.";
     }
 
-    log(`Found ${notes.length} notes`, 'info');
+    log(`Found ${notes.length} notes`, "info");
 
     // Format the results with note-ref tags for card display
-    let result = `Found ${notes.length} note${notes.length === 1 ? '' : 's'}:\n\n`;
+    let result = `Found ${notes.length} note${
+      notes.length === 1 ? "" : "s"
+    }:\n\n`;
 
     for (const note of notes) {
       // Add note-ref tag on its own line for card display
-      result += `<note-ref id="${note.id}"/>\n\n`;
+      result += `<note-ref id="${note.id}"/>`;
+
+      // Extract and include embedded images from content
+      const contentImages = extractImagesFromContent(note.content);
+      if (contentImages.length > 0) {
+        result += `\n[Embedded images: ${contentImages.join(", ")}]`;
+      }
+
+      result += "\n\n";
     }
 
     return result;
   } catch (error) {
-    return `Note search error: ${error instanceof Error ? error.message : 'Unknown'}`;
+    return `Note search error: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
   }
 }
 
@@ -875,31 +1035,44 @@ export async function searchNotes(
  */
 export function analyzeImage(
   imageUrl: string,
-  analysisFocus: string = 'overview',
-  tradeContext?: string
+  analysisFocus: string = "overview",
+  tradeContext?: string,
 ): string {
   try {
-    log(`Preparing image for analysis: ${imageUrl.substring(0, 50)}...`, 'info');
+    log(
+      `Preparing image for analysis: ${imageUrl.substring(0, 50)}...`,
+      "info",
+    );
 
     // Build analysis instruction based on focus
     const focusPrompts: Record<string, string> = {
-      entry: 'Focus on analyzing the entry point: Was the entry well-timed? What price action or patterns preceded the entry? Was there confluence?',
-      exit: 'Focus on analyzing the exit: Was the exit optimal? Was profit left on the table? Was the stop loss placement appropriate?',
-      patterns: 'Focus on identifying chart patterns: What patterns are visible (head & shoulders, flags, wedges, etc.)? Are there trend lines or channels?',
-      levels: 'Focus on support/resistance levels: Identify key horizontal levels, trend lines, and areas of interest. Where are the key decision points?',
-      overview: 'Provide a general analysis of this trade chart including: entry/exit quality, patterns, key levels, and any notable observations.'
+      entry:
+        "Focus on analyzing the entry point: Was the entry well-timed? What price action or patterns preceded the entry? Was there confluence?",
+      exit:
+        "Focus on analyzing the exit: Was the exit optimal? Was profit left on the table? Was the stop loss placement appropriate?",
+      patterns:
+        "Focus on identifying chart patterns: What patterns are visible (head & shoulders, flags, wedges, etc.)? Are there trend lines or channels?",
+      levels:
+        "Focus on support/resistance levels: Identify key horizontal levels, trend lines, and areas of interest. Where are the key decision points?",
+      overview:
+        "Provide a general analysis of this trade chart including: entry/exit quality, patterns, key levels, and any notable observations.",
     };
 
-    const focusInstruction = focusPrompts[analysisFocus] || focusPrompts.overview;
-    const contextNote = tradeContext ? ` Trade context: "${tradeContext}".` : '';
+    const focusInstruction = focusPrompts[analysisFocus] ||
+      focusPrompts.overview;
+    const contextNote = tradeContext
+      ? ` Trade context: "${tradeContext}".`
+      : "";
 
     // Return marker with image URL and instructions - conversation builder will inject the actual image
     return `[IMAGE_ANALYSIS:${imageUrl}]
 Analysis instructions: ${focusInstruction}${contextNote}
 Provide a concise analysis (3-5 bullet points). Be specific about what you observe in the chart image above.`;
   } catch (error) {
-    log(`Image preparation error: ${error}`, 'error');
-    return `Image analysis error: ${error instanceof Error ? error.message : 'Unknown'}`;
+    log(`Image preparation error: ${error}`, "error");
+    return `Image analysis error: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
   }
 }
 
@@ -920,92 +1093,155 @@ export async function executeCustomTool(
 ): Promise<string> {
   try {
     switch (toolName) {
-      case 'search_web': {
-        const query = typeof args.query === 'string' ? args.query : '';
-        const searchType = typeof args.type === 'string' ? args.type : 'search';
+      case "search_web": {
+        const query = typeof args.query === "string" ? args.query : "";
+        const searchType = typeof args.type === "string" ? args.type : "search";
         return await executeWebSearch(query, searchType);
       }
 
-      case 'scrape_url': {
-        const url = typeof args.url === 'string' ? args.url : '';
+      case "scrape_url": {
+        const url = typeof args.url === "string" ? args.url : "";
         return await scrapeUrl(url);
       }
 
-      case 'get_crypto_price': {
-        const coinId = typeof args.coin_id === 'string' ? args.coin_id : '';
+      case "get_crypto_price": {
+        const coinId = typeof args.coin_id === "string" ? args.coin_id : "";
         return await getCryptoPrice(coinId);
       }
 
-      case 'get_forex_price': {
-        const baseCurrency = typeof args.base_currency === 'string' ? args.base_currency : '';
-        const quoteCurrency = typeof args.quote_currency === 'string' ? args.quote_currency : '';
+      case "get_forex_price": {
+        const baseCurrency = typeof args.base_currency === "string"
+          ? args.base_currency
+          : "";
+        const quoteCurrency = typeof args.quote_currency === "string"
+          ? args.quote_currency
+          : "";
         return await getForexPrice(baseCurrency, quoteCurrency);
       }
 
-      case 'generate_chart': {
-        const chartType = typeof args.chart_type === 'string' ? args.chart_type : 'line';
-        const title = typeof args.title === 'string' ? args.title : 'Chart';
-        const xLabel = typeof args.x_label === 'string' ? args.x_label : '';
-        const yLabel = typeof args.y_label === 'string' ? args.y_label : '';
+      case "generate_chart": {
+        const chartType = typeof args.chart_type === "string"
+          ? args.chart_type
+          : "line";
+        const title = typeof args.title === "string" ? args.title : "Chart";
+        const xLabel = typeof args.x_label === "string" ? args.x_label : "";
+        const yLabel = typeof args.y_label === "string" ? args.y_label : "";
         const labels = Array.isArray(args.labels) ? args.labels : [];
         const datasets = Array.isArray(args.datasets) ? args.datasets : [];
-        return await generateChart(chartType, title, xLabel, yLabel, labels, datasets);
+        return await generateChart(
+          chartType,
+          title,
+          xLabel,
+          yLabel,
+          labels,
+          datasets,
+        );
       }
 
-      case 'create_note': {
+      case "create_note": {
         if (!supabase) {
-          return 'Supabase client not available for note creation';
+          return "Supabase client not available for note creation";
         }
-        const userId = context.userId || '';
-        const calendarId = context.calendarId || '';
-        const title = typeof args.title === 'string' ? args.title : '';
-        const content = typeof args.content === 'string' ? args.content : '';
-        const reminderType = typeof args.reminder_type === 'string' ? args.reminder_type : undefined;
-        const reminderDate = typeof args.reminder_date === 'string' ? args.reminder_date : undefined;
-        const reminderDays = Array.isArray(args.reminder_days) ? args.reminder_days : undefined;
+        const userId = context.userId || "";
+        const calendarId = context.calendarId || "";
+        const title = typeof args.title === "string" ? args.title : "";
+        const content = typeof args.content === "string" ? args.content : "";
+        const reminderType = typeof args.reminder_type === "string"
+          ? args.reminder_type
+          : undefined;
+        const reminderDate = typeof args.reminder_date === "string"
+          ? args.reminder_date
+          : undefined;
+        const reminderDays = Array.isArray(args.reminder_days)
+          ? args.reminder_days
+          : undefined;
         const tags = Array.isArray(args.tags) ? args.tags : undefined;
 
-        return await createNote(supabase, userId, calendarId, title, content, reminderType, reminderDate, reminderDays, tags);
+        return await createNote(
+          supabase,
+          userId,
+          calendarId,
+          title,
+          content,
+          reminderType,
+          reminderDate,
+          reminderDays,
+          tags,
+        );
       }
 
-      case 'update_note': {
+      case "update_note": {
         if (!supabase) {
-          return 'Supabase client not available for note update';
+          return "Supabase client not available for note update";
         }
-        const noteId = typeof args.note_id === 'string' ? args.note_id : '';
-        const title = typeof args.title === 'string' ? args.title : undefined;
-        const content = typeof args.content === 'string' ? args.content : undefined;
-        const reminderType = typeof args.reminder_type === 'string' ? args.reminder_type : undefined;
-        const reminderDate = typeof args.reminder_date === 'string' ? args.reminder_date : undefined;
-        const reminderDays = Array.isArray(args.reminder_days) ? args.reminder_days : undefined;
+        const noteId = typeof args.note_id === "string" ? args.note_id : "";
+        const title = typeof args.title === "string" ? args.title : undefined;
+        const content = typeof args.content === "string"
+          ? args.content
+          : undefined;
+        const reminderType = typeof args.reminder_type === "string"
+          ? args.reminder_type
+          : undefined;
+        const reminderDate = typeof args.reminder_date === "string"
+          ? args.reminder_date
+          : undefined;
+        const reminderDays = Array.isArray(args.reminder_days)
+          ? args.reminder_days
+          : undefined;
         const tags = Array.isArray(args.tags) ? args.tags : undefined;
-        return await updateNote(supabase, noteId, title, content, reminderType, reminderDate, reminderDays, tags);
+        return await updateNote(
+          supabase,
+          noteId,
+          title,
+          content,
+          reminderType,
+          reminderDate,
+          reminderDays,
+          tags,
+        );
       }
 
-      case 'delete_note': {
+      case "delete_note": {
         if (!supabase) {
-          return 'Supabase client not available for note deletion';
+          return "Supabase client not available for note deletion";
         }
-        const noteId = typeof args.note_id === 'string' ? args.note_id : '';
+        const noteId = typeof args.note_id === "string" ? args.note_id : "";
         return await deleteNote(supabase, noteId);
       }
 
-      case 'search_notes': {
+      case "search_notes": {
         if (!supabase) {
-          return 'Supabase client not available for note search';
+          return "Supabase client not available for note search";
         }
-        const userId = context.userId || '';
-        const calendarId = context.calendarId || '';
-        const searchQuery = typeof args.search_query === 'string' ? args.search_query : undefined;
-        const includeArchived = typeof args.include_archived === 'boolean' ? args.include_archived : false;
+        const userId = context.userId || "";
+        const calendarId = context.calendarId || "";
+        const searchQuery = typeof args.search_query === "string"
+          ? args.search_query
+          : undefined;
+        const includeArchived = typeof args.include_archived === "boolean"
+          ? args.include_archived
+          : false;
         const tags = Array.isArray(args.tags) ? args.tags : undefined;
-        return await searchNotes(supabase, userId, calendarId, searchQuery, includeArchived, tags);
+        return await searchNotes(
+          supabase,
+          userId,
+          calendarId,
+          searchQuery,
+          includeArchived,
+          tags,
+        );
       }
 
-      case 'analyze_image': {
-        const imageUrl = typeof args.image_url === 'string' ? args.image_url : '';
-        const analysisFocus = typeof args.analysis_focus === 'string' ? args.analysis_focus : 'overview';
-        const tradeContext = typeof args.trade_context === 'string' ? args.trade_context : undefined;
+      case "analyze_image": {
+        const imageUrl = typeof args.image_url === "string"
+          ? args.image_url
+          : "";
+        const analysisFocus = typeof args.analysis_focus === "string"
+          ? args.analysis_focus
+          : "overview";
+        const tradeContext = typeof args.trade_context === "string"
+          ? args.trade_context
+          : undefined;
         return analyzeImage(imageUrl, analysisFocus, tradeContext);
       }
 
@@ -1013,7 +1249,9 @@ export async function executeCustomTool(
         return `Unknown custom tool: ${toolName}`;
     }
   } catch (error) {
-    return `Tool execution error: ${error instanceof Error ? error.message : 'Unknown'}`;
+    return `Tool execution error: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
   }
 }
 
@@ -1031,6 +1269,6 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     updateNoteTool,
     deleteNoteTool,
     searchNotesTool,
-    analyzeImageTool
+    analyzeImageTool,
   ];
 }

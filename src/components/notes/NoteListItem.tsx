@@ -27,6 +27,7 @@ import {
 import { convertFromRaw } from 'draft-js';
 import { Note } from '../../types/note';
 import { Calendar } from '../../types/calendar';
+import { getTagDisplayLabel } from './NoteEditorDialog';
 
 interface NoteListItemProps {
   note: Note;
@@ -188,7 +189,7 @@ export const NoteListItem: React.FC<NoteListItemProps> = ({
             {note.tags.slice(0, 3).map((tag) => (
               <Chip
                 key={tag}
-                label={tag}
+                label={getTagDisplayLabel(tag)}
                 size="small"
                 sx={{
                   height: 16,

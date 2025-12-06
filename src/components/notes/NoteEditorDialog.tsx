@@ -38,7 +38,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   LocalOffer as TagIcon,
-  Add as AddIcon,
+
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -52,6 +52,22 @@ import * as notesService from '../../services/notesService';
 import { Note, ReminderType, DayAbbreviation } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
+
+// Default tags with display labels and internal values (for AI compatibility)
+export const DEFAULT_NOTE_TAGS_MAP: Record<string, string> = {
+  'STRATEGY': 'Strategy',
+  'GAME_PLAN': 'Game Plan',
+  'INSIGHT': 'Insight',
+  'LESSON_LEARNED': 'Lesson Learned',
+  'GENERAL': 'General',
+  'RISK_MANAGEMENT': 'Risk Management',
+  'PSYCHOLOGY': 'Psychology',
+};
+
+// Helper to get display label for a tag (returns original if not a default tag)
+export const getTagDisplayLabel = (tag: string): string => {
+  return DEFAULT_NOTE_TAGS_MAP[tag] || tag;
+};
 
 interface NoteEditorDialogProps {
   open: boolean;
@@ -93,30 +109,10 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   // Tags states
   const [tags, setTags] = useState<string[]>([]);
   const [isTagsExpanded, setIsTagsExpanded] = useState(false);
+
   const [newTagInput, setNewTagInput] = useState('');
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
-
   const allDays: DayAbbreviation[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  // Default tags with display labels and internal values (for AI compatibility)
-  const defaultTagsMap: Record<string, string> = {
-    'STRATEGY': 'Strategy',
-    'GAME_PLAN': 'Game Plan',
-    'INSIGHT': 'Insight',
-    'LESSON_LEARNED': 'Lesson Learned',
-  };
-  const defaultTags = Object.keys(defaultTagsMap);
-
-  // Helper to get display label for a tag (returns original if not a default tag)
-  const getTagDisplayLabel = (tag: string): string => {
-    return defaultTagsMap[tag] || tag;
-  };
-
-  // Helper to get internal value from display label
-  const getTagInternalValue = (displayLabel: string): string => {
-    const entry = Object.entries(defaultTagsMap).find(([_, label]) => label === displayLabel);
-    return entry ? entry[0] : displayLabel;
-  };
+  const defaultTags = Object.keys(DEFAULT_NOTE_TAGS_MAP);
 
   // Initialize note data when dialog opens
   useEffect(() => {
@@ -159,28 +155,6 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       }
     }
   }, [open, initialNote]);
-
-  // Load available tags from user's notes
-  useEffect(() => {
-    const loadAvailableTags = async () => {
-      if (!open || !user?.uid) return;
-
-      try {
-        const notes = await notesService.getUserNotes(user.uid);
-        // Extract unique tags from all notes and merge with default tags
-        const userTags = notes.flatMap(n => n.tags || []);
-        const allTags = [...defaultTags, ...userTags];
-        const uniqueTags = Array.from(new Set(allTags)).sort();
-        setAvailableTags(uniqueTags);
-      } catch (error) {
-        logger.error('Error loading available tags:', error);
-        // Still show default tags even if loading fails
-        setAvailableTags(defaultTags);
-      }
-    };
-
-    loadAvailableTags();
-  }, [open, user?.uid]);
 
   const saveNote = async () => {
     if (!user?.uid) return;
@@ -387,25 +361,15 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   };
 
   // Tag handlers
-  const handleAddTag = () => {
-    const trimmedTag = newTagInput.trim();
-    // Convert display label to internal value if it's a default tag
-    const internalValue = getTagInternalValue(trimmedTag);
-    if (internalValue && !tags.includes(internalValue)) {
-      setTags(prev => [...prev, internalValue]);
+  const handleAddTag = (tagValue: string) => {
+    if (tagValue && !tags.includes(tagValue)) {
+      setTags(prev => [...prev, tagValue]);
       setNewTagInput('');
     }
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
     setTags(prev => prev.filter(tag => tag !== tagToRemove));
-  };
-
-  const handleTagInputKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddTag();
-    }
   };
 
   // Check if tag editing is allowed (not for AI notes)
@@ -419,8 +383,8 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         fullScreen={fullScreen}
         maxWidth="md"
         sx={{
-        zIndex: (theme) => theme.zIndex.modal + 100, // Ensure it's above the AIChatDrawer
-      }}
+          zIndex: (theme) => theme.zIndex.modal + 100, // Ensure it's above the AIChatDrawer
+        }}
         PaperProps={{
           sx: {
             height: fullScreen ? '100%' : '90vh',
@@ -504,109 +468,109 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               </Box>
             </Box>
           )}
-            {/* Reminder Sub-Header */}
+          {/* Reminder Sub-Header */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 3,
+              py: 1,
+              bgcolor: alpha(theme.palette.info.main, 0.04),
+              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            }}
+          >
+            {/* Left side - Reminder toggle */}
             <Box
+              onClick={() => setIsReminderExpanded(!isReminderExpanded)}
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                px: 3,
-                py: 1,
-                bgcolor: alpha(theme.palette.info.main, 0.04),
-                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                gap: 1,
+                cursor: 'pointer',
+                py: 0.5,
+                '&:hover': {
+                  opacity: 0.8,
+                },
               }}
             >
-              {/* Left side - Reminder toggle */}
-              <Box
-                onClick={() => setIsReminderExpanded(!isReminderExpanded)}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  cursor: 'pointer',
-                  py: 0.5,
-                  '&:hover': {
-                    opacity: 0.8,
-                  },
-                }}
+              {isReminderActive ? (
+                <ReminderIcon sx={{ color: 'info.main', fontSize: '1.1rem' }} />
+              ) : (
+                <NoReminderIcon sx={{ color: 'text.secondary', fontSize: '1.1rem' }} />
+              )}
+              <Typography
+                variant="subtitle2"
+                fontWeight={600}
+                sx={{ color: isReminderActive ? 'info.main' : 'text.secondary' }}
               >
-                {isReminderActive ? (
-                  <ReminderIcon sx={{ color: 'info.main', fontSize: '1.1rem' }} />
-                ) : (
-                  <NoReminderIcon sx={{ color: 'text.secondary', fontSize: '1.1rem' }} />
-                )}
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={600}
-                  sx={{ color: isReminderActive ? 'info.main' : 'text.secondary' }}
-                >
-                  Reminder
+                Reminder
+              </Typography>
+              {isReminderActive && reminderType !== 'none' && (
+                <Typography variant="caption" color="text.secondary">
+                  {reminderType === 'weekly'
+                    ? `${reminderDays.length} day${reminderDays.length !== 1 ? 's' : ''}`
+                    : 'One-time'
+                  }
                 </Typography>
-                {isReminderActive && reminderType !== 'none' && (
-                  <Typography variant="caption" color="text.secondary">
-                    {reminderType === 'weekly'
-                      ? `${reminderDays.length} day${reminderDays.length !== 1 ? 's' : ''}`
-                      : 'One-time'
-                    }
-                  </Typography>
-                )}
-                <IconButton size="small" sx={{ color: 'text.secondary', ml: -0.5 }}>
-                  {isReminderExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                </IconButton>
-              </Box>
-
-              {/* Right side - Action buttons */}
-              <Box sx={{ display: 'flex', gap: 0.5 }}>
-                <IconButton
-                  size="small"
-                  onClick={() => setImagePickerOpen(true)}
-                  title={coverImage ? 'Change cover' : 'Add cover image'}
-                >
-                  <ImageIcon fontSize="small" />
-                </IconButton>
-
-                {note && (
-                  <>
-                    <IconButton
-                      size="small"
-                      onClick={handlePinNote}
-                      title={note.is_pinned ? 'Unpin note' : 'Pin note'}
-                      sx={{
-                        color: note.is_pinned ? 'primary.main' : 'inherit',
-                      }}
-                    >
-                      {note.is_pinned ? <PinIcon fontSize="small" /> : <PinOutlinedIcon fontSize="small" />}
-                    </IconButton>
-
-                    <IconButton
-                      size="small"
-                      onClick={handleArchiveNote}
-                      title={note.is_archived ? 'Unarchive note' : 'Archive note'}
-                    >
-                      {note.is_archived ? <UnarchiveIcon fontSize="small" /> : <ArchiveIcon fontSize="small" />}
-                    </IconButton>
-
-                    <IconButton
-                      size="small"
-                      onClick={handleDeleteNote}
-                      title="Delete note"
-                      sx={{ color: 'error.main' }}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </>
-                )}
-              </Box>
+              )}
+              <IconButton size="small" sx={{ color: 'text.secondary', ml: -0.5 }}>
+                {isReminderExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+              </IconButton>
             </Box>
 
-            {/* Collapsible Reminder Content */}
-            <Collapse in={isReminderExpanded}>
-              <Box sx={{ px: 3, py: 2, bgcolor: alpha(theme.palette.info.main, 0.02) }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Set a reminder to display this note on specific days. Perfect for game plans, daily routines, or weekly trading strategies.
-                </Typography>
+            {/* Right side - Action buttons */}
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              <IconButton
+                size="small"
+                onClick={() => setImagePickerOpen(true)}
+                title={coverImage ? 'Change cover' : 'Add cover image'}
+              >
+                <ImageIcon fontSize="small" />
+              </IconButton>
 
-                {/* Reminder Type Selector */}
+              {note && (
+                <>
+                  <IconButton
+                    size="small"
+                    onClick={handlePinNote}
+                    title={note.is_pinned ? 'Unpin note' : 'Pin note'}
+                    sx={{
+                      color: note.is_pinned ? 'primary.main' : 'inherit',
+                    }}
+                  >
+                    {note.is_pinned ? <PinIcon fontSize="small" /> : <PinOutlinedIcon fontSize="small" />}
+                  </IconButton>
+
+                  <IconButton
+                    size="small"
+                    onClick={handleArchiveNote}
+                    title={note.is_archived ? 'Unarchive note' : 'Archive note'}
+                  >
+                    {note.is_archived ? <UnarchiveIcon fontSize="small" /> : <ArchiveIcon fontSize="small" />}
+                  </IconButton>
+
+                  <IconButton
+                    size="small"
+                    onClick={handleDeleteNote}
+                    title="Delete note"
+                    sx={{ color: 'error.main' }}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </>
+              )}
+            </Box>
+          </Box>
+
+          {/* Collapsible Reminder Content */}
+          <Collapse in={isReminderExpanded}>
+            <Box sx={{ px: 3, py: 2, bgcolor: alpha(theme.palette.info.main, 0.02) }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Set a reminder to display this note on specific days. Perfect for game plans, daily routines, or weekly trading strategies.
+              </Typography>
+
+              {/* Reminder Type Selector */}
               <ToggleButtonGroup
                 value={reminderType}
                 exclusive
@@ -674,167 +638,137 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                   )}
                 </Box>
               )}
-              </Box>
-            </Collapse>
+            </Box>
+          </Collapse>
 
-            {/* Tags Sub-Header */}
+          {/* Tags Sub-Header */}
+          <Box
+            onClick={() => setIsTagsExpanded(!isTagsExpanded)}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 3,
+              py: 1,
+              bgcolor: alpha(theme.palette.secondary.main, 0.04),
+              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              cursor: 'pointer',
+              '&:hover': {
+                opacity: 0.8,
+              },
+            }}
+          >
+            {/* Left side - Tags label */}
             <Box
-              onClick={() => setIsTagsExpanded(!isTagsExpanded)}
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                px: 3,
-                py: 1,
-                bgcolor: alpha(theme.palette.secondary.main, 0.04),
-                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                cursor: 'pointer',
-                '&:hover': {
-                  opacity: 0.8,
-                },
+                gap: 1,
               }}
             >
-              {/* Left side - Tags label */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                }}
+              <TagIcon sx={{ color: tags.length > 0 ? 'secondary.main' : 'text.secondary', fontSize: '1.1rem' }} />
+              <Typography
+                variant="subtitle2"
+                fontWeight={600}
+                sx={{ color: tags.length > 0 ? 'secondary.main' : 'text.secondary' }}
               >
-                <TagIcon sx={{ color: tags.length > 0 ? 'secondary.main' : 'text.secondary', fontSize: '1.1rem' }} />
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={600}
-                  sx={{ color: tags.length > 0 ? 'secondary.main' : 'text.secondary' }}
-                >
-                  Tags
+                Tags
+              </Typography>
+              {/* AI note indicator */}
+              {note?.by_assistant && (
+                <Typography variant="caption" color="text.disabled">
+                  (read-only)
                 </Typography>
-                {/* AI note indicator */}
-                {note?.by_assistant && (
-                  <Typography variant="caption" color="text.disabled">
-                    (read-only)
-                  </Typography>
-                )}
-              </Box>
-
-              {/* Right side - Tag count and expand icon */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {tags.length > 0 && (
-                  <Typography variant="caption" color="text.secondary">
-                    {tags.length} tag{tags.length !== 1 ? 's' : ''}
-                  </Typography>
-                )}
-                <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                  {isTagsExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                </IconButton>
-              </Box>
+              )}
             </Box>
 
-            {/* Collapsible Tags Content */}
-            <Collapse in={isTagsExpanded}>
-              <Box sx={{ px: 3, py: 2, bgcolor: alpha(theme.palette.secondary.main, 0.02) }}>
-                {/* Existing tags */}
-                {tags.length > 0 && (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
-                    {tags.map((tag) => (
-                      <Chip
-                        key={tag}
-                        label={getTagDisplayLabel(tag)}
-                        size="small"
-                        onDelete={isTagEditingAllowed ? () => handleRemoveTag(tag) : undefined}
-                        sx={{
-                          bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                          color: 'secondary.main',
-                          fontWeight: 500,
-                        }}
-                      />
-                    ))}
-                  </Box>
-                )}
+            {/* Right side - Tag count and expand icon */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              {tags.length > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  {tags.length} tag{tags.length !== 1 ? 's' : ''}
+                </Typography>
+              )}
+              <IconButton size="small" sx={{ color: 'text.secondary' }}>
+                {isTagsExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+              </IconButton>
+            </Box>
+          </Box>
 
-                {/* Add new tag input - only for user-created notes */}
-                {isTagEditingAllowed ? (
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                    <Autocomplete
-                      freeSolo
+          {/* Collapsible Tags Content */}
+          <Collapse in={isTagsExpanded}>
+            <Box sx={{ px: 3, py: 2, bgcolor: alpha(theme.palette.secondary.main, 0.02) }}>
+              {/* Existing tags */}
+              {tags.length > 0 && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+                  {tags.map((tag) => (
+                    <Chip
+                      key={tag}
+                      label={getTagDisplayLabel(tag)}
                       size="small"
-                      options={availableTags.filter(t => !tags.includes(t))}
-                      getOptionLabel={(option) => getTagDisplayLabel(option)}
-                      value={null}
-                      inputValue={newTagInput}
-                      onInputChange={(_, value, reason) => {
-                        if (reason !== 'reset') {
-                          setNewTagInput(value);
-                        }
-                      }}
-                      onChange={(_, value) => {
-                        if (value && typeof value === 'string') {
-                          const trimmed = value.trim();
-                          // Convert display label to internal value if it's a default tag
-                          const internalValue = getTagInternalValue(trimmed);
-                          if (internalValue && !tags.includes(internalValue)) {
-                            setTags(prev => [...prev, internalValue]);
-                          }
-                        }
-                        setNewTagInput('');
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddTag();
-                        }
-                      }}
-                      sx={{ flex: 1 }}
-                      slotProps={{
-                        popper: {
-                          sx: { zIndex: (theme) => theme.zIndex.modal + 200 },
-                        },
-                      }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          placeholder="Add a tag..."
-                          InputProps={{
-                            ...params.InputProps,
-                            sx: { borderRadius: 2 },
-                          }}
-                        />
-                      )}
-                    />
-                    <IconButton
-                      size="small"
-                      onClick={handleAddTag}
-                      disabled={!newTagInput.trim()}
+                      onDelete={isTagEditingAllowed ? () => handleRemoveTag(tag) : undefined}
                       sx={{
                         bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                        '&:hover': {
-                          bgcolor: alpha(theme.palette.secondary.main, 0.2),
-                        },
-                        '&:disabled': {
-                          bgcolor: alpha(theme.palette.action.disabled, 0.1),
-                        },
+                        color: 'secondary.main',
+                        fontWeight: 500,
                       }}
-                    >
-                      <AddIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                ) : (
-                  tags.length === 0 && (
-                    <Typography variant="body2" color="text.secondary">
-                      No tags on this note.
-                    </Typography>
-                  )
-                )}
+                    />
+                  ))}
+                </Box>
+              )}
 
-                {/* Help text for user notes */}
-                {isTagEditingAllowed && (
-                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                    Type to search existing tags or create new ones
+              {/* Add new tag input - only for user-created notes */}
+              {isTagEditingAllowed ? (
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Autocomplete
+                    size="small"
+                    options={defaultTags.filter(t => !tags.includes(t))}
+                    getOptionLabel={(option) => getTagDisplayLabel(option)}
+                    value={null}
+                    inputValue={newTagInput}
+                    onInputChange={(_, value, reason) => {
+                      if (reason !== 'reset') {
+                        setNewTagInput(value);
+                      }
+                    }}
+                    onChange={(_, value) => {
+                      if (value && typeof value === 'string') {
+                        handleAddTag(value);
+                      }
+                      setNewTagInput('');
+                    }}
+                    sx={{ flex: 1 }}
+                    slotProps={{
+                      popper: {
+                        sx: { zIndex: (theme) => theme.zIndex.modal + 200 },
+                      },
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        placeholder="Add a tag..."
+                        InputProps={{
+                          ...params.InputProps,
+                          sx: { borderRadius: 2 },
+                        }}
+                      />
+                    )}
+                  />
+
+                </Box>
+              ) : (
+                tags.length === 0 && (
+                  <Typography variant="body2" color="text.secondary">
+                    No tags on this note.
                   </Typography>
-                )}
-              </Box>
-            </Collapse>
+                )
+              )}
+
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                Select a tag from the list
+              </Typography>
+            </Box>
+          </Collapse>
 
           {/* Content Area */}
           <Box
@@ -860,7 +794,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               </Alert>
             )}
 
-          
+
 
             {/* Title */}
             <TextField
