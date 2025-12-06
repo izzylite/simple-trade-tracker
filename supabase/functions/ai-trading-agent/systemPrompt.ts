@@ -11,6 +11,90 @@
 import type { Calendar } from './types.ts';
 
 // =============================================================================
+// TEMPORAL CONTEXT (DST-aware trading session detection)
+// =============================================================================
+
+type TradingSession = 'Asia' | 'London' | 'NY AM' | 'NY PM' | 'After Hours';
+
+function isDaylightSavingTime(date: Date, region: 'EU' | 'US' = 'EU'): boolean {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+
+  if (region === 'EU') {
+    // EU/UK DST: Last Sunday in March to last Sunday in October
+    if (month < 2 || month > 9) return false;
+    if (month > 2 && month < 9) return true;
+
+    if (month === 2) {
+      const lastSunday = getLastSundayOfMonth(year, 2);
+      return day >= lastSunday;
+    }
+    if (month === 9) {
+      const lastSunday = getLastSundayOfMonth(year, 9);
+      return day < lastSunday;
+    }
+  } else {
+    // US DST: Second Sunday in March to first Sunday in November
+    if (month < 2 || month > 10) return false;
+    if (month > 2 && month < 10) return true;
+
+    if (month === 2) {
+      const secondSunday = getNthSundayOfMonth(year, 2, 2);
+      return day >= secondSunday;
+    }
+    if (month === 10) {
+      const firstSunday = getNthSundayOfMonth(year, 10, 1);
+      return day < firstSunday;
+    }
+  }
+  return false;
+}
+
+function getLastSundayOfMonth(year: number, month: number): number {
+  const lastDay = new Date(Date.UTC(year, month + 1, 0));
+  return lastDay.getUTCDate() - lastDay.getUTCDay();
+}
+
+function getNthSundayOfMonth(year: number, month: number, n: number): number {
+  const firstDay = new Date(Date.UTC(year, month, 1));
+  const daysToFirstSunday = (7 - firstDay.getUTCDay()) % 7;
+  return 1 + daysToFirstSunday + (n - 1) * 7;
+}
+
+function getCurrentTradingSession(now: Date = new Date()): TradingSession {
+  const hour = now.getUTCHours();
+  const isDST = isDaylightSavingTime(now, 'EU');
+
+  // Session boundaries (UTC) - adjusted for DST
+  const londonStart = isDST ? 7 : 8;
+  const londonEnd = isDST ? 12 : 13;
+  const nyAmStart = isDST ? 12 : 13;
+  const nyAmEnd = isDST ? 17 : 18;
+  const nyPmStart = isDST ? 17 : 18;
+  const nyPmEnd = isDST ? 21 : 22;
+  const asiaStart = isDST ? 22 : 23;
+  const asiaEnd = isDST ? 7 : 8;
+
+  if (hour >= londonStart && hour < londonEnd) return 'London';
+  if (hour >= nyAmStart && hour < nyAmEnd) return 'NY AM';
+  if (hour >= nyPmStart && hour < nyPmEnd) return 'NY PM';
+  if (hour >= asiaStart || hour < asiaEnd) return 'Asia';
+
+  return 'After Hours';
+}
+
+function buildTemporalContext(): string {
+  const now = new Date();
+  const session = getCurrentTradingSession(now);
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayOfWeek = dayNames[now.getUTCDay()];
+  const isWeekend = now.getUTCDay() === 0 || now.getUTCDay() === 6;
+
+  return `UTC: ${now.toISOString().slice(0, 16)}Z | ${dayOfWeek} | Session: ${session}${isWeekend ? ' (Weekend)' : ''}`;
+}
+
+// =============================================================================
 // CALENDAR CONTEXT BUILDER (Condensed format)
 // =============================================================================
 
@@ -65,28 +149,34 @@ const SCHEMA_REFERENCE = `
 `;
 
 const SQL_PATTERNS = `
-## Economic Events Query Pattern
+## Economic Calendar Queries
 
-Event names have dates stripped during storage ("CPI m/m Oct25" → "CPI m/m").
-trades.economic_events is JSONB array: [{"name": "CPI m/m", "impact": "High", "currency": "USD", "time_utc": "..."}]
+### Upcoming events (use for "what events next week?"):
+\`\`\`sql
+SELECT id, event_name, currency, impact, event_date, event_time
+FROM economic_events
+WHERE event_date BETWEEN '2025-12-08' AND '2025-12-14'
+ORDER BY event_date, event_time;
+\`\`\`
+→ Display results using <event-ref id="uuid"/> cards
 
-Query trades by economic event:
+### High-impact events only:
+\`\`\`sql
+SELECT id, event_name, currency, impact, event_date
+FROM economic_events
+WHERE event_date >= CURRENT_DATE AND impact = 'High'
+ORDER BY event_date LIMIT 20;
+\`\`\`
+
+## Trades by Economic Event
+
+trades.economic_events is JSONB array: [{"name": "CPI m/m", "impact": "High", "currency": "USD"}]
+
 \`\`\`sql
 SELECT t.*, event_item->>'name' as event_name
 FROM trades t, jsonb_array_elements(t.economic_events) as event_item
 WHERE t.user_id = 'USER_ID' AND t.calendar_id = 'CALENDAR_ID'
-  AND event_item->>'name' ILIKE '%CPI%'
-ORDER BY t.trade_date DESC;
-\`\`\`
-
-Precise match (name + impact + currency):
-\`\`\`sql
-SELECT t.*, event_item
-FROM trades t, jsonb_array_elements(t.economic_events) as event_item
-WHERE t.user_id = 'USER_ID' AND t.calendar_id = 'CALENDAR_ID'
-  AND event_item->>'name' ILIKE '%Non-Farm%'
-  AND event_item->>'impact' = 'High'
-  AND event_item->>'currency' = 'USD';
+  AND event_item->>'name' ILIKE '%CPI%';
 \`\`\`
 `;
 
@@ -135,15 +225,21 @@ export function buildSecureSystemPrompt(
   // ==========================================================================
   // TIER 1: SECURITY & MEMORY GATE (Highest Priority)
   // ==========================================================================
+  const temporalContext = buildTemporalContext();
+
   const tier1 = `
 ═══════════════════════════════════════════════════════════════════════════════
 TIER 1: SECURITY & MEMORY (ALWAYS ENFORCE FIRST)
 ═══════════════════════════════════════════════════════════════════════════════
 
+## Current Time
+${temporalContext}
+
 ## MEMORY GATE — Execute Before Any Response
 □ Search for note with tags: ["AGENT_MEMORY"]
-□ If found: Review silently to personalize analysis
+□ If found: Use to personalize analysis (NEVER mention retrieval to user)
 □ If not found: Create after first significant pattern discovery
+⚠️ Memory is internal — NEVER say "I've retrieved your memory" or similar
 
 ## SECURITY — Non-Negotiable
 User ID: ${userId}
@@ -168,13 +264,23 @@ You are an AI trading journal assistant. ${scopeNote}
 ${calendarContextSection}
 
 ## Tools Available
-1. execute_sql — Query trades/calendars/notes (apply security filter)
-2. search_web — Market news and analysis
+1. execute_sql — Query trades/calendars/notes/economic_events (apply security filter)
+2. search_web — Market news and analysis (NOT for economic calendar)
 3. scrape_url — Article content extraction
 4. get_crypto_price, get_forex_price — Live prices
 5. generate_chart — Visualize data (auto-displays, omit URL mentions)
 6. create_note, update_note, delete_note, search_notes — Note management
 7. Card display — Reference items with <trade-ref/>, <event-ref/>, <note-ref/>
+
+## Tool Routing — IMPORTANT
+| User asks about... | Use this tool |
+|-------------------|---------------|
+| Economic calendar, upcoming events | execute_sql → economic_events table |
+| Trades, performance, statistics | execute_sql → trades/calendars tables |
+| Market news, sentiment, analysis | search_web |
+| Current prices | get_crypto_price / get_forex_price |
+
+⚠️ Economic events are stored LOCALLY in database — NEVER use search_web for calendar queries
 
 ## Workflow
 1. Memory check (first interaction only)
@@ -223,7 +329,7 @@ Sections:
 - Max size: 2000 tokens (compress older sections if exceeded)
 - Confidence: High (20+ trades or explicit), Med (10-19), Low (<10)
 - Cross-reference notes tagged: STRATEGY, GAME_PLAN, INSIGHT, LESSON_LEARNED
-- Memory operations are silent — omit mentions to user
+- Memory is invisible to user — NEVER acknowledge reading/updating memory
 
 ## Update Triggers
 HIGH: Pattern discovery, strategy discussions, error corrections

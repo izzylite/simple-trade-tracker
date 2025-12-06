@@ -27,8 +27,15 @@ interface ToolCache {
   timestamp: number;
 }
 
+interface MCPSession {
+  sessionId: string;
+  timestamp: number;
+}
+
 let toolCache: ToolCache | null = null;
+let mcpSession: MCPSession | null = null;
 const TOOL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const MCP_SESSION_TTL = 10 * 60 * 1000; // 10 minutes
 
 /**
  * ============================================================================
@@ -169,13 +176,17 @@ function convertMcpToolsToGeminiFormat(
 }
 
 /**
- * Call Supabase MCP list_tools endpoint
+ * Initialize MCP session and return session ID
  */
-async function listMCPTools(projectRef: string, accessToken: string): Promise<Array<{
-  name: string;
-  description?: string;
-  inputSchema?: { properties?: unknown; required?: string[] };
-}>> {
+async function initializeMCPSession(projectRef: string, accessToken: string): Promise<string | null> {
+  const now = Date.now();
+
+  // Return cached session if valid
+  if (mcpSession && (now - mcpSession.timestamp) < MCP_SESSION_TTL) {
+    log(`Using cached MCP session (age: ${Math.round((now - mcpSession.timestamp) / 1000)}s)`, 'info');
+    return mcpSession.sessionId;
+  }
+
   try {
     const mcpUrl = `https://mcp.supabase.com/mcp?project_ref=${projectRef}&read_only=true`;
 
@@ -186,6 +197,73 @@ async function listMCPTools(projectRef: string, accessToken: string): Promise<Ar
         'Content-Type': 'application/json',
         'Accept': 'application/json, text/event-stream',
       },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 0,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: {},
+          clientInfo: {
+            name: 'ai-trading-agent',
+            version: '1.0.0'
+          }
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      log(`MCP initialize failed: ${response.status} - ${errorText}`, 'error');
+      return null;
+    }
+
+    // Get session ID from response header
+    const sessionId = response.headers.get('Mcp-Session-Id');
+    if (sessionId) {
+      mcpSession = { sessionId, timestamp: now };
+      log(`MCP session initialized: ${sessionId.substring(0, 20)}...`, 'info');
+      return sessionId;
+    }
+
+    // Fallback: try to get from response body
+    const data = await response.json();
+    log(`MCP initialize response: ${JSON.stringify(data).substring(0, 200)}`, 'info');
+
+    return null;
+  } catch (error) {
+    log(`MCP initialize error: ${error}`, 'error');
+    return null;
+  }
+}
+
+/**
+ * Call Supabase MCP list_tools endpoint
+ */
+async function listMCPTools(projectRef: string, accessToken: string): Promise<Array<{
+  name: string;
+  description?: string;
+  inputSchema?: { properties?: unknown; required?: string[] };
+}>> {
+  try {
+    // Initialize session first
+    const sessionId = await initializeMCPSession(projectRef, accessToken);
+
+    const mcpUrl = `https://mcp.supabase.com/mcp?project_ref=${projectRef}&read_only=true`;
+
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
+    };
+
+    if (sessionId) {
+      headers['Mcp-Session-Id'] = sessionId;
+    }
+
+    const response = await fetch(mcpUrl, {
+      method: 'POST',
+      headers,
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 1,
@@ -219,15 +297,24 @@ async function callMCPTool(
   args: Record<string, unknown>
 ): Promise<string> {
   try {
+    // Ensure we have a valid session
+    const sessionId = await initializeMCPSession(projectRef, accessToken);
+
     const mcpUrl = `https://mcp.supabase.com/mcp?project_ref=${projectRef}&read_only=true`;
+
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
+    };
+
+    if (sessionId) {
+      headers['Mcp-Session-Id'] = sessionId;
+    }
 
     const response = await fetch(mcpUrl, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream',
-      },
+      headers,
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 2,
@@ -241,6 +328,12 @@ async function callMCPTool(
 
     if (!response.ok) {
       const errorText = await response.text();
+      // If session expired, clear cache and retry once
+      if (response.status === 400 && errorText.includes('Mcp-Session-Id')) {
+        log('MCP session expired, clearing cache and retrying...', 'info');
+        mcpSession = null;
+        return callMCPTool(projectRef, accessToken, toolName, args);
+      }
       return `MCP tool call failed: ${response.status} - ${errorText}`;
     }
 

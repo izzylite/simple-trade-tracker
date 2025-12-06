@@ -190,52 +190,57 @@ export const NoteListItem: React.FC<NoteListItemProps> = ({
         </Typography>
       </Box>
 
-      {/* Action buttons (show on hover) */}
-      {(isHovered || note.is_pinned) && (
-        <Stack direction="row" spacing={0.5}>
-          {onPin && (
-            <IconButton
-              size="small"
-              onClick={handlePinClick}
-              sx={{
-                p: 0.5,
-                color: note.is_pinned ? 'primary.main' : 'text.secondary',
-                '&:hover': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  color: 'primary.main',
-                },
-              }}
-            >
-              {note.is_pinned ? (
-                <PinIcon sx={{ fontSize: '1.1rem' }} />
-              ) : (
-                <PinOutlinedIcon sx={{ fontSize: '1.1rem' }} />
-              )}
-            </IconButton>
-          )}
+      {/* Action buttons (always rendered, visibility controlled by opacity to prevent layout shift) */}
+      <Stack
+        direction="row"
+        spacing={0.5}
+        sx={{
+          opacity: isHovered || note.is_pinned ? 1 : 0,
+          transition: 'opacity 0.15s ease',
+        }}
+      >
+        {onPin && (
+          <IconButton
+            size="small"
+            onClick={handlePinClick}
+            sx={{
+              p: 0.5,
+              color: note.is_pinned ? 'primary.main' : 'text.secondary',
+              '&:hover': {
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                color: 'primary.main',
+              },
+            }}
+          >
+            {note.is_pinned ? (
+              <PinIcon sx={{ fontSize: '1.1rem' }} />
+            ) : (
+              <PinOutlinedIcon sx={{ fontSize: '1.1rem' }} />
+            )}
+          </IconButton>
+        )}
 
-          {(onArchive || onUnarchive) && (
-            <IconButton
-              size="small"
-              onClick={handleArchiveClick}
-              sx={{
-                p: 0.5,
-                color: 'text.secondary',
-                '&:hover': {
-                  bgcolor: alpha(theme.palette.warning.main, 0.1),
-                  color: 'warning.main',
-                },
-              }}
-            >
-              {note.is_archived ? (
-                <UnarchiveIcon sx={{ fontSize: '1.1rem' }} />
-              ) : (
-                <ArchiveIcon sx={{ fontSize: '1.1rem' }} />
-              )}
-            </IconButton>
-          )}
-        </Stack>
-      )}
+        {(onArchive || onUnarchive) && (
+          <IconButton
+            size="small"
+            onClick={handleArchiveClick}
+            sx={{
+              p: 0.5,
+              color: 'text.secondary',
+              '&:hover': {
+                bgcolor: alpha(theme.palette.warning.main, 0.1),
+                color: 'warning.main',
+              },
+            }}
+          >
+            {note.is_archived ? (
+              <UnarchiveIcon sx={{ fontSize: '1.1rem' }} />
+            ) : (
+              <ArchiveIcon sx={{ fontSize: '1.1rem' }} />
+            )}
+          </IconButton>
+        )}
+      </Stack>
 
       {/* Cover image thumbnail (if exists) */}
       {note.cover_image && (

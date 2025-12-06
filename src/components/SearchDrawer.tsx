@@ -105,10 +105,13 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
   const filteredTrades = useMemo(() => {
     let filtered = [...trades];
 
-    // Filter by search query (name, notes, tags, or economic events)
+    // Filter by search query (id, name, notes, tags, or economic events)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(trade => {
+        // Search by trade ID
+        if (trade.id?.toLowerCase().includes(query)) return true;
+
         // Search in trade name
         if (trade.name?.toLowerCase().includes(query)) return true;
 
@@ -260,7 +263,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
         }}>
           <TextField
             fullWidth
-            placeholder="Search by name, tags, events, or session..."
+            placeholder="Search by ID, name, tags, events, or session..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             slotProps={{
