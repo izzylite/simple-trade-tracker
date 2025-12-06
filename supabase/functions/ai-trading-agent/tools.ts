@@ -379,6 +379,64 @@ export const analyzeImageTool: GeminiFunctionDeclaration = {
 };
 
 /**
+ * Get tag definition tool - look up user-defined meanings for custom tags
+ */
+export const getTagDefinitionTool: GeminiFunctionDeclaration = {
+  name: "get_tag_definition",
+  description: `Look up the user's definition for a custom trading tag.
+
+USE WHEN: You encounter a tag you don't understand (e.g., "Confluence:3x Displacement", "Setup:ICT OTE", "Risk:A++ Setup").
+
+WORKFLOW:
+1. If tag meaning is unclear, call this tool to get user's definition
+2. If no definition exists, you may SUGGEST a definition based on context
+3. ALWAYS ask user permission before saving a new definition
+4. Present your suggested definition and ask: "Would you like me to save this definition for future reference?"
+
+Returns the user's explanation of what this tag means to them, or null if no definition exists.`,
+  parameters: {
+    type: "object",
+    properties: {
+      tag_name: {
+        type: "string",
+        description:
+          "The exact tag name to look up (e.g., 'Confluence:3x Displacement')",
+      },
+    },
+    required: ["tag_name"],
+  },
+};
+
+/**
+ * Save tag definition tool - save a definition with user permission
+ */
+export const saveTagDefinitionTool: GeminiFunctionDeclaration = {
+  name: "save_tag_definition",
+  description: `Save or update a definition for a trading tag. IMPORTANT: Only use this AFTER getting explicit user permission.
+
+WORKFLOW:
+1. First suggest a definition to the user
+2. Wait for user confirmation
+3. Only then call this tool to save
+
+Never call this tool without user consent.`,
+  parameters: {
+    type: "object",
+    properties: {
+      tag_name: {
+        type: "string",
+        description: "The exact tag name to define",
+      },
+      definition: {
+        type: "string",
+        description: "The definition/meaning of the tag",
+      },
+    },
+    required: ["tag_name", "definition"],
+  },
+};
+
+/**
  * ============================================================================
  * TOOL IMPLEMENTATIONS
  * ============================================================================
@@ -1030,6 +1088,78 @@ export async function searchNotes(
 }
 
 /**
+ * Get tag definition from database
+ */
+export async function getTagDefinition(
+  supabase: SupabaseClient,
+  userId: string,
+  tagName: string
+): Promise<string> {
+  try {
+    log(`Looking up definition for tag: ${tagName}`, "info");
+
+    const { data, error } = await supabase
+      .from("tag_definitions")
+      .select("definition")
+      .eq("user_id", userId)
+      .eq("tag_name", tagName)
+      .single();
+
+    if (error && error.code !== "PGRST116") {
+      log(`Error fetching tag definition: ${error.message}`, "error");
+      return `Error looking up tag definition: ${error.message}`;
+    }
+
+    if (!data) {
+      return `No definition found for tag "${tagName}". You may suggest a definition and ask the user if they'd like to save it.`;
+    }
+
+    log(`Found definition for tag: ${tagName}`, "info");
+    return `Tag "${tagName}" definition: ${data.definition}`;
+  } catch (error) {
+    return `Error looking up tag definition: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
+  }
+}
+
+/**
+ * Save tag definition to database
+ */
+export async function saveTagDefinition(
+  supabase: SupabaseClient,
+  userId: string,
+  tagName: string,
+  definition: string
+): Promise<string> {
+  try {
+    log(`Saving definition for tag: ${tagName}`, "info");
+
+    const { error } = await supabase.from("tag_definitions").upsert(
+      {
+        user_id: userId,
+        tag_name: tagName,
+        definition: definition,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,tag_name" }
+    );
+
+    if (error) {
+      log(`Error saving tag definition: ${error.message}`, "error");
+      return `Error saving tag definition: ${error.message}`;
+    }
+
+    log(`Saved definition for tag: ${tagName}`, "info");
+    return `Successfully saved definition for tag "${tagName}".`;
+  } catch (error) {
+    return `Error saving tag definition: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
+  }
+}
+
+/**
  * Prepare image for multimodal analysis
  * Returns a marker that the conversation builder will detect and inject as inline_data
  */
@@ -1245,6 +1375,27 @@ export async function executeCustomTool(
         return analyzeImage(imageUrl, analysisFocus, tradeContext);
       }
 
+      case "get_tag_definition": {
+        if (!supabase) {
+          return "Supabase client not available for tag lookup";
+        }
+        const userId = context.userId || "";
+        const tagName = typeof args.tag_name === "string" ? args.tag_name : "";
+        return await getTagDefinition(supabase, userId, tagName);
+      }
+
+      case "save_tag_definition": {
+        if (!supabase) {
+          return "Supabase client not available for saving tag definition";
+        }
+        const userId = context.userId || "";
+        const tagName = typeof args.tag_name === "string" ? args.tag_name : "";
+        const definition = typeof args.definition === "string"
+          ? args.definition
+          : "";
+        return await saveTagDefinition(supabase, userId, tagName, definition);
+      }
+
       default:
         return `Unknown custom tool: ${toolName}`;
     }
@@ -1270,5 +1421,7 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     deleteNoteTool,
     searchNotesTool,
     analyzeImageTool,
+    getTagDefinitionTool,
+    saveTagDefinitionTool,
   ];
 }

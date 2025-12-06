@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   TextField,
   Typography,
@@ -9,20 +9,24 @@ import {
   Button,
   CircularProgress
 } from '@mui/material';
-import { Delete as DeleteIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, AutoAwesome as AIIcon } from '@mui/icons-material';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup, formatTagWithCapitalizedGroup } from '../utils/tagColors';
 import { BaseDialog } from './common';
 import { logger } from '../utils/logger';
+import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { supabase } from '../config/supabase';
+import { useAuth } from '../contexts/SupabaseAuthContext';
 
 interface TagEditDialogProps {
   open: boolean;
-  onClose: () => void;
+  onClose: (definitionUpdated?: boolean) => void;
   tag: string;
   calendarId: string;
   onSuccess?: (oldTag: string, newTag: string, tradesUpdated: number) => void;
   onDelete?: (deletedTag: string, tradesUpdated: number) => void;
   onTagUpdated?: (oldTag: string, newTag: string) => Promise<{ success: boolean; tradesUpdated: number }>;
+  /** Pre-loaded definition from parent (skip fetch if provided) */
+  initialDefinition?: string;
 }
 
 const TagEditDialog: React.FC<TagEditDialogProps> = ({
@@ -32,13 +36,88 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
   calendarId,
   onSuccess,
   onDelete,
-  onTagUpdated
+  onTagUpdated,
+  initialDefinition
 }) => {
   const theme = useTheme();
+  const { user } = useAuth();
   const [newTag, setNewTag] = useState(tag);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [definition, setDefinition] = useState('');
+  const [originalDefinition, setOriginalDefinition] = useState('');
+  const [isLoadingDefinition, setIsLoadingDefinition] = useState(false);
+
+  // Fetch existing definition when dialog opens
+  const fetchDefinition = useCallback(async (tagName: string) => {
+    if (!user?.id || !tagName) return;
+
+    setIsLoadingDefinition(true);
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('tag_definitions')
+        .select('definition')
+        .eq('user_id', user.id)
+        .eq('tag_name', tagName)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        // PGRST116 = no rows returned, which is fine
+        logger.error('Error fetching tag definition:', fetchError);
+      }
+
+      const def = data?.definition || '';
+      setDefinition(def);
+      setOriginalDefinition(def);
+    } catch (err) {
+      logger.error('Error fetching tag definition:', err);
+    } finally {
+      setIsLoadingDefinition(false);
+    }
+  }, [user?.id]);
+
+  // Save or update definition
+  const saveDefinition = async (tagName: string, newDefinition: string) => {
+    if (!user?.id) return;
+
+    const trimmedDef = newDefinition.trim();
+
+    if (trimmedDef === originalDefinition) {
+      return; // No change
+    }
+
+    try {
+      if (trimmedDef) {
+        // Upsert definition
+        const { error: upsertError } = await supabase
+          .from('tag_definitions')
+          .upsert({
+            user_id: user.id,
+            tag_name: tagName,
+            definition: trimmedDef,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id,tag_name' });
+
+        if (upsertError) {
+          logger.error('Error saving tag definition:', upsertError);
+        }
+      } else if (originalDefinition) {
+        // Delete definition if cleared
+        const { error: deleteError } = await supabase
+          .from('tag_definitions')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('tag_name', tagName);
+
+        if (deleteError) {
+          logger.error('Error deleting tag definition:', deleteError);
+        }
+      }
+    } catch (err) {
+      logger.error('Error saving tag definition:', err);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +134,10 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
       return;
     }
 
-    if (newTag === tag) {
+    const tagChanged = newTag !== tag;
+    const definitionChanged = definition.trim() !== originalDefinition;
+
+    if (!tagChanged && !definitionChanged) {
       onClose();
       return;
     }
@@ -68,20 +150,25 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
       // Capitalize the group name before submitting
       const trimmedNewTag = formatTagWithCapitalizedGroup(newTag.trim());
 
-      if (onTagUpdated) {
-        // Use the provided onTagUpdated callback
+      if (tagChanged && onTagUpdated) {
+        // Use the provided onTagUpdated callback for tag rename
         const result = await onTagUpdated(trimmedTag, trimmedNewTag);
 
         if (result.success) {
+          // Save or update the definition for the new tag name
+          await saveDefinition(trimmedNewTag, definition);
+
           if (onSuccess) {
             onSuccess(trimmedTag, trimmedNewTag, result.tradesUpdated || 0);
           }
-          onClose();
+          onClose(definitionChanged);
         } else {
           setError('Failed to update tag');
         }
       } else {
-        setError('No tag update handler provided');
+        // Only definition changed, save it
+        await saveDefinition(trimmedTag, definition);
+        onClose(true);
       }
     } catch (error) {
       logger.error('Error updating tag:', error);
@@ -98,12 +185,23 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
   const [tagGroup, setTagGroup] = useState(isGrouped ? getTagGroup(tag) : '');  
 
 
-  // Update state when tag prop changes
+  // Update state when tag prop changes or dialog opens
   useEffect(() => {
-    setNewTag(tag);
-    setTagName(getTagNamePart(tag));
-    setError(null);
-  }, [tag]);
+    if (open && tag) {
+      setNewTag(tag);
+      setTagName(getTagNamePart(tag));
+      setTagGroup(isGroupedTag(tag) ? getTagGroup(tag) : '');
+      setError(null);
+
+      // Use initialDefinition if provided, otherwise fetch
+      if (initialDefinition !== undefined) {
+        setDefinition(initialDefinition);
+        setOriginalDefinition(initialDefinition);
+      } else {
+        fetchDefinition(tag);
+      }
+    }
+  }, [tag, open, fetchDefinition, initialDefinition]);
 
   const handleFormSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -300,6 +398,45 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
             }}
           />
         )}
+
+        {/* Tag Definition - helps AI understand custom tags */}
+        <TextField
+          label="Definition (optional)"
+          value={definition}
+          onChange={(e) => {
+            if (e.target.value.length <= 200) {
+              setDefinition(e.target.value);
+            }
+          }}
+          fullWidth
+          multiline
+          rows={2}
+          disabled={isSubmitting || isLoadingDefinition}
+          placeholder="What does this tag mean? e.g., 'Trade taken at 0.62 Fibonacci retracement level'"
+          size="medium"
+          inputProps={{ maxLength: 200 }}
+          InputProps={{
+            startAdornment: isLoadingDefinition ? (
+              <CircularProgress size={16} sx={{ mr: 1 }} />
+            ) : undefined
+          }}
+          helperText={
+            <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <AIIcon sx={{ fontSize: 14 }} />
+              This definition helps the AI assistant understand your custom tags
+            </Box>
+          }
+          sx={{
+            '& .MuiInputBase-input': {
+              ...scrollbarStyles(theme)
+            },
+            '& .MuiFormHelperText-root': {
+              color: theme.palette.text.secondary,
+              display: 'flex',
+              alignItems: 'center'
+            }
+          }}
+        />
       </Box>
     </BaseDialog>
   );

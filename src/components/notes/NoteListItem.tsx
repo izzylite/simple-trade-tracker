@@ -210,9 +210,9 @@ export const NoteListItem: React.FC<NoteListItemProps> = ({
           </Stack>
         )}
 
-        {/* Date */}
+        {/* Last updated */}
         <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
-          {new Date(note.updated_at).toLocaleDateString('en-US', {
+          Last updated: {new Date(note.updated_at).toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
             year: 'numeric',

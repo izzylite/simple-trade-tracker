@@ -8,20 +8,20 @@
  *
  * Target: ~2000 tokens core prompt (down from ~4000)
  */
-import type { Calendar } from './types.ts';
+import type { Calendar } from "./types.ts";
 
 // =============================================================================
 // TEMPORAL CONTEXT (DST-aware trading session detection)
 // =============================================================================
 
-type TradingSession = 'Asia' | 'London' | 'NY AM' | 'NY PM' | 'After Hours';
+type TradingSession = "Asia" | "London" | "NY AM" | "NY PM" | "After Hours";
 
-function isDaylightSavingTime(date: Date, region: 'EU' | 'US' = 'EU'): boolean {
+function isDaylightSavingTime(date: Date, region: "EU" | "US" = "EU"): boolean {
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth();
   const day = date.getUTCDate();
 
-  if (region === 'EU') {
+  if (region === "EU") {
     // EU/UK DST: Last Sunday in March to last Sunday in October
     if (month < 2 || month > 9) return false;
     if (month > 2 && month < 9) return true;
@@ -64,7 +64,7 @@ function getNthSundayOfMonth(year: number, month: number, n: number): number {
 
 function getCurrentTradingSession(now: Date = new Date()): TradingSession {
   const hour = now.getUTCHours();
-  const isDST = isDaylightSavingTime(now, 'EU');
+  const isDST = isDaylightSavingTime(now, "EU");
 
   // Session boundaries (UTC) - adjusted for DST
   const londonStart = isDST ? 7 : 8;
@@ -76,50 +76,61 @@ function getCurrentTradingSession(now: Date = new Date()): TradingSession {
   const asiaStart = isDST ? 22 : 23;
   const asiaEnd = isDST ? 7 : 8;
 
-  if (hour >= londonStart && hour < londonEnd) return 'London';
-  if (hour >= nyAmStart && hour < nyAmEnd) return 'NY AM';
-  if (hour >= nyPmStart && hour < nyPmEnd) return 'NY PM';
-  if (hour >= asiaStart || hour < asiaEnd) return 'Asia';
+  if (hour >= londonStart && hour < londonEnd) return "London";
+  if (hour >= nyAmStart && hour < nyAmEnd) return "NY AM";
+  if (hour >= nyPmStart && hour < nyPmEnd) return "NY PM";
+  if (hour >= asiaStart || hour < asiaEnd) return "Asia";
 
-  return 'After Hours';
+  return "After Hours";
 }
 
 function buildTemporalContext(): string {
   const now = new Date();
   const session = getCurrentTradingSession(now);
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const dayOfWeek = dayNames[now.getUTCDay()];
   const isWeekend = now.getUTCDay() === 0 || now.getUTCDay() === 6;
 
-  return `UTC: ${now.toISOString().slice(0, 16)}Z | ${dayOfWeek} | Session: ${session}${isWeekend ? ' (Weekend)' : ''}`;
+  return `UTC: ${
+    now.toISOString().slice(0, 16)
+  }Z | ${dayOfWeek} | Session: ${session}${isWeekend ? " (Weekend)" : ""}`;
 }
 
 // =============================================================================
 // CALENDAR CONTEXT BUILDER (Condensed format)
 // =============================================================================
 
-function buildCalendarContextSection(calendarContext?: Partial<Calendar>): string {
-  if (!calendarContext) return '';
+function buildCalendarContextSection(
+  calendarContext?: Partial<Calendar>,
+): string {
+  if (!calendarContext) return "";
 
-  const winRate = typeof calendarContext.win_rate === 'number'
+  const winRate = typeof calendarContext.win_rate === "number"
     ? `${(calendarContext.win_rate * 100).toFixed(1)}%`
-    : '—';
-  const totalTrades = calendarContext.total_trades ?? '—';
-  const totalPnl = calendarContext.total_pnl ?? '—';
-  const currentBalance = calendarContext.current_balance ?? calendarContext.account_balance ?? '—';
-  const tags = calendarContext.tags?.length ? calendarContext.tags.join(', ') : 'None';
+    : "—";
+  const totalTrades = calendarContext.total_trades ?? "—";
+  const totalPnl = calendarContext.total_pnl ?? "—";
+  const currentBalance = calendarContext.current_balance ??
+    calendarContext.account_balance ?? "—";
+  const tags = calendarContext.tags?.length
+    ? calendarContext.tags.join(", ")
+    : "None";
 
   // Condensed filter summary
   const filters = calendarContext.economic_calendar_filters;
-  let filterLine = 'Filters: None (all events allowed)';
+  let filterLine = "Filters: None (all events allowed)";
   if (filters) {
-    const currencies = filters.currencies?.length ? filters.currencies.join(',') : 'ALL';
-    const impacts = filters.impacts?.length ? filters.impacts.join(',') : 'ALL';
+    const currencies = filters.currencies?.length
+      ? filters.currencies.join(",")
+      : "ALL";
+    const impacts = filters.impacts?.length ? filters.impacts.join(",") : "ALL";
     filterLine = `Filters: ${currencies} | ${impacts} impact`;
   }
 
   return `
-CALENDAR: "${calendarContext.name ?? 'Unknown'}" | Win: ${winRate} | Trades: ${totalTrades} | P&L: ${totalPnl} | Balance: ${currentBalance}
+CALENDAR: "${
+    calendarContext.name ?? "Unknown"
+  }" | Win: ${winRate} | Trades: ${totalTrades} | P&L: ${totalPnl} | Balance: ${currentBalance}
 Tags: ${tags}
 ${filterLine}
 `;
@@ -142,6 +153,10 @@ const SCHEMA_REFERENCE = `
 **economic_events** (id, currency, event_name, impact, event_date, event_time, actual_value, forecast_value, previous_value, actual_result_type, country)
 - impact: 'High' | 'Medium' | 'Low' | 'Holiday' | 'Non-Economic'
 - Global table (no user_id filter needed)
+
+**tag_definitions** (id, user_id, tag_name, definition, created_at, updated_at)
+- User's custom tag dictionary (cross-calendar)
+- Use get_tag_definition tool to look up (don't query directly)
 
 **notes** (id, user_id, calendar_id, title, content, by_assistant, is_pinned, tags[], created_at, updated_at)
 - by_assistant: true = AI-created (can modify), false = user-created (read-only)
@@ -211,20 +226,21 @@ export function buildSecureSystemPrompt(
   userId: string,
   calendarId?: string,
   calendarContext?: Partial<Calendar>,
-  focusedTradeId?: string
+  focusedTradeId?: string,
 ): string {
   const calendarContextSection = buildCalendarContextSection(calendarContext);
 
   const scopeNote = calendarId
-    ? 'Working with a specific calendar.'
-    : 'Working across all user calendars.';
+    ? "Working with a specific calendar."
+    : "Working across all user calendars.";
 
   const economicEventsRule = calendarId
     ? `economic_events is global (no user_id filter), BUT respect this calendar's filters.`
     : `economic_events is global (no user_id filter). Reference any relevant events.`;
 
   // Build focus mode section if analyzing a specific trade
-  const focusModeSection = focusedTradeId ? `
+  const focusModeSection = focusedTradeId
+    ? `
 ## 🎯 FOCUS MODE: Single Trade Analysis
 
 You are analyzing a SPECIFIC trade. Trade ID: ${focusedTradeId}
@@ -246,7 +262,8 @@ Focus areas for single trade analysis:
 - Pattern recognition from charts
 - What worked vs what could improve
 - Similar trades from history for comparison
-` : '';
+`
+    : "";
 
   // ==========================================================================
   // TIER 1: SECURITY & MEMORY GATE (Highest Priority)
@@ -269,9 +286,11 @@ ${temporalContext}
 
 ## SECURITY — Non-Negotiable
 User ID: ${userId}
-${calendarId ? `Calendar ID: ${calendarId}` : 'Scope: All user calendars'}
+${calendarId ? `Calendar ID: ${calendarId}` : "Scope: All user calendars"}
 
-REQUIRED FILTER: user_id = '${userId}'${calendarId ? ` AND calendar_id = '${calendarId}'` : ''}
+REQUIRED FILTER: user_id = '${userId}'${
+    calendarId ? ` AND calendar_id = '${calendarId}'` : ""
+  }
 - Apply to ALL queries on trades, calendars, notes tables
 - Exception: ${economicEventsRule}
 - Read-only access only — data modification prohibited
@@ -285,6 +304,7 @@ REQUIRED FILTER: user_id = '${userId}'${calendarId ? ` AND calendar_id = '${cale
 - NEVER just display image URLs — call analyze_image tool
 - NEVER create notes without user request (except AGENT_MEMORY)
 - NEVER guess data — if query returns empty, say so
+- NEVER mention anything related to Supabase database to the user
 `;
 
   // ==========================================================================
@@ -306,7 +326,8 @@ ${calendarContextSection}
 5. generate_chart — Visualize data (auto-displays, omit URL mentions)
 6. create_note, update_note, delete_note, search_notes — Note management
 7. analyze_image — Analyze trade chart images (entry/exit quality, patterns, levels)
-8. Card display — Reference items with <trade-ref/>, <event-ref/>, <note-ref/>
+8. get_tag_definition, save_tag_definition — Look up or save custom tag meanings
+9. Card display — Reference items with <trade-ref/>, <event-ref/>, <note-ref/>
 
 ## Tool Routing — IMPORTANT
 | User asks about... | Use this tool |
@@ -316,6 +337,15 @@ ${calendarContextSection}
 | Market news, sentiment, analysis | search_web |
 | Current prices | get_crypto_price / get_forex_price |
 | Review trade charts/images | analyze_image (pass trade.images[].url) |
+| Unknown tag meaning | get_tag_definition → user's tag dictionary |
+
+## Tag Definition Workflow
+When you encounter a custom tag you don't understand (e.g., "Confluence:3x Displacement"):
+1. Call get_tag_definition to check if user defined it
+2. If found → use the definition to understand the tag's meaning
+3. If NOT found → you may SUGGEST a definition based on context
+4. ALWAYS ask user: "Would you like me to save this definition for future reference?"
+5. Only call save_tag_definition AFTER user gives explicit permission
 
 ## Workflow
 1. Memory check (first interaction only)
