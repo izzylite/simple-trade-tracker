@@ -59,6 +59,34 @@ This project uses specialized AI subagents for specific domains. Claude Code sho
 - Security or performance concerns with data access
 
 
+### Context Engineering Specialist (`context-engineer`)
+**When to use:**
+- Designing or improving system prompts for AI agents
+- Building RAG pipelines or knowledge retrieval systems
+- Implementing memory systems for stateful AI agents
+- Optimizing context window utilization
+- Debugging AI agent failures (often context issues)
+- Designing tool definitions and orchestration
+- Structuring multi-agent communication
+- Improving AI response quality through better context
+
+**Example triggers:**
+- User mentions "system prompt", "context", "RAG", "memory"
+- Working with AI service files or edge functions that call LLMs
+- Designing prompts for AI features
+- Agent performance or accuracy issues
+- Token optimization or context window concerns
+
+**Key techniques:**
+- Context pruning and compression
+- Hierarchical instruction structuring
+- Few-shot example injection
+- Schema-based output definitions
+- Memory system design (short-term, long-term, episodic)
+
+
+## Commands
+
 ### Frontend Development
 - `npm start` - Start the React development server
 - `npm run build` - Build the production application

@@ -778,8 +778,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setIsAIChatOpen(true);
   }, []);
 
-
-
   // Scroll detection for floating month navigation
   useEffect(() => {
     const handleScroll = () => {
@@ -1351,7 +1349,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                     </Button>
                   </Tooltip>
                 )}
-              </Box>
+
+                </Box>
 
               {/* Secondary Actions Group */}
               <Box sx={{

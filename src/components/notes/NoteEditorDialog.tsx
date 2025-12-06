@@ -333,7 +333,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           },
         }}
       >
-        {/* Toolbar with actions */}
+        {/* Toolbar with title and close */}
         <Toolbar
           sx={{
             borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
@@ -344,52 +344,9 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
             {note ? 'Edit Note' : 'New Note'}
           </Typography>
 
-          {/* Action buttons */}
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
-            <IconButton
-              size="small"
-              onClick={() => setImagePickerOpen(true)}
-              title={coverImage ? 'Change cover' : 'Add cover image'}
-            >
-              <ImageIcon />
-            </IconButton>
-
-            {note && (
-              <>
-                <IconButton
-                  size="small"
-                  onClick={handlePinNote}
-                  title={note.is_pinned ? 'Unpin note' : 'Pin note'}
-                  sx={{
-                    color: note.is_pinned ? 'primary.main' : 'inherit',
-                  }}
-                >
-                  {note.is_pinned ? <PinIcon /> : <PinOutlinedIcon />}
-                </IconButton>
-
-                <IconButton
-                  size="small"
-                  onClick={handleArchiveNote}
-                  title={note.is_archived ? 'Unarchive note' : 'Archive note'}
-                >
-                  {note.is_archived ? <UnarchiveIcon /> : <ArchiveIcon />}
-                </IconButton>
-
-                <IconButton
-                  size="small"
-                  onClick={handleDeleteNote}
-                  title="Delete note"
-                  sx={{ color: 'error.main' }}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </>
-            )}
-
-            <IconButton size="small" onClick={handleClose}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
+          <IconButton size="small" onClick={handleClose}>
+            <CloseIcon />
+          </IconButton>
         </Toolbar>
 
         <DialogContent
@@ -454,23 +411,30 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           )}
             {/* Reminder Sub-Header */}
             <Box
-              onClick={() => setIsReminderExpanded(!isReminderExpanded)}
               sx={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 px: 3,
-                py: 1.5,
+                py: 1,
                 bgcolor: alpha(theme.palette.info.main, 0.04),
                 borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                '&:hover': {
-                  bgcolor: alpha(theme.palette.info.main, 0.08),
-                },
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {/* Left side - Reminder toggle */}
+              <Box
+                onClick={() => setIsReminderExpanded(!isReminderExpanded)}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  cursor: 'pointer',
+                  py: 0.5,
+                  '&:hover': {
+                    opacity: 0.8,
+                  },
+                }}
+              >
                 {isReminderActive ? (
                   <ReminderIcon sx={{ color: 'info.main', fontSize: '1.1rem' }} />
                 ) : (
@@ -491,10 +455,53 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                     }
                   </Typography>
                 )}
+                <IconButton size="small" sx={{ color: 'text.secondary', ml: -0.5 }}>
+                  {isReminderExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                </IconButton>
               </Box>
-              <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                {isReminderExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-              </IconButton>
+
+              {/* Right side - Action buttons */}
+              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                <IconButton
+                  size="small"
+                  onClick={() => setImagePickerOpen(true)}
+                  title={coverImage ? 'Change cover' : 'Add cover image'}
+                >
+                  <ImageIcon fontSize="small" />
+                </IconButton>
+
+                {note && (
+                  <>
+                    <IconButton
+                      size="small"
+                      onClick={handlePinNote}
+                      title={note.is_pinned ? 'Unpin note' : 'Pin note'}
+                      sx={{
+                        color: note.is_pinned ? 'primary.main' : 'inherit',
+                      }}
+                    >
+                      {note.is_pinned ? <PinIcon fontSize="small" /> : <PinOutlinedIcon fontSize="small" />}
+                    </IconButton>
+
+                    <IconButton
+                      size="small"
+                      onClick={handleArchiveNote}
+                      title={note.is_archived ? 'Unarchive note' : 'Archive note'}
+                    >
+                      {note.is_archived ? <UnarchiveIcon fontSize="small" /> : <ArchiveIcon fontSize="small" />}
+                    </IconButton>
+
+                    <IconButton
+                      size="small"
+                      onClick={handleDeleteNote}
+                      title="Delete note"
+                      sx={{ color: 'error.main' }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </>
+                )}
+              </Box>
             </Box>
 
             {/* Collapsible Reminder Content */}

@@ -155,9 +155,10 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
   const trendInfo = getTrendInfo();
 
   return (
-    <Slide direction="right" in={open} mountOnEnter unmountOnExit>
-      <Paper
-        elevation={8}
+    <Box sx={{ pointerEvents: 'auto' }}>
+      <Slide direction="right" in={open} mountOnEnter unmountOnExit>
+          <Paper
+            elevation={8}
         sx={{
           width: 320,
           maxWidth: 'calc(100vw - 24px)',
@@ -168,7 +169,8 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
             : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
           border: `1px solid ${alpha(theme.palette.divider, theme.palette.mode === 'dark' ? 0.3 : 0.15)}`,
           boxShadow: theme.shadows[8],
-          borderLeft: `4px solid ${getImpactColor(event.impact)}`
+          borderLeft: `4px solid ${getImpactColor(event.impact)}`,
+          pointerEvents: 'auto' // Enable clicks (container has pointerEvents: none)
         }}
       >
         {/* Compact Header with Close Button */}
@@ -333,7 +335,8 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
           </Box>
         </Box>
       </Paper>
-    </Slide>
+      </Slide>
+    </Box>
   );
 };
 
