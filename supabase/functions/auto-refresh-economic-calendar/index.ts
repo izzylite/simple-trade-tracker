@@ -34,11 +34,12 @@ import { errorResponse, successResponse, handleCors, log } from '../_shared/supa
     if (!supabaseUrl || !serviceRoleKey) {
       throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
     }
+    // For internal edge function calls, use only the apikey header with service role key
+    // Avoid using Authorization: Bearer which triggers JWT validation at the gateway
     const refreshResponse = await fetch(`${supabaseUrl}/functions/v1/refresh-economic-calendar`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceRoleKey}`,
         'apikey': serviceRoleKey
       },
       body: JSON.stringify({

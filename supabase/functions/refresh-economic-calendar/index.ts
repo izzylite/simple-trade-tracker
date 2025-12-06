@@ -133,20 +133,15 @@ async function parseJsonBody(req: Request): Promise<unknown> {
     if (!supabaseUrl || !serviceRoleKey) {
       throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
     }
-    // Get the anon key for the apikey header
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    if (!anonKey) {
-      throw new Error("Missing SUPABASE_ANON_KEY");
-    }
-
+    // For internal edge function calls, use only the apikey header with service role key
+    // Avoid using Authorization: Bearer which triggers JWT validation at the gateway
     const processResponse = await fetch(
       `${supabaseUrl}/functions/v1/process-economic-events`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${serviceRoleKey}`,
-          "apikey": anonKey,
+          "apikey": serviceRoleKey,
         },
         body: JSON.stringify({
           htmlContent: html,
