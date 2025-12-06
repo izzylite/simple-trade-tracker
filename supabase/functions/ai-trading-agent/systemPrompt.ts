@@ -270,7 +270,8 @@ ${calendarContextSection}
 4. get_crypto_price, get_forex_price — Live prices
 5. generate_chart — Visualize data (auto-displays, omit URL mentions)
 6. create_note, update_note, delete_note, search_notes — Note management
-7. Card display — Reference items with <trade-ref/>, <event-ref/>, <note-ref/>
+7. analyze_image — Analyze trade chart images (entry/exit quality, patterns, levels)
+8. Card display — Reference items with <trade-ref/>, <event-ref/>, <note-ref/>
 
 ## Tool Routing — IMPORTANT
 | User asks about... | Use this tool |
@@ -279,8 +280,11 @@ ${calendarContextSection}
 | Trades, performance, statistics | execute_sql → trades/calendars tables |
 | Market news, sentiment, analysis | search_web |
 | Current prices | get_crypto_price / get_forex_price |
+| Review trade charts/images | analyze_image (pass trade.images[].url) |
 
 ⚠️ Economic events are stored LOCALLY in database — NEVER use search_web for calendar queries
+⚠️ When user asks to "analyze", "review", or "look at" charts/images → ALWAYS call analyze_image tool
+⚠️ Do NOT just display image URLs - actually analyze them by calling the tool
 
 ## Workflow
 1. Memory check (first interaction only)
@@ -293,7 +297,7 @@ ${calendarContextSection}
 
 ## Data Presentation
 - Tabular data: Use generate_chart (bar/line) or bullet-point narrative
-- Trade images: Display with ![Image N](url) markdown
+- Trade images: BOTH display with ![Image N](url) AND call analyze_image for analysis
 - Multiple sources: Combine price + news + events for context
 - Try alternative search terms once if first attempt fails
 `;

@@ -36,6 +36,8 @@ import {
   NotificationsOff as NoReminderIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  LocalOffer as TagIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -87,6 +89,11 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   const [isReminderActive, setIsReminderActive] = useState(false);
   const [isReminderExpanded, setIsReminderExpanded] = useState(false);
 
+  // Tags states
+  const [tags, setTags] = useState<string[]>([]);
+  const [isTagsExpanded, setIsTagsExpanded] = useState(false);
+  const [newTagInput, setNewTagInput] = useState('');
+
   const allDays: DayAbbreviation[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   // Initialize note data when dialog opens
@@ -105,6 +112,10 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         setReminderDays(initialNote.reminder_days || []);
         setIsReminderActive(initialNote.is_reminder_active || false);
         setIsReminderExpanded(initialNote.is_reminder_active || false);
+
+        // Initialize tags states
+        setTags(initialNote.tags || []);
+        setIsTagsExpanded((initialNote.tags?.length || 0) > 0);
       } else {
         // Creating new note - reset to defaults
         setNote(null);
@@ -118,6 +129,11 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         setReminderDays([]);
         setIsReminderActive(false);
         setIsReminderExpanded(false);
+
+        // Reset tags states
+        setTags([]);
+        setIsTagsExpanded(false);
+        setNewTagInput('');
       }
     }
   }, [open, initialNote]);
@@ -129,8 +145,8 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       setSaving(true);
 
       if (note) {
-        // Update existing note
-        await notesService.updateNote(note.id, {
+        // Update existing note - only save tags if not an AI note
+        const updates: any = {
           title,
           content,
           cover_image: coverImage,
@@ -138,7 +154,14 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           reminder_date: reminderDate,
           reminder_days: reminderDays,
           is_reminder_active: isReminderActive,
-        });
+        };
+
+        // Only update tags for user-created notes
+        if (!note.by_assistant) {
+          updates.tags = tags;
+        }
+
+        await notesService.updateNote(note.id, updates);
 
         // Reload to get updated data
         const updatedNote = await notesService.getNote(note.id);
@@ -158,6 +181,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           reminder_date: reminderDate,
           reminder_days: reminderDays,
           is_reminder_active: isReminderActive,
+          tags,
         });
         setNote(newNote);
         if (onSave) onSave(newNote, true);
@@ -177,8 +201,9 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       const hasNonEmptyContent = content && content.trim() !== '';
       const hasCoverImage = coverImage !== null;
       const hasReminder = reminderType !== 'none' && isReminderActive;
+      const hasTags = tags.length > 0;
 
-      return hasNonEmptyTitle || hasNonEmptyContent || hasCoverImage || hasReminder;
+      return hasNonEmptyTitle || hasNonEmptyContent || hasCoverImage || hasReminder || hasTags;
     } else {
       // For existing notes, check if anything changed
       const titleChanged = title !== note.title;
@@ -188,9 +213,10 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       const reminderDateChanged = reminderDate !== (note.reminder_date || null);
       const reminderDaysChanged = JSON.stringify(reminderDays) !== JSON.stringify(note.reminder_days || []);
       const reminderActiveChanged = isReminderActive !== (note.is_reminder_active || false);
+      const tagsChanged = JSON.stringify(tags) !== JSON.stringify(note.tags || []);
 
       return titleChanged || contentChanged || coverImageChanged || reminderTypeChanged ||
-        reminderDateChanged || reminderDaysChanged || reminderActiveChanged;
+        reminderDateChanged || reminderDaysChanged || reminderActiveChanged || tagsChanged;
     }
   };
 
@@ -205,7 +231,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
     }, 1000); // 1 second debounce
 
     return () => clearTimeout(timeout);
-  }, [title, content, coverImage, open, note]);
+  }, [title, content, coverImage, tags, open, note]);
 
   const handleClose = async () => {
     // If it's a new note and has content, save it before closing
@@ -315,6 +341,29 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       }
     });
   };
+
+  // Tag handlers
+  const handleAddTag = () => {
+    const trimmedTag = newTagInput.trim();
+    if (trimmedTag && !tags.includes(trimmedTag)) {
+      setTags(prev => [...prev, trimmedTag]);
+      setNewTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(prev => prev.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTag();
+    }
+  };
+
+  // Check if tag editing is allowed (not for AI notes)
+  const isTagEditingAllowed = !note?.by_assistant;
 
   return (
     <>
@@ -582,6 +631,130 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               </Box>
             </Collapse>
 
+            {/* Tags Sub-Header */}
+            <Box
+              onClick={() => setIsTagsExpanded(!isTagsExpanded)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                px: 3,
+                py: 1,
+                bgcolor: alpha(theme.palette.secondary.main, 0.04),
+                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                cursor: 'pointer',
+                '&:hover': {
+                  opacity: 0.8,
+                },
+              }}
+            >
+              {/* Left side - Tags label */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                }}
+              >
+                <TagIcon sx={{ color: tags.length > 0 ? 'secondary.main' : 'text.secondary', fontSize: '1.1rem' }} />
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={600}
+                  sx={{ color: tags.length > 0 ? 'secondary.main' : 'text.secondary' }}
+                >
+                  Tags
+                </Typography>
+                {/* AI note indicator */}
+                {note?.by_assistant && (
+                  <Typography variant="caption" color="text.disabled">
+                    (read-only)
+                  </Typography>
+                )}
+              </Box>
+
+              {/* Right side - Tag count and expand icon */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {tags.length > 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    {tags.length} tag{tags.length !== 1 ? 's' : ''}
+                  </Typography>
+                )}
+                <IconButton size="small" sx={{ color: 'text.secondary' }}>
+                  {isTagsExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                </IconButton>
+              </Box>
+            </Box>
+
+            {/* Collapsible Tags Content */}
+            <Collapse in={isTagsExpanded}>
+              <Box sx={{ px: 3, py: 2, bgcolor: alpha(theme.palette.secondary.main, 0.02) }}>
+                {/* Existing tags */}
+                {tags.length > 0 && (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+                    {tags.map((tag) => (
+                      <Chip
+                        key={tag}
+                        label={tag}
+                        size="small"
+                        onDelete={isTagEditingAllowed ? () => handleRemoveTag(tag) : undefined}
+                        sx={{
+                          bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                          color: 'secondary.main',
+                          fontWeight: 500,
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )}
+
+                {/* Add new tag input - only for user-created notes */}
+                {isTagEditingAllowed ? (
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                    <TextField
+                      size="small"
+                      placeholder="Add a tag..."
+                      value={newTagInput}
+                      onChange={(e) => setNewTagInput(e.target.value)}
+                      onKeyDown={handleTagInputKeyDown}
+                      sx={{ flex: 1 }}
+                      InputProps={{
+                        sx: { borderRadius: 2 },
+                      }}
+                    />
+                    <IconButton
+                      size="small"
+                      onClick={handleAddTag}
+                      disabled={!newTagInput.trim()}
+                      sx={{
+                        bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                        '&:hover': {
+                          bgcolor: alpha(theme.palette.secondary.main, 0.2),
+                        },
+                        '&:disabled': {
+                          bgcolor: alpha(theme.palette.action.disabled, 0.1),
+                        },
+                      }}
+                    >
+                      <AddIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ) : (
+                  tags.length === 0 && (
+                    <Typography variant="body2" color="text.secondary">
+                      No tags on this note.
+                    </Typography>
+                  )
+                )}
+
+                {/* Help text for user notes */}
+                {isTagEditingAllowed && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    Press Enter or click + to add a tag
+                  </Typography>
+                )}
+              </Box>
+            </Collapse>
+
           {/* Content Area */}
           <Box
             sx={{
@@ -614,13 +787,15 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Untitled"
               fullWidth
+              multiline
               variant="standard"
               InputProps={{
                 disableUnderline: true,
                 sx: {
                   fontSize: '2.5rem',
                   fontWeight: 700,
-                  '& input': {
+                  lineHeight: 1.2,
+                  '& textarea': {
                     padding: 0,
                   },
                 },

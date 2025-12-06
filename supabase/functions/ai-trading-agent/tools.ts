@@ -286,6 +286,33 @@ export const searchNotesTool: GeminiFunctionDeclaration = {
 };
 
 /**
+ * Analyze trade image tool definition
+ */
+export const analyzeImageTool: GeminiFunctionDeclaration = {
+  name: 'analyze_image',
+  description: 'Analyze a trade chart image to extract insights about entries, exits, patterns, and price action. Use this when reviewing trades that have attached images. Pass the image URL from trade.images[].url field.',
+  parameters: {
+    type: 'object',
+    properties: {
+      image_url: {
+        type: 'string',
+        description: 'The URL of the trade image to analyze (from trade.images[].url)'
+      },
+      analysis_focus: {
+        type: 'string',
+        description: 'What to focus the analysis on: entry quality, exit timing, pattern identification, support/resistance, or general overview',
+        enum: ['entry', 'exit', 'patterns', 'levels', 'overview']
+      },
+      trade_context: {
+        type: 'string',
+        description: 'Optional context about the trade (e.g., "Long EUR/USD, won 2R") to help interpret the chart'
+      }
+    },
+    required: ['image_url']
+  }
+};
+
+/**
  * ============================================================================
  * TOOL IMPLEMENTATIONS
  * ============================================================================
@@ -843,6 +870,40 @@ export async function searchNotes(
 }
 
 /**
+ * Prepare image for multimodal analysis
+ * Returns a marker that the conversation builder will detect and inject as inline_data
+ */
+export function analyzeImage(
+  imageUrl: string,
+  analysisFocus: string = 'overview',
+  tradeContext?: string
+): string {
+  try {
+    log(`Preparing image for analysis: ${imageUrl.substring(0, 50)}...`, 'info');
+
+    // Build analysis instruction based on focus
+    const focusPrompts: Record<string, string> = {
+      entry: 'Focus on analyzing the entry point: Was the entry well-timed? What price action or patterns preceded the entry? Was there confluence?',
+      exit: 'Focus on analyzing the exit: Was the exit optimal? Was profit left on the table? Was the stop loss placement appropriate?',
+      patterns: 'Focus on identifying chart patterns: What patterns are visible (head & shoulders, flags, wedges, etc.)? Are there trend lines or channels?',
+      levels: 'Focus on support/resistance levels: Identify key horizontal levels, trend lines, and areas of interest. Where are the key decision points?',
+      overview: 'Provide a general analysis of this trade chart including: entry/exit quality, patterns, key levels, and any notable observations.'
+    };
+
+    const focusInstruction = focusPrompts[analysisFocus] || focusPrompts.overview;
+    const contextNote = tradeContext ? ` Trade context: "${tradeContext}".` : '';
+
+    // Return marker with image URL and instructions - conversation builder will inject the actual image
+    return `[IMAGE_ANALYSIS:${imageUrl}]
+Analysis instructions: ${focusInstruction}${contextNote}
+Provide a concise analysis (3-5 bullet points). Be specific about what you observe in the chart image above.`;
+  } catch (error) {
+    log(`Image preparation error: ${error}`, 'error');
+    return `Image analysis error: ${error instanceof Error ? error.message : 'Unknown'}`;
+  }
+}
+
+/**
  * ============================================================================
  * TOOL EXECUTOR
  * ============================================================================
@@ -941,6 +1002,13 @@ export async function executeCustomTool(
         return await searchNotes(supabase, userId, calendarId, searchQuery, includeArchived, tags);
       }
 
+      case 'analyze_image': {
+        const imageUrl = typeof args.image_url === 'string' ? args.image_url : '';
+        const analysisFocus = typeof args.analysis_focus === 'string' ? args.analysis_focus : 'overview';
+        const tradeContext = typeof args.trade_context === 'string' ? args.trade_context : undefined;
+        return analyzeImage(imageUrl, analysisFocus, tradeContext);
+      }
+
       default:
         return `Unknown custom tool: ${toolName}`;
     }
@@ -962,6 +1030,7 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     createNoteTool,
     updateNoteTool,
     deleteNoteTool,
-    searchNotesTool
+    searchNotesTool,
+    analyzeImageTool
   ];
 }

@@ -27,6 +27,9 @@ export interface Note {
   reminder_date?: Date | null; // For one-time reminders
   reminder_days?: DayAbbreviation[]; // For weekly reminders
   is_reminder_active?: boolean;
+
+  // Tags for categorization
+  tags?: string[];
 }
 
 export interface CreateNoteInput {
@@ -42,6 +45,9 @@ export interface CreateNoteInput {
   reminder_date?: Date | null;
   reminder_days?: DayAbbreviation[];
   is_reminder_active?: boolean;
+
+  // Tags for categorization
+  tags?: string[];
 }
 
 export interface UpdateNoteInput {
@@ -57,6 +63,9 @@ export interface UpdateNoteInput {
   reminder_date?: Date | null;
   reminder_days?: DayAbbreviation[];
   is_reminder_active?: boolean;
+
+  // Tags for categorization
+  tags?: string[];
 }
 
 export interface ReminderConfig {

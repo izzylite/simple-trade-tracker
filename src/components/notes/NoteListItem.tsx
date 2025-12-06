@@ -22,6 +22,7 @@ import {
   PushPinOutlined as PinOutlinedIcon,
   NotificationsActive as ReminderIcon,
   SmartToy as AIIcon,
+  LocalOffer as TagIcon,
 } from '@mui/icons-material';
 import { convertFromRaw } from 'draft-js';
 import { Note } from '../../types/note';
@@ -178,6 +179,34 @@ export const NoteListItem: React.FC<NoteListItemProps> = ({
           >
             {contentPreview}
           </Typography>
+        )}
+
+        {/* Tags preview */}
+        {note.tags && note.tags.length > 0 && (
+          <Stack direction="row" spacing={0.5} sx={{ mb: 0.5, flexWrap: 'wrap', gap: 0.25 }}>
+            <TagIcon sx={{ fontSize: '0.75rem', color: 'text.disabled', mt: 0.25 }} />
+            {note.tags.slice(0, 3).map((tag) => (
+              <Chip
+                key={tag}
+                label={tag}
+                size="small"
+                sx={{
+                  height: 16,
+                  fontSize: '0.65rem',
+                  bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                  color: 'text.secondary',
+                  '& .MuiChip-label': {
+                    px: 0.75,
+                  },
+                }}
+              />
+            ))}
+            {note.tags.length > 3 && (
+              <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
+                +{note.tags.length - 3}
+              </Typography>
+            )}
+          </Stack>
         )}
 
         {/* Date */}

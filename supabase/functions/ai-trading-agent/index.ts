@@ -96,6 +96,70 @@ async function sendSSE(writer: WritableStreamDefaultWriter, event: SSEEventType,
 }
 
 /**
+ * Build multimodal function response parts
+ * Detects [IMAGE_ANALYSIS:url] markers and injects images as inline_data
+ */
+async function buildFunctionResponseParts(
+  toolName: string,
+  result: string
+): Promise<Array<Record<string, unknown>>> {
+  const parts: Array<Record<string, unknown>> = [];
+
+  // Check for image analysis marker
+  const imageMarkerMatch = result.match(/\[IMAGE_ANALYSIS:(https?:\/\/[^\]]+)\]/);
+
+  if (imageMarkerMatch) {
+    const imageUrl = imageMarkerMatch[1];
+    log(`Injecting image into conversation: ${imageUrl.substring(0, 50)}...`, 'info');
+
+    try {
+      // Fetch and convert image to base64
+      const imageResponse = await fetch(imageUrl);
+      if (imageResponse.ok) {
+        const imageBuffer = await imageResponse.arrayBuffer();
+        const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+        const contentType = imageResponse.headers.get('content-type') || 'image/png';
+        const mimeType = contentType.split(';')[0].trim();
+
+        // Add image as inline_data part first (so model sees image before instructions)
+        parts.push({
+          inline_data: {
+            mime_type: mimeType,
+            data: base64Image
+          }
+        });
+
+        // Add text instructions (without the marker)
+        const textWithoutMarker = result.replace(/\[IMAGE_ANALYSIS:[^\]]+\]\n?/, '').trim();
+        parts.push({
+          functionResponse: {
+            name: toolName,
+            response: { result: textWithoutMarker }
+          }
+        });
+
+        log('Image injected successfully into conversation', 'info');
+        return parts;
+      } else {
+        log(`Failed to fetch image: ${imageResponse.status}`, 'error');
+      }
+    } catch (error) {
+      log(`Error fetching image for injection: ${error}`, 'error');
+    }
+  }
+
+  // Default: just return text function response
+  parts.push({
+    functionResponse: {
+      name: toolName,
+      response: { result }
+    }
+  });
+
+  return parts;
+}
+
+/**
  * Get MCP tools with caching
  * Returns cached tools if available and not expired, otherwise fetches fresh
  */
@@ -631,7 +695,7 @@ function handleStreamingRequest(
           }
 
           // Execute all tools in parallel
-          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes'];
+          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes', 'analyze_image'];
           const supabaseClient = createServiceClient();
           const executionPromises = result.functionCalls.map(async (call) => {
             try {
@@ -654,7 +718,7 @@ function handleStreamingRequest(
           const modelParts: Array<Record<string, unknown>> = [];
           const userParts: Array<Record<string, unknown>> = [];
 
-          for (const { call, result: funcResult, success } of results) {
+          for (const { call, result: funcResult } of results) {
             // Send tool_result event
             await sendSSE(writer, 'tool_result', {
               name: call.name,
@@ -672,12 +736,9 @@ function handleStreamingRequest(
               }
             });
 
-            userParts.push({
-              functionResponse: {
-                name: call.name,
-                response: { result: funcResult }
-              }
-            });
+            // Build multimodal response parts (handles image injection)
+            const responseParts = await buildFunctionResponseParts(call.name, funcResult);
+            userParts.push(...responseParts);
           }
 
           // Append to conversation history
@@ -720,7 +781,7 @@ function handleStreamingRequest(
           let functionResult: string;
 
           // Execute tool (custom or MCP)
-          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes'];
+          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes', 'analyze_image'];
           const supabaseClient = createServiceClient();
           if (customToolNames.includes(call.name)) {
             functionResult = await executeCustomTool(call.name, call.args, {
@@ -750,14 +811,11 @@ function handleStreamingRequest(
             }]
           });
 
+          // Build multimodal response parts (handles image injection)
+          const responseParts = await buildFunctionResponseParts(call.name, functionResult);
           conversationContents.push({
             role: 'user',
-            parts: [{
-              functionResponse: {
-                name: call.name,
-                response: { result: functionResult }
-              }
-            }]
+            parts: responseParts
           });
         } else {
           // No function calls and no text - shouldn't happen
@@ -1071,7 +1129,7 @@ Deno.serve(async (req: Request) => {
       let functionResult: string;
 
       // Check if it's a custom tool (from tools.ts)
-      const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes'];
+      const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes', 'analyze_image'];
       const supabaseClient = createServiceClient();
       if (customToolNames.includes(call.name)) {
         // Execute custom tool
@@ -1097,15 +1155,11 @@ Deno.serve(async (req: Request) => {
         }]
       });
 
-      // Append function response to conversation history
+      // Append function response to conversation history (handles image injection)
+      const responseParts = await buildFunctionResponseParts(call.name, functionResult);
       conversationContents.push({
         role: 'user',
-        parts: [{
-          functionResponse: {
-            name: call.name,
-            response: { result: functionResult }
-          }
-        }]
+        parts: responseParts
       });
 
       // Call Gemini again with updated conversation history
