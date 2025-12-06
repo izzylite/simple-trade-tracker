@@ -1089,6 +1089,7 @@ export async function searchNotes(
 
 /**
  * Get tag definition from database
+ * Supports partial matching: "3x Displacement" will match "Confluence:3x Displacement"
  */
 export async function getTagDefinition(
   supabase: SupabaseClient,
@@ -1098,24 +1099,45 @@ export async function getTagDefinition(
   try {
     log(`Looking up definition for tag: ${tagName}`, "info");
 
-    const { data, error } = await supabase
+    // First try exact match
+    const { data: exactMatch, error: exactError } = await supabase
       .from("tag_definitions")
-      .select("definition")
+      .select("tag_name, definition")
       .eq("user_id", userId)
       .eq("tag_name", tagName)
       .single();
 
-    if (error && error.code !== "PGRST116") {
-      log(`Error fetching tag definition: ${error.message}`, "error");
-      return `Error looking up tag definition: ${error.message}`;
+    if (exactError && exactError.code !== "PGRST116") {
+      log(`Error fetching tag definition: ${exactError.message}`, "error");
+      return `Error looking up tag definition: ${exactError.message}`;
     }
 
-    if (!data) {
-      return `No definition found for tag "${tagName}". You may suggest a definition and ask the user if they'd like to save it.`;
+    if (exactMatch) {
+      log(`Found exact definition for tag: ${tagName}`, "info");
+      return `Tag "${tagName}" definition: ${exactMatch.definition}`;
     }
 
-    log(`Found definition for tag: ${tagName}`, "info");
-    return `Tag "${tagName}" definition: ${data.definition}`;
+    // If no exact match, try partial match (tag name part of grouped tags)
+    // This allows "3x Displacement" to match "Confluence:3x Displacement"
+    const { data: partialMatches, error: partialError } = await supabase
+      .from("tag_definitions")
+      .select("tag_name, definition")
+      .eq("user_id", userId)
+      .ilike("tag_name", `%:${tagName}`);
+
+    if (partialError) {
+      log(`Error fetching partial tag definition: ${partialError.message}`, "error");
+      return `Error looking up tag definition: ${partialError.message}`;
+    }
+
+    if (partialMatches && partialMatches.length > 0) {
+      // Return the first match (most likely the intended one)
+      const match = partialMatches[0];
+      log(`Found partial match for tag "${tagName}": ${match.tag_name}`, "info");
+      return `Tag "${match.tag_name}" definition: ${match.definition}`;
+    }
+
+    return `No definition found for tag "${tagName}". You may suggest a definition and ask the user if they'd like to save it.`;
   } catch (error) {
     return `Error looking up tag definition: ${
       error instanceof Error ? error.message : "Unknown"
