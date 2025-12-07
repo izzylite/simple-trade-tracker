@@ -520,7 +520,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 onTradeClick={(tradeId, contextTrades) => {
                   // Navigate to the trade within the gallery
                   const tradeIndex = trades.findIndex(t => t.id === tradeId);
-                  if (tradeIndex >= 0) {
+                  if (tradeIndex >= 0 && trades.length <=5) {
                     setCurrentIndex(tradeIndex);
                     setActiveTab(0); // Switch to Trade tab
                   } else if (onOpenGalleryMode) {
