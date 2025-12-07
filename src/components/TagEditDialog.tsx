@@ -404,7 +404,7 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
           label="Definition (optional)"
           value={definition}
           onChange={(e) => {
-            if (e.target.value.length <= 1024) {
+            if (e.target.value.length <= 2024) {
               setDefinition(e.target.value);
             }
           }}
@@ -414,7 +414,7 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
           disabled={isSubmitting || isLoadingDefinition}
           placeholder="What does this tag mean? e.g., 'Trade taken at 0.62 Fibonacci retracement level'"
           size="medium"
-          inputProps={{ maxLength: 1024 }}
+          inputProps={{ maxLength: 2024 }}
           InputProps={{
             startAdornment: isLoadingDefinition ? (
               <CircularProgress size={16} sx={{ mr: 1 }} />
