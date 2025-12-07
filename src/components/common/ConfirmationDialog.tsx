@@ -6,7 +6,9 @@ import {
   DialogActions,
   Button,
   Typography,
-  CircularProgress
+  CircularProgress,
+  SxProps,
+  Theme
 } from '@mui/material';
 
 interface ConfirmationDialogProps {
@@ -19,6 +21,7 @@ interface ConfirmationDialogProps {
   onCancel: () => void;
   isSubmitting?: boolean;
   confirmColor?: 'primary' | 'error' | 'warning' | 'success' | 'info';
+  sx?: SxProps<Theme>;
 }
 
 const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
@@ -30,7 +33,8 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   onConfirm,
   onCancel,
   isSubmitting = false,
-  confirmColor = 'primary'
+  confirmColor = 'primary',
+  sx
 }) => {
   return (
     <Dialog
@@ -38,6 +42,12 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
       onClose={onCancel}
       maxWidth="xs"
       fullWidth
+      sx={sx}
+      slotProps={{
+        backdrop: {
+          sx,
+        },
+      }}
     >
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>

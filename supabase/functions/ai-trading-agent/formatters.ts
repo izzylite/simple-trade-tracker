@@ -202,7 +202,10 @@ function extractUrlsFromToolResult(result: any): string[] {
       const filteredUrls = matches.filter(url =>
         !url.includes('quickchart.io') && // Chart images
         !url.includes('firebasestorage.googleapis.com') && // Firebase storage images
-        !url.includes('.supabase.co/storage') // Supabase storage images
+        !url.includes('.supabase.co/storage') && // Supabase storage images
+        !url.includes('unsplash.com') && // Stock images
+        !url.includes('pexels.com') && // Stock images
+        !url.includes('pixabay.com') // Stock images
       );
       urls.push(...filteredUrls);
     }

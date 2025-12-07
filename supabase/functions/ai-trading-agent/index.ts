@@ -13,6 +13,7 @@ import {
 } from './tools.ts';
 import { fetchEmbeddedData, type EmbeddedData } from './embedDataFetcher.ts';
 import { buildSecureSystemPrompt } from "./systemPrompt.ts";
+import { encodeBase64 } from "https://deno.land/std@0.208.0/encoding/base64.ts";
 
 /**
  * ============================================================================
@@ -117,7 +118,8 @@ async function buildFunctionResponseParts(
       const imageResponse = await fetch(imageUrl);
       if (imageResponse.ok) {
         const imageBuffer = await imageResponse.arrayBuffer();
-        const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+        // Use Deno's encodeBase64 which handles large buffers without stack overflow
+        const base64Image = encodeBase64(new Uint8Array(imageBuffer));
         const contentType = imageResponse.headers.get('content-type') || 'image/png';
         const mimeType = contentType.split(';')[0].trim();
 
@@ -489,7 +491,7 @@ async function callGeminiStreaming(
   conversationHistory: Array<{ role: string; content: string }>,
   tools: GeminiFunctionDeclaration[],
   writer: WritableStreamDefaultWriter
-): Promise<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> }; functionCalls?: Array<{ name: string; args: Record<string, unknown> }> }> {
+): Promise<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> }; functionCalls?: Array<{ name: string; args: Record<string, unknown> }>; emptyBug?: boolean }> {
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
 
   // Build contents array
@@ -512,30 +514,58 @@ async function callGeminiStreaming(
     }
   };
 
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-  });
+  // Log request details for debugging
+  log(`Gemini streaming request: ${contents.length} messages, ${tools.length} tools`, 'info');
+  log(`Last user message: "${message.substring(0, 100)}..."`, 'info');
+
+  let response: Response;
+  try {
+    log('Initiating Gemini fetch...', 'info');
+    response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+    log(`Gemini fetch completed with status: ${response.status}`, 'info');
+  } catch (fetchError) {
+    log(`Gemini fetch failed: ${fetchError}`, 'error');
+    throw new Error(`Gemini fetch failed: ${fetchError}`);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
+    log(`Gemini API error response: ${errorText.substring(0, 500)}`, 'error');
     throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
   }
+
+  log('Gemini streaming response started', 'info');
 
   // Process streaming response
   let fullText = '';
   let functionCall: { name: string; args: Record<string, unknown> } | undefined;
   const functionCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+  let chunkCount = 0;
+
+  if (!response.body) {
+    log('Warning: Response body is null - no stream to process', 'warn');
+    return { text: '' };
+  }
 
   if (response.body) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let readCount = 0;
 
     try {
       while (true) {
         const { done, value } = await reader.read();
+        readCount++;
+
+        // Log first read to confirm streaming is working
+        if (readCount === 1) {
+          log(`First stream read: ${value ? value.length : 0} bytes`, 'info');
+        }
         if (done) break;
 
         // Decode chunk and add to buffer
@@ -554,9 +584,46 @@ async function callGeminiStreaming(
 
           try {
             const chunk = JSON.parse(jsonLine);
+            chunkCount++;
             const candidate = chunk.candidates?.[0];
+
+            // Log first chunk for debugging
+            if (chunkCount === 1) {
+              log(`First Gemini chunk: ${JSON.stringify(chunk).substring(0, 500)}`, 'info');
+            }
+
+            // Check for blocked or empty responses
+            if (!candidate) {
+              // Check if response was blocked
+              if (chunk.promptFeedback?.blockReason) {
+                log(`Gemini blocked response: ${chunk.promptFeedback.blockReason}`, 'warn');
+                log(`Block reason details: ${JSON.stringify(chunk.promptFeedback)}`, 'warn');
+              } else {
+                log(`Empty candidate in chunk: ${JSON.stringify(chunk).substring(0, 300)}`, 'warn');
+              }
+              continue;
+            }
+
+            // Check finish reason for issues
+            const finishReason = candidate.finishReason;
+            if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
+              log(`Gemini finish reason: ${finishReason}`, 'warn');
+              if (finishReason === 'SAFETY') {
+                log('Response blocked by safety filters', 'warn');
+              } else if (finishReason === 'RECITATION') {
+                log('Response blocked due to recitation', 'warn');
+              }
+            }
+
             const content = candidate?.content;
             const parts = content?.parts || [];
+
+            // KNOWN BUG: Gemini sometimes returns finishReason:STOP but empty parts
+            // Detect this: candidate exists, finishReason is STOP, but no parts
+            if (finishReason === 'STOP' && (!parts || parts.length === 0)) {
+              log('Warning: Gemini empty content bug - finishReason:STOP but no parts (known API issue)', 'warn');
+              // Continue processing - the empty response will be detected at the end
+            }
 
             // Extract ALL function calls (not just the first one)
             const functionCallParts = parts.filter((p: { functionCall?: unknown }) => p.functionCall);
@@ -573,14 +640,13 @@ async function callGeminiStreaming(
               }
             }
 
-            // Stream text chunks (only if no function calls in this part)
-            if (functionCallParts.length === 0) {
-              for (const part of parts) {
-                if (part.text) {
-                  fullText += part.text;
-                  // Send text chunk via SSE
-                  await sendSSE(writer, 'text_chunk', { text: part.text });
-                }
+            // Stream text chunks - ALWAYS extract text, even if function calls present
+            // Gemini can return text AND function calls in the same response
+            for (const part of parts) {
+              if (part.text) {
+                fullText += part.text;
+                // Send text chunk via SSE
+                await sendSSE(writer, 'text_chunk', { text: part.text });
               }
             }
           } catch (parseError) {
@@ -594,11 +660,22 @@ async function callGeminiStreaming(
     }
   }
 
-  // Return multiple function calls if available, otherwise single or text
+  // Log final streaming result
+  log(`Streaming complete: ${chunkCount} JSON chunks parsed, text=${fullText.length} chars, functionCalls=${functionCalls.length}`, 'info');
+
+  // Return result - include text alongside function calls when available
+  // This allows us to capture any text Gemini sends before/with function calls
   if (functionCalls.length > 1) {
-    return { functionCalls };
+    return { functionCalls, text: fullText || undefined };
   } else if (functionCall) {
-    return { functionCall };
+    return { functionCall, text: fullText || undefined };
+  }
+
+  // No function calls - return text (may be empty if model returned nothing)
+  if (!fullText) {
+    log('Warning: Gemini returned empty response (no text, no function calls) - known API bug', 'warn');
+    // Signal that this is the known empty bug so caller can retry
+    return { text: '', emptyBug: true };
   }
 
   return { text: fullText };
@@ -650,8 +727,9 @@ function handleStreamingRequest(
       let finalText = '';
       let turnCount = 0;
       const maxTurns = 15;
+      const maxRetries = 3;
 
-      // Initial streaming call
+      // Initial streaming call with retry logic for known Gemini empty response bug
       let result = await callGeminiStreaming(
         googleApiKey,
         systemPrompt,
@@ -660,6 +738,69 @@ function handleStreamingRequest(
         allTools,
         writer
       );
+
+      // RETRY LOGIC: Handle known Gemini empty content bug
+      // See: https://discuss.ai.google.dev/t/gemini-2-5-pro-with-empty-response-text/81175
+      if (result.emptyBug) {
+        log('Detected Gemini empty content bug, attempting retry with context enhancement', 'warn');
+
+        // Get last assistant message from history for context
+        const lastAssistantMsg = [...conversationHistory].reverse().find(m => m.role === 'assistant');
+        const contextPrefix = lastAssistantMsg
+          ? `(Continuing our conversation - you previously said: "${lastAssistantMsg.content.substring(0, 200)}...")\n\n`
+          : '';
+
+        for (let retryAttempt = 1; retryAttempt <= maxRetries; retryAttempt++) {
+          // Wait before retry (exponential backoff: 1s, 2s, 4s)
+          const delayMs = Math.pow(2, retryAttempt - 1) * 1000;
+          log(`Retry ${retryAttempt}/${maxRetries} after ${delayMs}ms delay`, 'info');
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+
+          // Different strategies for each retry
+          let clarifiedMessage: string;
+          let retryTools = allTools;
+
+          if (retryAttempt === 1) {
+            // Retry 1: Add context from conversation
+            clarifiedMessage = `${contextPrefix}User response: "${message}"\n\nPlease respond to the user's message above.`;
+          } else if (retryAttempt === 2) {
+            // Retry 2: Simplify - use fewer tools (only custom tools, no MCP)
+            clarifiedMessage = `${contextPrefix}User says: "${message}"\n\nProvide a helpful response.`;
+            retryTools = allTools.filter(t =>
+              ['execute_sql', 'search_web', 'get_crypto_price', 'get_forex_price', 'create_note', 'update_memory'].includes(t.name)
+            );
+            log(`Retry 2: Using reduced tool set (${retryTools.length} tools)`, 'info');
+          } else {
+            // Retry 3: No tools - just get a response
+            clarifiedMessage = `The user said: "${message}"\n\nBased on our conversation, please provide a helpful response. You can ask clarifying questions if needed.`;
+            retryTools = [];
+            log('Retry 3: No tools - forcing text response', 'info');
+          }
+
+          result = await callGeminiStreaming(
+            googleApiKey,
+            systemPrompt,
+            clarifiedMessage,
+            conversationHistory,
+            retryTools,
+            writer
+          );
+
+          if (!result.emptyBug && (result.text || result.functionCall || result.functionCalls)) {
+            log(`Retry ${retryAttempt} succeeded`, 'info');
+            break;
+          }
+
+          log(`Retry ${retryAttempt} also returned empty`, 'warn');
+        }
+
+        // If all retries failed, provide a fallback response
+        if (result.emptyBug || (!result.text && !result.functionCall && !result.functionCalls)) {
+          log('All retries failed - providing fallback response', 'warn');
+          finalText = "I apologize, but I'm having trouble generating a response right now. This appears to be a temporary issue with the AI service. Please try rephrasing your question or try again in a moment.";
+          await sendSSE(writer, 'text_chunk', { text: finalText });
+        }
+      }
 
       // Build conversation history for multi-turn function calling
       const conversationContents: Array<{ role: string; parts: Array<Record<string, unknown>> }> = [
@@ -673,12 +814,17 @@ function handleStreamingRequest(
       ];
 
       // Function calling loop
-      while (turnCount < maxTurns) {
+      // Skip if fallback was already provided due to empty bug
+      while (turnCount < maxTurns && !finalText) {
         turnCount++;
 
-        if (result.text) {
-          // Got final answer
+        // Capture any text that came with the response (even if there are also function calls)
+        if (result.text && !finalText) {
           finalText = result.text;
+        }
+
+        // If we have text and NO function calls, we're done
+        if (result.text && !result.functionCall && !result.functionCalls) {
           break;
         }
 
@@ -695,7 +841,7 @@ function handleStreamingRequest(
           }
 
           // Execute all tools in parallel
-          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes', 'analyze_image'];
+          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes', 'analyze_image', 'get_tag_definition', 'save_tag_definition', 'update_memory'];
           const supabaseClient = createServiceClient();
           const executionPromises = result.functionCalls.map(async (call) => {
             try {
@@ -781,7 +927,7 @@ function handleStreamingRequest(
           let functionResult: string;
 
           // Execute tool (custom or MCP)
-          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes', 'analyze_image'];
+          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes', 'analyze_image', 'get_tag_definition', 'save_tag_definition', 'update_memory'];
           const supabaseClient = createServiceClient();
           if (customToolNames.includes(call.name)) {
             functionResult = await executeCustomTool(call.name, call.args, {
@@ -818,7 +964,10 @@ function handleStreamingRequest(
             parts: responseParts
           });
         } else {
-          // No function calls and no text - shouldn't happen
+          // No function calls - check if we have text (final answer) or empty response
+          if (!result.text && !finalText) {
+            log('Warning: No function calls and no text in response - breaking loop', 'warn');
+          }
           break;
         }
 
@@ -875,18 +1024,19 @@ function handleStreamingRequest(
                   const content = candidate?.content;
                   const parts = content?.parts || [];
 
-                  const functionCallPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
-                  if (functionCallPart?.functionCall) {
-                    const fc = functionCallPart.functionCall as { name: string; args: Record<string, unknown> };
-                    newFunctionCall = { name: fc.name, args: fc.args || {} };
-                    continue;
-                  }
-
+                  // Process text parts first (don't skip text when function call is present)
                   for (const part of parts) {
                     if (part.text) {
                       newText += part.text;
                       await sendSSE(writer, 'text_chunk', { text: part.text });
                     }
+                  }
+
+                  // Check for function call
+                  const functionCallPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
+                  if (functionCallPart?.functionCall) {
+                    const fc = functionCallPart.functionCall as { name: string; args: Record<string, unknown> };
+                    newFunctionCall = { name: fc.name, args: fc.args || {} };
                   }
                 } catch (parseError) {
                   log(`Failed to parse streaming chunk: ${parseError}`, 'warn');
@@ -898,10 +1048,28 @@ function handleStreamingRequest(
           }
         }
 
-        result = newFunctionCall ? { functionCall: newFunctionCall } : { text: newText };
+        // Include text alongside function call if both present
+        result = newFunctionCall
+          ? { functionCall: newFunctionCall, text: newText || undefined }
+          : { text: newText };
+
+        // Capture any text before the loop continues or ends
+        if (newText) {
+          finalText = newText;
+        }
       }
 
-      log(`Completed in ${turnCount} turns with ${functionCalls.length} function calls`, 'info');
+      // Final fallback - if we still have no text but result has text
+      if (!finalText && result.text) {
+        finalText = result.text;
+      }
+
+      // Log completion with warning if no text was generated
+      if (!finalText) {
+        log(`Warning: Completed in ${turnCount} turns with ${functionCalls.length} function calls but NO TEXT generated`, 'warn');
+      } else {
+        log(`Completed in ${turnCount} turns with ${functionCalls.length} function calls`, 'info');
+      }
 
       // Format response with HTML and citations
       const { messageHtml, citations } = formatResponseWithHtmlAndCitations(
@@ -1024,8 +1192,8 @@ Deno.serve(async (req: Request) => {
     }
 
     log(`Processing request for user ${userId} (using ${userApiKey ? 'user' : 'server'} API key)`, 'info');
-
-    log(`Processing request for user ${userId}`, 'info');
+    log(`Input message (first 200 chars): "${message.substring(0, 200)}"`, 'info');
+    log(`Message length: ${message.length}, History length: ${conversationHistory.length}`, 'info');
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
@@ -1129,7 +1297,7 @@ Deno.serve(async (req: Request) => {
       let functionResult: string;
 
       // Check if it's a custom tool (from tools.ts)
-      const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes', 'analyze_image'];
+      const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes', 'analyze_image', 'get_tag_definition', 'save_tag_definition', 'update_memory'];
       const supabaseClient = createServiceClient();
       if (customToolNames.includes(call.name)) {
         // Execute custom tool

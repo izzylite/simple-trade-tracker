@@ -215,15 +215,60 @@ Content should be in plain text format. User ID and Calendar ID are automaticall
 };
 
 /**
+ * Update memory tool definition - dedicated tool for memory management with merge logic
+ */
+export const updateMemoryTool: GeminiFunctionDeclaration = {
+  name: "update_memory",
+  description: `Update your persistent memory with new insights. This tool MERGES new information with existing memory - it does NOT replace.
+
+CRITICAL: Provide ONLY the new information to add. The system will automatically merge it with existing content.
+
+SECTIONS (choose one):
+- TRADER_PROFILE: Trading style, risk tolerance, emotional patterns, timeframes
+- PERFORMANCE_PATTERNS: Setups/sessions that work, with win rates and evidence
+- STRATEGY_PREFERENCES: User-stated rules, entry criteria, risk management
+- LESSONS_LEARNED: Errors to avoid, corrections received, communication preferences
+- ACTIVE_FOCUS: Current goals, things to watch (this section CAN be replaced)
+
+FORMAT each insight as: "[Pattern/Rule]: [Evidence] [Confidence: High/Med/Low] [YYYY-MM]"
+
+EXAMPLES:
+- "London session scalps: 72% win rate on 15 trades [High] [2024-12]"
+- "Avoids trading during FOMC: User preference stated [High] [2024-12]"
+- "Struggles with counter-trend entries: 30% win rate [Med] [2024-12]"`,
+  parameters: {
+    type: "object",
+    properties: {
+      section: {
+        type: "string",
+        enum: ["TRADER_PROFILE", "PERFORMANCE_PATTERNS", "STRATEGY_PREFERENCES", "LESSONS_LEARNED", "ACTIVE_FOCUS"],
+        description: "Which section to update"
+      },
+      new_insights: {
+        type: "array",
+        items: { type: "string" },
+        description: "New bullet points to ADD to this section (will be merged with existing)"
+      },
+      replace_section: {
+        type: "boolean",
+        description: "If true, replaces section entirely. Only use for ACTIVE_FOCUS when goals change completely. Default: false (merge mode)"
+      }
+    },
+    required: ["section", "new_insights"]
+  }
+};
+
+/**
  * Update note tool definition
  */
 export const updateNoteTool: GeminiFunctionDeclaration = {
   name: "update_note",
   description: `Update an existing AI-created note. You can only update notes that you created (by_assistant=true).
 
+⚠️ CANNOT update AGENT_MEMORY notes - use update_memory tool instead for memory management.
+
 USE CASES:
 - Refine strategies or update insights
-- Update your "Trading Agent Memory" note incrementally (append new discoveries, don't rewrite entirely)
 - Add/modify/remove tags and reminders`,
   parameters: {
     type: "object",
@@ -809,6 +854,7 @@ export async function createNote(
 
 /**
  * Update an existing AI-created note
+ * NOTE: Cannot update AGENT_MEMORY notes - use updateMemory instead
  */
 export async function updateNote(
   supabase: SupabaseClient,
@@ -823,10 +869,10 @@ export async function updateNote(
   try {
     log(`Updating note: ${noteId}`, "info");
 
-    // First, verify this is an AI-created note
+    // First, verify this is an AI-created note and check for AGENT_MEMORY
     const { data: existingNote, error: fetchError } = await supabase
       .from("notes")
-      .select("id, by_assistant, title")
+      .select("id, by_assistant, title, tags")
       .eq("id", noteId)
       .single();
 
@@ -836,6 +882,12 @@ export async function updateNote(
 
     if (!existingNote) {
       return `Note not found with ID: ${noteId}`;
+    }
+
+    // Block updates to AGENT_MEMORY notes - must use update_memory tool instead
+    const noteTags = existingNote.tags || [];
+    if (noteTags.includes("AGENT_MEMORY")) {
+      return `Cannot update AGENT_MEMORY notes with update_note. Use the update_memory tool instead - it properly merges new insights with existing memory without losing information.`;
     }
 
     if (!existingNote.by_assistant) {
@@ -952,6 +1004,256 @@ export async function deleteNote(
     return `Note "${existingNote.title}" deleted successfully!`;
   } catch (error) {
     return `Note deletion error: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
+  }
+}
+
+// =============================================================================
+// MEMORY SYSTEM - Dedicated merge-based memory management
+// =============================================================================
+
+type MemorySection = "TRADER_PROFILE" | "PERFORMANCE_PATTERNS" | "STRATEGY_PREFERENCES" | "LESSONS_LEARNED" | "ACTIVE_FOCUS";
+
+const MEMORY_SECTION_ORDER: MemorySection[] = [
+  "TRADER_PROFILE",
+  "PERFORMANCE_PATTERNS",
+  "STRATEGY_PREFERENCES",
+  "LESSONS_LEARNED",
+  "ACTIVE_FOCUS"
+];
+
+/**
+ * Parse memory content into sections
+ */
+function parseMemorySections(content: string): Record<MemorySection, string[]> {
+  const sections: Record<MemorySection, string[]> = {
+    TRADER_PROFILE: [],
+    PERFORMANCE_PATTERNS: [],
+    STRATEGY_PREFERENCES: [],
+    LESSONS_LEARNED: [],
+    ACTIVE_FOCUS: []
+  };
+
+  // Split by section headers
+  const sectionPattern = /^## (TRADER_PROFILE|PERFORMANCE_PATTERNS|STRATEGY_PREFERENCES|LESSONS_LEARNED|ACTIVE_FOCUS)\s*$/gm;
+  const parts = content.split(sectionPattern);
+
+  // parts will be: [preamble, "SECTION_NAME", content, "SECTION_NAME", content, ...]
+  for (let i = 1; i < parts.length; i += 2) {
+    const sectionName = parts[i] as MemorySection;
+    const sectionContent = parts[i + 1] || "";
+
+    // Extract bullet points from section content (excluding placeholder text)
+    const bullets = sectionContent
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.startsWith('- '))
+      .map(line => line.substring(2).trim())
+      .filter(line => line.length > 0)
+      .filter(line => line !== '(No data yet)');
+
+    if (MEMORY_SECTION_ORDER.includes(sectionName)) {
+      sections[sectionName] = bullets;
+    }
+  }
+
+  return sections;
+}
+
+/**
+ * Build memory content from sections
+ */
+function buildMemoryContent(sections: Record<MemorySection, string[]>): string {
+  const parts: string[] = [];
+
+  for (const section of MEMORY_SECTION_ORDER) {
+    const items = sections[section] || [];
+    parts.push(`## ${section}`);
+    if (items.length > 0) {
+      parts.push(items.map(item => `- ${item}`).join('\n'));
+    } else {
+      parts.push('- (No data yet)');
+    }
+    parts.push(''); // Empty line between sections
+  }
+
+  return parts.join('\n').trim();
+}
+
+/**
+ * Deduplicate similar insights (basic similarity check)
+ */
+function deduplicateInsights(insights: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const insight of insights) {
+    // Normalize for comparison: lowercase, remove dates, trim
+    const normalized = insight
+      .toLowerCase()
+      .replace(/\[\d{4}-\d{2}\]/g, '') // Remove date tags
+      .replace(/\[high\]|\[med\]|\[low\]/gi, '') // Remove confidence
+      .trim();
+
+    // Check if we've seen something very similar
+    let isDuplicate = false;
+    for (const seenNorm of seen) {
+      // Simple similarity: if 80%+ of words match, consider duplicate
+      const words1 = new Set(normalized.split(/\s+/));
+      const words2 = new Set(seenNorm.split(/\s+/));
+      const intersection = [...words1].filter(w => words2.has(w)).length;
+      const union = new Set([...words1, ...words2]).size;
+      if (union > 0 && intersection / union > 0.8) {
+        isDuplicate = true;
+        break;
+      }
+    }
+
+    if (!isDuplicate) {
+      seen.add(normalized);
+      result.push(insight);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Create initial memory note with structure
+ */
+async function createInitialMemory(
+  supabase: SupabaseClient,
+  userId: string,
+  calendarId: string,
+  section: MemorySection,
+  insights: string[]
+): Promise<string> {
+  const sections: Record<MemorySection, string[]> = {
+    TRADER_PROFILE: [],
+    PERFORMANCE_PATTERNS: [],
+    STRATEGY_PREFERENCES: [],
+    LESSONS_LEARNED: [],
+    ACTIVE_FOCUS: []
+  };
+
+  sections[section] = insights;
+  const content = buildMemoryContent(sections);
+
+  const { data, error } = await supabase
+    .from("notes")
+    .insert({
+      user_id: userId,
+      calendar_id: calendarId,
+      title: "Memory",
+      content: content,
+      by_assistant: true,
+      is_archived: false,
+      is_pinned: true,
+      tags: ["AGENT_MEMORY"],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    log(`Error creating memory: ${error.message}`, "error");
+    return `Failed to create memory: ${error.message}`;
+  }
+
+  log(`Memory created with ID: ${data.id}`, "info");
+  return `Memory initialized with ${insights.length} insight(s) in ${section}.`;
+}
+
+/**
+ * Update memory with merge logic - preserves existing knowledge
+ */
+export async function updateMemory(
+  supabase: SupabaseClient,
+  userId: string,
+  calendarId: string,
+  section: MemorySection,
+  newInsights: string[],
+  replaceSection: boolean = false
+): Promise<string> {
+  try {
+    log(`Updating memory section: ${section} with ${newInsights.length} new insights`, "info");
+
+    // 1. Fetch existing memory note
+    const { data: memoryNote, error: fetchError } = await supabase
+      .from("notes")
+      .select("id, content")
+      .eq("user_id", userId)
+      .eq("calendar_id", calendarId)
+      .contains("tags", ["AGENT_MEMORY"])
+      .single();
+
+    if (fetchError && fetchError.code !== "PGRST116") {
+      log(`Error fetching memory: ${fetchError.message}`, "error");
+      return `Failed to fetch memory: ${fetchError.message}`;
+    }
+
+    // 2. If no memory exists, create initial one
+    if (!memoryNote) {
+      log("No existing memory found, creating initial memory", "info");
+      return await createInitialMemory(supabase, userId, calendarId, section, newInsights);
+    }
+
+    // 3. Parse existing content into sections
+    const sections = parseMemorySections(memoryNote.content || "");
+    const existingCount = sections[section].length;
+
+    // 4. Merge or replace section
+    if (replaceSection) {
+      log(`Replacing ${section} section entirely`, "info");
+      sections[section] = newInsights;
+    } else {
+      // APPEND new insights, preserving existing
+      log(`Merging ${newInsights.length} new insights into ${section} (existing: ${existingCount})`, "info");
+      sections[section] = [...sections[section], ...newInsights];
+
+      // Deduplicate similar entries
+      const beforeDedup = sections[section].length;
+      sections[section] = deduplicateInsights(sections[section]);
+      const afterDedup = sections[section].length;
+
+      if (beforeDedup !== afterDedup) {
+        log(`Deduplication removed ${beforeDedup - afterDedup} similar insights`, "info");
+      }
+    }
+
+    // 5. Rebuild content preserving structure
+    const updatedContent = buildMemoryContent(sections);
+
+    // 6. Check size limit (~2000 tokens ≈ 8000 chars)
+    if (updatedContent.length > 8000) {
+      log(`Memory exceeds size limit (${updatedContent.length} chars), consider compression`, "warn");
+      // For now, just warn - could implement compression here in future
+    }
+
+    // 7. Update note
+    const { error: updateError } = await supabase
+      .from("notes")
+      .update({
+        content: updatedContent,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", memoryNote.id);
+
+    if (updateError) {
+      log(`Error updating memory: ${updateError.message}`, "error");
+      return `Failed to update memory: ${updateError.message}`;
+    }
+
+    const finalCount = sections[section].length;
+    const addedCount = replaceSection ? newInsights.length : (finalCount - existingCount);
+
+    log(`Memory updated successfully: ${section} now has ${finalCount} insights`, "info");
+    return `Memory updated: ${replaceSection ? "Replaced" : "Added"} ${addedCount} insight(s) in ${section}. Total: ${finalCount} insights in section.`;
+  } catch (error) {
+    log(`Memory update error: ${error}`, "error");
+    return `Memory update error: ${
       error instanceof Error ? error.message : "Unknown"
     }`;
   }
@@ -1097,6 +1399,7 @@ export async function getTagDefinition(
   tagName: string
 ): Promise<string> {
   try {
+    console.log(`[getTagDefinition] Looking up: "${tagName}" for user: ${userId}`);
     log(`Looking up definition for tag: ${tagName}`, "info");
 
     // First try exact match
@@ -1113,9 +1416,12 @@ export async function getTagDefinition(
     }
 
     if (exactMatch) {
+      console.log(`[getTagDefinition] Found exact match: ${JSON.stringify(exactMatch)}`);
       log(`Found exact definition for tag: ${tagName}`, "info");
       return `Tag "${tagName}" definition: ${exactMatch.definition}`;
     }
+
+    console.log(`[getTagDefinition] No exact match, exactError: ${JSON.stringify(exactError)}`);
 
     // If no exact match, try partial match (tag name part of grouped tags)
     // This allows "3x Displacement" to match "Confluence:3x Displacement"
@@ -1182,6 +1488,22 @@ export async function saveTagDefinition(
 }
 
 /**
+ * Check if URL is a stock/placeholder image that should be skipped
+ */
+function isStockImageUrl(url: string): boolean {
+  const stockDomains = [
+    "unsplash.com",
+    "images.unsplash.com",
+    "pexels.com",
+    "pixabay.com",
+    "stock",
+    "placeholder",
+    "via.placeholder.com",
+  ];
+  return stockDomains.some((domain) => url.toLowerCase().includes(domain));
+}
+
+/**
  * Prepare image for multimodal analysis
  * Returns a marker that the conversation builder will detect and inject as inline_data
  */
@@ -1191,6 +1513,12 @@ export function analyzeImage(
   tradeContext?: string,
 ): string {
   try {
+    // Skip stock/placeholder images
+    if (isStockImageUrl(imageUrl)) {
+      log(`Skipping stock image: ${imageUrl.substring(0, 50)}...`, "info");
+      return `This appears to be a stock/placeholder image (${imageUrl.substring(0, 30)}...) and not an actual trade chart. Skipping analysis. Please provide a real trade chart image for analysis.`;
+    }
+
     log(
       `Preparing image for analysis: ${imageUrl.substring(0, 50)}...`,
       "info",
@@ -1418,6 +1746,31 @@ export async function executeCustomTool(
         return await saveTagDefinition(supabase, userId, tagName, definition);
       }
 
+      case "update_memory": {
+        if (!supabase) {
+          return "Supabase client not available for memory update";
+        }
+        const userId = context.userId || "";
+        const calendarId = context.calendarId || "";
+        const section = typeof args.section === "string"
+          ? args.section as "TRADER_PROFILE" | "PERFORMANCE_PATTERNS" | "STRATEGY_PREFERENCES" | "LESSONS_LEARNED" | "ACTIVE_FOCUS"
+          : "PERFORMANCE_PATTERNS";
+        const newInsights = Array.isArray(args.new_insights)
+          ? args.new_insights.map(i => String(i))
+          : [];
+        const replaceSection = typeof args.replace_section === "boolean"
+          ? args.replace_section
+          : false;
+        return await updateMemory(
+          supabase,
+          userId,
+          calendarId,
+          section,
+          newInsights,
+          replaceSection
+        );
+      }
+
       default:
         return `Unknown custom tool: ${toolName}`;
     }
@@ -1445,5 +1798,6 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     analyzeImageTool,
     getTagDefinitionTool,
     saveTagDefinitionTool,
+    updateMemoryTool,
   ];
 }

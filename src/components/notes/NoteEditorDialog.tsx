@@ -850,6 +850,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
         isSubmitting={deleting}
+        sx={{ zIndex: 9999 }}
       />
     </>
   );
