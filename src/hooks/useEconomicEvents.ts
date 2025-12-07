@@ -102,9 +102,11 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
 
-  // Refs for stable callbacks
+  // Refs for stable callbacks and caching
   const fetchingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const lastFetchedParamsRef = useRef<string | null>(null);
+  const hasFetchedRef = useRef(false);
 
   // Memoize date range to prevent unnecessary recalculations
   const dateRange = useMemo(
@@ -218,12 +220,25 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
     });
   }, []);
 
-  // Fetch on mount and when filters/date change
+  // Fetch on mount and when filters/date change (but NOT just when drawer opens)
   useEffect(() => {
-    if (enabled) {
-      setOffset(0);
-      fetchEvents(false);
+    if (!enabled) return;
+
+    // Create a unique key for current params
+    const currentParamsKey = `${dateRange.start}|${dateRange.end}|${filterParams.currencies}|${filterParams.impacts}|${filterParams.onlyUpcoming}`;
+
+    // Only fetch if params changed or we haven't fetched yet
+    if (hasFetchedRef.current && lastFetchedParamsRef.current === currentParamsKey) {
+      // Already have data for these exact params, skip fetch
+      return;
     }
+
+    // Update tracking refs
+    lastFetchedParamsRef.current = currentParamsKey;
+    hasFetchedRef.current = true;
+
+    setOffset(0);
+    fetchEvents(false);
 
     return () => {
       if (abortControllerRef.current) {
