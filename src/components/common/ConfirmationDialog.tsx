@@ -43,11 +43,6 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
       maxWidth="xs"
       fullWidth
       sx={sx}
-      slotProps={{
-        backdrop: {
-          sx,
-        },
-      }}
     >
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
