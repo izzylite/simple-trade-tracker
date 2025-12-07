@@ -79,7 +79,7 @@ export function mapEventToDbRow(e: EconomicEvent): EconomicEventDBRow | null {
     actual_value: e.actual_value ?? null,
     forecast_value: e.forecast_value ?? null,
     previous_value: e.previous_value ?? null,
-    actual_result_type: null,
+    actual_result_type: e.actual_result_type ?? null,
     country: e.country ?? null,
     flag_code: e.flag_code ?? null,
     flag_url: e.flag_url ?? null,
@@ -121,6 +121,49 @@ function cleanNumericValue(value: string): string {
     .trim()
 }
 
+/**
+ * Determine if an actual result is good or bad based on MyFXBook indicators
+ * Ported from Firebase implementation
+ */
+function determineResultType(cellEl: Element): 'good' | 'bad' | 'neutral' | '' {
+  // Method 1: Check CSS classes for background color indicators
+  const cellClass = cellEl.getAttribute('class') || ''
+  if (cellClass.includes('background-transparent-red')) {
+    return 'bad'
+  }
+  if (cellClass.includes('background-transparent-green')) {
+    return 'good'
+  }
+
+  // Method 2: Check data-content attribute for explicit descriptions
+  const dataContentEl = cellEl.querySelector('[data-content]') as Element | null
+  if (dataContentEl) {
+    const dataContent = dataContentEl.getAttribute('data-content') || ''
+    if (dataContent.toLowerCase().includes('worse than expected')) {
+      return 'bad'
+    }
+    if (dataContent.toLowerCase().includes('better than expected')) {
+      return 'good'
+    }
+    if (dataContent.toLowerCase().includes('as expected')) {
+      return 'neutral'
+    }
+  }
+
+  // Method 3: Check inner elements for color indicators
+  const innerElements = cellEl.querySelectorAll('[class*="background-transparent"]')
+  for (const inner of Array.from(innerElements)) {
+    const innerClass = (inner as Element).getAttribute('class') || ''
+    if (innerClass.includes('background-transparent-red')) {
+      return 'bad'
+    }
+    if (innerClass.includes('background-transparent-green')) {
+      return 'good'
+    }
+  }
+
+  return '' // Unable to determine
+}
 
 function getFlagUrl(countryCode: string, size: string = 'w160'): string {
   if (!countryCode) return ''
@@ -265,6 +308,7 @@ async function parseMyFXBookWeeklyEnhancedHTML(html: string): Promise<EconomicEv
         let previous = ''
         let forecast = ''
         let actual = ''
+        let actualResultType: 'good' | 'bad' | 'neutral' | '' = ''
         for (const c of Array.from(cells)) {
           const e = c as Element
           const prevAttr = e.getAttribute('data-previous') || e.getAttribute('previous-value')
@@ -274,7 +318,23 @@ async function parseMyFXBookWeeklyEnhancedHTML(html: string): Promise<EconomicEv
           const actAttr = e.getAttribute('data-actual')
           if (actAttr) {
             const actText = (e.textContent || '').trim()
-            if (!actual && actText && isNumericValue(actText)) actual = cleanNumericValue(actText)
+            if (!actual && actText && isNumericValue(actText)) {
+              actual = cleanNumericValue(actText)
+              // Determine if actual result is good/bad/neutral
+              actualResultType = determineResultType(e)
+            }
+          }
+        }
+        // Fallback: try to determine result type from the row if we have actual but no result type
+        if (actual && !actualResultType) {
+          // Check cells with actualCell class or data-actual attribute
+          for (const c of Array.from(cells)) {
+            const e = c as Element
+            const cls = e.getAttribute('class') || ''
+            if (cls.includes('actualCell') || e.getAttribute('data-actual')) {
+              actualResultType = determineResultType(e)
+              if (actualResultType) break
+            }
           }
         }
         if (!previous && cellTexts[6] && isNumericValue(cellTexts[6])) previous = cleanNumericValue(cellTexts[6])
@@ -306,7 +366,7 @@ async function parseMyFXBookWeeklyEnhancedHTML(html: string): Promise<EconomicEv
           actual_value: actual || undefined,
           forecast_value: forecast || undefined,
           previous_value: previous || undefined,
-          actual_result_type: '',
+          actual_result_type: actualResultType || undefined,
           country: country || undefined,
           flag_code: flagCode || undefined,
           flag_url: flagCode ? getFlagUrl(flagCode) : undefined,

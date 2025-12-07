@@ -1,9 +1,12 @@
 /**
  * Economic Event List Item Component
  * Displays individual economic calendar events in list format with realtime countdown
+ *
+ * OPTIMIZED: Now accepts currentTime as a prop from parent instead of running
+ * individual timers. This prevents hundreds of timers when displaying many events.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -29,15 +32,17 @@ import { PinnedEvent } from '../../types/dualWrite';
 
 interface EconomicEventListItemProps {
   event: EconomicEvent;
-  px: number,
-  py: number,
+  px: number;
+  py: number;
   showDivider?: boolean;
   pinnedEvents?: PinnedEvent[];
   onPinEvent?: (event: EconomicEvent) => void;
   onUnpinEvent?: (event: EconomicEvent) => void;
   isPinning?: boolean;
   onClick?: (event: EconomicEvent) => void;
-  tradeCount?: number; // Number of trades associated with this event
+  tradeCount?: number;
+  /** Current time passed from parent for countdown calculations */
+  currentTime?: Date;
 }
 
 // Helper function to format time and countdown with realtime updates
@@ -158,69 +163,57 @@ const getActualResultStyle = (actualResultType: string, theme: any) => {
 
 const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
   event,
-  px= 2.5,
-   py= 1.5,
+  px = 2.5,
+  py = 1.5,
   showDivider = true,
   pinnedEvents = [],
   onPinEvent,
   onUnpinEvent,
   isPinning = false,
   onClick,
-  tradeCount = 0
+  tradeCount = 0,
+  currentTime: propCurrentTime,
 }) => {
   const theme = useTheme();
-  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Check if this event is pinned
-  const eventIsPinned = isEventPinned(event, pinnedEvents);
+  // Use prop time or fall back to current time (for backwards compatibility)
+  const currentTime = propCurrentTime || new Date();
 
-  // Handle pin/unpin toggle
-  const handleTogglePin = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (isPinning) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (eventIsPinned) {
-      onUnpinEvent?.(event);
-    } else {
-      onPinEvent?.(event);
-    }
-  };
+  // Check if this event is pinned - memoized for performance
+  const eventIsPinned = useMemo(
+    () => isEventPinned(event, pinnedEvents),
+    [event, pinnedEvents]
+  );
 
-  // Get initial time info to check if event is imminent
-  const initialTimeInfo = formatTimeWithCountdown(event.time_utc, currentTime);
-
-  // Realtime countdown effect for imminent events
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-
-    if (initialTimeInfo.isImminent && initialTimeInfo.isUpcoming) {
-      // Update every second for imminent events
-      interval = setInterval(() => {
-        setCurrentTime(new Date());
-      }, 1000);
-    }
-    else {
-      // For non-imminent events, we still want to update the current time,
-      // but we can do so less frequently to avoid unnecessary re-renders.
-      // Here, we update every 10 min (1000 ms * 60 * 10).
-      interval = setInterval(() => {
-        setCurrentTime(new Date());
-      }, 1000 * 60 * 10);
-    }
-
-    return () => {
-      if (interval) {
-        clearInterval(interval);
+  // Handle pin/unpin toggle - memoized callback
+  const handleTogglePin = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (isPinning) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (eventIsPinned) {
+        onUnpinEvent?.(event);
+      } else {
+        onPinEvent?.(event);
       }
-    };
-  }, [initialTimeInfo.isImminent, initialTimeInfo.isUpcoming]);
+    },
+    [isPinning, eventIsPinned, event, onPinEvent, onUnpinEvent]
+  );
 
-  // Get current time info (will be updated in real-time for imminent events)
-  const timeInfo = formatTimeWithCountdown(event.time_utc, currentTime);
+  // Handle click - memoized callback
+  const handleClick = useCallback(() => {
+    onClick?.(event);
+  }, [onClick, event]);
+
+  // Get current time info - memoized for performance
+  const timeInfo = useMemo(
+    () => formatTimeWithCountdown(event.time_utc, currentTime),
+    [event.time_utc, currentTime]
+  );
 
   return (
     <ListItem
-      onClick={onClick ? () => onClick(event) : undefined}
+      onClick={onClick ? handleClick : undefined}
       sx={{
         px,
         py,
@@ -465,4 +458,6 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
   );
 };
 
-export default EconomicEventListItem;
+// Memoize the component to prevent unnecessary re-renders
+// Will only re-render when props actually change
+export default memo(EconomicEventListItem);

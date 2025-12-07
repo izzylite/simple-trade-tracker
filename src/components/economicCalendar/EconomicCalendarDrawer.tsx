@@ -1,9 +1,12 @@
 /**
  * Economic Calendar Drawer Component
  * Redesigned to match search drawer style with day/week/month pagination
+ *
+ * OPTIMIZED: Uses custom hooks for state management, data fetching, and shared time
+ * to prevent performance issues from frequent re-renders.
  */
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Drawer,
   Box,
@@ -14,21 +17,8 @@ import {
   Chip,
   Button,
   ButtonGroup,
-  Collapse,
-  FormControl,
-  FormLabel,
-  FormGroup,
-  FormControlLabel,
-  Checkbox,
-  Switch,
   CircularProgress,
-  List,
-  ListItem,
-  ListItemText,
   Divider,
-  TextField,
-  Avatar,
-  Stack,
   Paper,
   Tooltip
 } from '@mui/material';
@@ -43,53 +33,31 @@ import {
   DateRange as WeekIcon,
   CalendarMonth as MonthIcon,
   Event as EventIcon,
-  Check as CheckIcon,
   Notifications as NotificationsIcon,
   NotificationsOff as NotificationsOffIcon
 } from '@mui/icons-material';
-import { format, addDays, addWeeks, addMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, isToday, isTomorrow, parseISO } from 'date-fns';
+import { format, addDays, addWeeks, addMonths, startOfWeek, endOfWeek, isToday, isTomorrow, parseISO } from 'date-fns';
 import {
   EconomicCalendarDrawerProps,
   EconomicEvent,
-  Currency,
-  ImpactLevel
 } from '../../types/economicCalendar';
 import { Calendar } from '../../types/calendar';
-import { Trade, TradeEconomicEvent } from '../../types/trade';
-import { economicCalendarService } from '../../services/economicCalendarService';
+import { TradeEconomicEvent } from '../../types/trade';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import EconomicEventListItem from './EconomicEventListItem';
 import EconomicCalendarFilters from './EconomicCalendarFilters';
 import EconomicEventDetailDialog from './EconomicEventDetailDialog';
 import EconomicEventShimmer from './EconomicEventShimmer';
-import { log, error, logger, warn } from '../../utils/logger';
+import { logger } from '../../utils/logger';
 import { cleanEventNameForPinning, isEventPinned, eventMatchV3 } from '../../utils/eventNameUtils';
-import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
-import { supabase } from '../../config/supabase';
-// View types for pagination
-type ViewType = 'day' | 'week' | 'month';
+// Optimized hooks
+import { useEconomicEvents, ViewType } from '../../hooks/useEconomicEvents';
+import { useEconomicCalendarFilters, DEFAULT_FILTER_SETTINGS } from '../../hooks/useEconomicCalendarFilters';
+import { useEventCountdownTime } from '../../hooks/useCurrentTime';
 
-// Available currencies and impacts
-const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD'];
-const IMPACTS: ImpactLevel[] = ['High', 'Medium', 'Low'];
-
-// Interface for saved filter settings
-export interface EconomicCalendarFilterSettings {
-  currencies: Currency[];
-  impacts: ImpactLevel[];
-  viewType: ViewType;
-  notificationsEnabled: boolean;
-  onlyUpcomingEvents: boolean;
-}
-
-// Default filter settings
-export const DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS: EconomicCalendarFilterSettings = {
-  currencies: ['USD', 'EUR', 'GBP'],
-  impacts: ['High', 'Medium', 'Low'],
-  viewType: 'day',
-  notificationsEnabled: true,
-  onlyUpcomingEvents: false
-};
+// Re-export for backwards compatibility
+export type { EconomicCalendarFilterSettings } from '../../hooks/useEconomicCalendarFilters';
+export { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../../hooks/useEconomicCalendarFilters';
 
 // Helper function to get date header for month view
 const getDateHeader = (date: string) => {
@@ -126,6 +94,17 @@ const groupEventsByDate = (events: EconomicEvent[]) => {
   }));
 };
 
+// Check if any event is imminent (within 60 minutes)
+const hasImminentEvent = (events: EconomicEvent[]): boolean => {
+  const now = new Date();
+  return events.some(event => {
+    const eventDate = parseISO(event.time_utc);
+    const diffMs = eventDate.getTime() - now.getTime();
+    const diffMinutes = diffMs / (1000 * 60);
+    return diffMinutes > 0 && diffMinutes <= 60;
+  });
+};
+
 
 const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   open,
@@ -134,7 +113,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   trades = [],
   onUpdateCalendarProperty,
   onOpenGalleryMode,
-  payload,
   onUpdateTradeProperty,
   onEditTrade,
   onDeleteTrade,
@@ -144,90 +122,67 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 }) => {
   const theme = useTheme();
 
-  // Get current calendar and its settings
-  const savedSettings: EconomicCalendarFilterSettings = calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS;
-
-  // State management
-  const [viewType, setViewType] = useState<ViewType>(savedSettings.viewType);
+  // Local UI state
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [startDate, setStartDate] = useState<string | null>(null);
-  const [endDate, setEndDate] = useState<string | null>(null);
-  const [events, setEvents] = useState<EconomicEvent[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pinningEventId, setPinningEventId] = useState<string | null>(null);
-
-
-
-  // Handle real-time event updates
-  useEffect(() => {
-    if (payload) {
-      log(`📊 Updating event in Economic Calendar: ${payload.updatedEvents.join(', ')}`);
-      const events: EconomicEvent[] = payload.allEvents || []
-
-      // Find and update the specific event in the current events list
-      setEvents(prevEvents => {
-        if (!payload) return prevEvents;
-
-        let changed = false;
-        // Replace any matching events with the updated ones
-        const newEvents = prevEvents.map(event => {
-          const idx = events.findIndex(e => e.id === event.id);
-          if (idx >= 0) {
-            changed = true;
-            return { ...event, ...events[idx] };
-          }
-          return event;
-        });
-        // If no changes, return prevEvents to avoid unnecessary re-renders
-        return changed ? newEvents : prevEvents;
-      });
-    }
-  }, [payload]);
-
-  // Pagination state
-  const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState<number>(0); // Offset for pagination
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [pageSize] = useState(50); // Events per page
-
-  // Filter state
+  const [customDateRange, setCustomDateRange] = useState<{ start: string | null; end: string | null }>({
+    start: null,
+    end: null,
+  });
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
-
-  // Economic event detail dialog state
+  const [isMonthPickerActive, setIsMonthPickerActive] = useState(false);
+  const [pinningEventId, setPinningEventId] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
   const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
 
-  // Applied filters (used for queries) - initialized from localStorage
-  const [appliedCurrencies, setAppliedCurrencies] = useState<Currency[]>(savedSettings.currencies);
-  const [appliedImpacts, setAppliedImpacts] = useState<ImpactLevel[]>(savedSettings.impacts);
-  const [appliedOnlyUpcoming, setAppliedOnlyUpcoming] = useState<boolean>(savedSettings.onlyUpcomingEvents);
+  // Use optimized filter hook
+  const {
+    appliedFilters,
+    pendingFilters,
+    viewType,
+    notificationsEnabled,
+    filtersModified,
+    toggleCurrency,
+    toggleImpact,
+    setOnlyUpcoming,
+    setViewType,
+    setNotificationsEnabled,
+    applyFilters,
+    resetFilters,
+  } = useEconomicCalendarFilters({
+    calendar,
+    onUpdateCalendarProperty,
+  });
 
-  // Pending filters (temporary state before applying) - initialized from localStorage
-  const [pendingCurrencies, setPendingCurrencies] = useState<Currency[]>(savedSettings.currencies);
-  const [pendingImpacts, setPendingImpacts] = useState<ImpactLevel[]>(savedSettings.impacts);
-  const [pendingOnlyUpcoming, setPendingOnlyUpcoming] = useState<boolean>(savedSettings.onlyUpcomingEvents);
+  // Use optimized events hook
+  const {
+    events,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    dateRange,
+    loadMore,
+    refresh,
+  } = useEconomicEvents({
+    viewType,
+    currentDate,
+    currencies: appliedFilters.currencies,
+    impacts: appliedFilters.impacts,
+    onlyUpcoming: appliedFilters.onlyUpcoming,
+    enabled: open,
+    customDateRange,
+  });
 
-  // Notification settings
-  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(savedSettings.notificationsEnabled);
+  // Check if any events are imminent for optimized time updates
+  const hasImminent = useMemo(() => hasImminentEvent(events), [events]);
 
-  // Track if filters have been modified
-  const [filtersModified, setFiltersModified] = useState(false);
+  // Use shared time hook - only updates every second when there are imminent events
+  const { currentTime } = useEventCountdownTime(hasImminent, open);
 
-  // Check if filters have been modified
-  useEffect(() => {
-    const modified =
-      JSON.stringify(pendingCurrencies) !== JSON.stringify(appliedCurrencies) ||
-      JSON.stringify(pendingImpacts) !== JSON.stringify(appliedImpacts) ||
-      pendingOnlyUpcoming !== appliedOnlyUpcoming;
-    setFiltersModified(modified);
-  }, [pendingCurrencies, appliedCurrencies, pendingImpacts, appliedImpacts, pendingOnlyUpcoming, appliedOnlyUpcoming]);
+  // Group events by date - memoized to prevent recalculation
+  const groupedEvents = useMemo(() => groupEventsByDate(events), [events]);
 
-  // Track if the month picker is active
-  const [isMonthPickerActive, setIsMonthPickerActive] = useState(false);
-
-  // Calculate trade counts for each event
-  // This helps traders quickly see which events they've traded before
+  // Calculate trade counts for each event - memoized for performance
   const eventTradeCountMap = useMemo(() => {
     const countMap = new Map<string, number>();
 
@@ -247,268 +202,17 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     return countMap;
   }, [events, trades]);
 
-  // Function to save filter settings to calendar
-  const saveFilterSettings = useCallback(async (currencies: Currency[], impacts: ImpactLevel[], viewTypeToSave: ViewType, notificationsEnabledToSave: boolean, onlyUpcomingToSave: boolean) => {
-    if (!calendar?.id || !onUpdateCalendarProperty) {
-      warn('⚠️ Cannot save economic calendar filter settings: missing calendar or update function');
-      return;
-    }
-
-    const settings: EconomicCalendarFilterSettings = {
-      currencies,
-      impacts,
-      viewType: viewTypeToSave,
-      notificationsEnabled: notificationsEnabledToSave,
-      onlyUpcomingEvents: onlyUpcomingToSave
-    };
-
-    try {
-      await onUpdateCalendarProperty(calendar.id, (cal) => ({
-        ...cal,
-        economic_calendar_filters: settings
-      }));
-      log('📱 Economic calendar filter settings saved to calendar:', settings);
-    } catch (error) {
-      logger.error('⚠️ Failed to save economic calendar filter settings:', error);
-    }
-  }, [calendar, onUpdateCalendarProperty]);
-
-  // Function to handle view type changes and save settings
-  const handleViewTypeChange = useCallback(async (newViewType: ViewType) => {
+  // Handle view type change
+  const handleViewTypeChange = useCallback((newViewType: ViewType) => {
     setViewType(newViewType);
-    setStartDate(null);
-    setEndDate(null);
+    setCustomDateRange({ start: null, end: null });
     setCurrentDate(new Date());
-    setIsMonthPickerActive(false); // Deactivate month picker highlight when using view type buttons
-    await saveFilterSettings(appliedCurrencies, appliedImpacts, newViewType, notificationsEnabled, appliedOnlyUpcoming);
-  }, [appliedCurrencies, appliedImpacts, saveFilterSettings, notificationsEnabled, appliedOnlyUpcoming]);
-
-  // Sync pending filters with applied filters on mount
-  useEffect(() => {
-    setPendingCurrencies(appliedCurrencies);
-    setPendingImpacts(appliedImpacts);
-    setPendingOnlyUpcoming(appliedOnlyUpcoming);
-  }, []); // Only run on mount
-
-  // Calculate date range based on view type and current date
-  const dateRange = useMemo(() => {
-    // If custom date range is explicitly set, use it
-    if (startDate && endDate && startDate !== endDate) {
-      log('📅 Using custom date range:', { start: startDate, end: endDate });
-      return {
-        start: startDate,
-        end: endDate
-      };
-    }
-
-    const date = currentDate;
-
-    switch (viewType) {
-      case 'day':
-        const dayStart = startOfDay(date);
-        const dayEnd = endOfDay(date);
-        const dayResult = {
-          start: format(dayStart, 'yyyy-MM-dd'),
-          end: format(dayEnd, 'yyyy-MM-dd')
-        };
-        log('📅 Day view date range:', dayResult);
-        return dayResult;
-
-      case 'week':
-        const weekStart = startOfWeek(date, { weekStartsOn: 0 }); // Sunday
-        const weekEnd = endOfWeek(date, { weekStartsOn: 0 });
-        const weekResult = {
-          start: format(weekStart, 'yyyy-MM-dd'),
-          end: format(weekEnd, 'yyyy-MM-dd')
-        };
-        log('📅 Week view date range:', weekResult);
-        return weekResult;
-
-      case 'month':
-        const monthStart = startOfMonth(date);
-        const monthEnd = endOfMonth(date);
-        const monthResult = {
-          start: format(monthStart, 'yyyy-MM-dd'),
-          end: format(monthEnd, 'yyyy-MM-dd')
-        };
-        log('📅 Month view date range:', monthResult);
-        return monthResult;
-
-      default:
-        const defaultResult = {
-          start: format(date, 'yyyy-MM-dd'),
-          end: format(date, 'yyyy-MM-dd')
-        };
-        log('📅 Default date range:', defaultResult);
-        return defaultResult;
-    }
-  }, [viewType, currentDate, startDate, endDate]);
-
-  // Fetch events when date range or filters change
-  // Fetch events callback
-  const fetchEventsCallback = useCallback(async (isLoadMore = false) => {
-    if (loading || (isLoadMore && loadingMore)) return;
-
-    const currentOffset = isLoadMore ? offset : 0;
-
-    if (!isLoadMore) {
-      setLoading(true);
-      setError(null);
-    } else {
-      setLoadingMore(true);
-    }
-
-    try {
-      log(`🔄 ${isLoadMore ? 'Loading more' : 'Fetching'} ${viewType} events for ${dateRange.start} to ${dateRange.end}`);
-
-      const result = await economicCalendarService.fetchEventsPaginated(
-        dateRange,
-        { pageSize, offset: currentOffset },
-        {
-          currencies: appliedCurrencies,
-          impacts: appliedImpacts,
-          onlyUpcoming: appliedOnlyUpcoming
-        }
-      );
-
-      if (isLoadMore) {
-        setEvents(prev => [...prev, ...result.events]);
-      } else {
-        setEvents(result.events);
-      }
-
-      setHasMore(result.hasMore);
-      setOffset(result.offset || currentOffset + pageSize);
-
-      if (!isLoadMore) {
-        // Debug: Log unique currencies and impacts in results
-        const uniqueCurrencies = Array.from(new Set(result.events.map(e => e.currency)));
-        const uniqueImpacts = Array.from(new Set(result.events.map(e => e.impact)));
-        log(`📊 Results contain - Currencies: [${uniqueCurrencies.join(', ')}], Impacts: [${uniqueImpacts.join(', ')}]`);
-      }
-
-    } catch (err) {
-      logger.error('❌ Error fetching events:', err);
-      if (!isLoadMore) {
-        setError('Failed to load economic events');
-        setEvents([]);
-      }
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming, viewType, pageSize, offset, loading, loadingMore]);
-
-  // Initial fetch and filter changes
-  useEffect(() => {
-    // Only fetch if we haven't loaded events yet, or if filters/date changed
-    // We use a ref to track if it's the initial mount to avoid double fetching if strict mode
-    fetchEventsCallback(false);
-  }, [dateRange, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming, viewType, pageSize]);
-
-  // We removed 'open' from dependencies to prevent refetching on toggle
-  // But we might want to fetch on FIRST open if we want lazy loading. 
-  // For now, we rely on the effect above running on mount/update.
-
-  // Stabilize the refetch callback to prevent recreating it on every filter change
-  // This prevents accumulating multiple broadcast listeners
-  const refetchCallbackRef = useRef<(() => Promise<void>) | null>(null);
-
-  // Update the callback ref whenever dependencies change
-  useEffect(() => {
-    refetchCallbackRef.current = async () => {
-      try {
-        const result = await economicCalendarService.fetchEventsPaginated(
-          dateRange,
-          { pageSize, offset: 0 }, // Reset to first page
-          {
-            currencies: appliedCurrencies,
-            impacts: appliedImpacts,
-            onlyUpcoming: appliedOnlyUpcoming
-          }
-        );
-
-        if (result.events) {
-          setEvents(result.events);
-          setHasMore(result.hasMore);
-          setOffset(result.events.length);
-        }
-      } catch (error) {
-        logger.error('Error refetching events after realtime update:', error);
-      }
-    };
-  }, [dateRange, pageSize, appliedCurrencies, appliedImpacts, appliedOnlyUpcoming]);
-
-  // Memoize channel creation callback - stable reference to prevent recreation
-  const handleChannelCreated = useCallback((channel: any) => {
-    // Configure the channel BEFORE it subscribes
-    // Listen for INSERT, UPDATE, DELETE events via broadcast
-    channel.on(
-      'broadcast',
-      {
-        event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-      },
-      async (payload: any) => {
-        logger.log(`🔄 Economic event ${payload.event}:`, payload);
-
-        // Call the current refetch logic via the ref
-        if (refetchCallbackRef.current) {
-          await refetchCallbackRef.current();
-        }
-      }
-    );
-  }, []); // Empty dependencies - callback never recreates
-
-  const handleSubscribed = useCallback(() => {
-    logger.log(`✅ Economic events subscription active for ${dateRange.start} to ${dateRange.end}`);
-  }, [dateRange.start, dateRange.end]);
-
-  const handleError = useCallback((error: string) => {
-    logger.error(`❌ Economic events subscription error:`, error);
-  }, []);
-
-  // Subscribe to economic events changes
-  // Edge functions update events in real-time (scraping, updates from APIs)
-  // The hook automatically manages channel creation/cleanup based on the 'enabled' prop
-  useRealtimeSubscription({
-    channelName: `economic-events`,
-    enabled: open && !!dateRange.start && !!dateRange.end,
-    onChannelCreated: handleChannelCreated,
-    onSubscribed: handleSubscribed,
-    onError: handleError,
-  });
-
-  // Load more events function
-  // Load more events function
-  const loadMoreEvents = useCallback(() => {
-    if (hasMore && !loadingMore && !loading) {
-      fetchEventsCallback(true);
-    }
-  }, [hasMore, loadingMore, loading, fetchEventsCallback]);
-
-  // Infinite scroll handler
-  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
-
-    // Check if content is actually scrollable
-    if (scrollHeight <= clientHeight) {
-      return; // Content doesn't fill the container, no need to load more
-    }
-
-    const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
-
-    // Load more when user scrolls to 80% of the content
-    // Also ensure we have scrolled at least a little bit (scrollTop > 0) to avoid triggering on mount
-    if (scrollPercentage > 0.8 && scrollTop > 0 && hasMore && !loadingMore && !loading) {
-      loadMoreEvents();
-    }
-  }, [hasMore, loadingMore, loading, loadMoreEvents]);
+    setIsMonthPickerActive(false);
+  }, [setViewType]);
 
   // Navigation handlers
-  const handlePrevious = () => {
-    // Clear custom date range when navigating
-    setStartDate(null);
-    setEndDate(null);
+  const handlePrevious = useCallback(() => {
+    setCustomDateRange({ start: null, end: null });
 
     switch (viewType) {
       case 'day':
@@ -521,12 +225,10 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         setCurrentDate(prev => addMonths(prev, -1));
         break;
     }
-  };
+  }, [viewType]);
 
-  const handleNext = () => {
-    // Clear custom date range when navigating
-    setStartDate(null);
-    setEndDate(null);
+  const handleNext = useCallback(() => {
+    setCustomDateRange({ start: null, end: null });
 
     switch (viewType) {
       case 'day':
@@ -539,64 +241,48 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         setCurrentDate(prev => addMonths(prev, 1));
         break;
     }
-  };
+  }, [viewType]);
 
-  // Filter handlers
-  const handleCurrencyChange = (currency: Currency) => {
-    setPendingCurrencies(prev =>
-      prev.includes(currency)
-        ? prev.filter(c => c !== currency)
-        : [...prev, currency]
-    );
-  };
-
-  const handleImpactChange = (impact: ImpactLevel) => {
-    setPendingImpacts(prev =>
-      prev.includes(impact)
-        ? prev.filter(i => i !== impact)
-        : [...prev, impact]
-    );
-  };
-
-  const handleUpcomingEventsChange = (checked: boolean) => {
-    setPendingOnlyUpcoming(checked);
-  };
-
-  const handleMonthChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle month picker change
+  const handleMonthChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedDate = new Date(event.target.value + '-01');
     setCurrentDate(selectedDate);
     setIsMonthPickerActive(true);
-  };
+  }, []);
 
-  // Apply filters function
-  const handleApplyFilters = async () => {
-    setAppliedCurrencies(pendingCurrencies);
-    setAppliedImpacts(pendingImpacts);
-    setAppliedOnlyUpcoming(pendingOnlyUpcoming);
-    setFiltersModified(false);
-    setIsFilterExpanded(false); // Collapse filter section after applying
+  // Apply filters handler
+  const handleApplyFilters = useCallback(async () => {
+    await applyFilters();
+    setIsFilterExpanded(false);
+  }, [applyFilters]);
 
-    // Save filter settings to calendar
-    await saveFilterSettings(pendingCurrencies, pendingImpacts, viewType, notificationsEnabled, pendingOnlyUpcoming);
-  };
+  // Reset filters handler
+  const handleResetFilters = useCallback(() => {
+    resetFilters();
+  }, [resetFilters]);
 
-  // Reset filters function
-  const handleResetFilters = () => {
-    const defaultCurrencies: Currency[] = ['USD', 'EUR', 'GBP'];
-    const defaultImpacts: ImpactLevel[] = ['High', 'Medium', 'Low'];
-    const defaultOnlyUpcoming = false;
+  // Handle notification toggle
+  const handleNotificationToggle = useCallback(async (enabled: boolean) => {
+    await setNotificationsEnabled(enabled);
+  }, [setNotificationsEnabled]);
 
-    setPendingCurrencies(defaultCurrencies);
-    setPendingImpacts(defaultImpacts);
-    setPendingOnlyUpcoming(defaultOnlyUpcoming);
-    setAppliedCurrencies(defaultCurrencies);
-    setAppliedImpacts(defaultImpacts);
-    setAppliedOnlyUpcoming(defaultOnlyUpcoming);
-    setFiltersModified(false);
-  };
+  // Infinite scroll handler
+  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+
+    if (scrollHeight <= clientHeight) {
+      return;
+    }
+
+    const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
+
+    if (scrollPercentage > 0.8 && scrollTop > 0 && hasMore && !loadingMore && !loading) {
+      loadMore();
+    }
+  }, [hasMore, loadingMore, loading, loadMore]);
 
   // Format display text for current period
-  const getDisplayText = () => {
+  const getDisplayText = useCallback(() => {
     switch (viewType) {
       case 'day':
         return format(currentDate, 'EEEE, MMMM d, yyyy');
@@ -609,29 +295,22 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       default:
         return '';
     }
-  };
-
-  // Handle notification toggle
-  const handleNotificationToggle = async (enabled: boolean) => {
-    setNotificationsEnabled(enabled);
-    await saveFilterSettings(appliedCurrencies, appliedImpacts, viewType, enabled, appliedOnlyUpcoming);
-  };
+  }, [viewType, currentDate]);
 
   // Handle pin event
-  const handlePinEvent = async (event: EconomicEvent) => {
+  const handlePinEvent = useCallback(async (event: EconomicEvent) => {
     if (!calendar?.id || !onUpdateCalendarProperty) return;
 
     try {
       setPinningEventId(event.id);
-      await onUpdateCalendarProperty(calendar.id, (calendar: Calendar) => {
-        const currentPinnedEvents = calendar.pinned_events || [];
+      await onUpdateCalendarProperty(calendar.id, (cal: Calendar) => {
+        const currentPinnedEvents = cal.pinned_events || [];
         const cleanedEventName = cleanEventNameForPinning(event.event_name);
-        // Check if event is already pinned
         if (isEventPinned(event, currentPinnedEvents)) {
-          return calendar; // Already pinned, no change needed
+          return cal;
         }
         return {
-          ...calendar,
+          ...cal,
           pinned_events: [...currentPinnedEvents, {
             event: cleanedEventName,
             event_id: event.id,
@@ -647,20 +326,19 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     } finally {
       setPinningEventId(null);
     }
-  };
+  }, [calendar?.id, onUpdateCalendarProperty]);
 
   // Handle unpin event
-  const handleUnpinEvent = async (event: EconomicEvent) => {
+  const handleUnpinEvent = useCallback(async (event: EconomicEvent) => {
     if (!calendar?.id || !onUpdateCalendarProperty) return;
 
     try {
       setPinningEventId(event.id);
-      await onUpdateCalendarProperty(calendar.id, (calendar: Calendar) => {
-        const currentPinnedEvents = calendar.pinned_events || [];
+      await onUpdateCalendarProperty(calendar.id, (cal: Calendar) => {
+        const currentPinnedEvents = cal.pinned_events || [];
         return {
-          ...calendar,
+          ...cal,
           pinned_events: currentPinnedEvents.filter(pinnedEvent =>
-            // Use event_id for exact matching if available, fallback to name matching
             pinnedEvent.event_id ? pinnedEvent.event_id !== event.id :
               pinnedEvent.event.toLowerCase() !== cleanEventNameForPinning(event.event_name).toLowerCase()
           )
@@ -672,14 +350,27 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     } finally {
       setPinningEventId(null);
     }
-  };
+  }, [calendar?.id, onUpdateCalendarProperty]);
+
+  // Handle event click
+  const handleEventClick = useCallback((event: EconomicEvent) => {
+    logger.log('Economic event clicked:', event);
+    setSelectedEvent(event);
+    setEventDetailDialogOpen(true);
+  }, []);
+
+  // Handle dialog close
+  const handleDialogClose = useCallback(() => {
+    setEventDetailDialogOpen(false);
+    setSelectedEvent(null);
+  }, []);
 
   return (
     <Drawer
       anchor="right"
       open={open}
       onClose={onClose}
-      ModalProps={{ keepMounted: true }} // Keep the drawer mounted to preserve state and avoid refetching
+      ModalProps={{ keepMounted: true }}
       sx={{
         zIndex: 1300,
         '& .MuiDrawer-paper': {
@@ -829,7 +520,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Chip
-                      label={`${appliedCurrencies.length + appliedImpacts.length + (appliedOnlyUpcoming ? 1 : 0)} active`}
+                      label={`${appliedFilters.currencies.length + appliedFilters.impacts.length + (appliedFilters.onlyUpcoming ? 1 : 0)} active`}
                       size="small"
                       color={filtersModified ? "warning" : "primary"}
                       variant={filtersModified ? "filled" : "outlined"}
@@ -907,14 +598,14 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         <EconomicCalendarFilters
           isExpanded={isFilterExpanded}
           currentDate={currentDate}
-          pendingCurrencies={pendingCurrencies}
-          pendingImpacts={pendingImpacts}
-          pendingOnlyUpcoming={pendingOnlyUpcoming}
+          pendingCurrencies={pendingFilters.currencies}
+          pendingImpacts={pendingFilters.impacts}
+          pendingOnlyUpcoming={pendingFilters.onlyUpcoming}
           filtersModified={filtersModified}
           loading={loading}
-          onCurrencyChange={handleCurrencyChange}
-          onImpactChange={handleImpactChange}
-          onUpcomingEventsChange={handleUpcomingEventsChange}
+          onCurrencyChange={toggleCurrency}
+          onImpactChange={toggleImpact}
+          onUpcomingEventsChange={setOnlyUpcoming}
           onMonthChange={handleMonthChange}
           onApplyFilters={handleApplyFilters}
           onResetFilters={handleResetFilters}
@@ -937,7 +628,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
               <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
                 {error}
               </Typography>
-              <Button variant="outlined" onClick={() => window.location.reload()}>
+              <Button variant="outlined" onClick={refresh}>
                 Retry
               </Button>
             </Box>
@@ -952,9 +643,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
               </Typography>
             </Box>
           ) : (
-
             <Box>
-              {groupEventsByDate(events).map((dayGroup, dayIndex) => (
+              {groupedEvents.map((dayGroup) => (
                 <Box key={dayGroup.date}>
                   {/* Sticky Date Header */}
                   <Box sx={{
@@ -992,11 +682,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                             onUnpinEvent={handleUnpinEvent}
                             isPinning={pinningEventId === event.id}
                             tradeCount={tradeCount}
-                            onClick={(event) => {
-                              logger.log('Economic event clicked:', event);
-                              setSelectedEvent(event);
-                              setEventDetailDialogOpen(true);
-                            }}
+                            currentTime={currentTime}
+                            onClick={handleEventClick}
                           />
                           {eventIndex < dayGroup.events.length - 1 && <Divider sx={{ ml: 3 }} />}
                         </React.Fragment>
@@ -1010,7 +697,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
               {hasMore && (
                 <Box sx={{ p: 3 }}>
                   <Button
-                    onClick={loadMoreEvents}
+                    onClick={loadMore}
                     disabled={loadingMore}
                     variant="outlined"
                     fullWidth
@@ -1064,13 +751,10 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       </Box>
 
       {/* Economic Event Detail Dialog */}
-      {selectedEvent && (
+      {selectedEvent && calendar && (
         <EconomicEventDetailDialog
           open={eventDetailDialogOpen}
-          onClose={() => {
-            setEventDetailDialogOpen(false);
-            setSelectedEvent(null);
-          }}
+          onClose={handleDialogClose}
           event={selectedEvent}
           trades={trades}
           onUpdateTradeProperty={onUpdateTradeProperty}

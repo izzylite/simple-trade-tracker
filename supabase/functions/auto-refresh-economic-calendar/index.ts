@@ -55,8 +55,11 @@ import { errorResponse, successResponse, handleCors, log } from '../_shared/supa
     if (!refreshResult.success) {
       throw new Error(`Refresh function returned error: ${refreshResult.error}`);
     }
-    const eventsProcessed = refreshResult.foundEvents?.length || 0;
-    const eventsStored = refreshResult.updatedCount || 0;
+    // Response is wrapped in { success: true, data: {...} } by successResponse()
+    const refreshData = refreshResult.data || refreshResult;
+    // Use targetEvents for auto-refresh (foundEvents is only for specific event requests)
+    const eventsProcessed = refreshData.targetEvents?.length || 0;
+    const eventsStored = refreshData.updatedCount || 0;
     log(`Auto refresh completed: ${eventsProcessed} events processed, ${eventsStored} events stored`);
     return {
       eventsProcessed,

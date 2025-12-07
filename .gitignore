@@ -64,3 +64,7 @@ GEMINI.md
 /.playwright-mcp/
 # Windows reserved filename artifact
 nul
+
+# Migration scripts and backups
+/scripts/
+*-backup.json
