@@ -141,26 +141,71 @@ ${filterLine}
 // =============================================================================
 
 const SCHEMA_REFERENCE = `
-## Database Schema
+## Database Schema (Complete Field Reference)
 
-**trades** (id, calendar_id, user_id, name, amount, trade_type, trade_date, entry_price, exit_price, stop_loss, take_profit, session, tags[], notes, images JSONB, economic_events JSONB)
+### trades
+Core fields: id, calendar_id, user_id, name, amount, trade_type, trade_date
+Price data: entry_price, exit_price, stop_loss, take_profit, risk_to_reward
+Session/Tags: session, tags[], partials_taken
+Content: notes (text), images (JSONB array), economic_events (JSONB array)
+Flags: is_temporary, is_pinned, is_shared, share_id, share_link, shared_at
+Timestamps: created_at, updated_at
+Search: economic_events_text (auto-generated searchable text)
+
+Enums:
 - trade_type: 'win' | 'loss' | 'breakeven'
 - session: 'Asia' | 'London' | 'NY AM' | 'NY PM'
 - tags[]: Filter with 'TagName' = ANY(tags)
+- images[]: Array of {id, url, caption, row, column, column_width}
 
-**calendars** (id, user_id, name, account_balance, total_trades, win_count, loss_count, win_rate, profit_factor, total_pnl, current_balance, tags[], required_tag_groups[], economic_calendar_filters JSONB)
+### calendars
+Identity: id, user_id, name
+Balance/Risk: account_balance, current_balance, risk_per_trade, max_daily_drawdown
+Targets: weekly_target, monthly_target, yearly_target
+Dynamic Risk: dynamic_risk_enabled, increased_risk_percentage, profit_threshold_percentage
+Stats (computed): total_trades, win_count, loss_count, win_rate, profit_factor, total_pnl
+PnL Periods: weekly_pnl, monthly_pnl, yearly_pnl, weekly_pnl_percentage, monthly_pnl_percentage, yearly_pnl_percentage
+Progress: weekly_progress, monthly_progress, target_progress, pnl_performance
+Drawdown: max_drawdown, drawdown_start_date, drawdown_end_date, drawdown_recovery_needed, drawdown_duration
+Averages: avg_win, avg_loss
+Tags: tags[], required_tag_groups[]
+Settings: economic_calendar_filters (JSONB), pinned_events (JSONB), score_settings (JSONB)
+Display: hero_image_url, hero_image_attribution (JSONB)
+Sharing: is_shared, share_id, share_link, shared_at
+Deletion: mark_for_deletion, deletion_date, deleted_at, deleted_by, auto_delete_at
+Timestamps: created_at, updated_at
 
-**economic_events** (id, currency, event_name, impact, event_date, event_time, actual_value, forecast_value, previous_value, actual_result_type, country)
+### economic_events (Global - no user_id filter needed)
+Identity: id, external_id, currency, country, flag_code, flag_url
+Event: event_name, impact, description, is_all_day
+Timing: event_date (date), event_time (timestamp), time_utc, unix_timestamp
+Values: actual_value, forecast_value, previous_value, actual_result_type
+Meta: data_source, source_url, last_updated, created_at
+
+Enums:
 - impact: 'High' | 'Medium' | 'Low' | 'Holiday' | 'Non-Economic'
-- Global table (no user_id filter needed)
+- actual_result_type: 'good' | 'bad' | 'neutral' | ''
 
-**tag_definitions** (id, user_id, tag_name, definition, created_at, updated_at)
+### notes
+Identity: id, user_id, calendar_id, title (1-200 chars), content
+Flags: by_assistant, is_pinned, is_archived, archived_at
+Tags: tags[] (AGENT_MEMORY, STRATEGY, GAME_PLAN, INSIGHT, LESSON_LEARNED, RISK_MANAGEMENT, PSYCHOLOGY, GENERAL)
+Reminders: reminder_type ('none'|'once'|'weekly'), reminder_date, reminder_days[], is_reminder_active
+Display: cover_image
+Timestamps: created_at, updated_at
+
+Rules:
+- by_assistant: true = AI-created (can modify), false = user-created (read-only)
+- AGENT_MEMORY tag = AI persistent memory (use update_memory tool, not direct queries)
+
+### tag_definitions
+Fields: id, user_id, tag_name, definition, created_at, updated_at
 - User's custom tag dictionary (cross-calendar)
 - Use get_tag_definition tool to look up (don't query directly)
 
-**notes** (id, user_id, calendar_id, title, content, by_assistant, is_pinned, tags[], created_at, updated_at)
-- by_assistant: true = AI-created (can modify), false = user-created (read-only)
-- Tags: STRATEGY, GAME_PLAN, INSIGHT, LESSON_LEARNED, RISK_MANAGEMENT, PSYCHOLOGY, GENERAL, AGENT_MEMORY
+### ai_conversations (for reference only - managed automatically)
+Fields: id, calendar_id, user_id, trade_id, title, messages (JSONB), message_count, created_at, updated_at
+- trade_id: NULL = calendar conversation, NOT NULL = trade-specific
 `;
 
 const SQL_PATTERNS = `

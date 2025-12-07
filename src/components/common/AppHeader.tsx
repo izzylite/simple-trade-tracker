@@ -52,14 +52,27 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   // Debug panel keyboard shortcut (Ctrl+Shift+D) - only for authorized user
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.shiftKey && event.key === 'D' && isDebugAuthorized) {
+      // Case-insensitive check, and also check keyCode for better browser compatibility
+      const isD = event.key.toUpperCase() === 'D' || event.code === 'KeyD';
+      if (event.ctrlKey && event.shiftKey && isD && isDebugAuthorized) {
         event.preventDefault();
+        event.stopPropagation();
         setDebugPanelOpen(true);
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [isDebugAuthorized]);
+
+  // Expose debug panel opener to console for authorized users
+  useEffect(() => {
+    if (isDebugAuthorized) {
+      (window as any).openDebugPanel = () => setDebugPanelOpen(true);
+    }
+    return () => {
+      delete (window as any).openDebugPanel;
+    };
   }, [isDebugAuthorized]);
 
   const handleSignOut = async () => {

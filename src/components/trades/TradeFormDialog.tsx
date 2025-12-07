@@ -156,6 +156,15 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
 
+  // Track if component is mounted for safe state updates after async operations
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Determine the effective calendar_id (from prop or selected calendar)
   const effectiveCalendarId = calendar_id || selectedCalendarId;
 
@@ -184,7 +193,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         setNewTrade(() => ({
           ...data,
           is_temporary: true,
-          name: 'New Trade'
+          name: 'New Trade',
+          trade_date: trade_date // Initialize with the selected date from DayDialog
         }));
 
         const tradeData = await createFinalTradeData(data, trade_date);
@@ -382,7 +392,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       ...(finalTags.length > 0 && { tags: finalTags }),
       ...(newTrade.risk_to_reward && { risk_to_reward: newTrade.risk_to_reward }),
       partials_taken: newTrade.partials_taken,
-      ...(newTrade.session && { session: newTrade.session }),
+      session: newTrade.session || '', // Always include session
       ...(newTrade.notes && { notes: newTrade.notes }),
       images: newTrade.uploaded_images || [],
       // Economic events will be fetched automatically by TradeRepository
@@ -592,7 +602,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             ...(finalTags.length > 0 && { tags: finalTags }),
             ...(newTrade!.risk_to_reward && { risk_to_reward: newTrade!.risk_to_reward }),
             partials_taken: newTrade!.partials_taken,
-            ...(newTrade!.session && { session: newTrade!.session }),
+            session: newTrade!.session || '', // Always include session
             ...(newTrade!.notes && { notes: newTrade!.notes }),
             images: newTrade!.uploaded_images || [],
             calendar_id: effectiveCalendarId!,
@@ -909,82 +919,71 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
     if (!onAddTrade) return;
 
+    // Validate form
+    if (!newTrade!.amount) {
+      showErrorSnackbar('Amount is required');
+      return;
+    }
+    if (!newTrade!.session) {
+      showErrorSnackbar('Session is required');
+      return;
+    }
+    if (!newTrade!.risk_to_reward || newTrade!.risk_to_reward <= 0) {
+      showErrorSnackbar('Risk to reward is required');
+      return;
+    }
 
+    // Validate required tag groups
+    const { valid, missingGroups } = validateRequiredTagGroups(newTrade!.tags);
+    if (!valid) {
+      showErrorSnackbar(`Missing required tag groups: ${missingGroups.join(', ')}. Each trade must include at least one tag from these groups.`);
+      return;
+    }
+
+    // Check if there are any pending image uploads
+    if (hasPendingUploads()) {
+      showErrorSnackbar('Please wait for image uploads to complete...');
+      return;
+    }
+
+    // Capture all data needed BEFORE closing the dialog
+    const tradeData = createFinalTradeData(newTrade!, trade_date);
+    const isTemporary = newTrade!.is_temporary;
+    const tradeId = newTrade!.id;
+
+    // Close dialog immediately (optimistic approach)
+    resetForm();
+    onCancel();
+
+    // Save in background
     try {
-      // Validate form
-      if (!newTrade!.amount) {
-        showErrorSnackbar('Amount is required');
-        return;
+      if (isTemporary && tradeId) {
+        await onUpdateTradeProperty?.(tradeId, () => ({
+          ...tradeData,
+          is_temporary: false,
+          updated_at: new Date()
+        }));
+      } else {
+        await onAddTrade(tradeData);
       }
-      if (!newTrade!.session) {
-        showErrorSnackbar('Session is required');
-        return;
-      }
-      if (!newTrade!.risk_to_reward || newTrade!.risk_to_reward <= 0) {
-        showErrorSnackbar('Risk to reward is required');
-        return;
-      }
-
-      // Validate required tag groups
-      const { valid, missingGroups } = validateRequiredTagGroups(newTrade!.tags);
-      if (!valid) {
-        showErrorSnackbar(`Missing required tag groups: ${missingGroups.join(', ')}. Each trade must include at least one tag from these groups.`);
-        return;
-      }
-
-      // Check if there are any pending image uploads
-      // If there are pending uploads, wait for them to complete
-      if (hasPendingUploads()) {
-        // Just show the loading indicator and let the uploads continue
-        // The trade will be updated automatically when all uploads are complete
-        showErrorSnackbar('Please wait for image uploads to complete...');
-        return;
-      }
-      setIsSubmitting(true);
-      // Prepare data
-      let tradeData =  createFinalTradeData(newTrade!, trade_date);
-
-      try {
-        // Update the temporary trade with the final data
-        if (newTrade!.is_temporary && newTrade!.id) {
-          await handleUpdateTradeProperty(newTrade!.id, () => ({
-            ...tradeData,
-            is_temporary: false,
-            updatedAt: new Date() // Set updatedAt when making trade permanent
-          })); // Mark as a permanent trade
-        }
-        else {
-          await onAddTrade(tradeData);
-        }
-
-        // Only reset and close if the operation was successful
-        resetForm();
-        onCancel();
-
-      } catch (dbError) {
-        // If it's a temporary trade that failed to update, we should clean it up
-        if (newTrade!.is_temporary && newTrade!.id && onDeleteTrades) {
-          try {
-            // Delete the temporary trade that failed to be made permanent
-            await onDeleteTrades([newTrade!.id]);
-            log('Cleaned up temporary trade after failed update');
-          } catch (cleanupError) {
-            error('Failed to cleanup temporary trade:', cleanupError);
-          }
-        }
-
-        // Re-throw the original error
-        throw dbError;
-      }
-
+      logger.log('Trade saved successfully');
     } catch (err) {
       error('Error in trade submission:', err);
-      showErrorSnackbar(err instanceof Error ? err.message : 'Failed to add trade. Please try again.');
 
-      // Don't close the dialog on error - let the user try again or cancel manually
+      // Cleanup temporary trade on failure
+      if (isTemporary && tradeId && onDeleteTrades) {
+        try {
+          await onDeleteTrades([tradeId]);
+          log('Cleaned up temporary trade after failed update');
+        } catch (cleanupError) {
+          error('Failed to cleanup temporary trade:', cleanupError);
+        }
+      }
 
-    } finally {
-      setIsSubmitting(false);
+      // Show error only if component is still mounted
+      if (isMountedRef.current) {
+        showErrorSnackbar(err instanceof Error ? err.message : 'Failed to save trade. Please try again.');
+      }
     }
   };
 
@@ -992,145 +991,121 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     if (e) e.preventDefault();
     if (!editingTrade) return;
 
-    setIsSubmitting(true);
-    // Clear any previous errors
+    // Validate form
+    if (!newTrade!.amount) {
+      showErrorSnackbar('Amount is required');
+      return;
+    }
+    if (!newTrade!.session) {
+      showErrorSnackbar('Session is required');
+      return;
+    }
 
+    // Validate required tag groups
+    const { valid, missingGroups } = validateRequiredTagGroups(newTrade!.tags);
+    if (!valid) {
+      showErrorSnackbar(`Missing required tag groups: ${missingGroups.join(', ')}. Each trade must include at least one tag from these groups.`);
+      return;
+    }
+
+    // Check if there are any pending image uploads
+    if (hasPendingUploads()) {
+      showErrorSnackbar('Please wait for image uploads to complete...');
+      return;
+    }
+
+    // Capture all data needed BEFORE closing the dialog
+    const tradeId = editingTrade.id;
+    const finalAmount = calculateFinalAmount(newTrade!);
+    let finalTags = processTagsForSubmission([...newTrade!.tags]);
+
+    // Add Partials tag if partialsTaken is true
+    if (newTrade!.partials_taken) {
+      finalTags = finalTags.filter((tag: string) => !tag.startsWith('Partials:'));
+      finalTags.push('Partials:Yes');
+    } else {
+      finalTags = finalTags.filter((tag: string) => !tag.startsWith('Partials:'));
+    }
+
+    // Prepare the images array with layout information
+    const updatedImages = [
+      ...newTrade!.pending_images.map(img => ({
+        url: img.preview || '',
+        id: img.id!,
+        calendar_id: effectiveCalendarId!,
+        pending: true,
+        caption: img.caption || '',
+        width: img.width || 0,
+        height: img.height || 0,
+        row: img.row !== undefined ? img.row : 0,
+        column: img.column !== undefined ? img.column : 0,
+        column_width: img.column_width !== undefined ? img.column_width : 100
+      })),
+      ...newTrade!.uploaded_images.map(img => ({
+        url: img.url || '',
+        id: img.id,
+        calendar_id: effectiveCalendarId!,
+        pending: img.pending,
+        caption: img.caption || '',
+        width: img.width || 0,
+        height: img.height || 0,
+        row: img.row !== undefined ? img.row : 0,
+        column: img.column !== undefined ? img.column : 0,
+        column_width: img.column_width !== undefined ? img.column_width : 100
+      }))
+    ];
+
+    // Capture form values for background update
+    const updateData = {
+      trade_type: newTrade!.trade_type,
+      amount: finalAmount,
+      name: newTrade!.name || "",
+      entry_price: newTrade!.entry_price || undefined,
+      exit_price: newTrade!.exit_price || undefined,
+      stop_loss: newTrade!.stop_loss || undefined,
+      take_profit: newTrade!.take_profit || undefined,
+      trade_date: newTrade!.trade_date,
+      is_temporary: newTrade?.is_temporary && !newTrade.name,
+      tags: finalTags || [],
+      risk_to_reward: newTrade!.risk_to_reward || 1,
+      partials_taken: newTrade!.partials_taken,
+      session: newTrade!.session || "London",
+      notes: newTrade!.notes || "",
+      images: updatedImages
+    };
+
+    // Close dialog immediately (optimistic approach)
+    resetForm();
+    onCancel();
+
+    // Update in background
     try {
-      // Validate form
-      if (!newTrade!.amount) {
-        throw new Error('Amount is required');
-      }
-      if (!newTrade!.session) {
-        throw new Error('Session is required');
+      if (!tradeId) {
+        throw new Error('Cannot update trade: Missing trade ID');
       }
 
-      // Validate required tag groups
-      const { valid, missingGroups } = validateRequiredTagGroups(newTrade!.tags);
-      if (!valid) {
-        throw new Error(`Missing required tag groups: ${missingGroups.join(', ')}. Each trade must include at least one tag from these groups.`);
+      await onUpdateTradeProperty?.(tradeId, (trade) => {
+        const currentDate = new Date();
+        const tradeDate = updateData.trade_date || trade.trade_date;
+        const updatedDate = new Date(tradeDate.getFullYear(), tradeDate.getMonth(), tradeDate.getDate(),
+          currentDate.getHours(), currentDate.getMinutes(), currentDate.getSeconds());
+
+        return {
+          ...trade,
+          ...updateData,
+          trade_date: updatedDate,
+          updated_at: new Date()
+        };
+      });
+
+      logger.log('Trade updated successfully');
+    } catch (err) {
+      logger.error('Error editing trade:', err);
+
+      // Show error only if component is still mounted
+      if (isMountedRef.current) {
+        showErrorSnackbar(err instanceof Error ? err.message : 'Failed to update trade. Please try again.');
       }
-
-      // Check if there are any pending image uploads
-
-      // If there are pending uploads, wait for them to complete
-      if (hasPendingUploads()) {
-        // Just show the loading indicator and let the uploads continue
-        // The trade will be updated automatically when all uploads are complete
-        showErrorSnackbar('Please wait for image uploads to complete...');
-        setIsSubmitting(false);
-        return;
-      }
-
-
-      // Prepare data
-      let finalAmount = calculateFinalAmount(newTrade!);
-
-      // Process tags to ensure proper formatting
-      let finalTags = processTagsForSubmission([...newTrade!.tags]);
-
-      // Add Partials tag if partialsTaken is true
-      if (newTrade!.partials_taken) {
-        // Remove any existing Partials tags
-        finalTags = finalTags.filter((tag: string) => !tag.startsWith('Partials:'));
-        finalTags.push('Partials:Yes');
-      } else {
-        // Remove any existing Partials tags
-        finalTags = finalTags.filter((tag: string) => !tag.startsWith('Partials:'));
-      }
-
-
-      // Update trade
-      try {
-        // Verify the trade still exists
-        if (editingTrade.id) {
-          const existingTrade = await calendarService.getTrade(effectiveCalendarId!, editingTrade.id);
-
-          if (!existingTrade) {
-            throw new Error(`Trade with ID ${editingTrade.id} not found. It may have been deleted.`);
-          }
-          // Prepare the images array with layout information
-          const updatedImages = [
-            ...newTrade!.pending_images.map(img => ({
-              url: img.preview || '',
-              id: img.id!,
-              calendar_id: effectiveCalendarId!,
-              pending: true,
-              caption: img.caption || '',
-              width: img.width || 0,
-              height: img.height || 0,
-              row: img.row !== undefined ? img.row : 0,
-              column: img.column !== undefined ? img.column : 0,
-              column_width: img.column_width !== undefined ? img.column_width : 100 // Default to 100% for vertical layout
-            })),
-            ...newTrade!.uploaded_images.map(img => ({
-              url: img.url || '',
-              id: img.id,
-              calendar_id: effectiveCalendarId!,
-              pending: img.pending,
-              caption: img.caption || '',
-              width: img.width || 0,
-              height: img.height || 0,
-              row: img.row !== undefined ? img.row : 0,
-              column: img.column !== undefined ? img.column : 0,
-              column_width: img.column_width !== undefined ? img.column_width : 100 // Default to 100% for vertical layout
-            }))
-          ];
-
-          // Debug what's being saved
-          // logger.log("Saving images with layout info in handleEditSubmit:",
-          //   updatedImages.map(img => ({ id: img.id, row: img.row, column: img.column, column_width: img.column_width })));
-
-          await handleUpdateTradeProperty(editingTrade.id, (trade) => {
-            // Use the new date if it was changed, otherwise keep the original date
-            const currentDate = new Date();
-            const tradeDate = newTrade!.trade_date || trade.trade_date;
-            const updatedDate = new Date(tradeDate.getFullYear(), tradeDate.getMonth(), tradeDate.getDate(),
-              currentDate.getHours(), currentDate.getMinutes(), currentDate.getSeconds());
-
-            return {
-              ...trade,
-              trade_type: newTrade!.trade_type,
-              amount: finalAmount,
-              name: newTrade!.name || "",
-              entry_price: newTrade!.entry_price || undefined,
-              exit_price: newTrade!.exit_price || undefined,
-              stop_loss: newTrade!.stop_loss || undefined,
-              take_profit: newTrade!.take_profit || undefined,
-              trade_date: updatedDate,
-              is_temporary: newTrade?.is_temporary && !newTrade.name,
-              tags: finalTags || [],
-              risk_to_reward: newTrade!.risk_to_reward || 1,
-              partials_taken: newTrade!.partials_taken,
-              session: newTrade!.session || "London",
-              notes: newTrade!.notes || "",
-              images: updatedImages,
-              updated_at: new Date() // Set updated_at when editing trades
-            };
-          });
-
-          // Note: Economic events are now automatically fetched and updated by the TradeRepository layer
-          // during trade updates based on session, date, and tags changes
-
-          logger.log('Trade updated successfully');
-        } else {
-          throw new Error('Cannot update trade: Missing trade ID');
-        }
-      } catch (editError) {
-        logger.error('Error updating trade:', editError);
-        throw new Error(`Failed to update trade: ${editError instanceof Error ? editError.message : 'Unknown error'}`);
-      }
-
-      // Reset form
-      resetForm();
-      onCancel();
-
-      // No need to explicitly recalculate cumulative PnL
-      // It will be calculated directly in the DayHeader component
-    } catch (error) {
-      logger.error('Error editing trade:', error);
-      showErrorSnackbar(error instanceof Error ? error.message : 'Failed to edit trade. Please try again.');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
