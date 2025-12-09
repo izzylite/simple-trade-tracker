@@ -1203,10 +1203,17 @@ Deno.serve(async (req: Request) => {
       throw new Error('Supabase configuration missing');
     }
 
-    // Get MCP tools (with caching)
+    // Get MCP tools (with caching) and filter to only the ones we use
     log(`Getting MCP tools for project ${projectRef}`, 'info');
-    const geminiMcpTools = await getCachedMCPTools(projectRef, supabaseAccessToken);
-    log(`Using ${geminiMcpTools.length} MCP tools`, 'info');
+    const allMcpTools = await getCachedMCPTools(projectRef, supabaseAccessToken);
+
+    // Only keep MCP tools the agent actually needs (reduces context and improves focus)
+    const ALLOWED_MCP_TOOLS = [
+      'execute_sql',      // Database queries (main tool)
+      'list_tables',      // Schema discovery (rarely needed)
+    ];
+    const geminiMcpTools = allMcpTools.filter(tool => ALLOWED_MCP_TOOLS.includes(tool.name));
+    log(`Using ${geminiMcpTools.length}/${allMcpTools.length} MCP tools (filtered)`, 'info');
 
     // Combine all tools (MCP + Custom)
     const customTools = getAllCustomTools();

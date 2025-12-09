@@ -25,6 +25,7 @@ interface DayDialogProps {
   allTrades?: Trade[];
   calendarId: string;
   deletingTradeIds?: string[];
+  isTradeUpdating?: (tradeId: string) => boolean;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
   // Open AI chat mode for a specific trade
   onOpenAIChatMode?: (trades: Trade[], tradeId: string, title?: string) => void;
@@ -53,6 +54,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
   allTrades = [],
   calendarId,
   deletingTradeIds,
+  isTradeUpdating,
   onOpenGalleryMode,
   onOpenAIChatMode,
   calendar,
@@ -175,6 +177,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
             hideActions={isReadOnly} // Hide edit/delete actions in read-only mode
             enableBulkSelection={isReadOnly ? false : trades.length > 1} // Disable bulk selection in read-only mode
             deletingTradeIds={deletingTradeIds}
+            isTradeUpdating={isTradeUpdating}
             calendarId={calendarId}
             calendar={calendar}
             onOpenAIChat={onOpenAIChatMode ? handleOpenAIChat : undefined}

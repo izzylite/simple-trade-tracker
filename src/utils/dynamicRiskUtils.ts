@@ -13,15 +13,24 @@ export interface DynamicRiskSettings {
 }
 
 /**
- * Calculate cumulative P&L up to a specific date
+ * Calculate cumulative P&L up to (but not including) a specific date
+ * This ensures that when calculating risk for a trade on date X,
+ * we only consider trades BEFORE date X (historical accuracy)
  */
 export const calculateCumulativePnLToDate = (
   targetDate: Date,
   allTrades: Trade[]
 ): number => {
-   
+  // Use start of the target date to exclude all trades on that day
+  const targetStart = new Date(targetDate);
+  targetStart.setHours(0, 0, 0, 0);
+
   return allTrades
-    .filter(trade => new Date(trade.trade_date) <= targetDate)
+    .filter(trade => {
+      const tradeDate = new Date(trade.trade_date);
+      tradeDate.setHours(0, 0, 0, 0);
+      return tradeDate < targetStart;
+    })
     .sort((a, b) => new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime())
     .reduce((cumulative, trade) => cumulative + trade.amount, 0);
 };

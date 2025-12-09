@@ -495,12 +495,23 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     handleAccountBalanceChange,
     handleClearMonthTrades,
     handleUpdateCalendarProperty,
+    notification,
+    clearNotification,
+    isTradeUpdating,
   } = useCalendarTrades({
     calendarId,
     selectedCalendar,
     setLoading,
-    enableRealtime: !isReadOnly, // Disable real-time for read-only mode
+    enableRealtime: !isReadOnly, // Disable real-time for real-only mode
   });
+
+  // Show notifications from useCalendarTrades hook
+  useEffect(() => {
+    if (notification) {
+      showSnackbar(notification.message, notification.type === 'success' ? 'success' : 'error');
+      clearNotification();
+    }
+  }, [notification]);
 
   // Use hook calendar if available, otherwise fall back to selectedCalendar
   const calendar = hookCalendar || selectedCalendar;
@@ -1441,7 +1452,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   </Tooltip>
                 )}
 
-                </Box>
+              </Box>
 
               {/* Secondary Actions Group */}
               <Box sx={{
@@ -1684,6 +1695,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           account_balance={accountBalance}
           allTrades={trades} /* Pass all trades for tag suggestions */
           deletingTradeIds={deletingTradeIds}
+          isTradeUpdating={isTradeUpdating}
           onOpenGalleryMode={openGalleryMode}
           onOpenAIChatMode={isReadOnly ? undefined : openGalleryModeAI}
           calendar={calendar}

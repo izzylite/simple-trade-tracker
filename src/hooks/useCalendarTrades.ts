@@ -5,7 +5,14 @@
  * Handles trade additions, updates, and deletions with optimistic updates.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { Calendar, Trade } from "../types/dualWrite";
 import * as calendarService from "../services/calendarService";
 import { useRealtimeSubscription } from "./useRealtimeSubscription";
@@ -46,7 +53,17 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
   const [calendar, setCalendar] = useState<Calendar | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
+  const [notification, setNotification] = useState<
+    { message: string; type: "success" | "error" } | null
+  >(null);
+  const [updatingTradeIds, setUpdatingTradeIds] = useState<Set<string>>(
+    new Set(),
+  );
   const loadAttemptedRef = useRef<boolean>(false);
+
+  // Debounce refs for batching rapid broadcast updates
+  const calendarUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingCalendarUpdateRef = useRef<Calendar | null>(null);
 
   // useTransition for non-blocking state updates on heavy computations
   const [, startTransition] = useTransition();
@@ -57,10 +74,17 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
 
   // Helper to update tradesMap with O(1) operations
   const updateTradesMap = useCallback((
-    updater: (prev: Map<string, Trade>) => Map<string, Trade>
+    updater: (prev: Map<string, Trade>) => Map<string, Trade>,
   ) => {
-    setTradesMap(prev => updater(prev));
+    setTradesMap((prev) => updater(prev));
   }, []);
+
+  const clearNotification = useCallback(() => setNotification(null), []);
+
+  const isTradeUpdating = useCallback(
+    (tradeId: string) => updatingTradeIds.has(tradeId),
+    [updatingTradeIds],
+  );
 
   // Helper for bulk updates (used in heavy computations)
   const setTradesFromArray = useCallback((tradesArray: Trade[]) => {
@@ -119,10 +143,14 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       fetchTrades();
     }
 
-    // Reset load attempted when calendar changes
+    // Reset load attempted when calendar changes and cleanup debounce timers
     return () => {
       if (calendarId) {
         loadAttemptedRef.current = false;
+      }
+      // Cleanup debounce timeout on unmount
+      if (calendarUpdateTimeoutRef.current) {
+        clearTimeout(calendarUpdateTimeoutRef.current);
       }
     };
   }, [calendarId, fetchTrades]);
@@ -136,8 +164,14 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         throw new Error("Calendar ID is required");
       }
 
+      setUpdatingTradeIds((prev) => {
+        const next = new Set(prev);
+        next.add(trade.id);
+        return next;
+      });
+
       // Optimistic update - O(1) Map set
-      updateTradesMap(prev => {
+      updateTradesMap((prev) => {
         const next = new Map(prev);
         next.set(trade.id, trade);
         return next;
@@ -146,16 +180,30 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       try {
         await calendarService.addTrade(calendarId, trade);
         logger.log(`✅ Trade added: ${trade.id}`);
+        setNotification({
+          message: "Trade added successfully",
+          type: "success",
+        });
         // Real-time subscription will handle the update
       } catch (err) {
         // Revert optimistic update on error - O(1) Map delete
-        updateTradesMap(prev => {
+        updateTradesMap((prev) => {
           const next = new Map(prev);
           next.delete(trade.id);
           return next;
         });
         logger.error("Error adding trade:", err);
+        setNotification({
+          message: err instanceof Error ? err.message : "Failed to add trade",
+          type: "error",
+        });
         throw err;
+      } finally {
+        setUpdatingTradeIds((prev) => {
+          const next = new Set(prev);
+          next.delete(trade.id);
+          return next;
+        });
       }
     },
     [calendarId, updateTradesMap],
@@ -171,10 +219,16 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       throw new Error(`Calendar with ID ${calendarId} not found`);
     }
 
+    setUpdatingTradeIds((prev) => {
+      const next = new Set(prev);
+      next.add(tradeId);
+      return next;
+    });
+
     try {
       // Check if trade exists in cached trades first
-
-      let existingTrade = await calendarService.getTrade(calendar.id, tradeId);
+      
+      let existingTrade = tradesMap.get(calendar.id) || await calendarService.getTrade(calendar.id, tradeId);
       // If trade doesn't exist and we have a create function, create it
       if (!existingTrade && createIfNotExists) {
         // Create in database with all updates already applied
@@ -184,10 +238,14 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         );
 
         // O(1) Map set
-        updateTradesMap(prev => {
+        updateTradesMap((prev) => {
           const next = new Map(prev);
           next.set(finalTrade.id, finalTrade);
           return next;
+        });
+        setNotification({
+          message: "Trade created successfully",
+          type: "success",
         });
         return finalTrade;
       }
@@ -203,16 +261,32 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         return undefined;
       }
       // O(1) Map set instead of O(n) map
-      updateTradesMap(prev => {
+      updateTradesMap((prev) => {
         const next = new Map(prev);
         next.set(tradeId, result);
         return next;
       });
 
+      setNotification({
+        message: "Trade updated successfully",
+        type: "success",
+      });
       return result;
     } catch (error) {
       logger.error("Error updating trade:", error);
+      setNotification({
+        message: error instanceof Error
+          ? error.message
+          : "Failed to update trade",
+        type: "error",
+      });
       throw error;
+    } finally {
+      setUpdatingTradeIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tradeId);
+        return next;
+      });
     }
   };
 
@@ -225,11 +299,17 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         throw new Error("Calendar ID is required");
       }
 
+      setUpdatingTradeIds((prev) => {
+        const next = new Set(prev);
+        tradeIds.forEach((id) => next.add(id));
+        return next;
+      });
+
       // Store previous map for rollback
       let previousMap: Map<string, Trade> = new Map();
 
       // Optimistic update - O(k) where k is number of trades to delete
-      updateTradesMap(prev => {
+      updateTradesMap((prev) => {
         previousMap = prev;
         const next = new Map(prev);
         for (const id of tradeIds) {
@@ -244,12 +324,28 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
           tradeIds.map((tradeId) => calendarService.deleteTrade(tradeId)),
         );
         logger.log(`✅ Deleted ${tradeIds.length} trade(s)`);
+        setNotification({
+          message: `Deleted ${tradeIds.length} trade(s)`,
+          type: "success",
+        });
         // Real-time subscription will handle the update
       } catch (err) {
         // Revert optimistic update on error
         setTradesMap(previousMap);
         logger.error("Error deleting trades:", err);
+        setNotification({
+          message: err instanceof Error
+            ? err.message
+            : "Failed to delete trades",
+          type: "error",
+        });
         throw err;
+      } finally {
+        setUpdatingTradeIds((prev) => {
+          const next = new Set(prev);
+          tradeIds.forEach((id) => next.delete(id));
+          return next;
+        });
       }
     },
     [calendarId, updateTradesMap],
@@ -400,7 +496,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         `🔧 Setting up calendar broadcast subscription for calendar-${calendarId}`,
       );
 
-      // Listen for ALL broadcast events to debug
+      // Listen for ALL broadcast events with debouncing to prevent multiple re-renders
       channel.on(
         "broadcast",
         {
@@ -408,15 +504,30 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         },
         (payload: any) => {
           logger.log(
-            `� Broadcast event received on calendar-${calendarId}:`,
+            `📡 Broadcast event received on calendar-${calendarId}:`,
             payload,
           );
           // The payload structure from realtime.broadcast_changes is:
           // { event: "UPDATE", type: "broadcast", payload: { record: {...}, old_record: {...}, ... } }
           if (payload.event === "UPDATE" && payload.payload?.record) {
             const updatedCalendarData = payload.payload.record as Calendar;
-            // Update local calendar state with new data
-            setCalendar(updatedCalendarData);
+
+            // Store the latest update
+            pendingCalendarUpdateRef.current = updatedCalendarData;
+
+            // Clear any existing timeout
+            if (calendarUpdateTimeoutRef.current) {
+              clearTimeout(calendarUpdateTimeoutRef.current);
+            }
+
+            // Debounce: wait 150ms for more updates before applying
+            calendarUpdateTimeoutRef.current = setTimeout(() => {
+              if (pendingCalendarUpdateRef.current) {
+                logger.log(`📡 Applying debounced calendar update`);
+                setCalendar(pendingCalendarUpdateRef.current);
+                pendingCalendarUpdateRef.current = null;
+              }
+            }, 150);
           }
         },
       );
@@ -451,7 +562,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
           if (payload.payload?.record) {
             const newTrade = payload.payload.record as Trade;
             // O(1) Map operations instead of O(n) array operations
-            setTradesMap(prev => {
+            setTradesMap((prev) => {
               if (prev.has(newTrade.id)) return prev;
               const next = new Map(prev);
               next.set(newTrade.id, newTrade);
@@ -463,24 +574,24 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       );
 
       // Listen for UPDATE events
-      channel.on(
-        "broadcast",
-        {
-          event: "UPDATE",
-        },
-        (payload: any) => {
-          if (payload.payload?.record) {
-            const updatedTrade = payload.payload.record as Trade;
-            // O(1) Map set instead of O(n) map
-            setTradesMap(prev => {
-              const next = new Map(prev);
-              next.set(updatedTrade.id, updatedTrade);
-              return next;
-            });
-            logger.log(`✏️ Trade updated via broadcast: ${updatedTrade.id}`);
-          }
-        },
-      );
+      // channel.on(
+      //   "broadcast",
+      //   {
+      //     event: "UPDATE",
+      //   },
+      //   (payload: any) => {
+      //     if (payload.payload?.record) {
+      //       const updatedTrade = payload.payload.record as Trade;
+      //       // O(1) Map set instead of O(n) map
+      //       setTradesMap((prev) => {
+      //         const next = new Map(prev);
+      //         next.set(updatedTrade.id, updatedTrade);
+      //         return next;
+      //       });
+      //       logger.log(`✏️ Trade updated via broadcast: ${updatedTrade.id}`);
+      //     }
+      //   },
+      // );
 
       // Listen for DELETE events
       channel.on(
@@ -492,7 +603,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
           if (payload.payload?.old_record) {
             const deletedTrade = payload.payload.old_record as Trade;
             // O(1) Map delete instead of O(n) filter
-            setTradesMap(prev => {
+            setTradesMap((prev) => {
               const next = new Map(prev);
               next.delete(deletedTrade.id);
               return next;
@@ -545,11 +656,13 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         const tradesToDelete: Trade[] = [];
 
         // O(n) single pass to identify trades to delete
-        setTradesMap(prev => {
+        setTradesMap((prev) => {
           const next = new Map<string, Trade>();
           prev.forEach((trade, id) => {
             const tradeDate = new Date(trade.trade_date);
-            if (tradeDate.getFullYear() === year && tradeDate.getMonth() === month) {
+            if (
+              tradeDate.getFullYear() === year && tradeDate.getMonth() === month
+            ) {
               tradesToDelete.push(trade);
             } else {
               next.set(id, trade);
@@ -763,7 +876,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     // Use startTransition for this potentially heavy update
     startTransition(() => {
       // Update trades using Map for O(1) individual updates
-      setTradesMap(prev => {
+      setTradesMap((prev) => {
         const next = new Map<string, Trade>();
         prev.forEach((trade, id) => {
           next.set(id, updateTradeTagsWithGroupNameChange(trade));
@@ -795,5 +908,8 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     handleAccountBalanceChange,
     handleClearMonthTrades,
     handleUpdateCalendarProperty,
+    notification,
+    clearNotification,
+    isTradeUpdating,
   };
 }

@@ -2,7 +2,7 @@
  * Hook for managing economic event watching in TradeCalendar
  */
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useMemo } from 'react';
 import { economicEventWatcher } from '../services/economicEventWatcher';
 import { EconomicEvent } from '../types/economicCalendar';
 import { error, log } from '../utils/logger';
@@ -33,6 +33,23 @@ export const useEconomicEventWatcher = ({
 }: UseEconomicEventWatcherProps): UseEconomicEventWatcherReturn => {
   const isInitialized = useRef(false);
 
+  // Memoize filters to prevent unnecessary re-renders when only stats change
+  // Only recreate when actual filter values change, not object reference
+  const stableFilters = useMemo(() => {
+    if (!economic_calendar_filters) return undefined;
+    return {
+      currencies: economic_calendar_filters.currencies,
+      impacts: economic_calendar_filters.impacts,
+      viewType: economic_calendar_filters.viewType
+    };
+  }, [
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    economic_calendar_filters?.currencies?.join(','),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    economic_calendar_filters?.impacts?.join(','),
+    economic_calendar_filters?.viewType
+  ]);
+
   // Initialize the watcher once
   useEffect(() => {
     if (!isInitialized.current) {
@@ -59,10 +76,10 @@ export const useEconomicEventWatcher = ({
   }, []);
 
   const startWatching = useCallback(() => {
-    if (calendarId && isActive) { 
-      economicEventWatcher.startWatching(calendarId, economic_calendar_filters);
+    if (calendarId && isActive) {
+      economicEventWatcher.startWatching(calendarId, stableFilters);
     }
-  }, [calendarId, economic_calendar_filters, isActive]);
+  }, [calendarId, stableFilters, isActive]);
 
   const stopWatching = useCallback(() => {
     if (calendarId) { 

@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
-  Snackbar,
-  Alert,
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { endOfDay, format } from 'date-fns';
 import { Trade, Calendar } from '../../types/dualWrite';
@@ -152,9 +152,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreatingEmptyTrade, setIsCreatingEmptyTrade] = useState(false);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
   const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [showError, setShowError] = useState(false);
 
   // Track if component is mounted for safe state updates after async operations
   const isMountedRef = useRef(true);
@@ -206,9 +206,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
     } catch (error) {
       logger.error('Error creating empty trade:', error);
-      showErrorSnackbar(error instanceof Error ?
-        `Failed to create temporary trade: ${error.message}` :
-        'Failed to create temporary trade. Please try again.');
+      // We are no longer showing local snackbar for this, as the parent component handles global notifications
+      // or we accept that this error is logged but not flashed to the user in the dialog context immediately.
 
       // Still show the form, but without the temporary trade
       setNewTrade(prev => ({
@@ -231,6 +230,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     }
     else if (showForm.editTrade) {
       setEditingTrade(showForm.editTrade);
+      setNewTrade(createEditTradeData(showForm.editTrade));
     }
 
     // Update previous showForm ref
@@ -258,15 +258,15 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
 
 
-  // Function to show error messages in a Snackbar
+
+
   const showErrorSnackbar = (message: string) => {
-    setSnackbarMessage(message);
-    setSnackbarOpen(true);
+    setErrorMessage(message);
+    setShowError(true);
   };
 
-  // Function to handle Snackbar close
-  const handleSnackbarClose = () => {
-    setSnackbarOpen(false);
+  const handleCloseError = () => {
+    setShowError(false);
   };
 
   const resetForm = () => {
@@ -292,7 +292,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       return onUpdateTradeProperty(tradeId, updateCallback, createIfNotExists);
     } catch (error) {
       logger.error('Error updating trade property:', error);
-      showErrorSnackbar(error instanceof Error ? error.message : 'Failed to update trade property. Please try again.');
+      // Removed local snackbar call, rely on global handling or specific error UI if needed
     }
   };
 
@@ -355,7 +355,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     return trade.trade_type === 'loss' ? -Math.abs(amount) : Math.abs(amount);
   };
 
-  const createFinalTradeData =   (newTrade: NewTradeForm, trade_date: Date) : Trade => {
+  const createFinalTradeData = (newTrade: NewTradeForm, trade_date: Date): Trade => {
     let finalAmount = calculateFinalAmount(newTrade);
     logger.log(`trade final amount ${finalAmount}`)
 
@@ -408,12 +408,12 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   const calculateAmountFromRiskToReward = (risk_to_reward: number, cumulativePnL: number): number => {
     if (!newTrade || !risk_to_reward || !account_balance || newTrade.trade_type === 'breakeven') return 0;
 
-    
+
     const tradeDate = newTrade.trade_date || trade_date;
     const effectiveRiskPercentage = calculateEffectiveRiskPercentage(tradeDate, allTrades, dynamicRiskSettings);
     const riskAmount = calculateRiskAmount(effectiveRiskPercentage, account_balance, cumulativePnL);
 
-  
+
 
     // For win trades: risk amount * R:R
     // For loss trades: risk amount
@@ -465,7 +465,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     }
 
     if (errorMessages.length > 0) {
-      showErrorSnackbar(errorMessages.join(' '));
+      // Log errors instead of showing snackbar
+      logger.error('File validation errors:', errorMessages.join(' '));
     }
 
     // If no valid files, return early
@@ -637,7 +638,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         try {
           await handleUpdateTradeProperty(newTrade!.id!!, (trade) => {
             const existingImages = trade.images || [];
-            
+
             // Create a map of updated images for O(1) lookup
             const updatedImagesMap = new Map(successfulUploads.map(img => [img.id, img]));
 
@@ -664,7 +665,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           logger.log(`Updated trade with ${successfulUploads.length} uploaded images`);
         } catch (updateError) {
           logger.error('Error batch updating trade with new images:', updateError);
-          showErrorSnackbar('Failed to save images to trade. They are uploaded but not saved to the trade.');
+          // Removed local snackbar call
         }
       }
 
@@ -801,7 +802,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           // Image is currently uploading, we shouldn't allow deletion
           // This is a fallback in case the UI button wasn't hidden properly
           logger.warn('Attempted to delete an image that is currently uploading');
-          showErrorSnackbar('Cannot delete an image while it\'s uploading. Please wait for the upload to complete.');
+          // showErrorSnackbar('Cannot delete an image while it\'s uploading. Please wait for the upload to complete.');
           return;
         }
 
@@ -838,7 +839,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       }
     } catch (error) {
       logger.error('Error in handleImageRemove:', error);
-      showErrorSnackbar('Failed to remove image. Please try again.');
+      // showErrorSnackbar('Failed to remove image. Please try again.');
     }
   };
   // Handle image reordering
@@ -918,31 +919,40 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     if (e) e.preventDefault();
 
     if (!onAddTrade) return;
+    if (!newTrade) {
+      logger.error('Form state not initialized');
+      return;
+    }
 
     // Validate form
-    if (!newTrade!.amount) {
+    if (!newTrade.amount) {
+      logger.error('Validation error: Amount is required');
       showErrorSnackbar('Amount is required');
       return;
     }
-    if (!newTrade!.session) {
-      showErrorSnackbar('Session is required');
+    if (!newTrade.session) {
+      logger.error('Validation error: Session is required');
+      showErrorSnackbar('Session is required. Please select a trading session.');
       return;
     }
-    if (!newTrade!.risk_to_reward || newTrade!.risk_to_reward <= 0) {
+    if (!newTrade.risk_to_reward || newTrade.risk_to_reward <= 0) {
+      logger.error('Validation error: Risk to reward is required');
       showErrorSnackbar('Risk to reward is required');
       return;
     }
 
     // Validate required tag groups
-    const { valid, missingGroups } = validateRequiredTagGroups(newTrade!.tags);
+    const { valid, missingGroups } = validateRequiredTagGroups(newTrade.tags);
     if (!valid) {
-      showErrorSnackbar(`Missing required tag groups: ${missingGroups.join(', ')}. Each trade must include at least one tag from these groups.`);
+      logger.error(`Validation error: Missing required tag groups: ${missingGroups.join(', ')}`);
+      showErrorSnackbar(`Missing required tag groups: ${missingGroups.join(', ')}`);
       return;
     }
 
     // Check if there are any pending image uploads
     if (hasPendingUploads()) {
-      showErrorSnackbar('Please wait for image uploads to complete...');
+      logger.warn('Image uploads pending, prevented submission');
+      showErrorSnackbar('Please wait for images to finish uploading');
       return;
     }
 
@@ -982,7 +992,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
       // Show error only if component is still mounted
       if (isMountedRef.current) {
-        showErrorSnackbar(err instanceof Error ? err.message : 'Failed to save trade. Please try again.');
+        // Parent component handles global notifications for failures
+        logger.error(err instanceof Error ? err.message : 'Failed to save trade.');
       }
     }
   };
@@ -990,27 +1001,43 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   const handleEditSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!editingTrade) return;
+    if (!newTrade) {
+      logger.error('Form state not initialized');
+      return;
+    }
 
     // Validate form
-    if (!newTrade!.amount) {
+    if (!newTrade.amount) {
+      logger.error('Validation error: Amount is required');
       showErrorSnackbar('Amount is required');
       return;
     }
-    if (!newTrade!.session) {
-      showErrorSnackbar('Session is required');
+    if (!newTrade.session) {
+      logger.error('Validation error: Session is required');
+      showErrorSnackbar('Session is required. Please select a trading session.');
       return;
     }
 
     // Validate required tag groups
-    const { valid, missingGroups } = validateRequiredTagGroups(newTrade!.tags);
+    const { valid, missingGroups } = validateRequiredTagGroups(newTrade.tags);
     if (!valid) {
-      showErrorSnackbar(`Missing required tag groups: ${missingGroups.join(', ')}. Each trade must include at least one tag from these groups.`);
+      logger.error(`Validation error: Missing required tag groups: ${missingGroups.join(', ')}`);
+      showErrorSnackbar(`Missing required tag groups: ${missingGroups.join(', ')}`);
+      return;
+    }
+
+    // Validate trade date is not in the future
+    if (newTrade.trade_date && newTrade.trade_date > new Date()) {
+      logger.error('Validation error: Trade date cannot be in the future');
+      showErrorSnackbar('Trade date cannot be in the future');
       return;
     }
 
     // Check if there are any pending image uploads
+    // Check if there are any pending image uploads
     if (hasPendingUploads()) {
-      showErrorSnackbar('Please wait for image uploads to complete...');
+      logger.warn('Image uploads pending, prevented update');
+      showErrorSnackbar('Please wait for images to finish uploading');
       return;
     }
 
@@ -1104,7 +1131,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
       // Show error only if component is still mounted
       if (isMountedRef.current) {
-        showErrorSnackbar(err instanceof Error ? err.message : 'Failed to update trade. Please try again.');
+        logger.error(err instanceof Error ? err.message : 'Failed to update trade.');
       }
     }
   };
@@ -1219,21 +1246,19 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         </Box>
       </BaseDialog>
 
-
-
-      {/* Snackbar for error messages */}
+      {/* Error Snackbar */}
       <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={6000}
-        onClose={handleSnackbarClose}
+        open={showError}
+        autoHideDuration={4000}
+        onClose={handleCloseError}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleSnackbarClose} severity="error" sx={{ width: '100%' }}>
-          {snackbarMessage}
+        <Alert onClose={handleCloseError} severity="error" variant="filled" sx={{ width: '100%' }}>
+          {errorMessage}
         </Alert>
       </Snackbar>
-    </>
 
+    </>
   );
 };
 

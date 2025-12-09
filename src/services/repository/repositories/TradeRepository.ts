@@ -736,12 +736,10 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     }
 
     // Determine if we need to fetch new economic events
-    // Fetch if: session changed, date changed, tags changed, or no events exist
+    // Only fetch if: session changed or date changed (these determine which events are relevant)
     const shouldFetchEvents =
       (updates.session && updates.session !== existingTrade.session) ||
-      (updates.trade_date && new Date(updates.trade_date).getTime() !== existingTrade.trade_date.getTime()) ||
-      (updates.tags && JSON.stringify(updates.tags) !== JSON.stringify(existingTrade.tags)) ||
-      (!existingTrade.economic_events || existingTrade.economic_events.length === 0);
+      (updates.trade_date && new Date(updates.trade_date).getTime() !== existingTrade.trade_date.getTime());
 
     // Fetch economic events if needed
     let economicEvents = updates.economic_events || existingTrade.economic_events;
