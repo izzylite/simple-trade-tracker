@@ -18,36 +18,36 @@ import { calculateCumulativePnL, startOfNextDay } from '../trades/TradeFormDialo
 import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip } from 'recharts';
 import { formatCurrency } from '../../utils/formatters';
 import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
-import { EconomicCalendarFilterSettings } from '../economicCalendar/EconomicCalendarDrawer';
+import { TradeOperationsProps } from '../../types/tradeOperations';
 
 interface TradesDialogProps {
+  // Component-specific props
   open: boolean;
   trades: Trade[];
   title?: string;
   subtitle?: string;
   date: string;
   expandedTradeId: string | null;
-  showChartInfo?: boolean
+  showChartInfo?: boolean;
   onClose: () => void;
   onTradeExpand: (tradeId: string) => void;
-  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
-  economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
-  onZoomImage: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
   account_balance: number;
   allTrades: Trade[];
+
+  // Trade operations - can be passed as object or individual props
+  tradeOperations?: TradeOperationsProps;
+
+  // Individual props (for backward compatibility)
+  onUpdateTradeProperty?: TradeOperationsProps['onUpdateTradeProperty'];
+  economicFilter?: TradeOperationsProps['economicFilter'];
+  onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
   onEditClick?: (trade: Trade) => void;
   onDeleteClick?: (tradeId: string) => void;
   onDeleteMultiple?: (tradeIds: string[]) => void;
-  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
+  onOpenGalleryMode?: TradeOperationsProps['onOpenGalleryMode'];
   calendarId?: string;
-  // Calendar data for economic events filtering
-  calendar?: {
-    economic_calendar_filters?: {
-      currencies: string[];
-      impacts: string[];
-      viewType: 'day' | 'week' | 'month';
-    };
-  };
+  isTradeUpdating?: TradeOperationsProps['isTradeUpdating'];
+  calendar?: TradeOperationsProps['calendar'];
 }
 
 const TradesListDialog: React.FC<TradesDialogProps> = ({
@@ -59,17 +59,30 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   expandedTradeId,
   onClose,
   onTradeExpand,
-  onZoomImage,
   account_balance,
   allTrades,
-  onUpdateTradeProperty,
-  onEditClick,
-  onDeleteClick,
-  onDeleteMultiple,
-  onOpenGalleryMode,
-  calendarId,
-  economicFilter
+  tradeOperations,
+  // Individual props (fallback if tradeOperations not provided)
+  onZoomImage: onZoomImageProp,
+  onUpdateTradeProperty: onUpdateTradePropertyProp,
+  onEditClick: onEditClickProp,
+  onDeleteClick: onDeleteClickProp,
+  onDeleteMultiple: onDeleteMultipleProp,
+  onOpenGalleryMode: onOpenGalleryModeProp,
+  calendarId: calendarIdProp,
+  isTradeUpdating: isTradeUpdatingProp,
+  economicFilter: economicFilterProp
 }) => {
+  // Extract from tradeOperations or use individual props
+  const onZoomImage = tradeOperations?.onZoomImage || onZoomImageProp;
+  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
+  const onEditClick = tradeOperations?.onEditTrade || onEditClickProp;
+  const onDeleteClick = tradeOperations?.onDeleteTrade || onDeleteClickProp;
+  const onDeleteMultiple = tradeOperations?.onDeleteMultipleTrades || onDeleteMultipleProp;
+  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
+  const calendarId = tradeOperations?.calendarId || calendarIdProp;
+  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
+  const economicFilter = tradeOperations?.economicFilter || economicFilterProp;
   const theme = useTheme();
   const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
   // Format data for the chart based on selected metric
@@ -303,16 +316,18 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
           trades={trades}
           expandedTradeId={expandedTradeId}
           onTradeClick={onTradeExpand}
-          onEditClick={onEditClick || (() => { })} // Use provided handler or no-op
-          onDeleteClick={onDeleteClick || (() => { })} // Use provided handler or no-op
+          hideActions={!onEditClick && !onDeleteClick}
+          enableBulkSelection={trades.length > 1 && !!onDeleteMultiple}
+          tradeOperations={tradeOperations}
+          onEditClick={onEditClick}
+          onDeleteClick={onDeleteClick}
           onDeleteMultiple={onDeleteMultiple}
           onZoomedImage={onZoomImage}
           onUpdateTradeProperty={onUpdateTradeProperty}
-          hideActions={!onEditClick && !onDeleteClick} // Hide actions only if both handlers are not provided
-          enableBulkSelection={trades.length > 1 && !!onDeleteMultiple} // Enable bulk selection when there are multiple trades and handler is provided
           calendarId={calendarId}
           onOpenGalleryMode={onOpenGalleryMode}
           economicFilter={economicFilter}
+          isTradeUpdating={isTradeUpdating}
         />
       </Box>
     </BaseDialog>

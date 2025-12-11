@@ -55,21 +55,27 @@ import EconomicEventDetailDialog from '../economicCalendar/EconomicEventDetailDi
 import ApiKeySettingsDialog from './ApiKeySettingsDialog';
 import NoteEditorDialog from '../notes/NoteEditorDialog';
 import { Note } from '../../types/note';
+import { TradeOperationsProps } from '../../types/tradeOperations';
 
 interface AIChatDrawerProps {
   open: boolean;
   onClose: () => void;
   trades?: Trade[];
   calendar?: Calendar;
-  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
-  // Trade operation callbacks for EconomicEventDetailDialog
-  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
-  onEditTrade?: (trade: Trade) => void;
-  onDeleteTrade?: (tradeId: string) => void;
-  onDeleteMultipleTrades?: (tradeIds: string[]) => void;
-  onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
   isReadOnly?: boolean;
+
+  // Trade operations - can be passed as object or individual props
+  tradeOperations?: TradeOperationsProps;
+
+  // Individual props (for backward compatibility)
+  onOpenGalleryMode?: TradeOperationsProps['onOpenGalleryMode'];
+  onUpdateTradeProperty?: TradeOperationsProps['onUpdateTradeProperty'];
+  onEditTrade?: TradeOperationsProps['onEditTrade'];
+  onDeleteTrade?: TradeOperationsProps['onDeleteTrade'];
+  onDeleteMultipleTrades?: TradeOperationsProps['onDeleteMultipleTrades'];
+  onZoomImage?: TradeOperationsProps['onZoomImage'];
+  onUpdateCalendarProperty?: TradeOperationsProps['onUpdateCalendarProperty'];
+  isTradeUpdating?: TradeOperationsProps['isTradeUpdating'];
 }
 
 // Bottom sheet heights
@@ -82,15 +88,27 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   onClose,
   trades,
   calendar,
-  onOpenGalleryMode,
-  onUpdateTradeProperty,
-  onEditTrade,
-  onDeleteTrade,
-  onDeleteMultipleTrades,
-  onZoomImage,
-  onUpdateCalendarProperty,
-  isReadOnly = false
+  isReadOnly = false,
+  tradeOperations,
+  // Individual props (fallback if tradeOperations not provided)
+  onOpenGalleryMode: onOpenGalleryModeProp,
+  onUpdateTradeProperty: onUpdateTradePropertyProp,
+  onEditTrade: onEditTradeProp,
+  onDeleteTrade: onDeleteTradeProp,
+  onDeleteMultipleTrades: onDeleteMultipleTradesProp,
+  onZoomImage: onZoomImageProp,
+  onUpdateCalendarProperty: onUpdateCalendarPropertyProp,
+  isTradeUpdating: isTradeUpdatingProp
 }) => {
+  // Extract from tradeOperations or use individual props
+  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
+  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
+  const onEditTrade = tradeOperations?.onEditTrade || onEditTradeProp;
+  const onDeleteTrade = tradeOperations?.onDeleteTrade || onDeleteTradeProp;
+  const onDeleteMultipleTrades = tradeOperations?.onDeleteMultipleTrades || onDeleteMultipleTradesProp;
+  const onZoomImage = tradeOperations?.onZoomImage || onZoomImageProp;
+  const onUpdateCalendarProperty = tradeOperations?.onUpdateCalendarProperty || onUpdateCalendarPropertyProp;
+  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
   const theme = useTheme();
   const { user } = useAuth();
   const chatInterfaceRef = useRef<AIChatInterfaceRef>(null);
@@ -702,12 +720,14 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           }}
           event={selectedEvent}
           trades={trades || []}
+          tradeOperations={tradeOperations}
           onUpdateTradeProperty={onUpdateTradeProperty}
           onEditTrade={onEditTrade}
           onDeleteTrade={onDeleteTrade}
           onDeleteMultipleTrades={onDeleteMultipleTrades}
           onZoomImage={onZoomImage}
           onOpenGalleryMode={onOpenGalleryMode}
+          isTradeUpdating={isTradeUpdating}
           calendarId={calendar.id}
           calendar={calendar}
           onUpdateCalendarProperty={onUpdateCalendarProperty}

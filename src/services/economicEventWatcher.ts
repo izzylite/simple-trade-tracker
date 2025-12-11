@@ -438,9 +438,11 @@ class EconomicEventWatcher {
       }
 
       // Extract updated events from the edge function result
+      // Note: successResponse wraps data under .data, so we need to unwrap it
       const responseData = data as any;
-      const targetEvents: EconomicEvent[] = responseData?.targetEvents || [];
-      const foundEvents: EconomicEvent[] = responseData?.foundEvents || [];
+      const actualData = responseData?.data || responseData; // Handle both wrapped and unwrapped responses
+      const targetEvents: EconomicEvent[] = actualData?.targetEvents || [];
+      const foundEvents: EconomicEvent[] = actualData?.foundEvents || [];
 
       logger.log(`📊 Edge function returned ${targetEvents.length} total events, ${foundEvents.length} specifically requested events`);
 

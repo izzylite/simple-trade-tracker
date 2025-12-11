@@ -14,9 +14,6 @@ import {
   log,
   parseJsonBody
 } from '../_shared/supabase.ts'
-import {
-  cleanEventName
-} from '../_shared/utils.ts'
 import type {
   ProcessEconomicEventsResponse,
   EconomicEvent
@@ -118,6 +115,17 @@ function cleanNumericValue(value: string): string {
   return value.trim()
     .replace(/^\+/, '')
     .replace(/,/g, '')
+    .trim()
+}
+
+/**
+ * Clean event name by removing newlines and excess whitespace
+ */
+function cleanEventName(name: string): string {
+  if (!name) return ''
+  return name
+    .replace(/[\r\n]+/g, ' ')  // Replace newlines with space
+    .replace(/\s+/g, ' ')       // Collapse multiple whitespace to single space
     .trim()
 }
 
@@ -304,30 +312,77 @@ async function parseMyFXBookWeeklyEnhancedHTML(html: string): Promise<EconomicEv
           }
         }
 
-        // Values extraction
+        // Values extraction - matching Firebase logic exactly
+        // MyFXBook structure: data-previous/data-concensus may contain row IDs,
+        // but the actual values are in previous-value/concensus attributes OR cell text
         let previous = ''
         let forecast = ''
         let actual = ''
         let actualResultType: 'good' | 'bad' | 'neutral' | '' = ''
+
         for (const c of Array.from(cells)) {
           const e = c as Element
-          const prevAttr = e.getAttribute('data-previous') || e.getAttribute('previous-value')
-          if (!previous && prevAttr && isNumericValue(prevAttr)) previous = cleanNumericValue(prevAttr)
-          const fcAttr = e.getAttribute('data-concensus') || e.getAttribute('concensus')
-          if (!forecast && fcAttr && isNumericValue(fcAttr)) forecast = cleanNumericValue(fcAttr)
-          const actAttr = e.getAttribute('data-actual')
-          if (actAttr) {
-            const actText = (e.textContent || '').trim()
-            if (!actual && actText && isNumericValue(actText)) {
-              actual = cleanNumericValue(actText)
+          const cellText = (e.textContent || '').trim()
+
+          // Look for previous value - check if cell has data-previous or previous-value attr
+          // Then get value from previous-value attr OR fall back to cell text (Firebase logic)
+          if (!previous && (e.getAttribute('data-previous') || e.getAttribute('previous-value'))) {
+            const prevValue = e.getAttribute('previous-value') || cellText
+            if (prevValue && isNumericValue(prevValue)) {
+              previous = cleanNumericValue(prevValue)
+            }
+          }
+
+          // Look for forecast/consensus value - same pattern as previous
+          if (!forecast && (e.getAttribute('data-concensus') || e.getAttribute('concensus'))) {
+            const forecastValue = e.getAttribute('concensus') || cellText
+            if (forecastValue && isNumericValue(forecastValue)) {
+              forecast = cleanNumericValue(forecastValue)
+            }
+          }
+
+          // Look for actual value
+          if (e.getAttribute('data-actual')) {
+            if (!actual && cellText && isNumericValue(cellText)) {
+              actual = cleanNumericValue(cellText)
               // Determine if actual result is good/bad/neutral
               actualResultType = determineResultType(e)
             }
           }
         }
+
+        // Method 2: Use CSS classes as backup (matching Firebase)
+        if (!previous) {
+          for (const c of Array.from(cells)) {
+            const e = c as Element
+            const cls = e.getAttribute('class') || ''
+            if (cls.includes('previousCell')) {
+              const prevText = (e.textContent || '').trim()
+              if (isNumericValue(prevText)) {
+                previous = cleanNumericValue(prevText)
+                break
+              }
+            }
+          }
+        }
+
+        if (!actual) {
+          for (const c of Array.from(cells)) {
+            const e = c as Element
+            const cls = e.getAttribute('class') || ''
+            if (cls.includes('actualCell')) {
+              const actualText = (e.textContent || '').trim()
+              if (isNumericValue(actualText)) {
+                actual = cleanNumericValue(actualText)
+                actualResultType = determineResultType(e)
+                break
+              }
+            }
+          }
+        }
+
         // Fallback: try to determine result type from the row if we have actual but no result type
         if (actual && !actualResultType) {
-          // Check cells with actualCell class or data-actual attribute
           for (const c of Array.from(cells)) {
             const e = c as Element
             const cls = e.getAttribute('class') || ''
@@ -337,6 +392,8 @@ async function parseMyFXBookWeeklyEnhancedHTML(html: string): Promise<EconomicEv
             }
           }
         }
+
+        // Method 3: Fallback to position-based extraction (MyFXBook standard layout)
         if (!previous && cellTexts[6] && isNumericValue(cellTexts[6])) previous = cleanNumericValue(cellTexts[6])
         if (!forecast && cellTexts[7] && isNumericValue(cellTexts[7])) forecast = cleanNumericValue(cellTexts[7])
         if (!actual && cellTexts[8] && isNumericValue(cellTexts[8])) actual = cleanNumericValue(cellTexts[8])

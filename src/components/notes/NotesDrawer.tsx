@@ -379,7 +379,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
           >
             {loading ? (
               <Box>
-                {Array.from({ length: 5 }).map((_, index) => (
+                {Array.from({ length: 10 }).map((_, index) => (
                   <NoteListItemShimmer key={index} />
                 ))}
               </Box>

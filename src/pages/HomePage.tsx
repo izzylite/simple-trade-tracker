@@ -1062,7 +1062,7 @@ const Home: React.FC<HomeProps> = ({
                   fontSize: { xs: '1rem', sm: '1.125rem', md: '1.25rem' }
                 }}
               >
-                Economic Events Today
+                Economic Events
               </Typography>
               <Typography
                 variant="body2"

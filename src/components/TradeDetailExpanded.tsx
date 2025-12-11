@@ -56,6 +56,7 @@ import { tradeEconomicEventService } from '../services/tradeEconomicEventService
 import ShareButton from './sharing/ShareButton';
 import { useRealtimeSubscription } from '../hooks/useRealtimeSubscription';
 import { isToday } from 'date-fns';
+import { TradeOperationsProps } from '../types/tradeOperations';
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -64,14 +65,17 @@ interface TradeDetailExpandedProps {
   tradeData: Trade;
   isExpanded: boolean;
   animate?: boolean;
-  setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
+  trades?: Array<{ id: string;[key: string]: any }>;
+
+  // Trade operations - can be passed as object or individual props
+  tradeOperations?: TradeOperationsProps;
+
+  // Individual props (for backward compatibility)
+  setZoomedImage?: (url: string, allImages?: string[], initialIndex?: number) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
   calendarId?: string;
-  // Optional props for trade link navigation in notes
-  trades?: Array<{ id: string;[key: string]: any }>;
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
-  // Open AI chat for this specific trade
   onOpenAIChat?: (trade: Trade) => void;
   isTradeUpdating?: (tradeId: string) => boolean;
 }
@@ -114,17 +118,27 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   tradeData,
   isExpanded,
   animate,
-  setZoomedImage,
-  onUpdateTradeProperty,
-  calendarId,
   trades,
-  onOpenGalleryMode,
-  economicFilter,
-  onOpenAIChat,
-  isTradeUpdating
+  tradeOperations,
+  // Individual props (fallback if tradeOperations not provided)
+  setZoomedImage: setZoomedImageProp,
+  onUpdateTradeProperty: onUpdateTradePropertyProp,
+  calendarId: calendarIdProp,
+  onOpenGalleryMode: onOpenGalleryModeProp,
+  economicFilter: economicFilterProp,
+  onOpenAIChat: onOpenAIChatProp,
+  isTradeUpdating: isTradeUpdatingProp
 }) => {
+  // Extract from tradeOperations or use individual props
+  const setZoomedImage = tradeOperations?.onZoomImage || setZoomedImageProp;
+  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
+  const calendarId = tradeOperations?.calendarId || calendarIdProp;
+  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
+  const economicFilter = tradeOperations?.economicFilter || economicFilterProp;
+  const onOpenAIChat = tradeOperations?.onOpenAIChat || onOpenAIChatProp;
+  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
+
   const theme = useTheme();
-  // ... existing state ...
   const [trade, setTrade] = useState<Trade>(tradeData);
   const isUpdating = isTradeUpdating?.(trade.id);
   const [isPinning, setIsPinning] = useState(false);
@@ -867,7 +881,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                           const currentIndex = allImageUrls.findIndex(url => url === image.url);
 
                                           // Pass all images and the current index to the zoom dialog
-                                          setZoomedImage(image.url, allImageUrls, currentIndex);
+                                          setZoomedImage?.(image.url, allImageUrls, currentIndex);
                                         }}
                                       >
                                         <ZoomInIcon sx={{ color: 'white', fontSize: 32 }} />

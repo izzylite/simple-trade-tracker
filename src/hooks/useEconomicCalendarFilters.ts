@@ -32,7 +32,7 @@ interface UseEconomicCalendarFiltersOptions {
   onUpdateCalendarProperty?: (
     calendarId: string,
     updater: (cal: Calendar) => Calendar
-  ) => Promise<void>;
+  ) => Promise<Calendar | undefined | void>;
 }
 
 interface UseEconomicCalendarFiltersResult {

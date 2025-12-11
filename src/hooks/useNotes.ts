@@ -75,7 +75,7 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
     calendarId,
     isOpen,
     activeTab,
-    searchQuery = '',
+    searchQuery = null,
     selectedCalendarFilter = 'all',
     creatorFilter,
     notesPerPage = 20,
@@ -98,12 +98,12 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
     selectedCalendarFilter,
     creatorFilter,
     calendarId,
+    searchQuery,
   });
 
   const loadNotes = useCallback(
     async (reset: boolean = false) => {
       if (!userId) return;
-
       try {
         if (reset) {
           if(notes.length == 0) {
@@ -208,6 +208,7 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
 
     if (filtersChanged) {
       prevFiltersRef.current = {
+        ...prevFiltersRef.current,
         activeTab,
         selectedCalendarFilter,
         creatorFilter,
@@ -224,11 +225,15 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
     loadNotes,
   ]);
 
-  // Debounced search effect
+  // Debounced search effect - only runs when searchQuery actually changes
   useEffect(() => {
     if (!isOpen || !hasLoadedRef.current) return;
 
+    // Only trigger if searchQuery actually changed from previous value
+    if (prevFiltersRef.current.searchQuery === searchQuery) return;
+
     const timeout = setTimeout(() => {
+      prevFiltersRef.current.searchQuery = searchQuery;
       loadNotes(true);
     }, 500); // 500ms debounce
 

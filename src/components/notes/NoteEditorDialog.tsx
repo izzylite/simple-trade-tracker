@@ -3,7 +3,7 @@
  * Full-screen dialog for creating/editing notes
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -44,7 +44,8 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
-import RichTextEditor from '../common/RichTextEditor';
+import RichTextEditor, { RichTextEditorHandle } from '../common/RichTextEditor';
+import EditorToolbar from '../common/RichTextEditor/components/EditorToolbar';
 import ImagePickerDialog from '../heroImage/ImagePickerDialog';
 import ConfirmationDialog from '../common/ConfirmationDialog';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
@@ -89,6 +90,22 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   const theme = useTheme();
   const { user } = useAuth();
   const fullScreen = useMediaQuery(theme.breakpoints.down('md'));
+
+  // Ref for external toolbar control
+  const editorRef = useRef<RichTextEditorHandle>(null);
+  const [isToolbarMenuOpen, setIsToolbarMenuOpen] = useState(false);
+  const [editorMounted, setEditorMounted] = useState(false);
+
+  // Force re-render when editor mounts to access the ref
+  useEffect(() => {
+    if (open) {
+      // Small delay to ensure editor is mounted
+      const timer = setTimeout(() => setEditorMounted(true), 50);
+      return () => clearTimeout(timer);
+    } else {
+      setEditorMounted(false);
+    }
+  }, [open]);
 
   const [note, setNote] = useState<Note | null>(null);
   const [title, setTitle] = useState<string>('');
@@ -407,6 +424,29 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
             <CloseIcon />
           </IconButton>
         </Toolbar>
+
+        {/* Editor Toolbar - sticky in header area */}
+        {editorMounted && editorRef.current && (
+          <EditorToolbar
+            editorState={editorRef.current.editorState}
+            disabled={false}
+            variant="sticky"
+            stickyPosition="top"
+            toolbarRef={editorRef.current.toolbarRef}
+            onToggleInlineStyle={(style) => editorRef.current?.toggleInlineStyle(style)}
+            onToggleBlockType={(blockType) => editorRef.current?.toggleBlockType(blockType)}
+            onApplyTextColor={(color) => editorRef.current?.applyTextColor(color)}
+            onApplyBackgroundColor={(color) => editorRef.current?.applyBackgroundColor(color)}
+            onApplyHeading={(heading) => editorRef.current?.applyHeading(heading)}
+            onClearFormatting={() => editorRef.current?.clearFormatting()}
+            onLinkClick={() => editorRef.current?.handleLinkClick()}
+            onImageClick={() => editorRef.current?.handleImageClick()}
+            onMenuOpenChange={(isOpen) => {
+              setIsToolbarMenuOpen(isOpen);
+              editorRef.current?.setIsMenuOpen(isOpen);
+            }}
+          />
+        )}
 
         <DialogContent
           sx={{
@@ -820,12 +860,14 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
 
             {/* Content */}
             <RichTextEditor
+              ref={editorRef}
               value={content}
               onChange={setContent}
               placeholder="Document your emotions, game plan, lessons learned, or trading insights..."
               minHeight={300}
               maxLength={5000}
               hideCharacterCount={true}
+              toolbarVariant="none"
             />
           </Box>
         </DialogContent>

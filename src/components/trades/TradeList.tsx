@@ -37,62 +37,74 @@ import { TradeListItem, TradeInfo, TradeActions } from '../StyledComponents';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { useTheme } from '@mui/material/styles';
 import TradeDetailExpanded from '../TradeDetailExpanded';
-import { EconomicCalendarFilterSettings } from '../economicCalendar/EconomicCalendarDrawer';
+import { TradeOperationsProps } from '../../types/tradeOperations';
 
 interface TradeListProps {
+  // Component-specific props
   trades: Trade[];
   expandedTradeId: string | null;
   onTradeClick: (tradeId: string) => void;
-  onEditClick: (trade: Trade) => void;
-  onDeleteClick: (tradeId: string) => void;
-  onDeleteMultiple?: (tradeIds: string[]) => void; // New prop for bulk deletion
-  onZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
+  hideActions?: boolean;
+  enableBulkSelection?: boolean;
+  sx?: SxProps<Theme>;
+  initialPageSize?: number;
+  pageSize?: number;
+
+  // Trade operations - can be passed as object or individual props
+  tradeOperations?: TradeOperationsProps;
+
+  // Individual props (for backward compatibility, tradeOperations takes precedence)
+  onEditClick?: (trade: Trade) => void;
+  onDeleteClick?: (tradeId: string) => void;
+  onDeleteMultiple?: (tradeIds: string[]) => void;
+  onZoomedImage?: (url: string, allImages?: string[], initialIndex?: number) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
-  economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
-  hideActions?: boolean; // New prop to hide edit/delete buttons
-  enableBulkSelection?: boolean; // New prop to enable bulk selection
-  sx?: SxProps<Theme>; // Allow styling from parent component
-  deletingTradeIds?: string[]; // IDs of trades currently being deleted
-  isTradeUpdating?: (tradeId: string) => boolean; // Function to check if trade is being updated
-  calendarId?: string; // Calendar ID for sharing functionality
-  // Optional props for trade link navigation in notes
+  deletingTradeIds?: string[];
+  isTradeUpdating?: (tradeId: string) => boolean;
+  calendarId?: string;
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
-  // Open AI chat for a specific trade
   onOpenAIChat?: (trade: Trade) => void;
-  // Calendar data for economic events filtering
-  calendar?: {
-    economic_calendar_filters?: {
-      currencies: string[];
-      impacts: string[];
-      viewType: 'day' | 'week' | 'month';
-    };
-  };
-  // Pagination props
-  initialPageSize?: number; // Number of trades to show initially (default: 20)
-  pageSize?: number; // Number of trades to load per "Load More" click (default: 20)
+  economicFilter?: TradeOperationsProps['economicFilter'];
+  calendar?: TradeOperationsProps['calendar'];
 }
 
 const TradeList: React.FC<TradeListProps> = ({
   trades,
   expandedTradeId,
   onTradeClick,
-  onEditClick,
-  onDeleteClick,
-  onDeleteMultiple,
-  onZoomedImage,
-  onUpdateTradeProperty,
-  hideActions = false, // Default to showing actions
-  enableBulkSelection = false, // Default to disabled
+  hideActions = false,
+  enableBulkSelection = false,
   sx,
-  deletingTradeIds = [],
-  isTradeUpdating,
-  calendarId,
-  onOpenGalleryMode,
-  onOpenAIChat,
-  economicFilter,
   initialPageSize = 20,
-  pageSize = 20
+  pageSize = 20,
+  tradeOperations,
+  // Individual props (fallback if tradeOperations not provided)
+  onEditClick: onEditClickProp,
+  onDeleteClick: onDeleteClickProp,
+  onDeleteMultiple: onDeleteMultipleProp,
+  onZoomedImage: onZoomedImageProp,
+  onUpdateTradeProperty: onUpdateTradePropertyProp,
+  deletingTradeIds: deletingTradeIdsProp = [],
+  isTradeUpdating: isTradeUpdatingProp,
+  calendarId: calendarIdProp,
+  onOpenGalleryMode: onOpenGalleryModeProp,
+  onOpenAIChat: onOpenAIChatProp,
+  economicFilter: economicFilterProp,
+  calendar: calendarProp
 }) => {
+  // Extract from tradeOperations or use individual props
+  const onEditClick = tradeOperations?.onEditTrade || onEditClickProp;
+  const onDeleteClick = tradeOperations?.onDeleteTrade || onDeleteClickProp;
+  const onDeleteMultiple = tradeOperations?.onDeleteMultipleTrades || onDeleteMultipleProp;
+  const onZoomedImage = tradeOperations?.onZoomImage || onZoomedImageProp;
+  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
+  const deletingTradeIds = tradeOperations?.deletingTradeIds || deletingTradeIdsProp;
+  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
+  const calendarId = tradeOperations?.calendarId || calendarIdProp;
+  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
+  const onOpenAIChat = tradeOperations?.onOpenAIChat || onOpenAIChatProp;
+  const economicFilter = tradeOperations?.economicFilter || economicFilterProp;
+  const calendar = tradeOperations?.calendar || calendarProp;
   const theme = useTheme();
   const [selectedTradeIds, setSelectedTradeIds] = useState<string[]>([]);
   const [displayedCount, setDisplayedCount] = useState<number>(initialPageSize);
@@ -116,12 +128,12 @@ const TradeList: React.FC<TradeListProps> = ({
   };
 
   const handleEditSelected = () => {
-    if (menuTrade) onEditClick(menuTrade);
+    if (menuTrade && onEditClick) onEditClick(menuTrade);
     handleCloseMenu();
   };
 
   const handleDeleteSelected = () => {
-    if (menuTrade) onDeleteClick(menuTrade.id);
+    if (menuTrade && onDeleteClick) onDeleteClick(menuTrade.id);
     handleCloseMenu();
   };
 
@@ -520,10 +532,11 @@ const TradeList: React.FC<TradeListProps> = ({
                   tradeData={trade}
                   animate={true}
                   isExpanded={true}
+                  trades={trades}
+                  tradeOperations={tradeOperations}
                   setZoomedImage={onZoomedImage}
                   onUpdateTradeProperty={onUpdateTradeProperty}
                   calendarId={calendarId}
-                  trades={trades}
                   onOpenGalleryMode={onOpenGalleryMode}
                   economicFilter={economicFilter}
                   onOpenAIChat={onOpenAIChat}

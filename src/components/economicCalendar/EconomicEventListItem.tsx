@@ -336,7 +336,6 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
               size="small"
               sx={{
                 height: 20,
-                maxWidth : 40,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 fontSize: '0.5rem',

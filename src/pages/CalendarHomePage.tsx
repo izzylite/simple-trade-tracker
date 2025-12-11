@@ -60,7 +60,6 @@ import {
   DeleteForever as DeleteForeverIcon,
   Schedule as ScheduleIcon,
   Warning as WarningIcon,
-  SmartToy as SmartToyIcon,
   Home as HomeIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
@@ -86,7 +85,6 @@ import {
   getDaysUntilDeletion,
   TrashCalendar
 } from '../services/trashService';
-import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import { Trade } from '../types/dualWrite';
 import { TradeRepository } from '../services/repository/repositories/TradeRepository';
 import { CalendarManagementProps } from '../App';
@@ -147,31 +145,8 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
   // Trades for the selected calendar
   const [calendarTrades, setCalendarTrades] = useState<Trade[]>([]);
 
-  // AI Chat drawer state
-  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
-  const [allTrades, setAllTrades] = useState<Trade[]>([]);
-  const [zoomedImage, setZoomedImage] = useState<string>('');
-
   // Use external loading state if provided, otherwise use internal loading state
   const isLoading = externalLoading !== undefined ? externalLoading : false;
-
-  // Load all trades when AI chat opens
-  useEffect(() => {
-    const fetchAllTrades = async () => {
-      if (!isAIChatOpen || !user?.uid) return;
-
-      try {
-        const tradeRepository = new TradeRepository();
-        const trades = await tradeRepository.findByUserId(user.uid);
-        setAllTrades(trades);
-      } catch (error) {
-        logger.error('Error fetching trades for AI chat:', error);
-        setAllTrades([]);
-      }
-    };
-
-    fetchAllTrades();
-  }, [isAIChatOpen, user?.uid]);
 
   // Load trash calendars when trash tab is active
   useEffect(() => {
@@ -1212,43 +1187,6 @@ export const CalendarHome: React.FC<CalendarHomeProps> = ({
         )}
         </Box>
       </Box>
-
-      {/* AI Chat Drawer */}
-      {calendars.length > 0 && (
-        <AIChatDrawer
-          open={isAIChatOpen}
-          onClose={() => setIsAIChatOpen(false)}
-          trades={allTrades}
-          calendar={calendars[0]}
-          onOpenGalleryMode={() => {}}
-          onUpdateTradeProperty={() => Promise.resolve(undefined)}
-          onEditTrade={() => {}}
-          onDeleteTrade={() => {}}
-          onDeleteMultipleTrades={() => {}}
-          onZoomImage={setZoomedImage}
-          onUpdateCalendarProperty={() => Promise.resolve(undefined)}
-          isReadOnly={false}
-        />
-      )}
-
-      {/* AI Chat FAB */}
-      {user && (
-        <Tooltip title="AI Trading Assistant" placement="left">
-          <Fab
-            color="secondary"
-            aria-label="open ai chat"
-            onClick={() => setIsAIChatOpen(true)}
-            sx={{
-              position: 'fixed',
-              bottom: { xs: 88, sm: 96 },
-              right: { xs: 16, sm: 24 },
-              zIndex: 1200
-            }}
-          >
-            <SmartToyIcon />
-          </Fab>
-        </Tooltip>
-      )}
 
       {/* Floating Action Button */}
       {user && (

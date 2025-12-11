@@ -31,23 +31,28 @@ import { economicCalendarService } from '../services/economicCalendarService';
 import { logger } from '../utils/logger';
 import TradeCard from './aiChat/TradeCard';
 import RoundedTabs, { TabPanel } from './common/RoundedTabs';
+import { TradeOperationsProps } from '../types/tradeOperations';
 
 interface PinnedTradesDrawerProps {
   open: boolean;
   onClose: () => void;
   trades: Trade[];
   calendar?: Calendar;
-  onTradeClick?: (trade: Trade,trades: Trade[],title : string) => void;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: any) => any) => Promise<Calendar | undefined>;
-  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
-  // Trade operation callbacks for EconomicEventDetailDialog
-  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
-  onEditTrade?: (trade: Trade) => void;
-  onDeleteTrade?: (tradeId: string) => void;
-  onDeleteMultipleTrades?: (tradeIds: string[]) => void;
-  onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
-  // Read-only mode for shared calendars
+  onTradeClick?: (trade: Trade, trades: Trade[], title: string) => void;
   isReadOnly?: boolean;
+
+  // Trade operations - can be passed as object or individual props
+  tradeOperations?: TradeOperationsProps;
+
+  // Individual props (for backward compatibility)
+  onUpdateCalendarProperty?: TradeOperationsProps['onUpdateCalendarProperty'];
+  onOpenGalleryMode?: TradeOperationsProps['onOpenGalleryMode'];
+  onUpdateTradeProperty?: TradeOperationsProps['onUpdateTradeProperty'];
+  onEditTrade?: TradeOperationsProps['onEditTrade'];
+  onDeleteTrade?: TradeOperationsProps['onDeleteTrade'];
+  onDeleteMultipleTrades?: TradeOperationsProps['onDeleteMultipleTrades'];
+  onZoomImage?: TradeOperationsProps['onZoomImage'];
+  isTradeUpdating?: TradeOperationsProps['isTradeUpdating'];
 }
 
 const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
@@ -56,15 +61,27 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   trades,
   calendar,
   onTradeClick,
-  onUpdateCalendarProperty,
-  onOpenGalleryMode,
-  onUpdateTradeProperty,
-  onEditTrade,
-  onDeleteTrade,
-  onDeleteMultipleTrades,
-  onZoomImage,
-  isReadOnly = false
+  isReadOnly = false,
+  tradeOperations,
+  // Individual props (fallback if tradeOperations not provided)
+  onUpdateCalendarProperty: onUpdateCalendarPropertyProp,
+  onOpenGalleryMode: onOpenGalleryModeProp,
+  onUpdateTradeProperty: onUpdateTradePropertyProp,
+  onEditTrade: onEditTradeProp,
+  onDeleteTrade: onDeleteTradeProp,
+  onDeleteMultipleTrades: onDeleteMultipleTradesProp,
+  onZoomImage: onZoomImageProp,
+  isTradeUpdating: isTradeUpdatingProp
 }) => {
+  // Extract from tradeOperations or use individual props
+  const onUpdateCalendarProperty = tradeOperations?.onUpdateCalendarProperty || onUpdateCalendarPropertyProp;
+  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
+  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
+  const onEditTrade = tradeOperations?.onEditTrade || onEditTradeProp;
+  const onDeleteTrade = tradeOperations?.onDeleteTrade || onDeleteTradeProp;
+  const onDeleteMultipleTrades = tradeOperations?.onDeleteMultipleTrades || onDeleteMultipleTradesProp;
+  const onZoomImage = tradeOperations?.onZoomImage || onZoomImageProp;
+  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
   const theme = useTheme();
 
   // Tab state
@@ -434,12 +451,14 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
           }}
           event={selectedEvent}
           trades={trades}
+          tradeOperations={tradeOperations}
           onUpdateTradeProperty={onUpdateTradeProperty}
           onEditTrade={onEditTrade}
           onDeleteTrade={onDeleteTrade}
           onDeleteMultipleTrades={onDeleteMultipleTrades}
           onZoomImage={onZoomImage}
           onOpenGalleryMode={onOpenGalleryMode}
+          isTradeUpdating={isTradeUpdating}
           calendarId={calendar.id}
           calendar={calendar}
           onUpdateCalendarProperty={onUpdateCalendarProperty}

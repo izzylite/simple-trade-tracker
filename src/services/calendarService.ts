@@ -85,10 +85,16 @@ export const getCalendarStats = (calendar: Calendar): CalendarStats => {
     yearly_progress: calendar.target_progress || 0,
     current_balance: calendar.current_balance || calendar.account_balance || 0,
     initial_balance: calendar.account_balance || 0,
-    win_count: calendar.win_count || 0,  
-    loss_count: calendar.loss_count || 0, 
+    win_count: calendar.win_count || 0,
+    loss_count: calendar.loss_count || 0,
     target_progress: calendar.target_progress || 0,
-    pnl_performance: calendar.pnl_performance || 0
+    pnl_performance: calendar.pnl_performance || 0,
+    weekly_pnl: calendar.weekly_pnl || 0,
+    monthly_pnl: calendar.monthly_pnl || 0,
+    yearly_pnl: calendar.yearly_pnl || 0,
+    weekly_pnl_percentage: calendar.weekly_pnl_percentage || 0,
+    monthly_pnl_percentage: calendar.monthly_pnl_percentage || 0,
+    yearly_pnl_percentage: calendar.yearly_pnl_percentage || 0
   };
 };
 

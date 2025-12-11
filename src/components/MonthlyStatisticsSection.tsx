@@ -27,6 +27,7 @@ import {
   getFilteredTrades
 } from '../utils/chartDataUtils';
 import { EconomicCalendarFilterSettings } from './economicCalendar/EconomicCalendarDrawer';
+import { TradeOperationsProps } from '../types/tradeOperations';
 
 interface MonthlyStatisticsSectionProps {
   trades: Trade[];
@@ -36,19 +37,23 @@ interface MonthlyStatisticsSectionProps {
   monthly_target?: number;
   calendarId: string;
   scoreSettings?: import('../types/score').ScoreSettings;
-  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
   dynamicRiskSettings?: DynamicRiskSettings;
-  allTags?: string[]; // Add allTags prop to receive calendar.tags
-  // Optional handlers for trade interactions
-  onEditTrade?: (trade: Trade) => void;
-  onDeleteTrade?: (tradeId: string) => void;
-  onDeleteMultipleTrades?: (tradeIds: string[]) => void;
-  // Read-only mode for shared calendars
+  allTags?: string[];
   isReadOnly?: boolean;
-  onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
-  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
-  economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
+
+  // Trade operations - can be passed as object or individual props
+  tradeOperations?: TradeOperationsProps;
+
+  // Individual props (for backward compatibility)
+  onUpdateTradeProperty?: TradeOperationsProps['onUpdateTradeProperty'];
+  onUpdateCalendarProperty?: TradeOperationsProps['onUpdateCalendarProperty'];
+  onEditTrade?: TradeOperationsProps['onEditTrade'];
+  onDeleteTrade?: TradeOperationsProps['onDeleteTrade'];
+  onDeleteMultipleTrades?: TradeOperationsProps['onDeleteMultipleTrades'];
+  onZoomImage?: TradeOperationsProps['onZoomImage'];
+  onOpenGalleryMode?: TradeOperationsProps['onOpenGalleryMode'];
+  economicFilter?: TradeOperationsProps['economicFilter'];
+  isTradeUpdating?: TradeOperationsProps['isTradeUpdating'];
 }
 
 interface MultipleTradesDialog {
@@ -66,18 +71,31 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   monthly_target,
   calendarId,
   scoreSettings,
-  onUpdateTradeProperty,
-  onUpdateCalendarProperty,
   dynamicRiskSettings,
   allTags: propAllTags,
-  onEditTrade,
-  onDeleteTrade,
-  onDeleteMultipleTrades,
-  onZoomImage,
-  onOpenGalleryMode,
-  economicFilter,
-  isReadOnly = false
+  isReadOnly = false,
+  tradeOperations,
+  // Individual props (fallback if tradeOperations not provided)
+  onUpdateTradeProperty: onUpdateTradePropertyProp,
+  onUpdateCalendarProperty: onUpdateCalendarPropertyProp,
+  onEditTrade: onEditTradeProp,
+  onDeleteTrade: onDeleteTradeProp,
+  onDeleteMultipleTrades: onDeleteMultipleTradesProp,
+  onZoomImage: onZoomImageProp,
+  onOpenGalleryMode: onOpenGalleryModeProp,
+  economicFilter: economicFilterProp,
+  isTradeUpdating: isTradeUpdatingProp
 }) => {
+  // Extract from tradeOperations or use individual props
+  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
+  const onUpdateCalendarProperty = tradeOperations?.onUpdateCalendarProperty || onUpdateCalendarPropertyProp;
+  const onEditTrade = tradeOperations?.onEditTrade || onEditTradeProp;
+  const onDeleteTrade = tradeOperations?.onDeleteTrade || onDeleteTradeProp;
+  const onDeleteMultipleTrades = tradeOperations?.onDeleteMultipleTrades || onDeleteMultipleTradesProp;
+  const onZoomImage = tradeOperations?.onZoomImage || onZoomImageProp;
+  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
+  const economicFilter = tradeOperations?.economicFilter || economicFilterProp;
+  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
   const [multipleTradesDialog, setMultipleTradesDialog] = useState<MultipleTradesDialog>({
@@ -258,7 +276,6 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         onClose={() => setMultipleTradesDialog(prev => ({ ...prev, open: false }))}
         trades={multipleTradesDialog.trades}
         date={multipleTradesDialog.date}
-
         expandedTradeId={multipleTradesDialog.expandedTradeId}
         onTradeExpand={(tradeId) =>
           setMultipleTradesDialog(prev => ({
@@ -266,15 +283,18 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
             expandedTradeId: prev.expandedTradeId === tradeId ? null : tradeId
           }))
         }
-        onUpdateTradeProperty={onUpdateTradeProperty}
-        onZoomImage={onZoomImage || (() => { })}
         account_balance={accountBalance}
         allTrades={trades}
+        tradeOperations={tradeOperations}
+        onUpdateTradeProperty={onUpdateTradeProperty}
         onEditClick={onEditTrade}
         onDeleteClick={onDeleteTrade}
         onDeleteMultiple={onDeleteMultipleTrades}
+        onZoomImage={onZoomImage}
         onOpenGalleryMode={onOpenGalleryMode}
         economicFilter={economicFilter}
+        isTradeUpdating={isTradeUpdating}
+        calendarId={calendarId}
       />
 
       {/* Performance Details Dialog */}

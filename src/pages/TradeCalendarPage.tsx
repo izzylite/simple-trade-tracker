@@ -104,6 +104,7 @@ import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
 import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
 import EconomicCalendarDrawer, { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
 import { useEconomicEventWatcher, useEconomicEventsUpdates } from '../hooks/useEconomicEventWatcher';
+import { TradeOperationsProps } from '../types/tradeOperations';
 import EconomicEventNotification from '../components/notifications/EconomicEventNotification';
 import { EconomicEvent } from '../types/economicCalendar';
 import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
@@ -1110,7 +1111,50 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     });
   };
 
+  // Handler for editing a trade - used across multiple components
+  const handleEditTrade = useCallback((trade: Trade) => {
+    setNewTrade(() => (createEditTradeData(trade)));
+    setShowAddForm({
+      open: true,
+      trade_date: new Date(trade.trade_date),
+      editTrade: trade,
+      createTempTrade: false,
+      showDayDialogWhenDone: false
+    });
+  }, []);
 
+  // Create a unified tradeOperations object for all trade-related operations
+  const tradeOperations: TradeOperationsProps = useMemo(() => ({
+    onUpdateTradeProperty: isReadOnly ? undefined : handleUpdateTradeProperty,
+    onEditTrade: isReadOnly ? undefined : handleEditTrade,
+    onDeleteTrade: isReadOnly ? undefined : handleDeleteClick,
+    onDeleteMultipleTrades: isReadOnly ? undefined : handleDeleteMultipleTrades,
+    onZoomImage: setZoomedImage,
+    onOpenGalleryMode: openGalleryMode,
+    onOpenAIChat: isReadOnly ? undefined : (trade) => openGalleryModeAI(trades, trade.id, trade.name),
+    onUpdateCalendarProperty: isReadOnly ? undefined : onUpdateCalendarProperty,
+    isTradeUpdating,
+    deletingTradeIds,
+    calendarId: calendarId || undefined,
+    calendar,
+    isReadOnly,
+    economicFilter: (_calendarId) => calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
+  }), [
+    isReadOnly,
+    handleUpdateTradeProperty,
+    handleEditTrade,
+    handleDeleteClick,
+    handleDeleteMultipleTrades,
+    setZoomedImage,
+    openGalleryMode,
+    openGalleryModeAI,
+    trades,
+    onUpdateCalendarProperty,
+    isTradeUpdating,
+    deletingTradeIds,
+    calendarId,
+    calendar
+  ]);
 
   return (
     <Box sx={{
@@ -1649,25 +1693,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             monthly_target={monthly_target}
             calendarId={calendarId!!}
             scoreSettings={scoreSettings}
-            onUpdateTradeProperty={isReadOnly ? undefined : handleUpdateTradeProperty}
-            onUpdateCalendarProperty={isReadOnly ? undefined : onUpdateCalendarProperty}
             dynamicRiskSettings={dynamicRiskSettings}
             allTags={allTags}
-            onEditTrade={isReadOnly ? undefined : (trade) => {
-              // Use the same edit handler as in DayDialog
-              setNewTrade(() => (createEditTradeData(trade)));
-              setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
-            }}
-            onDeleteTrade={isReadOnly ? undefined : (tradeId) => {
-              // Use the same delete handler as in DayDialog
-              handleDeleteClick(tradeId);
-            }}
-            onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
-            onZoomImage={(imageUrl, allImages, initialIndex) => {
-              setZoomedImage(imageUrl, allImages, initialIndex);
-            }}
-            onOpenGalleryMode={openGalleryMode}
-            economicFilter={(_calendarId) => calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS}
+            isReadOnly={isReadOnly}
+            tradeOperations={tradeOperations}
           />
 
 
@@ -1914,18 +1943,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             setPinnedTradesDrawerOpen(false);
             openGalleryMode(allTrades, trade.id, title);
           }}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
-          onUpdateTradeProperty={isReadOnly ? undefined : handleUpdateTradeProperty}
-          onEditTrade={isReadOnly ? undefined : (trade) => {
-            // Use the same edit handler as in DayDialog
-            setNewTrade(() => (createEditTradeData(trade)));
-            setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
-          }}
-          onDeleteTrade={isReadOnly ? undefined : handleDeleteClick}
-          onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
-          onZoomImage={setZoomedImage}
-          onOpenGalleryMode={openGalleryMode}
           isReadOnly={isReadOnly}
+          tradeOperations={tradeOperations}
         />
 
         {/* Trade Gallery Dialog */}
@@ -1934,27 +1953,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onClose={closeGalleryMode}
           trades={galleryMode.trades}
           initialTradeId={galleryMode.initialTradeId}
-          onUpdateTradeProperty={handleUpdateTradeProperty}
           setZoomedImage={setZoomedImage}
           title={galleryMode.title}
           calendarId={calendarId}
-          onOpenGalleryMode={openGalleryMode}
           calendar={calendar}
           aiOnlyMode={galleryMode.aiOnlyMode}
-          onEditTrade={isReadOnly ? undefined : (trade) => {
-            setNewTrade(() => (createEditTradeData(trade)));
-            setShowAddForm({
-              open: true,
-              trade_date: new Date(trade.trade_date),
-              editTrade: trade,
-              createTempTrade: false,
-              showDayDialogWhenDone: false
-            });
-          }}
-          onDeleteTrade={isReadOnly ? undefined : (tradeId) => handleDeleteTrades([tradeId])}
-          onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
           isReadOnly={isReadOnly}
+          tradeOperations={tradeOperations}
         />
 
 
@@ -1975,19 +1980,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         onClose={() => setIsEconomicCalendarOpen(false)}
         calendar={calendar!}
         trades={trades}
-        onUpdateCalendarProperty={onUpdateCalendarProperty}
-        onOpenGalleryMode={openGalleryMode}
         payload={economicCalendarUpdatedEvent}
-        onUpdateTradeProperty={isReadOnly ? undefined : handleUpdateTradeProperty}
-        onEditTrade={isReadOnly ? undefined : (trade) => {
-          // Use the same edit handler as in DayDialog
-          setNewTrade(() => (createEditTradeData(trade)));
-          setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
-        }}
-        onDeleteTrade={isReadOnly ? undefined : handleDeleteClick}
-        onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
-        onZoomImage={setZoomedImage}
         isReadOnly={isReadOnly}
+        tradeOperations={tradeOperations}
       />
 
       {/* AI Chat Drawer */}
@@ -1996,18 +1991,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         onClose={() => setIsAIChatOpen(false)}
         trades={trades}
         calendar={calendar!}
-        onOpenGalleryMode={openGalleryMode}
-        onUpdateTradeProperty={isReadOnly ? undefined : handleUpdateTradeProperty}
-        onEditTrade={isReadOnly ? undefined : (trade) => {
-          // Use the same edit handler as in DayDialog
-          setNewTrade(() => (createEditTradeData(trade)));
-          setShowAddForm({ open: true, trade_date: new Date(trade.trade_date), editTrade: trade, createTempTrade: false, showDayDialogWhenDone: false });
-        }}
-        onDeleteTrade={isReadOnly ? undefined : handleDeleteClick}
-        onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
-        onZoomImage={setZoomedImage}
-        onUpdateCalendarProperty={onUpdateCalendarProperty}
         isReadOnly={isReadOnly}
+        tradeOperations={tradeOperations}
       />
 
       {/* Notes Drawer */}

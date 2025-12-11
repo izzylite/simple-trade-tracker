@@ -133,8 +133,7 @@ async function parseJsonBody(req: Request): Promise<unknown> {
     if (!supabaseUrl || !serviceRoleKey) {
       throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
     }
-    // For internal edge function calls, use only the apikey header with service role key
-    // Avoid using Authorization: Bearer which triggers JWT validation at the gateway
+    // For internal edge function calls, use both apikey and Authorization headers
     const processResponse = await fetch(
       `${supabaseUrl}/functions/v1/process-economic-events`,
       {
@@ -142,6 +141,7 @@ async function parseJsonBody(req: Request): Promise<unknown> {
         headers: {
           "Content-Type": "application/json",
           "apikey": serviceRoleKey,
+          "Authorization": `Bearer ${serviceRoleKey}`,
         },
         body: JSON.stringify({
           htmlContent: html,
@@ -200,7 +200,8 @@ async function parseJsonBody(req: Request): Promise<unknown> {
         );
         continue;
       }
-      const row = {
+      // Build row with only non-null value fields to avoid overwriting existing data
+      const row: Record<string, unknown> = {
         external_id: e.external_id,
         currency: e.currency,
         event_name: e.event_name,
@@ -211,9 +212,6 @@ async function parseJsonBody(req: Request): Promise<unknown> {
           : null,
         time_utc: e.time_utc ?? null,
         unix_timestamp: e.unix_timestamp ?? null,
-        actual_value: e.actual ?? null,
-        forecast_value: e.forecast ?? null,
-        previous_value: e.previous ?? null,
         country: e.country ?? null,
         flag_code: e.flag_code ?? null,
         flag_url: e.flag_url ?? null,
@@ -221,6 +219,14 @@ async function parseJsonBody(req: Request): Promise<unknown> {
         data_source: e.source ?? "myfxbook",
         last_updated: new Date().toISOString(),
       };
+      // Only include value fields if they have data - prevents overwriting existing values with null
+      if (e.actual) row.actual_value = e.actual;
+      if (e.forecast) row.forecast_value = e.forecast;
+      if (e.previous) row.previous_value = e.previous;
+      // Also check for _value suffixed properties (from process-economic-events)
+      if (e.actual_value) row.actual_value = e.actual_value;
+      if (e.forecast_value) row.forecast_value = e.forecast_value;
+      if (e.previous_value) row.previous_value = e.previous_value;
       const { data, error } = await supabase.from("economic_events").upsert(
         row,
         {

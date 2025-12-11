@@ -4,6 +4,7 @@
  */
 
 import { Calendar } from "./calendar";
+import { TradeOperationsProps } from "./tradeOperations";
 
 export type ImpactLevel = 'Low' | 'Medium' | 'High' | 'Holiday' | 'Non-Economic';
 
@@ -102,19 +103,25 @@ export interface EconomicCalendarProps {
 }
 
 export interface EconomicCalendarDrawerProps {
+  // Component-specific props
   open: boolean;
   onClose: () => void;
-  calendar : Calendar // Calendar type from calendar.ts
-  trades?: any[]; // Trades for event detail dialog
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: any) => any) => Promise<any>;
-  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
-  payload?: {updatedEvents : EconomicEvent[], allEvents : EconomicEvent[]} | null; // For real-time event updates
-  // Trade operation callbacks for EconomicEventDetailDialog
-  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: any) => any) => Promise<any>;
-  onEditTrade?: (trade: any) => void;
-  onDeleteTrade?: (tradeId: string) => void;
-  onDeleteMultipleTrades?: (tradeIds: string[]) => void;
-  onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
+  calendar: Calendar;
+  trades?: any[];
+  payload?: { updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null;
+
+  // Trade operations - can be passed as object or individual props
+  tradeOperations?: TradeOperationsProps;
+
+  // Individual props (for backward compatibility)
+  onUpdateCalendarProperty?: TradeOperationsProps['onUpdateCalendarProperty'];
+  onOpenGalleryMode?: TradeOperationsProps['onOpenGalleryMode'];
+  onUpdateTradeProperty?: TradeOperationsProps['onUpdateTradeProperty'];
+  onEditTrade?: TradeOperationsProps['onEditTrade'];
+  onDeleteTrade?: TradeOperationsProps['onDeleteTrade'];
+  onDeleteMultipleTrades?: TradeOperationsProps['onDeleteMultipleTrades'];
+  onZoomImage?: TradeOperationsProps['onZoomImage'];
+  isTradeUpdating?: TradeOperationsProps['isTradeUpdating'];
   isReadOnly?: boolean;
 }
 

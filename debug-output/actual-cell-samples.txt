@@ -1,0 +1,113 @@
+Event: Manufacturing Production MoM
+            (Oct)
+Actual: 0.2%
+Result Type: neutral
+Cell Class:  calendarToggleCell
+Cell HTML:
+
+        <span class="actualCell">
+                                                                                                                                                    <span class="eventTdPopover dotted" data-original-title="Actual" data-content="As Expected">
+                        
+================================================================================
+
+Event: Industrial Production YoY
+            (Oct)
+Actual: 2.3%
+Result Type: good
+Cell Class: background-transparent-green calendarToggleCell
+Cell HTML:
+
+        <span class="actualCell">
+                                                                                                                                                    <span class="eventTdPopover dotted" data-original-title="Actual" data-content="A better than expected result (+3.5%)"
+================================================================================
+
+Event: Industrial Production YoY
+            (Oct)
+Actual: 3.3%
+Result Type: good
+Cell Class: background-transparent-green calendarToggleCell
+Cell HTML:
+
+        <span class="actualCell">
+                                                                                                                                                    <span class="eventTdPopover dotted" data-original-title="Actual" data-content="A better than expected result (+5.6%)"
+================================================================================
+
+Event: Industrial Production YoY
+            (Oct)
+Actual: -3.8%
+Result Type: bad
+Cell Class: background-transparent-red calendarToggleCell
+Cell HTML:
+
+        <span class="actualCell">
+                                                                                                                                                    <span class="eventTdPopover dotted" data-original-title="Actual" data-content="A worse than expected result (-1.8%)">
+================================================================================
+
+Event: Industrial Production MoM
+            (Oct)
+Actual: -1%
+Result Type: bad
+Cell Class: background-transparent-red calendarToggleCell
+Cell HTML:
+
+        <span class="actualCell">
+                                                                                                                                                    <span class="eventTdPopover dotted" data-original-title="Actual" data-content="A worse than expected result (-0.7%)">
+================================================================================
+
+Event: Industrial Production YoY
+            (Oct)
+Actual: -0.3%
+Result Type: bad
+Cell Class: background-transparent-red calendarToggleCell
+Cell HTML:
+
+        <span class="actualCell">
+                                                                                                                                                    <span class="eventTdPopover dotted" data-original-title="Actual" data-content="A worse than expected result (-0.5%)">
+================================================================================
+
+Event: Industrial Production YoY
+            (Oct)
+Actual: -2%
+Result Type: bad
+Cell Class: background-transparent-red calendarToggleCell
+Cell HTML:
+
+        <span class="actualCell">
+                                                                                                                                                    <span class="eventTdPopover dotted" data-original-title="Actual" data-content="A worse than expected result (-0.5%)">
+================================================================================
+
+Event: Treasury Gilt 2035 Auction
+Actual: 4.613%
+Result Type: 
+Cell Class:  calendarToggleCell
+Cell HTML:
+
+        <span class="actualCell">
+                                                                                            4.613%
+                                                    </span>
+    
+================================================================================
+
+Event: Industrial Production YoY
+            (Oct)
+Actual: 6.4%
+Result Type: good
+Cell Class: background-transparent-green calendarToggleCell
+Cell HTML:
+
+        <span class="actualCell">
+                                                                                                                                                    <span class="eventTdPopover dotted" data-original-title="Actual" data-content="A better than expected result (+1%)">
+
+================================================================================
+
+Event: Bond Auction
+Actual: 0.466
+Result Type: 
+Cell Class:  calendarToggleCell
+Cell HTML:
+
+        <span class="actualCell">
+                                                                                            0.466
+                                                    </span>
+    
+================================================================================
