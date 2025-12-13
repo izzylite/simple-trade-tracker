@@ -857,7 +857,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         name: trade.name,
         trade_type: trade.trade_type,
         trade_date: trade.trade_date.toISOString(),
-        session: trade.session,
+        session: trade.session || null, // Convert empty string to null for DB constraint
         amount: trade.amount,
         entry_price: trade.entry_price ?? null,
         exit_price: trade.exit_price ?? null,
@@ -914,7 +914,11 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
       // Call the transactional PostgreSQL function
       const { data, error } = await supabase.rpc("update_trade_with_tags", {
         p_trade_id: tradeId,
-        p_trade_updates: {...trade, trade_date: trade.trade_date.toISOString()},
+        p_trade_updates: {
+          ...trade,
+          trade_date: trade.trade_date.toISOString(),
+          session: trade.session || null, // Convert empty string to null for DB constraint
+        },
         p_calendar_id: calendarId,
       });
 
