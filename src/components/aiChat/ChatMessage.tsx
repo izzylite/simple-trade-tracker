@@ -27,7 +27,6 @@ import {
   CheckCircle as CheckIcon,
   Error as ErrorIcon,
   Schedule as ScheduleIcon,
-  Refresh as RefreshIcon,
   Edit as EditIcon
 } from '@mui/icons-material';
 import { ChatMessage as ChatMessageType } from '../../types/aiChat';
@@ -39,7 +38,6 @@ import { logger } from '../../utils/logger';
 interface ChatMessageProps {
   message: ChatMessageType;
   showTimestamp?: boolean;
-  onRetry?: (messageId: string) => void;
   isLatestMessage?: boolean;
   enableAnimation?: boolean;
   onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void;
@@ -52,7 +50,6 @@ interface ChatMessageProps {
 const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
   showTimestamp = true,
-  onRetry,
   isLatestMessage = false,
   enableAnimation = true,
   onTradeClick,
@@ -265,6 +262,39 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             }
           }}
         >
+          {/* Attached Images (for user messages) */}
+          {isUser && message.images && message.images.length > 0 && (
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 1,
+                mb: message.content ? 1.5 : 0
+              }}
+            >
+              {message.images.map((image, index) => (
+                <Box
+                  key={image.id || index}
+                  component="img"
+                  src={image.url}
+                  alt={image.name || `Attached image ${index + 1}`}
+                  sx={{
+                    maxWidth: '100%',
+                    maxHeight: 200,
+                    borderRadius: 2,
+                    objectFit: 'contain',
+                    backgroundColor: alpha(theme.palette.common.black, 0.1),
+                    cursor: 'pointer',
+                    '&:hover': {
+                      opacity: 0.9
+                    }
+                  }}
+                  onClick={() => window.open(image.url, '_blank')}
+                />
+              ))}
+            </Box>
+          )}
+
           {/* Message Content */}
           <Box
             sx={{
@@ -350,24 +380,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               gap: 0.5
             }}
           >
-            {/* Retry button for assistant messages */}
-            {isAssistant && onRetry && (
-              <Tooltip title="Regenerate response">
-                <IconButton
-                  size="small"
-                  onClick={() => onRetry(message.id)}
-                  sx={{
-                    backgroundColor: alpha(theme.palette.background.paper, 0.8),
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.background.paper, 0.9)
-                    }
-                  }}
-                >
-                  <RefreshIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-              </Tooltip>
-            )}
-
             {/* Edit button for user messages */}
             {isUser && onEdit && (
               <Tooltip title="Edit message">

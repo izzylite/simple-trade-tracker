@@ -66,18 +66,7 @@ interface TradeDetailExpandedProps {
   isExpanded: boolean;
   animate?: boolean;
   trades?: Array<{ id: string;[key: string]: any }>;
-
-  // Trade operations - can be passed as object or individual props
-  tradeOperations?: TradeOperationsProps;
-
-  // Individual props (for backward compatibility)
-  setZoomedImage?: (url: string, allImages?: string[], initialIndex?: number) => void;
-  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
-  economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
-  calendarId?: string;
-  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
-  onOpenAIChat?: (trade: Trade) => void;
-  isTradeUpdating?: (tradeId: string) => boolean;
+  tradeOperations: TradeOperationsProps;
 }
 
 // Define shimmer animation
@@ -119,24 +108,18 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   isExpanded,
   animate,
   trades,
-  tradeOperations,
-  // Individual props (fallback if tradeOperations not provided)
-  setZoomedImage: setZoomedImageProp,
-  onUpdateTradeProperty: onUpdateTradePropertyProp,
-  calendarId: calendarIdProp,
-  onOpenGalleryMode: onOpenGalleryModeProp,
-  economicFilter: economicFilterProp,
-  onOpenAIChat: onOpenAIChatProp,
-  isTradeUpdating: isTradeUpdatingProp
+  tradeOperations
 }) => {
-  // Extract from tradeOperations or use individual props
-  const setZoomedImage = tradeOperations?.onZoomImage || setZoomedImageProp;
-  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
-  const calendarId = tradeOperations?.calendarId || calendarIdProp;
-  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
-  const economicFilter = tradeOperations?.economicFilter || economicFilterProp;
-  const onOpenAIChat = tradeOperations?.onOpenAIChat || onOpenAIChatProp;
-  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
+  // Destructure from tradeOperations directly
+  const {
+    onZoomImage: setZoomedImage,
+    onUpdateTradeProperty,
+    calendarId,
+    onOpenGalleryMode,
+    economicFilter,
+    onOpenAIChat,
+    isTradeUpdating
+  } = tradeOperations;
 
   const theme = useTheme();
   const [trade, setTrade] = useState<Trade>(tradeData);

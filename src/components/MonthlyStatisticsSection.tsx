@@ -40,20 +40,7 @@ interface MonthlyStatisticsSectionProps {
   dynamicRiskSettings?: DynamicRiskSettings;
   allTags?: string[];
   isReadOnly?: boolean;
-
-  // Trade operations - can be passed as object or individual props
-  tradeOperations?: TradeOperationsProps;
-
-  // Individual props (for backward compatibility)
-  onUpdateTradeProperty?: TradeOperationsProps['onUpdateTradeProperty'];
-  onUpdateCalendarProperty?: TradeOperationsProps['onUpdateCalendarProperty'];
-  onEditTrade?: TradeOperationsProps['onEditTrade'];
-  onDeleteTrade?: TradeOperationsProps['onDeleteTrade'];
-  onDeleteMultipleTrades?: TradeOperationsProps['onDeleteMultipleTrades'];
-  onZoomImage?: TradeOperationsProps['onZoomImage'];
-  onOpenGalleryMode?: TradeOperationsProps['onOpenGalleryMode'];
-  economicFilter?: TradeOperationsProps['economicFilter'];
-  isTradeUpdating?: TradeOperationsProps['isTradeUpdating'];
+  tradeOperations: TradeOperationsProps;
 }
 
 interface MultipleTradesDialog {
@@ -74,28 +61,19 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
   dynamicRiskSettings,
   allTags: propAllTags,
   isReadOnly = false,
-  tradeOperations,
-  // Individual props (fallback if tradeOperations not provided)
-  onUpdateTradeProperty: onUpdateTradePropertyProp,
-  onUpdateCalendarProperty: onUpdateCalendarPropertyProp,
-  onEditTrade: onEditTradeProp,
-  onDeleteTrade: onDeleteTradeProp,
-  onDeleteMultipleTrades: onDeleteMultipleTradesProp,
-  onZoomImage: onZoomImageProp,
-  onOpenGalleryMode: onOpenGalleryModeProp,
-  economicFilter: economicFilterProp,
-  isTradeUpdating: isTradeUpdatingProp
+  tradeOperations
 }) => {
-  // Extract from tradeOperations or use individual props
-  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
-  const onUpdateCalendarProperty = tradeOperations?.onUpdateCalendarProperty || onUpdateCalendarPropertyProp;
-  const onEditTrade = tradeOperations?.onEditTrade || onEditTradeProp;
-  const onDeleteTrade = tradeOperations?.onDeleteTrade || onDeleteTradeProp;
-  const onDeleteMultipleTrades = tradeOperations?.onDeleteMultipleTrades || onDeleteMultipleTradesProp;
-  const onZoomImage = tradeOperations?.onZoomImage || onZoomImageProp;
-  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
-  const economicFilter = tradeOperations?.economicFilter || economicFilterProp;
-  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
+  const {
+    onUpdateTradeProperty,
+    onUpdateCalendarProperty,
+    onEditTrade,
+    onDeleteTrade,
+    onDeleteMultipleTrades,
+    onZoomImage,
+    onOpenGalleryMode,
+    economicFilter,
+    isTradeUpdating
+  } = tradeOperations;
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
   const [multipleTradesDialog, setMultipleTradesDialog] = useState<MultipleTradesDialog>({
@@ -286,15 +264,6 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
         account_balance={accountBalance}
         allTrades={trades}
         tradeOperations={tradeOperations}
-        onUpdateTradeProperty={onUpdateTradeProperty}
-        onEditClick={onEditTrade}
-        onDeleteClick={onDeleteTrade}
-        onDeleteMultiple={onDeleteMultipleTrades}
-        onZoomImage={onZoomImage}
-        onOpenGalleryMode={onOpenGalleryMode}
-        economicFilter={economicFilter}
-        isTradeUpdating={isTradeUpdating}
-        calendarId={calendarId}
       />
 
       {/* Performance Details Dialog */}
@@ -336,11 +305,11 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
             monthlyTarget={monthly_target}
             calendarIds={[calendarId]}
             scoreSettings={scoreSettings}
-            onUpdateTradeProperty={onUpdateTradeProperty}
-            onUpdateCalendarProperty={onUpdateCalendarProperty}
             dynamicRiskSettings={dynamicRiskSettings}
             onEditTrade={onEditTrade}
             onDeleteTrade={onDeleteTrade}
+            onUpdateTradeProperty={onUpdateTradeProperty}
+            onUpdateCalendarProperty={onUpdateCalendarProperty}
             onOpenGalleryMode={onOpenGalleryMode}
             economicFilter={economicFilter}
           />

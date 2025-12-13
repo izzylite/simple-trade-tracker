@@ -103,25 +103,12 @@ export interface EconomicCalendarProps {
 }
 
 export interface EconomicCalendarDrawerProps {
-  // Component-specific props
   open: boolean;
   onClose: () => void;
   calendar: Calendar;
   trades?: any[];
   payload?: { updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null;
-
-  // Trade operations - can be passed as object or individual props
-  tradeOperations?: TradeOperationsProps;
-
-  // Individual props (for backward compatibility)
-  onUpdateCalendarProperty?: TradeOperationsProps['onUpdateCalendarProperty'];
-  onOpenGalleryMode?: TradeOperationsProps['onOpenGalleryMode'];
-  onUpdateTradeProperty?: TradeOperationsProps['onUpdateTradeProperty'];
-  onEditTrade?: TradeOperationsProps['onEditTrade'];
-  onDeleteTrade?: TradeOperationsProps['onDeleteTrade'];
-  onDeleteMultipleTrades?: TradeOperationsProps['onDeleteMultipleTrades'];
-  onZoomImage?: TradeOperationsProps['onZoomImage'];
-  isTradeUpdating?: TradeOperationsProps['isTradeUpdating'];
+  tradeOperations: TradeOperationsProps;
   isReadOnly?: boolean;
 }
 

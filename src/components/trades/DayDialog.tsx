@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Button,
@@ -10,6 +10,7 @@ import { Trade, Calendar } from '../../types/dualWrite';
 import { BaseDialog } from '../common';
 import { DayHeader, TradeList, ProgressSection } from './';
 import { calculateCumulativePnL, startOfNextDay } from './TradeFormDialog';
+import { TradeOperationsProps } from '../../types/tradeOperations';
 interface DayDialogProps {
   open: boolean;
   onClose: () => void;
@@ -108,14 +109,27 @@ const DayDialog: React.FC<DayDialogProps> = ({
   const handleOpenAIChat = (trade: Trade) => {
     if (onOpenAIChatMode) {
       const title = `AI Analysis - ${trade.name || format(date, 'MMM d, yyyy')}`;
+      setExpandedTradeId(null); // Collapse trade so TradeGalleryDialog fully overlaps
       onOpenAIChatMode(trades, trade.id, title);
-      onClose(); // Close the day dialog when opening AI chat
+      // Don't close DayDialog - only close when opening gallery mode
     }
   };
 
-
-   
-   
+  // Create tradeOperations object for TradeList
+  const tradeOperations: TradeOperationsProps = useMemo(() => ({
+    onEditTrade: handleEditClick,
+    onDeleteTrade,
+    onDeleteMultipleTrades,
+    onZoomImage: setZoomedImage,
+    onUpdateTradeProperty: isReadOnly ? undefined : onUpdateTradeProperty,
+    deletingTradeIds: deletingTradeIds || [],
+    isTradeUpdating,
+    calendarId,
+    onOpenGalleryMode,
+    onOpenAIChat: onOpenAIChatMode ? handleOpenAIChat : undefined,
+    economicFilter: undefined,
+    calendar
+  }), [onDeleteTrade, onDeleteMultipleTrades, setZoomedImage, isReadOnly, onUpdateTradeProperty, deletingTradeIds, isTradeUpdating, calendarId, onOpenGalleryMode, onOpenAIChatMode, calendar]);
 
   return (
     <>
@@ -169,18 +183,9 @@ const DayDialog: React.FC<DayDialogProps> = ({
             trades={trades}
             expandedTradeId={expandedTradeId}
             onTradeClick={handleTradeClick}
-            onEditClick={handleEditClick}
-            onDeleteClick={onDeleteTrade}
-            onDeleteMultiple={onDeleteMultipleTrades}
-            onZoomedImage={setZoomedImage}
-            onUpdateTradeProperty={isReadOnly ? undefined : onUpdateTradeProperty}
+            tradeOperations={tradeOperations}
             hideActions={isReadOnly} // Hide edit/delete actions in read-only mode
             enableBulkSelection={isReadOnly ? false : trades.length > 1} // Disable bulk selection in read-only mode
-            deletingTradeIds={deletingTradeIds}
-            isTradeUpdating={isTradeUpdating}
-            calendarId={calendarId}
-            calendar={calendar}
-            onOpenAIChat={onOpenAIChatMode ? handleOpenAIChat : undefined}
           />
         </Box>
       </BaseDialog>

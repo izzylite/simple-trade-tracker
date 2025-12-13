@@ -162,6 +162,54 @@ async function buildFunctionResponseParts(
 }
 
 /**
+ * Fetch AGENT_MEMORY note for pre-loading into system prompt
+ * This ensures memory is always available from turn 0 (no checklist needed)
+ */
+async function fetchAgentMemory(
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  userId: string,
+  calendarId?: string
+): Promise<string | null> {
+  try {
+    if (!calendarId) {
+      log('[Memory] No calendar ID, skipping memory fetch', 'info');
+      return null;
+    }
+
+    // Use direct REST API call to fetch memory note
+    const url = `${supabaseUrl}/rest/v1/notes?user_id=eq.${userId}&calendar_id=eq.${calendarId}&tags=cs.{AGENT_MEMORY}&select=content&limit=1`;
+
+    const response = await fetch(url, {
+      headers: {
+        'apikey': supabaseServiceKey,
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      log(`[Memory] Failed to fetch: ${response.status}`, 'warn');
+      return null;
+    }
+
+    const notes = await response.json();
+
+    if (notes && notes.length > 0 && notes[0].content) {
+      const content = notes[0].content;
+      log(`[Memory] Loaded ${content.length} chars of memory`, 'info');
+      return content;
+    }
+
+    log('[Memory] No existing memory found', 'info');
+    return null;
+  } catch (error) {
+    log(`[Memory] Error fetching: ${error}`, 'error');
+    return null;
+  }
+}
+
+/**
  * Get MCP tools with caching
  * Returns cached tools if available and not expired, otherwise fetches fresh
  */
@@ -446,6 +494,12 @@ async function callGemini(
   const requestBody = {
     contents,
     tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
+    // Force function calling on initial request to prevent "I will search..." without action
+    tool_config: tools.length > 0 ? {
+      function_calling_config: {
+        mode: "ANY"  // Forces model to call at least one function
+      }
+    } : undefined,
     generationConfig: {
       temperature: 0.3,
       maxOutputTokens: 4000,
@@ -490,9 +544,38 @@ async function callGeminiStreaming(
   message: string,
   conversationHistory: Array<{ role: string; content: string }>,
   tools: GeminiFunctionDeclaration[],
-  writer: WritableStreamDefaultWriter
+  writer: WritableStreamDefaultWriter,
+  userImages?: Array<{ url: string; mimeType: string }>
 ): Promise<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> }; functionCalls?: Array<{ name: string; args: Record<string, unknown> }>; emptyBug?: boolean }> {
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
+
+  // Build user message parts (text + optional images)
+  const userMessageParts: Array<Record<string, unknown>> = [];
+
+  // Add images first (if any) so model sees them before text
+  if (userImages && userImages.length > 0) {
+    log(`Injecting ${userImages.length} user images into request`, 'info');
+    for (const img of userImages) {
+      // Parse data URL to extract base64 data
+      const dataUrlMatch = img.url.match(/^data:([^;]+);base64,(.+)$/);
+      if (dataUrlMatch) {
+        const mimeType = dataUrlMatch[1];
+        const base64Data = dataUrlMatch[2];
+        userMessageParts.push({
+          inline_data: {
+            mime_type: mimeType,
+            data: base64Data
+          }
+        });
+        log(`Added image: ${mimeType}, ${base64Data.length} chars`, 'info');
+      } else {
+        log(`Skipping non-base64 image URL: ${img.url.substring(0, 50)}...`, 'warn');
+      }
+    }
+  }
+
+  // Add text message
+  userMessageParts.push({ text: message });
 
   // Build contents array
   const contents = [
@@ -502,12 +585,23 @@ async function callGeminiStreaming(
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }]
     })),
-    { role: 'user', parts: [{ text: message }] }
+    { role: 'user', parts: userMessageParts }
   ];
+
+  // When images are present, use AUTO mode so model can respond directly to images
+  // without being forced to call a tool. Otherwise use ANY to prevent "I will search..." without action
+  const hasImages = userImages && userImages.length > 0;
+  const toolMode = hasImages ? "AUTO" : "ANY";
 
   const requestBody = {
     contents,
     tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
+    // Force function calling on initial request (unless images present - then allow direct analysis)
+    tool_config: tools.length > 0 ? {
+      function_calling_config: {
+        mode: toolMode
+      }
+    } : undefined,
     generationConfig: {
       temperature: 0.3,
       maxOutputTokens: 4000,
@@ -715,7 +809,8 @@ function handleStreamingRequest(
   _calendarId: string | undefined,
   projectRef: string,
   supabaseAccessToken: string,
-  supabaseUrl: string
+  supabaseUrl: string,
+  userImages?: Array<{ url: string; mimeType: string }>
 ): Response {
   // Create SSE stream
   const { stream, writer } = createSSEStream();
@@ -736,7 +831,8 @@ function handleStreamingRequest(
         message,
         conversationHistory,
         allTools,
-        writer
+        writer,
+        userImages // Pass user-attached images on initial request
       );
 
       // RETRY LOGIC: Handle known Gemini empty content bug
@@ -978,6 +1074,12 @@ function handleStreamingRequest(
         const requestBody = {
           contents: conversationContents,
           tools: allTools.length > 0 ? [{ function_declarations: allTools }] : undefined,
+          // AUTO mode for continuation: allow text responses after function results
+          tool_config: allTools.length > 0 ? {
+            function_calling_config: {
+              mode: "AUTO"
+            }
+          } : undefined,
           generationConfig: {
             temperature: 0.3,
             maxOutputTokens: 4000,
@@ -1170,11 +1272,25 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: AgentRequest = await req.json();
-    const { message, userId, calendarId, focusedTradeId, conversationHistory = [], calendarContext, userApiKey } = body;
+    const { message, userId, calendarId, focusedTradeId, conversationHistory = [], calendarContext, userApiKey, images } = body;
 
-    if (!message || !userId) {
+    // Allow image-only messages (no text required if images present)
+    const hasContent = message || (images && images.length > 0);
+    if (!hasContent || !userId) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Missing required fields: message, userId' }),
+        JSON.stringify({ success: false, error: 'Missing required fields: message or images, and userId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Limit number of images per request (token/cost management)
+    const MAX_IMAGES_PER_REQUEST = 4;
+    if (images && images.length > MAX_IMAGES_PER_REQUEST) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Too many images. Maximum ${MAX_IMAGES_PER_REQUEST} images allowed per message.`
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -1191,9 +1307,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Use default message for image-only uploads
+    const effectiveMessage = message || (images && images.length > 0
+      ? `Please analyze ${images.length === 1 ? 'this image' : `these ${images.length} images`}.`
+      : '');
+
     log(`Processing request for user ${userId} (using ${userApiKey ? 'user' : 'server'} API key)`, 'info');
-    log(`Input message (first 200 chars): "${message.substring(0, 200)}"`, 'info');
-    log(`Message length: ${message.length}, History length: ${conversationHistory.length}`, 'info');
+    log(`Input message (first 200 chars): "${effectiveMessage.substring(0, 200)}"`, 'info');
+    log(`Message length: ${effectiveMessage.length}, History length: ${conversationHistory.length}, Images: ${images?.length || 0}`, 'info');
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
@@ -1219,8 +1340,12 @@ Deno.serve(async (req: Request) => {
     const customTools = getAllCustomTools();
     const allTools = [...geminiMcpTools, ...customTools];
 
-    // Build system prompt
-    const systemPrompt = buildSecureSystemPrompt(userId, calendarId, calendarContext, focusedTradeId);
+    // Pre-load agent memory (enforces memory availability from turn 0)
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const preloadedMemory = await fetchAgentMemory(supabaseUrl, supabaseServiceKey, userId, calendarId);
+
+    // Build system prompt with pre-loaded memory
+    const systemPrompt = buildSecureSystemPrompt(userId, calendarId, calendarContext, focusedTradeId, preloadedMemory);
 
     log('Sending request to Gemini with tools', 'info');
 
@@ -1237,20 +1362,22 @@ Deno.serve(async (req: Request) => {
       return handleStreamingRequest(
         googleApiKey,
         systemPrompt,
-        message,
+        effectiveMessage,
         conversationHistory,
         allTools,
         userId,
         calendarId,
         projectRef,
         supabaseAccessToken,
-        supabaseUrl
+        supabaseUrl,
+        images // Pass user-attached images
       );
     }
 
     // Non-streaming path (existing implementation)
+    // Note: Non-streaming doesn't support images yet - use streaming mode for image analysis
     // Initial call
-    let result = await callGemini(googleApiKey, systemPrompt, message, conversationHistory, allTools);
+    let result = await callGemini(googleApiKey, systemPrompt, effectiveMessage, conversationHistory, allTools);
 
     const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
     let finalText = '';
@@ -1343,6 +1470,12 @@ Deno.serve(async (req: Request) => {
       const requestBody = {
         contents: conversationContents,
         tools: allTools.length > 0 ? [{ function_declarations: allTools }] : undefined,
+        // AUTO mode for continuation: allow text responses after function results
+        tool_config: allTools.length > 0 ? {
+          function_calling_config: {
+            mode: "AUTO"
+          }
+        } : undefined,
         generationConfig: {
           temperature: 0.3,
           maxOutputTokens: 4000,

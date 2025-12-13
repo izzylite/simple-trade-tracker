@@ -16,6 +16,7 @@ import {
 import ShimmerLoader from './common/ShimmerLoader';
 import { supabase } from '../config/supabase';
 import { EconomicCalendarFilterSettings, DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from './economicCalendar/EconomicCalendarDrawer';
+import { TradeOperationsProps } from '../types/tradeOperations';
 
 // Lazy load chart components for better performance
 const PnLChartsWrapper = lazy(() => import('./charts/PnLChartsWrapper'));
@@ -187,6 +188,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     const calendar = calendars.find(c => c.id === calendarId);
     return calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS;
   });
+
   const [multipleTradesDialog, setMultipleTradesDialog] = useState<{
     open: boolean;
     trades: Trade[];
@@ -479,6 +481,20 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     setTagAnalysisTab(newValue);
   };
 
+  // Construct tradeOperations object
+  const tradeOperations: TradeOperationsProps = useMemo(() => ({
+    onEditTrade: onEditTrade,
+    onDeleteTrade: onDeleteTrade,
+    onDeleteMultipleTrades: undefined, // Not provided in PerformanceCharts
+    onUpdateTradeProperty: onUpdateTradeProperty,
+    onZoomImage: handleZoomImage,
+    onOpenGalleryMode: onOpenGalleryMode,
+    economicFilter: economicFilterFn,
+    calendarId: calendarIds[0] || '',
+    calendar: selectedCalendar || undefined, // Convert null to undefined
+    isTradeUpdating: undefined // Not tracked in PerformanceCharts
+  }), [onEditTrade, onDeleteTrade, onUpdateTradeProperty, onOpenGalleryMode, economicFilterFn, calendarIds, selectedCalendar]);
+
 
 
   // Handle pie chart click to show trades
@@ -573,17 +589,11 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             date={multipleTradesDialog.date}
             expandedTradeId={multipleTradesDialog.expandedTradeId}
             showChartInfo={multipleTradesDialog.showChartInfo || true}
-            onUpdateTradeProperty={onUpdateTradeProperty}
             onClose={() => setMultipleTradesDialog(prev => ({ ...prev, open: false }))}
             onTradeExpand={handleTradeExpand}
-            onZoomImage={handleZoomImage}
             account_balance={accountBalance}
             allTrades={trades}
-            onEditClick={onEditTrade}
-            onDeleteClick={onDeleteTrade}
-            onOpenGalleryMode={onOpenGalleryMode}
-            calendarId={calendarIds[0] || ''}
-            economicFilter={economicFilterFn}
+            tradeOperations={tradeOperations}
           />
         </Suspense>
       )}

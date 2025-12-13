@@ -1264,6 +1264,19 @@ const Home: React.FC<HomeProps> = ({
           open={economicCalendarOpen}
           onClose={() => setEconomicCalendarOpen(false)}
           calendar={calendars[0]}
+          tradeOperations={{
+            onOpenGalleryMode: () => {},
+            onUpdateTradeProperty: () => Promise.resolve(undefined),
+            onEditTrade: () => {},
+            onDeleteTrade: () => Promise.resolve(),
+            onDeleteMultipleTrades: () => {},
+            onZoomImage: setZoomedImage,
+            isTradeUpdating: () => false,
+            calendarId: calendars[0].id,
+            calendar: calendars[0],
+            onUpdateCalendarProperty: () => Promise.resolve(undefined)
+          }}
+          isReadOnly
         />
       )}
 
@@ -1271,11 +1284,16 @@ const Home: React.FC<HomeProps> = ({
       <AIChatDrawer
         open={isAIChatOpen}
         onClose={() => setIsAIChatOpen(false)}
-        onOpenGalleryMode={() => {}}
-        onUpdateTradeProperty={() => Promise.resolve(undefined)}
-        onDeleteMultipleTrades={() => {}}
-        onZoomImage={setZoomedImage}
-        onUpdateCalendarProperty={() => Promise.resolve(undefined)}
+        tradeOperations={{
+          onOpenGalleryMode: () => {},
+          onUpdateTradeProperty: () => Promise.resolve(undefined),
+          onEditTrade: () => {},
+          onDeleteTrade: () => Promise.resolve(),
+          onDeleteMultipleTrades: () => {},
+          onZoomImage: setZoomedImage,
+          isTradeUpdating: () => false,
+          onUpdateCalendarProperty: () => Promise.resolve(undefined)
+        }}
         isReadOnly={false}
       />
 

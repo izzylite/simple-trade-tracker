@@ -1035,9 +1035,19 @@ function parseMemorySections(content: string): Record<MemorySection, string[]> {
     ACTIVE_FOCUS: []
   };
 
+  // Handle empty content
+  if (!content || content.trim().length === 0) {
+    log(`[parseMemorySections] Empty content received`, "warn");
+    return sections;
+  }
+
   // Split by section headers
   const sectionPattern = /^## (TRADER_PROFILE|PERFORMANCE_PATTERNS|STRATEGY_PREFERENCES|LESSONS_LEARNED|ACTIVE_FOCUS)\s*$/gm;
   const parts = content.split(sectionPattern);
+
+  // Debug: log how many parts were found
+  const sectionNamesFound = parts.filter((_, i) => i % 2 === 1);
+  log(`[parseMemorySections] Found ${sectionNamesFound.length} section headers: ${sectionNamesFound.join(', ')}`, "info");
 
   // parts will be: [preamble, "SECTION_NAME", content, "SECTION_NAME", content, ...]
   for (let i = 1; i < parts.length; i += 2) {
@@ -1056,6 +1066,13 @@ function parseMemorySections(content: string): Record<MemorySection, string[]> {
     if (MEMORY_SECTION_ORDER.includes(sectionName)) {
       sections[sectionName] = bullets;
     }
+  }
+
+  // Warn if no sections were parsed from non-empty content
+  const totalBullets = Object.values(sections).reduce((sum, arr) => sum + arr.length, 0);
+  if (content.length > 50 && totalBullets === 0) {
+    log(`[parseMemorySections] WARNING: No bullets parsed from ${content.length} char content. Content may be malformed.`, "warn");
+    log(`[parseMemorySections] Content start: ${content.substring(0, 200).replace(/\n/g, '\\n')}`, "warn");
   }
 
   return sections;
@@ -1178,7 +1195,9 @@ export async function updateMemory(
   replaceSection: boolean = false
 ): Promise<string> {
   try {
-    log(`Updating memory section: ${section} with ${newInsights.length} new insights`, "info");
+    // Enhanced logging for debugging
+    log(`[updateMemory] START - section: ${section}, newInsights: ${newInsights.length}, replaceSection: ${replaceSection}`, "info");
+    log(`[updateMemory] New insights to add: ${JSON.stringify(newInsights).substring(0, 500)}`, "info");
 
     // 1. Fetch existing memory note
     const { data: memoryNote, error: fetchError } = await supabase
@@ -1190,27 +1209,50 @@ export async function updateMemory(
       .single();
 
     if (fetchError && fetchError.code !== "PGRST116") {
-      log(`Error fetching memory: ${fetchError.message}`, "error");
+      log(`[updateMemory] Error fetching memory: ${fetchError.message}`, "error");
       return `Failed to fetch memory: ${fetchError.message}`;
     }
 
     // 2. If no memory exists, create initial one
     if (!memoryNote) {
-      log("No existing memory found, creating initial memory", "info");
+      log("[updateMemory] No existing memory found, creating initial memory", "info");
       return await createInitialMemory(supabase, userId, calendarId, section, newInsights);
     }
 
     // 3. Parse existing content into sections
-    const sections = parseMemorySections(memoryNote.content || "");
+    const existingContent = memoryNote.content || "";
+    log(`[updateMemory] Existing content length: ${existingContent.length} chars`, "info");
+
+    // Debug: Log first 500 chars of existing content
+    if (existingContent.length > 0) {
+      log(`[updateMemory] Existing content preview: ${existingContent.substring(0, 500).replace(/\n/g, '\\n')}`, "info");
+    }
+
+    const sections = parseMemorySections(existingContent);
+
+    // Debug: Log what was parsed from each section
+    log(`[updateMemory] Parsed sections - TRADER_PROFILE: ${sections.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${sections.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${sections.STRATEGY_PREFERENCES.length}, LESSONS_LEARNED: ${sections.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${sections.ACTIVE_FOCUS.length}`, "info");
+
     const existingCount = sections[section].length;
+    log(`[updateMemory] Target section ${section} has ${existingCount} existing insights: ${JSON.stringify(sections[section]).substring(0, 300)}`, "info");
 
     // 4. Merge or replace section
     if (replaceSection) {
-      log(`Replacing ${section} section entirely`, "info");
-      sections[section] = newInsights;
-    } else {
+      // SAFEGUARD: Only allow replace_section for ACTIVE_FOCUS
+      if (section !== "ACTIVE_FOCUS") {
+        log(`[updateMemory] WARNING: replace_section=true attempted on ${section}, but only ACTIVE_FOCUS can be replaced. Falling back to MERGE mode.`, "warn");
+        // Fall through to merge logic instead of replacing
+      } else {
+        log(`[updateMemory] REPLACING ${section} section entirely (was: ${existingCount}, will be: ${newInsights.length})`, "info");
+        sections[section] = newInsights;
+        // Skip the else block by returning early after the full flow
+      }
+    }
+
+    // MERGE mode (default) - also used when replace_section was incorrectly set for non-ACTIVE_FOCUS
+    if (!replaceSection || section !== "ACTIVE_FOCUS") {
       // APPEND new insights, preserving existing
-      log(`Merging ${newInsights.length} new insights into ${section} (existing: ${existingCount})`, "info");
+      log(`[updateMemory] MERGING ${newInsights.length} new insights into ${section} (existing: ${existingCount})`, "info");
       sections[section] = [...sections[section], ...newInsights];
 
       // Deduplicate similar entries
@@ -1219,17 +1261,23 @@ export async function updateMemory(
       const afterDedup = sections[section].length;
 
       if (beforeDedup !== afterDedup) {
-        log(`Deduplication removed ${beforeDedup - afterDedup} similar insights`, "info");
+        log(`[updateMemory] Deduplication removed ${beforeDedup - afterDedup} similar insights`, "info");
       }
+
+      log(`[updateMemory] After merge - ${section}: ${sections[section].length} insights`, "info");
     }
 
     // 5. Rebuild content preserving structure
     const updatedContent = buildMemoryContent(sections);
+    log(`[updateMemory] Updated content length: ${updatedContent.length} chars`, "info");
+
+    // Debug: Verify all sections are present in rebuilt content
+    const verifyParsed = parseMemorySections(updatedContent);
+    log(`[updateMemory] VERIFY after rebuild - TRADER_PROFILE: ${verifyParsed.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${verifyParsed.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${verifyParsed.STRATEGY_PREFERENCES.length}, LESSONS_LEARNED: ${verifyParsed.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${verifyParsed.ACTIVE_FOCUS.length}`, "info");
 
     // 6. Check size limit (~2000 tokens ≈ 8000 chars)
     if (updatedContent.length > 8000) {
-      log(`Memory exceeds size limit (${updatedContent.length} chars), consider compression`, "warn");
-      // For now, just warn - could implement compression here in future
+      log(`[updateMemory] Memory exceeds size limit (${updatedContent.length} chars), consider compression`, "warn");
     }
 
     // 7. Update note
@@ -1242,17 +1290,17 @@ export async function updateMemory(
       .eq("id", memoryNote.id);
 
     if (updateError) {
-      log(`Error updating memory: ${updateError.message}`, "error");
+      log(`[updateMemory] Error updating memory: ${updateError.message}`, "error");
       return `Failed to update memory: ${updateError.message}`;
     }
 
     const finalCount = sections[section].length;
     const addedCount = replaceSection ? newInsights.length : (finalCount - existingCount);
 
-    log(`Memory updated successfully: ${section} now has ${finalCount} insights`, "info");
+    log(`[updateMemory] SUCCESS - ${section} now has ${finalCount} insights (added: ${addedCount})`, "info");
     return `Memory updated: ${replaceSection ? "Replaced" : "Added"} ${addedCount} insight(s) in ${section}. Total: ${finalCount} insights in section.`;
   } catch (error) {
-    log(`Memory update error: ${error}`, "error");
+    log(`[updateMemory] ERROR: ${error}`, "error");
     return `Memory update error: ${
       error instanceof Error ? error.message : "Unknown"
     }`;
@@ -1544,10 +1592,12 @@ export function analyzeImage(
       ? ` Trade context: "${tradeContext}".`
       : "";
 
-    // Return marker with image URL and instructions - conversation builder will inject the actual image
+    // Return marker with image URL - conversation builder will inject the actual image
+    // The prompt tells the model to generate its own analysis (not return instructions)
     return `[IMAGE_ANALYSIS:${imageUrl}]
-Analysis instructions: ${focusInstruction}${contextNote}
-Provide a concise analysis (3-5 bullet points). Be specific about what you observe in the chart image above.`;
+IMAGE LOADED SUCCESSFULLY. You are now viewing the chart image above.
+${focusInstruction}${contextNote}
+YOUR TASK: Analyze what you SEE in this image and respond with your findings (3-5 bullet points). Describe specific visual elements you observe: candlesticks, indicators, levels, patterns, entry/exit markers, platform UI, annotations, etc.`;
   } catch (error) {
     log(`Image preparation error: ${error}`, "error");
     return `Image analysis error: ${

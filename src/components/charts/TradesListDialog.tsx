@@ -34,26 +34,15 @@ interface TradesDialogProps {
   account_balance: number;
   allTrades: Trade[];
 
-  // Trade operations - can be passed as object or individual props
-  tradeOperations?: TradeOperationsProps;
-
-  // Individual props (for backward compatibility)
-  onUpdateTradeProperty?: TradeOperationsProps['onUpdateTradeProperty'];
-  economicFilter?: TradeOperationsProps['economicFilter'];
-  onZoomImage?: (imageUrl: string, allImages?: string[], initialIndex?: number) => void;
-  onEditClick?: (trade: Trade) => void;
-  onDeleteClick?: (tradeId: string) => void;
-  onDeleteMultiple?: (tradeIds: string[]) => void;
-  onOpenGalleryMode?: TradeOperationsProps['onOpenGalleryMode'];
-  calendarId?: string;
-  isTradeUpdating?: TradeOperationsProps['isTradeUpdating'];
-  calendar?: TradeOperationsProps['calendar'];
+  // Trade operations - required
+  tradeOperations: TradeOperationsProps;
 }
 
 const TradesListDialog: React.FC<TradesDialogProps> = ({
   open,
   trades,
-  title, subtitle,
+  title,
+  subtitle,
   date,
   showChartInfo,
   expandedTradeId,
@@ -61,28 +50,21 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   onTradeExpand,
   account_balance,
   allTrades,
-  tradeOperations,
-  // Individual props (fallback if tradeOperations not provided)
-  onZoomImage: onZoomImageProp,
-  onUpdateTradeProperty: onUpdateTradePropertyProp,
-  onEditClick: onEditClickProp,
-  onDeleteClick: onDeleteClickProp,
-  onDeleteMultiple: onDeleteMultipleProp,
-  onOpenGalleryMode: onOpenGalleryModeProp,
-  calendarId: calendarIdProp,
-  isTradeUpdating: isTradeUpdatingProp,
-  economicFilter: economicFilterProp
+  tradeOperations
 }) => {
-  // Extract from tradeOperations or use individual props
-  const onZoomImage = tradeOperations?.onZoomImage || onZoomImageProp;
-  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
-  const onEditClick = tradeOperations?.onEditTrade || onEditClickProp;
-  const onDeleteClick = tradeOperations?.onDeleteTrade || onDeleteClickProp;
-  const onDeleteMultiple = tradeOperations?.onDeleteMultipleTrades || onDeleteMultipleProp;
-  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
-  const calendarId = tradeOperations?.calendarId || calendarIdProp;
-  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
-  const economicFilter = tradeOperations?.economicFilter || economicFilterProp;
+  // Destructure from tradeOperations
+  const {
+    onZoomImage,
+    onUpdateTradeProperty,
+    onEditTrade,
+    onDeleteTrade,
+    onDeleteMultipleTrades,
+    onOpenGalleryMode,
+    calendarId,
+    isTradeUpdating,
+    economicFilter
+  } = tradeOperations;
+
   const theme = useTheme();
   const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
   // Format data for the chart based on selected metric
@@ -316,18 +298,9 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
           trades={trades}
           expandedTradeId={expandedTradeId}
           onTradeClick={onTradeExpand}
-          hideActions={!onEditClick && !onDeleteClick}
-          enableBulkSelection={trades.length > 1 && !!onDeleteMultiple}
+          hideActions={!onEditTrade && !onDeleteTrade}
+          enableBulkSelection={trades.length > 1 && !!onDeleteMultipleTrades}
           tradeOperations={tradeOperations}
-          onEditClick={onEditClick}
-          onDeleteClick={onDeleteClick}
-          onDeleteMultiple={onDeleteMultiple}
-          onZoomedImage={onZoomImage}
-          onUpdateTradeProperty={onUpdateTradeProperty}
-          calendarId={calendarId}
-          onOpenGalleryMode={onOpenGalleryMode}
-          economicFilter={economicFilter}
-          isTradeUpdating={isTradeUpdating}
         />
       </Box>
     </BaseDialog>

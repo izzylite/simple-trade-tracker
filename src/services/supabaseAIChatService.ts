@@ -8,7 +8,7 @@ import { supabase, supabaseUrl } from '../config/supabase';
 import { logger } from '../utils/logger';
 import type { Trade } from '../types/trade';
 import type { Calendar } from '../types/calendar';
-import type { ChatMessage as ChatMessageType } from '../types/aiChat';
+import type { ChatMessage as ChatMessageType, AttachedImage } from '../types/aiChat';
 import { getApiKey } from './apiKeyStorage';
 
 export interface AgentResponse {
@@ -126,7 +126,8 @@ class SupabaseAIChatService {
     calendar: Calendar | undefined,
     conversationHistory: ChatMessageType[] = [],
     signal?: AbortSignal,
-    focusedTradeId?: string
+    focusedTradeId?: string,
+    images?: AttachedImage[]
   ): AsyncGenerator<SSEEvent, void, unknown> {
     try {
       logger.log(`Sending streaming message to AI agent: "${message.substring(0, 50)}..."`);
@@ -166,6 +167,10 @@ class SupabaseAIChatService {
           conversationHistory: formattedHistory,
           calendarContext: calendar ? this.buildCalendarContext(calendar) : undefined,
           userApiKey: userApiKey || undefined, // Send user's API key if available
+          images: images && images.length > 0 ? images.map(img => ({
+            url: img.url,
+            mimeType: img.mimeType
+          })) : undefined, // Send attached images
         }),
         signal
       });

@@ -17,6 +17,7 @@ import TradeDetailExpanded from '../TradeDetailExpanded';
 import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 import { logger } from '../../utils/logger';
 import { getSharedTrade, SharedTradeData } from '../../services/sharingService';
+import { TradeOperationsProps } from '../../types/tradeOperations';
 
 interface SharedTradeViewProps {
   shareId: string;
@@ -182,14 +183,21 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
         tradeData={trade}
         animate={false}
         isExpanded={true}
-        setZoomedImage={(url: string, allImages?: string[], initialIndex?: number) => {
-          setZoomedImages({
-            selectetdImageIndex: initialIndex || 0,
-            allImages: allImages || [url]
-          });
+        tradeOperations={{
+          onZoomImage: (url: string, allImages?: string[], initialIndex?: number) => {
+            setZoomedImages({
+              selectetdImageIndex: initialIndex || 0,
+              allImages: allImages || [url]
+            });
+          },
+          // Read-only mode - no update/gallery/AI operations
+          onUpdateTradeProperty: undefined,
+          calendarId: undefined,
+          onOpenGalleryMode: undefined,
+          economicFilter: undefined,
+          onOpenAIChat: undefined,
+          isTradeUpdating: undefined
         }}
-        // No onUpdateTradeProperty or calendarId - this makes it read-only
-        // No trades or onOpenGalleryMode for shared view - external links only
       />
 
       {/* Footer */}

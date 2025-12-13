@@ -37,51 +37,18 @@ interface PinnedTradesDrawerProps {
   open: boolean;
   onClose: () => void;
   trades: Trade[];
-  calendar?: Calendar;
   onTradeClick?: (trade: Trade, trades: Trade[], title: string) => void;
-  isReadOnly?: boolean;
-
-  // Trade operations - can be passed as object or individual props
-  tradeOperations?: TradeOperationsProps;
-
-  // Individual props (for backward compatibility)
-  onUpdateCalendarProperty?: TradeOperationsProps['onUpdateCalendarProperty'];
-  onOpenGalleryMode?: TradeOperationsProps['onOpenGalleryMode'];
-  onUpdateTradeProperty?: TradeOperationsProps['onUpdateTradeProperty'];
-  onEditTrade?: TradeOperationsProps['onEditTrade'];
-  onDeleteTrade?: TradeOperationsProps['onDeleteTrade'];
-  onDeleteMultipleTrades?: TradeOperationsProps['onDeleteMultipleTrades'];
-  onZoomImage?: TradeOperationsProps['onZoomImage'];
-  isTradeUpdating?: TradeOperationsProps['isTradeUpdating'];
+  tradeOperations: TradeOperationsProps;
 }
 
 const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   open,
   onClose,
   trades,
-  calendar,
   onTradeClick,
-  isReadOnly = false,
-  tradeOperations,
-  // Individual props (fallback if tradeOperations not provided)
-  onUpdateCalendarProperty: onUpdateCalendarPropertyProp,
-  onOpenGalleryMode: onOpenGalleryModeProp,
-  onUpdateTradeProperty: onUpdateTradePropertyProp,
-  onEditTrade: onEditTradeProp,
-  onDeleteTrade: onDeleteTradeProp,
-  onDeleteMultipleTrades: onDeleteMultipleTradesProp,
-  onZoomImage: onZoomImageProp,
-  isTradeUpdating: isTradeUpdatingProp
+  tradeOperations
 }) => {
-  // Extract from tradeOperations or use individual props
-  const onUpdateCalendarProperty = tradeOperations?.onUpdateCalendarProperty || onUpdateCalendarPropertyProp;
-  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
-  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
-  const onEditTrade = tradeOperations?.onEditTrade || onEditTradeProp;
-  const onDeleteTrade = tradeOperations?.onDeleteTrade || onDeleteTradeProp;
-  const onDeleteMultipleTrades = tradeOperations?.onDeleteMultipleTrades || onDeleteMultipleTradesProp;
-  const onZoomImage = tradeOperations?.onZoomImage || onZoomImageProp;
-  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
+  const { calendar, isReadOnly = false } = tradeOperations;
   const theme = useTheme();
 
   // Tab state
@@ -452,17 +419,6 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
           event={selectedEvent}
           trades={trades}
           tradeOperations={tradeOperations}
-          onUpdateTradeProperty={onUpdateTradeProperty}
-          onEditTrade={onEditTrade}
-          onDeleteTrade={onDeleteTrade}
-          onDeleteMultipleTrades={onDeleteMultipleTrades}
-          onZoomImage={onZoomImage}
-          onOpenGalleryMode={onOpenGalleryMode}
-          isTradeUpdating={isTradeUpdating}
-          calendarId={calendar.id}
-          calendar={calendar}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
-          isReadOnly={isReadOnly}
         />
       )}
     </UnifiedDrawer>

@@ -24,7 +24,7 @@ SELECT cron.schedule(
 );
 
 -- =============================================================================
--- AUTO REFRESH ECONOMIC CALENDAR (Every 30 minutes)
+-- AUTO REFRESH ECONOMIC CALENDAR (Every 15 minutes)
 -- =============================================================================
 
 -- Remove existing job if it exists
@@ -33,7 +33,7 @@ SELECT cron.unschedule('auto-refresh-economic-calendar');
 -- Schedule auto refresh of economic calendar
 SELECT cron.schedule(
   'auto-refresh-economic-calendar',
-  '*/30 * * * *',  -- Every 30 minutes
+  '*/15 * * * *',  -- Every 15 minutes
   $$
   SELECT net.http_post(
     url := 'https://gwubzauelilziaqnsfac.supabase.co/functions/v1/auto-refresh-economic-calendar',
@@ -176,8 +176,8 @@ For cleanup-expired-calendars:
   );
 
 For auto-refresh-economic-calendar:
-- Name: auto-refresh-economic-calendar  
-- Schedule: */30 * * * * (every 30 minutes)
+- Name: auto-refresh-economic-calendar
+- Schedule: */15 * * * * (every 15 minutes)
 - SQL Command:
   SELECT net.http_post(
     'https://gwubzauelilziaqnsfac.supabase.co/functions/v1/auto-refresh-economic-calendar',
@@ -214,7 +214,7 @@ TIMEZONE CONSIDERATIONS:
 - Consider daylight saving time changes
 
 PERFORMANCE CONSIDERATIONS:
-- Economic calendar refresh every 30 minutes may be frequent for some use cases
+- Economic calendar refresh every 15 minutes ensures timely updates for trading
 - Adjust frequency based on your application's needs
 - Monitor database performance impact of scheduled jobs
 

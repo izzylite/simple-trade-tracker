@@ -50,22 +50,8 @@ interface TradeListProps {
   initialPageSize?: number;
   pageSize?: number;
 
-  // Trade operations - can be passed as object or individual props
-  tradeOperations?: TradeOperationsProps;
-
-  // Individual props (for backward compatibility, tradeOperations takes precedence)
-  onEditClick?: (trade: Trade) => void;
-  onDeleteClick?: (tradeId: string) => void;
-  onDeleteMultiple?: (tradeIds: string[]) => void;
-  onZoomedImage?: (url: string, allImages?: string[], initialIndex?: number) => void;
-  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
-  deletingTradeIds?: string[];
-  isTradeUpdating?: (tradeId: string) => boolean;
-  calendarId?: string;
-  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
-  onOpenAIChat?: (trade: Trade) => void;
-  economicFilter?: TradeOperationsProps['economicFilter'];
-  calendar?: TradeOperationsProps['calendar'];
+  // Trade operations - required
+  tradeOperations: TradeOperationsProps;
 }
 
 const TradeList: React.FC<TradeListProps> = ({
@@ -77,34 +63,16 @@ const TradeList: React.FC<TradeListProps> = ({
   sx,
   initialPageSize = 20,
   pageSize = 20,
-  tradeOperations,
-  // Individual props (fallback if tradeOperations not provided)
-  onEditClick: onEditClickProp,
-  onDeleteClick: onDeleteClickProp,
-  onDeleteMultiple: onDeleteMultipleProp,
-  onZoomedImage: onZoomedImageProp,
-  onUpdateTradeProperty: onUpdateTradePropertyProp,
-  deletingTradeIds: deletingTradeIdsProp = [],
-  isTradeUpdating: isTradeUpdatingProp,
-  calendarId: calendarIdProp,
-  onOpenGalleryMode: onOpenGalleryModeProp,
-  onOpenAIChat: onOpenAIChatProp,
-  economicFilter: economicFilterProp,
-  calendar: calendarProp
+  tradeOperations
 }) => {
-  // Extract from tradeOperations or use individual props
-  const onEditClick = tradeOperations?.onEditTrade || onEditClickProp;
-  const onDeleteClick = tradeOperations?.onDeleteTrade || onDeleteClickProp;
-  const onDeleteMultiple = tradeOperations?.onDeleteMultipleTrades || onDeleteMultipleProp;
-  const onZoomedImage = tradeOperations?.onZoomImage || onZoomedImageProp;
-  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
-  const deletingTradeIds = tradeOperations?.deletingTradeIds || deletingTradeIdsProp;
-  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
-  const calendarId = tradeOperations?.calendarId || calendarIdProp;
-  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
-  const onOpenAIChat = tradeOperations?.onOpenAIChat || onOpenAIChatProp;
-  const economicFilter = tradeOperations?.economicFilter || economicFilterProp;
-  const calendar = tradeOperations?.calendar || calendarProp;
+  // Destructure from tradeOperations
+  const {
+    onEditTrade: onEditClick,
+    onDeleteTrade: onDeleteClick,
+    onDeleteMultipleTrades: onDeleteMultiple,
+    deletingTradeIds = [],
+    isTradeUpdating,
+  } = tradeOperations;
   const theme = useTheme();
   const [selectedTradeIds, setSelectedTradeIds] = useState<string[]>([]);
   const [displayedCount, setDisplayedCount] = useState<number>(initialPageSize);
@@ -534,13 +502,6 @@ const TradeList: React.FC<TradeListProps> = ({
                   isExpanded={true}
                   trades={trades}
                   tradeOperations={tradeOperations}
-                  setZoomedImage={onZoomedImage}
-                  onUpdateTradeProperty={onUpdateTradeProperty}
-                  calendarId={calendarId}
-                  onOpenGalleryMode={onOpenGalleryMode}
-                  economicFilter={economicFilter}
-                  onOpenAIChat={onOpenAIChat}
-                  isTradeUpdating={isTradeUpdating}
                 />
               )}
             </React.Fragment>

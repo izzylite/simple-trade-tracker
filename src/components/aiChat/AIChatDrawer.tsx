@@ -63,19 +63,7 @@ interface AIChatDrawerProps {
   trades?: Trade[];
   calendar?: Calendar;
   isReadOnly?: boolean;
-
-  // Trade operations - can be passed as object or individual props
-  tradeOperations?: TradeOperationsProps;
-
-  // Individual props (for backward compatibility)
-  onOpenGalleryMode?: TradeOperationsProps['onOpenGalleryMode'];
-  onUpdateTradeProperty?: TradeOperationsProps['onUpdateTradeProperty'];
-  onEditTrade?: TradeOperationsProps['onEditTrade'];
-  onDeleteTrade?: TradeOperationsProps['onDeleteTrade'];
-  onDeleteMultipleTrades?: TradeOperationsProps['onDeleteMultipleTrades'];
-  onZoomImage?: TradeOperationsProps['onZoomImage'];
-  onUpdateCalendarProperty?: TradeOperationsProps['onUpdateCalendarProperty'];
-  isTradeUpdating?: TradeOperationsProps['isTradeUpdating'];
+  tradeOperations: TradeOperationsProps;
 }
 
 // Bottom sheet heights
@@ -89,26 +77,19 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   trades,
   calendar,
   isReadOnly = false,
-  tradeOperations,
-  // Individual props (fallback if tradeOperations not provided)
-  onOpenGalleryMode: onOpenGalleryModeProp,
-  onUpdateTradeProperty: onUpdateTradePropertyProp,
-  onEditTrade: onEditTradeProp,
-  onDeleteTrade: onDeleteTradeProp,
-  onDeleteMultipleTrades: onDeleteMultipleTradesProp,
-  onZoomImage: onZoomImageProp,
-  onUpdateCalendarProperty: onUpdateCalendarPropertyProp,
-  isTradeUpdating: isTradeUpdatingProp
+  tradeOperations
 }) => {
-  // Extract from tradeOperations or use individual props
-  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
-  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
-  const onEditTrade = tradeOperations?.onEditTrade || onEditTradeProp;
-  const onDeleteTrade = tradeOperations?.onDeleteTrade || onDeleteTradeProp;
-  const onDeleteMultipleTrades = tradeOperations?.onDeleteMultipleTrades || onDeleteMultipleTradesProp;
-  const onZoomImage = tradeOperations?.onZoomImage || onZoomImageProp;
-  const onUpdateCalendarProperty = tradeOperations?.onUpdateCalendarProperty || onUpdateCalendarPropertyProp;
-  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
+  // Destructure trade operations directly
+  const {
+    onOpenGalleryMode,
+    onUpdateTradeProperty,
+    onEditTrade,
+    onDeleteTrade,
+    onDeleteMultipleTrades,
+    onZoomImage,
+    onUpdateCalendarProperty,
+    isTradeUpdating
+  } = tradeOperations;
   const theme = useTheme();
   const { user } = useAuth();
   const chatInterfaceRef = useRef<AIChatInterfaceRef>(null);
@@ -124,7 +105,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     isAtMessageLimit,
     sendMessage,
     cancelRequest,
-    retryMessage,
     setInputForEdit,
     loadConversations,
     selectConversation,
@@ -453,7 +433,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                   isAtMessageLimit={isAtMessageLimit}
                   sendMessage={sendMessage}
                   cancelRequest={cancelRequest}
-                  retryMessage={retryMessage}
                   setInputForEdit={setInputForEdit}
                   startNewChat={startNewChat}
                   setMessages={setMessages}
@@ -721,16 +700,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           event={selectedEvent}
           trades={trades || []}
           tradeOperations={tradeOperations}
-          onUpdateTradeProperty={onUpdateTradeProperty}
-          onEditTrade={onEditTrade}
-          onDeleteTrade={onDeleteTrade}
-          onDeleteMultipleTrades={onDeleteMultipleTrades}
-          onZoomImage={onZoomImage}
-          onOpenGalleryMode={onOpenGalleryMode}
-          isTradeUpdating={isTradeUpdating}
-          calendarId={calendar.id}
-          calendar={calendar}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
           isReadOnly={isReadOnly}
         />
       )}

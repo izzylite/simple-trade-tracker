@@ -1937,13 +1937,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           open={pinnedTradesDrawerOpen}
           onClose={() => setPinnedTradesDrawerOpen(false)}
           trades={trades}
-          calendar={calendar}
           onTradeClick={(trade, allTrades, title) => {
             // Close drawer and open the trade in gallery mode
             setPinnedTradesDrawerOpen(false);
             openGalleryMode(allTrades, trade.id, title);
           }}
-          isReadOnly={isReadOnly}
           tradeOperations={tradeOperations}
         />
 

@@ -203,6 +203,12 @@ export interface Calendar {
   updated_at: Date | string;
 }
 
+// User-attached image for chat
+export interface UserAttachedImage {
+  url: string; // Data URL (base64) or remote URL
+  mimeType: string;
+}
+
 // Request/Response Types
 export interface AgentRequest {
   message: string;
@@ -212,6 +218,7 @@ export interface AgentRequest {
   conversationHistory?: ConversationMessage[];
   calendarContext?: Partial<Calendar>;
   userApiKey?: string; // User's own Gemini API key (optional)
+  images?: UserAttachedImage[]; // User-attached images for analysis
 }
 
 export interface ConversationMessage {

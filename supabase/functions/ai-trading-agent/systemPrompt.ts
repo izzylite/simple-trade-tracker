@@ -141,74 +141,76 @@ ${filterLine}
 // =============================================================================
 
 const SCHEMA_REFERENCE = `
-## Database Schema (Complete Field Reference)
+## Database Schema (Core Fields)
 
 ### trades
-Core fields: id, calendar_id, user_id, name, amount, trade_type, trade_date
-Price data: entry_price, exit_price, stop_loss, take_profit, risk_to_reward
-Session/Tags: session, tags[], partials_taken
-Content: notes (text), images (JSONB array), economic_events (JSONB array)
-Flags: is_temporary, is_pinned, is_shared, share_id, share_link, shared_at
-Timestamps: created_at, updated_at
-Search: economic_events_text (auto-generated searchable text)
+Required: id, calendar_id, user_id, trade_type, trade_date, amount
+Price: entry_price, exit_price, stop_loss, take_profit, risk_to_reward
+Session: session — ENUM column ('Asia'|'London'|'NY AM'|'NY PM')
+Tags: tags[] — ARRAY for custom labels, query: 'TagName' = ANY(tags)
+Meta: notes, images[], economic_events[], is_pinned
+Enums: trade_type ('win'|'loss'|'breakeven')
 
-Enums:
-- trade_type: 'win' | 'loss' | 'breakeven'
-- session: 'Asia' | 'London' | 'NY AM' | 'NY PM'
-- tags[]: Filter with 'TagName' = ANY(tags)
-- images[]: Array of {id, url, caption, row, column, column_width}
+⚠️ SESSION vs TAGS — CRITICAL DISTINCTION:
+- session is a COLUMN → WHERE session = 'London'
+- tags is an ARRAY → WHERE 'ScalpTrade' = ANY(tags)
 
 ### calendars
-Identity: id, user_id, name
-Balance/Risk: account_balance, current_balance, risk_per_trade, max_daily_drawdown
-Targets: weekly_target, monthly_target, yearly_target
-Dynamic Risk: dynamic_risk_enabled, increased_risk_percentage, profit_threshold_percentage
-Stats (computed): total_trades, win_count, loss_count, win_rate, profit_factor, total_pnl
-PnL Periods: weekly_pnl, monthly_pnl, yearly_pnl, weekly_pnl_percentage, monthly_pnl_percentage, yearly_pnl_percentage
-Progress: weekly_progress, monthly_progress, target_progress, pnl_performance
-Drawdown: max_drawdown, drawdown_start_date, drawdown_end_date, drawdown_recovery_needed, drawdown_duration
-Averages: avg_win, avg_loss
-Tags: tags[], required_tag_groups[]
-Settings: economic_calendar_filters (JSONB), pinned_events (JSONB), score_settings (JSONB)
-Display: hero_image_url, hero_image_attribution (JSONB)
-Sharing: is_shared, share_id, share_link, shared_at
-Deletion: mark_for_deletion, deletion_date, deleted_at, deleted_by, auto_delete_at
-Timestamps: created_at, updated_at
+Core: id, user_id, name, account_balance, current_balance, risk_per_trade
+Stats: win_rate, total_trades, total_pnl, profit_factor, avg_win, avg_loss
+PnL: weekly_pnl, monthly_pnl, yearly_pnl (and _percentage variants)
+Settings: tags[], economic_calendar_filters (JSONB)
 
-### economic_events (Global - no user_id filter needed)
-Identity: id, external_id, currency, country, flag_code, flag_url
-Event: event_name, impact, description, is_all_day
-Timing: event_date (date), event_time (timestamp), time_utc, unix_timestamp
+### economic_events (GLOBAL - no user_id filter)
+Core: id, event_name, currency, impact, event_date, event_time
 Values: actual_value, forecast_value, previous_value, actual_result_type
-Meta: data_source, source_url, last_updated, created_at
-
-Enums:
-- impact: 'High' | 'Medium' | 'Low' | 'Holiday' | 'Non-Economic'
-- actual_result_type: 'good' | 'bad' | 'neutral' | ''
+Enums: impact ('High'|'Medium'|'Low'|'Holiday'), actual_result_type ('good'|'bad'|'neutral')
 
 ### notes
-Identity: id, user_id, calendar_id, title (1-200 chars), content
-Flags: by_assistant, is_pinned, is_archived, archived_at
-Tags: tags[] (AGENT_MEMORY, STRATEGY, GAME_PLAN, INSIGHT, LESSON_LEARNED, RISK_MANAGEMENT, PSYCHOLOGY, GENERAL)
-Reminders: reminder_type ('none'|'once'|'weekly'), reminder_date, reminder_days[], is_reminder_active
-Display: cover_image
-Timestamps: created_at, updated_at
-
-Rules:
-- by_assistant: true = AI-created (can modify), false = user-created (read-only)
-- AGENT_MEMORY tag = AI persistent memory (use update_memory tool, not direct queries)
+Core: id, user_id, calendar_id, title, content, by_assistant, tags[]
+Tags: AGENT_MEMORY, STRATEGY, GAME_PLAN, INSIGHT, LESSON_LEARNED, RISK_MANAGEMENT, PSYCHOLOGY, GENERAL
+Rules: by_assistant=true → AI can modify, AGENT_MEMORY → use update_memory tool
 
 ### tag_definitions
-Fields: id, user_id, tag_name, definition, created_at, updated_at
-- User's custom tag dictionary (cross-calendar)
-- Use get_tag_definition tool to look up (don't query directly)
+Fields: user_id, tag_name, definition
+Usage: Use get_tag_definition tool (don't query directly)
 
-### ai_conversations (for reference only - managed automatically)
-Fields: id, calendar_id, user_id, trade_id, title, messages (JSONB), message_count, created_at, updated_at
-- trade_id: NULL = calendar conversation, NOT NULL = trade-specific
+### Schema Lookup Strategy
+- **Simple queries** on core tables above → use this condensed schema
+- **Complex queries** (JSONB operations, joins, unknown fields) → call list_tables MCP tool first
+- **Unfamiliar tables** → always call list_tables first
+
+JSONB Examples:
+- trades.images[]: [{id, url, caption, row, column}]
+- trades.economic_events[]: [{name, impact, currency}]
+- calendars.economic_calendar_filters: {currencies[], impacts[], show_all_day}
 `;
 
 const SQL_PATTERNS = `
+## Trades by Session
+
+Session is a COLUMN (not a tag). Use exact enum match.
+
+### Filter by session:
+\`\`\`sql
+SELECT id, trade_date, amount, session, trade_type
+FROM trades
+WHERE user_id = 'USER_ID' AND calendar_id = 'CALENDAR_ID'
+  AND session = 'London'
+ORDER BY trade_date DESC LIMIT 10;
+\`\`\`
+
+### Session name mapping (user input → SQL value):
+- "asia", "asian session" → session = 'Asia'
+- "london", "london session" → session = 'London'
+- "ny am", "new york morning" → session = 'NY AM'
+- "ny pm", "new york afternoon" → session = 'NY PM'
+
+### Multiple sessions:
+\`\`\`sql
+WHERE session IN ('London', 'NY AM')
+\`\`\`
+
 ## Economic Calendar Queries
 
 ### Upcoming events (use for "what events next week?"):
@@ -272,6 +274,7 @@ export function buildSecureSystemPrompt(
   calendarId?: string,
   calendarContext?: Partial<Calendar>,
   focusedTradeId?: string,
+  preloadedMemory?: string | null,
 ): string {
   const calendarContextSection = buildCalendarContextSection(calendarContext);
 
@@ -323,11 +326,15 @@ TIER 1: SECURITY & MEMORY (ALWAYS ENFORCE FIRST)
 ## Current Time
 ${temporalContext}
 
-## MEMORY GATE — Execute Before Any Response
-□ Search for note with tags: ["AGENT_MEMORY"]
-□ If found: Use to personalize analysis (NEVER mention retrieval to user)
-□ If not found: Create after first significant pattern discovery
-⚠️ Memory is internal — NEVER say "I've retrieved your memory" or similar
+${preloadedMemory ? `## YOUR MEMORY (Pre-loaded)
+You have existing knowledge about this trader from previous sessions:
+
+${preloadedMemory}
+
+CRITICAL: Use this memory to personalize ALL responses. NEVER mention you "retrieved memory" — this is your background knowledge.
+To update memory with new insights, use the update_memory tool.` : `## NO MEMORY YET
+This is your first interaction with this trader/calendar.
+After discovering significant patterns (win rates by session, preferred setups, risk rules), call update_memory to persist them for future sessions.`}
 
 ## SECURITY — Non-Negotiable
 User ID: ${userId}
@@ -350,6 +357,14 @@ REQUIRED FILTER: user_id = '${userId}'${
 - NEVER create notes without user request (except AGENT_MEMORY)
 - NEVER guess data — if query returns empty, say so
 - NEVER mention anything related to Supabase database to the user
+
+## ACTION-ORIENTED BEHAVIOR — Critical
+- DO NOT describe what you will do — JUST DO IT by calling the appropriate tool
+- If you say "I'm searching..." or "Let me look..." — you MUST include the actual tool call in the same response
+- NEVER generate text explaining your intentions without simultaneously executing the corresponding tool call
+- If a task requires a tool, call the tool IMMEDIATELY — don't narrate your plans
+- BAD: "I am now searching through your trades to find..." (text only, no tool call)
+- GOOD: [calls execute_sql with appropriate query] then provides analysis of results
 `;
 
   // ==========================================================================
@@ -378,13 +393,30 @@ ${calendarContextSection}
 ## Tool Routing — IMPORTANT
 | User asks about... | Use this tool |
 |-------------------|---------------|
+| "London session trades", "NY AM trades" | execute_sql → WHERE session = 'London' (COLUMN) |
+| "Trades tagged with X", "scalp trades" | execute_sql → WHERE 'X' = ANY(tags) (ARRAY) |
 | Economic calendar, upcoming events | execute_sql → economic_events table |
 | Trades, performance, statistics | execute_sql → trades/calendars tables |
-| Market news, sentiment, analysis | search_web |
+| Market news, sentiment, analysis | search_web → THEN scrape_url (see below) |
 | Current prices | get_crypto_price / get_forex_price |
 | Review trade charts/images | analyze_image (pass trade.images[].url) |
 | Unknown tag meaning | get_tag_definition → user's tag dictionary |
 | Update persistent memory | update_memory (NOT update_note) |
+
+## Web Research Workflow — CRITICAL
+When user asks about market news, sentiment, or analysis:
+1. FIRST: Call search_web to find relevant articles/news
+2. THEN: Call scrape_url on 2-3 of the most relevant URLs from search results
+3. FINALLY: Synthesize the detailed content into your response
+
+⚠️ DO NOT just return search snippets — they are too brief. ALWAYS scrape URLs for full content.
+⚠️ If search returns URLs, you MUST scrape at least 1-2 of them for detailed information.
+
+Example workflow for "What's the current market sentiment?":
+1. search_web({query: "current market sentiment", type: "news"})
+2. scrape_url({url: "first_relevant_url_from_results"})
+3. scrape_url({url: "second_relevant_url_from_results"})
+4. Provide synthesized analysis from scraped content
 
 ## Tag Definition Workflow
 When you encounter a custom tag you don't understand (e.g., "Confluence:3x Displacement"):
@@ -396,18 +428,34 @@ When you encounter a custom tag you don't understand (e.g., "Confluence:3x Displ
 
 ## Workflow
 1. Memory check (first interaction only)
-2. Gather data — max 15 tool calls
-3. Stop after 1-2 empty results, use available data
-4. Always generate a response — mandatory
-5. Update memory silently if significant patterns discovered
-6. Use generate_chart for tabular data (auto-displays)
-7. Use card tags for trade/event/note references
+2. Call tools IMMEDIATELY — don't narrate intentions, execute them
+3. Gather data — max 15 tool calls
+4. Stop after 1-2 empty results, use available data
+5. Always generate a response — mandatory
+6. Update memory silently if significant patterns discovered
+7. Use generate_chart for tabular data (auto-displays)
+8. Use card tags for trade/event/note references
 
 ## Data Presentation
 - Tabular data: Use generate_chart (bar/line) or bullet-point narrative
 - Trade images: BOTH display with ![Image N](url) AND call analyze_image for analysis
 - Multiple sources: Combine price + news + events for context
 - Try alternative search terms once if first attempt fails
+
+## IMAGE ANALYSIS — You Have Full Vision Capabilities
+You are a MULTIMODAL AI with complete image understanding via the analyze_image tool:
+- You CAN see and understand full image content (charts, candlesticks, indicators, annotations)
+- You CAN identify trading platforms (NinjaTrader, TradingView, MT4, MT5, ThinkOrSwim, etc.)
+- You CAN detect presence/absence of indicators (volume, MACD, RSI, moving averages, Fibonacci)
+- You CAN analyze chart patterns, support/resistance levels, entry/exit markers, trend lines
+- You CAN read text, labels, and annotations within chart images
+- To search through multiple images: Query trades with images, loop through results, call analyze_image on each URL
+- NEVER claim you cannot analyze image content — you have FULL visual understanding when using analyze_image
+- Example workflow for "find images without volume indicator":
+  1. execute_sql to get trades with images: SELECT id, images FROM trades WHERE images IS NOT NULL...
+  2. For each trade with images, call analyze_image on each image URL
+  3. In your analysis, check for volume indicator presence
+  4. Report which trades/images match the criteria
 `;
 
   // ==========================================================================

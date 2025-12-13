@@ -91,22 +91,34 @@ export function mapEventToDbRow(e: EconomicEvent): EconomicEventDBRow | null {
 // Helpers ported from Firebase parseMyFXBookWeeklyEnhanced
 function isNumericValue(value: string): boolean {
   if (!value || typeof value !== 'string') return false
+
   const trimmed = value.trim()
   if (trimmed.length === 0 || trimmed.length > 25) return false
+
+  // Check for pure text (no digits at all)
+  if (/^[a-zA-Z\s]+$/.test(trimmed)) return false
+  // Check for time format (e.g., "12:30")
+  if (trimmed.includes(':') && /\d{1,2}:\d{2}/.test(trimmed)) return false
+
   const cleaned = trimmed
-    .replace(/N\/?A|n\/?a/gi, '')
-    .replace(/%/g, '')
-    .replace(/bps/gi, '')
-    .replace(/pips?/gi, '')
-    .replace(/\+/g, '')
-    .replace(/,/g, '')
-    .replace(/–/g, '-')
-    .replace(/—/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim()
-  if (cleaned.length === 0 || cleaned.length > 20) return false
-  const isNumeric = /^-?\d*(\.\d+)?$/.test(cleaned)
-  const canParse = !isNaN(parseFloat(cleaned))
+    .replace(/[,%$€£¥]/g, '')  // Remove currency symbols and commas
+    .replace(/[()]/g, '')       // Remove parentheses
+    .replace(/^\+/, '')         // Remove leading plus
+    .replace(/\s+/g, '')        // Remove whitespace
+
+  // Multiple patterns to match various numeric formats (matching Firebase)
+  const numericPatterns = [
+    /^-?\d+\.?\d*$/,              // Basic number: 123, -123, 123.45
+    /^-?\d+\.?\d*[KMB]$/i,        // With K/M/B suffix: 189.87M, 1.5B
+    /^-?\d+\.?\d*%$/,             // Percentage: 5.5%
+    /^-?\d{1,3}(,\d{3})*\.?\d*$/, // With commas: 1,234.56
+    /^\d+\.?\d*[KMB]?$/i,         // Positive with optional suffix
+    /^-?\d+\.?\d*[bp]$/i,         // Basis points: 25bp
+  ]
+
+  const isNumeric = numericPatterns.some(pattern => pattern.test(cleaned))
+  const canParse = !isNaN(parseFloat(cleaned.replace(/[KMBbp%]/gi, '')))
+
   return isNumeric && canParse && cleaned.length > 0
 }
 

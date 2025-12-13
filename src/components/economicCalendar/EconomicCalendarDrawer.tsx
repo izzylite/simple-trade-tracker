@@ -113,26 +113,9 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   calendar,
   trades = [],
   tradeOperations,
-  // Individual props (fallback if tradeOperations not provided)
-  onUpdateCalendarProperty: onUpdateCalendarPropertyProp,
-  onOpenGalleryMode: onOpenGalleryModeProp,
-  onUpdateTradeProperty: onUpdateTradePropertyProp,
-  onEditTrade: onEditTradeProp,
-  onDeleteTrade: onDeleteTradeProp,
-  onDeleteMultipleTrades: onDeleteMultipleTradesProp,
-  onZoomImage: onZoomImageProp,
-  isTradeUpdating: isTradeUpdatingProp,
   isReadOnly = false
 }) => {
-  // Extract from tradeOperations or use individual props
-  const onUpdateCalendarProperty = tradeOperations?.onUpdateCalendarProperty || onUpdateCalendarPropertyProp;
-  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
-  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
-  const onEditTrade = tradeOperations?.onEditTrade || onEditTradeProp;
-  const onDeleteTrade = tradeOperations?.onDeleteTrade || onDeleteTradeProp;
-  const onDeleteMultipleTrades = tradeOperations?.onDeleteMultipleTrades || onDeleteMultipleTradesProp;
-  const onZoomImage = tradeOperations?.onZoomImage || onZoomImageProp;
-  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
+  const { onUpdateCalendarProperty } = tradeOperations;
   const theme = useTheme();
 
   // Local UI state
@@ -771,16 +754,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           event={selectedEvent}
           trades={trades}
           tradeOperations={tradeOperations}
-          onUpdateTradeProperty={onUpdateTradeProperty}
-          onEditTrade={onEditTrade}
-          onDeleteTrade={onDeleteTrade}
-          onDeleteMultipleTrades={onDeleteMultipleTrades}
-          onZoomImage={onZoomImage}
-          onOpenGalleryMode={onOpenGalleryMode}
-          isTradeUpdating={isTradeUpdating}
-          calendarId={calendar.id}
-          calendar={calendar}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
           isReadOnly={isReadOnly}
         />
       )}

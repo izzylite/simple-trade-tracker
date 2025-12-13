@@ -7,6 +7,15 @@ export type MessageRole = 'user' | 'assistant' | 'system';
 
 export type MessageStatus = 'sending' | 'sent' | 'error' | 'received' | 'pending' | 'receiving';
 
+// Attached image for user messages
+export interface AttachedImage {
+  id: string;
+  url: string; // Can be data URL (base64) or remote URL
+  mimeType: string;
+  name?: string;
+  size?: number; // bytes
+}
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -14,6 +23,8 @@ export interface ChatMessage {
   timestamp: Date;
   status: MessageStatus;
   error?: string;
+  // Attached images (for user messages)
+  images?: AttachedImage[];
   // HTML formatted message (from Supabase AI agent)
   messageHtml?: string;
   // Citations from tool results (from Supabase AI agent)
@@ -33,6 +44,7 @@ export interface ChatMessage {
 // Serializable version for database storage (timestamp as ISO string)
 export interface SerializableChatMessage extends Omit<ChatMessage, 'timestamp'> {
   timestamp: string; // ISO 8601 string
+  images?: AttachedImage[]; // Images are already serializable
 }
 
 // Conversation stored in database (after transformation from repository)

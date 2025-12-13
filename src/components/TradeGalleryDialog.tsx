@@ -58,17 +58,8 @@ interface TradeGalleryDialogProps {
   aiOnlyMode?: boolean;
   isReadOnly?: boolean;
 
-  // Trade operations - can be passed as object or individual props
-  tradeOperations?: TradeOperationsProps;
-
-  // Individual props (for backward compatibility)
-  onUpdateTradeProperty?: TradeOperationsProps['onUpdateTradeProperty'];
-  onOpenGalleryMode?: TradeOperationsProps['onOpenGalleryMode'];
-  onEditTrade?: TradeOperationsProps['onEditTrade'];
-  onDeleteTrade?: TradeOperationsProps['onDeleteTrade'];
-  onDeleteMultipleTrades?: TradeOperationsProps['onDeleteMultipleTrades'];
-  onUpdateCalendarProperty?: TradeOperationsProps['onUpdateCalendarProperty'];
-  isTradeUpdating?: TradeOperationsProps['isTradeUpdating'];
+  // Trade operations - required
+  tradeOperations: TradeOperationsProps;
 }
 
 const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
@@ -82,24 +73,18 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   calendar,
   aiOnlyMode = false,
   isReadOnly = false,
-  tradeOperations,
-  // Individual props (fallback if tradeOperations not provided)
-  onUpdateTradeProperty: onUpdateTradePropertyProp,
-  onOpenGalleryMode: onOpenGalleryModeProp,
-  onEditTrade: onEditTradeProp,
-  onDeleteTrade: onDeleteTradeProp,
-  onDeleteMultipleTrades: onDeleteMultipleTradesProp,
-  onUpdateCalendarProperty: onUpdateCalendarPropertyProp,
-  isTradeUpdating: isTradeUpdatingProp
+  tradeOperations
 }) => {
-  // Extract from tradeOperations or use individual props
-  const onUpdateTradeProperty = tradeOperations?.onUpdateTradeProperty || onUpdateTradePropertyProp;
-  const onOpenGalleryMode = tradeOperations?.onOpenGalleryMode || onOpenGalleryModeProp;
-  const onEditTrade = tradeOperations?.onEditTrade || onEditTradeProp;
-  const onDeleteTrade = tradeOperations?.onDeleteTrade || onDeleteTradeProp;
-  const onDeleteMultipleTrades = tradeOperations?.onDeleteMultipleTrades || onDeleteMultipleTradesProp;
-  const onUpdateCalendarProperty = tradeOperations?.onUpdateCalendarProperty || onUpdateCalendarPropertyProp;
-  const isTradeUpdating = tradeOperations?.isTradeUpdating || isTradeUpdatingProp;
+  // Destructure from tradeOperations directly
+  const {
+    onUpdateTradeProperty,
+    onOpenGalleryMode,
+    onEditTrade,
+    onDeleteTrade,
+    onDeleteMultipleTrades,
+    onUpdateCalendarProperty,
+    isTradeUpdating
+  } = tradeOperations;
   const theme = useTheme();
   const { user } = useAuth();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -490,13 +475,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             tradeData={currentTrade}
             isExpanded={true}
             animate={false}
-            setZoomedImage={setZoomedImage}
             trades={trades}
             tradeOperations={tradeOperations}
-            onUpdateTradeProperty={onUpdateTradeProperty}
-            onOpenGalleryMode={onOpenGalleryMode}
-            isTradeUpdating={isTradeUpdating}
-            calendarId={calendarId}
           />
         </Box>
       </TabPanel>
@@ -731,16 +711,6 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           event={selectedEvent}
           trades={trades}
           tradeOperations={tradeOperations}
-          onUpdateTradeProperty={onUpdateTradeProperty}
-          onEditTrade={onEditTrade}
-          onDeleteTrade={onDeleteTrade}
-          onDeleteMultipleTrades={onDeleteMultipleTrades}
-          onZoomImage={setZoomedImage}
-          onOpenGalleryMode={onOpenGalleryMode}
-          isTradeUpdating={isTradeUpdating}
-          calendarId={calendarId}
-          calendar={calendar}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
           isReadOnly={isReadOnly}
         />
       )}

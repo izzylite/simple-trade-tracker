@@ -25,11 +25,13 @@ import {
   Send as SendIcon,
   AddComment as NewChatIcon,
   Stop as StopIcon,
-  Notes as NotesIcon
+  Notes as NotesIcon,
+  Image as ImageIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import ChatMessage from './ChatMessage';
 import AIChatMentionInput from './AIChatMentionInput';
-import { ChatMessage as ChatMessageType } from '../../types/aiChat';
+import { ChatMessage as ChatMessageType, AttachedImage } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
 import { EconomicEvent } from '../../types/economicCalendar';
@@ -37,6 +39,9 @@ import { Note } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
 import * as notesService from '../../services/notesService';
+
+// Image limit for AI agent requests (must match backend MAX_IMAGES_PER_REQUEST)
+const MAX_IMAGES = 4;
 
 // Type for question templates
 export interface QuestionTemplate {
@@ -89,10 +94,9 @@ export interface AIChatInterfaceProps {
   isAtMessageLimit: boolean;
 
   // Actions from useAIChat hook
-  sendMessage: (messageText: string) => Promise<void>;
+  sendMessage: (messageText: string, images?: AttachedImage[]) => Promise<void>;
   cancelRequest: () => void;
-  retryMessage: (messageId: string) => Promise<void>;
-  setInputForEdit: (messageId: string) => string | null;
+  setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[] } | null;
   startNewChat: () => Promise<void>;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessageType[]>>;
   getWelcomeMessage: () => ChatMessageType;
@@ -128,7 +132,6 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   isAtMessageLimit,
   sendMessage,
   cancelRequest,
-  retryMessage,
   setInputForEdit,
   startNewChat,
   setMessages,
@@ -151,6 +154,8 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
 
   // Local UI state
   const [inputMessage, setInputMessage] = useState('');
+  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Notes context popup state
   const [notesAnchorEl, setNotesAnchorEl] = useState<HTMLElement | null>(null);
@@ -181,27 +186,142 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   // Event Handlers
   const handleSendMessage = async () => {
     const messageText = inputMessage.trim();
-    if (!messageText || isLoading) return;
+    if ((!messageText && attachedImages.length === 0) || isLoading) return;
 
+    const imagesToSend = attachedImages.length > 0 ? [...attachedImages] : undefined;
     setInputMessage('');
-    await sendMessage(messageText);
+    setAttachedImages([]);
+    await sendMessage(messageText, imagesToSend);
   };
+
+  // Image upload handlers
+  const handleImageUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newImages: AttachedImage[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        logger.warn('Skipping non-image file:', file.name);
+        continue;
+      }
+
+      // Limit file size to 10MB
+      if (file.size > 10 * 1024 * 1024) {
+        logger.warn('Skipping large file:', file.name, file.size);
+        continue;
+      }
+
+      try {
+        // Convert to base64 data URL
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        newImages.push({
+          id: crypto.randomUUID(),
+          url: dataUrl,
+          mimeType: file.type,
+          name: file.name,
+          size: file.size
+        });
+      } catch (error) {
+        logger.error('Error reading file:', error);
+      }
+    }
+
+    if (newImages.length > 0) {
+      setAttachedImages(prev => [...prev, ...newImages].slice(0, MAX_IMAGES));
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveImage = (imageId: string) => {
+    setAttachedImages(prev => prev.filter(img => img.id !== imageId));
+  };
+
+  // Handle paste event for images (Ctrl+V)
+  const handlePaste = useCallback(async (event: React.ClipboardEvent) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    const newImages: AttachedImage[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      // Check if it's an image
+      if (item.type.startsWith('image/')) {
+        event.preventDefault(); // Prevent default paste behavior for images
+
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        // Limit file size to 10MB
+        if (file.size > 10 * 1024 * 1024) {
+          logger.warn('Skipping large pasted image:', file.size);
+          continue;
+        }
+
+        try {
+          // Convert to base64 data URL
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
+          newImages.push({
+            id: crypto.randomUUID(),
+            url: dataUrl,
+            mimeType: file.type,
+            name: `pasted-image-${Date.now()}.${file.type.split('/')[1] || 'png'}`,
+            size: file.size
+          });
+        } catch (error) {
+          logger.error('Error reading pasted image:', error);
+        }
+      }
+    }
+
+    if (newImages.length > 0) {
+      setAttachedImages(prev => [...prev, ...newImages].slice(0, MAX_IMAGES));
+    }
+  }, []);
 
   const handleCancelRequest = () => {
     cancelRequest();
   };
 
   const handleEditMessage = (messageId: string) => {
-    const content = setInputForEdit(messageId);
-    if (content) {
-      setInputMessage(content);
+    const editData = setInputForEdit(messageId);
+    if (editData) {
+      setInputMessage(editData.content);
+      // Restore images when editing
+      if (editData.images && editData.images.length > 0) {
+        setAttachedImages(editData.images);
+      } else {
+        setAttachedImages([]);
+      }
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   };
-
-  const handleMessageRetry = useCallback(async (messageId: string) => {
-    await retryMessage(messageId);
-  }, [retryMessage]);
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -297,7 +417,6 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             key={message.id}
             message={message}
             showTimestamp={true}
-            onRetry={handleMessageRetry}
             isLatestMessage={index === displayMessages.length - 1}
             enableAnimation={index > 0}
             onTradeClick={(tradeId, contextTrades) => {
@@ -492,20 +611,98 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
         backgroundColor: alpha(theme.palette.background.paper, 0.8),
         backdropFilter: 'blur(10px)'
       }}>
-        <Box sx={{
-          display: 'flex',
-          gap: 1,
-          alignItems: 'center',
-          backgroundColor: 'background.paper',
-          borderRadius: 3,
-          p: 1,
-          border: '1px solid',
-          borderColor: 'divider',
-          '&:focus-within': {
-            borderColor: 'primary.main',
-            boxShadow: `0 0 0 1px ${alpha(theme.palette.primary.main, 0.15)}`
-          }
-        }}>
+        {/* Image Preview Section */}
+        {attachedImages.length > 0 && (
+          <Box sx={{
+            display: 'flex',
+            gap: 1,
+            mb: 1.5,
+            flexWrap: 'wrap',
+            alignItems: 'center'
+          }}>
+            <Typography
+              variant="caption"
+              sx={{
+                color: attachedImages.length >= MAX_IMAGES ? 'warning.main' : 'text.secondary',
+                fontWeight: 500,
+                mr: 0.5
+              }}
+            >
+              {attachedImages.length}/{MAX_IMAGES}
+            </Typography>
+            {attachedImages.map((image) => (
+              <Box
+                key={image.id}
+                sx={{
+                  position: 'relative',
+                  width: 64,
+                  height: 64,
+                  borderRadius: 1.5,
+                  overflow: 'hidden',
+                  border: '1px solid',
+                  borderColor: 'divider'
+                }}
+              >
+                <Box
+                  component="img"
+                  src={image.url}
+                  alt={image.name || 'Attached image'}
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover'
+                  }}
+                />
+                <IconButton
+                  size="small"
+                  onClick={() => handleRemoveImage(image.id)}
+                  sx={{
+                    position: 'absolute',
+                    top: 2,
+                    right: 2,
+                    width: 18,
+                    height: 18,
+                    backgroundColor: 'rgba(0,0,0,0.6)',
+                    color: 'white',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0,0,0,0.8)'
+                    }
+                  }}
+                >
+                  <CloseIcon sx={{ fontSize: 12 }} />
+                </IconButton>
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={handleImageSelect}
+        />
+
+        <Box
+          onPaste={handlePaste}
+          sx={{
+            display: 'flex',
+            gap: 1,
+            alignItems: 'center',
+            backgroundColor: 'background.paper',
+            borderRadius: 3,
+            p: 1,
+            border: '1px solid',
+            borderColor: 'divider',
+            '&:focus-within': {
+              borderColor: 'primary.main',
+              boxShadow: `0 0 0 1px ${alpha(theme.palette.primary.main, 0.15)}`
+            }
+          }}
+        >
           <AIChatMentionInput
             ref={inputRef}
             value={inputMessage}
@@ -517,6 +714,37 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             maxRows={4}
             sx={{ flex: 1, minWidth: 0, fontSize: '0.95rem', lineHeight: 1.4 }}
           />
+          {/* Image upload button */}
+          <IconButton
+            aria-label="Attach image"
+            onClick={handleImageUploadClick}
+            disabled={isReadOnly || isLoading || isAtMessageLimit || attachedImages.length >= MAX_IMAGES}
+            size="small"
+            sx={{
+              backgroundColor: attachedImages.length > 0
+                ? alpha(theme.palette.primary.main, 0.1)
+                : 'background.default',
+              color: attachedImages.length > 0 ? 'primary.main' : 'text.secondary',
+              width: 32,
+              height: 32,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: attachedImages.length > 0 ? 'primary.main' : 'divider',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                borderColor: 'primary.main',
+                color: 'primary.main'
+              },
+              '&:disabled': {
+                backgroundColor: 'action.disabledBackground',
+                color: 'action.disabled',
+                borderColor: 'action.disabledBackground'
+              }
+            }}
+          >
+            <ImageIcon sx={{ fontSize: 18 }} />
+          </IconButton>
           <IconButton
             aria-label="Insert note context"
             onClick={handleOpenNotesContext}
@@ -547,17 +775,17 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
           </IconButton>
           <IconButton
             onClick={isLoading ? handleCancelRequest : handleSendMessage}
-            disabled={(!inputMessage.trim() && !isLoading) || isAtMessageLimit}
+            disabled={(!inputMessage.trim() && attachedImages.length === 0 && !isLoading) || isAtMessageLimit}
             size="small"
             sx={{
               backgroundColor: isLoading
                 ? 'error.main'
-                : inputMessage.trim()
+                : (inputMessage.trim() || attachedImages.length > 0)
                   ? 'primary.main'
                   : 'action.disabledBackground',
               color: isLoading
                 ? 'error.contrastText'
-                : inputMessage.trim()
+                : (inputMessage.trim() || attachedImages.length > 0)
                   ? 'primary.contrastText'
                   : 'action.disabled',
               width: 36,
@@ -566,10 +794,10 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
               '&:hover': {
                 backgroundColor: isLoading
                   ? 'error.dark'
-                  : inputMessage.trim()
+                  : (inputMessage.trim() || attachedImages.length > 0)
                     ? 'primary.dark'
                     : 'action.disabledBackground',
-                transform: inputMessage.trim() && !isLoading ? 'scale(1.05)' : 'none'
+                transform: (inputMessage.trim() || attachedImages.length > 0) && !isLoading ? 'scale(1.05)' : 'none'
               },
               '&:disabled': {
                 backgroundColor: 'action.disabledBackground',
@@ -596,7 +824,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             opacity: 0.7
           }}
         >
-          {'Enter to send • Shift+Enter newline • @ for tags • Notes button inserts note:{title}'}
+          {`Enter to send • Shift+Enter newline • @ for tags • Up to ${MAX_IMAGES} images`}
         </Typography>
       </Box>
 

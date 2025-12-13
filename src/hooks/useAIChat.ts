@@ -9,7 +9,8 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   ChatMessage as ChatMessageType,
   ChatError,
-  AIConversation
+  AIConversation,
+  AttachedImage
 } from '../types/aiChat';
 import { Calendar } from '../types/calendar';
 import { Trade } from '../types/trade';
@@ -39,11 +40,10 @@ export interface UseAIChatReturn {
   editingMessageId: string | null;
 
   // Actions
-  sendMessage: (messageText: string) => Promise<void>;
+  sendMessage: (messageText: string, images?: AttachedImage[]) => Promise<void>;
   cancelRequest: () => void;
   editMessage: (messageId: string) => string | null;
-  retryMessage: (messageId: string) => Promise<void>;
-  setInputForEdit: (messageId: string) => string | null;
+  setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[] } | null;
   clearEditingState: () => void;
 
   // Conversation management
@@ -320,9 +320,9 @@ export function useAIChat({
   /**
    * Send a message to the AI
    */
-  const sendMessage = useCallback(async (messageText: string) => {
+  const sendMessage = useCallback(async (messageText: string, images?: AttachedImage[]) => {
     const trimmedMessage = messageText.trim();
-    if (!trimmedMessage || isLoading || !userId) return;
+    if ((!trimmedMessage && (!images || images.length === 0)) || isLoading || !userId) return;
 
     cancelRequestedRef.current = false;
 
@@ -341,6 +341,7 @@ export function useAIChat({
           id: uuidv4(),
           role: 'user',
           content: trimmedMessage,
+          images: images,
           timestamp: new Date(),
           status: 'sent'
         };
@@ -351,6 +352,7 @@ export function useAIChat({
         userMessage = {
           ...originalMessage,
           content: trimmedMessage,
+          images: images,
           timestamp: new Date(),
           status: 'sent'
         };
@@ -364,6 +366,7 @@ export function useAIChat({
         id: uuidv4(),
         role: 'user',
         content: trimmedMessage,
+        images: images,
         timestamp: new Date(),
         status: 'sent'
       };
@@ -401,7 +404,8 @@ export function useAIChat({
         calendar,
         baseHistory,
         abortController.signal,
-        trade?.id
+        trade?.id,
+        images
       )) {
         switch (event.type) {
           case 'text_chunk':
@@ -543,105 +547,25 @@ export function useAIChat({
   }, [userId, calendar, trade, messages, editingMessageId, isLoading, parseQuotaError, saveCurrentConversation]);
 
   /**
-   * Retry a failed message
+   * Set up message for editing and return its content and images
    */
-  const retryMessage = useCallback(async (messageId: string) => {
-    const messageIndex = messages.findIndex(msg => msg.id === messageId);
-    if (messageIndex === -1) return;
-
-    const messageToRetry = messages[messageIndex];
-    if (messageToRetry.role !== 'assistant') return;
-
-    let userMessageIndex = messageIndex - 1;
-    while (userMessageIndex >= 0 && messages[userMessageIndex].role !== 'user') {
-      userMessageIndex--;
-    }
-
-    if (userMessageIndex < 0) return;
-
-    const userMessage = messages[userMessageIndex];
-
-    try {
-      const updatedMessages = messages.slice(0, userMessageIndex + 1);
-      setMessages(updatedMessages);
-
-      setIsLoading(true);
-      setIsTyping(true);
-      setToolExecutionStatus('');
-
-      if (!userId) {
-        throw new Error('User not authenticated');
-      }
-
-      const response = await supabaseAIChatService.sendMessage(
-        userMessage.content,
-        userId,
-        calendar,
-        updatedMessages,
-        trade?.id
-      );
-
-      if (!response.success) {
-        throw new Error(response.message || 'Failed to get AI response');
-      }
-
-      const newAssistantMessage: ChatMessageType = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: response.message,
-        messageHtml: response.messageHtml,
-        citations: response.citations,
-        embeddedTrades: response.embeddedTrades,
-        embeddedEvents: response.embeddedEvents,
-        embeddedNotes: response.embeddedNotes,
-        timestamp: new Date(),
-        status: 'received'
-      };
-
-      setMessages(prev => [...prev, newAssistantMessage]);
-      logger.log('Message regenerated successfully');
-
-    } catch (error) {
-      logger.error('Error regenerating message:', error);
-
-      const errorDetails = error instanceof Error ? error.message : 'Unknown error';
-      const quotaErrorInfo = parseQuotaError(errorDetails);
-
-      const errorMessage: ChatMessageType = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: quotaErrorInfo.isQuotaError
-          ? quotaErrorInfo.userMessage
-          : 'Sorry, I encountered an error while regenerating the response. Please try again.',
-        timestamp: new Date(),
-        status: 'error',
-        error: quotaErrorInfo.isQuotaError ? 'API Quota Exceeded' : errorDetails
-      };
-
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-      setIsTyping(false);
-      setToolExecutionStatus('');
-    }
-  }, [messages, userId, calendar, trade, parseQuotaError]);
-
-  /**
-   * Set up message for editing and return its content
-   */
-  const setInputForEdit = useCallback((messageId: string): string | null => {
+  const setInputForEdit = useCallback((messageId: string): { content: string; images?: AttachedImage[] } | null => {
     const messageToEdit = messages.find(msg => msg.id === messageId);
     if (!messageToEdit || messageToEdit.role !== 'user') return null;
 
     setEditingMessageId(messageId);
-    return messageToEdit.content;
+    return {
+      content: messageToEdit.content,
+      images: messageToEdit.images
+    };
   }, [messages]);
 
   /**
    * Legacy edit message function (returns content for input field)
    */
   const editMessage = useCallback((messageId: string): string | null => {
-    return setInputForEdit(messageId);
+    const result = setInputForEdit(messageId);
+    return result ? result.content : null;
   }, [setInputForEdit]);
 
   /**
@@ -716,7 +640,6 @@ What would you like to know about your trading?`,
     sendMessage,
     cancelRequest,
     editMessage,
-    retryMessage,
     setInputForEdit,
     clearEditingState,
 
