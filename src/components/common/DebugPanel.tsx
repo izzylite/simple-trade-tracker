@@ -16,9 +16,12 @@ import {
   Box,
   Divider,
   Chip,
-  Stack
+  Stack,
+  useTheme,
+  alpha
 } from '@mui/material';
 import { loggerControls, LogLevel } from '../../utils/logger';
+import { scrollbarStyles } from '../../styles/scrollbarStyles';
 
 interface DebugPanelProps {
   open: boolean;
@@ -26,6 +29,7 @@ interface DebugPanelProps {
 }
 
 const DebugPanel: React.FC<DebugPanelProps> = ({ open, onClose }) => {
+  const theme = useTheme();
   const [config, setConfig] = useState(loggerControls.getConfig());
 
   useEffect(() => {

@@ -18,7 +18,7 @@ class Logger {
   private readonly DEFAULT_CONFIG: LoggerConfig = {
     enabled: process.env.NODE_ENV === 'development', // Enable by default in development
     level: 'info',
-    prefix: '[TradeTracker]',
+    prefix: '[JournoTrades]',
     timestamp: true
   };
 

@@ -33,7 +33,7 @@ import {
   FormatClear,
   Image as ImageIcon,
 } from '@mui/icons-material';
-import { EditorState } from 'draft-js';
+import { EditorState, DraftInlineStyle } from 'draft-js';
 
 import { TEXT_COLORS, BACKGROUND_COLORS } from '../constants/colors';
 import { HEADING_OPTIONS } from '../constants/headings';
