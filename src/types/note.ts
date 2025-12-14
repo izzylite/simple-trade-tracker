@@ -4,9 +4,16 @@
  * Supports reminder functionality for displaying notes on specific days
  */
 
-export type ReminderType = 'none' | 'once' | 'weekly';
+export type ReminderType = "none" | "once" | "weekly";
 
-export type DayAbbreviation = 'Sun' | 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat';
+export type DayAbbreviation =
+  | "Sun"
+  | "Mon"
+  | "Tue"
+  | "Wed"
+  | "Thu"
+  | "Fri"
+  | "Sat";
 
 export interface Note {
   id: string;
@@ -28,6 +35,9 @@ export interface Note {
   reminder_days?: DayAbbreviation[]; // For weekly reminders
   is_reminder_active?: boolean;
 
+  // Visuals
+  color?: string; // Hex code or preset name
+
   // Tags for categorization
   tags?: string[];
 }
@@ -46,6 +56,9 @@ export interface CreateNoteInput {
   reminder_days?: DayAbbreviation[];
   is_reminder_active?: boolean;
 
+  // Visuals
+  color?: string;
+
   // Tags for categorization
   tags?: string[];
 }
@@ -63,6 +76,9 @@ export interface UpdateNoteInput {
   reminder_date?: Date | null;
   reminder_days?: DayAbbreviation[];
   is_reminder_active?: boolean;
+
+  // Visuals
+  color?: string;
 
   // Tags for categorization
   tags?: string[];

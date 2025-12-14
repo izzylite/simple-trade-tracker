@@ -16,6 +16,23 @@ import {
   useTheme,
 } from '@mui/material';
 import {
+  pink,
+  purple,
+  deepPurple,
+  indigo,
+  lightBlue,
+  cyan,
+  teal,
+  lightGreen,
+  lime,
+  yellow,
+  amber,
+  deepOrange,
+  brown,
+  grey,
+  blueGrey,
+} from '@mui/material/colors';
+import {
   EventNote as EventNoteIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
@@ -263,7 +280,7 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
   };
 
   const handleNext = () => {
-   setCurrentIndex((prev) => (prev < reminderNotes.length - 1 ? prev + 1 : 0));
+    setCurrentIndex((prev) => (prev < reminderNotes.length - 1 ? prev + 1 : 0));
   };
 
   // Don't render if no reminders for today
@@ -274,6 +291,29 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
   const currentNote = reminderNotes[currentIndex];
   const hasMultipleNotes = reminderNotes.length > 1;
 
+  const colorMap: Record<string, string> = {
+    'red': theme.palette.error.main,
+    'pink': pink[500],
+    'purple': purple[500],
+    'deepPurple': deepPurple[500],
+    'indigo': indigo[500],
+    'blue': theme.palette.info.main,
+    'lightBlue': lightBlue[500],
+    'cyan': cyan[500],
+    'teal': teal[500],
+    'green': theme.palette.success.main,
+    'lightGreen': lightGreen[500],
+    'lime': lime[500],
+    'yellow': yellow[600],
+    'amber': amber[500],
+    'orange': theme.palette.warning.main,
+    'deepOrange': deepOrange[500],
+    'brown': brown[500],
+    'grey': grey[500],
+    'blueGrey': blueGrey[500],
+  };
+  const baseColor = currentNote.color ? colorMap[currentNote.color] : theme.palette.info.main; // Fallback to raw string if not mapped
+
   return (
     <>
       <Paper
@@ -281,24 +321,21 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
         sx={{
           overflow: 'hidden',
           borderRadius: 0,
-          backgroundColor: alpha(theme.palette.background.paper, 0.5),
+          backgroundColor: currentNote.color ? alpha(baseColor, 0.1) : alpha(theme.palette.background.paper, 0.5),
           transition: 'all 0.3s ease',
           boxShadow: `0 2px 8px ${alpha(theme.palette.grey[500], 0.1)}`,
-           
         }}
       >
         <Box
           sx={{
-            px: 2,
-            py: 1,
-            
+            pt: 1,
             borderBottom: `1px solid ${theme.palette.divider}`,
-            backgroundColor: alpha(theme.palette.info.main, 0.05),
-            borderLeft: `4px solid ${theme.palette.info.main}`,
+            backgroundColor: alpha(baseColor, 0.05),
+            borderLeft: `4px solid ${baseColor}`,
           }}
         >
           {/* Header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', px: 2, alignItems: 'center', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <EventNoteIcon sx={{ fontSize: '1rem', color: 'info.main' }} />
               <Typography
@@ -413,17 +450,43 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
           {/* Note Content */}
           {!isHidden && (
             <>
-              <Divider sx={{ my: 1, borderColor: theme.palette.divider, borderRadius: 1 }} />
+              <Divider sx={{ mt: 1, borderColor: theme.palette.divider, borderRadius: 1 }} />
               <Box
                 onClick={handleEditNote}
                 sx={{
                   cursor: 'pointer',
+                  backgroundColor: (() => {
+                    if (!currentNote.color) return alpha(theme.palette.info.main, 0.03);
+
+
+                    // Check if it's a valid hex/rgb to apply alpha, otherwise ignore
+                    try {
+                      return alpha(baseColor, 0.1);
+                    } catch (e) {
+                      return alpha(theme.palette.info.main, 0.03);
+                    }
+                  })(),
                   '&:hover': {
-                    backgroundColor: alpha(theme.palette.info.main, 0.03),
+                    backgroundColor: (() => {
+                      if (!currentNote.color) return alpha(theme.palette.info.main, 0.08);
+                      const colorMap: Record<string, string> = {
+                        'red': theme.palette.error.main,
+                        'green': theme.palette.success.main,
+                        'blue': theme.palette.info.main,
+                        'orange': theme.palette.warning.main,
+                        'purple': theme.palette.secondary.main,
+                      };
+                      const baseColor = colorMap[currentNote.color] || currentNote.color;
+                      try {
+                        return alpha(baseColor, 0.2);
+                      } catch (e) {
+                        return alpha(theme.palette.info.main, 0.08);
+                      }
+                    })(),
                   },
                   transition: 'background-color 0.2s ease',
-                  borderRadius: 1,
-                  py: 0.5,
+                  py: 2,
+                  px: 2,
                 }}
               >
                 {/* Note Title */}

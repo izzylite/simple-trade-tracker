@@ -24,7 +24,27 @@ import {
   Divider,
   Collapse,
   Autocomplete,
+  Menu,
+  MenuItem,
+  Popover,
 } from '@mui/material';
+import {
+  pink,
+  purple,
+  deepPurple,
+  indigo,
+  lightBlue,
+  cyan,
+  teal,
+  lightGreen,
+  lime,
+  yellow,
+  amber,
+  deepOrange,
+  brown,
+  grey,
+  blueGrey,
+} from '@mui/material/colors';
 import {
   Close as CloseIcon,
   Image as ImageIcon,
@@ -34,17 +54,19 @@ import {
   Unarchive as UnarchiveIcon,
   Delete as DeleteIcon,
   NotificationsActive as ReminderIcon,
-  NotificationsOff as NoReminderIcon,
+  NotificationsNone as NoReminderIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   LocalOffer as TagIcon,
-
+  Label as LabelIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 import RichTextEditor, { RichTextEditorHandle } from '../common/RichTextEditor';
+import { Z_INDEX } from '../../styles/zIndex';
 import EditorToolbar from '../common/RichTextEditor/components/EditorToolbar';
 import ImagePickerDialog from '../heroImage/ImagePickerDialog';
 import ConfirmationDialog from '../common/ConfirmationDialog';
@@ -52,7 +74,6 @@ import { useAuth } from '../../contexts/SupabaseAuthContext';
 import * as notesService from '../../services/notesService';
 import { Note, ReminderType, DayAbbreviation } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { Z_INDEX } from '../../styles/zIndex';
 import { logger } from '../../utils/logger';
 
 // Default tags with display labels and internal values (for AI compatibility)
@@ -123,6 +144,9 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   const [reminderDays, setReminderDays] = useState<DayAbbreviation[]>([]);
   const [isReminderActive, setIsReminderActive] = useState(false);
   const [isReminderExpanded, setIsReminderExpanded] = useState(false);
+  // Color state
+  const [noteColor, setNoteColor] = useState(initialNote?.color);
+  const [colorMenuAnchor, setColorMenuAnchor] = useState<null | HTMLElement>(null);
 
   // Tags states
   const [tags, setTags] = useState<string[]>([]);
@@ -148,6 +172,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         setReminderDays(initialNote.reminder_days || []);
         setIsReminderActive(initialNote.is_reminder_active || false);
         setIsReminderExpanded(false);
+        setNoteColor(initialNote.color);
 
         // Initialize tags states
         setTags(initialNote.tags || []);
@@ -165,6 +190,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         setReminderDays([]);
         setIsReminderActive(false);
         setIsReminderExpanded(false);
+        setNoteColor(undefined);
 
         // Reset tags states
         setTags([]);
@@ -190,6 +216,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           reminder_date: reminderDate,
           reminder_days: reminderDays,
           is_reminder_active: isReminderActive,
+          color: noteColor,
         };
 
         // Only update tags for user-created notes
@@ -217,6 +244,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           reminder_date: reminderDate,
           reminder_days: reminderDays,
           is_reminder_active: isReminderActive,
+          color: noteColor,
           tags,
         });
         setNote(newNote);
@@ -238,8 +266,9 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       const hasCoverImage = coverImage !== null;
       const hasReminder = reminderType !== 'none' && isReminderActive;
       const hasTags = tags.length > 0;
+      const hasColor = noteColor !== undefined;
 
-      return hasNonEmptyTitle || hasNonEmptyContent || hasCoverImage || hasReminder || hasTags;
+      return hasNonEmptyTitle || hasNonEmptyContent || hasCoverImage || hasReminder || hasTags || hasColor;
     } else {
       // For existing notes, check if anything changed
       const titleChanged = title !== note.title;
@@ -250,9 +279,10 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       const reminderDaysChanged = JSON.stringify(reminderDays) !== JSON.stringify(note.reminder_days || []);
       const reminderActiveChanged = isReminderActive !== (note.is_reminder_active || false);
       const tagsChanged = JSON.stringify(tags) !== JSON.stringify(note.tags || []);
+      const colorChanged = noteColor !== note.color;
 
       return titleChanged || contentChanged || coverImageChanged || reminderTypeChanged ||
-        reminderDateChanged || reminderDaysChanged || reminderActiveChanged || tagsChanged;
+        reminderDateChanged || reminderDaysChanged || reminderActiveChanged || tagsChanged || colorChanged;
     }
   };
 
@@ -611,25 +641,168 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                 Set a reminder to display this note on specific days. Perfect for game plans, daily routines, or weekly trading strategies.
               </Typography>
 
-              {/* Reminder Type Selector */}
-              <ToggleButtonGroup
-                value={reminderType}
-                exclusive
-                onChange={handleReminderTypeChange}
-                size="small"
-                sx={{ mb: 2 }}
-              >
-                <ToggleButton value="none">
-                  <NoReminderIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
-                  None
-                </ToggleButton>
-                <ToggleButton value="once">
-                  Once
-                </ToggleButton>
-                <ToggleButton value="weekly">
-                  Weekly
-                </ToggleButton>
-              </ToggleButtonGroup>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                {/* Reminder Type Selector */}
+                <ToggleButtonGroup
+                  value={reminderType}
+                  exclusive
+                  onChange={handleReminderTypeChange}
+                  size="small"
+                >
+                  <ToggleButton value="none">
+                    <NoReminderIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
+                    None
+                  </ToggleButton>
+                  <ToggleButton value="once">
+                    Once
+                  </ToggleButton>
+                  <ToggleButton value="weekly">
+                    Weekly
+                  </ToggleButton>
+                </ToggleButtonGroup>
+
+                {/* Color Template Selector */}
+                {/* Color Template Selector */}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', ml: { xs: 0, sm: 2 } }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+                    Color:
+                  </Typography>
+                  {(() => {
+                    const allPresets = [
+                      { value: undefined, label: 'Default', color: theme.palette.background.paper },
+                      { value: 'red', label: 'Red', color: theme.palette.error.main },
+                      { value: 'pink', label: 'Pink', color: pink[500] },
+                      { value: 'purple', label: 'Purple', color: purple[500] },
+                      { value: 'deepPurple', label: 'Deep Purple', color: deepPurple[500] },
+                      { value: 'indigo', label: 'Indigo', color: indigo[500] },
+                      { value: 'blue', label: 'Blue', color: theme.palette.info.main },
+                      { value: 'lightBlue', label: 'Light Blue', color: lightBlue[500] },
+                      { value: 'cyan', label: 'Cyan', color: cyan[500] },
+                      { value: 'teal', label: 'Teal', color: teal[500] },
+                      { value: 'green', label: 'Green', color: theme.palette.success.main },
+                      { value: 'lightGreen', label: 'Light Green', color: lightGreen[500] },
+                      { value: 'lime', label: 'Lime', color: lime[500] },
+                      { value: 'yellow', label: 'Yellow', color: yellow[600] },
+                      { value: 'amber', label: 'Amber', color: amber[500] },
+                      { value: 'orange', label: 'Orange', color: theme.palette.warning.main },
+                      { value: 'deepOrange', label: 'Deep Orange', color: deepOrange[500] },
+                      { value: 'brown', label: 'Brown', color: brown[500] },
+                      { value: 'grey', label: 'Grey', color: grey[500] },
+                      { value: 'blueGrey', label: 'Blue Grey', color: blueGrey[500] },
+                    ];
+
+                    const visiblePresets = allPresets.slice(0, 5);
+                    const hiddenPresets = allPresets.slice(5);
+
+                    // State for the menu (needs to be defined at component level, but for this refactor we'll use a local ref hack or just move state up. 
+                    // Actually, I can't define state inside this expression. I must move the logic out or assume state exists.
+                    // I will inject the state definition in a separate replace call effectively, but wait, I can't easily do that.
+                    // I should have added the state in the previous step. 
+                    // I will assume I can add the state in a separate edit to the top of the file.
+                    // BUT, to avoid breaking, I will use a Popover that is self-contained? No, that's messy.
+                    // I will render the list here assuming `colorMenuAnchor` exists, and I will add `colorMenuAnchor` in the next tool call (or previous if I could).
+                    // Actually, I'll allow the build to break for one second or I'll add the state FIRST efficiently.
+                    // For now, let's render the list and the menu trigger.
+
+                    return (
+                      <>
+                        {visiblePresets.map((preset) => (
+                          <Box
+                            key={preset.label}
+                            onClick={() => setNoteColor(preset.value)}
+                            sx={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: '50%',
+                              bgcolor: preset.value ? alpha(preset.color, 0.2) : alpha(theme.palette.divider, 0.1),
+                              border: `2px solid ${noteColor === preset.value ? theme.palette.primary.main : alpha(theme.palette.divider, 0.2)}`,
+                              cursor: 'pointer',
+                              transition: 'transform 0.2s',
+                              '&:hover': {
+                                transform: 'scale(1.1)',
+                                border: `2px solid ${theme.palette.primary.main}`,
+                              },
+                            }}
+                            title={preset.label}
+                          />
+                        ))}
+
+                        {/* More Colors Button */}
+                        <Box
+                          onClick={(e) => setColorMenuAnchor(e.currentTarget)}
+                          sx={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: '50%',
+                            border: `1px dashed ${theme.palette.text.secondary}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            '&:hover': {
+                              borderColor: theme.palette.primary.main,
+                              color: theme.palette.primary.main,
+                              bgcolor: alpha(theme.palette.primary.main, 0.05),
+                            },
+                          }}
+                          title="More colors"
+                        >
+                          <AddIcon sx={{ fontSize: 16 }} />
+                        </Box>
+
+                        {/* Hidden Colors Menu */}
+                        <Popover
+                          open={Boolean(colorMenuAnchor)}
+                          anchorEl={colorMenuAnchor}
+                          onClose={() => setColorMenuAnchor(null)}
+                          anchorOrigin={{
+                            vertical: 'bottom',
+                            horizontal: 'left',
+                          }}
+                          transformOrigin={{
+                            vertical: 'top',
+                            horizontal: 'left',
+                          }}
+                          PaperProps={{
+                            sx: { p: 2, maxWidth: 320 }
+                          }}
+                          sx={{ zIndex: Z_INDEX.DIALOG_POPUP }}
+                        >
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5, px: 0.5 }}>
+                            More Colors
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                            {hiddenPresets.map((preset) => (
+                              <Box
+                                key={preset.label}
+                                onClick={() => {
+                                  setNoteColor(preset.value);
+                                  setColorMenuAnchor(null);
+                                }}
+                                sx={{
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: '50%',
+                                  bgcolor: preset.value ? alpha(preset.color, 0.2) : alpha(theme.palette.divider, 0.1),
+                                  border: `2px solid ${noteColor === preset.value ? theme.palette.primary.main : alpha(theme.palette.divider, 0.2)}`,
+                                  cursor: 'pointer',
+                                  transition: 'transform 0.2s',
+                                  '&:hover': {
+                                    transform: 'scale(1.1)',
+                                    border: `2px solid ${theme.palette.primary.main}`,
+                                  },
+                                }}
+                                title={preset.label}
+                              />
+                            ))}
+                          </Box>
+                        </Popover>
+                      </>
+                    );
+                  })()}
+                </Box>
+              </Box>
 
               {/* One-time Reminder Date Picker */}
               {reminderType === 'once' && (

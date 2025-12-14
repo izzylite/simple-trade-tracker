@@ -209,6 +209,11 @@ Content should be in plain text format. User ID and Calendar ID are automaticall
         description:
           'Array of day abbreviations for weekly reminders. Only used when reminder_type is "weekly". Example: ["Mon", "Wed", "Fri"]',
       },
+      color: {
+        type: "string",
+        description:
+          "Optional background color name. Available: 'red', 'pink', 'purple', 'deepPurple', 'indigo', 'blue', 'lightBlue', 'cyan', 'teal', 'green', 'lightGreen', 'lime', 'yellow', 'amber', 'orange', 'deepOrange', 'brown', 'grey', 'blueGrey'. If not provided, a random color will be assigned.",
+      },
     },
     required: ["title", "content"],
   },
@@ -219,7 +224,8 @@ Content should be in plain text format. User ID and Calendar ID are automaticall
  */
 export const updateMemoryTool: GeminiFunctionDeclaration = {
   name: "update_memory",
-  description: `Update your persistent memory with new insights. This tool MERGES new information with existing memory - it does NOT replace.
+  description:
+    `Update your persistent memory with new insights. This tool MERGES new information with existing memory - it does NOT replace.
 
 CRITICAL: Provide ONLY the new information to add. The system will automatically merge it with existing content.
 
@@ -241,21 +247,29 @@ EXAMPLES:
     properties: {
       section: {
         type: "string",
-        enum: ["TRADER_PROFILE", "PERFORMANCE_PATTERNS", "STRATEGY_PREFERENCES", "LESSONS_LEARNED", "ACTIVE_FOCUS"],
-        description: "Which section to update"
+        enum: [
+          "TRADER_PROFILE",
+          "PERFORMANCE_PATTERNS",
+          "STRATEGY_PREFERENCES",
+          "LESSONS_LEARNED",
+          "ACTIVE_FOCUS",
+        ],
+        description: "Which section to update",
       },
       new_insights: {
         type: "array",
         items: { type: "string" },
-        description: "New bullet points to ADD to this section (will be merged with existing)"
+        description:
+          "New bullet points to ADD to this section (will be merged with existing)",
       },
       replace_section: {
         type: "boolean",
-        description: "If true, replaces section entirely. Only use for ACTIVE_FOCUS when goals change completely. Default: false (merge mode)"
-      }
+        description:
+          "If true, replaces section entirely. Only use for ACTIVE_FOCUS when goals change completely. Default: false (merge mode)",
+      },
     },
-    required: ["section", "new_insights"]
-  }
+    required: ["section", "new_insights"],
+  },
 };
 
 /**
@@ -263,7 +277,8 @@ EXAMPLES:
  */
 export const updateNoteTool: GeminiFunctionDeclaration = {
   name: "update_note",
-  description: `Update an existing AI-created note. You can only update notes that you created (by_assistant=true).
+  description:
+    `Update an existing AI-created note. You can only update notes that you created (by_assistant=true).
 
 ⚠️ CANNOT update AGENT_MEMORY notes - use update_memory tool instead for memory management.
 
@@ -457,7 +472,8 @@ Returns the user's explanation of what this tag means to them, or null if no def
  */
 export const saveTagDefinitionTool: GeminiFunctionDeclaration = {
   name: "save_tag_definition",
-  description: `Save or update a definition for a trading tag. IMPORTANT: Only use this AFTER getting explicit user permission.
+  description:
+    `Save or update a definition for a trading tag. IMPORTANT: Only use this AFTER getting explicit user permission.
 
 WORKFLOW:
 1. First suggest a definition to the user
@@ -795,9 +811,33 @@ export async function createNote(
   reminderDate?: string,
   reminderDays?: string[],
   tags?: string[],
+  color?: string,
 ): Promise<string> {
   try {
     log(`Creating note: ${title}`, "info");
+
+    // Assistant Colors Palette (Semantic)
+    const ASSISTANT_COLORS = [
+      "red",
+      "pink",
+      "purple",
+      "deepPurple",
+      "indigo",
+      "blue",
+      "lightBlue",
+      "cyan",
+      "teal",
+      "green",
+      "lightGreen",
+      "lime",
+      "yellow",
+      "amber",
+      "orange",
+      "deepOrange",
+      "brown",
+      "grey",
+      "blueGrey",
+    ];
 
     const noteData: Record<string, unknown> = {
       user_id: userId,
@@ -812,6 +852,26 @@ export async function createNote(
       updated_at: new Date().toISOString(),
       tags: tags || [],
     };
+
+    // Assign color: use provided color or random assistant color
+    if (color) {
+      noteData.color = color;
+    } else {
+      // Randomly select a color from the assistant palette
+      const randomColor =
+        ASSISTANT_COLORS[Math.floor(Math.random() * ASSISTANT_COLORS.length)];
+      noteData.color = randomColor;
+    }
+
+    // Assign color: use provided color or random assistant color
+    if (color) {
+      noteData.color = color;
+    } else {
+      // Randomly select a color from the assistant palette
+      const randomColor =
+        ASSISTANT_COLORS[Math.floor(Math.random() * ASSISTANT_COLORS.length)];
+      noteData.color = randomColor;
+    }
 
     // Add reminder fields if provided
     if (reminderType && reminderType !== "none") {
@@ -1013,14 +1073,19 @@ export async function deleteNote(
 // MEMORY SYSTEM - Dedicated merge-based memory management
 // =============================================================================
 
-type MemorySection = "TRADER_PROFILE" | "PERFORMANCE_PATTERNS" | "STRATEGY_PREFERENCES" | "LESSONS_LEARNED" | "ACTIVE_FOCUS";
+type MemorySection =
+  | "TRADER_PROFILE"
+  | "PERFORMANCE_PATTERNS"
+  | "STRATEGY_PREFERENCES"
+  | "LESSONS_LEARNED"
+  | "ACTIVE_FOCUS";
 
 const MEMORY_SECTION_ORDER: MemorySection[] = [
   "TRADER_PROFILE",
   "PERFORMANCE_PATTERNS",
   "STRATEGY_PREFERENCES",
   "LESSONS_LEARNED",
-  "ACTIVE_FOCUS"
+  "ACTIVE_FOCUS",
 ];
 
 /**
@@ -1032,7 +1097,7 @@ function parseMemorySections(content: string): Record<MemorySection, string[]> {
     PERFORMANCE_PATTERNS: [],
     STRATEGY_PREFERENCES: [],
     LESSONS_LEARNED: [],
-    ACTIVE_FOCUS: []
+    ACTIVE_FOCUS: [],
   };
 
   // Handle empty content
@@ -1042,12 +1107,18 @@ function parseMemorySections(content: string): Record<MemorySection, string[]> {
   }
 
   // Split by section headers
-  const sectionPattern = /^## (TRADER_PROFILE|PERFORMANCE_PATTERNS|STRATEGY_PREFERENCES|LESSONS_LEARNED|ACTIVE_FOCUS)\s*$/gm;
+  const sectionPattern =
+    /^## (TRADER_PROFILE|PERFORMANCE_PATTERNS|STRATEGY_PREFERENCES|LESSONS_LEARNED|ACTIVE_FOCUS)\s*$/gm;
   const parts = content.split(sectionPattern);
 
   // Debug: log how many parts were found
   const sectionNamesFound = parts.filter((_, i) => i % 2 === 1);
-  log(`[parseMemorySections] Found ${sectionNamesFound.length} section headers: ${sectionNamesFound.join(', ')}`, "info");
+  log(
+    `[parseMemorySections] Found ${sectionNamesFound.length} section headers: ${
+      sectionNamesFound.join(", ")
+    }`,
+    "info",
+  );
 
   // parts will be: [preamble, "SECTION_NAME", content, "SECTION_NAME", content, ...]
   for (let i = 1; i < parts.length; i += 2) {
@@ -1056,12 +1127,12 @@ function parseMemorySections(content: string): Record<MemorySection, string[]> {
 
     // Extract bullet points from section content (excluding placeholder text)
     const bullets = sectionContent
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.startsWith('- '))
-      .map(line => line.substring(2).trim())
-      .filter(line => line.length > 0)
-      .filter(line => line !== '(No data yet)');
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith("- "))
+      .map((line) => line.substring(2).trim())
+      .filter((line) => line.length > 0)
+      .filter((line) => line !== "(No data yet)");
 
     if (MEMORY_SECTION_ORDER.includes(sectionName)) {
       sections[sectionName] = bullets;
@@ -1069,10 +1140,21 @@ function parseMemorySections(content: string): Record<MemorySection, string[]> {
   }
 
   // Warn if no sections were parsed from non-empty content
-  const totalBullets = Object.values(sections).reduce((sum, arr) => sum + arr.length, 0);
+  const totalBullets = Object.values(sections).reduce(
+    (sum, arr) => sum + arr.length,
+    0,
+  );
   if (content.length > 50 && totalBullets === 0) {
-    log(`[parseMemorySections] WARNING: No bullets parsed from ${content.length} char content. Content may be malformed.`, "warn");
-    log(`[parseMemorySections] Content start: ${content.substring(0, 200).replace(/\n/g, '\\n')}`, "warn");
+    log(
+      `[parseMemorySections] WARNING: No bullets parsed from ${content.length} char content. Content may be malformed.`,
+      "warn",
+    );
+    log(
+      `[parseMemorySections] Content start: ${
+        content.substring(0, 200).replace(/\n/g, "\\n")
+      }`,
+      "warn",
+    );
   }
 
   return sections;
@@ -1088,14 +1170,14 @@ function buildMemoryContent(sections: Record<MemorySection, string[]>): string {
     const items = sections[section] || [];
     parts.push(`## ${section}`);
     if (items.length > 0) {
-      parts.push(items.map(item => `- ${item}`).join('\n'));
+      parts.push(items.map((item) => `- ${item}`).join("\n"));
     } else {
-      parts.push('- (No data yet)');
+      parts.push("- (No data yet)");
     }
-    parts.push(''); // Empty line between sections
+    parts.push(""); // Empty line between sections
   }
 
-  return parts.join('\n').trim();
+  return parts.join("\n").trim();
 }
 
 /**
@@ -1109,8 +1191,8 @@ function deduplicateInsights(insights: string[]): string[] {
     // Normalize for comparison: lowercase, remove dates, trim
     const normalized = insight
       .toLowerCase()
-      .replace(/\[\d{4}-\d{2}\]/g, '') // Remove date tags
-      .replace(/\[high\]|\[med\]|\[low\]/gi, '') // Remove confidence
+      .replace(/\[\d{4}-\d{2}\]/g, "") // Remove date tags
+      .replace(/\[high\]|\[med\]|\[low\]/gi, "") // Remove confidence
       .trim();
 
     // Check if we've seen something very similar
@@ -1119,7 +1201,7 @@ function deduplicateInsights(insights: string[]): string[] {
       // Simple similarity: if 80%+ of words match, consider duplicate
       const words1 = new Set(normalized.split(/\s+/));
       const words2 = new Set(seenNorm.split(/\s+/));
-      const intersection = [...words1].filter(w => words2.has(w)).length;
+      const intersection = [...words1].filter((w) => words2.has(w)).length;
       const union = new Set([...words1, ...words2]).size;
       if (union > 0 && intersection / union > 0.8) {
         isDuplicate = true;
@@ -1144,14 +1226,14 @@ async function createInitialMemory(
   userId: string,
   calendarId: string,
   section: MemorySection,
-  insights: string[]
+  insights: string[],
 ): Promise<string> {
   const sections: Record<MemorySection, string[]> = {
     TRADER_PROFILE: [],
     PERFORMANCE_PATTERNS: [],
     STRATEGY_PREFERENCES: [],
     LESSONS_LEARNED: [],
-    ACTIVE_FOCUS: []
+    ACTIVE_FOCUS: [],
   };
 
   sections[section] = insights;
@@ -1192,12 +1274,20 @@ export async function updateMemory(
   calendarId: string,
   section: MemorySection,
   newInsights: string[],
-  replaceSection: boolean = false
+  replaceSection: boolean = false,
 ): Promise<string> {
   try {
     // Enhanced logging for debugging
-    log(`[updateMemory] START - section: ${section}, newInsights: ${newInsights.length}, replaceSection: ${replaceSection}`, "info");
-    log(`[updateMemory] New insights to add: ${JSON.stringify(newInsights).substring(0, 500)}`, "info");
+    log(
+      `[updateMemory] START - section: ${section}, newInsights: ${newInsights.length}, replaceSection: ${replaceSection}`,
+      "info",
+    );
+    log(
+      `[updateMemory] New insights to add: ${
+        JSON.stringify(newInsights).substring(0, 500)
+      }`,
+      "info",
+    );
 
     // 1. Fetch existing memory note
     const { data: memoryNote, error: fetchError } = await supabase
@@ -1209,41 +1299,75 @@ export async function updateMemory(
       .single();
 
     if (fetchError && fetchError.code !== "PGRST116") {
-      log(`[updateMemory] Error fetching memory: ${fetchError.message}`, "error");
+      log(
+        `[updateMemory] Error fetching memory: ${fetchError.message}`,
+        "error",
+      );
       return `Failed to fetch memory: ${fetchError.message}`;
     }
 
     // 2. If no memory exists, create initial one
     if (!memoryNote) {
-      log("[updateMemory] No existing memory found, creating initial memory", "info");
-      return await createInitialMemory(supabase, userId, calendarId, section, newInsights);
+      log(
+        "[updateMemory] No existing memory found, creating initial memory",
+        "info",
+      );
+      return await createInitialMemory(
+        supabase,
+        userId,
+        calendarId,
+        section,
+        newInsights,
+      );
     }
 
     // 3. Parse existing content into sections
     const existingContent = memoryNote.content || "";
-    log(`[updateMemory] Existing content length: ${existingContent.length} chars`, "info");
+    log(
+      `[updateMemory] Existing content length: ${existingContent.length} chars`,
+      "info",
+    );
 
     // Debug: Log first 500 chars of existing content
     if (existingContent.length > 0) {
-      log(`[updateMemory] Existing content preview: ${existingContent.substring(0, 500).replace(/\n/g, '\\n')}`, "info");
+      log(
+        `[updateMemory] Existing content preview: ${
+          existingContent.substring(0, 500).replace(/\n/g, "\\n")
+        }`,
+        "info",
+      );
     }
 
     const sections = parseMemorySections(existingContent);
 
     // Debug: Log what was parsed from each section
-    log(`[updateMemory] Parsed sections - TRADER_PROFILE: ${sections.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${sections.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${sections.STRATEGY_PREFERENCES.length}, LESSONS_LEARNED: ${sections.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${sections.ACTIVE_FOCUS.length}`, "info");
+    log(
+      `[updateMemory] Parsed sections - TRADER_PROFILE: ${sections.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${sections.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${sections.STRATEGY_PREFERENCES.length}, LESSONS_LEARNED: ${sections.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${sections.ACTIVE_FOCUS.length}`,
+      "info",
+    );
 
     const existingCount = sections[section].length;
-    log(`[updateMemory] Target section ${section} has ${existingCount} existing insights: ${JSON.stringify(sections[section]).substring(0, 300)}`, "info");
+    log(
+      `[updateMemory] Target section ${section} has ${existingCount} existing insights: ${
+        JSON.stringify(sections[section]).substring(0, 300)
+      }`,
+      "info",
+    );
 
     // 4. Merge or replace section
     if (replaceSection) {
       // SAFEGUARD: Only allow replace_section for ACTIVE_FOCUS
       if (section !== "ACTIVE_FOCUS") {
-        log(`[updateMemory] WARNING: replace_section=true attempted on ${section}, but only ACTIVE_FOCUS can be replaced. Falling back to MERGE mode.`, "warn");
+        log(
+          `[updateMemory] WARNING: replace_section=true attempted on ${section}, but only ACTIVE_FOCUS can be replaced. Falling back to MERGE mode.`,
+          "warn",
+        );
         // Fall through to merge logic instead of replacing
       } else {
-        log(`[updateMemory] REPLACING ${section} section entirely (was: ${existingCount}, will be: ${newInsights.length})`, "info");
+        log(
+          `[updateMemory] REPLACING ${section} section entirely (was: ${existingCount}, will be: ${newInsights.length})`,
+          "info",
+        );
         sections[section] = newInsights;
         // Skip the else block by returning early after the full flow
       }
@@ -1252,7 +1376,10 @@ export async function updateMemory(
     // MERGE mode (default) - also used when replace_section was incorrectly set for non-ACTIVE_FOCUS
     if (!replaceSection || section !== "ACTIVE_FOCUS") {
       // APPEND new insights, preserving existing
-      log(`[updateMemory] MERGING ${newInsights.length} new insights into ${section} (existing: ${existingCount})`, "info");
+      log(
+        `[updateMemory] MERGING ${newInsights.length} new insights into ${section} (existing: ${existingCount})`,
+        "info",
+      );
       sections[section] = [...sections[section], ...newInsights];
 
       // Deduplicate similar entries
@@ -1261,23 +1388,42 @@ export async function updateMemory(
       const afterDedup = sections[section].length;
 
       if (beforeDedup !== afterDedup) {
-        log(`[updateMemory] Deduplication removed ${beforeDedup - afterDedup} similar insights`, "info");
+        log(
+          `[updateMemory] Deduplication removed ${
+            beforeDedup - afterDedup
+          } similar insights`,
+          "info",
+        );
       }
 
-      log(`[updateMemory] After merge - ${section}: ${sections[section].length} insights`, "info");
+      log(
+        `[updateMemory] After merge - ${section}: ${
+          sections[section].length
+        } insights`,
+        "info",
+      );
     }
 
     // 5. Rebuild content preserving structure
     const updatedContent = buildMemoryContent(sections);
-    log(`[updateMemory] Updated content length: ${updatedContent.length} chars`, "info");
+    log(
+      `[updateMemory] Updated content length: ${updatedContent.length} chars`,
+      "info",
+    );
 
     // Debug: Verify all sections are present in rebuilt content
     const verifyParsed = parseMemorySections(updatedContent);
-    log(`[updateMemory] VERIFY after rebuild - TRADER_PROFILE: ${verifyParsed.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${verifyParsed.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${verifyParsed.STRATEGY_PREFERENCES.length}, LESSONS_LEARNED: ${verifyParsed.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${verifyParsed.ACTIVE_FOCUS.length}`, "info");
+    log(
+      `[updateMemory] VERIFY after rebuild - TRADER_PROFILE: ${verifyParsed.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${verifyParsed.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${verifyParsed.STRATEGY_PREFERENCES.length}, LESSONS_LEARNED: ${verifyParsed.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${verifyParsed.ACTIVE_FOCUS.length}`,
+      "info",
+    );
 
     // 6. Check size limit (~2000 tokens ≈ 8000 chars)
     if (updatedContent.length > 8000) {
-      log(`[updateMemory] Memory exceeds size limit (${updatedContent.length} chars), consider compression`, "warn");
+      log(
+        `[updateMemory] Memory exceeds size limit (${updatedContent.length} chars), consider compression`,
+        "warn",
+      );
     }
 
     // 7. Update note
@@ -1285,20 +1431,30 @@ export async function updateMemory(
       .from("notes")
       .update({
         content: updatedContent,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq("id", memoryNote.id);
 
     if (updateError) {
-      log(`[updateMemory] Error updating memory: ${updateError.message}`, "error");
+      log(
+        `[updateMemory] Error updating memory: ${updateError.message}`,
+        "error",
+      );
       return `Failed to update memory: ${updateError.message}`;
     }
 
     const finalCount = sections[section].length;
-    const addedCount = replaceSection ? newInsights.length : (finalCount - existingCount);
+    const addedCount = replaceSection
+      ? newInsights.length
+      : (finalCount - existingCount);
 
-    log(`[updateMemory] SUCCESS - ${section} now has ${finalCount} insights (added: ${addedCount})`, "info");
-    return `Memory updated: ${replaceSection ? "Replaced" : "Added"} ${addedCount} insight(s) in ${section}. Total: ${finalCount} insights in section.`;
+    log(
+      `[updateMemory] SUCCESS - ${section} now has ${finalCount} insights (added: ${addedCount})`,
+      "info",
+    );
+    return `Memory updated: ${
+      replaceSection ? "Replaced" : "Added"
+    } ${addedCount} insight(s) in ${section}. Total: ${finalCount} insights in section.`;
   } catch (error) {
     log(`[updateMemory] ERROR: ${error}`, "error");
     return `Memory update error: ${
@@ -1323,8 +1479,7 @@ function extractImagesFromContent(content: string): string[] {
         if (entity.type === "IMAGE" && entity.data?.src) {
           const src = entity.data.src;
           // Filter out stock/splash image sources
-          const isStockImage =
-            src.includes("unsplash.com") ||
+          const isStockImage = src.includes("unsplash.com") ||
             src.includes("pexels.com") ||
             src.includes("pixabay.com") ||
             src.includes("stock") ||
@@ -1444,10 +1599,12 @@ export async function searchNotes(
 export async function getTagDefinition(
   supabase: SupabaseClient,
   userId: string,
-  tagName: string
+  tagName: string,
 ): Promise<string> {
   try {
-    console.log(`[getTagDefinition] Looking up: "${tagName}" for user: ${userId}`);
+    console.log(
+      `[getTagDefinition] Looking up: "${tagName}" for user: ${userId}`,
+    );
     log(`Looking up definition for tag: ${tagName}`, "info");
 
     // First try exact match
@@ -1464,12 +1621,18 @@ export async function getTagDefinition(
     }
 
     if (exactMatch) {
-      console.log(`[getTagDefinition] Found exact match: ${JSON.stringify(exactMatch)}`);
+      console.log(
+        `[getTagDefinition] Found exact match: ${JSON.stringify(exactMatch)}`,
+      );
       log(`Found exact definition for tag: ${tagName}`, "info");
       return `Tag "${tagName}" definition: ${exactMatch.definition}`;
     }
 
-    console.log(`[getTagDefinition] No exact match, exactError: ${JSON.stringify(exactError)}`);
+    console.log(
+      `[getTagDefinition] No exact match, exactError: ${
+        JSON.stringify(exactError)
+      }`,
+    );
 
     // If no exact match, try partial match (tag name part of grouped tags)
     // This allows "3x Displacement" to match "Confluence:3x Displacement"
@@ -1480,14 +1643,20 @@ export async function getTagDefinition(
       .ilike("tag_name", `%:${tagName}`);
 
     if (partialError) {
-      log(`Error fetching partial tag definition: ${partialError.message}`, "error");
+      log(
+        `Error fetching partial tag definition: ${partialError.message}`,
+        "error",
+      );
       return `Error looking up tag definition: ${partialError.message}`;
     }
 
     if (partialMatches && partialMatches.length > 0) {
       // Return the first match (most likely the intended one)
       const match = partialMatches[0];
-      log(`Found partial match for tag "${tagName}": ${match.tag_name}`, "info");
+      log(
+        `Found partial match for tag "${tagName}": ${match.tag_name}`,
+        "info",
+      );
       return `Tag "${match.tag_name}" definition: ${match.definition}`;
     }
 
@@ -1506,7 +1675,7 @@ export async function saveTagDefinition(
   supabase: SupabaseClient,
   userId: string,
   tagName: string,
-  definition: string
+  definition: string,
 ): Promise<string> {
   try {
     log(`Saving definition for tag: ${tagName}`, "info");
@@ -1518,7 +1687,7 @@ export async function saveTagDefinition(
         definition: definition,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "user_id,tag_name" }
+      { onConflict: "user_id,tag_name" },
     );
 
     if (error) {
@@ -1564,7 +1733,9 @@ export function analyzeImage(
     // Skip stock/placeholder images
     if (isStockImageUrl(imageUrl)) {
       log(`Skipping stock image: ${imageUrl.substring(0, 50)}...`, "info");
-      return `This appears to be a stock/placeholder image (${imageUrl.substring(0, 30)}...) and not an actual trade chart. Skipping analysis. Please provide a real trade chart image for analysis.`;
+      return `This appears to be a stock/placeholder image (${
+        imageUrl.substring(0, 30)
+      }...) and not an actual trade chart. Skipping analysis. Please provide a real trade chart image for analysis.`;
     }
 
     log(
@@ -1803,10 +1974,15 @@ export async function executeCustomTool(
         const userId = context.userId || "";
         const calendarId = context.calendarId || "";
         const section = typeof args.section === "string"
-          ? args.section as "TRADER_PROFILE" | "PERFORMANCE_PATTERNS" | "STRATEGY_PREFERENCES" | "LESSONS_LEARNED" | "ACTIVE_FOCUS"
+          ? args.section as
+            | "TRADER_PROFILE"
+            | "PERFORMANCE_PATTERNS"
+            | "STRATEGY_PREFERENCES"
+            | "LESSONS_LEARNED"
+            | "ACTIVE_FOCUS"
           : "PERFORMANCE_PATTERNS";
         const newInsights = Array.isArray(args.new_insights)
-          ? args.new_insights.map(i => String(i))
+          ? args.new_insights.map((i) => String(i))
           : [];
         const replaceSection = typeof args.replace_section === "boolean"
           ? args.replace_section
@@ -1817,7 +1993,7 @@ export async function executeCustomTool(
           calendarId,
           section,
           newInsights,
-          replaceSection
+          replaceSection,
         );
       }
 
