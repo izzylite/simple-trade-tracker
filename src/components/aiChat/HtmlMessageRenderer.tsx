@@ -52,6 +52,29 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const [imageZoomProp, setImageZoomProp] = useState<ImageZoomProp | null>(null);
 
+  // Create a map of live trades for O(1) lookup
+  const liveTradesMap = useMemo(() => {
+    const map = new Map<string, Trade>();
+    trades.forEach(trade => {
+      map.set(trade.id, trade);
+    });
+    return map;
+  }, [trades]);
+
+  // Merge embedded trades with live data - live data takes precedence
+  // This ensures trade cards update when trades are edited
+  const mergedEmbeddedTrades = useMemo(() => {
+    if (!embeddedTrades) return undefined;
+
+    const merged: Record<string, Trade> = {};
+    Object.entries(embeddedTrades).forEach(([tradeId, embeddedTrade]) => {
+      // Use live trade data if available, otherwise fall back to embedded snapshot
+      const liveTrade = liveTradesMap.get(tradeId);
+      merged[tradeId] = liveTrade || embeddedTrade;
+    });
+    return merged;
+  }, [embeddedTrades, liveTradesMap]);
+
   // Calculate trade count for each embedded event
   const eventTradeCountMap = useMemo(() => {
     const countMap = new Map<string, number>();
@@ -281,9 +304,9 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
     };
 
     contentSegments.forEach((segment, index) => {
-      if (segment.type === 'trade' && segment.id && embeddedTrades?.[segment.id]) {
-        const trade = embeddedTrades[segment.id];
-        const contextTrades = Object.values(embeddedTrades);
+      if (segment.type === 'trade' && segment.id && mergedEmbeddedTrades?.[segment.id]) {
+        const trade = mergedEmbeddedTrades[segment.id];
+        const contextTrades = Object.values(mergedEmbeddedTrades);
 
         currentTradeNodes.push(
           <Box key={`trade-${index}`} sx={{ my: 1 }}>

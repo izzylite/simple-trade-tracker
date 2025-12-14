@@ -383,9 +383,21 @@ export const getTradeRepository = () => {
  
 /**
  * Generate a unique image ID
+ * @param file - Optional file to extract extension from
+ * @returns A unique ID with file extension if file is provided
  */
-export const generateImageId = (): string => {
-  return `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+export const generateImageId = (file?: File): string => {
+  const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+  if (file) {
+    // Extract extension from file name or type
+    const extension = file.name.split('.').pop()?.toLowerCase() ||
+                      file.type.split('/').pop() ||
+                      'jpg';
+    return `${uniqueId}.${extension}`;
+  }
+
+  return uniqueId;
 };
 
 /**

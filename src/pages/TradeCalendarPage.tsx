@@ -98,6 +98,7 @@ import NotesDrawer from '../components/notes/NotesDrawer';
 import CalendarDayReminder from '../components/CalendarDayReminder';
 
 import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/dynamicRiskUtils';
+import { Z_INDEX } from '../styles/zIndex';
 
 import MonthlyStatisticsSection from '../components/MonthlyStatisticsSection';
 import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
@@ -1728,6 +1729,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onOpenGalleryMode={openGalleryMode}
           onOpenAIChatMode={isReadOnly ? undefined : openGalleryModeAI}
           calendar={calendar}
+          onUpdateCalendarProperty={isReadOnly ? undefined : onUpdateCalendarProperty}
           isReadOnly={isReadOnly}
         />
 
@@ -1843,6 +1845,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           autoHideDuration={snackbarSeverity === 'success' ? 3000 : deleteError ? 6000 : 4000}
           onClose={handleSnackbarClose}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          sx={{ zIndex: Z_INDEX.SNACKBAR }}
         >
           <Alert
             onClose={handleSnackbarClose}

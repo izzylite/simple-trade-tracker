@@ -36,6 +36,7 @@ import {
   from '../../utils/tradeNameSuggestions';
 import { Currency } from '../../types/economicCalendar';
 import { CURRENCY_PAIRS } from '../../services/tradeEconomicEventService';
+import { Z_INDEX } from '../../styles/zIndex';
 
 export const DEFAULT_PAIRS_TAG_GROUP ="Pairs"
 export interface NewTradeForm {
@@ -69,7 +70,6 @@ export interface PendingImage {
   row?: number;
   column?: number;
   column_width?: number; // Width as percentage (0-100)
-  upload_progress?: number;
 }
 
 export interface TradeImage {
@@ -269,6 +269,11 @@ const TradeForm: React.FC<TradeFormProps> = ({
             } as React.ChangeEvent<HTMLInputElement>;
             onNameChange(syntheticEvent);
           }}
+          slotProps={{
+            popper: {
+              sx: { zIndex: Z_INDEX.DIALOG_POPUP }
+            }
+          }}
           renderInput={(params) => (
             <TextField
               {...params}
@@ -345,6 +350,9 @@ const TradeForm: React.FC<TradeFormProps> = ({
               textField: {
                 fullWidth: true,
                 helperText: 'Change the date of this trade'
+              },
+              popper: {
+                sx: { zIndex: Z_INDEX.DIALOG_POPUP }
               }
             }}
           />
@@ -460,6 +468,9 @@ const TradeForm: React.FC<TradeFormProps> = ({
             onChange={onSessionChange}
             label="Session *"
             required
+            MenuProps={{
+              sx: { zIndex: Z_INDEX.DIALOG_POPUP }
+            }}
           >
             <MenuItem value="">None</MenuItem>
             <MenuItem value="Asia">Asia</MenuItem>

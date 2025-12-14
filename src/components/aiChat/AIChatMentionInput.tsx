@@ -4,6 +4,7 @@ import { Box, Chip, Popper, Paper, List, ListItem, ListItemButton, Typography, u
 import { Tag as TagIcon } from '@mui/icons-material';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import { Z_INDEX } from '../../styles/zIndex';
 
 export interface AIChatMentionInputProps {
   value: string;
@@ -490,7 +491,7 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
         anchorEl={anchorEl}
         placement="top-start"
         disablePortal
-        sx={{ zIndex: 1500 }}
+        sx={{ zIndex: Z_INDEX.DIALOG }}
       >
         <Paper
           elevation={8}

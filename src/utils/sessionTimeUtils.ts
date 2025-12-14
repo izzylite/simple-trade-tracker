@@ -136,20 +136,21 @@ export function getSessionTimeRange(session: TradingSession | LegacySession, tra
       // Asia session spans midnight, so we need to handle day boundaries
       const asiaStartHour = isDST ? 22 : 23; // 10:00 PM UTC (summer) / 11:00 PM UTC (winter)
       const asiaEndHour = isDST ? 7 : 8;     // 7:00 AM UTC (summer) / 8:00 AM UTC (winter)
-      
-      // Start time is on the previous day
-      const startDate = new Date(year, month, day - 1, asiaStartHour, 0, 0);
-      const endDate = new Date(year, month, day, asiaEndHour, 0, 0);
+
+      // Start time is on the previous day - use Date.UTC for proper UTC dates
+      const startDate = new Date(Date.UTC(year, month, day - 1, asiaStartHour, 0, 0));
+      const endDate = new Date(Date.UTC(year, month, day, asiaEndHour, 0, 0));
       return { start: startDate, end: endDate };
     default:
       // Default to full day range if session is unknown
       startHour = 0;
       endHour = 23;
   }
-  
-  const start = new Date(year, month, day, startHour, 0, 0);
-  const end = new Date(year, month, day, endHour, 59, 59);
-  
+
+  // Use Date.UTC to create proper UTC dates (session hours are defined in UTC)
+  const start = new Date(Date.UTC(year, month, day, startHour, 0, 0));
+  const end = new Date(Date.UTC(year, month, day, endHour, 59, 59));
+
   return { start, end };
 }
 

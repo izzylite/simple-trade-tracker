@@ -30,6 +30,7 @@ import { supabase } from '../../../../config/supabase';
 import { unsplashCache, UnsplashImage } from '../../../../services/unsplashCache';
 import { FILE_SIZE_LIMITS, formatFileSize } from '../../../../utils/fileValidation';
 import { scrollbarStyles } from '../../../../styles/scrollbarStyles';
+import { Z_INDEX } from '../../../../styles/zIndex';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ImageUploadDialogProps {
@@ -285,7 +286,7 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
       onClose={handleClose}
       maxWidth="md"
       fullWidth
-      sx={{ zIndex: 2100 }}
+      sx={{ zIndex: Z_INDEX.RICH_TEXT_DIALOG }}
     >
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

@@ -28,6 +28,7 @@ import { BaseDialog } from '../common';
 import TradeList from '../trades/TradeList';
 import { cleanEventNameForPinning, eventMatchV1, eventMatchV3 } from '../../utils/eventNameUtils';
 import { TradeOperationsProps } from '../../types/tradeOperations';
+import { Z_INDEX } from '../../styles/zIndex';
 
 interface EconomicEventDetailDialogProps {
   open: boolean;
@@ -222,7 +223,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
       open={open}
       onClose={onClose}
       sx={{
-        zIndex: 1450 // Higher than AI Chat Drawer (1400)
+        zIndex: Z_INDEX.ECONOMIC_CALENDAR_DETAIL
       }}
       title={
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>

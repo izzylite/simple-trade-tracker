@@ -220,13 +220,14 @@ export class EconomicEventRepository {
         .from('economic_events')
         .select('*')
         .eq('id', eventId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         throw error;
       }
 
       if (!data) {
+        logger.log(`No economic event found with ID: ${eventId}`);
         return {
           success: true,
           data: null,

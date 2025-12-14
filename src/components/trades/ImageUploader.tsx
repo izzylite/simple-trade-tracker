@@ -48,13 +48,9 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     fileInputRef.current?.click();
   };
 
-  // Check if any images are currently uploading
+  // Check if any images are currently uploading (pending images are still uploading)
   const isAnyImageUploading = (): boolean => {
-    return pendingImages.some(img =>
-      img.upload_progress !== undefined &&
-      img.upload_progress >= 0 &&
-      img.upload_progress < 100
-    );
+    return pendingImages.length > 0;
   };
 
   const organizeImagesVertically = () => {

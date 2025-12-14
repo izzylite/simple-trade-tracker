@@ -32,6 +32,11 @@ interface DayDialogProps {
   onOpenAIChatMode?: (trades: Trade[], tradeId: string, title?: string) => void;
   // Calendar data for economic events filtering and progress tracking
   calendar?: Calendar;
+  // Update calendar properties (for pinning events, etc.)
+  onUpdateCalendarProperty?: (
+    calendarId: string,
+    updateCallback: (calendar: Calendar) => Calendar
+  ) => Promise<Calendar | undefined>;
   // Read-only mode for shared calendars
   isReadOnly?: boolean;
 }
@@ -59,6 +64,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
   onOpenGalleryMode,
   onOpenAIChatMode,
   calendar,
+  onUpdateCalendarProperty,
   isReadOnly = false
 }) => {
 
@@ -128,8 +134,9 @@ const DayDialog: React.FC<DayDialogProps> = ({
     onOpenGalleryMode,
     onOpenAIChat: onOpenAIChatMode ? handleOpenAIChat : undefined,
     economicFilter: undefined,
-    calendar
-  }), [onDeleteTrade, onDeleteMultipleTrades, setZoomedImage, isReadOnly, onUpdateTradeProperty, deletingTradeIds, isTradeUpdating, calendarId, onOpenGalleryMode, onOpenAIChatMode, calendar]);
+    calendar,
+    onUpdateCalendarProperty: isReadOnly ? undefined : onUpdateCalendarProperty
+  }), [onDeleteTrade, onDeleteMultipleTrades, setZoomedImage, isReadOnly, onUpdateTradeProperty, deletingTradeIds, isTradeUpdating, calendarId, onOpenGalleryMode, onOpenAIChatMode, calendar, onUpdateCalendarProperty]);
 
   return (
     <>

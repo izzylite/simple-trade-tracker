@@ -8,14 +8,31 @@ import {
   RepositoryConfig,
   RepositoryResult
 } from './BaseRepository';
-import { 
-  AIConversation, 
+import {
+  AIConversation,
   SerializableAIConversation,
   ChatMessage,
   SerializableChatMessage
 } from '../../../types/aiChat';
 import { logger } from '../../../utils/logger';
 import { supabase } from '../../../config/supabase';
+
+/**
+ * Pagination options for conversation queries
+ */
+export interface ConversationPaginationOptions {
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Paginated result with metadata
+ */
+export interface PaginatedConversations {
+  conversations: AIConversation[];
+  totalCount: number;
+  hasMore: boolean;
+}
 
 /**
  * Safely parse a date value, returning a valid Date or fallback
@@ -101,49 +118,104 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
   /**
    * Find all conversations for a specific calendar (calendar-level only, excludes trade-specific)
    * Ordered by most recently updated first
+   * @param calendarId - The calendar ID to filter by
+   * @param options - Optional pagination options (limit, offset)
    */
-  async findByCalendarId(calendarId: string): Promise<AIConversation[]> {
+  async findByCalendarId(
+    calendarId: string,
+    options?: ConversationPaginationOptions
+  ): Promise<PaginatedConversations> {
+    const DEFAULT_LIMIT = 15;
+    const limit = options?.limit ?? DEFAULT_LIMIT;
+    const offset = options?.offset ?? 0;
+
     try {
+      // Get total count first
+      const { count, error: countError } = await supabase
+        .from('ai_conversations')
+        .select('*', { count: 'exact', head: true })
+        .eq('calendar_id', calendarId)
+        .is('trade_id', null);
+
+      if (countError) {
+        logger.error('Error counting conversations by calendar ID:', countError);
+        return { conversations: [], totalCount: 0, hasMore: false };
+      }
+
+      const totalCount = count ?? 0;
+
+      // Get paginated data
       const { data, error } = await supabase
         .from('ai_conversations')
         .select('*')
         .eq('calendar_id', calendarId)
-        .is('trade_id', null) // Only calendar-level conversations
-        .order('updated_at', { ascending: false });
+        .is('trade_id', null)
+        .order('updated_at', { ascending: false })
+        .range(offset, offset + limit - 1);
 
       if (error) {
         logger.error('Error finding conversations by calendar ID:', error);
-        return [];
+        return { conversations: [], totalCount: 0, hasMore: false };
       }
 
-      return data ? data.map(item => transformSupabaseConversation(item)) : [];
+      const conversations = data ? data.map(item => transformSupabaseConversation(item)) : [];
+      const hasMore = offset + conversations.length < totalCount;
+
+      return { conversations, totalCount, hasMore };
     } catch (error) {
       logger.error('Error finding conversations by calendar ID:', error);
-      return [];
+      return { conversations: [], totalCount: 0, hasMore: false };
     }
   }
 
   /**
    * Find all conversations for a specific trade
    * Ordered by most recently updated first
+   * @param tradeId - The trade ID to filter by
+   * @param options - Optional pagination options (limit, offset)
    */
-  async findByTradeId(tradeId: string): Promise<AIConversation[]> {
+  async findByTradeId(
+    tradeId: string,
+    options?: ConversationPaginationOptions
+  ): Promise<PaginatedConversations> {
+    const DEFAULT_LIMIT = 15;
+    const limit = options?.limit ?? DEFAULT_LIMIT;
+    const offset = options?.offset ?? 0;
+
     try {
+      // Get total count first
+      const { count, error: countError } = await supabase
+        .from('ai_conversations')
+        .select('*', { count: 'exact', head: true })
+        .eq('trade_id', tradeId);
+
+      if (countError) {
+        logger.error('Error counting conversations by trade ID:', countError);
+        return { conversations: [], totalCount: 0, hasMore: false };
+      }
+
+      const totalCount = count ?? 0;
+
+      // Get paginated data
       const { data, error } = await supabase
         .from('ai_conversations')
         .select('*')
         .eq('trade_id', tradeId)
-        .order('updated_at', { ascending: false });
+        .order('updated_at', { ascending: false })
+        .range(offset, offset + limit - 1);
 
       if (error) {
         logger.error('Error finding conversations by trade ID:', error);
-        return [];
+        return { conversations: [], totalCount: 0, hasMore: false };
       }
 
-      return data ? data.map(item => transformSupabaseConversation(item)) : [];
+      const conversations = data ? data.map(item => transformSupabaseConversation(item)) : [];
+      const hasMore = offset + conversations.length < totalCount;
+
+      return { conversations, totalCount, hasMore };
     } catch (error) {
       logger.error('Error finding conversations by trade ID:', error);
-      return [];
+      return { conversations: [], totalCount: 0, hasMore: false };
     }
   }
 

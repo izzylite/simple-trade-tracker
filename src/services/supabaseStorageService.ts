@@ -7,101 +7,14 @@ import { supabase } from '../config/supabase';
 import { logger } from '../utils/logger';
 import { TradeImage } from '../components/trades/TradeForm';
 
-export interface UploadProgress {
-  loaded: number;
-  total: number;
-  percentage: number;
-}
-
 export interface UploadOptions {
-  onProgress?: (progress: UploadProgress) => void;
   contentType?: string;
   cacheControl?: string;
   upsert?: boolean;
 }
 
-// Environment values used for direct REST uploads
-const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-
-// Helper to safely encode path segments for REST endpoint
-function buildObjectUrl(bucketName: string, filePath: string): string {
-  const encodePath = filePath
-    .split('/')
-    .map((seg) => encodeURIComponent(seg))
-    .join('/');
-  return `${SUPABASE_URL}/storage/v1/object/${bucketName}/${encodePath}`;
-}
-
-// Upload using XMLHttpRequest to emit real progress events (browser only)
-async function uploadViaXHR(
-  bucketName: string,
-  filePath: string,
-  file: File,
-  {
-    contentType,
-    cacheControl,
-    upsert,
-    accessToken,
-  }: { contentType?: string; cacheControl?: string; upsert?: boolean; accessToken: string },
-  onProgress?: (progress: UploadProgress) => void
-): Promise<{ data: any; error: any }> {
-  return new Promise((resolve) => {
-    try {
-      const url = buildObjectUrl(bucketName, filePath);
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', url, true);
-
-      // Headers required by Supabase Storage REST API
-      xhr.setRequestHeader('authorization', `Bearer ${accessToken}`);
-      if (SUPABASE_ANON_KEY) xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
-      if (cacheControl) xhr.setRequestHeader('cache-control', cacheControl);
-      if (contentType) xhr.setRequestHeader('content-type', contentType);
-      if (upsert) xhr.setRequestHeader('x-upsert', 'true');
-
-      if (xhr.upload && onProgress) {
-        let lastUpdate = 0;
-        xhr.upload.onprogress = (e) => {
-          if (!e.lengthComputable) return;
-          
-          const now = Date.now();
-          // Throttle updates to every 100ms to prevent UI freezing
-          if (now - lastUpdate >= 100 || e.loaded === e.total) {
-            const percentage = Math.round((e.loaded / e.total) * 100);
-            onProgress({ loaded: e.loaded, total: e.total, percentage });
-            lastUpdate = now;
-          }
-        };
-      }
-
-      xhr.onerror = () => {
-        resolve({ data: null, error: new Error('Network error during upload') });
-      };
-
-      xhr.onload = () => {
-        // 200/201 are success for uploads
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const resp = xhr.responseText ? JSON.parse(xhr.responseText) : null;
-            resolve({ data: resp ?? { path: filePath }, error: null });
-          } catch (_) {
-            resolve({ data: { path: filePath }, error: null });
-          }
-        } else {
-          resolve({ data: null, error: new Error(`Upload failed (${xhr.status}): ${xhr.responseText}`) });
-        }
-      };
-
-      xhr.send(file);
-    } catch (err) {
-      resolve({ data: null, error: err });
-    }
-  });
-}
-
-
 /**
- * Upload a file to Supabase Storage with progress tracking
+ * Upload a file to Supabase Storage
  */
 export const uploadFile = async (
   bucketName: string,
@@ -111,28 +24,11 @@ export const uploadFile = async (
 ): Promise<{ data: any; error: any }> => {
   try {
     const {
-      onProgress,
       contentType = file.type,
       cacheControl = '3600',
       upsert = false
     } = options;
 
-    // // Prefer real progress via REST + XHR when available
-    // if (typeof window !== 'undefined' && typeof XMLHttpRequest !== 'undefined' && onProgress) {
-    //   const { data: sessionData } = await supabase.auth.getSession();
-    //   const accessToken = sessionData?.session?.access_token;
-    //   if (accessToken && SUPABASE_URL) {
-    //     return await uploadViaXHR(
-    //       bucketName,
-    //       filePath,
-    //       file,
-    //       { contentType, cacheControl, upsert, accessToken },
-    //       onProgress
-    //     );
-    //   }
-    // }
-
-    // Fallback to supabase-js upload (no native progress)
     const { data, error } = await supabase.storage
       .from(bucketName)
       .upload(filePath, file, {
@@ -182,7 +78,7 @@ export const createSignedUrl = async (
  
 
 /**
- * Upload a trade image with progress tracking
+ * Upload a trade image to Supabase Storage
  * This is a specialized function for trade images
  */
 export const uploadTradeImage = async (
@@ -191,8 +87,7 @@ export const uploadTradeImage = async (
   file: File,
   width?: number,
   height?: number,
-  caption?: string,
-  onProgress?: (progress: number) => void
+  caption?: string
 ): Promise<TradeImage> => {
   try {
     // Get current user from Supabase Auth
@@ -205,9 +100,8 @@ export const uploadTradeImage = async (
     // Create the file path
     const filePath = `users/${user.id}/trade-images/${filename}`;
 
-    // Upload the file with progress tracking
+    // Upload the file
     const { error } = await uploadFile('trade-images', filePath, file, {
-      onProgress: onProgress ? (progress) => onProgress(progress.percentage) : undefined,
       contentType: file.type,
       upsert: false
     });

@@ -37,6 +37,7 @@ import { Calendar } from '../../types/calendar';
 import { EconomicEvent } from '../../types/economicCalendar';
 import { Note } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import { Z_INDEX } from '../../styles/zIndex';
 import { logger } from '../../utils/logger';
 import * as notesService from '../../services/notesService';
 
@@ -836,7 +837,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             anchorEl={notesAnchorEl}
             placement="top-end"
             disablePortal
-            sx={{ zIndex: 1600 }}
+            sx={{ zIndex: Z_INDEX.DIALOG_POPUP }}
           >
             <Paper
               elevation={8}

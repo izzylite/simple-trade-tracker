@@ -25,7 +25,6 @@ export interface GridPendingImage extends Partial<PendingImage> {
   caption?: string;
   width?: number;
   height?: number;
-  upload_progress?: number;
   row?: number;
   column?: number;
   column_width?: number; // Width as percentage (0-100)
@@ -229,13 +228,9 @@ const ImageGrid: React.FC<ImageGridProps> = ({
     return 'isPending' in image ? !!(image as any).isPending : 'file' in image;
   };
 
-  // Helper to check if any image is currently uploading
+  // Helper to check if any image is currently uploading (pending images are still being uploaded)
   const isAnyImageUploading = (): boolean => {
-    return pendingImages.some(img =>
-      img.upload_progress !== undefined &&
-      img.upload_progress >= 0 && // default uploadProgress state is -1 or undefined 
-      img.upload_progress < 100
-    );
+    return pendingImages.length > 0;
   };
 
   // --- Drag and Drop (Reordering) Handlers ---
@@ -745,30 +740,26 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                         aspectRatio: pendingImg?.width && pendingImg?.height ? `${pendingImg.width}/${pendingImg.height}` : '16/9', // Default aspect ratio
                                     }}
                                 >
-                                {/* Progress Indicator - shows during upload */}
-                                {pendingImg?.upload_progress !== undefined && pendingImg.upload_progress >= 0 && pendingImg.upload_progress < 100 && (
-                                    <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 2 }}>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                                            <CircularProgress size={48} sx={{ color: 'white' }} />
-                                            <Typography variant="caption" component="div" sx={{ color: 'white', fontWeight: 'bold' }}>
-                                                Uploading...
-                                            </Typography>
-                                        </Box>
+                                {/* Uploading Indicator */}
+                                <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 2 }}>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                        <CircularProgress size={48} sx={{ color: 'white' }} />
+                                        <Typography variant="caption" component="div" sx={{ color: 'white', fontWeight: 'bold' }}>
+                                            Uploading...
+                                        </Typography>
                                     </Box>
-                                )}
+                                </Box>
                                 {/* Image Preview */}
                                 <img
                                     src={pendingImg?.preview}
                                     alt="Pending Upload"
                                     style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }}
                                 />
-                                {/* Delete Button */}
-                                {(!pendingImg?.upload_progress || pendingImg.upload_progress === 100 || pendingImg.upload_progress === -1) && (
-                                     <IconButton size="small" onClick={() => onImageRemove(pendingImages.findIndex(img => img.id === image.id), true)}
-                                         sx={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0, 0, 0, 0.5)', color: 'white', zIndex: 10, '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' } }}>
-                                         <DeleteIcon fontSize="small" />
-                                     </IconButton>
-                                 )}
+                                {/* Delete Button - always show, allows canceling upload */}
+                                <IconButton size="small" onClick={() => onImageRemove(pendingImages.findIndex(img => img.id === image.id), true)}
+                                    sx={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0, 0, 0, 0.5)', color: 'white', zIndex: 10, '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' } }}>
+                                    <DeleteIcon fontSize="small" />
+                                </IconButton>
                                 </Box>
                                 {/* Caption Field - Multiline with smaller font */}
                                 <TextField
@@ -780,8 +771,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                     minRows={1}
                                     maxRows={20} // Large number to effectively disable scrolling
                                     fullWidth
-                                    // Disable the field when image is uploading
-                                    disabled={pendingImg?.upload_progress !== undefined && pendingImg.upload_progress >= 0 && pendingImg.upload_progress < 100}
+                                    // Disable the field while image is uploading (pending images are always uploading)
+                                    disabled={true}
                                     sx={{
                                         px: 1,
                                         py: 0.5,

@@ -13,6 +13,7 @@ import {
   ArrowForwardIos as ArrowForwardIcon
 } from '@mui/icons-material';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
+import { Z_INDEX } from '../styles/zIndex';
 
 interface ImageZoomDialogProps {
   open: boolean;
@@ -193,7 +194,7 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
       maxWidth="md"
       fullWidth
       sx={{
-        zIndex: 1600 // Higher than AI drawer (1400) to ensure gallery appears on top
+        zIndex: Z_INDEX.DIALOG_POPUP
       }}
       PaperProps={{
         sx: {

@@ -818,8 +818,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     file: File,
     width?: number,
     height?: number,
-    caption?: string,
-    onProgress?: (progress: number) => void,
+    caption?: string
   ): Promise<TradeImage> {
     try {
       return await uploadTradeImage(
@@ -828,8 +827,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         file,
         width,
         height,
-        caption,
-        onProgress,
+        caption
       );
     } catch (error) {
       logger.error("Error uploading image:", error);

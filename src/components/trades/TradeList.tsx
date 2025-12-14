@@ -38,6 +38,7 @@ import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from
 import { useTheme } from '@mui/material/styles';
 import TradeDetailExpanded from '../TradeDetailExpanded';
 import { TradeOperationsProps } from '../../types/tradeOperations';
+import { Z_INDEX } from '../../styles/zIndex';
 
 interface TradeListProps {
   // Component-specific props
@@ -471,7 +472,10 @@ const TradeList: React.FC<TradeListProps> = ({
                       onClose={handleCloseMenu}
                       anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                       transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                      PaperProps={{ sx: { minWidth: 160 } }}
+                      slotProps={{
+                        paper: { sx: { minWidth: 160 } },
+                        root: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } }
+                      }}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <MenuItem onClick={(e) => { e.stopPropagation(); handleEditSelected(); }}>

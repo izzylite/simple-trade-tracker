@@ -53,10 +53,12 @@ import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar'
 import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS, EconomicCalendarFilterSettings } from './economicCalendar/EconomicCalendarDrawer';
 import { logger } from '../utils/logger';
 import { tradeEconomicEventService } from '../services/tradeEconomicEventService';
+import { useEventPinning } from '../hooks/useEventPinning';
 import ShareButton from './sharing/ShareButton';
 import { useRealtimeSubscription } from '../hooks/useRealtimeSubscription';
 import { isToday } from 'date-fns';
 import { TradeOperationsProps } from '../types/tradeOperations';
+import { Z_INDEX } from '../styles/zIndex';
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -118,7 +120,9 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     onOpenGalleryMode,
     economicFilter,
     onOpenAIChat,
-    isTradeUpdating
+    isTradeUpdating,
+    calendar,
+    onUpdateCalendarProperty
   } = tradeOperations;
 
   const theme = useTheme();
@@ -126,6 +130,16 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   const isUpdating = isTradeUpdating?.(trade.id);
   const [isPinning, setIsPinning] = useState(false);
   const [loadingImages, setLoadingImages] = useState<{ [key: string]: boolean }>({});
+
+  // Use the reusable event pinning hook
+  const {
+    pinningEventId,
+    handlePinEvent,
+    handleUnpinEvent
+  } = useEventPinning({
+    calendar,
+    onUpdateCalendarProperty
+  });
   const [showTagGroups, setShowTagGroups] = useState(() => {
     // Load from localStorage, default to false if not found
     const saved = localStorage.getItem('tradeDetail_showTagGroups');
@@ -236,7 +250,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
       // Convert trade_date to Date object if it's a string
       const tradeDate = typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date;
       const sessionRange = tradeEconomicEventService.getSessionTimeRange(trade.session!, tradeDate);
-
+      console.log(`sessionRange : ${JSON.stringify(sessionRange)}`)
       const events = await economicCalendarService.fetchEvents(
         { start: sessionRange.start, end: sessionRange.end },
         {
@@ -429,7 +443,10 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               }}>
                 {/* AI Analysis Button */}
                 {onOpenAIChat && (
-                  <Tooltip title="AI Analysis">
+                  <Tooltip
+                    title="AI Analysis"
+                    slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+                  >
                     <IconButton
                       onClick={() => onOpenAIChat(trade)}
                       sx={{
@@ -446,7 +463,10 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 )}
                 {/* Pin Button */}
                 {onUpdateTradeProperty && (
-                  <Tooltip title={trade.is_pinned ? 'Unpin trade' : 'Pin trade'}>
+                  <Tooltip
+                    title={trade.is_pinned ? 'Unpin trade' : 'Pin trade'}
+                    slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+                  >
                     <IconButton
                       onClick={handleTogglePin}
                       disabled={isPinning}
@@ -951,7 +971,10 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                         Tags
                       </Typography>
                     </Box>
-                    <Tooltip title={showTagGroups ? "Show flat tag list" : "Group tags by category"}>
+                    <Tooltip
+                      title={showTagGroups ? "Show flat tag list" : "Group tags by category"}
+                      slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+                    >
                       <IconButton
                         size="small"
                         onClick={handleToggleTagGroups}
@@ -998,7 +1021,10 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                         Economic Events ({format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'MMM d, yyyy')})
                       </Typography>
                     </Box>
-                    <Tooltip title={showEconomicEvents ? "Hide economic events" : "Show economic events"}>
+                    <Tooltip
+                      title={showEconomicEvents ? "Hide economic events" : "Show economic events"}
+                      slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+                    >
                       <IconButton
                         size="small"
                         onClick={handleToggleEconomicEvents}
@@ -1187,7 +1213,15 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                     },
                                     transition: 'background-color 0.2s ease-in-out'
                                   }}>
-                                    <EconomicEventListItem px={0} py={0} event={event} />
+                                    <EconomicEventListItem
+                                      px={0}
+                                      py={0}
+                                      event={event}
+                                      pinnedEvents={calendar?.pinned_events || []}
+                                      onPinEvent={handlePinEvent}
+                                      onUnpinEvent={handleUnpinEvent}
+                                      isPinning={pinningEventId === event.id}
+                                    />
                                   </Box>
                                   {index < economicEvents.length - 1 && (
                                     <Divider sx={{

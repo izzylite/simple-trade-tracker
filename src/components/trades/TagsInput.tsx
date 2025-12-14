@@ -18,6 +18,7 @@ import {
 } from '../../utils/tagColors';
 import TagEditDialog from '../TagEditDialog';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import { Z_INDEX } from '../../styles/zIndex';
 
 interface TagsInputProps {
   tags: string[];
@@ -93,6 +94,9 @@ const TagsInput: React.FC<TagsInputProps> = ({
         value={tags || []}
         onChange={handleTagsChangeWithValidation}
         slotProps={{
+          popper: {
+            sx: { zIndex: Z_INDEX.DIALOG_POPUP }
+          },
           listbox: {
             sx: {
               ...scrollbarStyles(theme)
@@ -185,6 +189,7 @@ const TagsInput: React.FC<TagsInputProps> = ({
         autoHideDuration={4000}
         onClose={() => setShowWarning(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        sx={{ zIndex: Z_INDEX.DIALOG_POPUP }}
       >
         <Alert
           onClose={() => setShowWarning(false)}

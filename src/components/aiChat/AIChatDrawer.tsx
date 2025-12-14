@@ -27,7 +27,8 @@ import {
   DialogContentText,
   DialogActions,
   TextField,
-  InputAdornment
+  InputAdornment,
+  CircularProgress
 } from '@mui/material';
 import {
   SmartToy as AIIcon,
@@ -56,6 +57,7 @@ import ApiKeySettingsDialog from './ApiKeySettingsDialog';
 import NoteEditorDialog from '../notes/NoteEditorDialog';
 import { Note } from '../../types/note';
 import { TradeOperationsProps } from '../../types/tradeOperations';
+import { Z_INDEX } from '../../styles/zIndex';
 
 interface AIChatDrawerProps {
   open: boolean;
@@ -102,11 +104,15 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     toolExecutionStatus,
     conversations,
     loadingConversations,
+    loadingMoreConversations,
+    hasMoreConversations,
+    totalConversationsCount,
     isAtMessageLimit,
     sendMessage,
     cancelRequest,
     setInputForEdit,
     loadConversations,
+    loadMoreConversations,
     selectConversation,
     deleteConversation,
     startNewChat,
@@ -247,7 +253,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           bottom: 0,
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
           backdropFilter: 'blur(4px)',
-          zIndex: 1399,
+          zIndex: Z_INDEX.AI_DRAWER_BACKDROP,
           opacity: open ? 1 : 0,
           visibility: open ? 'visible' : 'hidden',
           transition: 'opacity 0.3s ease-in-out, visibility 0.3s ease-in-out',
@@ -262,7 +268,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           bottom: 0,
           right: { xs: 0, sm: 20 },
           left: { xs: 0, sm: 'auto' },
-          zIndex: 1400,
+          zIndex: Z_INDEX.AI_DRAWER,
           height: open ? BOTTOM_SHEET_HEIGHTS.default : 0,
           maxHeight: '85vh',
           width: '100%',
@@ -667,15 +673,43 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                   )}
                 </Box>
 
+                {/* Load More Button */}
+                {!loadingConversations && hasMoreConversations && (
+                  <Box sx={{
+                    p: 2,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                  }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={loadMoreConversations}
+                      disabled={loadingMoreConversations}
+                      startIcon={loadingMoreConversations ? (
+                        <CircularProgress size={16} color="inherit" />
+                      ) : null}
+                      sx={{
+                        borderRadius: 2,
+                        textTransform: 'none',
+                        px: 3
+                      }}
+                    >
+                      {loadingMoreConversations ? 'Loading...' : 'Load More'}
+                    </Button>
+                  </Box>
+                )}
+
                 {/* Footer Info */}
                 {!loadingConversations && conversations.length > 0 && (
                   <Box sx={{
                     p: 2,
-                    borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    pt: hasMoreConversations ? 0 : 2,
+                    borderTop: hasMoreConversations ? 'none' : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                     backgroundColor: alpha(theme.palette.background.default, 0.5)
                   }}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                      {conversations.length} conversation{conversations.length !== 1 ? 's' : ''} saved
+                      Showing {conversations.length} of {totalConversationsCount} conversation{totalConversationsCount !== 1 ? 's' : ''}
                     </Typography>
                   </Box>
                 )}
@@ -711,7 +745,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         maxWidth="xs"
         fullWidth
         sx={{
-          zIndex: 1500 // Higher than drawer (1400) and backdrop (1399)
+          zIndex: Z_INDEX.DIALOG
         }}
       >
         <DialogTitle>Delete Conversation?</DialogTitle>

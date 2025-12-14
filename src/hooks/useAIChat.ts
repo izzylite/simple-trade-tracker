@@ -15,9 +15,14 @@ import {
 import { Calendar } from '../types/calendar';
 import { Trade } from '../types/trade';
 import { supabaseAIChatService } from '../services/supabaseAIChatService';
-import { ConversationRepository } from '../services/repository/repositories/ConversationRepository';
+import {
+  ConversationRepository,
+  ConversationPaginationOptions
+} from '../services/repository/repositories/ConversationRepository';
 import { logger } from '../utils/logger';
 import { hasApiKey } from '../services/apiKeyStorage';
+
+const CONVERSATIONS_PAGE_SIZE = 15;
 
 export interface UseAIChatOptions {
   userId: string | undefined;
@@ -36,6 +41,9 @@ export interface UseAIChatReturn {
   currentConversationId: string | null;
   conversations: AIConversation[];
   loadingConversations: boolean;
+  loadingMoreConversations: boolean;
+  hasMoreConversations: boolean;
+  totalConversationsCount: number;
   isAtMessageLimit: boolean;
   editingMessageId: string | null;
 
@@ -48,6 +56,7 @@ export interface UseAIChatReturn {
 
   // Conversation management
   loadConversations: () => Promise<void>;
+  loadMoreConversations: () => Promise<void>;
   selectConversation: (conversation: AIConversation) => void;
   deleteConversation: (conversationId: string) => Promise<boolean>;
   startNewChat: () => Promise<void>;
@@ -77,6 +86,9 @@ export function useAIChat({
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(false);
+  const [loadingMoreConversations, setLoadingMoreConversations] = useState(false);
+  const [hasMoreConversations, setHasMoreConversations] = useState(false);
+  const [totalConversationsCount, setTotalConversationsCount] = useState(0);
   const [isAtMessageLimit, setIsAtMessageLimit] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
@@ -183,14 +195,20 @@ export function useAIChat({
    * Load conversations - either trade-specific or calendar-level
    * If trade is provided: loads trade-specific conversations
    * If only calendar: loads calendar-level conversations (without trade_id)
+   * Resets pagination and loads first page
    */
   const loadConversations = useCallback(async () => {
     // Trade-specific: load conversations for this trade
     if (trade?.id) {
       setLoadingConversations(true);
       try {
-        const convos = await conversationRepo.findByTradeId(trade.id);
-        setConversations(convos);
+        const result = await conversationRepo.findByTradeId(trade.id, {
+          limit: CONVERSATIONS_PAGE_SIZE,
+          offset: 0
+        });
+        setConversations(result.conversations);
+        setHasMoreConversations(result.hasMore);
+        setTotalConversationsCount(result.totalCount);
       } catch (error) {
         logger.error('Error loading trade conversations:', error);
       } finally {
@@ -204,14 +222,71 @@ export function useAIChat({
 
     setLoadingConversations(true);
     try {
-      const convos = await conversationRepo.findByCalendarId(calendar.id);
-      setConversations(convos);
+      const result = await conversationRepo.findByCalendarId(calendar.id, {
+        limit: CONVERSATIONS_PAGE_SIZE,
+        offset: 0
+      });
+      setConversations(result.conversations);
+      setHasMoreConversations(result.hasMore);
+      setTotalConversationsCount(result.totalCount);
     } catch (error) {
       logger.error('Error loading conversations:', error);
     } finally {
       setLoadingConversations(false);
     }
   }, [calendar?.id, trade?.id, conversationRepo]);
+
+  /**
+   * Load more conversations (pagination)
+   * Appends to existing conversations list
+   */
+  const loadMoreConversations = useCallback(async () => {
+    if (loadingMoreConversations || !hasMoreConversations) return;
+
+    const currentOffset = conversations.length;
+
+    // Trade-specific
+    if (trade?.id) {
+      setLoadingMoreConversations(true);
+      try {
+        const result = await conversationRepo.findByTradeId(trade.id, {
+          limit: CONVERSATIONS_PAGE_SIZE,
+          offset: currentOffset
+        });
+        setConversations(prev => [...prev, ...result.conversations]);
+        setHasMoreConversations(result.hasMore);
+      } catch (error) {
+        logger.error('Error loading more trade conversations:', error);
+      } finally {
+        setLoadingMoreConversations(false);
+      }
+      return;
+    }
+
+    // Calendar-level
+    if (!calendar?.id) return;
+
+    setLoadingMoreConversations(true);
+    try {
+      const result = await conversationRepo.findByCalendarId(calendar.id, {
+        limit: CONVERSATIONS_PAGE_SIZE,
+        offset: currentOffset
+      });
+      setConversations(prev => [...prev, ...result.conversations]);
+      setHasMoreConversations(result.hasMore);
+    } catch (error) {
+      logger.error('Error loading more conversations:', error);
+    } finally {
+      setLoadingMoreConversations(false);
+    }
+  }, [
+    calendar?.id,
+    trade?.id,
+    conversations.length,
+    loadingMoreConversations,
+    hasMoreConversations,
+    conversationRepo
+  ]);
 
   /**
    * Save current conversation
@@ -633,6 +708,9 @@ What would you like to know about your trading?`,
     currentConversationId,
     conversations,
     loadingConversations,
+    loadingMoreConversations,
+    hasMoreConversations,
+    totalConversationsCount,
     isAtMessageLimit,
     editingMessageId,
 
@@ -645,6 +723,7 @@ What would you like to know about your trading?`,
 
     // Conversation management
     loadConversations,
+    loadMoreConversations,
     selectConversation,
     deleteConversation,
     startNewChat,

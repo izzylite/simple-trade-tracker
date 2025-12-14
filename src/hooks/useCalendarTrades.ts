@@ -227,8 +227,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
 
     try {
       // Check if trade exists in cached trades first
-      
-      let existingTrade = tradesMap.get(calendar.id) || await calendarService.getTrade(calendar.id, tradeId);
+      let existingTrade = tradesMap.get(tradeId) || await calendarService.getTrade(calendar.id, tradeId);
       // If trade doesn't exist and we have a create function, create it
       if (!existingTrade && createIfNotExists) {
         // Create in database with all updates already applied

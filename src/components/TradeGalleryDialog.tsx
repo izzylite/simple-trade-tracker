@@ -3,6 +3,7 @@ import {
   Dialog,
   Box,
   IconButton,
+  Button,
   Typography,
   useTheme,
   alpha,
@@ -25,7 +26,9 @@ import {
   AddComment as NewChatIcon,
   Delete as DeleteIcon,
   ArrowBack as BackIcon,
-  Schedule as ScheduleIcon
+  Schedule as ScheduleIcon,
+  Edit as EditIcon,
+  EditDocument
 } from '@mui/icons-material';
 import { AIConversation } from '../types/aiChat';
 import { format } from 'date-fns';
@@ -43,6 +46,7 @@ import Shimmer from './Shimmer';
 import EconomicEventDetailDialog from './economicCalendar/EconomicEventDetailDialog';
 import NoteEditorDialog from './notes/NoteEditorDialog';
 import { logger } from '../utils/logger';
+import { Z_INDEX } from '../styles/zIndex';
 
 interface TradeGalleryDialogProps {
   open: boolean;
@@ -303,7 +307,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       maxWidth="md"
       fullWidth
       sx={{
-        zIndex: 1600
+        zIndex: Z_INDEX.DIALOG_POPUP
       }}
       PaperProps={{
         sx: {
@@ -329,7 +333,10 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           {/* Navigation and Title */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
             {/* Previous Button */}
-            <Tooltip title="Previous trade (←)">
+            <Tooltip
+              title="Previous trade (←)"
+              slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+            >
               <span>
                 <IconButton
                   onClick={navigatePrevious}
@@ -378,7 +385,10 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             </Box>
 
             {/* Next Button */}
-            <Tooltip title="Next trade (→)">
+            <Tooltip
+              title="Next trade (→)"
+              slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+            >
               <span>
                 <IconButton
                   onClick={navigateNext}
@@ -397,7 +407,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           </Box>
         </Box>
 
-        {/* Tabs and History Controls */}
+        {/* Tabs, Edit, and History Controls */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
           <RoundedTabs
             tabs={[
@@ -409,10 +419,35 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             size="small"
           />
 
+          {/* Edit Button - only show when not read-only */}
+          {!isReadOnly && onEditTrade && (
+            <Button
+              size="small"
+              variant="outlined" 
+              onClick={() => {
+                onEditTrade(currentTrade);
+                onClose();
+              }}
+              sx={{
+                textTransform: 'none',
+                borderRadius: 2,
+                px: 1.5,
+                py: 0.5,
+                mr: 1,
+                fontSize: '0.8rem'
+              }}
+            >
+              Edit Trade
+            </Button>
+          )}
+ 
           {/* History controls - only show when on Assistant tab */}
           {activeTab === 1 && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 1 }}>
-              <Tooltip title="New Chat">
+              <Tooltip
+                title="New Chat"
+                slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+              >
                 <span>
                   <IconButton
                     size="small"
@@ -429,7 +464,10 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 </span>
               </Tooltip>
 
-              <Tooltip title={showHistoryView ? "Back to Chat" : "Conversation History"}>
+              <Tooltip
+                title={showHistoryView ? "Back to Chat" : "Conversation History"}
+                slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+              >
                 <IconButton
                   size="small"
                   onClick={() => setShowHistoryView(!showHistoryView)}

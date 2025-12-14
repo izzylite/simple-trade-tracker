@@ -52,6 +52,7 @@ import { useAuth } from '../../contexts/SupabaseAuthContext';
 import * as notesService from '../../services/notesService';
 import { Note, ReminderType, DayAbbreviation } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import { Z_INDEX } from '../../styles/zIndex';
 import { logger } from '../../utils/logger';
 
 // Default tags with display labels and internal values (for AI compatibility)
@@ -643,7 +644,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                         size: 'small',
                       },
                       popper: {
-                        sx: { zIndex: 2100 },
+                        sx: { zIndex: Z_INDEX.RICH_TEXT_DIALOG },
                       },
                     }}
                   />
@@ -892,7 +893,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
         isSubmitting={deleting}
-        sx={{ zIndex: 9999 }}
+        sx={{ zIndex: Z_INDEX.LOADING_PROGRESS }}
       />
     </>
   );

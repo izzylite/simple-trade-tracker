@@ -133,7 +133,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
           setSelectedEvent(event);
           setEventDetailDialogOpen(true);
         } else {
-          logger.warn(`No economic event found with ID: ${pinnedEvent.event_id}`);
+          logger.warn(`No economic event found with ID: ${pinnedEvent.event_id} data: ${JSON.stringify(pinnedEvent)}`);
         }
       } else {
         // Fallback for old pinned events without event_id

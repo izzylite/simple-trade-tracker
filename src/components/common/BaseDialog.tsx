@@ -12,6 +12,7 @@ import {
 import { Close as CloseIcon } from '@mui/icons-material';
 import { dialogProps } from '../../styles/dialogStyles';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import { Z_INDEX } from '../../styles/zIndex';
 import {
   DialogTitleStyled,
   DialogContentStyled,
@@ -63,6 +64,7 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
       maxWidth={maxWidth}
       fullWidth={fullWidth}
       {...dialogProps}
+      sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
           sx: {

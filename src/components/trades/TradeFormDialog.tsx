@@ -26,6 +26,7 @@ import {
 import { error, log, logger } from '../../utils/logger';
 import { validateFiles, FILE_SIZE_LIMITS } from '../../utils/fileValidation';
 import { formatTagsWithCapitalizedGroups } from '../../utils/tagColors';
+import { Z_INDEX } from '../../styles/zIndex';
 
 interface FormDialogProps {
   open: boolean;
@@ -111,8 +112,10 @@ export const createEditTradeData = (trade: Trade): NewTradeForm => {
     pending_images: [],
     is_temporary: trade.is_temporary,
     economic_events: trade.economic_events || [],
-    uploaded_images: trade.images ? trade.images.map((img, index) => ({
+    uploaded_images: trade.images ? trade.images.filter(img => img).map((img, index) => ({
       ...img,
+      // Ensure ID is present - generate one if missing to prevent delete issues
+      id: img.id || calendarService.generateImageId(),
       // Ensure layout properties are explicitly preserved
       row: img.row !== undefined ? img.row : index, // Each image gets its own row by default
       column: img.column !== undefined ? img.column : 0, // Always in first column by default
@@ -229,8 +232,22 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       createEmptyTrade();
     }
     else if (showForm.editTrade) {
-      setEditingTrade(showForm.editTrade);
-      setNewTrade(createEditTradeData(showForm.editTrade));
+      const prevEditTradeId = prevShowFormRef.current?.editTrade?.id;
+      const currentEditTradeId = showForm.editTrade.id;
+      const wasDialogClosed = !prevShowFormRef.current?.open;
+      const isDialogOpening = wasDialogClosed && showForm.open;
+      const isSwitchingTrade = prevEditTradeId !== currentEditTradeId;
+
+      // Initialize form data when:
+      // 1. Dialog is opening (from closed state) - need fresh data
+      // 2. Switching to a different trade (by ID)
+      //
+      // Do NOT reinitialize when parent updates showForm.editTrade with fresh
+      // database data during an active edit session - this would lose pending images
+      if (isDialogOpening || isSwitchingTrade) {
+        setEditingTrade(showForm.editTrade);
+        setNewTrade(createEditTradeData(showForm.editTrade));
+      }
     }
 
     // Update previous showForm ref
@@ -493,13 +510,12 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         const dimensions = await getDimensions(preview);
 
         return {
-          id: calendarService.generateImageId(),
+          id: calendarService.generateImageId(file),
           file,
           preview,
           caption: '',
           width: dimensions.width,
-          height: dimensions.height,
-          upload_progress: 0
+          height: dimensions.height
         };
       })
     );
@@ -642,6 +658,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             // Create a map of updated images for O(1) lookup
             const updatedImagesMap = new Map(successfulUploads.map(img => [img.id, img]));
 
+            // Create a set of existing image IDs for quick lookup
+            const existingImageIds = new Set(existingImages.map(img => img.id));
+
             // Map over existing images: if it's one of the successfully uploaded ones, update it
             const mergedImages = existingImages.map(existingImg => {
               if (updatedImagesMap.has(existingImg.id)) {
@@ -657,9 +676,17 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               return existingImg;
             });
 
+            // IMPORTANT: Add any uploaded images that aren't already in the database
+            // This handles race conditions where the first update (adding pending images)
+            // hasn't propagated to the database yet
+            const newImagesToAdd = successfulUploads.filter(img => !existingImageIds.has(img.id));
+            if (newImagesToAdd.length > 0) {
+              logger.log(`Adding ${newImagesToAdd.length} images that weren't in database yet (race condition protection)`);
+            }
+
             return {
               ...trade,
-              images: mergedImages
+              images: [...mergedImages, ...newImagesToAdd]
             };
           });
           logger.log(`Updated trade with ${successfulUploads.length} uploaded images`);
@@ -674,35 +701,18 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     }
   };
 
-  // Function to upload a single image, track progress, update local state, AND return the uploaded image object
+  // Function to upload a single image, update local state, AND return the uploaded image object
   // Does NOT update the database directly
   const uploadImageAndTrackProgress = async (image: PendingImage, tradeId: string, pending_images: PendingImage[]): Promise<TradeImage | null> => {
     try {
-      // Update progress to show upload has started
-      setNewTrade(prev => ({
-        ...prev!,
-        pending_images: prev!.pending_images.map((img) =>
-          img.id === image.id ? { ...img, upload_progress: 1 } : img
-        )
-      }));
-
-      // Upload the image with progress tracking
+      // Upload the image
       const uploadedImage: TradeImage = await calendarService.uploadTradeImage(
         effectiveCalendarId!,
         image.id!!,
         image.file,
         image.width,
         image.height,
-        image.caption,
-        (progress: number) => {
-          // Update progress in the UI
-          setNewTrade(prev => ({
-            ...prev!,
-            pending_images: prev!.pending_images.map((img) =>
-              img.id === image.id ? { ...img, upload_progress: progress } : img
-            )
-          }));
-        }
+        image.caption
       );
 
       // Once upload is complete, move from pending_images to uploadedImages
@@ -717,20 +727,29 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         column_width: originalPendingImage?.column_width || 100
       };
 
-      // Update local state
+      // Update local state - but only if image wasn't deleted during upload
+      let wasDeleted = false;
       setNewTrade(prev => {
         const newPendingImages = [...prev!.pending_images];
-        // Remove the uploaded image from pending_images
-        let imageIndex = newPendingImages.findIndex(img => img.id === image.id);
-        if (imageIndex !== -1) {
-          newPendingImages.splice(imageIndex, 1);
+        // Check if the image still exists in pending_images
+        const imageIndex = newPendingImages.findIndex(img => img.id === image.id);
+
+        if (imageIndex === -1) {
+          // Image was deleted during upload - don't add to uploaded_images
+          wasDeleted = true;
+          logger.log(`Image ${image.id} was deleted during upload, skipping`);
+          return prev;
         }
+
+        // Remove from pending_images
+        newPendingImages.splice(imageIndex, 1);
+
         // Find the image where pending is true in the uploadedImages list
         // Setting pending to the image is useful for show shimmer in tradeDetail
         const newUploadedImages = [...prev!.uploaded_images];
-        imageIndex = newUploadedImages.findIndex(img => img.id === image.id);
-        if (imageIndex !== -1 && newUploadedImages[imageIndex].pending) {
-          newUploadedImages.splice(imageIndex, 1);
+        const uploadedIndex = newUploadedImages.findIndex(img => img.id === image.id);
+        if (uploadedIndex !== -1 && newUploadedImages[uploadedIndex].pending) {
+          newUploadedImages.splice(uploadedIndex, 1);
         }
 
         return {
@@ -740,18 +759,29 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         };
       });
 
-      return updatedImage;
+      // Return null if image was deleted so database update skips it
+      return wasDeleted ? null : updatedImage;
 
     } catch (error) {
       logger.error(`Error uploading image ${image.id}:`, error);
 
-      // Update UI to show upload failed
+      // Remove failed image from pending (local state)
       setNewTrade(prev => ({
         ...prev!,
-        pending_images: prev!.pending_images.map((img) =>
-          img.id === image.id ? { ...img, upload_progress: -1 } : img
-        )
+        pending_images: prev!.pending_images.filter((img) => img.id !== image.id)
       }));
+
+      // Also remove failed image from database
+      if (newTrade?.id) {
+        handleUpdateTradeProperty(newTrade.id, (trade) => ({
+          ...trade,
+          images: (trade.images || []).filter(img => img && img.id !== image.id)
+        })).then(() => {
+          logger.log(`Removed failed upload ${image.id} from database`);
+        }).catch(err => {
+          logger.error(`Failed to remove failed upload ${image.id} from database:`, err);
+        });
+      }
 
       return null;
     }
@@ -761,15 +791,6 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   const handleImageCaptionChange = async (index: number, caption: string, isPending: boolean) => {
     try {
       if (isPending) {
-        // Check if the image is currently being uploaded
-        const image = newTrade!.pending_images[index];
-        if (image.upload_progress !== undefined && image.upload_progress > 0 && image.upload_progress < 100) {
-          // Image is currently uploading, we shouldn't allow caption changes
-          // This is a fallback in case the UI field wasn't disabled properly
-          logger.warn('Attempted to change caption of an image that is currently uploading');
-          return;
-        }
-
         // Update caption for pending image
         setNewTrade(prev => ({
           ...prev!,
@@ -795,47 +816,58 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
   const handleImageRemove = async (index: number, isPending: boolean) => {
     try {
+      // Guard against invalid index (can happen if image ID matching fails)
+      if (index < 0) {
+        logger.error('handleImageRemove called with invalid index:', index, 'isPending:', isPending);
+        return;
+      }
+
       if (isPending) {
-        // Check if the image is currently being uploaded
         const image = newTrade!.pending_images[index];
-        if (image.upload_progress !== undefined && image.upload_progress > 0 && image.upload_progress < 100) {
-          // Image is currently uploading, we shouldn't allow deletion
-          // This is a fallback in case the UI button wasn't hidden properly
-          logger.warn('Attempted to delete an image that is currently uploading');
-          // showErrorSnackbar('Cannot delete an image while it\'s uploading. Please wait for the upload to complete.');
+        if (!image) {
+          logger.error('Pending image not found at index:', index);
           return;
         }
+
+        const imageId = image.id;
 
         // Release object URL to avoid memory leaks
         URL.revokeObjectURL(image.preview);
 
-        // Update local state
+        // Update local state - remove from pending_images
+        // When upload completes, it will see the image is gone and skip adding it
         setNewTrade(prev => ({
           ...prev!,
           pending_images: prev!.pending_images.filter((_, i) => i !== index)
         }));
+
+        // Also remove from database - the image may have been added with pending:true
+        if (imageId && newTrade?.id) {
+          handleUpdateTradeProperty(newTrade.id, (trade) => ({
+            ...trade,
+            images: (trade.images || []).filter(img => img && img.id !== imageId)
+          })).then(() => {
+            logger.log(`Removed pending image ${imageId} from database`);
+          }).catch(err => {
+            logger.error(`Failed to remove pending image ${imageId} from database:`, err);
+          });
+        }
       } else {
         const image = newTrade!.uploaded_images[index];
+        if (!image) {
+          logger.error('Uploaded image not found at index:', index);
+          return;
+        }
 
-        // Update local state first for immediate UI feedback
+        // Update local state for immediate UI feedback
+        // The actual database update happens when user clicks Save
+        // Edge function (handle-trade-changes) will clean up removed images from storage
         setNewTrade(prev => ({
           ...prev!,
           uploaded_images: prev!.uploaded_images.filter((_, i) => i !== index)
         }));
 
-        //delete the image and update the trade in the background
-        try {
-          await handleUpdateTradeProperty(newTrade!.id, (trade) => ({
-            ...trade,
-            images: (trade.images || []).filter(img => img.id !== image.id)
-          }));
-
-          logger.log(`Image ${image.id} deleted and trade updated successfully`);
-        } catch (deleteError) {
-          logger.error('Error deleting image or updating trade:', deleteError);
-          // Don't show error to user since the image is already removed from UI
-          // and will be properly cleaned up when the form is submitted
-        }
+        logger.log(`Image ${image.id} removed from UI - will be deleted from storage on save`);
       }
     } catch (error) {
       logger.error('Error in handleImageRemove:', error);
@@ -881,9 +913,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     return { success: true, tradesUpdated: 0 };
   };
 
-  const hasPendingUploads = (): boolean => newTrade!.pending_images.some(img =>
-    img.upload_progress !== undefined && img.upload_progress < 100 && img.upload_progress >= 0
-  );
+  const hasPendingUploads = (): boolean => newTrade!.pending_images.length > 0;
 
   // Check if all required tag groups are present in the trade's tags
   const validateRequiredTagGroups = (tags: string[]): { valid: boolean; missingGroups: string[] } => {
@@ -1252,6 +1282,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         autoHideDuration={4000}
         onClose={handleCloseError}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        sx={{ zIndex: Z_INDEX.DIALOG_POPUP }}
       >
         <Alert onClose={handleCloseError} severity="error" variant="filled" sx={{ width: '100%' }}>
           {errorMessage}

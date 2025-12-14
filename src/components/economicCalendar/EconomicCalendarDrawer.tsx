@@ -41,18 +41,19 @@ import {
   EconomicCalendarDrawerProps,
   EconomicEvent,
 } from '../../types/economicCalendar';
-import { Calendar } from '../../types/calendar';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { TradeEconomicEvent } from '../../types/trade';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import { Z_INDEX } from '../../styles/zIndex';
 import EconomicEventListItem from './EconomicEventListItem';
 import EconomicCalendarFilters from './EconomicCalendarFilters';
 import EconomicEventDetailDialog from './EconomicEventDetailDialog';
 import EconomicEventShimmer from './EconomicEventShimmer';
 import { logger } from '../../utils/logger';
-import { cleanEventNameForPinning, isEventPinned, eventMatchV3 } from '../../utils/eventNameUtils';
+import { eventMatchV3 } from '../../utils/eventNameUtils';
 // Optimized hooks
 import { useEconomicEvents, ViewType } from '../../hooks/useEconomicEvents';
+import { useEventPinning } from '../../hooks/useEventPinning';
 import { useEconomicCalendarFilters, DEFAULT_FILTER_SETTINGS } from '../../hooks/useEconomicCalendarFilters';
 import { useEventCountdownTime } from '../../hooks/useCurrentTime';
 
@@ -126,9 +127,18 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   });
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const [isMonthPickerActive, setIsMonthPickerActive] = useState(false);
-  const [pinningEventId, setPinningEventId] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
   const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
+
+  // Use reusable event pinning hook
+  const {
+    pinningEventId,
+    handlePinEvent,
+    handleUnpinEvent
+  } = useEventPinning({
+    calendar,
+    onUpdateCalendarProperty
+  });
 
   // Use optimized filter hook
   const {
@@ -293,61 +303,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     }
   }, [viewType, currentDate]);
 
-  // Handle pin event
-  const handlePinEvent = useCallback(async (event: EconomicEvent) => {
-    if (!calendar?.id || !onUpdateCalendarProperty) return;
-
-    try {
-      setPinningEventId(event.id);
-      await onUpdateCalendarProperty(calendar.id, (cal: Calendar) => {
-        const currentPinnedEvents = cal.pinned_events || [];
-        const cleanedEventName = cleanEventNameForPinning(event.event_name);
-        if (isEventPinned(event, currentPinnedEvents)) {
-          return cal;
-        }
-        return {
-          ...cal,
-          pinned_events: [...currentPinnedEvents, {
-            event: cleanedEventName,
-            event_id: event.id,
-            notes: '',
-            impact: event.impact,
-            currency: event.currency
-          }]
-        };
-      });
-      logger.log(`📌 Successfully pinned event: ${event.event_name} (ID: ${event.id})`);
-    } catch (error) {
-      logger.error('Error pinning event:', error);
-    } finally {
-      setPinningEventId(null);
-    }
-  }, [calendar?.id, onUpdateCalendarProperty]);
-
-  // Handle unpin event
-  const handleUnpinEvent = useCallback(async (event: EconomicEvent) => {
-    if (!calendar?.id || !onUpdateCalendarProperty) return;
-
-    try {
-      setPinningEventId(event.id);
-      await onUpdateCalendarProperty(calendar.id, (cal: Calendar) => {
-        const currentPinnedEvents = cal.pinned_events || [];
-        return {
-          ...cal,
-          pinned_events: currentPinnedEvents.filter(pinnedEvent =>
-            pinnedEvent.event_id ? pinnedEvent.event_id !== event.id :
-              pinnedEvent.event.toLowerCase() !== cleanEventNameForPinning(event.event_name).toLowerCase()
-          )
-        };
-      });
-      logger.log(`📌 Successfully unpinned event: ${event.event_name} (ID: ${event.id})`);
-    } catch (error) {
-      logger.error('Error unpinning event:', error);
-    } finally {
-      setPinningEventId(null);
-    }
-  }, [calendar?.id, onUpdateCalendarProperty]);
-
   // Handle event click
   const handleEventClick = useCallback((event: EconomicEvent) => {
     logger.log('Economic event clicked:', event);
@@ -368,11 +323,11 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       onClose={onClose}
       ModalProps={{ keepMounted: true }}
       sx={{
-        zIndex: 1300,
+        zIndex: Z_INDEX.ECONOMIC_CALENDAR_DRAWER,
         '& .MuiDrawer-paper': {
           width: { xs: '100%', sm: 450 },
           maxWidth: '100vw',
-          zIndex: 1300,
+          zIndex: Z_INDEX.ECONOMIC_CALENDAR_DRAWER,
           background: theme.palette.mode === 'dark'
             ? 'linear-gradient(135deg, rgba(18, 18, 18, 0.95) 0%, rgba(30, 30, 30, 0.95) 100%)'
             : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',

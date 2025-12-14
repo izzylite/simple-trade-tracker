@@ -10,6 +10,7 @@ import {
   SxProps,
   Theme
 } from '@mui/material';
+import { Z_INDEX } from '../../styles/zIndex';
 
 interface ConfirmationDialogProps {
   open: boolean;
@@ -42,7 +43,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
       onClose={onCancel}
       maxWidth="xs"
       fullWidth
-      sx={sx}
+      sx={{ zIndex: Z_INDEX.DIALOG, ...sx }}
     >
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
