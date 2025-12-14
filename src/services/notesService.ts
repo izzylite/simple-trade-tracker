@@ -3,9 +3,13 @@
  * Simple service for Notion-style notes
  */
 
-import { Note, CreateNoteInput, UpdateNoteInput } from '../types/note';
-import { logger } from '../utils/logger';
-import { NoteRepository, NoteQueryOptions, NoteQueryResult } from './repository/repositories/NoteRepository';
+import { CreateNoteInput, Note, UpdateNoteInput } from "../types/note";
+import { logger } from "../utils/logger";
+import {
+  NoteQueryOptions,
+  NoteQueryResult,
+  NoteRepository,
+} from "./repository/repositories/NoteRepository";
 
 const noteRepository = new NoteRepository();
 
@@ -19,7 +23,7 @@ export const getUserNotes = async (userId: string): Promise<Note[]> => {
   try {
     return await noteRepository.findByUserId(userId);
   } catch (error) {
-    logger.error('Error getting user notes:', error);
+    logger.error("Error getting user notes:", error);
     return [];
   }
 };
@@ -29,13 +33,28 @@ export const getUserNotes = async (userId: string): Promise<Note[]> => {
  */
 export const queryUserNotes = async (
   userId: string,
-  options: NoteQueryOptions = {}
+  options: NoteQueryOptions = {},
 ): Promise<NoteQueryResult> => {
   try {
     return await noteRepository.queryByUserId(userId, options);
   } catch (error) {
-    logger.error('Error querying user notes:', error);
+    logger.error("Error querying user notes:", error);
     return { notes: [], total: 0, hasMore: false };
+  }
+};
+
+/**
+ * Get notes by tag for a user
+ */
+export const getNotesByTag = async (
+  userId: string,
+  tag: string,
+): Promise<Note[]> => {
+  try {
+    return await noteRepository.findByTag(userId, tag);
+  } catch (error) {
+    logger.error("Error getting notes by tag:", error);
+    return [];
   }
 };
 
@@ -46,7 +65,7 @@ export const getCalendarNotes = async (calendarId: string): Promise<Note[]> => {
   try {
     return await noteRepository.findByCalendarId(calendarId);
   } catch (error) {
-    logger.error('Error getting calendar notes:', error);
+    logger.error("Error getting calendar notes:", error);
     return [];
   }
 };
@@ -56,12 +75,12 @@ export const getCalendarNotes = async (calendarId: string): Promise<Note[]> => {
  */
 export const queryCalendarNotes = async (
   calendarId: string,
-  options: NoteQueryOptions = {}
+  options: NoteQueryOptions = {},
 ): Promise<NoteQueryResult> => {
   try {
     return await noteRepository.queryByCalendarId(calendarId, options);
   } catch (error) {
-    logger.error('Error querying calendar notes:', error);
+    logger.error("Error querying calendar notes:", error);
     return { notes: [], total: 0, hasMore: false };
   }
 };
@@ -73,7 +92,7 @@ export const getNote = async (noteId: string): Promise<Note | null> => {
   try {
     return await noteRepository.findById(noteId);
   } catch (error) {
-    logger.error('Error getting note:', error);
+    logger.error("Error getting note:", error);
     return null;
   }
 };
@@ -85,8 +104,8 @@ export const createNote = async (noteInput: CreateNoteInput): Promise<Note> => {
   try {
     const noteData = {
       ...noteInput,
-      title: noteInput.title || 'Untitled',
-      content: noteInput.content || '',
+      title: noteInput.title || "Untitled",
+      content: noteInput.content || "",
       cover_image: noteInput.cover_image ?? null,
       is_archived: false,
       is_pinned: false,
@@ -95,11 +114,11 @@ export const createNote = async (noteInput: CreateNoteInput): Promise<Note> => {
     };
     const result = await noteRepository.create(noteData);
     if (!result.success || !result.data) {
-      throw new Error(result.error?.message || 'Failed to create note');
+      throw new Error(result.error?.message || "Failed to create note");
     }
-    return  result.data as Note;
+    return result.data as Note;
   } catch (error) {
-    logger.error('Error creating note:', error);
+    logger.error("Error creating note:", error);
     throw error;
   }
 };
@@ -109,15 +128,15 @@ export const createNote = async (noteInput: CreateNoteInput): Promise<Note> => {
  */
 export const updateNote = async (
   noteId: string,
-  updates: UpdateNoteInput
+  updates: UpdateNoteInput,
 ): Promise<void> => {
   try {
     const result = await noteRepository.update(noteId, updates);
     if (!result.success) {
-      throw new Error(result.error?.message || 'Failed to update note');
+      throw new Error(result.error?.message || "Failed to update note");
     }
   } catch (error) {
-    logger.error('Error updating note:', error);
+    logger.error("Error updating note:", error);
     throw error;
   }
 };
@@ -129,10 +148,10 @@ export const deleteNote = async (noteId: string): Promise<void> => {
   try {
     const result = await noteRepository.delete(noteId);
     if (!result.success) {
-      throw new Error(result.error?.message || 'Failed to delete note');
+      throw new Error(result.error?.message || "Failed to delete note");
     }
   } catch (error) {
-    logger.error('Error deleting note:', error);
+    logger.error("Error deleting note:", error);
     throw error;
   }
 };
@@ -144,10 +163,10 @@ export const archiveNote = async (noteId: string): Promise<void> => {
   try {
     const success = await noteRepository.archiveNote(noteId);
     if (!success) {
-      throw new Error('Failed to archive note');
+      throw new Error("Failed to archive note");
     }
   } catch (error) {
-    logger.error('Error archiving note:', error);
+    logger.error("Error archiving note:", error);
     throw error;
   }
 };
@@ -159,10 +178,10 @@ export const unarchiveNote = async (noteId: string): Promise<void> => {
   try {
     const success = await noteRepository.unarchiveNote(noteId);
     if (!success) {
-      throw new Error('Failed to unarchive note');
+      throw new Error("Failed to unarchive note");
     }
   } catch (error) {
-    logger.error('Error unarchiving note:', error);
+    logger.error("Error unarchiving note:", error);
     throw error;
   }
 };
@@ -174,10 +193,10 @@ export const pinNote = async (noteId: string): Promise<void> => {
   try {
     const success = await noteRepository.pinNote(noteId);
     if (!success) {
-      throw new Error('Failed to pin note');
+      throw new Error("Failed to pin note");
     }
   } catch (error) {
-    logger.error('Error pinning note:', error);
+    logger.error("Error pinning note:", error);
     throw error;
   }
 };
@@ -189,10 +208,10 @@ export const unpinNote = async (noteId: string): Promise<void> => {
   try {
     const success = await noteRepository.unpinNote(noteId);
     if (!success) {
-      throw new Error('Failed to unpin note');
+      throw new Error("Failed to unpin note");
     }
   } catch (error) {
-    logger.error('Error unpinning note:', error);
+    logger.error("Error unpinning note:", error);
     throw error;
   }
 };
@@ -202,15 +221,15 @@ export const unpinNote = async (noteId: string): Promise<void> => {
  */
 export const moveNoteToCalendar = async (
   noteId: string,
-  calendarId: string
+  calendarId: string,
 ): Promise<void> => {
   try {
     const success = await noteRepository.moveNoteToCalendar(noteId, calendarId);
     if (!success) {
-      throw new Error('Failed to move note to calendar');
+      throw new Error("Failed to move note to calendar");
     }
   } catch (error) {
-    logger.error('Error moving note to calendar:', error);
+    logger.error("Error moving note to calendar:", error);
     throw error;
   }
 };
@@ -221,12 +240,12 @@ export const moveNoteToCalendar = async (
  */
 export const getReminderNotesForDay = async (
   calendarId: string,
-  dayAbbreviation: string
+  dayAbbreviation: string,
 ): Promise<Note[]> => {
   try {
     return await noteRepository.findRemindersByDay(calendarId, dayAbbreviation);
   } catch (error) {
-    logger.error('Error getting reminder notes for day:', error);
+    logger.error("Error getting reminder notes for day:", error);
     return [];
   }
 };
@@ -236,12 +255,12 @@ export const getReminderNotesForDay = async (
  */
 export const getReminderNotesForDate = async (
   calendarId: string,
-  date: Date
+  date: Date,
 ): Promise<Note[]> => {
   try {
     return await noteRepository.findRemindersByDate(calendarId, date);
   } catch (error) {
-    logger.error('Error getting reminder notes for date:', error);
+    logger.error("Error getting reminder notes for date:", error);
     return [];
   }
 };
@@ -253,17 +272,17 @@ export const setNoteReminder = async (
   noteId: string,
   reminderType: string,
   reminderDate?: Date | null,
-  reminderDays?: string[]
+  reminderDays?: string[],
 ): Promise<void> => {
   try {
     await noteRepository.update(noteId, {
       reminder_type: reminderType as any,
       reminder_date: reminderDate,
       reminder_days: reminderDays as any,
-      is_reminder_active: reminderType !== 'none',
+      is_reminder_active: reminderType !== "none",
     });
   } catch (error) {
-    logger.error('Error setting note reminder:', error);
+    logger.error("Error setting note reminder:", error);
     throw error;
   }
 };
@@ -274,13 +293,13 @@ export const setNoteReminder = async (
 export const clearNoteReminder = async (noteId: string): Promise<void> => {
   try {
     await noteRepository.update(noteId, {
-      reminder_type: 'none' as any,
+      reminder_type: "none" as any,
       reminder_date: null,
       reminder_days: [] as any,
       is_reminder_active: false,
     });
   } catch (error) {
-    logger.error('Error clearing note reminder:', error);
+    logger.error("Error clearing note reminder:", error);
     throw error;
   }
 };

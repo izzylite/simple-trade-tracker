@@ -77,19 +77,29 @@ import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
 
 // Default tags with display labels and internal values (for AI compatibility)
-export const DEFAULT_NOTE_TAGS_MAP: Record<string, string> = {
-  'STRATEGY': 'Strategy',
-  'GAME_PLAN': 'Game Plan',
-  'INSIGHT': 'Insight',
-  'LESSON_LEARNED': 'Lesson Learned',
-  'GENERAL': 'General',
-  'RISK_MANAGEMENT': 'Risk Management',
-  'PSYCHOLOGY': 'Psychology',
+export interface TagInfo {
+  label: string;
+  subtitle: string;
+}
+
+export const DEFAULT_NOTE_TAGS_MAP: Record<string, TagInfo> = {
+  'STRATEGY': { label: 'Strategy', subtitle: 'Long-term trading approach and rules' },
+  'GAME_PLAN': { label: 'Game Plan', subtitle: 'Specific plan for the upcoming session' },
+  'INSIGHT': { label: 'Insight', subtitle: 'Market observations and patterns' },
+  'LESSON_LEARNED': { label: 'Lesson Learned', subtitle: 'Review of mistakes and successes' },
+  'GENERAL': { label: 'General', subtitle: 'General notes and thoughts' },
+  'RISK_MANAGEMENT': { label: 'Risk Management', subtitle: 'Position sizing and stop-loss rules' },
+  'PSYCHOLOGY': { label: 'Psychology', subtitle: 'Mental state and emotional control' },
+  'GUIDELINE': { label: 'Guideline', subtitle: 'Instructions for the AI Assistant (Max 1)' },
 };
 
 // Helper to get display label for a tag (returns original if not a default tag)
 export const getTagDisplayLabel = (tag: string): string => {
-  return DEFAULT_NOTE_TAGS_MAP[tag] || tag;
+  return DEFAULT_NOTE_TAGS_MAP[tag]?.label || tag;
+};
+
+export const getTagSubtitle = (tag: string): string => {
+  return DEFAULT_NOTE_TAGS_MAP[tag]?.subtitle || '';
 };
 
 interface NoteEditorDialogProps {
@@ -150,11 +160,30 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
 
   // Tags states
   const [tags, setTags] = useState<string[]>([]);
-  const [isTagsExpanded, setIsTagsExpanded] = useState(false);
-
   const [newTagInput, setNewTagInput] = useState('');
+  const [isTagsExpanded, setIsTagsExpanded] = useState(false);
+  const [hasExistingGuideline, setHasExistingGuideline] = useState(false);
+
+  // Default tags list
   const allDays: DayAbbreviation[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const defaultTags = Object.keys(DEFAULT_NOTE_TAGS_MAP);
+
+  // Check for existing guideline note on open
+  useEffect(() => {
+    const checkGuideline = async () => {
+      if (open && user?.id) {
+        try {
+          const guidelineNotes = await notesService.getNotesByTag(user.id, 'GUIDELINE');
+          const existingGuideline = guidelineNotes.find(n => n.id !== initialNote?.id);
+          setHasExistingGuideline(!!existingGuideline);
+        } catch (error) {
+          console.error('Error checking for existing guideline:', error);
+        }
+      }
+    };
+    checkGuideline();
+  }, [open, user?.id, initialNote?.id]);
+
 
   // Initialize note data when dialog opens
   useEffect(() => {
@@ -936,7 +965,11 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                   <Autocomplete
                     size="small"
-                    options={defaultTags.filter(t => !tags.includes(t))}
+                    options={defaultTags.filter(t => {
+                      if (tags.includes(t)) return false;
+                      if (t === 'GUIDELINE' && hasExistingGuideline) return false;
+                      return true;
+                    })}
                     getOptionLabel={(option) => getTagDisplayLabel(option)}
                     value={null}
                     inputValue={newTagInput}
@@ -951,7 +984,25 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                       }
                       setNewTagInput('');
                     }}
+                    renderOption={(props, option) => (
+                      <li {...props} style={{ display: 'block' }}>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {getTagDisplayLabel(option)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {getTagSubtitle(option)}
+                          </Typography>
+                        </Box>
+                      </li>
+                    )}
                     sx={{ flex: 1 }}
+                    ListboxProps={{
+                      sx: {
+                        ...scrollbarStyles(theme),
+                        maxHeight: 250, // Increase max height slightly for better visibility with subtitles
+                      }
+                    }}
                     slotProps={{
                       popper: {
                         sx: { zIndex: (theme) => theme.zIndex.modal + 200 },

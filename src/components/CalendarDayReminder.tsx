@@ -469,14 +469,6 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
                   '&:hover': {
                     backgroundColor: (() => {
                       if (!currentNote.color) return alpha(theme.palette.info.main, 0.08);
-                      const colorMap: Record<string, string> = {
-                        'red': theme.palette.error.main,
-                        'green': theme.palette.success.main,
-                        'blue': theme.palette.info.main,
-                        'orange': theme.palette.warning.main,
-                        'purple': theme.palette.secondary.main,
-                      };
-                      const baseColor = colorMap[currentNote.color] || currentNote.color;
                       try {
                         return alpha(baseColor, 0.2);
                       } catch (e) {
