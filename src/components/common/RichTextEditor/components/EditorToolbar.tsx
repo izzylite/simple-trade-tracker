@@ -97,10 +97,38 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
     addRecentBgColor,
   } = useRecentColors();
 
-  // Get current editor state info
-  const currentStyles = editorState.getCurrentInlineStyle();
-  const currentBlockType = getCurrentBlockType(editorState);
-  const currentLink = getCurrentLink(editorState);
+  // Guard against undefined or invalid editorState
+  // Check that editorState exists, has content, and has a valid selection
+  if (!editorState) {
+    return null;
+  }
+
+  const content = editorState.getCurrentContent();
+  const selection = editorState.getSelection();
+
+  if (!content || !selection) {
+    return null;
+  }
+
+  // Additional guard: check that the selection's anchor block exists
+  const anchorKey = selection.getAnchorKey();
+  if (!anchorKey || !content.getBlockForKey(anchorKey)) {
+    return null;
+  }
+
+  // Get current editor state info - wrap in try-catch for extra safety
+  let currentStyles;
+  let currentBlockType;
+  let currentLink;
+
+  try {
+    currentStyles = editorState.getCurrentInlineStyle();
+    currentBlockType = getCurrentBlockType(editorState);
+    currentLink = getCurrentLink(editorState);
+  } catch (error) {
+    // If getting styles fails, return null to avoid rendering broken toolbar
+    return null;
+  }
 
   // Menu handlers
   const handleHeadingButtonClick = (event: React.MouseEvent<HTMLElement>) => {

@@ -110,32 +110,41 @@ export function getSessionTimeRange(session: TradingSession | LegacySession, tra
   const year = tradeDate.getFullYear();
   const month = tradeDate.getMonth();
   const day = tradeDate.getDate();
-  
-  // Use EU DST rules as default since London session is a key reference
-  const isDST = isDaylightSavingTime(tradeDate, 'EU');
-  
-  let startHour: number, endHour: number;
-  
+
   // Normalize session names
   const normalizedSession = normalizeSessionName(session);
-  
+
+  // Use appropriate DST rules based on session location
+  // - London/Asia: EU DST rules (UK follows EU timing)
+  // - NY AM/PM: US DST rules
+  const isEuDST = isDaylightSavingTime(tradeDate, 'EU');
+  const isUsDST = isDaylightSavingTime(tradeDate, 'US');
+
+  let startHour: number, endHour: number;
+
   switch (normalizedSession) {
     case 'London':
-      startHour = isDST ? 7 : 8;   // 8:00 AM GMT / 9:00 AM BST -> 7:00/8:00 UTC
-      endHour = isDST ? 12 : 13;   // 1:00 PM GMT / 2:00 PM BST -> 12:00/13:00 UTC
+      // London session uses EU/UK DST
+      // 8:00 AM London local time -> UTC offset depends on BST/GMT
+      startHour = isEuDST ? 7 : 8;   // 8:00 AM BST = 7:00 UTC / 8:00 AM GMT = 8:00 UTC
+      endHour = isEuDST ? 12 : 13;   // 1:00 PM BST = 12:00 UTC / 1:00 PM GMT = 13:00 UTC
       break;
     case 'NY AM':
-      startHour = isDST ? 12 : 13; // 8:00 AM EST / 9:00 AM EDT -> 12:00/13:00 UTC
-      endHour = isDST ? 17 : 18;   // 1:00 PM EST / 2:00 PM EDT -> 17:00/18:00 UTC
+      // NY session uses US DST
+      // 8:00 AM NY local time -> UTC offset depends on EDT/EST
+      startHour = isUsDST ? 12 : 13; // 8:00 AM EDT = 12:00 UTC / 8:00 AM EST = 13:00 UTC
+      endHour = isUsDST ? 17 : 18;   // 1:00 PM EDT = 17:00 UTC / 1:00 PM EST = 18:00 UTC
       break;
     case 'NY PM':
-      startHour = isDST ? 17 : 18; // 1:00 PM EST / 2:00 PM EDT -> 17:00/18:00 UTC
-      endHour = isDST ? 21 : 22;   // 5:00 PM EST / 6:00 PM EDT -> 21:00/22:00 UTC
+      // NY session uses US DST
+      startHour = isUsDST ? 17 : 18; // 1:00 PM EDT = 17:00 UTC / 1:00 PM EST = 18:00 UTC
+      endHour = isUsDST ? 21 : 22;   // 5:00 PM EDT = 21:00 UTC / 5:00 PM EST = 22:00 UTC
       break;
     case 'Asia':
-      // Asia session spans midnight, so we need to handle day boundaries
-      const asiaStartHour = isDST ? 22 : 23; // 10:00 PM UTC (summer) / 11:00 PM UTC (winter)
-      const asiaEndHour = isDST ? 7 : 8;     // 7:00 AM UTC (summer) / 8:00 AM UTC (winter)
+      // Asia session timing relative to London open (Tokyo doesn't observe DST)
+      // Adjusted based on EU DST for market overlap consistency
+      const asiaStartHour = isEuDST ? 22 : 23; // Previous day UTC
+      const asiaEndHour = isEuDST ? 7 : 8;     // Trade day UTC
 
       // Start time is on the previous day - use Date.UTC for proper UTC dates
       const startDate = new Date(Date.UTC(year, month, day - 1, asiaStartHour, 0, 0));

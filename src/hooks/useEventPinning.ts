@@ -55,7 +55,9 @@ export function useEventPinning({
             event_id: event.id,
             notes: '',
             impact: event.impact,
-            currency: event.currency
+            currency: event.currency,
+            flag_url: event.flag_url,
+            country: event.country
           }]
         };
       });

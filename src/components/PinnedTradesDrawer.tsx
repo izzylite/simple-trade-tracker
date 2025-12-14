@@ -13,13 +13,15 @@ import {
   IconButton,
   InputAdornment,
   TextField,
-  Stack
+  Stack,
+  Tooltip
 } from '@mui/material';
 import {
   PushPin as PinIcon,
   Event as EventIcon,
   Search as SearchIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  StickyNote2 as NoteIcon
 } from '@mui/icons-material';
 import { Trade, Calendar, PinnedEvent } from '../types/dualWrite';
 import { EconomicEvent } from '../types/economicCalendar';
@@ -27,7 +29,6 @@ import UnifiedDrawer from './common/UnifiedDrawer';
 import { eventMatchV2 } from '../utils/eventNameUtils';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import EconomicEventDetailDialog from './economicCalendar/EconomicEventDetailDialog';
-import { economicCalendarService } from '../services/economicCalendarService';
 import { logger } from '../utils/logger';
 import TradeCard from './aiChat/TradeCard';
 import RoundedTabs, { TabPanel } from './common/RoundedTabs';
@@ -40,6 +41,20 @@ interface PinnedTradesDrawerProps {
   onTradeClick?: (trade: Trade, trades: Trade[], title: string) => void;
   tradeOperations: TradeOperationsProps;
 }
+
+// Helper function to get impact colors (matches EconomicEventListItem)
+const getImpactColor = (impact: string | undefined, theme: any) => {
+  switch (impact) {
+    case 'High':
+      return theme.palette.error.main;
+    case 'Medium':
+      return theme.palette.warning.main;
+    case 'Low':
+      return theme.palette.success.main;
+    default:
+      return theme.palette.text.secondary;
+  }
+};
 
 const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   open,
@@ -60,7 +75,6 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   // Economic event detail dialog state
   const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
   const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
-  const [loadingEvent, setLoadingEvent] = useState(false);
 
   // Get pinned trades
   const pinnedTrades = useMemo(() => {
@@ -118,32 +132,33 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
     });
   }, [pinnedEvents, searchQuery]);
 
-  // Handle clicking on a pinned event - fetch and open detail dialog
-  const handleEventClick = async (pinnedEvent: PinnedEvent) => {
-    if (!calendar) return;
-
-    try {
-      setLoadingEvent(true);
-
-      // Use event_id to fetch the event directly from the database
-      if (pinnedEvent.event_id) {
-        const event = await economicCalendarService.getEventById(pinnedEvent.event_id);
-
-        if (event) {
-          setSelectedEvent(event);
-          setEventDetailDialogOpen(true);
-        } else {
-          logger.warn(`No economic event found with ID: ${pinnedEvent.event_id} data: ${JSON.stringify(pinnedEvent)}`);
-        }
-      } else {
-        // Fallback for old pinned events without event_id
-        logger.warn('Pinned event does not have event_id. Please re-pin the event to get the latest data.');
-      }
-    } catch (error) {
-      logger.error('Error fetching economic event:', error);
-    } finally {
-      setLoadingEvent(false);
+  // Handle clicking on a pinned event - construct event from stored data
+  const handleEventClick = (pinnedEvent: PinnedEvent) => {
+    if (!calendar || !pinnedEvent.event_id) {
+      logger.warn('Pinned event does not have event_id. Please re-pin the event to get the latest data.');
+      return;
     }
+
+    // Construct EconomicEvent from PinnedEvent data (no fetch needed)
+    const event: EconomicEvent = {
+      id: pinnedEvent.event_id,
+      event_name: pinnedEvent.event,
+      currency: pinnedEvent.currency || 'USD',
+      impact: pinnedEvent.impact || 'Medium',
+      flag_url: pinnedEvent.flag_url,
+      country: pinnedEvent.country,
+      // Default values for fields not needed by the detail dialog
+      actual_result_type: '',
+      event_time: '',
+      time_utc: '',
+      actual_value: '',
+      forecast_value: '',
+      previous_value: '',
+      event_date: ''
+    };
+
+    setSelectedEvent(event);
+    setEventDetailDialogOpen(true);
   };
 
   // Get dynamic title and icon
@@ -335,33 +350,47 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                   )
                 );
 
+                const impactColor = getImpactColor(pinnedEvent.impact, theme);
+
                 return (
                   <React.Fragment key={pinnedEvent.event}>
                     <ListItem disablePadding>
                       <ListItemButton
                         onClick={() => handleEventClick(pinnedEvent)}
-                        disabled={loadingEvent}
                         sx={{
                           p: 2,
-                          backgroundColor: alpha(theme.palette.warning.main, 0.03),
-                          borderLeft: `3px solid ${theme.palette.warning.main}`,
+                          backgroundColor: alpha(impactColor, 0.03),
+                          borderLeft: `3px solid ${impactColor}`,
                           '&:hover': {
-                            backgroundColor: alpha(theme.palette.warning.main, 0.08)
+                            backgroundColor: alpha(impactColor, 0.08)
                           }
                         }}
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
-                          {/* Event Icon */}
-                          <Avatar
-                            sx={{
-                              width: 32,
-                              height: 32,
-                              backgroundColor: alpha(theme.palette.warning.main, 0.1),
-                              color: 'warning.main'
-                            }}
-                          >
-                            <EventIcon sx={{ fontSize: 18 }} />
-                          </Avatar>
+                          {/* Event Flag or Icon */}
+                          {pinnedEvent.flag_url ? (
+                            <img
+                              src={pinnedEvent.flag_url}
+                              alt={pinnedEvent.country || pinnedEvent.currency || ''}
+                              style={{
+                                width: 32,
+                                height: 24,
+                                borderRadius: 4,
+                                objectFit: 'cover'
+                              }}
+                            />
+                          ) : (
+                            <Avatar
+                              sx={{
+                                width: 32,
+                                height: 32,
+                                backgroundColor: alpha(impactColor, 0.1),
+                                color: impactColor
+                              }}
+                            >
+                              <EventIcon sx={{ fontSize: 18 }} />
+                            </Avatar>
+                          )}
 
                           {/* Event Content */}
                           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -382,6 +411,19 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                               {tradesWithEvent.length} trade{tradesWithEvent.length !== 1 ? 's' : ''} found
                             </Typography>
                           </Box>
+
+                          {/* Note Icon */}
+                          {pinnedEvent.notes && (
+                            <Tooltip title={pinnedEvent.notes} arrow placement="top">
+                              <NoteIcon
+                                sx={{
+                                  fontSize: 18,
+                                  color: alpha(theme.palette.info.main, 0.7),
+                                  cursor: 'pointer'
+                                }}
+                              />
+                            </Tooltip>
+                          )}
 
                           {/* Trade Count Badge */}
                           {tradesWithEvent.length > 0 && (

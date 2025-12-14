@@ -23,7 +23,8 @@ import {
   HourglassEmpty as HourglassEmptyIcon,
   PushPin as PinIcon,
   PushPinOutlined as UnpinIcon,
-  ShowChart as TradeIcon
+  ShowChart as TradeIcon,
+  StickyNote2 as NoteIcon
 } from '@mui/icons-material';
 import { format, parseISO, isAfter } from 'date-fns';
 import { EconomicEvent } from '../../types/economicCalendar';
@@ -179,11 +180,19 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
   // Use prop time or fall back to current time (for backwards compatibility)
   const currentTime = propCurrentTime || new Date();
 
-  // Check if this event is pinned - memoized for performance
+  // Check if this event is pinned and get pinned data - memoized for performance
   const eventIsPinned = useMemo(
     () => isEventPinned(event, pinnedEvents),
     [event, pinnedEvents]
   );
+
+  // Get pinned event data (including notes) - memoized for performance
+  const pinnedEventData = useMemo(() => {
+    if (!eventIsPinned) return null;
+    return pinnedEvents.find(pe =>
+      pe.event_id ? pe.event_id === event.id : pe.event.toLowerCase() === event.event_name.toLowerCase()
+    ) || null;
+  }, [eventIsPinned, pinnedEvents, event.id, event.event_name]);
 
   // Handle pin/unpin toggle - memoized callback
   const handleTogglePin = useCallback(
@@ -296,6 +305,18 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
             {/* Spacer */}
             <Box sx={{ flex: 1 }} />
 
+            {/* Note Icon for pinned events with notes */}
+            {pinnedEventData?.notes && (
+              <Tooltip title={pinnedEventData.notes} arrow placement="top">
+                <NoteIcon
+                  sx={{
+                    fontSize: 16,
+                    color: alpha(theme.palette.info.main, 0.7),
+                    cursor: 'pointer'
+                  }}
+                />
+              </Tooltip>
+            )}
 
             {/* Trade Count Badge */}
             {tradeCount > 0 && (

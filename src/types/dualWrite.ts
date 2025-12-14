@@ -110,6 +110,8 @@ export interface PinnedEvent {
   notes?: string;
   impact?: ImpactLevel;
   currency?: Currency;
+  flag_url?: string;
+  country?: string;
 }
 
 /**

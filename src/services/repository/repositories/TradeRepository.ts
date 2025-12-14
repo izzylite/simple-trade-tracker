@@ -45,8 +45,17 @@ const parseOptionalDate = (dateValue: any): Date | undefined => {
 };
 
 /**
+ * Sort tags alphabetically (case-insensitive)
+ */
+const sortTags = (tags: string[] | undefined): string[] => {
+  if (!tags || tags.length === 0) return [];
+  return [...tags].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+};
+
+/**
  * Transform Supabase trade data to Trade type
  * Converts string dates to Date objects with validation
+ * Sorts tags alphabetically for consistent display
  */
 const transformSupabaseTrade = (data: any): Trade => {
   return {
@@ -55,6 +64,7 @@ const transformSupabaseTrade = (data: any): Trade => {
     created_at: parseDate(data.created_at),
     updated_at: parseDate(data.updated_at),
     shared_at: parseOptionalDate(data.shared_at),
+    tags: sortTags(data.tags),
   } as Trade;
 };
 
@@ -442,7 +452,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         take_profit: trade.take_profit ?? null,
         risk_to_reward: trade.risk_to_reward ?? null,
         partials_taken: trade.partials_taken ?? null,
-        tags: trade.tags || [],
+        tags: sortTags(trade.tags),
         notes: trade.notes || '',
         images: trade.images || [],
         economic_events: trade.economic_events || [],
@@ -450,7 +460,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         is_pinned: trade.is_pinned ?? false,
         share_link: trade.share_link ?? null,
         is_shared: trade.is_shared ?? false,
-        shared_at: trade.shared_at ? trade.shared_at.toISOString() : null, 
+        shared_at: trade.shared_at ? trade.shared_at.toISOString() : null,
         created_at: now.toISOString(),
         updated_at: now.toISOString()
       }));
@@ -563,7 +573,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         take_profit: trade.take_profit ?? null,
         risk_to_reward: trade.risk_to_reward ?? null,
         partials_taken: trade.partials_taken ?? null,
-        tags: trade.tags || [],
+        tags: sortTags(trade.tags),
         notes: trade.notes || '',
         images: trade.images || [],
         economic_events: trade.economic_events || [],
@@ -864,7 +874,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         risk_to_reward: trade.risk_to_reward ?? null,
         partials_taken: trade.partials_taken,
         notes: trade.notes,
-        tags: trade.tags || [],
+        tags: sortTags(trade.tags),
         images: trade.images || [],
         economic_events: trade.economic_events || [],
         is_temporary: trade.is_temporary,
@@ -916,6 +926,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
           ...trade,
           trade_date: trade.trade_date.toISOString(),
           session: trade.session || null, // Convert empty string to null for DB constraint
+          tags: sortTags(trade.tags),
         },
         p_calendar_id: calendarId,
       });

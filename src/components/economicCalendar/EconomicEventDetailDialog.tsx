@@ -3,7 +3,7 @@
  * Simple dialog for pinning events and adding notes
  */
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -57,6 +57,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   const [expandedTradeId, setExpandedTradeId] = React.useState<string | null>(null);
   const [notesText, setNotesText] = useState('');
   const [pinning, setPinning] = useState(false);
+  const initialNotesRef = useRef<string>('');
 
   // Filter trades that occurred during this event
   const eventTrades = useMemo(() => { 
@@ -86,11 +87,9 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
 
   // Initialize notes text when pinned event data changes
   useEffect(() => {
-    if (pinnedEventData?.notes) {
-      setNotesText(pinnedEventData.notes);
-    } else {
-      setNotesText('');
-    }
+    const notes = pinnedEventData?.notes || '';
+    setNotesText(notes);
+    initialNotesRef.current = notes;
   }, [pinnedEventData]);
 
   // Handle pin/unpin with progress indicator
@@ -115,7 +114,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
             )
           };
         } else {
-          // Pin - include event_id
+          // Pin - include event_id, flag_url, and country
           return {
             ...cal,
             pinned_events: [...currentPinned, {
@@ -123,7 +122,9 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
               event_id: event.id,
               notes: '',
               impact: event.impact,
-              currency: event.currency
+              currency: event.currency,
+              flag_url: event.flag_url,
+              country: event.country
             }]
           };
         }
@@ -133,17 +134,15 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     }
   };
 
-  // Handle notes change with auto-save
-  const handleNotesChange = async (newNotes: string) => {
-    // Limit to 250 characters
-    const trimmedNotes = newNotes.slice(0, 250);
-    setNotesText(trimmedNotes);
+  // Check if notes have been modified
+  const hasNotesChanged = notesText !== initialNotesRef.current;
 
-    if (!calendar || !('id' in calendar) || !('pinned_events' in calendar) || !calendarId || !onUpdateCalendarProperty || !isPinned) {
+  // Save notes to calendar (only called on close if changed)
+  const saveNotesIfChanged = async () => {
+    if (!hasNotesChanged || !calendar || !('id' in calendar) || !('pinned_events' in calendar) || !calendarId || !onUpdateCalendarProperty || !isPinned) {
       return;
     }
 
-    // Auto-save notes
     await onUpdateCalendarProperty(calendarId, (cal: Calendar) => {
       const currentPinned = cal.pinned_events || [];
       const existingIndex = currentPinned.findIndex(pe =>
@@ -154,7 +153,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
         const updated = [...currentPinned];
         updated[existingIndex] = {
           ...updated[existingIndex],
-          notes: trimmedNotes.trim() || undefined
+          notes: notesText.trim() || undefined
         };
         return {
           ...cal,
@@ -166,9 +165,22 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     });
   };
 
+  // Handle dialog close - save notes if changed
+  const handleClose = async () => {
+    await saveNotesIfChanged();
+    onClose();
+  };
+
+  // Handle notes change (local state only, no save)
+  const handleNotesChange = (newNotes: string) => {
+    // Limit to 250 characters
+    setNotesText(newNotes.slice(0, 250));
+  };
+
   // Handle gallery mode for event trades
-  const handleEventGalleryMode = () => {
+  const handleEventGalleryMode = async () => {
     if (onOpenGalleryMode && eventTrades.length > 0) {
+      await saveNotesIfChanged();
       const title = `${event.event_name} - All Trades (${eventTrades.length} trades)`;
       onOpenGalleryMode(eventTrades, eventTrades[0].id, title);
       onClose();
@@ -221,7 +233,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   return (
     <BaseDialog
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       sx={{
         zIndex: Z_INDEX.ECONOMIC_CALENDAR_DETAIL
       }}
@@ -362,7 +374,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
                   }
                 }
               }}
-              helperText={`${notesText.length}/250 characters`}
+              helperText={`${notesText.length}/250 characters${hasNotesChanged ? ' • Unsaved changes (saves on close)' : ''}`}
             />
           </Box>
         )}
