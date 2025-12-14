@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Button,
   FormControlLabel,
   Switch,
@@ -20,6 +16,7 @@ import {
   useTheme,
   alpha
 } from '@mui/material';
+import BaseDialog from './BaseDialog';
 import { loggerControls, LogLevel } from '../../utils/logger';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 
@@ -80,111 +77,124 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ open, onClose }) => {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Debug Panel - Logger Settings</DialogTitle>
-      <DialogContent>
-        <Stack spacing={3} sx={{ mt: 1 }}>
-          {/* Current Status */}
-          <Box>
-            <Typography variant="subtitle2" gutterBottom>
-              Current Status
-            </Typography>
-            <Chip 
-              label={config.enabled ? 'Logging Enabled' : 'Logging Disabled'} 
-              color={config.enabled ? 'success' : 'default'}
-              size="small"
+    <BaseDialog
+      open={open}
+      onClose={onClose}
+      title="Debug Panel - Logger Settings"
+      maxWidth="sm"
+      fullWidth
+      cancelButtonText="Close"
+      cancelButtonAction={onClose}
+      actions={
+        <Button onClick={handleReset} color="warning">
+          Reset to Defaults
+        </Button>
+      }
+    >
+      <Stack spacing={3} sx={{ mt: 1 }}>
+        {/* Current Status */}
+        <Box>
+          <Typography variant="subtitle2" gutterBottom>
+            Current Status
+          </Typography>
+          <Chip
+            label={config.enabled ? 'Logging Enabled' : 'Logging Disabled'}
+            color={config.enabled ? 'success' : 'default'}
+            size="small"
+          />
+        </Box>
+
+        <Divider />
+
+        {/* Enable/Disable Logging */}
+        <FormControlLabel
+          control={
+            <Switch
+              checked={config.enabled}
+              onChange={handleEnabledChange}
+              color="primary"
             />
-          </Box>
+          }
+          label="Enable Logging"
+        />
 
-          <Divider />
+        {/* Log Level */}
+        <FormControl fullWidth disabled={!config.enabled}>
+          <InputLabel>Log Level</InputLabel>
+          <Select
+            value={config.level}
+            label="Log Level"
+            onChange={handleLevelChange}
+          >
+            <MenuItem value="debug">Debug (All messages)</MenuItem>
+            <MenuItem value="info">Info (Info, Warn, Error)</MenuItem>
+            <MenuItem value="warn">Warn (Warn, Error only)</MenuItem>
+            <MenuItem value="error">Error (Error only)</MenuItem>
+          </Select>
+        </FormControl>
 
-          {/* Enable/Disable Logging */}
-          <FormControlLabel
-            control={
-              <Switch
-                checked={config.enabled}
-                onChange={handleEnabledChange}
-                color="primary"
-              />
-            }
-            label="Enable Logging"
-          />
+        {/* Log Prefix */}
+        <TextField
+          fullWidth
+          label="Log Prefix"
+          value={config.prefix || ''}
+          onChange={handlePrefixChange}
+          disabled={!config.enabled}
+          helperText="Prefix to add to all log messages"
+        />
 
-          {/* Log Level */}
-          <FormControl fullWidth disabled={!config.enabled}>
-            <InputLabel>Log Level</InputLabel>
-            <Select
-              value={config.level}
-              label="Log Level"
-              onChange={handleLevelChange}
-            >
-              <MenuItem value="debug">Debug (All messages)</MenuItem>
-              <MenuItem value="info">Info (Info, Warn, Error)</MenuItem>
-              <MenuItem value="warn">Warn (Warn, Error only)</MenuItem>
-              <MenuItem value="error">Error (Error only)</MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* Log Prefix */}
-          <TextField
-            fullWidth
-            label="Log Prefix"
-            value={config.prefix || ''}
-            onChange={handlePrefixChange}
-            disabled={!config.enabled}
-            helperText="Prefix to add to all log messages"
-          />
-
-          {/* Timestamp */}
-          <FormControlLabel
-            control={
-              <Switch
-                checked={config.timestamp}
-                onChange={handleTimestampChange}
-                color="primary"
-                disabled={!config.enabled}
-              />
-            }
-            label="Include Timestamps"
-          />
-
-          <Divider />
-
-          {/* Test Logs */}
-          <Box>
-            <Typography variant="subtitle2" gutterBottom>
-              Test Logging
-            </Typography>
-            <Button
-              variant="outlined"
-              onClick={testLogs}
+        {/* Timestamp */}
+        <FormControlLabel
+          control={
+            <Switch
+              checked={config.timestamp}
+              onChange={handleTimestampChange}
+              color="primary"
               disabled={!config.enabled}
-              size="small"
-            >
-              Send Test Messages
-            </Button>
-            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-              Check browser console to see the test messages
-            </Typography>
-          </Box>
+            />
+          }
+          label="Include Timestamps"
+        />
 
-          {/* Instructions */}
-          <Box>
-            <Typography variant="subtitle2" gutterBottom>
-              Browser Console Access
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              You can also control logging from the browser console:
-            </Typography>
-            <Box component="pre" sx={{ 
-              fontSize: '0.75rem', 
-              bgcolor: 'grey.100', 
-              p: 1, 
-              borderRadius: 1,
-              mt: 1,
-              overflow: 'auto'
-            }}>
-{`// Enable/disable logging
+        <Divider />
+
+        {/* Test Logs */}
+        <Box>
+          <Typography variant="subtitle2" gutterBottom>
+            Test Logging
+          </Typography>
+          <Button
+            variant="outlined"
+            onClick={testLogs}
+            disabled={!config.enabled}
+            size="small"
+          >
+            Send Test Messages
+          </Button>
+          <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+            Check browser console to see the test messages
+          </Typography>
+        </Box>
+
+        {/* Instructions */}
+        <Box>
+          <Typography variant="subtitle2" gutterBottom>
+            Browser Console Access
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            You can also control logging from the browser console:
+          </Typography>
+          <Box component="pre" sx={{
+            fontSize: '0.75rem',
+            bgcolor: alpha(theme.palette.text.primary, 0.05),
+            p: 1.5,
+            borderRadius: 1,
+            mt: 1,
+            overflow: 'auto',
+            border: `1px solid ${theme.palette.divider}`,
+            ...scrollbarStyles(theme)
+          }}>
+            {`// Enable/disable logging
 logger.setEnabled(true);
 logger.setEnabled(false);
 
@@ -197,19 +207,10 @@ logger.getConfig();
 // Or use shortcuts
 loggerControls.enable();
 loggerControls.disable();`}
-            </Box>
           </Box>
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={handleReset} color="warning">
-          Reset to Defaults
-        </Button>
-        <Button onClick={onClose}>
-          Close
-        </Button>
-      </DialogActions>
-    </Dialog>
+        </Box>
+      </Stack>
+    </BaseDialog>
   );
 };
 

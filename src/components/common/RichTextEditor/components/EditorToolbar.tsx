@@ -117,9 +117,9 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
   }
 
   // Get current editor state info - wrap in try-catch for extra safety
-  let currentStyles;
-  let currentBlockType;
-  let currentLink;
+  let currentStyles: DraftInlineStyle;
+  let currentBlockType: string;
+  let currentLink: { entityKey: string; url: string } | null;
 
   try {
     currentStyles = editorState.getCurrentInlineStyle();
