@@ -907,7 +907,7 @@ const Home: React.FC<HomeProps> = ({
               borderRadius: 1,
               height: { xs: 'auto', md: '620px' },
               minHeight: { xs: '400px', md: '620px' },
-              maxWidth: recentCalendars.length <= 1 ? { xs: 'none', md: '500px' } : 'none',
+              maxWidth: recentCalendars.length <= 1 ? { xs: 'none', md: '400px' } : 'none',
               p: { xs: 0.5, sm: 1 },
               display: 'flex',
               flexDirection: 'column'
@@ -1117,9 +1117,16 @@ const Home: React.FC<HomeProps> = ({
                       borderRadius: 2,
                       cursor: 'pointer',
                       transition: 'all 0.2s',
+                      bgcolor: theme.palette.mode === 'dark'
+                        ? alpha(theme.palette.common.black, 0.2)
+                        : alpha(theme.palette.common.black, 0.03),
+                      border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                       '&:hover': {
                         boxShadow: 2,
-                        transform: 'translateY(-2px)'
+                        transform: 'translateY(-2px)',
+                        bgcolor: theme.palette.mode === 'dark'
+                          ? alpha(theme.palette.common.black, 0.3)
+                          : alpha(theme.palette.common.black, 0.06),
                       },
                       '&:last-child': {
                         mb: 0

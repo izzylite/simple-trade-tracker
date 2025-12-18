@@ -451,16 +451,8 @@ class EconomicEventWatcher {
       for (const originalEvent of events) {
         // First try to find in foundEvents (more specific), then fall back to targetEvents
         // Match by external_id since that's the consistent identifier from MyFXBook parsing
-        let updatedEvent = foundEvents.find(e =>
-          e.external_id === originalEvent.external_id ||
-          e.id === originalEvent.external_id
-        );
-        if (!updatedEvent) {
-          updatedEvent = targetEvents.find(e =>
-            e.external_id === originalEvent.external_id ||
-            e.id === originalEvent.external_id
-          );
-        }
+        let updatedEvent = foundEvents.find(e =>   e.external_id === originalEvent.external_id);
+       
 
         const eventToNotify: EconomicEvent = updatedEvent ? {
           ...originalEvent,

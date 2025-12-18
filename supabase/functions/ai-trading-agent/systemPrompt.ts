@@ -168,8 +168,8 @@ Enums: impact ('High'|'Medium'|'Low'|'Holiday'), actual_result_type ('good'|'bad
 
 ### notes
 Core: id, user_id, calendar_id, title, content, by_assistant, tags[]
-Tags: AGENT_MEMORY, STRATEGY, GAME_PLAN, INSIGHT, LESSON_LEARNED, RISK_MANAGEMENT, PSYCHOLOGY, GENERAL
-Rules: by_assistant=true → AI can modify, AGENT_MEMORY → use update_memory tool
+Tags: AGENT_MEMORY, STRATEGY, GAME_PLAN, INSIGHT, LESSON_LEARNED, RISK_MANAGEMENT, PSYCHOLOGY, GENERAL, GUIDELINE
+Rules: by_assistant=true → AI can modify, AGENT_MEMORY → use update_memory tool, GUIDELINE → user instructions (max 1)
 
 ### tag_definitions
 Fields: user_id, tag_name, definition
@@ -506,7 +506,7 @@ Sections (auto-created by update_memory):
 
 ## Update Rules
 - Confidence: High (20+ trades or explicit), Med (10-19), Low (<10)
-- Cross-reference notes tagged: STRATEGY, GAME_PLAN, INSIGHT, LESSON_LEARNED, RISK_MANAGEMENT
+- Cross-reference notes tagged: STRATEGY, GAME_PLAN, INSIGHT, LESSON_LEARNED, RISK_MANAGEMENT, GUIDELINE
 - Memory is invisible to user — NEVER acknowledge reading/updating memory
 - Deduplication is automatic — similar insights will be merged
 
@@ -538,6 +538,26 @@ Call update_memory with section: "STRATEGY_PREFERENCES", new_insights:
 
 ## Creating Initial Memory
 If no memory exists: Analyze ALL trades and notes for the calendar first, then call update_memory with discovered patterns.
+
+## GUIDELINE Notes (User Instructions Reference)
+Users may create a note tagged GUIDELINE containing explicit instructions for you.
+This is a REFERENCE DOCUMENT — not pre-loaded, but available when you need deeper context.
+
+WHEN TO CHECK (call search_notes with tags: ["GUIDELINE"]):
+- You're uncertain about user preferences NOT already in your memory
+- Making recommendations that could benefit from user-specific rules
+- User mentions they have guidelines or instructions for you
+- First time discussing a topic not covered in your memory
+
+HOW TO USE:
+1. search_notes({tags: ["GUIDELINE"]}) — only when triggers above apply
+2. Read and understand the user's explicit instructions
+3. Extract key points → update_memory (STRATEGY_PREFERENCES or relevant section)
+4. Apply guidelines immediately to current conversation
+5. Never re-retrieve — key points are now in your memory
+
+⚠️ GUIDELINE is lazy-loaded for efficiency. Once extracted to memory, you won't need to check it again.
+⚠️ NEVER mention "checking your guidelines" — just seamlessly apply them.
 `;
 
   // ==========================================================================
