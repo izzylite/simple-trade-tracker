@@ -239,9 +239,9 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
             }}
           >
             {isSharing ? (
-              <CircularProgress size={20} />
+              <CircularProgress size={size === 'small' ? 16 : 20} />
             ) : (
-              <ShareIcon />
+              <ShareIcon fontSize={size === 'small' ? 'small' : 'medium'} />
             )}
           </IconButton>
         </Tooltip>

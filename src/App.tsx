@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, Box, useMediaQuery } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
@@ -20,13 +20,12 @@ import { supabaseAuthService } from './services/supabaseAuthService';
 import AppLoadingProgress from './components/AppLoadingProgress';
 
 
-import SideNavigation from './components/common/SideNavigation';
 import AppHeader from './components/common/AppHeader';
 
 // Lazy load page components from pages directory
 const Home = lazy(() => import('./pages/HomePage'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
-const CalendarHome = lazy(() => import('./pages/CalendarHomePage').then(module => ({ default: module.CalendarHome })));
 const TradeCalendar = lazy(() => import('./pages/TradeCalendarPage').then(module => ({ default: module.TradeCalendar })));
 const SharedTradePage = lazy(() => import('./pages/SharedTradePage'));
 const SharedCalendarPage = lazy(() => import('./pages/SharedCalendarPage'));
@@ -41,7 +40,7 @@ const LoadingFallback = () => <AppLoadingProgress />;
 
 /**
  * Shared interface for calendar management props
- * Used by HomePage and CalendarHomePage
+ * Used by HomePage
  */
 export interface CalendarManagementProps {
   calendars: Calendar[];
@@ -65,7 +64,6 @@ export interface CalendarManagementProps {
   onUpdateCalendar: (id: string, updates: Partial<Calendar>) => void;
   onToggleTheme: () => void;
   mode: 'light' | 'dark';
-  onMenuClick: () => void;
   isLoading?: boolean;
 }
 
@@ -78,22 +76,10 @@ function AppContent() {
     return savedMode ? (savedMode as 'light' | 'dark') : (prefersDarkMode ? 'dark' : 'light');
   });
 
-  const [isLoadingTrades, setIsLoadingTrades] = useState<boolean>(false); 
+  const [isLoadingTrades, setIsLoadingTrades] = useState<boolean>(false);
   const [loadingAction, setLoadingAction] = useState<'loading' | 'importing' | 'exporting'>('loading');
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  // Navigation drawer collapsed state - persist in localStorage
-  const [navCollapsed, setNavCollapsed] = useState<boolean>(() => {
-    const saved = localStorage.getItem('navCollapsed');
-    return saved ? JSON.parse(saved) : false;
-  });
 
   const { user } = useAuth();
-
-  // Save navigation collapsed state to localStorage
-  useEffect(() => {
-    localStorage.setItem('navCollapsed', JSON.stringify(navCollapsed));
-  }, [navCollapsed]);
 
   // Use SWR to fetch calendars with automatic focus revalidation
   // This solves the Chrome Energy Saver tab freezing issue
@@ -117,7 +103,7 @@ function AppContent() {
   }, [swrCalendars]);
 
 
-   
+
 
   const theme = useMemo(() => createTheme(createAppTheme(mode)), [mode]);
 
@@ -217,7 +203,7 @@ function AppContent() {
 
 
 
-  
+
 
   return (
     <ThemeProvider theme={theme}>
@@ -227,15 +213,6 @@ function AppContent() {
         <AppHeader
           onToggleTheme={toggleColorMode}
           mode={mode}
-          onMenuClick={() => setDrawerOpen(true)}
-        />
-
-        {/* Side Navigation */}
-        <SideNavigation
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          collapsed={navCollapsed}
-          onToggleCollapse={() => setNavCollapsed(!navCollapsed)}
         />
 
         {/* Main Content */}
@@ -253,13 +230,32 @@ function AppContent() {
           }}
         >
           <TradeLoadingIndicator
-            isLoading={isLoadingTrades} 
+            isLoading={isLoadingTrades}
             action={loadingAction}
           />
           <Routes>
             <Route path="/about" element={<AboutPage />} />
             <Route
               path="/"
+              element={
+                user ? (
+                  <Home
+                    calendars={calendars}
+                    onToggleTheme={toggleColorMode}
+                    mode={mode}
+                    isLoading={isLoadingCalendars}
+                    onCreateCalendar={handleCreateCalendar}
+                    onDuplicateCalendar={handleDuplicateCalendar}
+                    onDeleteCalendar={handleDeleteCalendar}
+                    onUpdateCalendar={handleUpdateCalendar}
+                  />
+                ) : (
+                  <LandingPage />
+                )
+              }
+            />
+            <Route
+              path="/dashboard"
               element={
                 <Home
                   calendars={calendars}
@@ -270,29 +266,7 @@ function AppContent() {
                   onDuplicateCalendar={handleDuplicateCalendar}
                   onDeleteCalendar={handleDeleteCalendar}
                   onUpdateCalendar={handleUpdateCalendar}
-                  onMenuClick={() => setDrawerOpen(true)}
                 />
-              }
-            />
-            <Route
-              path="/calendars"
-              element={
-                <ProtectedRoute
-                  title="Access Your Calendars"
-                  subtitle="Sign in to view and manage your trading calendars"
-                >
-                  <CalendarHome
-                    calendars={calendars}
-                    onCreateCalendar={handleCreateCalendar}
-                    onDuplicateCalendar={handleDuplicateCalendar}
-                    onDeleteCalendar={handleDeleteCalendar}
-                    onUpdateCalendar={handleUpdateCalendar}
-                    onToggleTheme={toggleColorMode}
-                    mode={mode}
-                    isLoading={isLoadingCalendars}
-                    onMenuClick={() => setDrawerOpen(true)}
-                  />
-                </ProtectedRoute>
               }
             />
             <Route
@@ -337,7 +311,6 @@ function AppContent() {
                   <CommunityPage
                     onToggleTheme={toggleColorMode}
                     mode={mode}
-                    onMenuClick={() => setDrawerOpen(true)}
                   />
                 </ProtectedRoute>
               }
@@ -356,11 +329,23 @@ function AppContent() {
   );
 }
 
+// Scrolls to top when route changes
+const ScrollToTop: React.FC = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+};
+
 function App() {
   return (
     <AuthProvider>
       <LocalizationProvider dateAdapter={AdapterDateFns}>
         <Router>
+          <ScrollToTop />
           <Suspense fallback={<LoadingFallback />}>
             <AppContent />
           </Suspense>

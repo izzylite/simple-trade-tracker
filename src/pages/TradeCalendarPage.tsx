@@ -98,6 +98,7 @@ import NotesDrawer from '../components/notes/NotesDrawer';
 import CalendarDayReminder from '../components/CalendarDayReminder';
 
 import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/dynamicRiskUtils';
+import AnimatedBackground from '../components/common/AnimatedBackground';
 import { Z_INDEX } from '../styles/zIndex';
 
 import MonthlyStatisticsSection from '../components/MonthlyStatisticsSection';
@@ -679,7 +680,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Breadcrumb items
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: 'Home', path: '/', icon: <HomeIcon sx={{ fontSize: 18 }} /> },
-    { label: 'Calendars', path: '/calendars', icon: <CalendarIcon sx={{ fontSize: 18 }} /> },
+    { label: 'Calendars', path: '/dashboard', icon: <CalendarIcon sx={{ fontSize: 18 }} /> },
     { label: calendarName || 'Calendar', path: `/calendar/${calendarId}` }
   ];
 
@@ -1161,8 +1162,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     <Box sx={{
       minHeight: '100vh',
       bgcolor: 'custom.pageBackground',
-      position: 'relative'
+      position: 'relative',
+      overflow: 'hidden'
     }}>
+      <AnimatedBackground />
       {/* Floating Month Navigation */}
       <FloatingMonthNavigation
         currentDate={currentDate}

@@ -148,20 +148,23 @@ export const NoteListItem: React.FC<NoteListItemProps> = ({
           >
             {note.title}
           </Typography>
-          {showCalendarBadge && calendar && (
-            <Chip
-              label={calendar.name}
-              size="small"
-              sx={{
-                height: 18,
-                fontSize: '0.7rem',
-                bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                color: 'secondary.main',
-                fontWeight: 600,
-              }}
-            />
-          )}
         </Stack>
+         {/* Calendar badge */}
+        {showCalendarBadge && calendar && (
+          <Chip
+            label={calendar.name}
+            size="small"
+            sx={{
+              height: 18,
+              fontSize: '0.7rem',
+              bgcolor: alpha(theme.palette.secondary.main, 0.1),
+              color: 'secondary.main',
+              fontWeight: 600,
+              alignSelf: 'flex-start',
+              mb: 0.5,
+            }}
+          />
+        )}
 
         {/* Content preview */}
         {contentPreview && (
@@ -207,8 +210,11 @@ export const NoteListItem: React.FC<NoteListItemProps> = ({
                 +{note.tags.length - 3}
               </Typography>
             )}
+            
           </Stack>
         )}
+
+       
 
         {/* Last updated */}
         <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>

@@ -5,7 +5,6 @@ import { LoginPromptContent } from './LoginDialog';
 interface LoginPromptProps {
   title?: string;
   subtitle?: string;
-  showFeatures?: boolean;
 }
 
 /**
@@ -16,7 +15,6 @@ interface LoginPromptProps {
 const LoginPrompt: React.FC<LoginPromptProps> = ({
   title = 'Sign In Required',
   subtitle = 'Please sign in to access this feature',
-  showFeatures = true,
 }) => {
   const theme = useTheme();
 
@@ -45,7 +43,6 @@ const LoginPrompt: React.FC<LoginPromptProps> = ({
           <LoginPromptContent
             title={title}
             subtitle={subtitle}
-            showFeatures={showFeatures}
           />
         </Paper>
       </Container>

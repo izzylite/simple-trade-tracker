@@ -1,17 +1,18 @@
 import React, { JSX, ReactNode } from 'react';
-import { 
-  TextField, 
-  TextFieldProps, 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
+import {
+  TextField,
+  TextFieldProps,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   SelectProps,
   Autocomplete,
   AutocompleteProps,
   Box,
   Typography
 } from '@mui/material';
+import { Z_INDEX } from '../../styles/zIndex';
 
 // Text Field
 interface TextInputProps extends Omit<TextFieldProps, 'label'> {
@@ -49,11 +50,11 @@ interface SelectInputProps extends Omit<SelectProps, 'label'> {
   helperText?: string;
 }
 
-export const SelectInput: React.FC<SelectInputProps> = ({ 
-  label, 
-  options, 
+export const SelectInput: React.FC<SelectInputProps> = ({
+  label,
+  options,
   helperText,
-  ...rest 
+  ...rest
 }) => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -61,6 +62,9 @@ export const SelectInput: React.FC<SelectInputProps> = ({
         <InputLabel>{label}</InputLabel>
         <Select
           label={label}
+          MenuProps={{
+            sx: { zIndex: Z_INDEX.DIALOG_POPUP }
+          }}
           {...rest}
         >
           {options.map((option) => (

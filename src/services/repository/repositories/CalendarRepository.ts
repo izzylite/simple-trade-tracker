@@ -12,7 +12,6 @@ import { logger } from '../../../utils/logger';
 
 // Supabase imports
 import { supabase } from '../../../config/supabase';
-import { supabaseAuthService } from '../../supabaseAuthService';
 
 
 /**
@@ -61,9 +60,6 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
 
   async findById(id: string): Promise<Calendar | null> {
     try {
-      // Ensure session is valid before fetching calendar by ID
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from('calendars')
         .select('*')
@@ -84,9 +80,6 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
 
   async findByUserId(userId: string): Promise<Calendar[]> {
     try {
-      // Ensure session is valid before fetching calendars by user
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from('calendars')
         .select('*')
@@ -109,9 +102,6 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
 
   async findAll(): Promise<Calendar[]> {
     try {
-      // Ensure session is valid before fetching all calendars
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from('calendars')
         .select('*');
@@ -199,9 +189,6 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
    */
   async findTrashByUserId(userId: string): Promise<Calendar[]> {
     try {
-      // Ensure session is valid before fetching trashed calendars
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from('calendars')
         .select('*')
@@ -220,6 +207,47 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
       logger.error('Error finding trash calendars by user ID:', error);
       return [];
     }
+  }
+
+  /**
+   * Restore a calendar from trash (remove deleted_at and auto_delete_at)
+   */
+  async restoreFromTrash(id: string): Promise<Calendar> {
+    const { data, error } = await supabase
+      .from('calendars')
+      .update({
+        deleted_at: null,
+        auto_delete_at: null,
+        updated_at: new Date()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return transformSupabaseCalendar(data);
+  }
+
+  /**
+   * Permanently delete a calendar (mark for deletion)
+   */
+  async permanentlyDelete(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('calendars')
+      .update({
+        mark_for_deletion: true,
+        deletion_date: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
+
+    return true;
   }
 
   /**
@@ -244,9 +272,6 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
    */
   async calculateStats(calendarId: string, trades?: Trade[]): Promise<any> {
     try {
-      // Ensure session is valid
-      await supabaseAuthService.ensureValidSession();
-
       if (trades && trades.length > 0) {
         // Use get_calendar_stats to calculate without updating database
         logger.log(`📊 Calculating hypothetical stats for calendar ${calendarId} with ${trades.length} trades`);

@@ -9,26 +9,21 @@ import {
   useTheme,
   useMediaQuery,
   alpha,
-  Paper,
   Alert,
   CircularProgress,
   IconButton,
   InputAdornment,
-  Divider
+  Divider,
+  Stack
 } from '@mui/material';
 import {
   Google as GoogleIcon,
-  TrendingUp,
-  Analytics,
-  CalendarMonth,
-  SmartToy,
-  MenuBook,
-  Note,
   Visibility,
   VisibilityOff,
   ArrowBack,
   CheckCircle,
-  Close as CloseIcon
+  Close as CloseIcon,
+  VpnKey
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { inviteService } from '../../services/inviteService';
@@ -41,13 +36,11 @@ interface LoginDialogProps {
   onClose: () => void;
   title?: string;
   subtitle?: string;
-  showFeatures?: boolean;
 }
 
 export interface LoginPromptContentProps {
   title?: string;
   subtitle?: string;
-  showFeatures?: boolean;
   onAfterSignIn?: () => void;
 }
 
@@ -55,9 +48,8 @@ type AuthStep = 'invite' | 'auth' | 'reset-password';
 type EmailAuthType = 'signin' | 'signup';
 
 export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
-  title = 'Sign In',
-  subtitle = 'Please sign in to access this feature',
-  showFeatures = true,
+  title = 'Welcome Back',
+  subtitle = 'Sign in to continue to JournoTrades',
   onAfterSignIn,
 }) => {
   const theme = useTheme();
@@ -87,34 +79,6 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
-
-  const features = [
-    {
-      icon: <MenuBook sx={{ fontSize: 28, color: 'primary.main' }} />,
-      title: 'Journal Trades',
-      description: 'Document and organize all your trades in one place'
-    },
-    {
-      icon: <Note sx={{ fontSize: 28, color: 'warning.main' }} />,
-      title: 'Notes',
-      description: 'Capture your thoughts, ideas, and trade insights'
-    }, 
-    {
-      icon: <Analytics sx={{ fontSize: 28, color: 'info.main' }} />,
-      title: 'Advanced Analytics',
-      description: 'Get insights with comprehensive charts and metrics'
-    },
-    {
-      icon: <CalendarMonth sx={{ fontSize: 28, color: 'warning.main' }} />,
-      title: 'Economic Calendar',
-      description: 'Stay informed with real-time economic events'
-    },
-    {
-      icon: <SmartToy sx={{ fontSize: 28, color: 'secondary.main' }} />,
-      title: 'AI Trading Assistant',
-      description: 'Get intelligent insights and analysis powered by AI'
-    }
-  ];
 
   // Handle invite verification
   const handleVerifyInvite = async () => {
@@ -279,102 +243,92 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
   };
 
   return (
-    <React.Fragment>
-      {/* Header with gradient background and app logo */}
+    <Box sx={{ minHeight: '100%' }}>
+      {/* Header */}
       <Box
         sx={{
-          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-          py: { xs: 3, sm: 4, md: 5 },
-          px: { xs: 2, sm: 3 },
+          pt: { xs: 4, sm: 5 },
+          pb: { xs: 3, sm: 4 },
+          px: { xs: 3, sm: 4 },
           textAlign: 'center'
         }}
       >
-        {/* App Logo */}
+        {/* Logo */}
         <Box
+          component="img"
+          src="/android-chrome-192x192.png"
+          alt="JournoTrades"
           sx={{
-            margin: '0 auto',
-            mb: { xs: 2, sm: 2.5, md: 3 }
+            width: { xs: 56, sm: 64 },
+            height: { xs: 56, sm: 64 },
+            borderRadius: 2.5,
+            boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.25)}`,
+            mb: 2.5
           }}
-        >
-          <Box
-            component="img"
-            src="/android-chrome-192x192.png"
-            alt="Cotex Logo"
-            sx={{
-              width: { xs: 60, sm: 70, md: 80 },
-              height: { xs: 60, sm: 70, md: 80 },
-              borderRadius: { xs: '16px', sm: '18px', md: '20px' },
-              boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.3)}`,
-            }}
-          />
-        </Box>
+        />
 
         {/* Title */}
         <Typography
-          variant="h4"
+          variant="h5"
           sx={{
-            color: 'white',
             fontWeight: 700,
-            mb: 1,
-            fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+            mb: 0.75,
+            fontSize: { xs: '1.375rem', sm: '1.5rem' }
           }}
         >
-          {title}
+          {currentStep === 'invite' ? 'Get Started' : currentStep === 'reset-password' ? 'Reset Password' : title}
         </Typography>
 
         {/* Subtitle */}
         <Typography
-          variant="body1"
-          sx={{
-            color: alpha(theme.palette.common.white, 0.9),
-            fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-            px: { xs: 1, sm: 0 }
-          }}
+          variant="body2"
+          color="text.secondary"
+          sx={{ fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}
         >
-          {currentStep === 'invite' ? 'Enter your invite code to get started' : subtitle}
+          {currentStep === 'invite'
+            ? 'Enter your invite code to continue'
+            : currentStep === 'reset-password'
+            ? "We'll send you a reset link"
+            : subtitle}
         </Typography>
       </Box>
 
-      {/* Content Section */}
-      <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
-        {/* Step 1: Invite Code Verification */}
+      {/* Content */}
+      <Box sx={{ px: { xs: 3, sm: 4 }, pb: { xs: 3, sm: 4 } }}>
+        {/* Step 1: Invite Code */}
         {currentStep === 'invite' && (
-          <Box>
-            <Typography
-              variant="subtitle2"
-              color="text.secondary"
-              sx={{
-                mb: 2,
-                textAlign: 'center',
-                fontSize: { xs: '0.8125rem', sm: '0.875rem' }
-              }}
-            >
-              You need an invite code to create an account
-            </Typography>
-
+          <Stack spacing={2.5}>
             <TextField
               fullWidth
               label="Invite Code"
+              placeholder="Enter your invite code"
               value={inviteCode}
               onChange={(e) => {
-                setInviteCode(e.target.value);
+                setInviteCode(e.target.value.toUpperCase());
                 setInviteError(null);
               }}
               error={!!inviteError}
               helperText={inviteError}
               disabled={inviteVerifying}
               onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handleVerifyInvite();
-                }
+                if (e.key === 'Enter') handleVerifyInvite();
               }}
-              sx={{ mb: 2 }}
               InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <VpnKey sx={{ color: 'text.disabled', fontSize: 20 }} />
+                  </InputAdornment>
+                ),
                 endAdornment: inviteVerified && (
                   <InputAdornment position="end">
                     <CheckCircle color="success" />
                   </InputAdornment>
                 )
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2
+                }
               }}
             />
 
@@ -385,10 +339,15 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
               onClick={handleVerifyInvite}
               disabled={inviteVerifying || !inviteCode.trim()}
               sx={{
-                py: { xs: 1.25, sm: 1.5 },
-                fontSize: { xs: '0.9375rem', sm: '1rem' },
+                py: 1.5,
+                borderRadius: 2,
+                fontSize: '0.9375rem',
                 fontWeight: 600,
-                textTransform: 'none'
+                textTransform: 'none',
+                boxShadow: 'none',
+                '&:hover': {
+                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+                }
               }}
             >
               {inviteVerifying ? (
@@ -397,105 +356,101 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
                   Verifying...
                 </>
               ) : (
-                'Verify Invite Code'
+                'Continue'
               )}
             </Button>
 
-            {showFeatures && (
-              <Box sx={{ mt: { xs: 3, sm: 4 } }}>
-                <Divider sx={{ mb: 2 }} />
-                <Typography
-                  variant="subtitle2"
-                  color="text.secondary"
-                  sx={{
-                    textAlign: 'center',
-                    mb: 2,
-                    fontSize: { xs: '0.8125rem', sm: '0.875rem' }
-                  }}
-                >
-                  What you'll get:
-                </Typography>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: { xs: 1.5, sm: 2 },
-                    maxHeight: { xs: '200px', sm: '250px', md: '300px' },
-                    overflow: 'auto',
-                    pr: 1,
-                    ...scrollbarStyles(theme)
-                  }}
-                >
-                  {features.map((feature, index) => (
-                    <Paper
-                      key={index}
-                      sx={{
-                        p: { xs: 1.5, sm: 2 },
-                        display: 'flex',
-                        gap: { xs: 1.5, sm: 2 },
-                        alignItems: 'flex-start',
-                        bgcolor: alpha(theme.palette.background.default, 0.5),
-                        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                        borderRadius: { xs: 1.5, sm: 2 }
-                      }}
-                    >
-                      <Box sx={{ flexShrink: 0 }}>
-                        {feature.icon}
-                      </Box>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography
-                          variant="subtitle2"
-                          sx={{
-                            fontWeight: 600,
-                            mb: 0.5,
-                            fontSize: { xs: '0.8125rem', sm: '0.875rem' }
-                          }}
-                        >
-                          {feature.title}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{
-                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
-                          }}
-                        >
-                          {feature.description}
-                        </Typography>
-                      </Box>
-                    </Paper>
-                  ))}
-                </Box>
-              </Box>
-            )}
-          </Box>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ textAlign: 'center', display: 'block' }}
+            >
+              Don't have an invite code? Check our Discord community.
+            </Typography>
+          </Stack>
         )}
 
-        {/* Step 2: Authentication Options */}
+        {/* Step 2: Authentication */}
         {currentStep === 'auth' && (
-          <Box>
+          <Stack spacing={2}>
             {/* Back Button */}
             <Button
-              startIcon={<ArrowBack />}
+              startIcon={<ArrowBack fontSize="small" />}
               onClick={handleBackToInvite}
-              sx={{ mb: 2, textTransform: 'none' }}
+              size="small"
+              sx={{
+                alignSelf: 'flex-start',
+                textTransform: 'none',
+                color: 'text.secondary',
+                mb: 0.5
+              }}
             >
-              Change Invite Code
+              Back
             </Button>
 
-            {/* Error Alert */}
+            {/* Alerts */}
             {authError && (
-              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setAuthError(null)}>
+              <Alert
+                severity="error"
+                onClose={() => setAuthError(null)}
+                sx={{ borderRadius: 2 }}
+              >
                 {authError}
               </Alert>
             )}
-
-            {/* Success Alert */}
             {authSuccess && (
-              <Alert severity="success" sx={{ mb: 2 }} onClose={() => setAuthSuccess(null)}>
+              <Alert
+                severity="success"
+                onClose={() => setAuthSuccess(null)}
+                sx={{ borderRadius: 2 }}
+              >
                 {authSuccess}
               </Alert>
             )}
+
+            {/* Google Sign-In - Primary Option */}
+            <Button
+              variant="outlined"
+              size="large"
+              fullWidth
+              startIcon={<GoogleIcon />}
+              onClick={handleGoogleSignIn}
+              disabled={authLoading}
+              sx={{
+                py: 1.5,
+                borderRadius: 2,
+                fontSize: '0.9375rem',
+                fontWeight: 600,
+                textTransform: 'none',
+                borderColor: alpha(theme.palette.divider, 0.3),
+                color: 'text.primary',
+                '&:hover': {
+                  borderColor: theme.palette.primary.main,
+                  bgcolor: alpha(theme.palette.primary.main, 0.04)
+                }
+              }}
+            >
+              Continue with Google
+            </Button>
+
+            {/* Divider */}
+            <Box sx={{ position: 'relative', py: 1 }}>
+              <Divider />
+              <Typography
+                variant="caption"
+                sx={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  bgcolor: 'background.paper',
+                  px: 2,
+                  color: 'text.disabled'
+                }}
+              >
+                or
+              </Typography>
+            </Box>
 
             {/* Email Field */}
             <TextField
@@ -509,7 +464,10 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
                 setAuthSuccess(null);
               }}
               disabled={authLoading}
-              sx={{ mb: 2 }}
+              size="medium"
+              sx={{
+                '& .MuiOutlinedInput-root': { borderRadius: 2 }
+              }}
             />
 
             {/* Display Name (Sign-Up Only) */}
@@ -520,7 +478,10 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 disabled={authLoading}
-                sx={{ mb: 2 }}
+                size="medium"
+                sx={{
+                  '& .MuiOutlinedInput-root': { borderRadius: 2 }
+                }}
               />
             )}
 
@@ -541,20 +502,23 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
                   emailAuthType === 'signin' ? handleEmailSignIn() : handleEmailSignUp();
                 }
               }}
-              sx={{ mb: 2 }}
+              helperText={emailAuthType === 'signup' ? 'Minimum 8 characters' : undefined}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton
                       onClick={() => setShowPassword(!showPassword)}
                       edge="end"
+                      size="small"
                     >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                      {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                     </IconButton>
                   </InputAdornment>
                 )
               }}
-              helperText={emailAuthType === 'signup' ? 'Minimum 8 characters' : ''}
+              sx={{
+                '& .MuiOutlinedInput-root': { borderRadius: 2 }
+              }}
             />
 
             {/* Submit Button */}
@@ -565,11 +529,15 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
               onClick={emailAuthType === 'signin' ? handleEmailSignIn : handleEmailSignUp}
               disabled={authLoading || !email.trim() || !password.trim()}
               sx={{
-                py: { xs: 1.25, sm: 1.5 },
-                fontSize: { xs: '0.9375rem', sm: '1rem' },
+                py: 1.5,
+                borderRadius: 2,
+                fontSize: '0.9375rem',
                 fontWeight: 600,
                 textTransform: 'none',
-                mb: 2
+                boxShadow: 'none',
+                '&:hover': {
+                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+                }
               }}
             >
               {authLoading ? (
@@ -582,148 +550,84 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
               )}
             </Button>
 
-            {/* Sign In / Sign Up Toggle Link */}
-            <Box sx={{ textAlign: 'center', mb: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                {emailAuthType === 'signin' ? "Don't have an account? " : "Already have an account? "}
-                <Button
-                  onClick={() => {
-                    setEmailAuthType(emailAuthType === 'signin' ? 'signup' : 'signin');
-                    setAuthError(null);
-                    setAuthSuccess(null);
-                  }}
-                  sx={{
-                    textTransform: 'none',
-                    p: 0,
-                    minWidth: 'auto',
-                    fontWeight: 600,
-                    '&:hover': {
-                      bgcolor: 'transparent',
-                      textDecoration: 'underline'
-                    }
-                  }}
-                >
-                  {emailAuthType === 'signin' ? 'Sign up' : 'Sign in'}
-                </Button>
-              </Typography>
-            </Box>
+            {/* Footer Links */}
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ pt: 0.5 }}
+            >
+              <Button
+                onClick={() => {
+                  setEmailAuthType(emailAuthType === 'signin' ? 'signup' : 'signin');
+                  setAuthError(null);
+                  setAuthSuccess(null);
+                }}
+                size="small"
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  fontSize: '0.8125rem'
+                }}
+              >
+                {emailAuthType === 'signin' ? 'Create account' : 'Sign in instead'}
+              </Button>
 
-            {/* Forgot Password Link (Sign In Only) */}
-            {emailAuthType === 'signin' && (
-              <Box sx={{ textAlign: 'center', mb: 3 }}>
+              {emailAuthType === 'signin' && (
                 <Button
                   onClick={() => {
                     setCurrentStep('reset-password');
-                    setResetEmail(email); // Pre-fill with current email
+                    setResetEmail(email);
                   }}
+                  size="small"
                   sx={{
                     textTransform: 'none',
-                    p: 0,
-                    minWidth: 'auto',
-                    fontSize: '0.875rem',
                     color: 'text.secondary',
-                    '&:hover': {
-                      bgcolor: 'transparent',
-                      textDecoration: 'underline',
-                      color: 'primary.main'
-                    }
+                    fontSize: '0.8125rem',
+                    '&:hover': { color: 'primary.main' }
                   }}
                 >
                   Forgot password?
                 </Button>
-              </Box>
-            )}
-
-            {/* Divider with "or" text */}
-            <Box sx={{ position: 'relative', mb: 3 }}>
-              <Divider />
-              <Typography
-                variant="body2"
-                sx={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  bgcolor: 'background.paper',
-                  px: 2,
-                  color: 'text.secondary'
-                }}
-              >
-                or continue with
-              </Typography>
-            </Box>
-
-            {/* Google Sign-In */}
-            <Button
-              variant="outlined"
-              size="large"
-              fullWidth
-              startIcon={<GoogleIcon />}
-              onClick={handleGoogleSignIn}
-              disabled={authLoading}
-              sx={{
-                py: { xs: 1.25, sm: 1.5 },
-                fontSize: { xs: '0.9375rem', sm: '1rem' },
-                fontWeight: 600,
-                textTransform: 'none',
-                borderColor: alpha(theme.palette.divider, 0.3),
-                color: 'text.primary',
-                '&:hover': {
-                  borderColor: theme.palette.primary.main,
-                  bgcolor: alpha(theme.palette.primary.main, 0.08)
-                },
-                transition: 'all 0.3s ease-in-out'
-              }}
-            >
-              Google
-            </Button>
-          </Box>
+              )}
+            </Stack>
+          </Stack>
         )}
 
         {/* Step 3: Password Reset */}
         {currentStep === 'reset-password' && (
-          <Box>
+          <Stack spacing={2}>
             {/* Back Button */}
             <Button
-              startIcon={<ArrowBack />}
+              startIcon={<ArrowBack fontSize="small" />}
               onClick={handleBackToAuth}
-              sx={{ mb: 2, textTransform: 'none' }}
+              size="small"
+              sx={{
+                alignSelf: 'flex-start',
+                textTransform: 'none',
+                color: 'text.secondary',
+                mb: 0.5
+              }}
             >
-              Back to Sign In
+              Back
             </Button>
 
-            <Typography
-              variant="h6"
-              sx={{
-                mb: 1,
-                fontWeight: 600,
-                fontSize: { xs: '1.125rem', sm: '1.25rem' }
-              }}
-            >
-              Reset Your Password
-            </Typography>
-
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{
-                mb: 3,
-                fontSize: { xs: '0.8125rem', sm: '0.875rem' }
-              }}
-            >
-              Enter your email address and we'll send you a link to reset your password.
-            </Typography>
-
-            {/* Error Alert */}
+            {/* Alerts */}
             {resetError && (
-              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setResetError(null)}>
+              <Alert
+                severity="error"
+                onClose={() => setResetError(null)}
+                sx={{ borderRadius: 2 }}
+              >
                 {resetError}
               </Alert>
             )}
-
-            {/* Success Alert */}
             {resetSuccess && (
-              <Alert severity="success" sx={{ mb: 2 }} onClose={() => setResetSuccess(null)}>
+              <Alert
+                severity="success"
+                onClose={() => setResetSuccess(null)}
+                sx={{ borderRadius: 2 }}
+              >
                 {resetSuccess}
               </Alert>
             )}
@@ -741,11 +645,11 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
               }}
               disabled={resetLoading}
               onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handlePasswordReset();
-                }
+                if (e.key === 'Enter') handlePasswordReset();
               }}
-              sx={{ mb: 2 }}
+              sx={{
+                '& .MuiOutlinedInput-root': { borderRadius: 2 }
+              }}
             />
 
             {/* Submit Button */}
@@ -756,11 +660,15 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
               onClick={handlePasswordReset}
               disabled={resetLoading || !resetEmail.trim()}
               sx={{
-                py: { xs: 1.25, sm: 1.5 },
-                fontSize: { xs: '0.9375rem', sm: '1rem' },
+                py: 1.5,
+                borderRadius: 2,
+                fontSize: '0.9375rem',
                 fontWeight: 600,
                 textTransform: 'none',
-                mb: 2
+                boxShadow: 'none',
+                '&:hover': {
+                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+                }
               }}
             >
               {resetLoading ? (
@@ -773,60 +681,51 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
               )}
             </Button>
 
-            {/* Back to Sign In Link */}
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">
-                Remember your password?{' '}
-                <Button
-                  onClick={handleBackToAuth}
-                  sx={{
-                    textTransform: 'none',
-                    p: 0,
-                    minWidth: 'auto',
-                    fontWeight: 600,
-                    '&:hover': {
-                      bgcolor: 'transparent',
-                      textDecoration: 'underline'
-                    }
-                  }}
-                >
-                  Sign in
-                </Button>
-              </Typography>
-            </Box>
-          </Box>
+            {/* Back Link */}
+            <Button
+              onClick={handleBackToAuth}
+              size="small"
+              sx={{
+                alignSelf: 'center',
+                textTransform: 'none',
+                color: 'text.secondary',
+                fontSize: '0.8125rem',
+                '&:hover': { color: 'primary.main' }
+              }}
+            >
+              Back to sign in
+            </Button>
+          </Stack>
         )}
+      </Box>
 
-        {/* Footer text */}
+      {/* Footer */}
+      <Box sx={{ px: { xs: 3, sm: 4 }, pb: { xs: 2, sm: 3 } }}>
         <Typography
           variant="caption"
-          color="text.secondary"
+          color="text.disabled"
           sx={{
             textAlign: 'center',
-            mt: { xs: 2, sm: 3 },
             display: 'block',
-            fontSize: { xs: '0.6875rem', sm: '0.75rem' },
-            px: { xs: 1, sm: 0 }
+            fontSize: '0.6875rem'
           }}
         >
-          By signing in, you agree to our Terms of Service and Privacy Policy
+          By continuing, you agree to our Terms of Service and Privacy Policy
         </Typography>
       </Box>
-    </React.Fragment>
+    </Box>
   );
 };
 
 /**
  * LoginDialog Component
- * Reusable dialog component that displays a login prompt for unauthenticated users
- * Features invite code verification followed by authentication options
+ * Clean, minimal login dialog with invite code verification and authentication
  */
 const LoginDialog: React.FC<LoginDialogProps> = ({
   open,
   onClose,
-  title = 'Sign In',
-  subtitle = 'Please sign in to access this feature',
-  showFeatures = true,
+  title = 'Welcome Back',
+  subtitle = 'Sign in to continue to JournoTrades',
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -835,7 +734,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="sm"
+      maxWidth="xs"
       fullWidth
       fullScreen={isMobile}
       {...dialogProps}
@@ -843,11 +742,9 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
         sx: {
           borderRadius: isMobile ? 0 : 3,
           overflow: 'hidden',
-          background: theme.palette.mode === 'dark'
-            ? `linear-gradient(145deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.default, 0.98)} 100%)`
-            : `linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.98) 100%)`,
+          bgcolor: 'background.paper',
           m: isMobile ? 0 : undefined,
-          maxHeight: isMobile ? '100vh' : '90vh',
+          maxHeight: isMobile ? '100vh' : 'calc(100vh - 64px)',
           position: 'relative'
         }
       }}
@@ -855,21 +752,21 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
       {/* Close Button */}
       <IconButton
         onClick={onClose}
+        size="small"
         sx={{
           position: 'absolute',
-          right: { xs: 8, sm: 16 },
-          top: { xs: 8, sm: 16 },
+          right: 12,
+          top: 12,
           zIndex: 1,
           color: 'text.secondary',
-          bgcolor: alpha(theme.palette.background.paper, 0.8),
-          backdropFilter: 'blur(8px)',
+          bgcolor: alpha(theme.palette.action.hover, 0.08),
           '&:hover': {
-            bgcolor: alpha(theme.palette.background.paper, 0.95),
+            bgcolor: alpha(theme.palette.action.hover, 0.16),
             color: 'text.primary'
           }
         }}
       >
-        <CloseIcon />
+        <CloseIcon fontSize="small" />
       </IconButton>
 
       <DialogContent
@@ -882,7 +779,6 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
         <LoginPromptContent
           title={title}
           subtitle={subtitle}
-          showFeatures={showFeatures}
           onAfterSignIn={onClose}
         />
       </DialogContent>

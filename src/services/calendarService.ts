@@ -129,6 +129,47 @@ export const getUserCalendars = async (userId: string): Promise<Calendar[]> => {
 };
 
 /**
+ * Get all trash (soft-deleted) calendars for a user
+ */
+export const getTrashCalendars = async (userId: string): Promise<Calendar[]> => {
+  try {
+    const calendars = await calendarRepository.findTrashByUserId(userId);
+    return calendars;
+  } catch (error) {
+    logger.error('Error getting trash calendars:', error);
+    return [];
+  }
+};
+
+/**
+ * Restore a calendar from trash
+ */
+export const restoreCalendar = async (calendarId: string): Promise<Calendar> => {
+  try {
+    const calendar = await calendarRepository.restoreFromTrash(calendarId);
+    logger.log('Calendar restored:', calendarId);
+    return calendar;
+  } catch (error) {
+    logger.error('Error restoring calendar:', error);
+    throw error;
+  }
+};
+
+/**
+ * Permanently delete a calendar
+ */
+export const permanentlyDeleteCalendar = async (calendarId: string): Promise<boolean> => {
+  try {
+    await calendarRepository.permanentlyDelete(calendarId);
+    logger.log('Calendar permanently deleted:', calendarId);
+    return true;
+  } catch (error) {
+    logger.error('Error permanently deleting calendar:', error);
+    throw error;
+  }
+};
+
+/**
  * Create a new calendar
  */
 export const createCalendar = async (

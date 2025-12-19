@@ -8,14 +8,11 @@ import {
   useTheme,
   useMediaQuery,
   alpha,
-  Chip,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Button,
-  IconButton,
-  Toolbar
+  Button
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -26,21 +23,20 @@ import {
   Delete as DeleteIcon,
   Edit as EditIcon,
   SmartToy as AIIcon,
-  Home as HomeIcon
+  DeleteOutline as TrashIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { format, startOfMonth, endOfMonth, isSameDay } from 'date-fns';
 import { Calendar } from '../types/calendar';
 import { Trade } from '../types/dualWrite';
-import { EconomicEvent } from '../types/economicCalendar';
 import { formatCurrency } from '../utils/formatters';
-import { economicCalendarService } from '../services/economicCalendarService';
 import { TradeWithCalendarName, useRecentTrades } from '../hooks/useRecentTrades';
 import { useUpcomingEconomicEvents } from '../hooks/useUpcomingEconomicEvents';
+import { useCalendars, useTrashCalendars } from '../hooks/useCalendars';
 
 import Shimmer from '../components/Shimmer';
 import CalendarCard from '../components/CalendarCard';
 import CalendarCardShimmer from '../components/CalendarCardShimmer';
+import RoundedTabs, { TabPanel } from '../components/common/RoundedTabs';
 import { logger } from '../utils/logger';
 import { useAuth } from '../contexts/SupabaseAuthContext';
 import LoginDialog from '../components/auth/LoginDialog';
@@ -51,7 +47,9 @@ import EconomicEventShimmer from '../components/economicCalendar/EconomicEventSh
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { dialogProps } from '../styles/dialogStyles';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
+import AnimatedBackground from '../components/common/AnimatedBackground';
 import { DuplicateCalendarDialog } from '../components/dialogs/DuplicateCalendarDialog';
+import CalendarListDialog from '../components/dialogs/CalendarListDialog';
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import TradeFormDialog from '../components/trades/TradeFormDialog';
 import { NewTradeForm } from '../components/trades';
@@ -60,6 +58,8 @@ import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import * as calendarService from '../services/calendarService';
 import { CalendarManagementProps } from '../App';
 import NotesDrawer from '../components/notes/NotesDrawer';
+import TrashCalendarItem from '../components/trash/TrashCalendarItem';
+import { Schedule as ScheduleIcon } from '@mui/icons-material';
 
 interface HomeProps extends CalendarManagementProps {}
 
@@ -69,8 +69,7 @@ const Home: React.FC<HomeProps> = ({
   onCreateCalendar,
   onDuplicateCalendar,
   onDeleteCalendar,
-  onUpdateCalendar,
-  onMenuClick
+  onUpdateCalendar
 }) => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -84,6 +83,17 @@ const Home: React.FC<HomeProps> = ({
   const { recentTrades: recentTrades_, isLoading: loadingTrades } = useRecentTrades(user?.uid, calendars, {
     limit: 5,
   });
+  // Track if trash tab has been selected (for lazy loading)
+  const [hasLoadedTrash, setHasLoadedTrash] = useState(false);
+
+  // Get refresh function for calendars (SWR will dedupe with parent's data)
+  const { refresh: refreshCalendars } = useCalendars(user?.uid);
+
+  const {
+    trashCalendars: fetchedTrashCalendars,
+    isLoading: loadingTrash,
+    refresh: refreshTrashCalendars
+  } = useTrashCalendars(hasLoadedTrash ? user?.uid : undefined);
 
   const [economicCalendarOpen, setEconomicCalendarOpen] = useState(false);
   const [isCreateCalendarDialogOpen, setIsCreateCalendarDialogOpen] = useState(false);
@@ -100,6 +110,12 @@ const Home: React.FC<HomeProps> = ({
 
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
+
+  // Calendar tabs state (0 = Recent, 1 = Trash)
+  const [calendarTabIndex, setCalendarTabIndex] = useState(0);
+
+  // Calendar list dialog state
+  const [isCalendarListDialogOpen, setIsCalendarListDialogOpen] = useState(false);
 
   // Image zoom state
   const [zoomedImage, setZoomedImage] = useState<string>('');
@@ -122,14 +138,22 @@ const Home: React.FC<HomeProps> = ({
   }, [recentTrades_])
 
   // Get recently updated calendars (top 2 for large screens, top 1 for smaller screens)
+  // Filter out deleted calendars from recent
   const recentCalendars = useMemo(() => {
     const limit = isLargeScreen ? 2 : 1;
     return [...calendars]
+      .filter(c => !c.deleted_at)
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
       .slice(0, limit);
   }, [calendars, isLargeScreen]);
 
-
+  // Get trash calendars (soft-deleted) - use fetched data
+  const trashCalendars = useMemo(() => {
+    const limit = isLargeScreen ? 2 : 1;
+    return [...fetchedTrashCalendars]
+      .sort((a, b) => new Date(b.deleted_at!).getTime() - new Date(a.deleted_at!).getTime())
+      .slice(0, limit);
+  }, [fetchedTrashCalendars, isLargeScreen]);
 
   // Calendar action handlers - open dialogs for edit/duplicate/delete
   const handleEditCalendar = (calendar: Calendar) => {
@@ -145,6 +169,25 @@ const Home: React.FC<HomeProps> = ({
   const handleDeleteCalendar = (calendarId: string) => {
     setCalendarToDelete(calendarId);
     setIsDeleteDialogOpen(true);
+  };
+
+  // Trash action handlers
+  const handleRestoreCalendar = async (calendarId: string) => {
+    try {
+      await calendarService.restoreCalendar(calendarId);
+      refreshTrashCalendars();
+    } catch (error) {
+      logger.error('Error restoring calendar:', error);
+    }
+  };
+
+  const handlePermanentDeleteCalendar = async (calendarId: string) => {
+    try {
+      await calendarService.permanentlyDeleteCalendar(calendarId);
+      refreshTrashCalendars();
+    } catch (error) {
+      logger.error('Error permanently deleting calendar:', error);
+    }
   };
 
   // Update calendar property handler for share button
@@ -268,6 +311,22 @@ const Home: React.FC<HomeProps> = ({
   const requiredTagGroupsForTradeDialog = selectedTradeCalendar?.required_tag_groups || [];
   const accountBalanceForTradeDialog = selectedTradeCalendar?.account_balance ?? 0;
 
+  const handleCalendarTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setCalendarTabIndex(newValue);
+    // Refresh data in background when switching tabs
+    if (newValue === 0) {
+      // Switching to Recent Calendars - refresh calendars
+      refreshCalendars();
+    } else if (newValue === 1) {
+      // Switching to Trash - lazy load on first visit, then refresh
+      if (!hasLoadedTrash) {
+        setHasLoadedTrash(true);
+      } else {
+        refreshTrashCalendars();
+      }
+    }
+  };
+
   const handleCalendarClick = (calendarId: string) => {
     navigate(`/calendar/${calendarId}`);
   };
@@ -382,9 +441,11 @@ const Home: React.FC<HomeProps> = ({
       sx={{
         minHeight: '100vh',
         bgcolor: 'custom.pageBackground',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
-
+      <AnimatedBackground />
 
       <Box
         sx={{
@@ -393,6 +454,8 @@ const Home: React.FC<HomeProps> = ({
           px: { xs: 2, sm: 3, md: 4 },
           maxWidth: '1400px',
           mx: 'auto',
+          position: 'relative',
+          zIndex: 1,
         }}
       >
         {/* Header Section */}
@@ -923,15 +986,15 @@ const Home: React.FC<HomeProps> = ({
                 pt: { xs: 1.5, sm: 2 }
               }}
             >
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 600,
-                  fontSize: { xs: '1rem', sm: '1.125rem', md: '1.25rem' }
-                }}
-              >
-                Recent Calendars
-              </Typography>
+              <RoundedTabs
+                tabs={[
+                  { label: 'Recent Calendars', icon: <CalendarToday sx={{ fontSize: 18 }} /> },
+                  { label: 'Trash', icon: <TrashIcon sx={{ fontSize: 18 }} /> }
+                ]}
+                activeTab={calendarTabIndex}
+                onTabChange={handleCalendarTabChange} 
+                variant="contained"
+              />
               <Typography
                 variant="body2"
                 sx={{
@@ -940,80 +1003,81 @@ const Home: React.FC<HomeProps> = ({
                   fontSize: { xs: '0.8125rem', sm: '0.875rem' },
                   '&:hover': { textDecoration: 'underline' }
                 }}
-                onClick={() => navigate('/calendars')}
+                onClick={() => setIsCalendarListDialogOpen(true)}
               >
                 View all
               </Typography>
             </Stack>
 
-            {isLoading ? (
-              <Box sx={{ px: 2, pb: 2, flex: 1, display: 'flex', flexDirection: 'row', gap: 2 }}>
-                <Box sx={{ minWidth: '450px', flex: '0 0 auto' }}>
-                  <CalendarCardShimmer />
+            {/* Recent Calendars Tab */}
+            <TabPanel value={calendarTabIndex} index={0}>
+              {isLoading ? (
+                <Box sx={{ px: 2, pb: 2, flex: 1, display: 'flex', flexDirection: 'row', gap: 2 }}>
+                  <Box sx={{ minWidth: '450px', flex: '0 0 auto' }}>
+                    <CalendarCardShimmer />
+                  </Box>
                 </Box>
-              </Box>
-            ) : recentCalendars.length === 0 ? (
-              <Box sx={{
-                textAlign: 'center',
-                py: 6,
-                px: 2,
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center'
-              }}>
-                <CalendarToday sx={{ fontSize: 48, color: 'text.secondary', mb: 2, mx: 'auto' }} />
-                <Typography variant="subtitle2" color="text.primary" sx={{ mb: 1, fontWeight: 600 }}>
-                  No calendars yet
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 300 }}>
-                  Create your first trading calendar to start tracking your trades and analyzing performance
-                </Typography>
-               
-              </Box>
-            ) : (
-              <Box sx={{
-                px: 1,
-                pb: 2,
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'row',
-                gap: 1
-              }}>
-                {recentCalendars.map((calendar) => {
-                  // Extract stats from calendar object (stats are auto-calculated by Supabase)
-                  const stats = {
-                    total_pnl: calendar.total_pnl || 0,
-                    win_rate: calendar.win_rate || 0,
-                    total_trades: calendar.total_trades || 0,
-                    growth_percentage: calendar.pnl_performance || 0,
-                    avg_win: calendar.avg_win || 0,
-                    avg_loss: calendar.avg_loss || 0,
-                    profit_factor: calendar.profit_factor || 0,
-                    max_drawdown: calendar.max_drawdown || 0,
-                    drawdown_recovery_needed: calendar.drawdown_recovery_needed || 0,
-                    drawdown_duration: calendar.drawdown_duration || 0,
-                    drawdown_start_date: calendar.drawdown_start_date || null,
-                    drawdown_end_date: calendar.drawdown_end_date || null,
-                    target_progress: calendar.target_progress || 0,
-                    pnl_performance: calendar.pnl_performance || 0,
-                    win_count: calendar.win_count || 0,
-                    loss_count: calendar.loss_count || 0,
-                    current_balance: calendar.current_balance || calendar.account_balance,
-                    initial_balance: calendar.account_balance,
-                    weekly_pnl: calendar.weekly_pnl,
-                    monthly_pnl: calendar.monthly_pnl,
-                    yearly_pnl: calendar.yearly_pnl,
-                    weekly_pnl_percentage: calendar.weekly_pnl_percentage,
-                    monthly_pnl_percentage: calendar.monthly_pnl_percentage,
-                    yearly_pnl_percentage: calendar.yearly_pnl_percentage,
-                    weekly_progress: calendar.weekly_progress,
-                    monthly_progress: calendar.monthly_progress
-                  };
-                  return (
-                     <CalendarCard
-                      key={calendar.id}
+              ) : recentCalendars.length === 0 ? (
+                <Box sx={{
+                  textAlign: 'center',
+                  py: 6,
+                  px: 2,
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <CalendarToday sx={{ fontSize: 48, color: 'text.secondary', mb: 2, mx: 'auto' }} />
+                  <Typography variant="subtitle2" color="text.primary" sx={{ mb: 1, fontWeight: 600 }}>
+                    No calendars yet
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 300 }}>
+                    Create your first trading calendar to start tracking your trades and analyzing performance
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{
+                  px: 1,
+                  pb: 2,
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'row',
+                  gap: 1
+                }}>
+                  {recentCalendars.map((calendar) => {
+                    // Extract stats from calendar object (stats are auto-calculated by Supabase)
+                    const stats = {
+                      total_pnl: calendar.total_pnl || 0,
+                      win_rate: calendar.win_rate || 0,
+                      total_trades: calendar.total_trades || 0,
+                      growth_percentage: calendar.pnl_performance || 0,
+                      avg_win: calendar.avg_win || 0,
+                      avg_loss: calendar.avg_loss || 0,
+                      profit_factor: calendar.profit_factor || 0,
+                      max_drawdown: calendar.max_drawdown || 0,
+                      drawdown_recovery_needed: calendar.drawdown_recovery_needed || 0,
+                      drawdown_duration: calendar.drawdown_duration || 0,
+                      drawdown_start_date: calendar.drawdown_start_date || null,
+                      drawdown_end_date: calendar.drawdown_end_date || null,
+                      target_progress: calendar.target_progress || 0,
+                      pnl_performance: calendar.pnl_performance || 0,
+                      win_count: calendar.win_count || 0,
+                      loss_count: calendar.loss_count || 0,
+                      current_balance: calendar.current_balance || calendar.account_balance,
+                      initial_balance: calendar.account_balance,
+                      weekly_pnl: calendar.weekly_pnl,
+                      monthly_pnl: calendar.monthly_pnl,
+                      yearly_pnl: calendar.yearly_pnl,
+                      weekly_pnl_percentage: calendar.weekly_pnl_percentage,
+                      monthly_pnl_percentage: calendar.monthly_pnl_percentage,
+                      yearly_pnl_percentage: calendar.yearly_pnl_percentage,
+                      weekly_progress: calendar.weekly_progress,
+                      monthly_progress: calendar.monthly_progress
+                    };
+                    return (
+                      <CalendarCard
+                        key={calendar.id}
                         calendar={calendar}
                         stats={stats}
                         onCalendarClick={handleCalendarClick}
@@ -1027,10 +1091,77 @@ const Home: React.FC<HomeProps> = ({
                         onUpdateCalendarProperty={handleUpdateCalendarProperty}
                         formatCurrency={formatCurrency}
                       />
-                  );
-                })}
-              </Box>
-            )}
+                    );
+                  })}
+                </Box>
+              )}
+            </TabPanel>
+
+            {/* Trash Calendars Tab */}
+            <TabPanel value={calendarTabIndex} index={1}>
+              {loadingTrash ? (
+                <Box sx={{ px: 2, pb: 2, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Shimmer width="100%" height={60} sx={{ borderRadius: 2 }} />
+                  <Shimmer width="100%" height={60} sx={{ borderRadius: 2 }} />
+                </Box>
+              ) : trashCalendars.length === 0 ? (
+                <Box sx={{
+                  textAlign: 'center',
+                  py: 6,
+                  px: 2,
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <TrashIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2, mx: 'auto' }} />
+                  <Typography variant="subtitle2" color="text.primary" sx={{ mb: 1, fontWeight: 600 }}>
+                    Trash is empty
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 300 }}>
+                    Deleted calendars will appear here for 30 days before being permanently removed
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ px: 2, pb: 2, flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {/* Trash Header */}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: alpha(theme.palette.warning.main, 0.08),
+                      border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`
+                    }}
+                  >
+                    <ScheduleIcon sx={{ color: 'warning.main', fontSize: 20 }} />
+                    <Box>
+                      <Typography variant="body2" fontWeight={600} color="warning.main">
+                        Items will be permanently deleted after 30 days
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Restore calendars before they're automatically removed from your account
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* Trash Items */}
+                  <Stack spacing={1}>
+                    {trashCalendars.map((calendar) => (
+                      <TrashCalendarItem
+                        key={calendar.id}
+                        calendar={calendar}
+                        onRestore={handleRestoreCalendar}
+                        onPermanentDelete={handlePermanentDeleteCalendar}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </TabPanel>
           </Card>
 
   {/* Economic Events Section */}
@@ -1370,6 +1501,20 @@ const Home: React.FC<HomeProps> = ({
         onDuplicate={handleDuplicateOptionSelect}
       />
 
+      {/* Calendar List Dialog */}
+      <CalendarListDialog
+        open={isCalendarListDialogOpen}
+        onClose={() => setIsCalendarListDialogOpen(false)}
+        isTrash={calendarTabIndex === 1}
+        onCalendarClick={handleCalendarClick}
+        onEditCalendar={handleEditCalendar}
+        onDuplicateCalendar={handleDuplicateCalendar}
+        onDeleteCalendar={handleDeleteCalendar}
+        onUpdateCalendarProperty={handleUpdateCalendarProperty}
+        onRestoreCalendar={handleRestoreCalendar}
+        onPermanentDeleteCalendar={handlePermanentDeleteCalendar}
+      />
+
       {/* Delete Calendar Dialog */}
       <Dialog
         open={isDeleteDialogOpen}
@@ -1416,18 +1561,8 @@ const Home: React.FC<HomeProps> = ({
       <LoginDialog
         open={showLoginDialog}
         onClose={handleLoginDialogClose}
-        title="JournoTrades"
-        subtitle="Please sign in to access this feature"
-        showFeatures={true}
-      />
-
-      {/* Login Dialog */}
-      <LoginDialog
-        open={showLoginDialog}
-        onClose={handleLoginDialogClose}
-        title="JournoTrades"
-        subtitle="Please sign in to access this feature"
-        showFeatures={true}
+        title="Welcome Back"
+        subtitle="Sign in to continue"
       />
     </Box>
   );

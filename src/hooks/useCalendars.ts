@@ -9,6 +9,7 @@
 import useSWR from 'swr';
 import * as calendarService from '../services/calendarService';
 import type { Calendar } from '../types/dualWrite';
+export type { Calendar };
 
 interface UseCalendarsOptions {
   /**
@@ -69,6 +70,44 @@ export function useCalendars(
     /**
      * Manually refresh calendars data
      */
+    refresh: mutate,
+  };
+}
+
+/**
+ * Custom hook to fetch trash (soft-deleted) calendars for a user
+ */
+export function useTrashCalendars(
+  userId: string | undefined,
+  options: UseCalendarsOptions = {}
+) {
+  const {
+    refreshInterval = 0,
+    revalidateOnFocus = true,
+  } = options;
+
+  const { data, error, isLoading, mutate } = useSWR(
+    // Only fetch if userId is defined
+    userId ? ['trash-calendars', userId] : null,
+    // Fetcher function
+    async () => {
+      if (!userId) return null;
+      const calendars = await calendarService.getTrashCalendars(userId);
+      return calendars;
+    },
+    {
+      revalidateOnFocus,
+      dedupingInterval: 2000,
+      refreshInterval,
+      shouldRetryOnError: false,
+      keepPreviousData: true,
+    }
+  );
+
+  return {
+    trashCalendars: data ?? [],
+    isLoading,
+    error,
     refresh: mutate,
   };
 }

@@ -7,7 +7,6 @@ import { AbstractBaseRepository, RepositoryConfig } from "./BaseRepository";
 import { Note } from "../../../types/note";
 import { logger } from "../../../utils/logger";
 import { supabase } from "../../../config/supabase";
-import { supabaseAuthService } from "../../supabaseAuthService";
 
 /**
  * Query options for filtering and pagination
@@ -60,8 +59,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
 
   async findById(id: string): Promise<Note | null> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from("notes")
         .select("*")
@@ -82,8 +79,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
 
   async findByUserId(userId: string): Promise<Note[]> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from("notes")
         .select("*")
@@ -104,8 +99,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
 
   async findByTag(userId: string, tag: string): Promise<Note[]> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from("notes")
         .select("*")
@@ -132,8 +125,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
     options: NoteQueryOptions = {},
   ): Promise<NoteQueryResult> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const {
         isPinned,
         isArchived,
@@ -192,8 +183,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
 
   async findByCalendarId(calendarId: string): Promise<Note[]> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from("notes")
         .select("*")
@@ -220,8 +209,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
     options: NoteQueryOptions = {},
   ): Promise<NoteQueryResult> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const {
         isPinned,
         isArchived,
@@ -280,8 +267,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
 
   async findAll(): Promise<Note[]> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from("notes")
         .select("*")
@@ -306,8 +291,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
    */
   async archiveNote(noteId: string): Promise<boolean> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const { error } = await supabase
         .from("notes")
         .update({
@@ -333,8 +316,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
    */
   async unarchiveNote(noteId: string): Promise<boolean> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const { error } = await supabase
         .from("notes")
         .update({
@@ -365,8 +346,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
     calendarId: string,
   ): Promise<boolean> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const { error } = await supabase
         .from("notes")
         .update({
@@ -394,8 +373,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
    */
   async pinNote(noteId: string): Promise<boolean> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const { error } = await supabase
         .from("notes")
         .update({
@@ -421,8 +398,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
    */
   async unpinNote(noteId: string): Promise<boolean> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const { error } = await supabase
         .from("notes")
         .update({
@@ -454,8 +429,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
     dayAbbreviation: string,
   ): Promise<Note[]> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from("notes")
         .select("*")
@@ -484,8 +457,6 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
    */
   async findRemindersByDate(calendarId: string, date: Date): Promise<Note[]> {
     try {
-      await supabaseAuthService.ensureValidSession();
-
       const dateStr = date.toISOString().split("T")[0]; // Format: YYYY-MM-DD
 
       const { data, error } = await supabase

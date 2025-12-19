@@ -7,7 +7,6 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   title?: string;
   subtitle?: string;
-  showFeatures?: boolean;
 }
 
 /**
@@ -18,8 +17,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   title,
-  subtitle,
-  showFeatures = true
+  subtitle
 }) => {
   const { user, loading } = useAuth();
 
@@ -46,7 +44,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       <LoginPrompt
         title={title}
         subtitle={subtitle}
-        showFeatures={showFeatures}
       />
     );
   }

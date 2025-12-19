@@ -13,7 +13,6 @@ import { logger } from '../../../utils/logger';
 
 // Supabase imports
 import { supabase } from '../../../config/supabase';
-import { supabaseAuthService } from '../../supabaseAuthService';
 
 
 // Storage imports
@@ -79,9 +78,6 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
 
   async findById(id: string): Promise<Trade | null> {
     try {
-      // Ensure session is valid before fetching trade by ID
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from('trades')
         .select('*')
@@ -109,9 +105,6 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     }
   ): Promise<Trade[]> {
     try {
-      // Ensure session is valid before fetching trades by user
-      await supabaseAuthService.ensureValidSession();
-
       const { limit, orderBy = 'created_at', ascending = false } = options || {};
 
       let query = supabase
@@ -140,9 +133,6 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
 
   async findByCalendarId(calendarId: string): Promise<Trade[]> {
     try {
-      // Ensure session is valid before fetching trades by calendar
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from('trades')
         .select('*')
@@ -162,9 +152,6 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
 
   async findAll(): Promise<Trade[]> {
     try {
-      // Ensure session is valid before fetching all trades
-      await supabaseAuthService.ensureValidSession();
-
       const { data, error } = await supabase
         .from('trades')
         .select('*');
@@ -209,9 +196,6 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     totalPages: number;
   }> {
     try {
-      // Ensure session is valid before searching trades
-      await supabaseAuthService.ensureValidSession();
-
       const {
         searchQuery = '',
         selectedTags = [],
@@ -334,9 +318,6 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     batchSize: number = 50
   ): Promise<RepositoryResult<number>> {
     return await this.withRetryAndErrorHandling(async () => {
-      // Ensure session is valid before bulk delete
-      await supabaseAuthService.ensureValidSession();
- 
 
       const tradeIds = trades?.map(t => t.id) || [];
 
@@ -424,9 +405,6 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
           operation: 'bulkCreate'
         };
       }
-
-      // Ensure session is valid before bulk create
-      await supabaseAuthService.ensureValidSession();
 
       // Get current user from Supabase Auth
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -553,9 +531,6 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
           operation: 'bulkUpdate'
         };
       }
-
-      // Ensure session is valid before bulk update
-      await supabaseAuthService.ensureValidSession();
 
       // Prepare trades for update - convert Date objects to ISO strings
       const tradesForUpdate = trades.map(trade => ({

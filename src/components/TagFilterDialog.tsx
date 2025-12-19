@@ -18,6 +18,7 @@ import {
 } from '../utils/tagColors';
 import { BaseDialog, SelectInput } from './common';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
+import { Z_INDEX } from '../styles/zIndex';
 
 interface TagFilterDialogProps {
   open: boolean;
@@ -106,6 +107,9 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
           value={selectedTags}
           onChange={(_, newValue) => onTagsChange(newValue)}
           slotProps={{
+            popper: {
+              sx: { zIndex: Z_INDEX.DIALOG_POPUP }
+            },
             listbox: {
               sx: {
                 ...scrollbarStyles(theme)

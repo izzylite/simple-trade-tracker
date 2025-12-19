@@ -106,9 +106,7 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
       if (!userId) return;
       try {
         if (reset) {
-          if(notes.length == 0) {
           setLoading(true);
-          }
           offsetRef.current = 0;
         } else {
           setLoadingMore(true);

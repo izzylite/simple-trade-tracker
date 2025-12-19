@@ -22,6 +22,7 @@ import {
   Security
 } from '@mui/icons-material';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
+import AnimatedBackground from '../components/common/AnimatedBackground';
 
 interface SectionProps {
   icon: React.ReactNode;
@@ -30,11 +31,23 @@ interface SectionProps {
   children: React.ReactNode;
 }
 
-const Section: React.FC<SectionProps> = ({ icon, title, subtitle, children }) => {
+interface SectionPropsExtended extends SectionProps {
+  delay?: number;
+}
+
+const Section: React.FC<SectionPropsExtended> = ({ icon, title, subtitle, children, delay = 0 }) => {
   const theme = useTheme();
 
   return (
-    <Box>
+    <Box
+      sx={{
+        animation: `fadeInUp 0.6s ease-out ${delay}s both`,
+        '@keyframes fadeInUp': {
+          from: { opacity: 0, transform: 'translateY(30px)' },
+          to: { opacity: 1, transform: 'translateY(0)' }
+        }
+      }}
+    >
       <Stack direction="row" spacing={2.5} alignItems="flex-start" sx={{ mb: 2.5 }}>
         <Box
           sx={{
@@ -47,7 +60,11 @@ const Section: React.FC<SectionProps> = ({ icon, title, subtitle, children }) =>
             background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
             color: 'primary.contrastText',
             flexShrink: 0,
-            boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+            boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+            transition: 'transform 0.3s ease',
+            '&:hover': {
+              transform: 'scale(1.1) rotate(5deg)'
+            }
           }}
         >
           {icon}
@@ -79,14 +96,25 @@ const AboutPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
+      <AnimatedBackground />
       {/* Hero Section */}
       <Box
         sx={{
           background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.08)} 100%)`,
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           py: { xs: 5, sm: 8 },
-          px: { xs: 2, sm: 3 }
+          px: { xs: 2, sm: 3 },
+          position: 'relative',
+          zIndex: 1,
+          '@keyframes scaleUp': {
+            from: { opacity: 0, transform: 'scale(0.8)' },
+            to: { opacity: 1, transform: 'scale(1)' }
+          },
+          '@keyframes fadeInUp': {
+            from: { opacity: 0, transform: 'translateY(20px)' },
+            to: { opacity: 1, transform: 'translateY(0)' }
+          }
         }}
       >
         <Container maxWidth="md">
@@ -101,18 +129,30 @@ const AboutPage: React.FC = () => {
                 justifyContent: 'center',
                 background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
                 color: 'primary.contrastText',
-                boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`
+                boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`,
+                animation: 'scaleUp 0.5s ease-out both'
               }}
             >
               <TrendingUp sx={{ fontSize: { xs: 36, sm: 40 } }} />
             </Box>
-            <Typography variant={isXs ? 'h4' : 'h3'} sx={{ fontWeight: 800 }}>
+            <Typography
+              variant={isXs ? 'h4' : 'h3'}
+              sx={{
+                fontWeight: 800,
+                animation: 'fadeInUp 0.6s ease-out 0.2s both'
+              }}
+            >
               JournoTrades
             </Typography>
             <Typography
               variant={isXs ? 'h6' : 'h5'}
               color="text.secondary"
-              sx={{ maxWidth: 600, fontWeight: 400, lineHeight: 1.7 }}
+              sx={{
+                maxWidth: 600,
+                fontWeight: 400,
+                lineHeight: 1.7,
+                animation: 'fadeInUp 0.6s ease-out 0.4s both'
+              }}
             >
               Track your trades, organize your strategy, and let AI uncover insights from your data.
             </Typography>
@@ -126,6 +166,8 @@ const AboutPage: React.FC = () => {
         sx={{
           pt: { xs: 5, sm: 7 },
           pb: { xs: 6, sm: 9 },
+          position: 'relative',
+          zIndex: 1,
           ...(scrollbarStyles(theme) as any)
         }}
       >
@@ -135,6 +177,7 @@ const AboutPage: React.FC = () => {
             icon={<CalendarMonth fontSize="large" />}
             title="Calendars"
             subtitle="Organize your trading accounts and strategies"
+            delay={0.1}
           >
             <Typography variant="body1" sx={paragraphSx}>
               Calendars are containers for your trades and performance data. Create a calendar for each trading year, prop firm account, or strategy you want to track separately.
@@ -152,6 +195,7 @@ const AboutPage: React.FC = () => {
             icon={<ShowChart fontSize="large" />}
             title="Trades"
             subtitle="Log and analyze every trade"
+            delay={0.2}
           >
             <Typography variant="body1" sx={paragraphSx}>
               Record your trades with all the details that matter: direction, instrument, size, entry and exit prices, PnL, screenshots, and detailed notes.
@@ -172,6 +216,7 @@ const AboutPage: React.FC = () => {
             icon={<SmartToy fontSize="large" />}
             title="AI Assistant"
             subtitle="Your personal trading analyst"
+            delay={0.3}
           >
             <Typography variant="body1" sx={paragraphSx}>
               The AI assistant reads your trades, calendar notes, and performance data to provide personalized insights about your trading.
@@ -192,6 +237,7 @@ const AboutPage: React.FC = () => {
             icon={<Event fontSize="large" />}
             title="Economic Calendar"
             subtitle="Stay ahead of market-moving events"
+            delay={0.4}
           >
             <Typography variant="body1" sx={paragraphSx}>
               Track high-impact economic events directly on your trading calendar. Never be caught off guard by NFP or FOMC again.
@@ -209,6 +255,7 @@ const AboutPage: React.FC = () => {
             icon={<BarChart fontSize="large" />}
             title="Performance Analytics"
             subtitle="Deep dive into your trading metrics"
+            delay={0.5}
           >
             <Typography variant="body1" sx={paragraphSx}>
               Visualize your progress with interactive charts showing equity curves, daily PnL, and win rates over time.
@@ -226,6 +273,7 @@ const AboutPage: React.FC = () => {
             icon={<Security fontSize="large" />}
             title="Data Privacy & Security"
             subtitle="Your data belongs to you"
+            delay={0.6}
           >
             <Typography variant="body1" sx={paragraphSx}>
               Your trading data is stored securely in your own Supabase database. We prioritize your privacy and data ownership.
@@ -240,21 +288,41 @@ const AboutPage: React.FC = () => {
         </Stack>
 
         {/* Workflow Section */}
-        <Box sx={{ mt: { xs: 6, sm: 8 } }}>
-          <Divider sx={{ mb: 4 }}>
+        <Box
+          sx={{
+            mt: { xs: 6, sm: 8 },
+            '@keyframes fadeInUp': {
+              from: { opacity: 0, transform: 'translateY(20px)' },
+              to: { opacity: 1, transform: 'translateY(0)' }
+            }
+          }}
+        >
+          <Divider sx={{ mb: 4, animation: 'fadeInUp 0.6s ease-out 0.7s both' }}>
             <Chip label="Getting Started" size="small" />
           </Divider>
 
           <Typography
             variant={isXs ? 'h5' : 'h4'}
-            sx={{ fontWeight: 700, mb: 1, textAlign: 'center' }}
+            sx={{
+              fontWeight: 700,
+              mb: 1,
+              textAlign: 'center',
+              animation: 'fadeInUp 0.6s ease-out 0.8s both'
+            }}
           >
             How to Get Started
           </Typography>
           <Typography
             variant="body1"
             color="text.secondary"
-            sx={{ mb: 4, textAlign: 'center', maxWidth: 600, mx: 'auto', lineHeight: 1.7 }}
+            sx={{
+              mb: 4,
+              textAlign: 'center',
+              maxWidth: 600,
+              mx: 'auto',
+              lineHeight: 1.7,
+              animation: 'fadeInUp 0.6s ease-out 0.9s both'
+            }}
           >
             Follow these simple steps to start improving your trading.
           </Typography>
@@ -263,7 +331,8 @@ const AboutPage: React.FC = () => {
             sx={{
               borderRadius: 3,
               background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.03)} 0%, ${alpha(theme.palette.secondary.main, 0.03)} 100%)`,
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+              animation: 'fadeInUp 0.6s ease-out 1s both'
             }}
           >
             <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
@@ -303,12 +372,22 @@ const AboutPage: React.FC = () => {
         </Box>
 
         {/* Discord CTA */}
-        <Box sx={{ mt: { xs: 5, sm: 6 }, mb: { xs: 2, sm: 3 } }}>
+        <Box
+          sx={{
+            mt: { xs: 5, sm: 6 },
+            mb: { xs: 2, sm: 3 },
+            '@keyframes fadeInUp': {
+              from: { opacity: 0, transform: 'translateY(20px)' },
+              to: { opacity: 1, transform: 'translateY(0)' }
+            }
+          }}
+        >
           <Card
             sx={{
               borderRadius: 3,
               background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
-              border: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`
+              border: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+              animation: 'fadeInUp 0.6s ease-out 1.1s both'
             }}
           >
             <CardContent

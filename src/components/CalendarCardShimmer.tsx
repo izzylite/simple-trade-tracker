@@ -13,7 +13,7 @@ import Shimmer from './Shimmer';
 
 /**
  * Reusable shimmer loading component for calendar cards
- * Used in CalendarHome, Home, and CalendarTrash components
+ * Used in Home and CalendarTrash components
  */
 const CalendarCardShimmer: React.FC = () => {
   const theme = useTheme();
