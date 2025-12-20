@@ -245,7 +245,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           reminder_date: reminderDate,
           reminder_days: reminderDays,
           is_reminder_active: isReminderActive,
-          color: noteColor,
+          color: noteColor ?? null,
         };
 
         // Only update tags for user-created notes
@@ -273,7 +273,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           reminder_date: reminderDate,
           reminder_days: reminderDays,
           is_reminder_active: isReminderActive,
-          color: noteColor,
+          color: (noteColor ?? null) as any,
           tags,
         });
         setNote(newNote);

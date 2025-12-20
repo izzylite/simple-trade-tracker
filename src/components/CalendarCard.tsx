@@ -21,15 +21,11 @@ import {
 import {
   TrendingUp,
   TrendingDown,
-  BarChart as ChartIcon,
   MoreVert as MoreVertIcon,
   ContentCopy as CopyIcon,
   Delete as TrashIcon,
   Edit as EditIcon,
-  CalendarToday as CalendarIcon,
-  InfoOutlined,
-  ExpandMore,
-  ExpandLess
+  CalendarToday as CalendarIcon
 } from '@mui/icons-material';
 import { format, isValid } from 'date-fns';
 import { Calendar } from '../types/calendar';
@@ -51,10 +47,7 @@ const safeFormatDate = (date: Date | undefined | null, formatStr: string, fallba
 interface CalendarCardProps {
   calendar: Calendar;
   stats: CalendarStats;
-  isExpanded?: boolean;
-  onToggleExpand?: (e: React.MouseEvent, calendarId: string) => void;
   onCalendarClick: (calendarId: string) => void;
-  onViewCharts: (e: React.MouseEvent, calendar: Calendar) => void;
   onEditCalendar: (calendar: Calendar) => void;
   onDuplicateCalendar: (calendar: Calendar) => void;
   onDeleteCalendar: (calendarId: string) => void;
@@ -65,10 +58,7 @@ interface CalendarCardProps {
 const CalendarCard: React.FC<CalendarCardProps> = ({
   calendar,
   stats,
-  isExpanded = false,
-  onToggleExpand,
   onCalendarClick,
-  onViewCharts,
   onEditCalendar,
   onDuplicateCalendar,
   onDeleteCalendar,
@@ -376,7 +366,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               )}
             </Typography>
             {/* Account Growth */}
-            {!isExpanded && renderAccountGrowth(stats, theme, formatCurrency)}
+            {renderAccountGrowth(stats, theme, formatCurrency)}
           </Box>
         </Box>
 
@@ -418,320 +408,16 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
             </Typography>
           </Box>
         </Stack>
-
-        {/* Divider - only show when expanded */}
-        {isExpanded && <Divider sx={{ my: 1, opacity: 0.6 }} />}
-
-        {/* Detailed stats section */}
-        {isExpanded && (
-          <Stack spacing={2} sx={{
-            flexGrow: 0,
-            mb: 2
-          }}>
-            {renderAccountGrowth(stats, theme, formatCurrency)}
-
-            <Box sx={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: 2
-            }}>
-              <Box sx={{
-                p: 1.5,
-                borderRadius: 1,
-                bgcolor: alpha(theme.palette.background.default, 0.6)
-              }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Initial Balance
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {formatCurrency(stats.initial_balance)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Current: {formatCurrency(stats.initial_balance + stats.total_pnl)}
-                </Typography>
-              </Box>
-
-              <Box sx={{
-                p: 1.5,
-                borderRadius: 1,
-                bgcolor: alpha(theme.palette.background.default, 0.6)
-              }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Win Rate
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {stats.win_rate.toFixed(1)}%
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {stats.win_count}W - {stats.loss_count}L
-                </Typography>
-              </Box>
-            </Box>
-
-            <Box sx={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: 2
-            }}>
-              <Box sx={{
-                p: 1.5,
-                borderRadius: 1,
-                bgcolor: alpha(theme.palette.background.default, 0.6)
-              }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Profit Factor
-                </Typography>
-                <Tooltip
-                  title={
-                    <Box sx={{ p: 1, maxWidth: 300 }}>
-                      <Typography variant="body2" gutterBottom>
-                        Profit Factor is the ratio of gross profit to gross loss. A value greater than 1 indicates profitable trading.
-                      </Typography>
-                      <Typography variant="body2" sx={{ mt: 1 }}>
-                        • Value &gt; 3: Excellent
-                      </Typography>
-                      <Typography variant="body2">
-                        • Value 2-3: Very Good
-                      </Typography>
-                      <Typography variant="body2">
-                        • Value 1.5-2: Good
-                      </Typography>
-                      <Typography variant="body2">
-                        • Value 1-1.5: Marginal
-                      </Typography>
-                      <Typography variant="body2">
-                        • Value &lt; 1: Unprofitable
-                      </Typography>
-                    </Box>
-                  }
-                  arrow
-                  placement="top"
-                >
-                  <Typography variant="h6" sx={{ fontWeight: 600, cursor: 'help' }}>
-                    <InfoOutlined sx={{ fontSize: '1rem', mr: 0.5 }} />
-                    {stats.profit_factor.toFixed(2)}
-                  </Typography>
-                </Tooltip>
-                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                  Avg Win: {formatCurrency(stats.avg_win)}
-                </Typography>
-              </Box>
-
-              <Box sx={{
-                p: 1.5,
-                borderRadius: 1,
-                bgcolor: alpha(theme.palette.background.default, 0.6)
-              }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Max Drawdown
-                </Typography>
-                <Tooltip
-                  title={
-                    <Box sx={{ p: 1, maxWidth: 300 }}>
-                      <Typography variant="body2" gutterBottom>
-                        Maximum drawdown represents the largest peak-to-trough decline in your account balance.
-                      </Typography>
-                      {stats.max_drawdown > 0 && (
-                        <>
-                          <Typography variant="body2" sx={{ mt: 1 }}>
-                            Recovery needed: {stats.drawdown_recovery_needed.toFixed(1)}%
-                          </Typography>
-                          <Typography variant="body2" sx={{ mt: 1 }}>
-                            Duration: {stats.drawdown_duration} days
-                          </Typography>
-                          {stats.drawdown_start_date && stats.drawdown_end_date && (
-                            <Typography variant="body2" sx={{ mt: 1 }}>
-                              Period: {safeFormatDate(stats.drawdown_start_date, 'MMM d')} - {safeFormatDate(stats.drawdown_end_date, 'MMM d')}
-                            </Typography>
-                          )}
-                        </>
-                      )}
-                    </Box>
-                  }
-                  arrow
-                  placement="top"
-                >
-                  <Typography variant="h6" sx={{ fontWeight: 600, cursor: 'help' }}>
-                    <InfoOutlined sx={{ fontSize: '1rem', mr: 0.5 }} />
-                    {stats.max_drawdown.toFixed(1)}%
-                  </Typography>
-                </Tooltip>
-                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', mt: 0.5 }}>
-                  Avg Loss: {formatCurrency(stats.avg_loss)}
-                </Typography>
-              </Box>
-            </Box>
-
-            {/* Target Progress Section */}
-            {(calendar.weekly_target || calendar.monthly_target || calendar.yearly_target) && (
-              <Box sx={{
-                p: 1.5,
-                borderRadius: 1,
-                bgcolor: alpha(theme.palette.background.default, 0.6)
-              }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Target Progress
-                </Typography>
-                <Box sx={{
-                  display: 'grid',
-                  gridTemplateColumns: calendar.weekly_target && calendar.monthly_target && calendar.yearly_target
-                    ? 'repeat(3, 1fr)'
-                    : (calendar.weekly_target && calendar.monthly_target) || (calendar.weekly_target && calendar.yearly_target) || (calendar.monthly_target && calendar.yearly_target)
-                      ? 'repeat(2, 1fr)'
-                      : '1fr',
-                  gap: 2
-                }}>
-                  {calendar.weekly_target && (
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Weekly
-                      </Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        {Math.min(stats.weekly_progress ?? 0, 100).toFixed(1)}%
-                      </Typography>
-                    </Box>
-                  )}
-                  {calendar.monthly_target && (
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Monthly
-                      </Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        {Math.min(stats.monthly_progress ?? 0, 100).toFixed(1)}%
-                      </Typography>
-                    </Box>
-                  )}
-                  {calendar.yearly_target && (
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Yearly
-                      </Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        {Math.min(stats.yearly_progress ?? 0, 100).toFixed(1)}%
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-              </Box>
-            )}
-
-            {/* PnL Performance Section */}
-            <Box sx={{
-              p: 1.5,
-              borderRadius: 1,
-              bgcolor: alpha(theme.palette.background.default, 0.6)
-            }}>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                PnL Performance
-              </Typography>
-              <Box sx={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: 2
-              }}>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Weekly
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 600,
-                      color: parseFloat(String(stats.weekly_pnl_percentage)) > 0
-                        ? 'success.main'
-                        : parseFloat(String(stats.weekly_pnl_percentage)) < 0
-                          ? 'error.main'
-                          : 'text.primary'
-                    }}
-                  >
-                    {parseFloat(String(stats.weekly_pnl_percentage)) > 0 ? '+' : ''}{parseFloat(String(stats.weekly_pnl_percentage)).toFixed(1)}%
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Monthly
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 600,
-                      color: parseFloat(String(stats.monthly_pnl_percentage)) > 0
-                        ? 'success.main'
-                        : parseFloat(String(stats.monthly_pnl_percentage)) < 0
-                          ? 'error.main'
-                          : 'text.primary'
-                    }}
-                  >
-                    {parseFloat(String(stats.monthly_pnl_percentage)) > 0 ? '+' : ''}{parseFloat(String(stats.monthly_pnl_percentage)).toFixed(1)}%
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Yearly
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 600,
-                      color: parseFloat(String(stats.yearly_pnl_percentage)) > 0
-                        ? 'success.main'
-                        : parseFloat(String(stats.yearly_pnl_percentage)) < 0
-                          ? 'error.main'
-                          : 'text.primary'
-                    }}
-                  >
-                    {parseFloat(String(stats.yearly_pnl_percentage)) > 0 ? '+' : ''}{parseFloat(String(stats.yearly_pnl_percentage)).toFixed(1)}%
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
-          </Stack>
-        )}
       </CardContent>
 
       {/* Card Actions */}
       <CardActions sx={{
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
         alignItems: 'center',
         p: 2,
         borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`
       }}>
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<ChartIcon />}
-          onClick={(e) => onViewCharts(e, calendar)}
-          sx={{
-            borderRadius: 2,
-            textTransform: 'none',
-            fontWeight: 600
-          }}
-        >
-          View Charts
-        </Button>
-
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-
-
-          {onToggleExpand && (
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleExpand(e, calendar.id);
-              }}
-              sx={{
-                color: 'text.secondary',
-                '&:hover': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  color: 'primary.main'
-                }
-              }}
-            >
-              {isExpanded ? <ExpandLess /> : <ExpandMore />}
-            </IconButton>
-          )}
-
           {/* Share Calendar Button */}
           {onUpdateCalendarProperty && (
             <ShareButton

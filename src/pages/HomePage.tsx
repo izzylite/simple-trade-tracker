@@ -12,7 +12,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Button
+  Button,
+  IconButton
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -23,7 +24,8 @@ import {
   Delete as DeleteIcon,
   Edit as EditIcon,
   SmartToy as AIIcon,
-  DeleteOutline as TrashIcon
+  DeleteOutline as TrashIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { Calendar } from '../types/calendar';
@@ -32,10 +34,12 @@ import { formatCurrency } from '../utils/formatters';
 import { TradeWithCalendarName, useRecentTrades } from '../hooks/useRecentTrades';
 import { useUpcomingEconomicEvents } from '../hooks/useUpcomingEconomicEvents';
 import { useCalendars, useTrashCalendars } from '../hooks/useCalendars';
+import { useCalendarTrades } from '../hooks/useCalendarTrades';
 
 import Shimmer from '../components/Shimmer';
 import CalendarCard from '../components/CalendarCard';
 import CalendarCardShimmer from '../components/CalendarCardShimmer';
+import PerformanceCharts from '../components/PerformanceCharts';
 import RoundedTabs, { TabPanel } from '../components/common/RoundedTabs';
 import { logger } from '../utils/logger';
 import { useAuth } from '../contexts/SupabaseAuthContext';
@@ -710,13 +714,13 @@ const Home: React.FC<HomeProps> = ({
             <Card
               sx={{
                 borderRadius: 2,
-                border: `2px dashed ${alpha(theme.palette.primary.main, 0.3)}`,
-                bgcolor: 'transparent',
+                border: `2px dashed ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.3 : 0.5)}`,
+                bgcolor: theme.palette.mode === 'dark' ? 'transparent' : alpha(theme.palette.primary.main, 0.03),
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 '&:hover': {
                   borderColor: theme.palette.primary.main,
-                  bgcolor: alpha(theme.palette.primary.main, 0.05),
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.05 : 0.08),
                   transform: 'translateY(-2px)'
                 }
               }}
@@ -732,7 +736,7 @@ const Home: React.FC<HomeProps> = ({
                     width: { xs: 40, sm: 48, md: 56 },
                     height: { xs: 40, sm: 48, md: 56 },
                     borderRadius: 2,
-                    bgcolor: alpha(theme.palette.primary.main, 0.1),
+                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.1 : 0.15),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -769,14 +773,14 @@ const Home: React.FC<HomeProps> = ({
             <Card
               sx={{
                 borderRadius: 2,
-                border: `2px dashed ${alpha(theme.palette.info.main, 0.3)}`,
-                bgcolor: 'transparent',
+                border: `2px dashed ${alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.3 : 0.5)}`,
+                bgcolor: theme.palette.mode === 'dark' ? 'transparent' : alpha(theme.palette.info.main, 0.03),
                 cursor: calendars.length > 0 ? 'pointer' : 'not-allowed',
                 opacity: calendars.length > 0 ? 1 : 0.6,
                 transition: 'all 0.2s',
                 '&:hover': calendars.length > 0 ? {
                   borderColor: theme.palette.info.main,
-                  bgcolor: alpha(theme.palette.info.main, 0.05),
+                  bgcolor: alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.05 : 0.08),
                   transform: 'translateY(-2px)'
                 } : {}
               }}
@@ -792,7 +796,7 @@ const Home: React.FC<HomeProps> = ({
                     width: { xs: 40, sm: 48, md: 56 },
                     height: { xs: 40, sm: 48, md: 56 },
                     borderRadius: 2,
-                    bgcolor: alpha(theme.palette.info.main, 0.1),
+                    bgcolor: alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.1 : 0.15),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -829,13 +833,13 @@ const Home: React.FC<HomeProps> = ({
             <Card
               sx={{
                 borderRadius: 2,
-                border: `2px dashed ${alpha(theme.palette.warning.main, 0.3)}`,
-                bgcolor: 'transparent',
+                border: `2px dashed ${alpha(theme.palette.warning.main, theme.palette.mode === 'dark' ? 0.3 : 0.5)}`,
+                bgcolor: theme.palette.mode === 'dark' ? 'transparent' : alpha(theme.palette.warning.main, 0.03),
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 '&:hover': {
                   borderColor: theme.palette.warning.main,
-                  bgcolor: alpha(theme.palette.warning.main, 0.05),
+                  bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === 'dark' ? 0.05 : 0.08),
                   transform: 'translateY(-2px)'
                 }
               }}
@@ -854,7 +858,7 @@ const Home: React.FC<HomeProps> = ({
                     width: { xs: 40, sm: 48, md: 56 },
                     height: { xs: 40, sm: 48, md: 56 },
                     borderRadius: 2,
-                    bgcolor: alpha(theme.palette.warning.main, 0.1),
+                    bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === 'dark' ? 0.1 : 0.15),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -891,13 +895,13 @@ const Home: React.FC<HomeProps> = ({
             <Card
               sx={{
                 borderRadius: 2,
-                border: `2px dashed ${alpha(theme.palette.secondary.main, 0.3)}`,
-                bgcolor: 'transparent',
+                border: `2px dashed ${alpha(theme.palette.secondary.main, theme.palette.mode === 'dark' ? 0.3 : 0.5)}`,
+                bgcolor: theme.palette.mode === 'dark' ? 'transparent' : alpha(theme.palette.secondary.main, 0.03),
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 '&:hover': {
                   borderColor: theme.palette.secondary.main,
-                  bgcolor: alpha(theme.palette.secondary.main, 0.05),
+                  bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === 'dark' ? 0.05 : 0.08),
                   transform: 'translateY(-2px)'
                 }
               }}
@@ -919,7 +923,7 @@ const Home: React.FC<HomeProps> = ({
                     width: { xs: 40, sm: 48, md: 56 },
                     height: { xs: 40, sm: 48, md: 56 },
                     borderRadius: 2,
-                    bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                    bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === 'dark' ? 0.1 : 0.15),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1081,10 +1085,6 @@ const Home: React.FC<HomeProps> = ({
                         calendar={calendar}
                         stats={stats}
                         onCalendarClick={handleCalendarClick}
-                        onViewCharts={(e) => {
-                          e.stopPropagation();
-                          navigate(`/calendar/${calendar.id}`);
-                        }}
                         onEditCalendar={handleEditCalendar}
                         onDuplicateCalendar={handleDuplicateCalendar}
                         onDeleteCalendar={handleDeleteCalendar}
@@ -1554,8 +1554,6 @@ const Home: React.FC<HomeProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
-
-
 
       {/* Login Dialog */}
       <LoginDialog

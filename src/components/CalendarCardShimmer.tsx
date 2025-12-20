@@ -22,6 +22,7 @@ const CalendarCardShimmer: React.FC = () => {
     <Card
       sx={{
         height: '100%',
+        width: '350px',
         position: 'relative',
         overflow: 'hidden',
         transition: 'transform 0.3s ease-in-out',

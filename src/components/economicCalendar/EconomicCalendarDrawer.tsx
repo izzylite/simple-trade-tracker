@@ -6,7 +6,7 @@
  * to prevent performance issues from frequent re-renders.
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Drawer,
   Box,
@@ -113,6 +113,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   onClose,
   calendar,
   trades = [],
+  payload,
   tradeOperations,
   isReadOnly = false
 }) => {
@@ -129,6 +130,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const [isMonthPickerActive, setIsMonthPickerActive] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
   const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
+  const [updatedEventIds, setUpdatedEventIds] = useState<Set<string>>(new Set());
 
   // Use reusable event pinning hook
   const {
@@ -185,14 +187,51 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   // Use shared time hook - only updates every second when there are imminent events
   const { currentTime } = useEventCountdownTime(hasImminent, open);
 
+  // Handle incoming payload (updated economic events)
+  useEffect(() => {
+    if (payload && payload.updatedEvents.length > 0 && open) {
+      logger.log('📊 Economic Calendar Drawer: Received updated events payload', {
+        updatedCount: payload.updatedEvents.length,
+        eventIds: payload.updatedEvents.map(e => e.id)
+      });
+
+      // Track updated event IDs for visual feedback
+      const newUpdatedIds = new Set(payload.updatedEvents.map(e => e.id));
+      setUpdatedEventIds(newUpdatedIds);
+
+      // Clear visual feedback after 5 seconds
+      setTimeout(() => {
+        setUpdatedEventIds(new Set());
+      }, 5000);
+    }
+  }, [payload, open]);
+
+  // Merge events with payload updates - use updated events if available
+  const mergedEvents = useMemo(() => {
+    if (!payload || payload.updatedEvents.length === 0) {
+      return events;
+    }
+
+    // Create a map of updated events by ID for quick lookup
+    const updatedEventsMap = new Map(
+      payload.updatedEvents.map(event => [event.id, event])
+    );
+
+    // Replace matching events with updated versions
+    return events.map(event => {
+      const updatedEvent = updatedEventsMap.get(event.id);
+      return updatedEvent || event;
+    });
+  }, [events, payload]);
+
   // Group events by date - memoized to prevent recalculation
-  const groupedEvents = useMemo(() => groupEventsByDate(events), [events]);
+  const groupedEvents = useMemo(() => groupEventsByDate(mergedEvents), [mergedEvents]);
 
   // Calculate trade counts for each event - memoized for performance
   const eventTradeCountMap = useMemo(() => {
     const countMap = new Map<string, number>();
 
-    events.forEach(event => {
+    mergedEvents.forEach(event => {
       const tradeCount = trades.filter(trade => {
         if (!trade.economic_events || trade.economic_events.length === 0) {
           return false;
@@ -206,7 +245,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     });
 
     return countMap;
-  }, [events, trades]);
+  }, [mergedEvents, trades]);
 
   // Handle view type change
   const handleViewTypeChange = useCallback((newViewType: ViewType) => {
@@ -622,6 +661,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                     {dayGroup.events.map((event, eventIndex) => {
                       const uniqueKey = `${event.id}-${eventIndex}`;
                       const tradeCount = eventTradeCountMap.get(event.id) || 0;
+                      const isRecentlyUpdated = updatedEventIds.has(event.id);
                       return (
                         <React.Fragment key={uniqueKey}>
                           <EconomicEventListItem
@@ -635,6 +675,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                             tradeCount={tradeCount}
                             currentTime={currentTime}
                             onClick={handleEventClick}
+                            isRecentlyUpdated={isRecentlyUpdated}
                           />
                           {eventIndex < dayGroup.events.length - 1 && <Divider sx={{ ml: 3 }} />}
                         </React.Fragment>

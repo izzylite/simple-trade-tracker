@@ -313,29 +313,39 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
     'blueGrey': blueGrey[500],
   };
   const baseColor = currentNote.color ? colorMap[currentNote.color] : theme.palette.info.main; // Fallback to raw string if not mapped
+  const isDark = theme.palette.mode === 'dark';
 
   return (
     <>
       <Paper
-        elevation={3}
+        elevation={isDark ? 3 : 1}
         sx={{
           overflow: 'hidden',
           borderRadius: 0,
-          backgroundColor: currentNote.color ? alpha(baseColor, 0.1) : alpha(theme.palette.background.paper, 0.5),
+          position: 'relative',
+          zIndex: 10,
+          backgroundColor: currentNote.color
+            ? alpha(baseColor, isDark ? 0.1 : 0.2)
+            : isDark
+              ? alpha(theme.palette.background.paper, 0.5)
+              : theme.palette.background.paper,
           transition: 'all 0.3s ease',
-          boxShadow: `0 2px 8px ${alpha(theme.palette.grey[500], 0.1)}`,
+          boxShadow: isDark
+            ? `0 2px 8px ${alpha(theme.palette.grey[500], 0.1)}`
+            : `0 2px 12px ${alpha(theme.palette.grey[500], 0.15)}`,
+          border: isDark ? 'none' : `1px solid ${alpha(theme.palette.divider, 0.15)}`,
         }}
       >
         <Box
           sx={{
             pt: 1,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            backgroundColor: alpha(baseColor, 0.05),
+            borderBottom: `1px solid ${alpha(theme.palette.divider, isDark ? 0.3 : 0.15)}`,
+            backgroundColor: alpha(baseColor, isDark ? 0.05 : 0.12),
             borderLeft: `4px solid ${baseColor}`,
           }}
         >
           {/* Header */}
-          <Box sx={{ display: 'flex', px: 2, alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', px: 2, pb: isHidden? 1 : 0, alignItems: 'center', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <EventNoteIcon sx={{ fontSize: '1rem', color: 'info.main' }} />
               <Typography
@@ -456,23 +466,21 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
                 sx={{
                   cursor: 'pointer',
                   backgroundColor: (() => {
-                    if (!currentNote.color) return alpha(theme.palette.info.main, 0.03);
-
-
+                    if (!currentNote.color) return alpha(theme.palette.info.main, isDark ? 0.03 : 0.06);
                     // Check if it's a valid hex/rgb to apply alpha, otherwise ignore
                     try {
-                      return alpha(baseColor, 0.1);
+                      return alpha(baseColor, isDark ? 0.1 : 0.15);
                     } catch (e) {
-                      return alpha(theme.palette.info.main, 0.03);
+                      return alpha(theme.palette.info.main, isDark ? 0.03 : 0.06);
                     }
                   })(),
                   '&:hover': {
                     backgroundColor: (() => {
-                      if (!currentNote.color) return alpha(theme.palette.info.main, 0.08);
+                      if (!currentNote.color) return alpha(theme.palette.info.main, isDark ? 0.08 : 0.12);
                       try {
-                        return alpha(baseColor, 0.2);
+                        return alpha(baseColor, isDark ? 0.2 : 0.22);
                       } catch (e) {
-                        return alpha(theme.palette.info.main, 0.08);
+                        return alpha(theme.palette.info.main, isDark ? 0.08 : 0.12);
                       }
                     })(),
                   },
@@ -488,7 +496,6 @@ const CalendarDayReminder: React.FC<CalendarDayReminderProps> = ({
                     sx={{
                       fontWeight: 600,
                       color: 'text.primary',
-                      mb: 0.5,
                     }}
                   >
                     {currentNote.title}

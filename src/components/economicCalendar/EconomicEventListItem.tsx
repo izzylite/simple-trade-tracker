@@ -44,6 +44,8 @@ interface EconomicEventListItemProps {
   tradeCount?: number;
   /** Current time passed from parent for countdown calculations */
   currentTime?: Date;
+  /** Indicates if this event was recently updated with actual data */
+  isRecentlyUpdated?: boolean;
 }
 
 // Helper function to format time and countdown with realtime updates
@@ -174,6 +176,7 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
   onClick,
   tradeCount = 0,
   currentTime: propCurrentTime,
+  isRecentlyUpdated = false,
 }) => {
   const theme = useTheme();
 
@@ -226,13 +229,34 @@ const EconomicEventListItem: React.FC<EconomicEventListItemProps> = ({
       sx={{
         px,
         py,
-        backgroundColor: timeInfo.isImminent ? alpha(getImpactColor(event.impact, theme), 0.12) : 'transparent',
-        borderLeft: 'none',
+        backgroundColor: isRecentlyUpdated
+          ? alpha(theme.palette.success.main, 0.15)
+          : timeInfo.isImminent
+            ? alpha(getImpactColor(event.impact, theme), 0.12)
+            : 'transparent',
+        borderLeft: isRecentlyUpdated
+          ? `3px solid ${theme.palette.success.main}`
+          : 'none',
         mb: 0,
         minHeight: 'auto',
         cursor: onClick ? 'pointer' : 'default',
+        transition: 'all 0.3s ease-in-out',
+        animation: isRecentlyUpdated ? 'updateGlow 2s ease-in-out' : 'none',
+        '@keyframes updateGlow': {
+          '0%': {
+            boxShadow: `0 0 0 0 ${alpha(theme.palette.success.main, 0.7)}`,
+          },
+          '50%': {
+            boxShadow: `0 0 20px 5px ${alpha(theme.palette.success.main, 0.3)}`,
+          },
+          '100%': {
+            boxShadow: `0 0 0 0 ${alpha(theme.palette.success.main, 0)}`,
+          }
+        },
         '&:hover': onClick ? {
-          backgroundColor: alpha(theme.palette.primary.main, 0.08)
+          backgroundColor: isRecentlyUpdated
+            ? alpha(theme.palette.success.main, 0.2)
+            : alpha(theme.palette.primary.main, 0.08)
         } : {}
       }}
     >

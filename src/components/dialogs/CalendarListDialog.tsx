@@ -14,7 +14,9 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
-  CircularProgress
+  CircularProgress,
+  Tooltip,
+  Divider
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -26,7 +28,10 @@ import {
   Edit as EditIcon,
   ContentCopy as DuplicateIcon,
   Delete as DeleteIcon,
-  Schedule as ScheduleIcon
+  Schedule as ScheduleIcon,
+  ExpandMore,
+  ExpandLess,
+  InfoOutlined
 } from '@mui/icons-material';
 import { format, isValid } from 'date-fns';
 import { Calendar } from '../../types/calendar';
@@ -57,6 +62,8 @@ interface CalendarListDialogProps {
 interface CompactCalendarItemProps {
   calendar: Calendar;
   isTrash?: boolean;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
   onClick: () => void;
   onEdit?: () => void;
   onDuplicate?: () => void;
@@ -85,6 +92,8 @@ const safeFormatDate = (
 const CompactCalendarItem: React.FC<CompactCalendarItemProps> = ({
   calendar,
   isTrash,
+  isExpanded = false,
+  onToggleExpand,
   onClick,
   onEdit,
   onDuplicate,
@@ -129,14 +138,8 @@ const CompactCalendarItem: React.FC<CompactCalendarItemProps> = ({
 
   return (
     <Box
-      onClick={onClick}
       sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1.5,
-        p: 1.5,
-        borderRadius: 2,
-        cursor: 'pointer',
+        borderRadius: 1,
         bgcolor: theme.palette.mode === 'dark'
           ? alpha(theme.palette.background.paper, 0.4)
           : alpha(theme.palette.background.default, 0.6),
@@ -151,121 +154,398 @@ const CompactCalendarItem: React.FC<CompactCalendarItemProps> = ({
         }
       }}
     >
-      {/* Hero Image or Placeholder */}
-      <Avatar
-        src={calendar.hero_image_url || undefined}
-        variant="rounded"
+      <Box
+        onClick={onClick}
         sx={{
-          width: 48,
-          height: 48,
-          flexShrink: 0,
-          bgcolor: alpha(theme.palette.primary.main, 0.1),
-          '& img': {
-            objectFit: 'cover'
-          }
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          p: 1.5,
+          cursor: 'pointer'
         }}
       >
-        <CalendarToday sx={{ color: theme.palette.primary.main }} />
-      </Avatar>
-
-      {/* Calendar Info */}
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography
-          variant="subtitle2"
+        {/* Hero Image or Placeholder */}
+        <Avatar
+          src={calendar.hero_image_url || undefined}
+          variant="rounded"
           sx={{
-            fontWeight: 600,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            mb: 0.25
+            width: 48,
+            height: 48,
+            flexShrink: 0,
+            bgcolor: alpha(theme.palette.primary.main, 0.1),
+            '& img': {
+              objectFit: 'cover'
+            }
           }}
         >
-          {calendar.name}
-        </Typography>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Typography variant="caption" color="text.secondary">
-            {totalTrades} trades
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {winRate.toFixed(1)}% win
-          </Typography>
-          {isTrash && calendar.deleted_at && (
-            <Typography variant="caption" color="error.main">
-              Deleted {safeFormatDate(calendar.deleted_at, 'MMM d')}
-            </Typography>
-          )}
-        </Stack>
-      </Box>
+          <CalendarToday sx={{ color: theme.palette.primary.main }} />
+        </Avatar>
 
-      {/* P&L */}
-      <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-        <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.5}>
-          {isPositive ? (
-            <TrendingUp sx={{ fontSize: 16, color: 'success.main' }} />
-          ) : (
-            <TrendingDown sx={{ fontSize: 16, color: 'error.main' }} />
-          )}
+        {/* Calendar Info */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography
             variant="subtitle2"
             sx={{
               fontWeight: 600,
-              color: isPositive ? 'success.main' : 'error.main'
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              mb: 0.25
             }}
           >
-            {formatCurrency(pnl)}
+            {calendar.name}
           </Typography>
-        </Stack>
-        <Typography variant="caption" color="text.secondary">
-          {safeFormatDate(calendar.updated_at, 'MMM d, yyyy')}
-        </Typography>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Typography variant="caption" color="text.secondary">
+              {totalTrades} trades
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {winRate.toFixed(1)}% win
+            </Typography>
+            {isTrash && calendar.deleted_at && (
+              <Typography variant="caption" color="error.main">
+                Deleted {safeFormatDate(calendar.deleted_at, 'MMM d')}
+              </Typography>
+            )}
+          </Stack>
+        </Box>
+
+        {/* P&L */}
+        <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+          <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.5}>
+            {isPositive ? (
+              <TrendingUp sx={{ fontSize: 16, color: 'success.main' }} />
+            ) : (
+              <TrendingDown sx={{ fontSize: 16, color: 'error.main' }} />
+            )}
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 600,
+                color: isPositive ? 'success.main' : 'error.main'
+              }}
+            >
+              {formatCurrency(pnl)}
+            </Typography>
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            {safeFormatDate(calendar.updated_at, 'MMM d, yyyy')}
+          </Typography>
+        </Box>
+
+        {/* Actions */}
+        {!isTrash && (
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0 }}>
+            {onToggleExpand && (
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand();
+                }}
+                sx={{ color: 'text.secondary' }}
+              >
+                {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+              </IconButton>
+            )}
+            {onUpdateCalendarProperty && (
+              <ShareButton
+                type="calendar"
+                item={calendar}
+                onUpdateItemProperty={onUpdateCalendarProperty}
+                size="small"
+              />
+            )}
+            <IconButton
+              size="small"
+              onClick={handleMenuClick}
+              sx={{ color: 'text.secondary' }}
+            >
+              <MoreVertIcon fontSize="small" />
+            </IconButton>
+            <Menu
+              anchorEl={menuAnchorEl}
+              open={menuOpen}
+              onClose={() => handleMenuClose()}
+              onClick={(e) => e.stopPropagation()}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              <MenuItem onClick={handleEdit}>
+                <ListItemIcon>
+                  <EditIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Edit</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={handleDuplicate}>
+                <ListItemIcon>
+                  <DuplicateIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Duplicate</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
+                <ListItemIcon>
+                  <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+                </ListItemIcon>
+                <ListItemText>Delete</ListItemText>
+              </MenuItem>
+            </Menu>
+          </Stack>
+        )}
       </Box>
 
-      {/* Actions */}
-      {!isTrash && (
-        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0 }}>
-          {onUpdateCalendarProperty && (
-            <ShareButton
-              type="calendar"
-              item={calendar}
-              onUpdateItemProperty={onUpdateCalendarProperty}
-              size="small"
-            />
-          )}
-          <IconButton
-            size="small"
-            onClick={handleMenuClick}
-            sx={{ color: 'text.secondary' }}
-          >
-            <MoreVertIcon fontSize="small" />
-          </IconButton>
-          <Menu
-            anchorEl={menuAnchorEl}
-            open={menuOpen}
-            onClose={() => handleMenuClose()}
-            onClick={(e) => e.stopPropagation()}
-            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-          >
-            <MenuItem onClick={handleEdit}>
-              <ListItemIcon>
-                <EditIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Edit</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={handleDuplicate}>
-              <ListItemIcon>
-                <DuplicateIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Duplicate</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
-              <ListItemIcon>
-                <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
-              </ListItemIcon>
-              <ListItemText>Delete</ListItemText>
-            </MenuItem>
-          </Menu>
-        </Stack>
+      {/* Expanded Content */}
+      {isExpanded && !isTrash && (
+        <Box sx={{ px: 1.5, pb: 1.5 }}>
+          <Divider sx={{ mb: 1.5, opacity: 0.6 }} />
+          <Stack spacing={1.5}>
+            {/* Initial Balance and Win Rate */}
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: 1.5
+            }}>
+              <Box sx={{
+                p: 1.5,
+                borderRadius: 1,
+                bgcolor: alpha(theme.palette.background.default, 0.6)
+              }}>
+                <Typography variant="caption" color="text.secondary" gutterBottom>
+                  Initial Balance
+                </Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  {formatCurrency(calendar.account_balance || 0)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Current: {formatCurrency((calendar.account_balance || 0) + pnl)}
+                </Typography>
+              </Box>
+
+              <Box sx={{
+                p: 1.5,
+                borderRadius: 1,
+                bgcolor: alpha(theme.palette.background.default, 0.6)
+              }}>
+                <Typography variant="caption" color="text.secondary" gutterBottom>
+                  Win Rate
+                </Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  {winRate.toFixed(1)}%
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {calendar.win_count || 0}W - {calendar.loss_count || 0}L
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Profit Factor and Max Drawdown */}
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: 1.5
+            }}>
+              <Box sx={{
+                p: 1.5,
+                borderRadius: 1,
+                bgcolor: alpha(theme.palette.background.default, 0.6)
+              }}>
+                <Typography variant="caption" color="text.secondary" gutterBottom>
+                  Profit Factor
+                </Typography>
+                <Tooltip
+                  title={
+                    <Box sx={{ p: 1, maxWidth: 300 }}>
+                      <Typography variant="caption" gutterBottom>
+                        Profit Factor is the ratio of gross profit to gross loss. A value greater than 1 indicates profitable trading.
+                      </Typography>
+                      <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
+                        • Value &gt; 3: Excellent
+                      </Typography>
+                      <Typography variant="caption" sx={{ display: 'block' }}>
+                        • Value 2-3: Very Good
+                      </Typography>
+                      <Typography variant="caption" sx={{ display: 'block' }}>
+                        • Value 1.5-2: Good
+                      </Typography>
+                      <Typography variant="caption" sx={{ display: 'block' }}>
+                        • Value 1-1.5: Marginal
+                      </Typography>
+                      <Typography variant="caption" sx={{ display: 'block' }}>
+                        • Value &lt; 1: Unprofitable
+                      </Typography>
+                    </Box>
+                  }
+                  arrow
+                  placement="top"
+                >
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, cursor: 'help', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <InfoOutlined sx={{ fontSize: '0.875rem' }} />
+                    {(calendar.profit_factor || 0).toFixed(2)}
+                  </Typography>
+                </Tooltip>
+                <Typography variant="caption" color="text.secondary">
+                  Avg Win: {formatCurrency(calendar.avg_win || 0)}
+                </Typography>
+              </Box>
+
+              <Box sx={{
+                p: 1.5,
+                borderRadius: 1,
+                bgcolor: alpha(theme.palette.background.default, 0.6)
+              }}>
+                <Typography variant="caption" color="text.secondary" gutterBottom>
+                  Max Drawdown
+                </Typography>
+                <Tooltip
+                  title={
+                    <Box sx={{ p: 1, maxWidth: 300 }}>
+                      <Typography variant="caption" gutterBottom>
+                        Maximum drawdown represents the largest peak-to-trough decline in your account balance.
+                      </Typography>
+                      {(calendar.max_drawdown || 0) > 0 && (
+                        <>
+                          <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
+                            Recovery needed: {(calendar.drawdown_recovery_needed || 0).toFixed(1)}%
+                          </Typography>
+                          <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
+                            Duration: {calendar.drawdown_duration || 0} days
+                          </Typography>
+                          {calendar.drawdown_start_date && calendar.drawdown_end_date && (
+                            <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
+                              Period: {safeFormatDate(calendar.drawdown_start_date, 'MMM d')} - {safeFormatDate(calendar.drawdown_end_date, 'MMM d')}
+                            </Typography>
+                          )}
+                        </>
+                      )}
+                    </Box>
+                  }
+                  arrow
+                  placement="top"
+                >
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, cursor: 'help', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <InfoOutlined sx={{ fontSize: '0.875rem' }} />
+                    {(calendar.max_drawdown || 0).toFixed(1)}%
+                  </Typography>
+                </Tooltip>
+                <Typography variant="caption" color="text.secondary">
+                  Avg Loss: {formatCurrency(calendar.avg_loss || 0)}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Target Progress Section */}
+            {(calendar.weekly_target || calendar.monthly_target) && (
+              <Box sx={{
+                p: 1.5,
+                borderRadius: 1,
+                bgcolor: alpha(theme.palette.background.default, 0.6)
+              }}>
+                <Typography variant="caption" color="text.secondary" gutterBottom>
+                  Target Progress
+                </Typography>
+                <Box sx={{
+                  display: 'grid',
+                  gridTemplateColumns: calendar.weekly_target && calendar.monthly_target
+                    ? 'repeat(2, 1fr)'
+                    : '1fr',
+                  gap: 1.5
+                }}>
+                  {calendar.weekly_target && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Weekly
+                      </Typography>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        {Math.min(calendar.weekly_progress ?? 0, 100).toFixed(1)}%
+                      </Typography>
+                    </Box>
+                  )}
+                  {calendar.monthly_target && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Monthly
+                      </Typography>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        {Math.min(calendar.monthly_progress ?? 0, 100).toFixed(1)}%
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            )}
+
+            {/* PnL Performance Section */}
+            <Box sx={{
+              p: 1.5,
+              borderRadius: 1,
+              bgcolor: alpha(theme.palette.background.default, 0.6)
+            }}>
+              <Typography variant="caption" color="text.secondary" gutterBottom>
+                PnL Performance
+              </Typography>
+              <Box sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 1.5
+              }}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Weekly
+                  </Typography>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{
+                      fontWeight: 600,
+                      color: parseFloat(String(calendar.weekly_pnl_percentage || 0)) > 0
+                        ? 'success.main'
+                        : parseFloat(String(calendar.weekly_pnl_percentage || 0)) < 0
+                          ? 'error.main'
+                          : 'text.primary'
+                    }}
+                  >
+                    {parseFloat(String(calendar.weekly_pnl_percentage || 0)) > 0 ? '+' : ''}{parseFloat(String(calendar.weekly_pnl_percentage || 0)).toFixed(1)}%
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Monthly
+                  </Typography>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{
+                      fontWeight: 600,
+                      color: parseFloat(String(calendar.monthly_pnl_percentage || 0)) > 0
+                        ? 'success.main'
+                        : parseFloat(String(calendar.monthly_pnl_percentage || 0)) < 0
+                          ? 'error.main'
+                          : 'text.primary'
+                    }}
+                  >
+                    {parseFloat(String(calendar.monthly_pnl_percentage || 0)) > 0 ? '+' : ''}{parseFloat(String(calendar.monthly_pnl_percentage || 0)).toFixed(1)}%
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Yearly
+                  </Typography>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{
+                      fontWeight: 600,
+                      color: parseFloat(String(calendar.yearly_pnl_percentage || 0)) > 0
+                        ? 'success.main'
+                        : parseFloat(String(calendar.yearly_pnl_percentage || 0)) < 0
+                          ? 'error.main'
+                          : 'text.primary'
+                    }}
+                  >
+                    {parseFloat(String(calendar.yearly_pnl_percentage || 0)) > 0 ? '+' : ''}{parseFloat(String(calendar.yearly_pnl_percentage || 0)).toFixed(1)}%
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Stack>
+        </Box>
       )}
     </Box>
   );
@@ -285,6 +565,7 @@ const CalendarListDialog: React.FC<CalendarListDialogProps> = ({
 }) => {
   const theme = useTheme();
   const { user } = useAuth();
+  const [expandedCalendarIds, setExpandedCalendarIds] = useState<Set<string>>(new Set());
 
   // Fetch fresh data when dialog opens
   const {
@@ -318,6 +599,18 @@ const CalendarListDialog: React.FC<CalendarListDialogProps> = ({
   const handleCalendarClick = (calendarId: string) => {
     onCalendarClick(calendarId);
     onClose();
+  };
+
+  const handleToggleExpand = (calendarId: string) => {
+    setExpandedCalendarIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(calendarId)) {
+        newSet.delete(calendarId);
+      } else {
+        newSet.add(calendarId);
+      }
+      return newSet;
+    });
   };
 
   return (
@@ -448,6 +741,7 @@ const CalendarListDialog: React.FC<CalendarListDialogProps> = ({
               maxHeight: '60vh',
               overflowY: 'auto',
               overflowX: 'hidden',
+              p:1,
               ...scrollbarStyles(theme)
             }}
           >
@@ -456,6 +750,8 @@ const CalendarListDialog: React.FC<CalendarListDialogProps> = ({
                 key={calendar.id}
                 calendar={calendar}
                 isTrash={isTrash}
+                isExpanded={expandedCalendarIds.has(calendar.id)}
+                onToggleExpand={() => handleToggleExpand(calendar.id)}
                 onClick={() => handleCalendarClick(calendar.id)}
                 onEdit={() => onEditCalendar?.(calendar)}
                 onDuplicate={() => onDuplicateCalendar?.(calendar)}

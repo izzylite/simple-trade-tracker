@@ -11,12 +11,10 @@ import {
     Card,
     CardContent,
     IconButton,
-    Divider,
     Chip,
 } from '@mui/material';
 import {
     TrendingUp,
-    SmartToy,
     CalendarMonth,
     BarChart,
     ArrowForward,
@@ -136,66 +134,8 @@ const LandingPage: React.FC = () => {
             <AnimatedBackground />
 
             <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
-                {/* Navigation */}
-                <Box sx={{
-                    py: 3,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    animation: 'fadeInDown 0.8s ease-out',
-                    '@keyframes fadeInDown': {
-                        from: { opacity: 0, transform: 'translateY(-20px)' },
-                        to: { opacity: 1, transform: 'translateY(0)' }
-                    }
-                }}>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Box
-                            sx={{
-                                width: 44,
-                                height: 44,
-                                borderRadius: 1.5,
-                                bgcolor: 'primary.main',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'white',
-                                boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
-                            }}
-                        >
-                            <TrendingUp sx={{ fontSize: 28 }} />
-                        </Box>
-                        <Typography variant="h5" sx={{ fontWeight: 900, letterSpacing: -1, fontSize: '1.75rem' }}>
-                            JournoTrades
-                        </Typography>
-                    </Stack>
-                    <Stack direction="row" spacing={2} alignItems="center">
-                        <Button
-                            variant="text"
-                            onClick={() => navigate('/about')}
-                            sx={{ fontWeight: 600, px: 2, display: { xs: 'none', sm: 'inline-flex' } }}
-                        >
-                            Features
-                        </Button>
-                        <Button
-                            variant="contained"
-                            onClick={() => navigate('/dashboard')}
-                            sx={{
-                                borderRadius: 2.5,
-                                px: 4,
-                                py: 1.2,
-                                fontWeight: 700,
-                                fontSize: '0.95rem',
-                                boxShadow: `0 8px 20px ${alpha(theme.palette.primary.main, 0.3)}`,
-                                '&:hover': {
-                                    transform: 'translateY(-2px)',
-                                    boxShadow: `0 12px 28px ${alpha(theme.palette.primary.main, 0.4)}`,
-                                }
-                            }}
-                        >
-                            Dashboard
-                        </Button>
-                    </Stack>
-                </Box>
+                {/* Navigation - Minimal empty space */}
+                <Box sx={{ py: 3 }} />
 
                 {/* Hero Section */}
                 <Box sx={{ pt: { xs: 8, md: 12 }, textAlign: 'center' }}>
@@ -272,7 +212,7 @@ const LandingPage: React.FC = () => {
                             variant="contained"
                             size="large"
                             endIcon={<ArrowForward />}
-                            onClick={handleGetStarted}
+                            onClick={() => navigate('/dashboard')}
                             sx={{
                                 height: 64,
                                 px: 5,
@@ -282,7 +222,7 @@ const LandingPage: React.FC = () => {
                                 boxShadow: `0 12px 30px ${alpha(theme.palette.primary.main, 0.4)}`,
                             }}
                         >
-                            Get Started for Free
+                            Dashboard
                         </Button>
                         <Button
                             variant="outlined"
