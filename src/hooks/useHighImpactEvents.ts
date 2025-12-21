@@ -146,7 +146,8 @@ export const useHighImpactEvents = ({
         const events = await economicCalendarService.fetchEvents(dateRange, {
           currencies,
           impacts: ['High'] as ImpactLevel[], // Only high-impact events for red dots
-          onlyUpcoming: false // Include all events for the month, not just upcoming
+          onlyUpcoming: false, // Include all events for the month, not just upcoming
+          limit: 500  // Reasonable limit for a full month of high-impact events
         });
 
         // Create a map of dates that have high-impact events

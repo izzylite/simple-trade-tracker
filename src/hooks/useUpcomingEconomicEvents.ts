@@ -61,18 +61,15 @@ export function useUpcomingEconomicEvents(
             end: today
           },
           {
-            impacts
+            impacts,
+            onlyUpcoming: true,  // Filter at database level for efficiency
+            limit: 50  // Reasonable limit for single day's upcoming events
           }
         );
 
-        // Filter to show only unreleased events (future events that haven't happened yet)
-        const currentTime = now.getTime();
-        const upcomingEvents = events.filter(event =>
-          new Date(event.time_utc).getTime() > currentTime
-        );
-
-        // Sort in ascending order (soonest unreleased event first)
-        const sortedEvents = upcomingEvents.sort((a, b) =>
+        // Sort in ascending order (soonest upcoming event first)
+        // Database already filtered to upcoming events via onlyUpcoming
+        const sortedEvents = events.sort((a, b) =>
           new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime()
         );
 

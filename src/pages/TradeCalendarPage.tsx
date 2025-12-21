@@ -131,42 +131,28 @@ interface TradeCalendarProps {
 
 interface WeeklyPnLProps {
   trade_date: Date;
-  trades: Trade[];
-  monthStart: Date;
   weekIndex: number;
-  currentMonth: number;
-  accountBalance: number;
   weeklyTarget?: number;
   sx?: SxProps<Theme>;
+  // Pre-calculated stats
+  weekStats: {
+    weekTrades: Trade[];
+    netAmount: number;
+    percentage: string;
+    targetProgressValue: number;
+  };
 }
 
 
 
 
 
-const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({ trade_date, trades, monthStart, weekIndex, currentMonth, accountBalance, weeklyTarget, sx }) => {
+const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({ trade_date, weekIndex, weeklyTarget, sx, weekStats }) => {
   const theme = useTheme();
-  const weekStart = startOfWeek(trade_date, { weekStartsOn: 0 });
 
-  const weekTrades = useMemo(() => trades.filter(trade =>
-    isSameWeek(new Date(trade.trade_date), weekStart, { weekStartsOn: 0 }) &&
-    new Date(trade.trade_date).getMonth() === currentMonth
-  ), [trades, weekStart, currentMonth]);
+  // Use pre-calculated stats
+  const { weekTrades, netAmount, percentage, targetProgressValue } = weekStats;
 
-
-  // Calculate net amount for the week
-  const netAmount = useMemo(() => weekTrades.reduce((sum, trade) => sum + trade.amount, 0), [weekTrades]);
-
-  // Calculate percentage loss/gain relative to account value at start of week (excluding current week trades)
-  const percentage = useMemo(() => trades
-    ? calculatePercentageOfValueAtDate(netAmount, accountBalance, trades, weekStart).toFixed(1)
-    : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0', [trades, netAmount, accountBalance, weekStart]);
-
-
-  // Calculate target progress using centralized function
-  const targetProgressValue = useMemo(() => weeklyTarget && weeklyTarget > 0
-    ? calculateTargetProgress(weekTrades, accountBalance, weeklyTarget, weekStart, trades)
-    : 0, [weeklyTarget, weekTrades, accountBalance, weekStart, trades]);
   const targetProgress = targetProgressValue.toFixed(0);
   const isTargetMet = weeklyTarget ? parseFloat(percentage) >= weeklyTarget : false;
 
@@ -283,7 +269,7 @@ interface TagFilterProps {
   onOpenDrawer: () => void;
 }
 
-const TagFilter: React.FC<TagFilterProps> = ({ allTags, selectedTags, onTagsChange, onOpenDrawer }) => {
+const TagFilter = React.memo<TagFilterProps>(({ allTags, selectedTags, onTagsChange, onOpenDrawer }) => {
   const theme = useTheme();
 
   const handleClearTags = () => {
@@ -353,43 +339,29 @@ const TagFilter: React.FC<TagFilterProps> = ({ allTags, selectedTags, onTagsChan
       )}
     </Box>
   );
-};
+});
 
 interface CalendarDayCellProps {
   day: Date;
   dayTrades: Trade[];
-  accountBalance: number;
-  maxDailyDrawdown?: number;
-  dynamicRiskSettings: DynamicRiskSettings;
-  allTrades: Trade[];
   currentDate: Date;
   monthlyHighImpactEvents: Map<string, boolean>;
   onDayClick: (day: Date) => void;
   isMdDown: boolean;
+  // Pre-calculated stats
+  dayStats: ReturnType<typeof calculateDayStats>;
 }
 
 const CalendarDayCell = React.memo(({
   day,
   dayTrades,
-  accountBalance,
-  maxDailyDrawdown,
-  dynamicRiskSettings,
-  allTrades,
   currentDate,
   monthlyHighImpactEvents,
   onDayClick,
-  isMdDown
+  isMdDown,
+  dayStats
 }: CalendarDayCellProps) => {
   const theme = useTheme();
-
-  const dayStats = useMemo(() => calculateDayStats(
-    dayTrades,
-    accountBalance,
-    maxDailyDrawdown || 0,
-    dynamicRiskSettings,
-    allTrades,
-    day
-  ), [dayTrades, accountBalance, maxDailyDrawdown, dynamicRiskSettings, allTrades, day]);
 
   const isCurrentMonth = isSameMonth(day, currentDate);
   const isCurrentDay = isToday(day);
@@ -514,7 +486,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       showSnackbar(notification.message, notification.type === 'success' ? 'success' : 'error');
       clearNotification();
     }
-  }, [notification]);
+  }, [notification, clearNotification]);
 
   // Use hook calendar if available, otherwise fall back to selectedCalendar
   const calendar = hookCalendar || selectedCalendar;
@@ -533,13 +505,19 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const scoreSettings = calendar.score_settings;
   const totalPnL = calendar.total_pnl;
 
-  const dynamicRiskSettings: DynamicRiskSettings = {
+  const dynamicRiskSettings: DynamicRiskSettings = useMemo(() => ({
     account_balance: calendar.account_balance,
     risk_per_trade: calendar.risk_per_trade,
     dynamic_risk_enabled: calendar.dynamic_risk_enabled,
     increased_risk_percentage: calendar.increased_risk_percentage,
     profit_threshold_percentage: calendar.profit_threshold_percentage
-  };
+  }), [
+    calendar.account_balance,
+    calendar.risk_per_trade,
+    calendar.dynamic_risk_enabled,
+    calendar.increased_risk_percentage,
+    calendar.profit_threshold_percentage
+  ]);
 
 
 
@@ -660,14 +638,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Determine which hero image to display
   const displayHeroImageUrl = reminderImageOverride || heroImageUrl;
 
-  const breadcrumbButtons: BreadcrumbButton[] = [
+  const breadcrumbButtons = useMemo<BreadcrumbButton[]>(() => [
     ...((!isReadOnly) ? [{
       key: 'image',
       icon: <ImageIcon fontSize="small" />,
       onClick: () => setIsImagePickerOpen(true),
       tooltip: heroImageUrl ? 'Change cover image' : 'Add cover image'
     }] : [])
-  ];
+  ], [isReadOnly, heroImageUrl]);
 
   const breadcrumbRightContent = (!isReadOnly && calendar && onUpdateCalendarProperty) ? (
     <ShareButton type="calendar" item={calendar} onUpdateItemProperty={onUpdateCalendarProperty} size="small" />
@@ -678,11 +656,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
 
   // Breadcrumb items
-  const breadcrumbItems: BreadcrumbItem[] = [
+  const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => [
     { label: 'Home', path: '/', icon: <HomeIcon sx={{ fontSize: 18 }} /> },
     { label: 'Calendars', path: '/dashboard', icon: <CalendarIcon sx={{ fontSize: 18 }} /> },
     { label: calendarName || 'Calendar', path: `/calendar/${calendarId}` }
-  ];
+  ], [calendarName, calendarId]);
 
   // Use optimized hook for high-impact economic events
   const { highImpactEventDates: monthlyHighImpactEvents } = useHighImpactEvents({
@@ -832,19 +810,27 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     setIsAIChatOpen(true);
   }, []);
 
-  // Scroll detection for floating month navigation
+  // Scroll detection for floating month navigation with throttling
   useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      // Find the score section element
-      const section = document.querySelector('[data-testid="month-nav-section"]');
-      if (section) {
-        const rect = section.getBoundingClientRect();
-        // Show floating nav when section is NOT visible (top of element is NOT viewport)
-        setShowFloatingMonthNav((rect.top <= window.innerHeight && rect.bottom >= 0) === false ? true : false);
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          // Find the score section element
+          const section = document.querySelector('[data-testid="month-nav-section"]');
+          if (section) {
+            const rect = section.getBoundingClientRect();
+            // Show floating nav when section is NOT visible
+            setShowFloatingMonthNav(!(rect.top <= window.innerHeight && rect.bottom >= 0));
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll(); // Check initial state
 
     return () => window.removeEventListener('scroll', handleScroll);
@@ -915,18 +901,80 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   }, [filteredTrades, selectedTags, totalPnL]);
 
 
-  const calendarDays = useMemo(() => {
-    const days: Date[] = [];
-    const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+  // Pre-calculate day statistics for all days in the current month
+  // This prevents expensive recalculations in CalendarDayCell components
+  const dayStatsMap = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof calculateDayStats>>();
 
-    for (let day = firstDay; day <= lastDay; day.setDate(day.getDate() + 1)) {
-      days.push(new Date(day));
-    }
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-    return days;
-  }, [currentDate]);
+    days.forEach(day => {
+      const dayKey = format(day, 'yyyy-MM-dd');
+      const dayTrades = tradesByDay.get(dayKey) || [];
 
+      const dayStats = calculateDayStats(
+        dayTrades,
+        accountBalance,
+        maxDailyDrawdown || 0,
+        dynamicRiskSettings,
+        filteredTrades,
+        day
+      );
+
+      map.set(dayKey, dayStats);
+    });
+
+    return map;
+  }, [currentDate, tradesByDay, accountBalance, maxDailyDrawdown, dynamicRiskSettings, filteredTrades]);
+
+  // Pre-calculate weekly statistics for all weeks in the current month
+  // This prevents expensive recalculations in WeeklyPnL components
+  const weeklyStatsMap = useMemo(() => {
+    const map = new Map<string, {
+      weekTrades: Trade[];
+      netAmount: number;
+      percentage: string;
+      targetProgressValue: number;
+    }>();
+
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const weeks = eachWeekOfInterval({ start: monthStart, end: monthEnd }, { weekStartsOn: 0 });
+
+    weeks.forEach(weekStart => {
+      const weekKey = format(weekStart, 'yyyy-MM-dd');
+
+      // Filter trades for this week
+      const weekTrades = filteredTrades.filter(trade =>
+        isSameWeek(new Date(trade.trade_date), weekStart, { weekStartsOn: 0 }) &&
+        new Date(trade.trade_date).getMonth() === currentDate.getMonth()
+      );
+
+      // Calculate net amount for the week
+      const netAmount = weekTrades.reduce((sum, trade) => sum + trade.amount, 0);
+
+      // Calculate percentage - use the centralized function
+      const percentage = filteredTrades
+        ? calculatePercentageOfValueAtDate(netAmount, accountBalance, filteredTrades, weekStart).toFixed(1)
+        : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0';
+
+      // Calculate target progress
+      const targetProgressValue = weeklyTarget && weeklyTarget > 0
+        ? calculateTargetProgress(weekTrades, accountBalance, weeklyTarget, weekStart, filteredTrades)
+        : 0;
+
+      map.set(weekKey, {
+        weekTrades,
+        netAmount,
+        percentage,
+        targetProgressValue
+      });
+    });
+
+    return map;
+  }, [currentDate, filteredTrades, accountBalance, weeklyTarget]);
 
   const handlePrevMonth = () => {
     setCurrentDate(prev => subMonths(prev, 1));
@@ -1650,32 +1698,38 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                       const dateKey = format(day, 'yyyy-MM-dd');
                       const dayTrades = tradesByDay.get(dateKey) || [];
 
+                      const dayStats = dayStatsMap.get(dateKey) ?? {
+                        netAmount: 0,
+                        percentage: '0',
+                        status: 'none' as DayStatus,
+                        isDrawdownViolation: false
+                      };
+
                       return (
                         <CalendarDayCell
                           key={day.toISOString()}
                           day={day}
                           dayTrades={dayTrades}
-                          accountBalance={accountBalance}
-                          maxDailyDrawdown={maxDailyDrawdown}
-                          dynamicRiskSettings={dynamicRiskSettings}
-                          allTrades={filteredTrades}
                           currentDate={currentDate}
                           monthlyHighImpactEvents={monthlyHighImpactEvents}
                           onDayClick={handleDayClick}
                           isMdDown={isMdDown}
+                          dayStats={dayStats}
                         />
                       );
                     })}
 
                     <WeeklyPnL
                       trade_date={weekStart}
-                      trades={filteredTrades}
-                      monthStart={startOfMonth(currentDate)}
                       weekIndex={index}
-                      currentMonth={currentDate.getMonth()}
-                      accountBalance={accountBalance}
                       weeklyTarget={weeklyTarget}
                       sx={{ display: { xs: 'none', sm: 'flex' } }}
+                      weekStats={weeklyStatsMap.get(format(weekStart, 'yyyy-MM-dd')) ?? {
+                        weekTrades: [],
+                        netAmount: 0,
+                        percentage: '0',
+                        targetProgressValue: 0
+                      }}
                     />
 
                   </React.Fragment>

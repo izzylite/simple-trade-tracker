@@ -194,7 +194,8 @@ export class TradeEconomicEventService {
       // Fetch only high and medium impact events for the relevant currencies
       const events = await economicCalendarService.fetchEvents(dateRange, {
         currencies: targetCurrencies,
-        impacts: ['High', 'Medium'] as ImpactLevel[]
+        impacts: ['High', 'Medium'] as ImpactLevel[],
+        limit: 100  // Reasonable limit for session range
       });
 
       // Filter events that fall within the trade session

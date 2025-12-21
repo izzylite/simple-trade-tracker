@@ -215,14 +215,12 @@ class EconomicEventWatcher {
 
       const todaysEvents = await economicCalendarService.fetchEventsPaginated(
         dateRange,
-        { pageSize: 50 }, // Might not actually be 50. Depending on the events for the day
+        { pageSize: 50 },
         { currencies, impacts, onlyUpcoming: true },
       );
 
-      // Filter and sort upcoming events
-      const currentDate = new Date();
+      // Sort upcoming events (already filtered by database via onlyUpcoming)
       const upcomingEvents = todaysEvents.events
-        .filter(event => new Date(event.time_utc) > currentDate)
         .sort((a, b) => new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime());
 
       // Store in memory queue

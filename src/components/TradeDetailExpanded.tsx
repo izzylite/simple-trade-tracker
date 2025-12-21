@@ -255,7 +255,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
         { start: sessionRange.start, end: sessionRange.end },
         {
           currencies: (filterSetting?.currencies as Currency[]),
-          impacts: (filterSetting?.impacts as ImpactLevel[])
+          impacts: (filterSetting?.impacts as ImpactLevel[]),
+          limit: 100  // Reasonable limit for session range
         }
       );
 
@@ -333,7 +334,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
               end: tradeDateStr
             }, {
               currencies: (filterSetting?.currencies as Currency[]),
-              impacts: (filterSetting?.impacts as ImpactLevel[])
+              impacts: (filterSetting?.impacts as ImpactLevel[]),
+              limit: 100  // Reasonable limit for single day
             });
             setAllEconomicEvents(updatedEvents.sort((a, b) =>
               new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime()

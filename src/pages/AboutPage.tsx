@@ -276,7 +276,7 @@ const AboutPage: React.FC = () => {
             delay={0.6}
           >
             <Typography variant="body1" sx={paragraphSx}>
-              Your trading data is stored securely in your own Supabase database. We prioritize your privacy and data ownership.
+              Your trading data is stored securely. We prioritize your privacy and data ownership.
             </Typography>
             <Typography variant="body1" sx={paragraphSx}>
               We do not have access to your brokerage accounts or funds. This is a journaling tool, not a trading execution platform.

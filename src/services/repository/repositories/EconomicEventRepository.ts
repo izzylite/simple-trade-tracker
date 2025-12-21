@@ -163,8 +163,8 @@ export class EconomicEventRepository {
     try {
       logger.log('🔄 Fetching all events from database:', dateRange, filters);
 
-      // Use limit from filters if provided, otherwise use large page size
-      const pageSize = filters?.limit || 1000;
+      // Use limit from filters if provided, otherwise use reasonable default
+      const pageSize = filters?.limit || 200;
 
       // Use paginated method with configured page size
       const result = await this.fetchEventsPaginated(dateRange, { pageSize }, filters);

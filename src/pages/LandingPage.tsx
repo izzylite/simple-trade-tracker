@@ -20,7 +20,7 @@ import {
     ArrowForward,
     CheckCircleOutline,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/SupabaseAuthContext';
 import AnimatedBackground from '../components/common/AnimatedBackground';
 import LoginDialog from '../components/auth/LoginDialog';
@@ -97,6 +97,7 @@ const heroImages = [
 const LandingPage: React.FC = () => {
     const theme = useTheme();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { user } = useAuth();
     const [currentSlide, setCurrentSlide] = useState(0);
     const [showLoginDialog, setShowLoginDialog] = useState(false);
@@ -108,6 +109,18 @@ const LandingPage: React.FC = () => {
     const goToSlide = useCallback((index: number) => {
         setCurrentSlide(index);
     }, []);
+
+    // Redirect password reset errors to reset-password page
+    useEffect(() => {
+        const errorCode = searchParams.get('error_code');
+        const errorParam = searchParams.get('error');
+
+        // If we have password reset errors, redirect to reset-password page with params
+        if (errorCode === 'otp_expired' || errorParam === 'access_denied') {
+            const params = new URLSearchParams(searchParams);
+            navigate(`/auth/reset-password?${params.toString()}`, { replace: true });
+        }
+    }, [searchParams, navigate]);
 
     // Auto-advance slides
     useEffect(() => {
