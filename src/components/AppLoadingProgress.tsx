@@ -295,7 +295,7 @@ const AppLoadingProgress: React.FC = () => {
         <Typography
           variant="body1"
           sx={{
-            mb: 5,
+            mb: 2,
             color: colors.text.secondary,
             textAlign: 'center',
             fontSize: { xs: '0.875rem', sm: '1rem' },
@@ -375,21 +375,7 @@ const AppLoadingProgress: React.FC = () => {
             />
           </Box>
 
-          {/* Progress percentage */}
-          <Typography
-            variant="caption"
-            sx={{
-              position: 'absolute',
-              top: '50%',
-              right: -40,
-              transform: 'translateY(-50%)',
-              color: colors.text.secondary,
-              fontWeight: 600,
-              fontSize: '0.8125rem',
-            }}
-          >
-            {Math.round(progress)}%
-          </Typography>
+       
         </Box>
       </Box>
     </Box>
