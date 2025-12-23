@@ -3,7 +3,7 @@
  * Provides authentication state and methods using Supabase Auth
  */
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { supabaseAuthService, type SupabaseUser, type AuthState } from '../services/supabaseAuthService';
 import { logger } from '../utils/logger';
 
@@ -130,7 +130,7 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  const value: SupabaseAuthContextType = {
+  const value: SupabaseAuthContextType = useMemo(() => ({
     user: authState.user,
     loading: authState.loading,
     signInWithGoogle,
@@ -143,7 +143,7 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     getAccessToken,
     refreshSession,
     ensureValidSession,
-  };
+  }), [authState.user, authState.loading]);
 
   return (
     <SupabaseAuthContext.Provider value={value}>

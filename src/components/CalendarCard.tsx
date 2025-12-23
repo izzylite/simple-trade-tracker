@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -68,19 +68,19 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
   const theme = useTheme();
   const [menuAnchorEl, setMenuAnchorEl] = React.useState<HTMLElement | null>(null);
 
-  const handleMenuClick = (e: React.MouseEvent<HTMLElement>) => {
+  const handleMenuClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
     setMenuAnchorEl(e.currentTarget);
-  };
+  }, []);
 
-  const handleMenuClose = () => {
+  const handleMenuClose = useCallback(() => {
     setMenuAnchorEl(null);
-  };
+  }, []);
 
-  const handleMenuItemClick = (action: () => void) => {
+  const handleMenuItemClick = useCallback((action: () => void) => {
     handleMenuClose();
     action();
-  };
+  }, [handleMenuClose]);
 
   function renderAccountGrowth(
     stats: CalendarStats,
@@ -481,4 +481,4 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
   );
 };
 
-export default CalendarCard;
+export default React.memo(CalendarCard);

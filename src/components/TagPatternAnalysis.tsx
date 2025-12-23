@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -41,11 +41,30 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
   settings
 }) => {
   const theme = useTheme();
+  const [analysis, setAnalysis] = useState<Awaited<ReturnType<typeof tagPatternService.analyzeTagPatterns>> | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Calculate tag pattern analysis
-  const analysis = useMemo(() => {
-    if (trades.length < 10) return null;
-    return tagPatternService.analyzeTagPatterns(trades, selectedDate, settings);
+  // Calculate tag pattern analysis using async worker
+  useEffect(() => {
+    const calculateAnalysis = async () => {
+      if (trades.length < 10) {
+        setAnalysis(null);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const result = await tagPatternService.analyzeTagPatterns(trades, selectedDate, settings);
+        setAnalysis(result);
+      } catch (error) {
+        console.error('Error analyzing tag patterns:', error);
+        setAnalysis(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    calculateAnalysis();
   }, [trades, selectedDate, settings]);
 
   const getInsightIcon = (type: TagPatternInsight['type']) => {
@@ -83,6 +102,32 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
   const formatWinRate = (win_rate: number) => {
     return `${win_rate.toFixed(1)}%`;
   };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <Card
+        sx={{
+          borderRadius: 3,
+          boxShadow: 'none',
+          border: `1px solid ${theme.palette.divider}`,
+          mb: 3
+        }}
+      >
+        <CardContent>
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+            🔍 Tag Pattern Analysis
+          </Typography>
+          <Box sx={{ mt: 2 }}>
+            <LinearProgress />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Analyzing tag patterns with Web Worker...
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!analysis || trades.length < 10) {
     return (

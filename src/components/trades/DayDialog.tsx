@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -75,51 +75,51 @@ const DayDialog: React.FC<DayDialogProps> = ({
   
  
 
-  // Handlers
-  const handlePrevDay = () => {
+  // Handlers - wrapped in useCallback to prevent child re-renders
+  const handlePrevDay = useCallback(() => {
     const prevDay = new Date(date);
     prevDay.setDate(prevDay.getDate() - 1);
     onDateChange(prevDay);
-  };
-  
-  const handleNextDay = () => {
+  }, [date, onDateChange]);
+
+  const handleNextDay = useCallback(() => {
     const nextDay = startOfNextDay(date);
     // Don't allow navigating to future dates
     if (!isAfter(nextDay, startOfDay(new Date()))) {
       onDateChange(nextDay);
     }
-  };
+  }, [date, onDateChange]);
 
-  const handleTradeClick = (tradeId: string) => {
-    setExpandedTradeId(expandedTradeId === tradeId ? null : tradeId);
-  };
+  const handleTradeClick = useCallback((tradeId: string) => {
+    setExpandedTradeId(prev => prev === tradeId ? null : tradeId);
+  }, []);
 
-  const handleAddClick = async () => {
+  const handleAddClick = useCallback(async () => {
     showAddForm(null);
-  };
- 
+  }, [showAddForm]);
 
 
-  const handleEditClick = (trade: Trade) => {
+
+  const handleEditClick = useCallback((trade: Trade) => {
     showAddForm(trade);
-  };
+  }, [showAddForm]);
 
-  const handleGalleryModeClick = () => {
+  const handleGalleryModeClick = useCallback(() => {
     if (onOpenGalleryMode && trades.length > 0) {
       const title = `${format(date, 'EEEE, MMMM d, yyyy')} - ${trades.length} Trade${trades.length > 1 ? 's' : ''}`;
       onOpenGalleryMode(trades, expandedTradeId || trades[0].id, title);
       onClose(); // Close the day dialog when opening gallery mode
     }
-  };
+  }, [onOpenGalleryMode, trades, date, expandedTradeId, onClose]);
 
-  const handleOpenAIChat = (trade: Trade) => {
+  const handleOpenAIChat = useCallback((trade: Trade) => {
     if (onOpenAIChatMode) {
       const title = `AI Analysis - ${trade.name || format(date, 'MMM d, yyyy')}`;
       setExpandedTradeId(null); // Collapse trade so TradeGalleryDialog fully overlaps
       onOpenAIChatMode(trades, trade.id, title);
       // Don't close DayDialog - only close when opening gallery mode
     }
-  };
+  }, [onOpenAIChatMode, trades, date]);
 
   // Create tradeOperations object for TradeList
   const tradeOperations: TradeOperationsProps = useMemo(() => ({

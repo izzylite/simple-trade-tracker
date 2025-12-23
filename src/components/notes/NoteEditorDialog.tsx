@@ -70,7 +70,7 @@ import { Z_INDEX } from '../../styles/zIndex';
 import EditorToolbar from '../common/RichTextEditor/components/EditorToolbar';
 import ImagePickerDialog from '../heroImage/ImagePickerDialog';
 import ConfirmationDialog from '../common/ConfirmationDialog';
-import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { useAuthState } from '../../contexts/AuthStateContext';
 import * as notesService from '../../services/notesService';
 import { Note, ReminderType, DayAbbreviation } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
@@ -120,7 +120,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   onDelete,
 }) => {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user } = useAuthState();
   const fullScreen = useMediaQuery(theme.breakpoints.down('md'));
 
   // Ref for external toolbar control

@@ -41,7 +41,7 @@ import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import ShareButton from '../sharing/ShareButton';
 import TrashCalendarItem from '../trash/TrashCalendarItem';
 import { useCalendars, useTrashCalendars } from '../../hooks/useCalendars';
-import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { useAuthState } from '../../contexts/AuthStateContext';
 
 interface CalendarListDialogProps {
   open: boolean;
@@ -564,7 +564,7 @@ const CalendarListDialog: React.FC<CalendarListDialogProps> = ({
   onPermanentDeleteCalendar
 }) => {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user } = useAuthState();
   const [expandedCalendarIds, setExpandedCalendarIds] = useState<Set<string>>(new Set());
 
   // Fetch fresh data when dialog opens

@@ -12,6 +12,9 @@ import type { Trade } from '../types/dualWrite';
 import type { Calendar } from '../types/calendar';
 import { logger } from '../utils/logger';
 
+// Create singleton repository instance at module level
+const tradeRepository = new TradeRepository();
+
 export interface TradeWithCalendarName extends Trade {
   calendarName: string;
 }
@@ -60,8 +63,6 @@ export function useRecentTrades(
       if (!userId || !calendars) return null;
 
       try {
-        const tradeRepository = new TradeRepository();
-        
         // Fetch trades ordered by trade_date (descending) with limit
         const allTrades = await tradeRepository.findByUserId(userId, {
           limit,

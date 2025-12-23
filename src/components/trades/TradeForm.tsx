@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import {
   TextField,
   FormControl,
@@ -238,7 +238,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
 
 
 
-  const handleRiskToRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRiskToRewardChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       const numValue = value === '' ? 0 : parseFloat(value);
@@ -252,7 +252,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
         }
       }
     }
-  };
+  }, [onRiskToRewardChange, dynamicRiskSettings.risk_per_trade, newTrade.partials_taken, cumulativePnl, onAmountChange]);
 
 
   return (

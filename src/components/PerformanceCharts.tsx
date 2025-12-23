@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, lazy, Suspense } from 'react';
+import React, { useMemo, useState, useEffect, lazy, Suspense, useCallback } from 'react';
 import { format } from 'date-fns';
 import { Box, Typography, useTheme, useMediaQuery, Paper, CircularProgress, LinearProgress, Alert, Button, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 import { Trade, Calendar } from '../types/dualWrite';
@@ -30,6 +30,21 @@ const TradesListDialog = lazy(() => import('./charts/TradesListDialog'));
 const RiskRewardChart = lazy(() => import('./charts/RiskRewardChart'));
 const EconomicEventCorrelationAnalysis = lazy(() => import('./charts/EconomicEventCorrelationAnalysis'));
 
+// Type definition needed for module-level constants
+type TimePeriod = 'month' | 'year' | 'all';
+
+// Module-level static arrays to prevent recreation on every render
+const TIME_PERIOD_TABS = [
+  { label: 'Month', value: 'month' as TimePeriod },
+  { label: 'Year', value: 'year' as TimePeriod },
+  { label: 'All Time', value: 'all' as TimePeriod }
+];
+
+const TAG_ANALYSIS_TABS = [
+  { label: 'Tag Performance' },
+  { label: 'Day of Week' }
+];
+
 interface PerformanceChartsProps {
   trades?: Trade[]; // Optional - will be fetched internally if not provided
   calendars?: Calendar[]; // Optional - if provided, will use these calendars instead of fetching
@@ -56,8 +71,6 @@ interface PerformanceChartsProps {
   // Show calendar selector
   showCalendarSelector?: boolean;
 }
-
-type TimePeriod = 'month' | 'year' | 'all';
 
 const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   trades: tradesProp,
@@ -117,8 +130,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   const selectedDate = useMemo(() => selectedDateProp || defaultDate, [selectedDateProp, defaultDate]);
 
   // Create stable calendar IDs array to prevent infinite loops
-  // Only recalculate when the actual IDs change, not when the calendar objects change
-  const allCalendarIds = useMemo(() => calendars.map(c => c.id), [calendars.map(c => c.id).join(',')]);
+  // Only recalculate when the calendars array changes
+  const allCalendarIds = useMemo(() => calendars.map(c => c.id), [calendars]);
 
   // Determine which calendar IDs to use
   const calendarIds = useMemo(() => {
@@ -129,7 +142,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       return allCalendarIds;
     }
     return [selectedCalendarId];
-  }, [calendarIdsProp.join(','), selectedCalendarId, allCalendarIds.join(',')]);
+  }, [calendarIdsProp, selectedCalendarId, allCalendarIds]);
 
   // Get selected calendar for settings
   const selectedCalendar = useMemo(() => {
@@ -383,31 +396,18 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     onTimePeriodChange?.(newValue);
   };
 
-  // Define tabs for time period selection
-  const timePeriodTabs = [
-    { label: 'Month', value: 'month' },
-    { label: 'Year', value: 'year' },
-    { label: 'All Time', value: 'all' }
-  ];
-
   // Convert string value to tab index for RoundedTabs
   const getTimePeriodTabIndex = (period: TimePeriod): number => {
-    return timePeriodTabs.findIndex(tab => tab.value === period);
+    return TIME_PERIOD_TABS.findIndex(tab => tab.value === period);
   };
 
   // Handle tab change for time period
   const handleTimePeriodTabChange = (_: React.SyntheticEvent, newIndex: number) => {
-    const newPeriod = timePeriodTabs[newIndex]?.value as TimePeriod;
+    const newPeriod = TIME_PERIOD_TABS[newIndex]?.value as TimePeriod;
     if (newPeriod) {
       handleTimePeriodChange(newPeriod);
     }
   };
-
-  // Define tabs for tag analysis
-  const tagAnalysisTabs = [
-    { label: 'Tag Performance' },
-    { label: 'Day of Week' }
-  ];
 
   const filteredTrades = useMemo(() => {
     const filtered = getFilteredTrades(trades, selectedDate, timePeriod);
@@ -464,22 +464,22 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     return -(maxDailyDrawdown / 100) * accountBalance;
   }, [maxDailyDrawdown, accountBalance]);
 
-  // These handlers are now used directly in the chart overlays
+  // These handlers are now used directly in the chart overlays - wrapped in useCallback
 
-  const handleTradeExpand = (tradeId: string) => {
+  const handleTradeExpand = useCallback((tradeId: string) => {
     setMultipleTradesDialog(prev => ({
       ...prev,
       expandedTradeId: prev.expandedTradeId === tradeId ? null : tradeId
     }));
-  };
+  }, []);
 
-  const handleZoomImage = (imageUrl: string, allImages?: string[], initialIndex?: number) => {
+  const handleZoomImage = useCallback((imageUrl: string, allImages?: string[], initialIndex?: number) => {
     setZoomedImages({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [imageUrl] });
-  };
+  }, []);
 
-  const handleTagAnalysisTabChange = (_: React.SyntheticEvent, newValue: number) => {
+  const handleTagAnalysisTabChange = useCallback((_: React.SyntheticEvent, newValue: number) => {
     setTagAnalysisTab(newValue);
-  };
+  }, []);
 
   // Construct tradeOperations object
   const tradeOperations: TradeOperationsProps = useMemo(() => ({
@@ -497,8 +497,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
 
 
-  // Handle pie chart click to show trades
-  const handlePieClick = (category: string) => {
+  // Handle pie chart click to show trades - wrapped in useCallback
+  const handlePieClick = useCallback((category: string) => {
 
     let categoryTrades: Trade[] = [];
     let dialogTitle = '';
@@ -542,7 +542,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         expandedTradeId: categoryTrades.length === 1 ? categoryTrades[0].id : null
       });
     }
-  };
+  }, [filteredTrades, timePeriod, selectedDate]);
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 }, minHeight: { xs: 'auto', sm: 500 } }}>
@@ -622,7 +622,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
           }
         </Typography>
         <RoundedTabs
-          tabs={timePeriodTabs}
+          tabs={TIME_PERIOD_TABS}
           activeTab={getTimePeriodTabIndex(timePeriod)}
           onTabChange={handleTimePeriodTabChange}
           size={tabSize || 'small'}
@@ -741,7 +741,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               mb: 2
             }}>
               <RoundedTabs
-                tabs={tagAnalysisTabs}
+                tabs={TAG_ANALYSIS_TABS}
                 activeTab={tagAnalysisTab}
                 onTabChange={handleTagAnalysisTabChange}
                 size="small"
@@ -863,4 +863,4 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   );
 };
 
-export default PerformanceCharts;
+export default React.memo(PerformanceCharts);

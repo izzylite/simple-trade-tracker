@@ -7,6 +7,9 @@ import { supabase } from '../config/supabase';
 import { logger } from '../utils/logger';
 import { TradeImage } from '../components/trades/TradeForm';
 
+// Module-level cache for public URLs to reduce Supabase client calls
+const publicUrlCache = new Map<string, string>();
+
 export interface UploadOptions {
   contentType?: string;
   cacheControl?: string;
@@ -46,12 +49,20 @@ export const uploadFile = async (
 
 /**
  * Get a public URL for a file in Supabase Storage
+ * Uses module-level cache to reduce redundant Supabase client calls
  */
 export const getPublicUrl = (bucketName: string, filePath: string): string => {
+  const cacheKey = `${bucketName}:${filePath}`;
+
+  if (publicUrlCache.has(cacheKey)) {
+    return publicUrlCache.get(cacheKey)!;
+  }
+
   const { data } = supabase.storage
     .from(bucketName)
     .getPublicUrl(filePath);
 
+  publicUrlCache.set(cacheKey, data.publicUrl);
   return data.publicUrl;
 };
 

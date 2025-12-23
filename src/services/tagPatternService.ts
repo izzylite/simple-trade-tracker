@@ -1,6 +1,8 @@
 import { Trade } from '../types/dualWrite';
 import { TagCombination, TagPatternInsight, TagPatternAnalysis, ScoreSettings } from '../types/score';
 import { subDays, isAfter } from 'date-fns';
+import { generateTagCombinationsInWorker } from '../workers/tagPatternWorker';
+import { logger } from '../utils/logger';
 
 /**
  * Service for analyzing tag patterns and winrate trends
@@ -13,23 +15,30 @@ class TagPatternService {
 
   /**
    * Analyze tag patterns and generate insights
+   * Now async to support Web Worker integration
    */
-  analyzeTagPatterns(trades: Trade[], targetDate: Date = new Date(), settings?: ScoreSettings): TagPatternAnalysis {
+  async analyzeTagPatterns(trades: Trade[], targetDate: Date = new Date(), settings?: ScoreSettings): Promise<TagPatternAnalysis> {
     const recentCutoff = subDays(targetDate, this.recentPeriodDays);
     const historicalCutoff = subDays(targetDate, this.historicalPeriodDays);
 
     // Filter trades into recent and historical periods
     const recentTrades = trades.filter(trade => isAfter(new Date(trade.trade_date), recentCutoff));
-    const historicalTrades = trades.filter(trade => 
-      isAfter(new Date(trade.trade_date), historicalCutoff) && 
+    const historicalTrades = trades.filter(trade =>
+      isAfter(new Date(trade.trade_date), historicalCutoff) &&
       !isAfter(new Date(trade.trade_date), recentCutoff)
     );
 
-    // Get all tag combinations (excluding specified tags)
-    const combinations = this.generateTagCombinations(trades, settings?.excludedTagsFromPatterns);
-    
+    // Get all tag combinations using Web Worker (excluding specified tags)
+    let combinations: string[][];
+    try {
+      combinations = await generateTagCombinationsInWorker(trades, settings?.excludedTagsFromPatterns);
+    } catch (error) {
+      logger.error('Tag pattern worker failed, using fallback:', error);
+      combinations = this.generateTagCombinations(trades, settings?.excludedTagsFromPatterns);
+    }
+
     // Analyze each combination
-    const analyzedCombinations = combinations.map(combo => 
+    const analyzedCombinations = combinations.map(combo =>
       this.analyzeTagCombination(combo, recentTrades, historicalTrades, trades)
     ).filter(combo => combo.total_trades >= this.minTradesForCombination);
 
@@ -53,7 +62,7 @@ class TagPatternService {
 
     // Generate insights
     const insights = this.generateInsights(topCombinations, decliningCombinations, trades);
-    
+
     // Generate market condition alerts
     const marketConditionAlerts = this.generateMarketConditionAlerts(analyzedCombinations, trades);
 

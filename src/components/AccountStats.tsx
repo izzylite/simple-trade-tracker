@@ -374,4 +374,4 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
   );
 };
 
-export default AccountBalance;
+export default React.memo(AccountBalance);

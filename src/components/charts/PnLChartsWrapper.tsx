@@ -73,4 +73,4 @@ const PnLChartsWrapper: React.FC<PnLChartsWrapperProps> = ({
   );
 };
 
-export default PnLChartsWrapper;
+export default React.memo(PnLChartsWrapper);

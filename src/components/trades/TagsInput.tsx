@@ -203,4 +203,4 @@ const TagsInput: React.FC<TagsInputProps> = ({
   );
 };
 
-export default TagsInput;
+export default React.memo(TagsInput);

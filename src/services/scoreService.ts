@@ -104,9 +104,9 @@ export class ScoreService {
     // Determine trend
     const trend = this.calculateTrend(allTrades, period, targetDate);
 
-    // Calculate tag pattern analysis (only for sufficient data)
+    // Calculate tag pattern analysis using Web Worker (only for sufficient data)
     const tagPatternAnalysis = allTrades.length >= 10
-      ? tagPatternService.analyzeTagPatterns(allTrades, targetDate, scoreSettings)
+      ? await tagPatternService.analyzeTagPatterns(allTrades, targetDate, scoreSettings)
       : undefined;
 
     // Generate recommendations (including tag pattern insights)

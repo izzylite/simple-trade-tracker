@@ -97,6 +97,8 @@ export function useAIChat({
   const abortControllerRef = useRef<AbortController | null>(null);
   const cancelRequestedRef = useRef(false);
   const activeRequestRef = useRef<{ userId: string; aiId: string } | null>(null);
+  const messageUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingTextRef = useRef<string>('');
 
   // Check message limit whenever messages change
   useEffect(() => {
@@ -485,24 +487,33 @@ export function useAIChat({
         switch (event.type) {
           case 'text_chunk':
             accumulatedText += event.data.text;
+            pendingTextRef.current = accumulatedText;
 
-            if (!aiMessageAdded) {
-              const newMessage: ChatMessageType = {
-                id: aiMessageId,
-                role: 'assistant',
-                content: accumulatedText,
-                timestamp: new Date(),
-                status: 'receiving'
-              };
-              setMessages(prev => [...prev, newMessage]);
-              aiMessageAdded = true;
-            } else {
-              setMessages(prev => prev.map(msg =>
-                msg.id === aiMessageId
-                  ? { ...msg, content: accumulatedText, status: 'receiving' as const }
-                  : msg
-              ));
+            // Clear existing timeout
+            if (messageUpdateTimeoutRef.current) {
+              clearTimeout(messageUpdateTimeoutRef.current);
             }
+
+            // Debounce: batch updates every 100ms
+            messageUpdateTimeoutRef.current = setTimeout(() => {
+              if (!aiMessageAdded) {
+                const newMessage: ChatMessageType = {
+                  id: aiMessageId,
+                  role: 'assistant',
+                  content: pendingTextRef.current,
+                  timestamp: new Date(),
+                  status: 'receiving'
+                };
+                setMessages(prev => [...prev, newMessage]);
+                aiMessageAdded = true;
+              } else {
+                setMessages(prev => prev.map(msg =>
+                  msg.id === aiMessageId
+                    ? { ...msg, content: pendingTextRef.current, status: 'receiving' as const }
+                    : msg
+                ));
+              }
+            }, 100);
             break;
 
           case 'tool_call':
@@ -539,6 +550,12 @@ export function useAIChat({
           case 'error':
             throw new Error(event.data.error || 'Streaming error');
         }
+      }
+
+      // Clear any pending debounced update
+      if (messageUpdateTimeoutRef.current) {
+        clearTimeout(messageUpdateTimeoutRef.current);
+        messageUpdateTimeoutRef.current = null;
       }
 
       if (cancelRequestedRef.current || (!aiMessageAdded && !accumulatedText)) {
@@ -612,6 +629,11 @@ export function useAIChat({
         setMessages(prev => [...prev, errorMessage]);
       }
     } finally {
+      // Clear any pending debounced update
+      if (messageUpdateTimeoutRef.current) {
+        clearTimeout(messageUpdateTimeoutRef.current);
+        messageUpdateTimeoutRef.current = null;
+      }
       abortControllerRef.current = null;
       activeRequestRef.current = null;
       cancelRequestedRef.current = false;

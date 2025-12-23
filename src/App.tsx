@@ -6,7 +6,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { v4 as uuidv4 } from 'uuid';
 import { Trade, Calendar } from './types/dualWrite';
-import { AuthProvider, useAuth } from './contexts/SupabaseAuthContext';
+import { AuthProvider } from './contexts/SupabaseAuthContext';
+import { useAuthState, AuthStateProvider } from './contexts/AuthStateContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
@@ -79,7 +80,7 @@ function AppContent() {
   const [isLoadingTrades, setIsLoadingTrades] = useState<boolean>(false);
   const [loadingAction, setLoadingAction] = useState<'loading' | 'importing' | 'exporting'>('loading');
 
-  const { user } = useAuth();
+  const { user } = useAuthState();
 
   // Use SWR to fetch calendars with automatic focus revalidation
   // This solves the Chrome Energy Saver tab freezing issue
@@ -343,14 +344,16 @@ const ScrollToTop: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <LocalizationProvider dateAdapter={AdapterDateFns}>
-        <Router>
-          <ScrollToTop />
-          <Suspense fallback={<LoadingFallback />}>
-            <AppContent />
-          </Suspense>
-        </Router>
-      </LocalizationProvider>
+      <AuthStateProvider>
+        <LocalizationProvider dateAdapter={AdapterDateFns}>
+          <Router>
+            <ScrollToTop />
+            <Suspense fallback={<LoadingFallback />}>
+              <AppContent />
+            </Suspense>
+          </Router>
+        </LocalizationProvider>
+      </AuthStateProvider>
     </AuthProvider>
   );
 }

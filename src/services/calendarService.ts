@@ -61,13 +61,24 @@ export interface CalendarStats {
 // via database triggers (see migration 005_auto_calculate_calendar_stats.sql)
 // The calculateCalendarStats function has been removed - stats are read directly from the calendar object
 
+// Cache for memoized calendar stats
+const statsCache = new Map<string, CalendarStats>();
 
 /**
  * Get calendar statistics from calendar object
  * Returns CalendarStats with snake_case properties matching database schema
+ * Results are cached based on calendar ID and updated_at timestamp
  */
 export const getCalendarStats = (calendar: Calendar): CalendarStats => {
-  return {
+  // Check cache using calendar ID and updated_at as key
+  const cacheKey = `${calendar.id}:${calendar.updated_at?.toString() || 'no-timestamp'}`;
+
+  if (statsCache.has(cacheKey)) {
+    return statsCache.get(cacheKey)!;
+  }
+
+  // Compute stats
+  const stats: CalendarStats = {
     total_pnl: calendar.total_pnl || 0,
     win_rate: calendar.win_rate || 0,
     total_trades: calendar.total_trades || 0,
@@ -96,6 +107,11 @@ export const getCalendarStats = (calendar: Calendar): CalendarStats => {
     monthly_pnl_percentage: calendar.monthly_pnl_percentage || 0,
     yearly_pnl_percentage: calendar.yearly_pnl_percentage || 0
   };
+
+  // Store in cache
+  statsCache.set(cacheKey, stats);
+
+  return stats;
 };
 
 // =====================================================

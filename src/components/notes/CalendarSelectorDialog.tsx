@@ -29,7 +29,7 @@ import {
 } from '@mui/icons-material';
 
 import { Calendar } from '../../types/calendar';
-import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { useAuthState } from '../../contexts/AuthStateContext';
 import { CalendarRepository } from '../../services/repository/repositories/CalendarRepository';
 import * as notesService from '../../services/notesService';
 import { logger } from '../../utils/logger';
@@ -46,7 +46,7 @@ const CalendarSelectorDialog: React.FC<CalendarSelectorDialogProps> = ({
   onSelect,
 }) => {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user } = useAuthState();
 
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [noteCounts, setNoteCounts] = useState<Map<string, number>>(new Map());

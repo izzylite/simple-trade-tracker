@@ -50,7 +50,7 @@ import { Calendar } from '../../types/calendar';
 import { EconomicEvent } from '../../types/economicCalendar';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
-import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { useAuthState } from '../../contexts/AuthStateContext';
 import { useAIChat } from '../../hooks/useAIChat';
 import EconomicEventDetailDialog from '../economicCalendar/EconomicEventDetailDialog';
 import ApiKeySettingsDialog from './ApiKeySettingsDialog';
@@ -93,7 +93,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     isTradeUpdating
   } = tradeOperations;
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user } = useAuthState();
   const chatInterfaceRef = useRef<AIChatInterfaceRef>(null);
 
   // Use the AI Chat hook for core functionality

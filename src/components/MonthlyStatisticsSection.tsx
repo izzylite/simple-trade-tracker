@@ -19,7 +19,6 @@ import { PnLChartsWrapper, SessionPerformanceAnalysis, TradesListDialog, WinLoss
 import ScoreSection from './ScoreSection';
 import PerformanceCharts from './PerformanceCharts';
 import {
-  calculateChartData,
   calculateSessionStats,
   calculateTargetValue,
   calculateDrawdownViolationValue,
@@ -28,6 +27,7 @@ import {
 } from '../utils/chartDataUtils';
 import { EconomicCalendarFilterSettings } from './economicCalendar/EconomicCalendarDrawer';
 import { TradeOperationsProps } from '../types/tradeOperations';
+import { useChartWorker } from '../hooks/useChartWorker';
 
 interface MonthlyStatisticsSectionProps {
   trades: Trade[];
@@ -89,12 +89,18 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
 
   const timePeriod: TimePeriod = 'month';
 
-  // Calculate chart data using the async utility function
+  // Initialize chart worker hook with automatic fallback
+  const { calculateChartData: calculateChartDataWorker } = useChartWorker({
+    useWorker: true,
+    fallbackOnError: true
+  });
+
+  // Calculate chart data using Web Worker with automatic fallback
   useEffect(() => {
     const calculateChartDataAsync = async () => {
       setIsCalculatingChartData(true);
       try {
-        const data = await calculateChartData(trades, selectedDate, timePeriod);
+        const data = await calculateChartDataWorker(trades, selectedDate, timePeriod);
         setChartData(data);
       } catch (error) {
         logger.error('Error calculating chart data:', error);
@@ -105,7 +111,7 @@ const MonthlyStatisticsSection: React.FC<MonthlyStatisticsSectionProps> = ({
     };
 
     calculateChartDataAsync();
-  }, [trades, selectedDate, timePeriod]);
+  }, [trades, selectedDate, timePeriod, calculateChartDataWorker]);
 
   // Calculate session statistics using the utility function
   const sessionStats = useMemo(() => {

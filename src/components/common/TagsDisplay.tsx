@@ -133,4 +133,4 @@ const TagsDisplay: React.FC<TagsDisplayProps> = ({
   );
 };
 
-export default TagsDisplay;
+export default React.memo(TagsDisplay);

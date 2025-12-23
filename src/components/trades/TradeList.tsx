@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -39,6 +39,156 @@ import { useTheme } from '@mui/material/styles';
 import TradeDetailExpanded from '../TradeDetailExpanded';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
+
+// Memoized component for tag display to prevent recalculating on every render
+const TradeTagsDisplay: React.FC<{ tags: string[] }> = React.memo(({ tags }) => {
+  const theme = useTheme();
+
+  const tagDisplayData = useMemo(() => {
+    const filteredTags = tags.filter(tag => !tag.startsWith('Partials:'));
+    const tagGroups: Record<string, string[]> = {};
+    const ungroupedTags: string[] = [];
+
+    filteredTags.forEach(tag => {
+      if (isGroupedTag(tag)) {
+        const group = getTagGroup(tag);
+        if (!tagGroups[group]) tagGroups[group] = [];
+        tagGroups[group].push(tag);
+      } else {
+        ungroupedTags.push(tag);
+      }
+    });
+
+    const MAX_VISIBLE_ITEMS = 5;
+    const groupEntries = Object.entries(tagGroups);
+    const totalItems = groupEntries.length + ungroupedTags.length;
+    const hasMore = totalItems > MAX_VISIBLE_ITEMS;
+    let visibleGroups = groupEntries;
+    let visibleUngroupedTags = ungroupedTags;
+    let remainingCount = 0;
+
+    if (hasMore) {
+      const availableSlots = MAX_VISIBLE_ITEMS;
+      if (groupEntries.length >= availableSlots) {
+        visibleGroups = groupEntries.slice(0, availableSlots);
+        remainingCount = totalItems - availableSlots;
+        visibleUngroupedTags = [];
+      } else {
+        const remainingSlots = availableSlots - groupEntries.length;
+        visibleUngroupedTags = ungroupedTags.slice(0, remainingSlots);
+        remainingCount = totalItems - (groupEntries.length + remainingSlots);
+      }
+    }
+
+    return {
+      visibleGroups,
+      visibleUngroupedTags,
+      hasMore,
+      remainingCount,
+      groupEntries,
+      ungroupedTags
+    };
+  }, [tags]);
+
+  if (tags.length === 0) return null;
+
+  const {
+    visibleGroups,
+    visibleUngroupedTags,
+    hasMore,
+    remainingCount,
+    groupEntries,
+    ungroupedTags
+  } = tagDisplayData;
+
+  return (
+    <>
+      {visibleGroups.map(([group, groupTags]) => (
+        <Tooltip
+          key={group}
+          title={
+            <Box sx={{ p: 0.5 }}>
+              {groupTags.map(tag => (
+                <Typography key={tag} variant="body2">
+                  {formatTagForDisplay(tag, true)}
+                </Typography>
+              ))}
+            </Box>
+          }
+          arrow
+        >
+          <Chip
+            label={`${group} ${groupTags.length > 1 ? groupTags.length : ""}`}
+            size="small"
+            sx={{
+              ...getTagChipStyles(groupTags[0], theme),
+              height: '20px',
+              fontWeight: 600,
+              '& .MuiChip-label': { px: 1, fontSize: '0.7rem' }
+            }}
+          />
+        </Tooltip>
+      ))}
+      {visibleUngroupedTags.map((tag, tagIndex) => (
+        <Chip
+          key={tagIndex}
+          label={formatTagForDisplay(tag)}
+          size="small"
+          sx={{
+            ...getTagChipStyles(tag, theme),
+            height: '20px',
+            '& .MuiChip-label': { px: 1, fontSize: '0.7rem' }
+          }}
+        />
+      ))}
+      {hasMore && remainingCount > 0 && (
+        <Tooltip
+          title={
+            <Box sx={{ p: 0.5 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                {remainingCount} more tag{remainingCount > 1 ? 's' : ''}
+              </Typography>
+              {groupEntries.slice(visibleGroups.length).map(([group, groupTags]) => (
+                <Box key={group} sx={{ mb: 0.5 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                    {group}:
+                  </Typography>
+                  {groupTags.map(tag => (
+                    <Typography key={tag} variant="body2" sx={{ ml: 1 }}>
+                      {formatTagForDisplay(tag, true)}
+                    </Typography>
+                  ))}
+                </Box>
+              ))}
+              {ungroupedTags.slice(visibleUngroupedTags.length).map(tag => (
+                <Typography key={tag} variant="body2">
+                  {formatTagForDisplay(tag)}
+                </Typography>
+              ))}
+            </Box>
+          }
+          arrow
+        >
+          <Chip
+            label={`+${remainingCount}`}
+            size="small"
+            sx={{
+              height: '20px',
+              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+              color: 'text.secondary',
+              fontWeight: 600,
+              border: '1px dashed',
+              borderColor: 'divider',
+              '& .MuiChip-label': { px: 1, fontSize: '0.7rem' }
+            }}
+          />
+        </Tooltip>
+      )}
+    </>
+  );
+});
+
+TradeTagsDisplay.displayName = 'TradeTagsDisplay';
 
 interface TradeListProps {
   // Component-specific props
@@ -85,26 +235,26 @@ const TradeList: React.FC<TradeListProps> = ({
   // Responsive helpers
   const isSmDown = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const handleOpenMenu = (e: React.MouseEvent<HTMLElement>, trade: Trade) => {
+  const handleOpenMenu = useCallback((e: React.MouseEvent<HTMLElement>, trade: Trade) => {
     e.stopPropagation();
     setMenuAnchorEl(e.currentTarget);
     setMenuTrade(trade);
-  };
+  }, []);
 
-  const handleCloseMenu = () => {
+  const handleCloseMenu = useCallback(() => {
     setMenuAnchorEl(null);
     setMenuTrade(null);
-  };
+  }, []);
 
-  const handleEditSelected = () => {
+  const handleEditSelected = useCallback(() => {
     if (menuTrade && onEditClick) onEditClick(menuTrade);
     handleCloseMenu();
-  };
+  }, [menuTrade, onEditClick, handleCloseMenu]);
 
-  const handleDeleteSelected = () => {
+  const handleDeleteSelected = useCallback(() => {
     if (menuTrade && onDeleteClick) onDeleteClick(menuTrade.id);
     handleCloseMenu();
-  };
+  }, [menuTrade, onDeleteClick, handleCloseMenu]);
 
   // Reset displayed count when trades array changes (e.g., filtering, new data)
   useEffect(() => {
@@ -119,45 +269,45 @@ const TradeList: React.FC<TradeListProps> = ({
   // Check if there are more trades to load
   const hasMoreTrades = displayedCount < trades.length;
 
-  // Handle load more
-  const handleLoadMore = () => {
+  // Handle load more - wrapped in useCallback
+  const handleLoadMore = useCallback(() => {
     setDisplayedCount(prev => Math.min(prev + pageSize, trades.length));
-  };
+  }, [pageSize, trades.length]);
 
   // Helper function to check if a trade is being deleted
-  const isTradeBeingDeleted = (tradeId: string) => deletingTradeIds.includes(tradeId);
+  const isTradeBeingDeleted = useCallback((tradeId: string) => deletingTradeIds.includes(tradeId), [deletingTradeIds]);
 
   // Helper function to check if a trade is being updated
-  const isTradeBeingUpdated = (tradeId: string) => isTradeUpdating?.(tradeId) || false;
+  const isTradeBeingUpdated = useCallback((tradeId: string) => isTradeUpdating?.(tradeId) || false, [isTradeUpdating]);
 
   // Helper function to check if a trade is selected
-  const isTradeSelected = (tradeId: string) => selectedTradeIds.includes(tradeId);
+  const isTradeSelected = useCallback((tradeId: string) => selectedTradeIds.includes(tradeId), [selectedTradeIds]);
 
   // Handle individual trade selection
-  const handleTradeSelection = (tradeId: string, selected: boolean) => {
+  const handleTradeSelection = useCallback((tradeId: string, selected: boolean) => {
     if (selected) {
       setSelectedTradeIds(prev => [...prev, tradeId]);
     } else {
       setSelectedTradeIds(prev => prev.filter(id => id !== tradeId));
     }
-  };
+  }, []);
 
   // Handle select all/none (only for displayed trades)
-  const handleSelectAll = () => {
+  const handleSelectAll = useCallback(() => {
     if (selectedTradeIds.length === displayedTrades.length) {
       setSelectedTradeIds([]);
     } else {
       setSelectedTradeIds(displayedTrades.map(trade => trade.id));
     }
-  };
+  }, [selectedTradeIds.length, displayedTrades]);
 
   // Handle bulk delete
-  const handleBulkDelete = () => {
+  const handleBulkDelete = useCallback(() => {
     if (onDeleteMultiple && selectedTradeIds.length > 0) {
       onDeleteMultiple(selectedTradeIds);
       setSelectedTradeIds([]);
     }
-  };
+  }, [onDeleteMultiple, selectedTradeIds]);
 
   return (
     <Box sx={{ mt: 2, ...sx }}>
@@ -295,56 +445,9 @@ const TradeList: React.FC<TradeListProps> = ({
                         }}>
                           ${Math.abs(trade.amount).toLocaleString()}
                         </Typography>
-                        {trade.tags && trade.tags.length > 0 && (() => {
-                          const filteredTags = trade.tags.filter(tag => !tag.startsWith('Partials:'));
-                          const tagGroups: Record<string, string[]> = {};
-                          const ungroupedTags: string[] = [];
-                          filteredTags.forEach(tag => {
-                            if (isGroupedTag(tag)) {
-                              const group = getTagGroup(tag);
-                              if (!tagGroups[group]) tagGroups[group] = [];
-                              tagGroups[group].push(tag);
-                            } else {
-                              ungroupedTags.push(tag);
-                            }
-                          });
-                          const MAX_VISIBLE_ITEMS = 5;
-                          const groupEntries = Object.entries(tagGroups);
-                          const totalItems = groupEntries.length + ungroupedTags.length;
-                          const hasMore = totalItems > MAX_VISIBLE_ITEMS;
-                          let visibleGroups = groupEntries;
-                          let visibleUngroupedTags = ungroupedTags;
-                          let remainingCount = 0;
-                          if (hasMore) {
-                            const availableSlots = MAX_VISIBLE_ITEMS;
-                            if (groupEntries.length >= availableSlots) {
-                              visibleGroups = groupEntries.slice(0, availableSlots);
-                              remainingCount = totalItems - availableSlots;
-                              visibleUngroupedTags = [];
-                            } else {
-                              const remainingSlots = availableSlots - groupEntries.length;
-                              visibleUngroupedTags = ungroupedTags.slice(0, remainingSlots);
-                              remainingCount = totalItems - (groupEntries.length + remainingSlots);
-                            }
-                          }
-                          return (
-                            <>
-                              {visibleGroups.map(([group, groupTags]) => (
-                                <Tooltip key={group} title={<Box sx={{ p: 0.5 }}>{groupTags.map(tag => (<Typography key={tag} variant="body2">{formatTagForDisplay(tag, true)}</Typography>))}</Box>} arrow>
-                                  <Chip label={`${group} ${groupTags.length > 1 ? groupTags.length : ""}`} size="small" sx={{ ...getTagChipStyles(groupTags[0], theme), height: '20px', fontWeight: 600, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }} />
-                                </Tooltip>
-                              ))}
-                              {visibleUngroupedTags.map((tag, tagIndex) => (
-                                <Chip key={tagIndex} label={formatTagForDisplay(tag)} size="small" sx={{ ...getTagChipStyles(tag, theme), height: '20px', '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }} />
-                              ))}
-                              {hasMore && remainingCount > 0 && (
-                                <Tooltip title={<Box sx={{ p: 0.5 }}><Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>{remainingCount} more tag{remainingCount > 1 ? 's' : ''}</Typography>{groupEntries.slice(visibleGroups.length).map(([group, groupTags]) => (<Box key={group} sx={{ mb: 0.5 }}><Typography variant="caption" sx={{ fontWeight: 600 }}>{group}:</Typography>{groupTags.map(tag => (<Typography key={tag} variant="body2" sx={{ ml: 1 }}>{formatTagForDisplay(tag, true)}</Typography>))}</Box>))}{ungroupedTags.slice(visibleUngroupedTags.length).map(tag => (<Typography key={tag} variant="body2">{formatTagForDisplay(tag)}</Typography>))}</Box>} arrow>
-                                  <Chip label={`+${remainingCount}`} size="small" sx={{ height: '20px', backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)', color: 'text.secondary', fontWeight: 600, border: '1px dashed', borderColor: 'divider', '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }} />
-                                </Tooltip>
-                              )}
-                            </>
-                          );
-                        })()}
+                        {trade.tags && trade.tags.length > 0 && (
+                          <TradeTagsDisplay tags={trade.tags} />
+                        )}
                       </Box>
                       <Box sx={{ display: 'flex', flexDirection: 'row', gap: { xs: 0.75, sm: 1, md: 1.5 }, alignItems: 'center', mt: { xs: 0.25, sm: 0.5 }, flexWrap: 'wrap' }}>
                         {trade.images && trade.images.length > 0 && (
@@ -546,4 +649,4 @@ const TradeList: React.FC<TradeListProps> = ({
   );
 };
 
-export default TradeList;
+export default React.memo(TradeList);

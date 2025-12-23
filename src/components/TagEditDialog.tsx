@@ -15,7 +15,7 @@ import { BaseDialog } from './common';
 import { logger } from '../utils/logger';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { supabase } from '../config/supabase';
-import { useAuth } from '../contexts/SupabaseAuthContext';
+import { useAuthState } from '../contexts/AuthStateContext';
 
 interface TagEditDialogProps {
   open: boolean;
@@ -40,7 +40,7 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
   initialDefinition
 }) => {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user } = useAuthState();
   const [newTag, setNewTag] = useState(tag);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);

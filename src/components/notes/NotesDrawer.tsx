@@ -37,7 +37,7 @@ import { Note } from '../../types/note';
 import { Calendar } from '../../types/calendar';
 import * as notesService from '../../services/notesService';
 import { logger } from '../../utils/logger';
-import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { useAuthState } from '../../contexts/AuthStateContext';
 import { CalendarRepository } from '../../services/repository/repositories/CalendarRepository';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { useNotes } from '../../hooks/useNotes';
@@ -100,7 +100,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
   onNoteClick
 }) => {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user } = useAuthState();
 
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');

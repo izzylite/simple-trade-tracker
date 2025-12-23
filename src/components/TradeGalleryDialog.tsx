@@ -41,7 +41,7 @@ import { TradeOperationsProps } from '../types/tradeOperations';
 import RoundedTabs, { TabPanel } from './common/RoundedTabs';
 import { useAIChat } from '../hooks/useAIChat';
 import AIChatInterface, { QuestionTemplate } from './aiChat/AIChatInterface';
-import { useAuth } from '../contexts/SupabaseAuthContext';
+import { useAuthState } from '../contexts/AuthStateContext';
 import Shimmer from './Shimmer';
 import EconomicEventDetailDialog from './economicCalendar/EconomicEventDetailDialog';
 import NoteEditorDialog from './notes/NoteEditorDialog';
@@ -90,7 +90,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     isTradeUpdating
   } = tradeOperations;
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user } = useAuthState();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   // In aiOnlyMode, always show Assistant tab (index 1)
   const [activeTab, setActiveTab] = useState(aiOnlyMode ? 1 : 0);

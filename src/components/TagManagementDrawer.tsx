@@ -40,7 +40,7 @@ import {
 import { Calendar } from '../types/calendar';
 import { logger } from '../utils/logger';
 import { supabase } from '../config/supabase';
-import { useAuth } from '../contexts/SupabaseAuthContext';
+import { useAuthState } from '../contexts/AuthStateContext';
 
 interface TagManagementDrawerProps {
   open: boolean;
@@ -65,7 +65,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
   isReadOnly = false
 }) => {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user } = useAuthState();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTagGroup, setSelectedTagGroup] = useState<string>('');
   const [tagToEdit, setTagToEdit] = useState<string | null>(null);

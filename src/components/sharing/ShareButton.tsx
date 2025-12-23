@@ -26,7 +26,7 @@ import {
   Close as CloseIcon
 } from '@mui/icons-material';
 import { Trade, Calendar } from '../../types/dualWrite';
-import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { useAuthState } from '../../contexts/AuthStateContext';
 import { logger } from '../../utils/logger';
 import {
   deactivateTradeShareLink,
@@ -70,7 +70,7 @@ type ShareButtonProps = ShareTradeProps | ShareCalendarProps;
 
 const ShareButton: React.FC<ShareButtonProps> = (props) => {
   const { type, item, onUpdateItemProperty } = props;
-  const { user } = useAuth();
+  const { user } = useAuthState();
 
   // Trade-specific props
   const calendarId = type === 'trade' ? (props as ShareTradeProps).calendarId : undefined;
