@@ -152,6 +152,146 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     }
   }
 
+  /**
+   * Fetch only pinned trades for a calendar
+   * Optimized query that only retrieves trades where is_pinned = true
+   * @param calendarId - Calendar ID to fetch pinned trades from
+   * @returns Array of pinned trades
+   */
+  async fetchPinnedTrades(calendarId: string): Promise<Trade[]> {
+    try {
+      const { data, error } = await supabase
+        .from('trades')
+        .select('*')
+        .eq('calendar_id', calendarId)
+        .eq('is_pinned', true)
+        .order('trade_date', { ascending: false });
+
+      if (error) {
+        logger.error('Error fetching pinned trades:', error);
+        return [];
+      }
+
+      logger.log(`📌 Fetched ${data?.length || 0} pinned trades for calendar ${calendarId}`);
+      return data ? data.map(item => transformSupabaseTrade(item)) : [];
+    } catch (error) {
+      logger.error('Error fetching pinned trades:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch trades that have a specific economic event
+   * Uses cleaned_name, currency, and impact for matching
+   * @param calendarId - Calendar ID to search within
+   * @param cleanedEventName - Normalized event name (from cleanEventNameForPinning)
+   * @param currency - Event currency (e.g., 'USD', 'EUR')
+   * @param impact - Event impact level ('High', 'Medium', 'Low')
+   * @returns Array of trades with the matching event
+   */
+  async fetchTradesByEvent(
+    calendarId: string,
+    cleanedEventName: string,
+    currency: string,
+    impact: string
+  ): Promise<Trade[]> {
+    try {
+      const normalizedName = cleanedEventName.toLowerCase();
+
+      // Query trades where economic_events JSONB array contains an object with matching:
+      // - cleaned_name
+      // - currency
+      // - impact
+      const { data, error } = await supabase
+        .from('trades')
+        .select('*')
+        .eq('calendar_id', calendarId)
+        .not('economic_events', 'is', null)
+        .filter('economic_events', 'cs', JSON.stringify([{
+          cleaned_name: normalizedName,
+          currency,
+          impact
+        }]))
+        .order('trade_date', { ascending: false });
+
+      if (error) {
+        logger.error('Error fetching trades by event:', error);
+        return [];
+      }
+
+      return data ? data.map(item => transformSupabaseTrade(item)) : [];
+    } catch (error) {
+      logger.error('Error fetching trades by event:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch trade counts for multiple economic events using parallel server-side queries
+   * Uses PostgreSQL JSONB containment operator (@>) for efficient database-side filtering
+   * Runs all count queries in parallel for optimal performance
+   * Returns a Map of event ID to trade count
+   * @param calendarId - Calendar ID to search within
+   * @param events - Array of economic events with id, event_name, currency, and impact
+   * @returns Map of event ID to trade count
+   */
+  async fetchTradeCountsByEvents(
+    calendarId: string,
+    events: Array<{ id: string; event_name: string; currency: string; impact: string }>
+  ): Promise<Map<string, number>> {
+    try {
+      if (events.length === 0) {
+        return new Map();
+      }
+
+      // Import cleanEventNameForPinning here to avoid circular dependencies
+      const { cleanEventNameForPinning } = await import('../../../utils/eventNameUtils');
+
+      // Create parallel count queries for each event
+      // Each query uses the JSONB containment operator (cs) to count on server-side
+      const countPromises = events.map(async (event) => {
+        const cleanedName = cleanEventNameForPinning(event.event_name).toLowerCase();
+
+        // Build JSONB filter for this specific event signature
+        const eventFilter = JSON.stringify([{
+          cleaned_name: cleanedName,
+          currency: event.currency,
+          impact: event.impact
+        }]);
+
+        // Execute server-side count query using head:true to avoid downloading data
+        const { count, error } = await supabase
+          .from('trades')
+          .select('*', { count: 'exact', head: true })
+          .eq('calendar_id', calendarId)
+          .not('economic_events', 'is', null)
+          .filter('economic_events', 'cs', eventFilter);
+
+        if (error) {
+          logger.error(`Error counting trades for event ${event.id}:`, error);
+          return { eventId: event.id, count: 0 };
+        }
+
+        return { eventId: event.id, count: count || 0 };
+      });
+
+      // Execute all count queries in parallel
+      const results = await Promise.all(countPromises);
+
+      // Build result map from parallel query results
+      const countMap = new Map<string, number>();
+      results.forEach(({ eventId, count }) => {
+        countMap.set(eventId, count);
+      });
+
+      logger.log(`📊 Fetched trade counts for ${events.length} events using ${events.length} parallel server-side queries`);
+      return countMap;
+    } catch (error) {
+      logger.error('Error fetching trade counts by events:', error);
+      return new Map();
+    }
+  }
+
   async findAll(): Promise<Trade[]> {
     try {
       const { data, error } = await supabase
@@ -308,6 +448,105 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         currentPage: 1,
         totalPages: 0
       };
+    }
+  }
+
+  /**
+   * Get trades for a specific month
+   * Used for on-demand loading when user selects a month in SelectDateDialog
+   * @param calendarId - Calendar ID to search within
+   * @param year - Year (e.g., 2024)
+   * @param month - Month index (0-11, where 0 = January)
+   * @returns Array of trades for the specified month
+   */
+  async getTradesByMonth(
+    calendarId: string,
+    year: number,
+    month: number
+  ): Promise<Trade[]> {
+    try {
+      // Validate month (0-11)
+      if (month < 0 || month > 11) {
+        logger.error('Invalid month index:', month);
+        return [];
+      }
+
+      // Calculate start and end of month
+      const startOfMonth = new Date(year, month, 1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const endOfMonth = new Date(year, month + 1, 0); // Last day of month
+      endOfMonth.setHours(23, 59, 59, 999);
+
+      logger.log(`📅 Fetching trades for ${year}-${month + 1} (${startOfMonth.toISOString()} to ${endOfMonth.toISOString()})`);
+
+      // Query trades for the month
+      const { data, error } = await supabase
+        .from('trades')
+        .select('*')
+        .eq('calendar_id', calendarId)
+        .gte('trade_date', startOfMonth.toISOString())
+        .lte('trade_date', endOfMonth.toISOString())
+        .order('trade_date', { ascending: false });
+
+      if (error) {
+        logger.error('Error fetching trades by month:', error);
+        throw error;
+      }
+
+      const trades = data ? data.map(item => transformSupabaseTrade(item)) : [];
+
+      logger.log(`✅ Found ${trades.length} trades for ${year}-${month + 1}`);
+
+      return trades;
+    } catch (error) {
+      logger.error('Error in getTradesByMonth:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all trades within a specific date range
+   * Used for loading visible calendar range (including overflow days from adjacent months)
+   * @param calendarId - Calendar ID
+   * @param startDate - Start date (inclusive)
+   * @param endDate - End date (inclusive)
+   */
+  async getTradesByDateRange(
+    calendarId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<Trade[]> {
+    try {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      logger.log(`📅 Fetching trades for date range (${start.toISOString()} to ${end.toISOString()})`);
+
+      const { data, error } = await supabase
+        .from('trades')
+        .select('*')
+        .eq('calendar_id', calendarId)
+        .gte('trade_date', start.toISOString())
+        .lte('trade_date', end.toISOString())
+        .order('trade_date', { ascending: false });
+
+      if (error) {
+        logger.error('Error fetching trades by date range:', error);
+        throw error;
+      }
+
+      const trades = data ? data.map(item => transformSupabaseTrade(item)) : [];
+
+      logger.log(`✅ Found ${trades.length} trades for date range`);
+
+      return trades;
+    } catch (error) {
+      logger.error('Error in getTradesByDateRange:', error);
+      return [];
     }
   }
 

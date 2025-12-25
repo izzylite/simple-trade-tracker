@@ -29,8 +29,7 @@ import { ImpactLevel, Currency } from '../../types/economicCalendar';
 import { formatValue } from '../../utils/formatters';
 
 import RoundedTabs from '../common/RoundedTabs';
-import { getCurrenciesForPair } from '../../services/tradeEconomicEventService'; 
-import { performanceCalculationService, CalculationProgress } from '../../services/performanceCalculationService';
+import { getCurrenciesForPair } from '../../services/tradeEconomicEventService';
 
 // Helper function to get flag URL
 const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {
@@ -39,11 +38,12 @@ const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {
 };
 
 interface EconomicEventCorrelationAnalysisProps {
-  calendarIds: string[]; // Changed from calendarId to support multiple calendars
+  calendarId: string; // Single calendar ID
   trades: Trade[];
   timePeriod: 'month' | 'year' | 'all';
   selectedDate: Date;
   setMultipleTradesDialog?: (dialogState: any) => void;
+  economicCorrelations?: any; // Pre-calculated economic correlations { high: {...}, medium: {...} }
 }
 
 interface TradeEventCorrelation {
@@ -103,11 +103,12 @@ interface CorrelationStats {
 
 
 const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysisProps> = ({
-  calendarIds,
+  calendarId,
   trades,
   timePeriod,
   selectedDate,
-  setMultipleTradesDialog
+  setMultipleTradesDialog,
+  economicCorrelations
 }) => {
   const theme = useTheme();
   const [selectedImpact, setSelectedImpact] = useState<ImpactLevel>('High');
@@ -138,7 +139,6 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
     mostCommonEventTypes: []
   });
   const [isCalculating, setIsCalculating] = useState(false);
-  const [calculationProgress, setCalculationProgress] = useState<CalculationProgress | null>(null);
 
   // Define tabs for impact level selection
   const impactTabs = [
@@ -177,36 +177,45 @@ const CURRENCY_OPTIONS = [
     }
   };
 
-  // Calculate economic event correlations using PostgreSQL RPC function
+  // Use pre-calculated economic correlations from server (instant switching between impact levels!)
   useEffect(() => {
-    const calculateCorrelations = async () => {
-      setIsCalculating(true);
-      setCalculationProgress(null);
-      try {
-        const result = await performanceCalculationService.calculateEconomicEventCorrelations(
-          calendarIds,
-          selectedCurrency,
-          selectedImpact,
-          timePeriod,
-          selectedDate,
-          setCalculationProgress
-        );
-        setLosingTradeCorrelations(result.losingTradeCorrelations);
-        setWinningTradeCorrelations(result.winningTradeCorrelations);
-        setCorrelationStats(result.correlationStats);
-      } catch (error) {
-        console.error('Error calculating economic event correlations:', error);
-        setLosingTradeCorrelations([]);
-        setWinningTradeCorrelations([]);
-        setCorrelationStats({});
-      } finally {
-        setIsCalculating(false);
-        setCalculationProgress(null);
-      }
+    if (!economicCorrelations) {
+      setLosingTradeCorrelations([]);
+      setWinningTradeCorrelations([]);
+      setCorrelationStats({});
+      return;
+    }
+
+    // Select data based on impact level (High or Medium)
+    const impactData = selectedImpact === 'High'
+      ? economicCorrelations.high
+      : economicCorrelations.medium;
+
+    if (!impactData) {
+      setLosingTradeCorrelations([]);
+      setWinningTradeCorrelations([]);
+      setCorrelationStats({});
+      return;
+    }
+
+    // Filter by currency if needed (client-side filtering of pre-calculated data)
+    const filterByCurrency = (correlations: any[]) => {
+      if (selectedCurrency === 'ALL') return correlations;
+
+      return correlations
+        .map(correlation => ({
+          ...correlation,
+          economic_events: correlation.economic_events?.filter(
+            (event: any) => event.currency === selectedCurrency
+          ) || []
+        }))
+        .filter(correlation => correlation.economic_events.length > 0);
     };
 
-    calculateCorrelations();
-  }, [calendarIds, selectedCurrency, selectedImpact, timePeriod, selectedDate]);
+    setLosingTradeCorrelations(filterByCurrency(impactData.losingTradeCorrelations || []));
+    setWinningTradeCorrelations(filterByCurrency(impactData.winningTradeCorrelations || []));
+    setCorrelationStats(impactData.correlationStats || {});
+  }, [economicCorrelations, selectedImpact, selectedCurrency]);
 
   // Get losing and winning trades (kept for legacy compatibility)
   const losingTrades = useMemo(() => {
@@ -323,17 +332,6 @@ const CURRENCY_OPTIONS = [
             <Typography variant="body2" color="text.secondary">
               Calculating economic event correlations...
             </Typography>
-            {calculationProgress && (
-              <Box sx={{ width: '100%', maxWidth: 400 }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  {calculationProgress.step} ({calculationProgress.progress}/{calculationProgress.total})
-                </Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={(calculationProgress.progress / calculationProgress.total) * 100}
-                />
-              </Box>
-            )}
           </Box>
         )}
 

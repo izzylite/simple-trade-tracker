@@ -5,6 +5,7 @@ import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar'
 import { logger } from '../utils/logger';
 import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
 import { getSessionTimeRange, type TradingSession } from '../utils/sessionTimeUtils';
+import { cleanEventNameForPinning } from '../utils/eventNameUtils';
  
 
 // Currency pair mapping interface
@@ -140,10 +141,12 @@ export class TradeEconomicEventService {
 
   /**
    * Convert full EconomicEvent to simplified TradeEconomicEvent
+   * Includes cleaned_name for efficient querying
    */
   private convertToTradeEvent(event: EconomicEvent): TradeEconomicEvent {
     return {
       name: event.event_name,
+      cleaned_name: cleanEventNameForPinning(event.event_name).toLowerCase(),
       flag_code: event.flag_code,
       impact: event.impact,
       currency: event.currency,

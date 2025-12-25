@@ -747,7 +747,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             setSelectedEvent(null);
           }}
           event={selectedEvent}
-          trades={trades}
+          calendarId={calendar.id}
           tradeOperations={tradeOperations}
           isReadOnly={isReadOnly}
         />

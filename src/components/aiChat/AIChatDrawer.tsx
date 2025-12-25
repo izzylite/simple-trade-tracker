@@ -732,7 +732,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             setSelectedEvent(null);
           }}
           event={selectedEvent}
-          trades={trades || []}
+          calendarId={calendar.id}
           tradeOperations={tradeOperations}
           isReadOnly={isReadOnly}
         />

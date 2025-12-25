@@ -29,12 +29,13 @@ import TradeList from '../trades/TradeList';
 import { cleanEventNameForPinning, eventMatchV1, eventMatchV3 } from '../../utils/eventNameUtils';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
+import Shimmer from '../Shimmer';
 
 interface EconomicEventDetailDialogProps {
   open: boolean;
   onClose: () => void;
   event: EconomicEvent;
-  trades: Trade[];
+  calendarId: string;
   tradeOperations: TradeOperationsProps;
   isReadOnly?: boolean;
 }
@@ -43,13 +44,12 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   open,
   onClose,
   event,
-  trades,
+  calendarId,
   tradeOperations,
   isReadOnly = false
 }) => {
   const {
     onOpenGalleryMode,
-    calendarId,
     calendar,
     onUpdateCalendarProperty
   } = tradeOperations;
@@ -59,17 +59,40 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   const [pinning, setPinning] = useState(false);
   const initialNotesRef = useRef<string>('');
 
-  // Filter trades that occurred during this event
-  const eventTrades = useMemo(() => { 
-    return trades.filter(trade => {
-      if (!trade.economic_events || trade.economic_events.length === 0) {
-        return false;
-      } 
-      return trade.economic_events.some(tradeEvent => { 
-        return eventMatchV3(tradeEvent,event)
-      });
-    });
-  }, [trades, event]);
+  // State for event trades
+  const [eventTrades, setEventTrades] = useState<Trade[]>([]);
+  const [isLoadingTrades, setIsLoadingTrades] = useState(false);
+
+  // Fetch trades for this event when dialog opens
+  useEffect(() => {
+    const fetchEventTrades = async () => {
+      if (!open || !calendarId) {
+        setEventTrades([]);
+        return;
+      }
+
+      setIsLoadingTrades(true);
+      try {
+        const calendarServiceModule = await import('../../services/calendarService');
+        const cleanedName = cleanEventNameForPinning(event.event_name);
+
+        const trades = await calendarServiceModule.getTradeRepository().fetchTradesByEvent(
+          calendarId,
+          cleanedName,
+          event.currency,
+          event.impact
+        );
+        setEventTrades(trades);
+      } catch (error) {
+        console.error('Error fetching trades for event:', error);
+        setEventTrades([]);
+      } finally {
+        setIsLoadingTrades(false);
+      }
+    };
+
+    fetchEventTrades();
+  }, [open, calendarId, event.event_name, event.currency, event.impact]);
 
   // Check if event is pinned and get pinned event data
   const pinnedEventData = useMemo(() => {
@@ -381,9 +404,40 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
 
         {/* Trades List */}
         <Box>
-         
-
-          {eventTrades.length === 0 ? (
+          {isLoadingTrades ? (
+            // Show shimmer loading state while fetching trades
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {[1, 2, 3].map((index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    backgroundColor: alpha(theme.palette.background.paper, 0.3),
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1
+                  }}
+                >
+                  {/* Trade header shimmer */}
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                    <Shimmer width={60} height={24} borderRadius={4} intensity="medium" />
+                    <Shimmer width={80} height={24} borderRadius={4} intensity="medium" />
+                    <Box sx={{ flex: 1 }} />
+                    <Shimmer width={70} height={28} borderRadius={4} intensity="high" />
+                  </Box>
+                  {/* Trade details shimmer */}
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Shimmer width="40%" height={20} borderRadius={4} intensity="low" />
+                    <Shimmer width="30%" height={20} borderRadius={4} intensity="low" />
+                  </Box>
+                  {/* Trade amount shimmer */}
+                  <Shimmer width="25%" height={20} borderRadius={4} intensity="low" />
+                </Box>
+              ))}
+            </Box>
+          ) : eventTrades.length === 0 ? (
             <Box
               sx={{
                 textAlign: 'center',

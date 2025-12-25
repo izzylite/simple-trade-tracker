@@ -5,7 +5,8 @@ import {
   CardContent,
   Typography,
   useTheme,
-  Stack
+  Stack,
+  LinearProgress
 } from '@mui/material';
 import { useMediaQuery } from '@mui/material';
 
@@ -30,23 +31,32 @@ interface ScoreHistoryProps {
   history: ScoreHistoryType[];
   period: 'daily' | 'weekly' | 'monthly' | 'yearly';
   onPeriodChange: (period: 'daily' | 'weekly' | 'monthly' | 'yearly') => void;
+  availablePeriods?: ('daily' | 'weekly' | 'monthly' | 'yearly')[]; // Available periods based on parent time filter
+  isLoading?: boolean; // Loading state for showing progress indicator
 }
 
 const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
   history,
   period,
-  onPeriodChange
+  onPeriodChange,
+  availablePeriods = ['daily', 'weekly', 'monthly', 'yearly'], // Default to all periods
+  isLoading = false
 }) => {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
-  // Define tabs for period selection
-  const periodTabs = [
+  // Define all possible period tabs
+  const allPeriodTabs = [
     { label: 'Daily', value: 'daily' },
     { label: 'Weekly', value: 'weekly' },
     { label: 'Monthly', value: 'monthly' },
     { label: 'Yearly', value: 'yearly' }
   ];
+
+  // Filter tabs based on available periods
+  const periodTabs = useMemo(() => {
+    return allPeriodTabs.filter(tab => availablePeriods.includes(tab.value as any));
+  }, [availablePeriods]);
 
   // Convert string value to tab index for RoundedTabs
   const getPeriodTabIndex = (currentPeriod: string): number => {
@@ -172,6 +182,28 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
             size="small"
           />
         </Stack>
+
+        {isLoading && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', mb: 2 }}>
+            <LinearProgress
+              sx={{
+                width: { xs: '100%', sm: 'auto' },
+                minWidth: { sm: 200 },
+                borderRadius: 1,
+                mb: 0.5
+              }}
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'text.secondary',
+                fontSize: '0.7rem'
+              }}
+            >
+              Loading...
+            </Typography>
+          </Box>
+        )}
 
         {chartData.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 4 }}>

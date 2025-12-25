@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -10,25 +10,26 @@ import {
   DialogTitle,
   DialogContent,
   IconButton,
-  CircularProgress
+  CircularProgress,
+  LinearProgress
 } from '@mui/material';
 import { useMediaQuery } from '@mui/material';
 
 import { alpha } from '@mui/material/styles';
 import { Close } from '@mui/icons-material';
-import { Trade, Calendar } from '../types/dualWrite';
-import { ScoreSettings, ScoreAnalysis } from '../types/score';
-import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
-import { scoreService } from '../services/scoreService';
+import { Trade, Calendar } from '../../types/dualWrite';
+import { ScoreSettings, ScoreAnalysis } from '../../types/score';
+import { DynamicRiskSettings } from '../../utils/dynamicRiskUtils';
+import { scoreService } from '../../services/scoreService';
 
-import { scrollbarStyles } from '../styles/scrollbarStyles';
-import ScoreCard from './scoring/ScoreCard';
-import ScoreBreakdown from './scoring/ScoreBreakdown';
-import ScoreHistory from './scoring/ScoreHistory';
-import ScoreSettingsComponent from './scoring/ScoreSettings';
-import TagPatternAnalysis from './TagPatternAnalysis';
-import RoundedTabs, { TabPanel } from './common/RoundedTabs';
-import { logger } from '../utils/logger';
+import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import ScoreCard from './ScoreCard';
+import ScoreBreakdown from './ScoreBreakdown';
+import ScoreHistory from './ScoreHistory';
+import ScoreSettingsComponent from './ScoreSettings';
+import TagPatternAnalysis from '../TagPatternAnalysis';
+import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
+import { logger } from '../../utils/logger';
 interface ScoreSectionProps {
   trades: Trade[];
   selectedDate: Date;
@@ -39,6 +40,7 @@ interface ScoreSectionProps {
   accountBalance?: number;
   dynamicRiskSettings?: DynamicRiskSettings;
   allTags?: string[]; // Add allTags prop to receive calendar.tags
+  timePeriod?: 'month' | 'year' | 'all'; // Parent chart time period to restrict available score periods
 }
 
 
@@ -51,7 +53,8 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
   onUpdateCalendarProperty,
   accountBalance,
   dynamicRiskSettings,
-  allTags
+  allTags,
+  timePeriod = 'all' // Default to 'all' if not provided
 }) => {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
@@ -62,11 +65,15 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
   const [selectedTags, setSelectedTags] = useState<string[]>(scoreSettings?.selectedTags || []);
   const [isSaving, setIsSaving] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
-
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isLoadingMultiPeriod, setIsLoadingMultiPeriod] = useState(false);
 
   const [scoreAnalysis, setScoreAnalysis] = useState<ScoreAnalysis | null>(null);
   const [scoreHistory, setScoreHistory] = useState<any[]>([]);
   const [multiPeriodScores, setMultiPeriodScores] = useState<any>(null);
+
+  // Cache for score history to avoid recalculating when switching tabs
+  const scoreHistoryCache = useRef<Map<string, any[]>>(new Map());
 
   // State for breakdown modal
   const [breakdownModalOpen, setBreakdownModalOpen] = useState(false);
@@ -93,6 +100,30 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
     const updatedSettings = { ...settings, selectedTags };
     scoreService.updateSettings(updatedSettings);
   }, [selectedTags, settings]);
+
+  // Determine available score history periods based on parent chart time period
+  const availablePeriods = React.useMemo((): ('daily' | 'weekly' | 'monthly' | 'yearly')[] => {
+    switch (timePeriod) {
+      case 'month':
+        // For monthly view: only daily and weekly
+        return ['daily', 'weekly'];
+      case 'year':
+        // For yearly view: daily, weekly, and monthly
+        return ['daily', 'weekly', 'monthly'];
+      case 'all':
+      default:
+        // For all time view: all periods available
+        return ['daily', 'weekly', 'monthly', 'yearly'];
+    }
+  }, [timePeriod]);
+
+  // Ensure current historyPeriod is valid when parent timePeriod changes
+  useEffect(() => {
+    if (!availablePeriods.includes(historyPeriod)) {
+      // If current period is not available, switch to the most granular available period
+      setHistoryPeriod(availablePeriods[availablePeriods.length - 1]);
+    }
+  }, [availablePeriods, historyPeriod]);
 
   // Update dynamic risk settings in score service
   useEffect(() => {
@@ -137,33 +168,130 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
   useEffect(() => {
     if (trades.length === 0) {
       setScoreHistory([]);
+      setIsLoadingHistory(false);
       return;
     }
 
     const calculateScoreHistory = async () => {
+      // Generate cache key based on calculation parameters
+      const cacheKey = JSON.stringify({
+        tradesCount: trades.length,
+        historyPeriod,
+        selectedTags: selectedTags.sort(),
+        settingsKey: `${settings.thresholds.minTradesForScore}-${settings.weights.consistency}`,
+        selectedDate: selectedDate.toISOString().split('T')[0],
+        timePeriod
+      });
+
+      // Check cache first
+      const cachedHistory = scoreHistoryCache.current.get(cacheKey);
+      if (cachedHistory) {
+        // Use cached data immediately without loading
+        setScoreHistory(cachedHistory);
+        setIsLoadingHistory(false);
+        return;
+      }
+
+      setIsLoadingHistory(true);
       try {
         // Ensure score service has the latest settings before calculation
         const updatedSettings = { ...settings, selectedTags };
         scoreService.updateSettings(updatedSettings);
-        const history = await scoreService.getScoreHistory(trades, historyPeriod, 12, updatedSettings);
+
+        // Determine number of periods based on parent time period and history period
+        let periodsBack = 12;
+        if (timePeriod === 'month') {
+          // For monthly view, limit to current month
+          if (historyPeriod === 'daily') {
+            // Show days in the selected month (max ~31)
+            periodsBack = 31;
+          } else if (historyPeriod === 'weekly') {
+            // Show weeks in the selected month (max 5)
+            periodsBack = 5;
+          } else if (historyPeriod === 'monthly') {
+            // Show just the current month
+            periodsBack = 1;
+          }
+        } else if (timePeriod === 'year') {
+          // For yearly view, limit to current year
+          if (historyPeriod === 'daily') {
+            // Show days in the selected year (max ~365)
+            periodsBack = 365;
+          } else if (historyPeriod === 'weekly') {
+            // Show weeks in the selected year (max 53)
+            periodsBack = 53;
+          } else if (historyPeriod === 'monthly') {
+            // Show months in the selected year (12)
+            periodsBack = 12;
+          } else if (historyPeriod === 'yearly') {
+            // Show just the current year
+            periodsBack = 1;
+          }
+        } else {
+          // For 'all' view, show last 12 periods
+          periodsBack = 12;
+        }
+
+        let history = await scoreService.getScoreHistory(
+          trades,
+          historyPeriod,
+          periodsBack,
+          updatedSettings,
+          selectedDate // Pass selected date as reference
+        );
+
+        // Filter history to only include periods within the parent time period bounds
+        if (timePeriod === 'month') {
+          // Only show scores from the selected month
+          const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+          const monthEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+          history = history.filter(entry => {
+            const entryDate = new Date(entry.date);
+            return entryDate >= monthStart && entryDate <= monthEnd;
+          });
+        } else if (timePeriod === 'year') {
+          // Only show scores from the selected year
+          const yearStart = new Date(selectedDate.getFullYear(), 0, 1);
+          const yearEnd = new Date(selectedDate.getFullYear(), 11, 31);
+          history = history.filter(entry => {
+            const entryDate = new Date(entry.date);
+            return entryDate >= yearStart && entryDate <= yearEnd;
+          });
+        }
+
+        // Store in cache for future use
+        scoreHistoryCache.current.set(cacheKey, history);
+
+        // Clear old cache entries if cache gets too large (keep last 10)
+        if (scoreHistoryCache.current.size > 10) {
+          const firstKey = scoreHistoryCache.current.keys().next().value;
+          if (firstKey) {
+            scoreHistoryCache.current.delete(firstKey);
+          }
+        }
+
         setScoreHistory(history);
       } catch (error) {
         logger.error('Error calculating score history:', error);
         setScoreHistory([]);
+      } finally {
+        setIsLoadingHistory(false);
       }
     };
 
     calculateScoreHistory();
-  }, [trades, historyPeriod, selectedTags, settings]);
+  }, [trades, historyPeriod, selectedTags, settings, selectedDate, timePeriod]);
 
   // Calculate multi-period scores for overview
   useEffect(() => {
     if (trades.length === 0) {
       setMultiPeriodScores(null);
+      setIsLoadingMultiPeriod(false);
       return;
     }
 
     const calculateMultiPeriodScores = async () => {
+      setIsLoadingMultiPeriod(true);
       try {
         // Ensure score service has the latest settings before calculation
         const updatedSettings = { ...settings, selectedTags };
@@ -173,6 +301,8 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
       } catch (error) {
         logger.error('Error calculating multi-period scores:', error);
         setMultiPeriodScores(null);
+      } finally {
+        setIsLoadingMultiPeriod(false);
       }
     };
 
@@ -328,24 +458,18 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
       <Box sx={{ px: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 3 } }}>
         {/* Overview Tab */}
         <TabPanel value={activeTab} index={0}>
-          <Stack spacing={4}>
-            {/* Multi-period score cards */}
-            {isCalculating ? (
-              <Box
+          <Box>
+            {isLoadingMultiPeriod && (
+              <LinearProgress
                 sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  py: 4
+                  mb: 2,
+                  borderRadius: 1
                 }}
-              >
-                <CircularProgress size={40} sx={{ mb: 2 }} />
-                <Typography variant="body2" color="text.secondary">
-                  Calculating trading scores...
-                </Typography>
-              </Box>
-            ) : multiPeriodScores ? (
+              />
+            )}
+            <Stack spacing={4}>
+              {/* Multi-period score cards */}
+              {multiPeriodScores ? (
               <Box>
 
                 <Typography
@@ -479,7 +603,8 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
                 </Typography>
               </Alert>
             )}
-          </Stack>
+            </Stack>
+          </Box>
         </TabPanel>
 
         {/* Score History Tab */}
@@ -488,6 +613,8 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
             history={scoreHistory}
             period={historyPeriod}
             onPeriodChange={handleHistoryPeriodChange}
+            availablePeriods={availablePeriods}
+            isLoading={isLoadingHistory}
           />
         </TabPanel>
 

@@ -18,8 +18,7 @@ import { formatValue } from '../../utils/formatters';
 import TagFilterDialog from '../TagFilterDialog';
 import { performanceCalculationService } from '../../services/performanceCalculationService';
 
-interface TagPerformanceAnalysisProps {
-  calendarIds: string[]; // Changed from calendarId to support multiple calendars
+interface TagPerformanceAnalysisProps { 
   trades: Trade[];
   selectedDate: Date;
   timePeriod: 'month' | 'year' | 'all';
@@ -31,8 +30,7 @@ interface TagPerformanceAnalysisProps {
   setMultipleTradesDialog: (dialogState: any) => void;
 }
 
-const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
-  calendarIds,
+const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({ 
   trades,
   selectedDate,
   timePeriod,
@@ -50,9 +48,9 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
   const [isCalculating, setIsCalculating] = useState(false);
 
 
-  // Calculate filtered tag stats using PostgreSQL RPC function
+  // Calculate filtered tag stats client-side (no DB query needed)
   useEffect(() => {
-    const calculateFilteredStats = async () => {
+    const calculateFilteredStats = () => {
       if (primaryTags.length === 0) {
         setFilteredTagStats([]);
         return;
@@ -60,16 +58,14 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
 
       setIsCalculating(true);
       try {
-        // Use RPC function for server-side calculation
-        const tagPerformanceData = await performanceCalculationService.calculateTagPerformanceRPC(
-          calendarIds,
+        // Use client-side calculation from already-fetched trades
+        const tagPerformanceData = performanceCalculationService.calculateTagPerformanceFromTrades(
+          trades,
           primaryTags,
-          secondaryTags,
-          timePeriod,
-          selectedDate
+          secondaryTags
         );
 
-        // Transform RPC data to match component expectations
+        // Transform data to match component expectations
         const tagStats = tagPerformanceData.map((tagData: any) => ({
           tag: tagData.tag.substring(tagData.tag.indexOf(":") + 1, tagData.tag.length),
           wins: tagData.wins,
@@ -81,7 +77,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
           avg_pnl: tagData.avg_pnl,
           max_win: tagData.max_win,
           max_loss: tagData.max_loss,
-          trades: [] // RPC doesn't return individual trades (use client-side filter if needed for clicks)
+          trades: [] // Can be populated client-side if needed for clicks
         }));
 
         setFilteredTagStats(tagStats);
@@ -94,7 +90,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
     };
 
     calculateFilteredStats();
-  }, [calendarIds, primaryTags, secondaryTags, timePeriod, selectedDate]);
+  }, [trades, primaryTags, secondaryTags]);
 
 
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -14,7 +14,8 @@ import {
   InputAdornment,
   TextField,
   Stack,
-  Tooltip
+  Tooltip,
+  CircularProgress
 } from '@mui/material';
 import {
   PushPin as PinIcon,
@@ -33,11 +34,13 @@ import { logger } from '../utils/logger';
 import TradeCard from './aiChat/TradeCard';
 import RoundedTabs, { TabPanel } from './common/RoundedTabs';
 import { TradeOperationsProps } from '../types/tradeOperations';
+import * as calendarService from '../services/calendarService';
+import Shimmer from './Shimmer';
 
 interface PinnedTradesDrawerProps {
   open: boolean;
   onClose: () => void;
-  trades: Trade[];
+  calendarId: string | undefined;
   onTradeClick?: (trade: Trade, trades: Trade[], title: string) => void;
   tradeOperations: TradeOperationsProps;
 }
@@ -59,7 +62,7 @@ const getImpactColor = (impact: string | undefined, theme: any) => {
 const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   open,
   onClose,
-  trades,
+  calendarId,
   onTradeClick,
   tradeOperations
 }) => {
@@ -76,10 +79,30 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
   const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
 
-  // Get pinned trades
-  const pinnedTrades = useMemo(() => {
-    return trades.filter(trade => trade.is_pinned);
-  }, [trades]);
+  // Pinned trades state
+  const [pinnedTrades, setPinnedTrades] = useState<Trade[]>([]);
+  const [isLoadingPinned, setIsLoadingPinned] = useState(false);
+
+  // Fetch pinned trades when drawer opens
+  useEffect(() => {
+    const fetchPinnedTrades = async () => {
+      if (!open || !calendarId) return;
+
+      setIsLoadingPinned(true);
+      try {
+        const trades = await calendarService.getTradeRepository().fetchPinnedTrades(calendarId);
+        setPinnedTrades(trades);
+        logger.log(`📌 Loaded ${trades.length} pinned trades`);
+      } catch (error) {
+        logger.error('Error fetching pinned trades:', error);
+        setPinnedTrades([]);
+      } finally {
+        setIsLoadingPinned(false);
+      }
+    };
+
+    fetchPinnedTrades();
+  }, [open, calendarId]);
 
   // Get pinned events from calendar
   const pinnedEvents = useMemo(() => {
@@ -247,7 +270,49 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
         {/* Render content based on current state */}
         {activeTab === 0 ? (
           // Pinned Trades Tab
-          sortedPinnedTrades.length === 0 ? (
+          isLoadingPinned ? (
+            <Stack spacing={2} sx={{ p: 2, overflow: 'auto', height: '100%', ...scrollbarStyles(theme) }}>
+              {/* Show 3 shimmer cards while loading */}
+              {[1, 2, 3].map((index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    maxWidth: 400,
+                    border: '1px solid',
+                    borderColor: alpha(theme.palette.divider, 0.2),
+                    borderRadius: 1,
+                    p: 2,
+                    pt: 1
+                  }}
+                >
+                  {/* Header - Name and Amount */}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Shimmer height={20} width="40%" borderRadius={4} variant="wave" intensity="medium" />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Shimmer height={16} width={16} borderRadius="50%" variant="wave" intensity="medium" />
+                      <Shimmer height={20} width={80} borderRadius={4} variant="wave" intensity="medium" />
+                    </Box>
+                  </Box>
+
+                  {/* Info Icons Row */}
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
+                    <Shimmer height={14} width={14} borderRadius="50%" variant="wave" intensity="low" />
+                    <Shimmer height={14} width={14} borderRadius="50%" variant="wave" intensity="low" />
+                    <Shimmer height={12} width={80} borderRadius={4} variant="wave" intensity="low" />
+                    <Shimmer height={14} width={14} borderRadius="50%" variant="wave" intensity="low" />
+                    <Shimmer height={12} width={60} borderRadius={4} variant="wave" intensity="low" />
+                  </Box>
+
+                  {/* Tags Row */}
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    <Shimmer height={20} width={80} borderRadius={10} variant="wave" intensity="medium" />
+                    <Shimmer height={20} width={60} borderRadius={10} variant="wave" intensity="medium" />
+                    <Shimmer height={20} width={70} borderRadius={10} variant="wave" intensity="medium" />
+                  </Box>
+                </Box>
+              ))}
+            </Stack>
+          ) : sortedPinnedTrades.length === 0 ? (
             <Box
               sx={{
                 p: 4,
@@ -344,12 +409,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
           ) : (
             <List sx={{ p: 0, overflow: 'auto', height: '100%', ...scrollbarStyles(theme) }}>
               {filteredPinnedEvents.map((pinnedEvent, index) => {
-                const tradesWithEvent = trades.filter(trade =>
-                  trade.economic_events?.some(event =>
-                    eventMatchV2(event, pinnedEvent)
-                  )
-                );
-
+                // Note: Trade count for events will be fetched when implementing EconomicCalendarDrawer optimization
                 const impactColor = getImpactColor(pinnedEvent.impact, theme);
 
                 return (
@@ -407,9 +467,6 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                             >
                               {pinnedEvent.event}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
-                              {tradesWithEvent.length} trade{tradesWithEvent.length !== 1 ? 's' : ''} found
-                            </Typography>
                           </Box>
 
                           {/* Note Icon */}
@@ -423,20 +480,6 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
                                 }}
                               />
                             </Tooltip>
-                          )}
-
-                          {/* Trade Count Badge */}
-                          {tradesWithEvent.length > 0 && (
-                            <Chip
-                              label={tradesWithEvent.length}
-                              size="small"
-                              sx={{
-                                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                color: 'primary.main',
-                                fontWeight: 600,
-                                minWidth: 32
-                              }}
-                            />
                           )}
                         </Box>
                       </ListItemButton>
@@ -459,7 +502,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
             setSelectedEvent(null);
           }}
           event={selectedEvent}
-          trades={trades}
+          calendarId={calendar.id}
           tradeOperations={tradeOperations}
         />
       )}

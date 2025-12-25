@@ -101,9 +101,9 @@ import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/
 import AnimatedBackground from '../components/common/AnimatedBackground';
 import { Z_INDEX } from '../styles/zIndex';
 
-import MonthlyStatisticsSection from '../components/MonthlyStatisticsSection';
 import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
 import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
+import { calculateSessionStats } from '../utils/chartDataUtils';
 import EconomicCalendarDrawer, { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
 import { useEconomicEventWatcher, useEconomicEventsUpdates } from '../hooks/useEconomicEventWatcher';
 import { TradeOperationsProps } from '../types/tradeOperations';
@@ -113,6 +113,7 @@ import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
 import { useCalendarTrades } from '../hooks/useCalendarTrades';
+import { SessionPerformanceAnalysis, TradesListDialog } from '../components/charts';
 
 interface TradeCalendarProps {
   // Trade CRUD operations now handled internally via useCalendarTrades hook
@@ -473,6 +474,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     notification,
     clearNotification,
     isTradeUpdating,
+    loadMonthTrades,
+    loadVisibleRangeTrades,
   } = useCalendarTrades({
     calendarId,
     selectedCalendar,
@@ -553,7 +556,18 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [deletingTradeIds, setDeletingTradeIds] = useState<string[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-
+  // Session statistics dialog state
+  const [sessionTradesDialog, setSessionTradesDialog] = useState<{
+    open: boolean;
+    trades: Trade[];
+    date: string;
+    expandedTradeId: string | null;
+  }>({
+    open: false,
+    trades: [],
+    date: '',
+    expandedTradeId: null
+  });
 
   // Custom function to handle setting zoomed image and related state
   const setZoomedImage = useCallback((url: string, allImages?: string[], initialIndex?: number) => {
@@ -677,6 +691,20 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     isActive: true // Always active when TradeCalendar is mounted
   });
 
+  // Load trades for visible calendar range when month changes
+  // This ensures overflow days from adjacent months show their trades
+  useEffect(() => {
+    if (!calendarId) return;
+
+    // Calculate the visible date range in the calendar grid
+    // Includes overflow days from previous/next months
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const visibleStart = startOfWeek(monthStart, { weekStartsOn: 0 }); // Sunday
+    const visibleEnd = endOfWeek(monthEnd, { weekStartsOn: 0 }); // Saturday
+
+    loadVisibleRangeTrades(visibleStart, visibleEnd);
+  }, [currentDate, calendarId, loadVisibleRangeTrades]);
 
   // Listen for multiple economic event updates (same release time)
   useEconomicEventsUpdates((updatedEvents, allEvents, updatedCalendarId) => {
@@ -901,14 +929,16 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   }, [filteredTrades, selectedTags, totalPnL]);
 
 
-  // Pre-calculate day statistics for all days in the current month
-  // This prevents expensive recalculations in CalendarDayCell components
+  // Pre-calculate day statistics for all visible days in the calendar grid
+  // Includes overflow days from adjacent months to show complete statistics
   const dayStatsMap = useMemo(() => {
     const map = new Map<string, ReturnType<typeof calculateDayStats>>();
 
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(currentDate);
-    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    const visibleStart = startOfWeek(monthStart, { weekStartsOn: 0 }); // Sunday
+    const visibleEnd = endOfWeek(monthEnd, { weekStartsOn: 0 }); // Saturday
+    const days = eachDayOfInterval({ start: visibleStart, end: visibleEnd });
 
     days.forEach(day => {
       const dayKey = format(day, 'yyyy-MM-dd');
@@ -929,8 +959,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     return map;
   }, [currentDate, tradesByDay, accountBalance, maxDailyDrawdown, dynamicRiskSettings, filteredTrades]);
 
-  // Pre-calculate weekly statistics for all weeks in the current month
-  // This prevents expensive recalculations in WeeklyPnL components
+  // Pre-calculate weekly statistics for all visible weeks in the calendar grid
+  // Includes weeks with overflow days from adjacent months
   const weeklyStatsMap = useMemo(() => {
     const map = new Map<string, {
       weekTrades: Trade[];
@@ -941,15 +971,16 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(currentDate);
-    const weeks = eachWeekOfInterval({ start: monthStart, end: monthEnd }, { weekStartsOn: 0 });
+    const visibleStart = startOfWeek(monthStart, { weekStartsOn: 0 }); // Sunday
+    const visibleEnd = endOfWeek(monthEnd, { weekStartsOn: 0 }); // Saturday
+    const weeks = eachWeekOfInterval({ start: visibleStart, end: visibleEnd }, { weekStartsOn: 0 });
 
     weeks.forEach(weekStart => {
       const weekKey = format(weekStart, 'yyyy-MM-dd');
 
-      // Filter trades for this week
+      // Filter trades for this week (include all trades, not just current month)
       const weekTrades = filteredTrades.filter(trade =>
-        isSameWeek(new Date(trade.trade_date), weekStart, { weekStartsOn: 0 }) &&
-        new Date(trade.trade_date).getMonth() === currentDate.getMonth()
+        isSameWeek(new Date(trade.trade_date), weekStart, { weekStartsOn: 0 })
       );
 
       // Calculate net amount for the week
@@ -975,6 +1006,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
     return map;
   }, [currentDate, filteredTrades, accountBalance, weeklyTarget]);
+
+  // Calculate session statistics for the monthly statistics section
+  const sessionStats = useMemo(() => {
+    return calculateSessionStats(filteredTrades, currentDate, 'month', accountBalance);
+  }, [filteredTrades, currentDate, accountBalance]);
 
   const handlePrevMonth = () => {
     setCurrentDate(prev => subMonths(prev, 1));
@@ -1097,12 +1133,15 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
   const handleMonthClick = () => {
+    // Open month selector - year_stats are already synced via realtime
     setIsMonthSelectorOpen(true);
   };
 
   const handleMonthSelect = (trade_date: Date) => {
+    // Setting currentDate will trigger useEffect to load visible calendar range
+    // This includes overflow days from adjacent months
     setCurrentDate(trade_date);
-    setIsMonthSelectorOpen(false);
+    // Note: Dialog closes itself after this completes
   };
 
   const handleTagsChange = (tags: string[]) => {
@@ -1380,11 +1419,20 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 trades={filteredTrades}
                 accountBalance={accountBalance}
                 onImportTrades={handleImportTrades}
+                onDeleteTrade={handleDeleteClick}
                 currentDate={currentDate}
                 monthlyTarget={monthly_target}
                 onClearMonthTrades={handleClearMonthTrades}
                 isReadOnly={isReadOnly}
                 onOpenGalleryMode={openGalleryMode}
+                calendarId={calendarId!!}
+                scoreSettings={scoreSettings}
+                dynamicRiskSettings={dynamicRiskSettings}
+                onUpdateTradeProperty={handleUpdateTradeProperty}
+                onUpdateCalendarProperty={onUpdateCalendarProperty}
+                onEditTrade={handleEditTrade}
+                economicFilter={(_calendarId) => calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS}
+                maxDailyDrawdown={maxDailyDrawdown}
               />
 
             </Box>
@@ -1743,17 +1791,32 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
           {/*Current Monthly Statistics Section */}
-          <MonthlyStatisticsSection
-            trades={filteredTrades}
-            selectedDate={currentDate}
-            accountBalance={accountBalance}
-            maxDailyDrawdown={maxDailyDrawdown}
-            monthly_target={monthly_target}
-            calendarId={calendarId!!}
-            scoreSettings={scoreSettings}
-            dynamicRiskSettings={dynamicRiskSettings}
-            allTags={allTags}
-            isReadOnly={isReadOnly}
+          {/* Session Performance - Only shown on desktop */}
+          {!isMdDown && (
+            <SessionPerformanceAnalysis
+              sessionStats={sessionStats}
+              trades={filteredTrades}
+              selectedDate={currentDate}
+              timePeriod="month"
+              setMultipleTradesDialog={setSessionTradesDialog}
+            />
+          )}
+
+          {/* Session Trades List Dialog */}
+          <TradesListDialog
+            open={sessionTradesDialog.open}
+            onClose={() => setSessionTradesDialog(prev => ({ ...prev, open: false }))}
+            trades={sessionTradesDialog.trades}
+            date={sessionTradesDialog.date}
+            expandedTradeId={sessionTradesDialog.expandedTradeId}
+            onTradeExpand={(tradeId) =>
+              setSessionTradesDialog(prev => ({
+                ...prev,
+                expandedTradeId: prev.expandedTradeId === tradeId ? null : tradeId
+              }))
+            }
+            account_balance={accountBalance}
+            allTrades={trades}
             tradeOperations={tradeOperations}
           />
 
@@ -1850,6 +1913,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           accountBalance={accountBalance}
           monthlyTarget={monthly_target}
           yearlyTarget={yearlyTarget}
+          yearStats={calendar?.year_stats || {}}
           onOpenGalleryMode={openGalleryMode}
         />
 
@@ -1996,7 +2060,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         <PinnedTradesDrawer
           open={pinnedTradesDrawerOpen}
           onClose={() => setPinnedTradesDrawerOpen(false)}
-          trades={trades}
+          calendarId={calendarId}
           onTradeClick={(trade, allTrades, title) => {
             // Close drawer and open the trade in gallery mode
             setPinnedTradesDrawerOpen(false);
@@ -2037,7 +2101,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         open={isEconomicCalendarOpen}
         onClose={() => setIsEconomicCalendarOpen(false)}
         calendar={calendar!}
-        trades={trades}
         payload={economicCalendarUpdatedEvent}
         isReadOnly={isReadOnly}
         tradeOperations={tradeOperations}

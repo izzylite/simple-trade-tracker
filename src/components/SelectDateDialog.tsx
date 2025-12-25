@@ -19,7 +19,7 @@ import {
   ViewCarousel as GalleryIcon
 } from '@mui/icons-material';
 import { addYears, subYears } from 'date-fns';
-import { Trade } from '../types/dualWrite';
+import { Trade, YearStats } from '../types/dualWrite';
 import TargetBadge from '../components/TargetBadge';
 import { BaseDialog } from './common';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
@@ -34,6 +34,7 @@ interface SelectDateDialogProps {
   accountBalance: number;
   monthlyTarget?: number;
   yearlyTarget?: number;
+  yearStats: Record<string, YearStats>; // Pre-calculated year statistics
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
 }
 
@@ -46,6 +47,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   accountBalance,
   monthlyTarget,
   yearlyTarget,
+  yearStats,
   onOpenGalleryMode
 }) => {
   const theme = useTheme();
@@ -83,31 +85,44 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
 
   const currentMonth = currentDate.getMonth();
 
-  // Memoize yearly statistics - only recalculate when year or trades change
+  // Get yearly statistics from pre-calculated year_stats
+  // Falls back to empty stats if year data not available
   const yearlyStats = React.useMemo(() => {
-    const yearTrades = trades.filter(trade => new Date(trade.trade_date).getFullYear() === currentYear);
-    const yearlyPnL = yearTrades.reduce((sum, trade) => sum + trade.amount, 0);
-    const yearlyWinCount = yearTrades.filter(trade => trade.trade_type === 'win').length;
-    const yearlyLossCount = yearTrades.filter(trade => trade.trade_type === 'loss').length;
-    const yearlyWinRate = yearTrades.length > 0 ? (yearlyWinCount / yearTrades.length * 100).toFixed(1) : '0';
+    const stats = yearStats[currentYear.toString()];
 
-    // Calculate yearly growth percentage using account value at start of year
+    if (!stats) {
+      // Fallback for years with no trades or not yet calculated
+      return {
+        yearTrades: [],
+        yearlyPnL: 0,
+        yearlyWinCount: 0,
+        yearlyLossCount: 0,
+        yearlyWinRate: '0',
+        yearlyGrowthPercentage: '0',
+        accountValueAtStartOfYear: accountBalance,
+        startOfYear: new Date(currentYear, 0, 1)
+      };
+    }
+
+    // Calculate account value at start of year for target calculations
     const startOfYear = new Date(currentYear, 0, 1);
     const tradesBeforeYear = trades.filter(trade => new Date(trade.trade_date) < startOfYear);
     const accountValueAtStartOfYear = accountBalance + tradesBeforeYear.reduce((sum, trade) => sum + trade.amount, 0);
-    const yearlyGrowthPercentage = accountValueAtStartOfYear > 0 ? (yearlyPnL / accountValueAtStartOfYear * 100).toFixed(2) : '0';
+
+    // Filter year trades for gallery mode (still need actual trade objects)
+    const yearTrades = trades.filter(trade => new Date(trade.trade_date).getFullYear() === currentYear);
 
     return {
       yearTrades,
-      yearlyPnL,
-      yearlyWinCount,
-      yearlyLossCount,
-      yearlyWinRate,
-      yearlyGrowthPercentage,
+      yearlyPnL: stats.yearly_pnl,
+      yearlyWinCount: stats.win_count,
+      yearlyLossCount: stats.loss_count,
+      yearlyWinRate: stats.win_rate.toFixed(1),
+      yearlyGrowthPercentage: stats.yearly_growth_percentage.toFixed(2),
       accountValueAtStartOfYear,
       startOfYear
     };
-  }, [currentYear, trades, accountBalance]);
+  }, [currentYear, yearStats, accountBalance, trades]);
 
   const {
     yearTrades,
@@ -120,7 +135,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
     startOfYear
   } = yearlyStats;
 
-  // Memoize monthly statistics - pre-calculate all months at once
+  // Get monthly statistics from pre-calculated year_stats
   const monthlyStats = React.useMemo(() => {
     const stats = new Map<number, {
       monthPnL: number;
@@ -134,67 +149,73 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
       growthPercentage: string;
     }>();
 
+    const yearData = yearStats[currentYear.toString()];
+
+    if (!yearData) {
+      // Fallback: create empty stats for all 12 months
+      for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
+        stats.set(monthIndex, {
+          monthPnL: 0,
+          monthTrades: [],
+          accountValueAtStartOfMonth: accountBalance,
+          targetProgress: null,
+          growthPercentage: '0'
+        });
+      }
+      return stats;
+    }
+
+    // Use pre-calculated monthly stats from year_stats
     for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
+      const monthStats = yearData.monthly_stats[monthIndex];
       const startOfMonth = new Date(currentYear, monthIndex, 1);
 
-      // Filter trades for this month
+      // Filter trades for this month (still needed for gallery mode and target progress calculation)
       const monthTrades = trades.filter(trade => {
         const tradeDate = new Date(trade.trade_date);
         return tradeDate.getFullYear() === currentYear && tradeDate.getMonth() === monthIndex;
       });
 
-      const monthPnL = monthTrades.reduce((sum, trade) => sum + trade.amount, 0);
-
-      // Calculate account value at start of month (excluding that month's trades)
-      const tradesBeforeMonth = trades.filter(trade => new Date(trade.trade_date) < startOfMonth);
-      const accountValueAtStartOfMonth = accountBalance + tradesBeforeMonth.reduce((sum, trade) => sum + trade.amount, 0);
-
-      // Calculate growth percentage
-      const growthPercentage = accountValueAtStartOfMonth > 0
-        ? (monthPnL / accountValueAtStartOfMonth * 100).toFixed(2)
-        : '0';
-
-      // Calculate target progress
+      // Calculate target progress if monthly target is set
       let targetProgress = null;
       if (monthlyTarget && monthlyTarget > 0) {
         const progress = calculateTargetProgress(monthTrades, accountBalance, monthlyTarget, startOfMonth, trades);
-        const targetAmount = (monthlyTarget / 100) * accountValueAtStartOfMonth;
+        const targetAmount = (monthlyTarget / 100) * monthStats.account_value_at_start;
         targetProgress = {
           progress,
-          isMet: monthPnL >= targetAmount,
-          rawProgress: (monthPnL / targetAmount) * 100
+          isMet: monthStats.month_pnl >= targetAmount,
+          rawProgress: (monthStats.month_pnl / targetAmount) * 100
         };
       }
 
       stats.set(monthIndex, {
-        monthPnL,
+        monthPnL: monthStats.month_pnl,
         monthTrades,
-        accountValueAtStartOfMonth,
+        accountValueAtStartOfMonth: monthStats.account_value_at_start,
         targetProgress,
-        growthPercentage
+        growthPercentage: monthStats.growth_percentage.toFixed(2)
       });
     }
 
     return stats;
-  }, [currentYear, trades, accountBalance, monthlyTarget]);
+  }, [currentYear, yearStats, accountBalance, monthlyTarget, trades]);
 
-  // Find the best month using memoized stats
+  // Get best month from pre-calculated year_stats
   const bestMonth = React.useMemo(() => {
-    let bestMonthIndex = -1;
-    let bestMonthPnL = 0;
+    const yearData = yearStats[currentYear.toString()];
 
-    monthlyStats.forEach((stats, monthIndex) => {
-      if (stats.monthPnL > bestMonthPnL) {
-        bestMonthPnL = stats.monthPnL;
-        bestMonthIndex = monthIndex;
-      }
-    });
+    if (!yearData || yearData.best_month_pnl <= 0) {
+      return {
+        name: 'None',
+        pnl: 0
+      };
+    }
 
     return {
-      name: bestMonthIndex >= 0 ? months[bestMonthIndex] : 'None',
-      pnl: bestMonthPnL
+      name: months[yearData.best_month_index],
+      pnl: yearData.best_month_pnl
     };
-  }, [monthlyStats, months]);
+  }, [currentYear, yearStats, months]);
 
   // Calculate yearly target progress using memoized values
   const yearlyTargetProgress = React.useMemo(() => {

@@ -131,10 +131,17 @@ export class ScoreService {
     allTrades: Trade[],
     period: 'daily' | 'weekly' | 'monthly' | 'yearly',
     periodsBack: number = 12,
-    scoreSettings: ScoreSettings = DEFAULT_SCORE_SETTINGS
+    scoreSettings: ScoreSettings = DEFAULT_SCORE_SETTINGS,
+    referenceDate: Date = new Date()
   ): Promise<ScoreHistory[]> {
     const history: ScoreHistory[] = [];
-    const today = new Date();
+    const today = referenceDate;
+
+    // Use dynamic threshold based on period type
+    // Longer periods need fewer trades per period to show meaningful data
+    const minTrades = period === 'monthly' || period === 'yearly'
+      ? 1
+      : this.settings.thresholds.minTradesForScore;
 
     for (let i = 0; i < periodsBack; i++) {
       let targetDate: Date;
@@ -156,7 +163,7 @@ export class ScoreService {
 
       const periodTrades = this.getTradesForPeriod(allTrades, period, targetDate);
 
-      if (periodTrades.length >= this.settings.thresholds.minTradesForScore) {
+      if (periodTrades.length >= minTrades) {
         const analysis = await this.calculateScore(allTrades, period, targetDate, scoreSettings);
 
         history.push({

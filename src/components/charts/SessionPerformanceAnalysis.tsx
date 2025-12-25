@@ -51,12 +51,12 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
       <Typography variant="h6" sx={{ mb: 2 }}>
         Session Performance
       </Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minHeight: 300 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
         <Box sx={{
           display: 'grid',
           gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(2, 1fr)', md: 'repeat(2, 1fr)' },
           gap: 2,
-          minHeight: '400px'
+          gridAutoRows: 'minmax(min-content, max-content)'
         }}>
           {sessionStats.map(session => (
             <Paper

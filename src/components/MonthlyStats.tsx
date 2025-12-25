@@ -34,7 +34,8 @@ import {
   Balance,
   MoreVert,
   Delete,
-  ViewCarousel as GalleryIcon
+  ViewCarousel as GalleryIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import { Trade } from '../types/dualWrite';
 import { exportTrades } from '../utils/tradeExportImport';
@@ -43,6 +44,8 @@ import { calculatePercentageOfValueAtDate } from '../utils/dynamicRiskUtils';
 import { calculateTargetProgress } from '../utils/statsUtils';
 import { error } from '../utils/logger';
 import { ImportMappingDialog } from './import/ImportMappingDialog';
+import PerformanceCharts from './PerformanceCharts';
+import { scrollbarStyles } from '../styles/scrollbarStyles';
 
 
 
@@ -58,6 +61,15 @@ interface MonthlyStatsProps {
   isReadOnly?: boolean;
   // Gallery mode handler
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
+  // Performance charts props
+  calendarId?: string;
+  scoreSettings?: import('../types/score').ScoreSettings;
+  dynamicRiskSettings?: import('../utils/dynamicRiskUtils').DynamicRiskSettings;
+  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
+  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: import('../types/dualWrite').Calendar) => import('../types/dualWrite').Calendar) => Promise<import('../types/dualWrite').Calendar | undefined>;
+  onEditTrade?: (trade: Trade) => void;
+  economicFilter?: (calendarId: string) => import('./economicCalendar/EconomicCalendarDrawer').EconomicCalendarFilterSettings;
+  maxDailyDrawdown?: number;
 }
 
 
@@ -70,12 +82,21 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   monthlyTarget,
   onClearMonthTrades,
   isReadOnly = false,
-  onOpenGalleryMode
+  onOpenGalleryMode,
+  calendarId,
+  scoreSettings,
+  dynamicRiskSettings,
+  onUpdateTradeProperty,
+  onUpdateCalendarProperty,
+  onEditTrade,
+  economicFilter,
+  maxDailyDrawdown
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const menuOpen = Boolean(menuAnchorEl);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
 
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
@@ -264,6 +285,28 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               id="import-file"
               onChange={handleFileSelect}
             />
+            {/* View Details Stats Button */}
+            {calendarId && (
+              <Tooltip title="View detailed performance analytics" arrow>
+                <IconButton
+                  onClick={() => setIsPerformanceDialogOpen(true)}
+                  size="small"
+                  sx={{
+                    color: 'primary.main',
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderColor: alpha(theme.palette.primary.main, 0.3),
+                    '&:hover': {
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      color: 'primary.main',
+                      borderColor: 'primary.main'
+                    }
+                  }}
+                >
+                  <Analytics />
+                </IconButton>
+              </Tooltip>
+            )}
             {/* Gallery Button - Moved from TradeCalendarPage */}
             {monthTrades.length > 0 && onOpenGalleryMode && (
               <Tooltip title="View all trades for this month in gallery mode" arrow>
@@ -628,6 +671,57 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
         onImport={handleImportComplete}
         file={selectedFile}
       />
+
+      {/* Performance Details Dialog */}
+      {calendarId && (
+        <Dialog
+          open={isPerformanceDialogOpen}
+          onClose={() => setIsPerformanceDialogOpen(false)}
+          maxWidth="lg"
+          fullWidth
+          fullScreen={isXs}
+          sx={{
+            '& .MuiDialog-paper': {
+              borderRadius: 2,
+              boxShadow: 'none',
+              border: `1px solid ${theme.palette.divider}`,
+              maxHeight: '90vh',
+              overflow: 'hidden'
+            },
+            '& .MuiDialogContent-root': {
+              ...scrollbarStyles(theme)
+            }
+          }}
+        >
+          <DialogTitle>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <Typography variant="h6">
+                Performance Analytics
+              </Typography>
+              <IconButton onClick={() => setIsPerformanceDialogOpen(false)} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          </DialogTitle>
+          <DialogContent sx={{ p: 0 }}>
+            <PerformanceCharts
+              selectedDate={currentDate}
+              accountBalance={accountBalance}
+              maxDailyDrawdown={maxDailyDrawdown || 0}
+              monthlyTarget={monthlyTarget}
+              calendarId={calendarId}
+              scoreSettings={scoreSettings}
+              dynamicRiskSettings={dynamicRiskSettings}
+              onEditTrade={onEditTrade}
+              onDeleteTrade={onDeleteTrade}
+              onUpdateTradeProperty={onUpdateTradeProperty}
+              onUpdateCalendarProperty={onUpdateCalendarProperty}
+              onOpenGalleryMode={onOpenGalleryMode}
+              economicFilter={economicFilter}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 };

@@ -41,8 +41,6 @@ import {
   EconomicCalendarDrawerProps,
   EconomicEvent,
 } from '../../types/economicCalendar';
-import { TradeOperationsProps } from '../../types/tradeOperations';
-import { TradeEconomicEvent } from '../../types/trade';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
 import EconomicEventListItem from './EconomicEventListItem';
@@ -50,11 +48,10 @@ import EconomicCalendarFilters from './EconomicCalendarFilters';
 import EconomicEventDetailDialog from './EconomicEventDetailDialog';
 import EconomicEventShimmer from './EconomicEventShimmer';
 import { logger } from '../../utils/logger';
-import { eventMatchV3 } from '../../utils/eventNameUtils';
 // Optimized hooks
 import { useEconomicEvents, ViewType } from '../../hooks/useEconomicEvents';
 import { useEventPinning } from '../../hooks/useEventPinning';
-import { useEconomicCalendarFilters, DEFAULT_FILTER_SETTINGS } from '../../hooks/useEconomicCalendarFilters';
+import { useEconomicCalendarFilters } from '../../hooks/useEconomicCalendarFilters';
 import { useEventCountdownTime } from '../../hooks/useCurrentTime';
 
 // Re-export for backwards compatibility
@@ -64,7 +61,6 @@ export { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } fro
 // Helper function to get date header for month view
 const getDateHeader = (date: string) => {
   const eventDate = parseISO(date);
-  const today = new Date();
 
   if (isToday(eventDate)) {
     return 'Today';
@@ -112,7 +108,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   open,
   onClose,
   calendar,
-  trades = [],
   payload,
   tradeOperations,
   isReadOnly = false
@@ -130,7 +125,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const [isMonthPickerActive, setIsMonthPickerActive] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
   const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
-  const [updatedEventIds, setUpdatedEventIds] = useState<Set<string>>(new Set());
 
   // Use reusable event pinning hook
   const {
@@ -168,7 +162,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     loadingMore,
     error,
     hasMore,
-    dateRange,
     loadMore,
     refresh,
   } = useEconomicEvents({
@@ -187,24 +180,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   // Use shared time hook - only updates every second when there are imminent events
   const { currentTime } = useEventCountdownTime(hasImminent, open);
 
-  // Handle incoming payload (updated economic events)
-  useEffect(() => {
-    if (payload && payload.updatedEvents.length > 0 && open) {
-      logger.log('📊 Economic Calendar Drawer: Received updated events payload', {
-        updatedCount: payload.updatedEvents.length,
-        eventIds: payload.updatedEvents.map(e => e.id)
-      });
-
-      // Track updated event IDs for visual feedback
-      const newUpdatedIds = new Set(payload.updatedEvents.map(e => e.id));
-      setUpdatedEventIds(newUpdatedIds);
-
-      // Clear visual feedback after 5 seconds
-      setTimeout(() => {
-        setUpdatedEventIds(new Set());
-      }, 5000);
-    }
-  }, [payload, open]);
+  // State for trade counts
+  const [eventTradeCountMap, setEventTradeCountMap] = useState<Map<string, number>>(new Map());
 
   // Merge events with payload updates - use updated events if available
   const mergedEvents = useMemo(() => {
@@ -227,25 +204,34 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   // Group events by date - memoized to prevent recalculation
   const groupedEvents = useMemo(() => groupEventsByDate(mergedEvents), [mergedEvents]);
 
-  // Calculate trade counts for each event - memoized for performance
-  const eventTradeCountMap = useMemo(() => {
-    const countMap = new Map<string, number>();
+  // Fetch trade counts when events change
+  useEffect(() => {
+    const fetchTradeCounts = async () => {
+      if (!calendar?.id || mergedEvents.length === 0) {
+        setEventTradeCountMap(new Map());
+        return;
+      }
 
-    mergedEvents.forEach(event => {
-      const tradeCount = trades.filter(trade => {
-        if (!trade.economic_events || trade.economic_events.length === 0) {
-          return false;
-        }
-        return trade.economic_events.some((tradeEvent: TradeEconomicEvent) => {
-          return eventMatchV3(tradeEvent, event);
-        });
-      }).length;
+      try {
+        const calendarServiceModule = await import('../../services/calendarService');
+        const counts = await calendarServiceModule.getTradeRepository().fetchTradeCountsByEvents(
+          calendar.id,
+          mergedEvents.map(event => ({
+            id: event.id,
+            event_name: event.event_name,
+            currency: event.currency,
+            impact: event.impact
+          }))
+        );
+        setEventTradeCountMap(counts);
+      } catch (error) {
+        logger.error('Error fetching trade counts:', error);
+        setEventTradeCountMap(new Map());
+      }
+    };
 
-      countMap.set(event.id, tradeCount);
-    });
-
-    return countMap;
-  }, [mergedEvents, trades]);
+    fetchTradeCounts();
+  }, [mergedEvents, calendar?.id]);
 
   // Handle view type change
   const handleViewTypeChange = useCallback((newViewType: ViewType) => {
@@ -661,7 +647,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                     {dayGroup.events.map((event, eventIndex) => {
                       const uniqueKey = `${event.id}-${eventIndex}`;
                       const tradeCount = eventTradeCountMap.get(event.id) || 0;
-                      const isRecentlyUpdated = updatedEventIds.has(event.id);
                       return (
                         <React.Fragment key={uniqueKey}>
                           <EconomicEventListItem
@@ -675,7 +660,6 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                             tradeCount={tradeCount}
                             currentTime={currentTime}
                             onClick={handleEventClick}
-                            isRecentlyUpdated={isRecentlyUpdated}
                           />
                           {eventIndex < dayGroup.events.length - 1 && <Divider sx={{ ml: 3 }} />}
                         </React.Fragment>
@@ -748,7 +732,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
           open={eventDetailDialogOpen}
           onClose={handleDialogClose}
           event={selectedEvent}
-          trades={trades}
+          calendarId={calendar.id}
           tradeOperations={tradeOperations}
           isReadOnly={isReadOnly}
         />

@@ -106,7 +106,6 @@ export interface EconomicCalendarDrawerProps {
   open: boolean;
   onClose: () => void;
   calendar: Calendar;
-  trades?: any[];
   payload?: { updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null;
   tradeOperations: TradeOperationsProps;
   isReadOnly?: boolean;

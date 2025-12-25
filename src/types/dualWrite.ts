@@ -45,6 +45,7 @@ export interface User extends BaseEntity {
  */
 export interface TradeEconomicEvent {
   name: string;
+  cleaned_name: string; // Normalized name for efficient querying (removes date suffixes)
   flag_code?: string;
   impact: ImpactLevel;
   currency: Currency;
@@ -115,6 +116,37 @@ export interface PinnedEvent {
 }
 
 /**
+ * Monthly statistics for a specific month
+ * Pre-calculated and stored in calendar.year_stats
+ */
+export interface MonthlyStats {
+  month_index: number; // 0-11 (0 = January, 11 = December)
+  month_pnl: number;
+  trade_count: number;
+  win_count: number;
+  loss_count: number;
+  growth_percentage: number;
+  account_value_at_start: number;
+}
+
+/**
+ * Yearly statistics including monthly breakdown
+ * Pre-calculated and stored in calendar.year_stats
+ */
+export interface YearStats {
+  year: number;
+  yearly_pnl: number;
+  yearly_growth_percentage: number;
+  total_trades: number;
+  win_count: number;
+  loss_count: number;
+  win_rate: number;
+  best_month_index: number; // 0-11 (0 = January, 11 = December)
+  best_month_pnl: number;
+  monthly_stats: MonthlyStats[]; // Array of 12 months (indices 0-11)
+}
+
+/**
  * Calendar entity - canonical database schema
  * Matches exact Supabase database schema with snake_case fields
  */
@@ -157,7 +189,12 @@ export interface Calendar extends BaseEntity {
   score_settings?: ScoreSettings;
   economic_calendar_filters?: EconomicCalendarFilterSettings;
   pinned_events?: PinnedEvent[];
-  
+
+  // Pre-calculated year statistics
+  // Structure: { "2024": YearStats, "2025": YearStats, ... }
+  // Populated automatically by handle-trade-changes edge function
+  year_stats?: Record<string, YearStats>;
+
   // Calculated statistics
   win_rate?: number;
   profit_factor?: number;
