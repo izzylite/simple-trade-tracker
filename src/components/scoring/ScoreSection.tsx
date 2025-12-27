@@ -285,6 +285,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
   // Calculate multi-period scores for overview
   useEffect(() => {
     if (trades.length === 0) {
+      logger.warn('ScoreSection: No trades available for multi-period calculation');
       setMultiPeriodScores(null);
       setIsLoadingMultiPeriod(false);
       return;
@@ -293,13 +294,33 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
     const calculateMultiPeriodScores = async () => {
       setIsLoadingMultiPeriod(true);
       try {
+        logger.debug('ScoreSection: Starting multi-period score calculation', {
+          tradesCount: trades.length,
+          selectedDate: selectedDate.toISOString(),
+          selectedTags: selectedTags.length
+        });
+
         // Ensure score service has the latest settings before calculation
         const updatedSettings = { ...settings, selectedTags };
         scoreService.updateSettings(updatedSettings);
         const scores = await scoreService.calculateMultiPeriodScore(trades, selectedDate, updatedSettings);
+
+        logger.debug('ScoreSection: Multi-period scores calculated successfully', {
+          dailyScore: scores.daily.currentScore.overall,
+          weeklyScore: scores.weekly.currentScore.overall,
+          monthlyScore: scores.monthly.currentScore.overall,
+          yearlyScore: scores.yearly.currentScore.overall
+        });
+
         setMultiPeriodScores(scores);
       } catch (error) {
-        logger.error('Error calculating multi-period scores:', error);
+        logger.error('ScoreSection: Error calculating multi-period scores:', error);
+        console.error('ScoreSection multi-period calculation error details:', {
+          error,
+          tradesCount: trades.length,
+          selectedDate: selectedDate.toISOString(),
+          sampleTrade: trades[0]
+        });
         setMultiPeriodScores(null);
       } finally {
         setIsLoadingMultiPeriod(false);

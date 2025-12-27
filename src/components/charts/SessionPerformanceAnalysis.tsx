@@ -87,8 +87,8 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                   );
                   setMultipleTradesDialog({
                     open: true,
-                    trades: sessionTrades,
-                    date: `${session.session} Session Trades`,
+                    tradeIds: sessionTrades.map(t => t.id),
+                    title: `${session.session} Session Trades`,
                     expandedTradeId: sessionTrades.length === 1 ? sessionTrades[0].id : null
                   });
                 }

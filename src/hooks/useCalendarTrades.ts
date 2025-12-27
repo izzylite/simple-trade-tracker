@@ -18,11 +18,12 @@ import * as calendarService from "../services/calendarService";
 import { useRealtimeSubscription } from "./useRealtimeSubscription";
 import { logger } from "../utils/logger";
 import {
-  calculateEffectiveRiskPercentage,
+  calculateEffectiveRiskPercentageAsync,
   calculateRiskAmount,
   DynamicRiskSettings,
 } from "../utils/dynamicRiskUtils";
 import { supabase } from "../config/supabase";
+import { useTradeSyncContextOptional } from "../contexts/TradeSyncContext";
 export interface UseCalendarTradesOptions {
   /**
    * Calendar ID to fetch trades for
@@ -48,6 +49,9 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
   const { calendarId, selectedCalendar, enableRealtime = true, setLoading } =
     options;
 
+  // Get trade sync context for broadcasting updates to other components
+  const tradeSync = useTradeSyncContextOptional();
+
   // Use Map for O(1) lookups instead of array
   const [tradesMap, setTradesMap] = useState<Map<string, Trade>>(new Map());
   const [calendar, setCalendar] = useState<Calendar | null>(null);
@@ -59,7 +63,6 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
   const [updatingTradeIds, setUpdatingTradeIds] = useState<Set<string>>(
     new Set(),
   );
-  const loadAttemptedRef = useRef<boolean>(false);
 
   // Cache for loaded trades to avoid redundant database queries
   // Key format: "month:YYYY-MM" or "range:START_ISO-END_ISO"
@@ -230,10 +233,10 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
   }, [tradesCache]);
 
   /**
-   * Fetch trades for the calendar with pagination support
-   * @param loadAll - If true, loads all trades. If false, loads first page only.
+   * Fetch all trades for the calendar
+   * Used internally for dynamic risk calculations (not for initial page load)
    */
-  const fetchTrades = useCallback(async (loadAll = false) => {
+  const fetchAllTrades = useCallback(async () => {
     setCalendar(selectedCalendar || null);
     if (!calendarId) {
       setTradesMap(new Map());
@@ -244,31 +247,10 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     setError(null);
 
     try {
-      const calendar = await calendarService.getCalendar(calendarId);
+      const [calendar, allTrades] = await Promise.all([calendarService.getCalendar(calendarId),calendarService.getAllTrades(calendarId)])
       setCalendar(calendar);
-
-      if (loadAll) {
-        // Load all trades for operations that need the full dataset
-        const allTrades = await calendarService.getAllTrades(calendarId);
-        setTradesFromArray(allTrades);
-        logger.log(
-          `✅ Loaded all ${allTrades.length} trades for calendar ${calendarId}`,
-        );
-      } else {
-        // Load first page only for faster initial load
-        const result = await calendarService.getTradeRepository().searchTrades(
-          calendarId,
-          {
-            page: 1,
-            pageSize: 100,
-          },
-        );
-
-        setTradesFromArray(result.trades);
-        logger.log(
-          `✅ Loaded ${result.trades.length} of ${result.totalCount} trades (page 1) for calendar ${calendarId}`,
-        );
-      }
+      setTradesFromArray(allTrades);
+      logger.log(  `✅ Loaded all ${allTrades.length} trades for calendar ${calendarId}`,);
     } catch (err) {
       const error = err instanceof Error
         ? err
@@ -286,22 +268,21 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     setLoading(isLoading, "loading");
   }, [isLoading]);
 
+  // Initialize calendar from selectedCalendar prop
+  // This is needed because loadVisibleRangeTrades doesn't set calendar state
+  useEffect(() => {
+    if (selectedCalendar) {
+      setCalendar(selectedCalendar);
+    }
+  }, [selectedCalendar]);
+
   /**
-   * Load trades on mount or when calendarId changes
-   * IMPORTANT: Only depends on calendarId, NOT fetchTrades, to prevent re-fetching
-   * when selectedCalendar prop changes (e.g., year_stats update via realtime)
+   * Cleanup on unmount or calendar change
+   * Note: Initial trades loading is handled by TradeCalendarPage via loadVisibleRangeTrades()
    */
   useEffect(() => {
-    if (calendarId && !loadAttemptedRef.current) {
-      loadAttemptedRef.current = true;
-      fetchTrades();
-    }
-
-    // Reset load attempted when calendar changes and cleanup debounce timers
+    // Cleanup on unmount or when calendar changes
     return () => {
-      if (calendarId) {
-        loadAttemptedRef.current = false;
-      }
       // Cleanup debounce timeout on unmount
       if (calendarUpdateTimeoutRef.current) {
         clearTimeout(calendarUpdateTimeoutRef.current);
@@ -310,7 +291,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       clearTradesCache();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calendarId]); // Only calendarId - do not add fetchTrades!
+  }, [calendarId]);
 
   /**
    * Add a trade with optimistic update
@@ -326,6 +307,8 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         next.add(trade.id);
         return next;
       });
+      // Broadcast updating state to context (for TradeList progress indicators)
+      tradeSync?.setTradeUpdating(trade.id, true);
 
       // Optimistic update - O(1) Map set
       updateTradesMap((prev) => {
@@ -340,6 +323,9 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
 
         // Update cache with the new trade
         updateTradeInCache(trade);
+
+        // Broadcast insert to other components (e.g., PerformanceCharts)
+        tradeSync?.broadcastTradeInsert(trade);
 
         setNotification({
           message: "Trade added successfully",
@@ -365,9 +351,11 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
           next.delete(trade.id);
           return next;
         });
+        // Broadcast updating state to context
+        tradeSync?.setTradeUpdating(trade.id, false);
       }
     },
-    [calendarId, updateTradesMap, updateTradeInCache],
+    [calendarId, updateTradesMap, updateTradeInCache, tradeSync],
   );
 
   const handleUpdateTradeProperty = async (
@@ -385,6 +373,8 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       next.add(tradeId);
       return next;
     });
+    // Broadcast updating state to context (for TradeList progress indicators)
+    tradeSync?.setTradeUpdating(tradeId, true);
 
     try {
       // Check if trade exists in cached trades first
@@ -406,6 +396,9 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
 
         // Update cache with the new trade
         updateTradeInCache(finalTrade);
+
+        // Broadcast insert to other components (e.g., PerformanceCharts)
+        tradeSync?.broadcastTradeInsert(finalTrade);
 
         setNotification({
           message: "Trade created successfully",
@@ -434,6 +427,9 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       // Update cache with the updated trade
       updateTradeInCache(result);
 
+      // Broadcast update to other components (e.g., PerformanceCharts)
+      tradeSync?.broadcastTradeUpdate(result);
+
       setNotification({
         message: "Trade updated successfully",
         type: "success",
@@ -454,6 +450,8 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         next.delete(tradeId);
         return next;
       });
+      // Broadcast updating state to context
+      tradeSync?.setTradeUpdating(tradeId, false);
     }
   };
 
@@ -471,15 +469,22 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         tradeIds.forEach((id) => next.add(id));
         return next;
       });
+      // Broadcast updating state to context (for TradeList progress indicators)
+      tradeIds.forEach((id) => tradeSync?.setTradeUpdating(id, true));
 
-      // Store previous map for rollback
+      // Store previous map for rollback and collect trades for broadcast
       let previousMap: Map<string, Trade> = new Map();
+      const deletedTrades: Trade[] = [];
 
       // Optimistic update - O(k) where k is number of trades to delete
       updateTradesMap((prev) => {
         previousMap = prev;
         const next = new Map(prev);
         for (const id of tradeIds) {
+          const trade = prev.get(id);
+          if (trade) {
+            deletedTrades.push(trade);
+          }
           next.delete(id);
         }
         return next;
@@ -494,6 +499,9 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
 
         // Remove deleted trades from cache
         tradeIds.forEach((tradeId) => removeTradeFromCache(tradeId));
+
+        // Broadcast delete to other components (e.g., PerformanceCharts)
+        deletedTrades.forEach((trade) => tradeSync?.broadcastTradeDelete(trade));
 
         setNotification({
           message: `Deleted ${tradeIds.length} trade(s)`,
@@ -517,9 +525,11 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
           tradeIds.forEach((id) => next.delete(id));
           return next;
         });
+        // Broadcast updating state to context
+        tradeIds.forEach((id) => tradeSync?.setTradeUpdating(id, false));
       }
     },
-    [calendarId, updateTradesMap, removeTradeFromCache],
+    [calendarId, updateTradesMap, removeTradeFromCache, tradeSync],
   );
 
   // Function to handle dynamic risk toggle
@@ -533,16 +543,21 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     if (useActualAmounts) {
       logger.log("Resetting to actual trade amounts...");
       // Reload all trades for the calendar to get the original values
-      fetchTrades(true); // Load all trades for dynamic risk calculation
+      fetchAllTrades(); // Load all trades for dynamic risk calculation
       return;
     }
 
-    // All trades are already loaded with date-range loading, no need to check pagination state
+    // Load all trades before recalculation since we use pagination
+    logger.log("Loading all trades for dynamic risk recalculation...");
+    setIsLoading(true);
+    const allTrades = await calendarService.getAllTrades(calendar.id);
+    setTradesFromArray(allTrades);
+    setIsLoading(false);
 
     // Recalculate ALL trade amounts based on risk to reward to show potential with consistent risk management
     // Optimized with batch processing to prevent UI freeze with 500+ trades
     const recalculateTrades = async () => {
-      if (!calendar.risk_per_trade || !trades.length) {
+      if (!calendar.risk_per_trade || !allTrades.length) {
         return;
       }
 
@@ -551,7 +566,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       );
 
       // Sort trades by date to calculate cumulative P&L correctly
-      const sortedTrades = [...trades].sort((a, b) =>
+      const sortedTrades = [...allTrades].sort((a, b) =>
         new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime()
       );
 
@@ -589,10 +604,11 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
           }
 
           // Use the already-recalculated trades for effective risk calculation
-          const effectiveRisk = calculateEffectiveRiskPercentage(
+          const effectiveRisk = await calculateEffectiveRiskPercentageAsync(
             new Date(trade.trade_date),
-            updatedTrades, // ✅ Use recalculated trades, not original
+            calendar,
             dynamicRiskSettings,
+            updatedTrades, // ✅ Use recalculated trades, not original
           );
 
           const riskAmount = calculateRiskAmount(
@@ -652,7 +668,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     setIsLoading(true);
     await recalculateTrades();
     setIsLoading(false);
-  }, [calendar, trades, fetchTrades, startTransition, setTradesFromArray]);
+  }, [calendar, trades, fetchAllTrades, startTransition, setTradesFromArray]);
 
   const handleImportTrades = useCallback(async (
     importedTrades: Partial<Trade>[],
@@ -1238,7 +1254,6 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     error,
     addTrade,
     deleteTrades,
-    refresh: fetchTrades,
     loadMonthTrades,
     loadVisibleRangeTrades,
     handleUpdateTradeProperty,

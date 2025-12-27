@@ -44,7 +44,9 @@ export interface TradeOperationsProps {
   onOpenGalleryMode?: (
     trades: Trade[],
     initialTradeId?: string,
-    title?: string
+    title?: string,
+    /** If set, dialog will fetch trades for this year when trades array is empty */
+    fetchYear?: number
   ) => void;
 
   /** Open AI chat for a specific trade */

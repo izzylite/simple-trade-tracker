@@ -334,9 +334,15 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                   fontSize: '0.75rem'
                 }}>
                   {calendar
-                    ? (trades && trades.length > 0
-                      ? `${trades.length} trades in ${calendar.name}`
-                      : `${calendar.name} - Ready for analysis`)
+                    ? (() => {
+                        // Calculate total trade count from year_stats
+                        const totalTrades = calendar.year_stats
+                          ? Object.values(calendar.year_stats).reduce((sum, yearStats) => sum + (yearStats.total_trades || 0), 0)
+                          : 0;
+                        return totalTrades > 0
+                          ? `${totalTrades} trade${totalTrades !== 1 ? 's' : ''} in ${calendar.name}`
+                          : `${calendar.name} - Ready for analysis`;
+                      })()
                     : 'Ready for trading analysis across all calendars'
                   }
                 </Typography>

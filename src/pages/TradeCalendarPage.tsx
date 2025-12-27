@@ -37,8 +37,8 @@ import {
   SmartToy as AIIcon,
   Home as HomeIcon,
   CalendarToday as CalendarIcon,
-  Image as ImageIcon,
-  Notes as NotesIcon
+  Notes as NotesIcon,
+  Edit as EditIcon
 
 } from '@mui/icons-material';
 import {
@@ -87,12 +87,12 @@ import { Calendar } from '../types/calendar';
 import MonthlyStats from '../components/MonthlyStats';
 import AccountStats from '../components/AccountStats';
 import TradeFormDialog, { createEditTradeData } from '../components/trades/TradeFormDialog';
+import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import PinnedTradesDrawer from '../components/PinnedTradesDrawer';
 import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ShareButton from '../components/sharing/ShareButton';
 
-import { ImagePickerDialog, ImageAttribution } from '../components/heroImage';
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import NotesDrawer from '../components/notes/NotesDrawer';
 import CalendarDayReminder from '../components/CalendarDayReminder';
@@ -556,16 +556,16 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [deletingTradeIds, setDeletingTradeIds] = useState<string[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Session statistics dialog state
+  // Session statistics dialog state - stores trade IDs, trades computed via useMemo
   const [sessionTradesDialog, setSessionTradesDialog] = useState<{
     open: boolean;
-    trades: Trade[];
-    date: string;
+    tradeIds: string[];
+    title: string;
     expandedTradeId: string | null;
   }>({
     open: false,
-    trades: [],
-    date: '',
+    tradeIds: [],
+    title: '',
     expandedTradeId: null
   });
 
@@ -590,16 +590,19 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     initialTradeId?: string;
     title?: string;
     aiOnlyMode?: boolean;
+    fetchYear?: number;
   }>({
     open: false,
     trades: [],
     initialTradeId: undefined,
     title: undefined,
-    aiOnlyMode: false
+    aiOnlyMode: false,
+    fetchYear: undefined
   });
 
-  // Image picker state
-  const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
+  // Calendar edit dialog state
+  const [isCalendarEditOpen, setIsCalendarEditOpen] = useState(false);
+  const [isCalendarEditSubmitting, setIsCalendarEditSubmitting] = useState(false);
 
   // Economic calendar drawer state
   const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(false);
@@ -654,12 +657,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   const breadcrumbButtons = useMemo<BreadcrumbButton[]>(() => [
     ...((!isReadOnly) ? [{
-      key: 'image',
-      icon: <ImageIcon fontSize="small" />,
-      onClick: () => setIsImagePickerOpen(true),
-      tooltip: heroImageUrl ? 'Change cover image' : 'Add cover image'
+      key: 'edit',
+      icon: <EditIcon fontSize="small" />,
+      onClick: () => setIsCalendarEditOpen(true),
+      tooltip: 'Edit calendar settings'
     }] : [])
-  ], [isReadOnly, heroImageUrl]);
+  ], [isReadOnly]);
 
   const breadcrumbRightContent = (!isReadOnly && calendar && onUpdateCalendarProperty) ? (
     <ShareButton type="calendar" item={calendar} onUpdateItemProperty={onUpdateCalendarProperty} size="small" />
@@ -789,43 +792,35 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
-  // Hero image handlers
-  const handleHeroImageChange = async (imageUrl: string | null, attribution?: ImageAttribution) => {
+  // Calendar edit handler
+  const handleCalendarEditSubmit = async (formData: CalendarFormData) => {
+    if (!onUpdateCalendarProperty || !calendarId) return;
+
+    setIsCalendarEditSubmitting(true);
     try {
-      if (!onUpdateCalendarProperty) {
-        throw new Error('onUpdateCalendarProperty is undefined');
-      }
-
-      await onUpdateCalendarProperty(calendarId!!, (calendar) => {
-        const updatedCalendar = {
-          ...calendar,
-          hero_image_url: imageUrl || undefined,
-          hero_image_attribution: imageUrl ? attribution : undefined
-        };
-
-        // For removal, we need to explicitly mark fields for deletion
-        if (!imageUrl) {
-          (updatedCalendar as any)._deleteHeroImage = true;
-        }
-
-        return updatedCalendar;
-      });
+      await onUpdateCalendarProperty(calendarId, (cal) => ({
+        ...cal,
+        name: formData.name,
+        account_balance: formData.account_balance,
+        max_daily_drawdown: formData.max_daily_drawdown,
+        weekly_target: formData.weekly_target,
+        monthly_target: formData.monthly_target,
+        yearly_target: formData.yearly_target,
+        risk_per_trade: formData.risk_per_trade,
+        dynamic_risk_enabled: formData.dynamic_risk_enabled,
+        increased_risk_percentage: formData.increased_risk_percentage,
+        profit_threshold_percentage: formData.profit_threshold_percentage,
+        hero_image_url: formData.hero_image_url,
+        hero_image_attribution: formData.hero_image_attribution,
+      }));
+      setIsCalendarEditOpen(false);
+      showSnackbar('Calendar updated successfully', 'success');
     } catch (error) {
-      logger.error('Error saving hero image:', error);
+      logger.error('Error updating calendar:', error);
+      showSnackbar('Failed to update calendar', 'error');
+    } finally {
+      setIsCalendarEditSubmitting(false);
     }
-  };
-
-  const handleOpenImagePicker = () => {
-    setIsImagePickerOpen(true);
-  };
-
-  const handleRemoveHeroImage = () => {
-    handleHeroImageChange(null);
-  };
-
-  const handleImageSelect = async (imageUrl: string, attribution?: ImageAttribution) => {
-    await handleHeroImageChange(imageUrl, attribution);
-    setIsImagePickerOpen(false);
   };
 
   // Economic calendar toggle handler
@@ -866,20 +861,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
-  // Use calendar.tags, fallback to extracting from trades if not available
+  // Use calendar.tags,
   const allTags = useMemo(() => {
-    if (calendar.tags && calendar.tags.length > 0) {
-      return calendar.tags;
-    }
-
-    // Fallback: extract from trades (for backwards compatibility)
-    const tagSet = new Set<string>();
-    trades.forEach(trade => {
-      if (trade.tags) {
-        trade.tags.forEach(tag => tagSet.add(tag));
-      }
-    });
-    return Array.from(tagSet).sort();
+    return calendar.tags || [];
   }, [calendar.tags, trades]);
 
   // Filter trades based on selected tags
@@ -916,7 +900,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     return tradesByDay.get(dateKey) || [];
   }, [selectedDate, tradesByDay]);
 
-
+  // Compute session dialog trades from IDs - ensures trades update when underlying data changes
+  const sessionDialogTrades = useMemo(() => {
+    if (!sessionTradesDialog.tradeIds.length) return [];
+    return sessionTradesDialog.tradeIds
+      .map(id => filteredTrades.find(t => t.id === id))
+      .filter((t): t is Trade => t !== undefined);
+  }, [sessionTradesDialog.tradeIds, filteredTrades]);
 
   // Calculate total profit based on filtered trades or use pre-calculated value
   const totalProfit = useMemo(() => {
@@ -1169,13 +1159,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   };
 
   // Gallery mode handlers
-  const openGalleryMode = (trades: Trade[], initialTradeId?: string, title?: string) => {
+  const openGalleryMode = (trades: Trade[], initialTradeId?: string, title?: string, fetchYear?: number) => {
     setGalleryMode({
       open: true,
       trades,
       initialTradeId,
       title,
-      aiOnlyMode: false
+      aiOnlyMode: false,
+      fetchYear
     });
   };
 
@@ -1196,7 +1187,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       trades: [],
       initialTradeId: undefined,
       title: undefined,
-      aiOnlyMode: false
+      aiOnlyMode: false,
+      fetchYear: undefined
     });
   };
 
@@ -1400,7 +1392,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               <AccountStats
                 balance={accountBalance}
                 totalProfit={totalProfit}
-                onChange={handleAccountBalanceChange}
                 trades={filteredTrades}
                 risk_per_trade={dynamicRiskSettings?.risk_per_trade}
                 dynamicRiskSettings={dynamicRiskSettings}
@@ -1802,23 +1793,24 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             />
           )}
 
-          {/* Session Trades List Dialog */}
-          <TradesListDialog
-            open={sessionTradesDialog.open}
-            onClose={() => setSessionTradesDialog(prev => ({ ...prev, open: false }))}
-            trades={sessionTradesDialog.trades}
-            date={sessionTradesDialog.date}
-            expandedTradeId={sessionTradesDialog.expandedTradeId}
-            onTradeExpand={(tradeId) =>
-              setSessionTradesDialog(prev => ({
-                ...prev,
-                expandedTradeId: prev.expandedTradeId === tradeId ? null : tradeId
-              }))
-            }
-            account_balance={accountBalance}
-            allTrades={trades}
-            tradeOperations={tradeOperations}
-          />
+          {/* Session Trades List Dialog - conditionally rendered to prevent unnecessary effects */}
+          {sessionTradesDialog.open && (
+            <TradesListDialog
+              open={sessionTradesDialog.open}
+              onClose={() => setSessionTradesDialog(prev => ({ ...prev, open: false }))}
+              trades={sessionDialogTrades}
+              title={sessionTradesDialog.title}
+              expandedTradeId={sessionTradesDialog.expandedTradeId}
+              onTradeExpand={(tradeId) =>
+                setSessionTradesDialog(prev => ({
+                  ...prev,
+                  expandedTradeId: prev.expandedTradeId === tradeId ? null : tradeId
+                }))
+              }
+              account_balance={accountBalance}
+              tradeOperations={tradeOperations}
+            />
+          )}
 
 
         </Box>
@@ -1843,9 +1835,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onDateChange={handleDayChange}
           setZoomedImage={setZoomedImage}
           account_balance={accountBalance}
-          allTrades={trades} /* Pass all trades for tag suggestions */
           deletingTradeIds={deletingTradeIds}
-          isTradeUpdating={isTradeUpdating}
           onOpenGalleryMode={openGalleryMode}
           onOpenAIChatMode={isReadOnly ? undefined : openGalleryModeAI}
           calendar={calendar}
@@ -1876,19 +1866,17 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               setShowAddForm(null);
             }}
             showForm={{ open: showAddForm?.open || false, editTrade: showAddForm?.editTrade || null, createTempTrade: showAddForm?.createTempTrade || false }}
-            trade_date={showAddForm?.trade_date || new Date()}
-            trades={showAddForm?.trade_date ? tradesForSelectedDay : []}
+            trade_date={showAddForm?.trade_date || new Date()} 
             onAddTrade={handleAddTrade}
             newMainTrade={newTrade}
             setNewMainTrade={prev => setNewTrade(prev(newTrade!!))}
             onTagUpdated={handleTagUpdated}
             onUpdateTradeProperty={handleUpdateTradeProperty}
-            onDeleteTrades={handleDeleteTrades}
-            calendar_id={calendarId!!}
+            onDeleteTrades={handleDeleteTrades} 
             setZoomedImage={setZoomedImage}
             account_balance={accountBalance}
             onAccountBalanceChange={handleAccountBalanceChange}
-            allTrades={trades}
+            calendar={calendar}
             tags={allTags}
             dynamicRiskSettings={dynamicRiskSettings}
             requiredTagGroups={requiredTagGroups}
@@ -1909,7 +1897,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           onClose={() => setIsMonthSelectorOpen(false)}
           onDateSelect={handleMonthSelect}
           initialDate={selectedDate || undefined}
-          trades={filteredTrades}
           accountBalance={accountBalance}
           monthlyTarget={monthly_target}
           yearlyTarget={yearlyTarget}
@@ -2040,11 +2027,11 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
         {/* Search & Filter Drawer */}
-        {calendar && (
+        {calendar && calendarId && (
           <SearchDrawer
             open={isSearchDrawerOpen}
             onClose={() => setIsSearchDrawerOpen(false)}
-            trades={trades}
+            calendarId={calendarId}
             allTags={allTags}
             selectedTags={selectedTags}
             onTagsChange={handleTagsChange}
@@ -2081,17 +2068,22 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           calendar={calendar}
           aiOnlyMode={galleryMode.aiOnlyMode}
           isReadOnly={isReadOnly}
+          fetchYear={galleryMode.fetchYear}
           tradeOperations={tradeOperations}
         />
 
 
 
-        {/* Image Picker Dialog */}
-        <ImagePickerDialog
-          open={isImagePickerOpen}
-          onClose={() => setIsImagePickerOpen(false)}
-          onImageSelect={handleImageSelect}
-          title="Choose a cover image for your calendar"
+        {/* Calendar Edit Dialog */}
+        <CalendarFormDialog
+          open={isCalendarEditOpen}
+          onClose={() => setIsCalendarEditOpen(false)}
+          onSubmit={handleCalendarEditSubmit}
+          initialData={calendar}
+          isSubmitting={isCalendarEditSubmitting}
+          mode="edit"
+          title="Edit Calendar"
+          submitButtonText="Save"
         />
 
       </Box>

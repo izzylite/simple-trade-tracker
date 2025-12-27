@@ -18,8 +18,8 @@ import { DEFAULT_PAIRS_TAG_GROUP, PendingImage, TradeImage } from './TradeForm';
 import { GridImage, GridPendingImage } from './ImageGrid';
 import { createNewTradeData } from '../../pages/TradeCalendarPage';
 import {
-  calculateEffectiveRiskPercentage,
-  calculateCumulativePnLToDate,
+  calculateCumulativePnLToDateAsync,
+  calculateEffectiveRiskPercentageAsync,
   calculateRiskAmount,
   DynamicRiskSettings
 } from '../../utils/dynamicRiskUtils';
@@ -27,14 +27,14 @@ import { error, log, logger } from '../../utils/logger';
 import { validateFiles, FILE_SIZE_LIMITS } from '../../utils/fileValidation';
 import { formatTagsWithCapitalizedGroups } from '../../utils/tagColors';
 import { Z_INDEX } from '../../styles/zIndex';
+import { TradeRepository } from '../../services/repository/repositories/TradeRepository';
 
 interface FormDialogProps {
   open: boolean;
   onClose: () => void;
   newMainTrade?: NewTradeForm | null
   trade_date: Date;
-  showForm: FormProps;
-  trades: Trade[];
+  showForm: FormProps; 
   account_balance: number;
 
   onAddTrade?: (trade: Trade & { id?: string }) => Promise<void>;
@@ -45,17 +45,16 @@ interface FormDialogProps {
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   setNewMainTrade: (prev: (trade: NewTradeForm) => NewTradeForm | null) => void
   onCancel: () => void;
-  allTrades?: Trade[];
-  dynamicRiskSettings: DynamicRiskSettings;
-  calendar_id?: string; // Made optional for Home.tsx usage
+  dynamicRiskSettings: DynamicRiskSettings; 
+  /** Calendar object with year_stats for cumulative P&L calculation */
+  calendar: Calendar;
   tags: string[];
   requiredTagGroups?: string[];
   // Optional props for trade link navigation in notes
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
   // Optional props for calendar selection (used when opened from Home.tsx)
   calendars?: Calendar[];
-  onCalendarChange?: (calendarId: string) => void;
-  selectedCalendarId?: string;
+  onCalendarChange?: (calendarId: string) => void; 
 }
 
 interface FormProps {
@@ -80,11 +79,6 @@ const processTagsForSubmission = (tags: string[]): string[] => {
     return [...tags, pendingTag];
   }
   return tags;
-};
-
-// Calculate cumulative PnL up to a given date (using centralized utility)
-export const calculateCumulativePnL = (trade_date: Date, allTrades: Trade[]) => {
-  return calculateCumulativePnLToDate(trade_date, allTrades);
 };
 
 export const startOfNextDay = (trade_date: Date | string): Date => {
@@ -130,8 +124,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   onClose,
   newMainTrade,
   setNewMainTrade,
-  trade_date,
-  trades,
+  trade_date, 
   account_balance,
   showForm,
   onCancel,
@@ -139,15 +132,13 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   onTagUpdated,
   onUpdateTradeProperty,
   onDeleteTrades,
-  allTrades = [],
-  dynamicRiskSettings,
-  calendar_id,
+  dynamicRiskSettings, 
+  calendar,
   tags = [],
   requiredTagGroups = [],
   onOpenGalleryMode,
   calendars,
-  onCalendarChange,
-  selectedCalendarId
+  onCalendarChange
 }) => {
 
   // State
@@ -159,6 +150,12 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [showError, setShowError] = useState(false);
 
+  // Pre-calculated cumulative P&L and effective risk (fetched async when dialog opens)
+  const [precalculatedPnL, setPrecalculatedPnL] = useState<number>(0);
+  const [precalculatedRiskPercentage, setPrecalculatedRiskPercentage] = useState<number>(0);
+  const [isLoadingPrecalculatedValues, setIsLoadingPrecalculatedValues] = useState(false);
+  const [dayTotalPnL, setDayTotalPnL] = useState<number>(0);
+
   // Track if component is mounted for safe state updates after async operations
   const isMountedRef = useRef(true);
   useEffect(() => {
@@ -168,14 +165,70 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     };
   }, []);
 
-  // Determine the effective calendar_id (from prop or selected calendar)
-  const effectiveCalendarId = calendar_id || selectedCalendarId;
+  
 
   // Check if calendar selection is required (when calendars prop is provided)
   const isCalendarSelectionMode = !!calendars;
-  const isCalendarSelected = isCalendarSelectionMode ? !!effectiveCalendarId : true;
+  const isCalendarSelected = isCalendarSelectionMode ? !!(calendar?.id) : true;
 
+  // Use primitive values for stable dependencies
+  const tradeDateTimestamp = trade_date instanceof Date ? trade_date.getTime() : new Date(trade_date).getTime();
+  const newTradeDateTimestamp = newTrade?.trade_date instanceof Date
+    ? newTrade.trade_date.getTime()
+    : newTrade?.trade_date ? new Date(newTrade.trade_date).getTime() : null;
+  const calendarId = calendar?.id;
 
+  // Pre-fetch cumulative P&L when dialog opens or trade_date changes
+  useEffect(() => {
+    const fetchPrecalculatedValues = async () => {
+      if (!open || !calendar || !calendarId) return;
+
+      const targetDate = newTrade?.trade_date || trade_date;
+
+      setIsLoadingPrecalculatedValues(true);
+      try {
+        const [pnl, riskPct] = await Promise.all([
+          calculateCumulativePnLToDateAsync(targetDate, calendar),
+          calculateEffectiveRiskPercentageAsync(targetDate, calendar, dynamicRiskSettings)
+        ]);
+        if (isMountedRef.current) {
+          setPrecalculatedPnL(pnl);
+          setPrecalculatedRiskPercentage(riskPct);
+        }
+      } catch (err) {
+        logger.error('Error fetching precalculated values:', err);
+      } finally {
+        if (isMountedRef.current) {
+          setIsLoadingPrecalculatedValues(false);
+        }
+      }
+    };
+
+    fetchPrecalculatedValues();
+  }, [open, calendarId, tradeDateTimestamp, newTradeDateTimestamp]);
+
+  // Fetch day's total P&L when dialog opens or trade_date changes
+  useEffect(() => {
+    const fetchDayTotalPnL = async () => {
+      if (!open || !calendar || !calendarId) return;
+
+      try {
+        const tradeRepo = new TradeRepository();
+        const dayTrades = await tradeRepo.getTradesByDay(calendarId, trade_date, ['amount']);
+        const total = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
+        if (isMountedRef.current) {
+          setDayTotalPnL(total);
+        }
+      } catch (error) {
+        logger.error('Error fetching day total P&L:', error);
+        if (isMountedRef.current) {
+          setDayTotalPnL(0);
+        }
+      }
+    };
+
+    fetchDayTotalPnL();
+  }, [open, tradeDateTimestamp, calendarId]);
 
   // Track previous showForm state to avoid unnecessary handleAddClick calls
   const prevShowFormRef = useRef<FormProps | null>(null);
@@ -189,7 +242,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
     // Create an empty trade
     try {
-      if (effectiveCalendarId && onAddTrade) {
+      if (calendar?.id && onAddTrade) {
 
         // Update the form with the temporary trade ID and isTemporary flag
         const data = createNewTradeData();
@@ -221,7 +274,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       // Re-enable cancel/close buttons regardless of success or failure
       setIsCreatingEmptyTrade(false);
     }
-  }, [effectiveCalendarId, onAddTrade, trade_date]);
+  }, [calendar?.id, onAddTrade, trade_date]);
 
   useEffect(() => {
     // Only call handleAddClick when showForm changes from not meeting conditions to meeting them
@@ -360,7 +413,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     if (isRiskPerTradeEnabled && trade.risk_to_reward && trade.risk_to_reward > 0 && !trade.partials_taken) {
       const rr = trade.risk_to_reward;
       if (!isNaN(rr)) {
-        const calculatedAmount = calculateAmountFromRiskToReward(rr, calculateCumulativePnL(trade.trade_date || endOfDay(trade_date), allTrades));
+        // Use precalculated values from useEffect (no need to pass cumulativePnL)
+        const calculatedAmount = calculateAmountFromRiskToReward(rr);
 
         // Apply sign based on trade type
         return trade.trade_type === 'loss' ? -Math.abs(calculatedAmount) : Math.abs(calculatedAmount);
@@ -414,7 +468,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       images: newTrade.uploaded_images || [],
       // Economic events will be fetched automatically by TradeRepository
       ...(newTrade.economic_events && newTrade.economic_events.length > 0 && { economic_events: newTrade.economic_events }),
-      calendar_id: effectiveCalendarId!,
+      calendar_id: calendar.id!,
       user_id: '', // Will be set by the service layer
       created_at: new Date(),
       updated_at: new Date()
@@ -422,15 +476,12 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   }
 
   // Calculate amount based on risk per trade (as percentage of account balance) and risk-to-reward ratio
-  const calculateAmountFromRiskToReward = (risk_to_reward: number, cumulativePnL: number): number => {
+  // Uses precalculated values from useEffect
+  const calculateAmountFromRiskToReward = (risk_to_reward: number): number => {
     if (!newTrade || !risk_to_reward || !account_balance || newTrade.trade_type === 'breakeven') return 0;
 
-
-    const tradeDate = newTrade.trade_date || trade_date;
-    const effectiveRiskPercentage = calculateEffectiveRiskPercentage(tradeDate, allTrades, dynamicRiskSettings);
-    const riskAmount = calculateRiskAmount(effectiveRiskPercentage, account_balance, cumulativePnL);
-
-
+    const effectiveRiskPercentage = precalculatedRiskPercentage || dynamicRiskSettings.risk_per_trade || 0;
+    const riskAmount = calculateRiskAmount(effectiveRiskPercentage, account_balance, precalculatedPnL);
 
     // For win trades: risk amount * R:R
     // For loss trades: risk amount
@@ -574,7 +625,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           return {
             url: img.preview,
             pending: true,
-            calendar_id: effectiveCalendarId!,
+            calendar_id: calendar.id!,
             id: img.id,
             width: img.width,
             height: img.height,
@@ -622,7 +673,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             session: newTrade!.session || '', // Always include session
             ...(newTrade!.notes && { notes: newTrade!.notes }),
             images: newTrade!.uploaded_images || [],
-            calendar_id: effectiveCalendarId!,
+            calendar_id: calendar.id!,
             user_id: '', // Will be set by the service layer
             created_at: new Date(),
             updated_at: new Date()
@@ -650,7 +701,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       const successfulUploads = uploadedResults.filter((img): img is TradeImage => img !== null);
 
       // If we have successful uploads, perform ONE batch update to the database
-      if (successfulUploads.length > 0 && effectiveCalendarId && newTrade!.id!!) {
+      if (successfulUploads.length > 0 && calendar?.id && newTrade!.id!!) {
         try {
           await handleUpdateTradeProperty(newTrade!.id!!, (trade) => {
             const existingImages = trade.images || [];
@@ -707,7 +758,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     try {
       // Upload the image
       const uploadedImage: TradeImage = await calendarService.uploadTradeImage(
-        effectiveCalendarId!,
+        calendar.id!,
         image.id!!,
         image.file,
         image.width,
@@ -954,6 +1005,13 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       return;
     }
 
+    // Prevent saving while precalculated values are loading (would result in incorrect amounts)
+    if (isLoadingPrecalculatedValues) {
+      logger.warn('Precalculated values still loading, prevented submission');
+      showErrorSnackbar('Please wait for risk calculations to complete');
+      return;
+    }
+
     // Validate form
     if (!newTrade.amount) {
       logger.error('Validation error: Amount is required');
@@ -1036,6 +1094,13 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       return;
     }
 
+    // Prevent saving while precalculated values are loading (would result in incorrect amounts)
+    if (isLoadingPrecalculatedValues) {
+      logger.warn('Precalculated values still loading, prevented update');
+      showErrorSnackbar('Please wait for risk calculations to complete');
+      return;
+    }
+
     // Validate form
     if (!newTrade.amount) {
       logger.error('Validation error: Amount is required');
@@ -1089,7 +1154,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       ...newTrade!.pending_images.map(img => ({
         url: img.preview || '',
         id: img.id!,
-        calendar_id: effectiveCalendarId!,
+        calendar_id: calendar.id!,
         pending: true,
         caption: img.caption || '',
         width: img.width || 0,
@@ -1101,7 +1166,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       ...newTrade!.uploaded_images.map(img => ({
         url: img.url || '',
         id: img.id,
-        calendar_id: effectiveCalendarId!,
+        calendar_id: calendar.id!,
         pending: img.pending,
         caption: img.caption || '',
         width: img.width || 0,
@@ -1188,7 +1253,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           (e?: React.FormEvent) => handleEditSubmit(e) :
           (e?: React.FormEvent) => handleSubmit(e)
         )}
-        isSubmitting={isSubmitting || isCreatingEmptyTrade} // Show loading state when creating empty trade
+        isSubmitting={isSubmitting || isCreatingEmptyTrade || isLoadingPrecalculatedValues} // Disable while creating empty trade or loading risk calculations
         cancelButtonAction={() => {
           // Only allow canceling if we're not in the process of creating an empty trade
           if (!isCreatingEmptyTrade) {
@@ -1208,10 +1273,13 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
                 <Select
                   labelId="trade-calendar-select-label"
                   id="trade-calendar-select"
-                  value={selectedCalendarId || ''}
+                  value={calendar?.id || ''}
                   label="Calendar"
                   onChange={(e) => onCalendarChange?.(e.target.value)}
                   disabled={isSubmitting || isCreatingEmptyTrade}
+                  MenuProps={{
+                    sx: { zIndex: Z_INDEX.DIALOG_POPUP }
+                  }}
                 >
                   {calendars?.map((calendar) => (
                     <MenuItem key={calendar.id} value={calendar.id}>
@@ -1225,9 +1293,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
           <DayHeader
             title={format(trade_date, 'EEEE, MMMM d, yyyy')}
-            account_balance={account_balance + calculateCumulativePnL(startOfNextDay(trade_date), allTrades)}
+            account_balance={account_balance + precalculatedPnL}
             formInputVisible={true}
-            total_pnl={trades.reduce((sum, trade) => sum + trade.amount, 0)}
+            total_pnl={dayTotalPnL}
             onPrevDay={() => { }}
             onNextDay={() => { }}
           />
@@ -1238,16 +1306,16 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           }}>
             <TradeForm
               accountBalance={account_balance}
-              calculateCumulativePnl={(newTrade) => calculateCumulativePnL(newTrade?.trade_date || endOfDay(trade_date), allTrades)}
+              calculateCumulativePnl={() => precalculatedPnL}
               dynamicRiskSettings={dynamicRiskSettings}
-              calendarId={effectiveCalendarId || ''}
+              calendarId={calendar?.id || ''}
               requiredTagGroups={requiredTagGroups}
               onTagUpdated={handleTagUpdated}
               newTrade={newTrade!}
               editingTrade={editingTrade}
               allTags={allTags}
-              allTrades={allTrades}
               isSubmitting={isSubmitting}
+              isLoadingPrecalculatedValues={isLoadingPrecalculatedValues}
               calculateAmountFromRiskToReward={calculateAmountFromRiskToReward}
               onNameChange={handleNameChange}
               onAmountChange={handleAmountChange}
@@ -1267,7 +1335,6 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               onImageRemove={handleImageRemove}
               onImagesReordered={handleImagesReordered}
               onSubmit={editingTrade ? handleEditSubmit : handleSubmit}
-              trades={allTrades}
               onOpenGalleryMode={onOpenGalleryMode}
             />
 

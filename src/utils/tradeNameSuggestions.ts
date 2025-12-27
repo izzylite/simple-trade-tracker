@@ -1,4 +1,60 @@
 import { Trade } from '../types/dualWrite';
+import { TradeRepository } from '../services/repository/repositories/TradeRepository';
+import { logger } from './logger';
+
+/**
+ * Fetch recent trades and generate contextual suggestions
+ * @param calendarId Calendar ID to fetch trades from
+ * @param currentTags Current trade tags
+ * @param currentSession Current trade session
+ * @param currentInput Current input value
+ * @param maxSuggestions Maximum number of suggestions to return
+ * @returns Array of suggested trade names
+ */
+export const fetchAndGenerateTradeNameSuggestions = async (
+  calendarId: string,
+  currentTags: string[] = [],
+  currentSession?: string,
+  currentInput: string = '',
+  maxSuggestions: number = 8
+): Promise<string[]> => {
+  try {
+    const tradeRepo = new TradeRepository();
+    // Fetch last 15 recent trades for suggestions
+    const currentYear = new Date().getFullYear();
+    const result = await tradeRepo.getTradesForYearPaginated(calendarId, currentYear, 1, 15);
+    const recentTrades = result.trades;
+
+    // If no trades found, return common patterns
+    if (!recentTrades || recentTrades.length === 0) {
+      return generateCommonTradeNamePatterns(currentInput);
+    }
+
+    // Generate contextual suggestions from recent trades
+    const contextualSuggestions = generateContextualTradeNameSuggestions(
+      recentTrades,
+      currentTags,
+      currentSession,
+      currentInput,
+      maxSuggestions
+    );
+
+    // If few contextual suggestions, add common patterns
+    if (contextualSuggestions.length < 5) {
+      const commonPatterns = generateCommonTradeNamePatterns(currentInput);
+      const uniquePatterns = commonPatterns.filter(pattern =>
+        !contextualSuggestions.includes(pattern)
+      );
+      return [...contextualSuggestions, ...uniquePatterns].slice(0, maxSuggestions);
+    }
+
+    return contextualSuggestions;
+  } catch (error) {
+    logger.error('Error fetching trades for autocomplete:', error);
+    // Fallback to common patterns on error
+    return generateCommonTradeNamePatterns(currentInput);
+  }
+};
 
 /**
  * Generate trade name suggestions based on past trades

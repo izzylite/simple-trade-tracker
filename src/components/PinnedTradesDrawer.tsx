@@ -14,8 +14,7 @@ import {
   InputAdornment,
   TextField,
   Stack,
-  Tooltip,
-  CircularProgress
+  Tooltip
 } from '@mui/material';
 import {
   PushPin as PinIcon,
@@ -35,7 +34,7 @@ import TradeCard from './aiChat/TradeCard';
 import RoundedTabs, { TabPanel } from './common/RoundedTabs';
 import { TradeOperationsProps } from '../types/tradeOperations';
 import * as calendarService from '../services/calendarService';
-import Shimmer from './Shimmer';
+import TradeCardShimmer from './TradeCardShimmer';
 
 interface PinnedTradesDrawerProps {
   open: boolean;
@@ -201,6 +200,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
       icon={getIcon()}
       width={{ xs: '100%', sm: 400 }}
       headerVariant="enhanced"
+      contentSx={scrollbarStyles(theme)}
     >
       {/* Tabs */}
       <Box sx={{ p: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
@@ -266,52 +266,12 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
       )}
 
       {/* Content */}
-      <Box sx={{ flex: 1, overflow: 'auto', ...scrollbarStyles(theme) }}>
+      <Box sx={{ flex: 1 }}>
         {/* Render content based on current state */}
         {activeTab === 0 ? (
           // Pinned Trades Tab
           isLoadingPinned ? (
-            <Stack spacing={2} sx={{ p: 2, overflow: 'auto', height: '100%', ...scrollbarStyles(theme) }}>
-              {/* Show 3 shimmer cards while loading */}
-              {[1, 2, 3].map((index) => (
-                <Box
-                  key={index}
-                  sx={{
-                    maxWidth: 400,
-                    border: '1px solid',
-                    borderColor: alpha(theme.palette.divider, 0.2),
-                    borderRadius: 1,
-                    p: 2,
-                    pt: 1
-                  }}
-                >
-                  {/* Header - Name and Amount */}
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                    <Shimmer height={20} width="40%" borderRadius={4} variant="wave" intensity="medium" />
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Shimmer height={16} width={16} borderRadius="50%" variant="wave" intensity="medium" />
-                      <Shimmer height={20} width={80} borderRadius={4} variant="wave" intensity="medium" />
-                    </Box>
-                  </Box>
-
-                  {/* Info Icons Row */}
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
-                    <Shimmer height={14} width={14} borderRadius="50%" variant="wave" intensity="low" />
-                    <Shimmer height={14} width={14} borderRadius="50%" variant="wave" intensity="low" />
-                    <Shimmer height={12} width={80} borderRadius={4} variant="wave" intensity="low" />
-                    <Shimmer height={14} width={14} borderRadius="50%" variant="wave" intensity="low" />
-                    <Shimmer height={12} width={60} borderRadius={4} variant="wave" intensity="low" />
-                  </Box>
-
-                  {/* Tags Row */}
-                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                    <Shimmer height={20} width={80} borderRadius={10} variant="wave" intensity="medium" />
-                    <Shimmer height={20} width={60} borderRadius={10} variant="wave" intensity="medium" />
-                    <Shimmer height={20} width={70} borderRadius={10} variant="wave" intensity="medium" />
-                  </Box>
-                </Box>
-              ))}
-            </Stack>
+            <TradeCardShimmer count={6} containerSx={{ p: 2 }} />
           ) : sortedPinnedTrades.length === 0 ? (
             <Box
               sx={{
@@ -353,7 +313,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
               </Typography>
             </Box>
           ) : (
-            <Stack spacing={2} sx={{ p: 2, overflow: 'auto', height: '100%', ...scrollbarStyles(theme) }}>
+            <Stack spacing={2} sx={{ p: 2 }}>
               {filteredPinnedTrades.map((trade) => (
                 <TradeCard
                   key={trade.id}
@@ -407,7 +367,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
               </Typography>
             </Box>
           ) : (
-            <List sx={{ p: 0, overflow: 'auto', height: '100%', ...scrollbarStyles(theme) }}>
+            <List sx={{ p: 0 }}>
               {filteredPinnedEvents.map((pinnedEvent, index) => {
                 // Note: Trade count for events will be fetched when implementing EconomicCalendarDrawer optimization
                 const impactColor = getImpactColor(pinnedEvent.impact, theme);

@@ -59,6 +59,8 @@ import { useRealtimeSubscription } from '../hooks/useRealtimeSubscription';
 import { isToday } from 'date-fns';
 import { TradeOperationsProps } from '../types/tradeOperations';
 import { Z_INDEX } from '../styles/zIndex';
+import { useTradeSyncContextOptional } from '../contexts/TradeSyncContext';
+import { normalizeTradeDates } from '../utils/tradeUtils';
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -120,14 +122,16 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     onOpenGalleryMode,
     economicFilter,
     onOpenAIChat,
-    isTradeUpdating,
     calendar,
     onUpdateCalendarProperty
   } = tradeOperations;
 
+  // Use global context for trade updating state
+  const tradeSync = useTradeSyncContextOptional();
+
   const theme = useTheme();
   const [trade, setTrade] = useState<Trade>(tradeData);
-  const isUpdating = isTradeUpdating?.(trade.id);
+  const isUpdating = tradeSync?.isTradeUpdating(trade.id) || false;
   const [isPinning, setIsPinning] = useState(false);
   const [loadingImages, setLoadingImages] = useState<{ [key: string]: boolean }>({});
 
@@ -164,6 +168,21 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   useEffect(() => {
     setTrade(tradeData);
   }, [tradeData]);
+
+  // Subscribe to trade sync events to update local state when trade is modified elsewhere
+  useEffect(() => {
+    if (!tradeSync?.lastSyncEvent) return;
+
+    const { type, trade: syncedTrade, timestamp } = tradeSync.lastSyncEvent;
+
+    // Only process updates for this specific trade
+    if (syncedTrade.id !== trade.id) return;
+
+    if (type === 'update') {
+      setTrade(normalizeTradeDates(syncedTrade));
+      logger.log(`📡 TradeDetailExpanded: Synced trade update for ${syncedTrade.id}`);
+    }
+  }, [tradeSync?.lastSyncEvent, trade.id]);
 
   // Initialize loading state for all images
   useEffect(() => {

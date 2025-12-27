@@ -23,19 +23,17 @@ import { Trade, YearStats } from '../types/dualWrite';
 import TargetBadge from '../components/TargetBadge';
 import { BaseDialog } from './common';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
-import { calculateTargetProgress } from '../utils/statsUtils';
 
 interface SelectDateDialogProps {
   open: boolean;
   onClose: () => void;
   onDateSelect: (date: Date) => void;
   initialDate?: Date;
-  trades: Trade[];
   accountBalance: number;
   monthlyTarget?: number;
   yearlyTarget?: number;
   yearStats: Record<string, YearStats>; // Pre-calculated year statistics
-  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
+  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string, fetchYear?: number) => void;
 }
 
 const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
@@ -43,7 +41,6 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   onClose,
   onDateSelect,
   initialDate,
-  trades,
   accountBalance,
   monthlyTarget,
   yearlyTarget,
@@ -76,9 +73,13 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   };
 
   const handleYearlyGalleryMode = () => {
-    if (onOpenGalleryMode && yearTrades.length > 0) {
-      const title = `${currentYear} - All Trades (${yearTrades.length} trades)`;
-      onOpenGalleryMode(yearTrades, yearTrades[0].id, title);
+    if (onOpenGalleryMode) {
+      const yearData = yearStats[currentYear.toString()];
+      const totalTrades = yearData?.total_trades || 0;
+      const title = `${currentYear} - All Trades (${totalTrades} trades)`;
+      // Use fetch mode with empty trades array and fetchYear
+      // TradeGalleryDialog derives totalCount from calendar.year_stats
+      onOpenGalleryMode([], undefined, title, currentYear);
       onClose();
     }
   };
@@ -89,31 +90,32 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   // Falls back to empty stats if year data not available
   const yearlyStats = React.useMemo(() => {
     const stats = yearStats[currentYear.toString()];
+    const startOfYear = new Date(currentYear, 0, 1);
 
     if (!stats) {
       // Fallback for years with no trades or not yet calculated
       return {
-        yearTrades: [],
+        totalTrades: 0,
         yearlyPnL: 0,
         yearlyWinCount: 0,
         yearlyLossCount: 0,
         yearlyWinRate: '0',
         yearlyGrowthPercentage: '0',
         accountValueAtStartOfYear: accountBalance,
-        startOfYear: new Date(currentYear, 0, 1)
+        startOfYear
       };
     }
 
-    // Calculate account value at start of year for target calculations
-    const startOfYear = new Date(currentYear, 0, 1);
-    const tradesBeforeYear = trades.filter(trade => new Date(trade.trade_date) < startOfYear);
-    const accountValueAtStartOfYear = accountBalance + tradesBeforeYear.reduce((sum, trade) => sum + trade.amount, 0);
-
-    // Filter year trades for gallery mode (still need actual trade objects)
-    const yearTrades = trades.filter(trade => new Date(trade.trade_date).getFullYear() === currentYear);
+    // Calculate account value at start of year from previous years' PnL
+    let accountValueAtStartOfYear = accountBalance;
+    Object.entries(yearStats).forEach(([year, yearData]) => {
+      if (parseInt(year) < currentYear) {
+        accountValueAtStartOfYear += yearData.yearly_pnl;
+      }
+    });
 
     return {
-      yearTrades,
+      totalTrades: stats.total_trades,
       yearlyPnL: stats.yearly_pnl,
       yearlyWinCount: stats.win_count,
       yearlyLossCount: stats.loss_count,
@@ -122,10 +124,10 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
       accountValueAtStartOfYear,
       startOfYear
     };
-  }, [currentYear, yearStats, accountBalance, trades]);
+  }, [currentYear, yearStats, accountBalance]);
 
   const {
-    yearTrades,
+    totalTrades,
     yearlyPnL,
     yearlyWinCount,
     yearlyLossCount,
@@ -139,7 +141,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   const monthlyStats = React.useMemo(() => {
     const stats = new Map<number, {
       monthPnL: number;
-      monthTrades: Trade[];
+      tradeCount: number;
       accountValueAtStartOfMonth: number;
       targetProgress: {
         progress: number;
@@ -156,7 +158,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
       for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
         stats.set(monthIndex, {
           monthPnL: 0,
-          monthTrades: [],
+          tradeCount: 0,
           accountValueAtStartOfMonth: accountBalance,
           targetProgress: null,
           growthPercentage: '0'
@@ -168,29 +170,22 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
     // Use pre-calculated monthly stats from year_stats
     for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
       const monthStats = yearData.monthly_stats[monthIndex];
-      const startOfMonth = new Date(currentYear, monthIndex, 1);
 
-      // Filter trades for this month (still needed for gallery mode and target progress calculation)
-      const monthTrades = trades.filter(trade => {
-        const tradeDate = new Date(trade.trade_date);
-        return tradeDate.getFullYear() === currentYear && tradeDate.getMonth() === monthIndex;
-      });
-
-      // Calculate target progress if monthly target is set
+      // Calculate target progress if monthly target is set using pre-calculated values
       let targetProgress = null;
-      if (monthlyTarget && monthlyTarget > 0) {
-        const progress = calculateTargetProgress(monthTrades, accountBalance, monthlyTarget, startOfMonth, trades);
+      if (monthlyTarget && monthlyTarget > 0 && monthStats.account_value_at_start > 0) {
         const targetAmount = (monthlyTarget / 100) * monthStats.account_value_at_start;
+        const rawProgress = targetAmount > 0 ? (monthStats.month_pnl / targetAmount) * 100 : 0;
         targetProgress = {
-          progress,
+          progress: Math.min(rawProgress, 100),
           isMet: monthStats.month_pnl >= targetAmount,
-          rawProgress: (monthStats.month_pnl / targetAmount) * 100
+          rawProgress
         };
       }
 
       stats.set(monthIndex, {
         monthPnL: monthStats.month_pnl,
-        monthTrades,
+        tradeCount: monthStats.trade_count,
         accountValueAtStartOfMonth: monthStats.account_value_at_start,
         targetProgress,
         growthPercentage: monthStats.growth_percentage.toFixed(2)
@@ -198,7 +193,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
     }
 
     return stats;
-  }, [currentYear, yearStats, accountBalance, monthlyTarget, trades]);
+  }, [currentYear, yearStats, accountBalance, monthlyTarget]);
 
   // Get best month from pre-calculated year_stats
   const bestMonth = React.useMemo(() => {
@@ -217,19 +212,19 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
     };
   }, [currentYear, yearStats, months]);
 
-  // Calculate yearly target progress using memoized values
+  // Calculate yearly target progress using pre-calculated values
   const yearlyTargetProgress = React.useMemo(() => {
-    if (!yearlyTarget || yearlyTarget <= 0) return null;
+    if (!yearlyTarget || yearlyTarget <= 0 || accountValueAtStartOfYear <= 0) return null;
 
-    const progress = calculateTargetProgress(yearTrades, accountBalance, yearlyTarget, startOfYear, trades);
     const targetAmount = (yearlyTarget / 100) * accountValueAtStartOfYear;
+    const rawProgress = targetAmount > 0 ? (yearlyPnL / targetAmount) * 100 : 0;
 
     return {
-      progress,
+      progress: Math.min(rawProgress, 100),
       isMet: yearlyPnL >= targetAmount,
-      rawProgress: (yearlyPnL / targetAmount) * 100
+      rawProgress
     };
-  }, [yearlyTarget, yearTrades, accountBalance, startOfYear, trades, accountValueAtStartOfYear, yearlyPnL]);
+  }, [yearlyTarget, accountValueAtStartOfYear, yearlyPnL]);
 
   const dialogTitle = (
     <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
@@ -304,7 +299,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
         }}
       >
         Cancel
-      </Button>{onOpenGalleryMode && yearTrades.length > 0 && (
+      </Button>{onOpenGalleryMode && totalTrades > 0 && (
         <Button
           onClick={handleYearlyGalleryMode}
           variant="contained"
@@ -557,7 +552,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                 color: 'text.primary',
                 textAlign: 'center'
               }}>
-                {yearTrades.length}
+                {totalTrades}
               </Typography>
               <Typography variant="body1" sx={{
                 fontWeight: 500,

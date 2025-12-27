@@ -17,16 +17,7 @@ import {
 } from '../utils/scoreUtils';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import { tagPatternService } from './tagPatternService';
-import {
-  subDays,
-  subWeeks,
-  subMonths,
-  subYears,
-  isSameDay,
-  isSameWeek,
-  isSameMonth,
-  isSameYear
-} from 'date-fns';
+import * as dateFns from 'date-fns';
 import { logger } from '../utils/logger';
 
 /**
@@ -148,16 +139,16 @@ export class ScoreService {
 
       switch (period) {
         case 'daily':
-          targetDate = subDays(today, i);
+          targetDate = dateFns.subDays(today, i);
           break;
         case 'weekly':
-          targetDate = subWeeks(today, i);
+          targetDate = dateFns.subWeeks(today, i);
           break;
         case 'monthly':
-          targetDate = subMonths(today, i);
+          targetDate = dateFns.subMonths(today, i);
           break;
         case 'yearly':
-          targetDate = subYears(today, i);
+          targetDate = dateFns.subYears(today, i);
           break;
       }
 
@@ -187,7 +178,7 @@ export class ScoreService {
   /**
    * Get trades for a specific period
    */
-  private getTradesForPeriod(
+  getTradesForPeriod(
     trades: Trade[],
     period: 'daily' | 'weekly' | 'monthly' | 'yearly',
     targetDate: Date
@@ -197,13 +188,13 @@ export class ScoreService {
 
       switch (period) {
         case 'daily':
-          return isSameDay(tradeDate, targetDate);
+          return dateFns.isSameDay(tradeDate, targetDate);
         case 'weekly':
-          return isSameWeek(tradeDate, targetDate, { weekStartsOn: 0 });
+          return dateFns.isSameWeek(tradeDate, targetDate, { weekStartsOn: 0 });
         case 'monthly':
-          return isSameMonth(tradeDate, targetDate);
+          return dateFns.isSameMonth(tradeDate, targetDate);
         case 'yearly':
-          return isSameYear(tradeDate, targetDate);
+          return dateFns.isSameYear(tradeDate, targetDate);
         default:
           return false;
       }
@@ -214,7 +205,7 @@ export class ScoreService {
    * Get historical trades for pattern calculation
    */
   private getHistoricalTrades(trades: Trade[], targetDate: Date): Trade[] {
-    const cutoffDate = subDays(targetDate, this.settings.thresholds.lookbackPeriod);
+    const cutoffDate = dateFns.subDays(targetDate, this.settings.thresholds.lookbackPeriod);
     return trades.filter(trade => {
       const tradeDate = new Date(trade.trade_date);
       return tradeDate >= cutoffDate && tradeDate <= targetDate;
@@ -298,13 +289,13 @@ export class ScoreService {
   ): boolean {
     switch (period) {
       case 'daily':
-        return isSameDay(targetDate, now);
+        return dateFns.isSameDay(targetDate, now);
       case 'weekly':
-        return isSameWeek(targetDate, now, { weekStartsOn: 0 });
+        return dateFns.isSameWeek(targetDate, now, { weekStartsOn: 0 });
       case 'monthly':
-        return isSameMonth(targetDate, now);
+        return dateFns.isSameMonth(targetDate, now);
       case 'yearly':
-        return isSameYear(targetDate, now);
+        return dateFns.isSameYear(targetDate, now);
       default:
         return false;
     }
@@ -352,12 +343,25 @@ export class ScoreService {
     monthly: ScoreAnalysis;
     yearly: ScoreAnalysis;
   }> {
+    console.log('ScoreService: calculateMultiPeriodScore called', {
+      tradesCount: allTrades.length,
+      targetDate: targetDate.toISOString(),
+      sampleTrade: allTrades[0]
+    });
+
     const [daily, weekly, monthly, yearly] = await Promise.all([
       this.calculateScore(allTrades, 'daily', targetDate, scoreSettings),
       this.calculateScore(allTrades, 'weekly', targetDate, scoreSettings),
       this.calculateScore(allTrades, 'monthly', targetDate, scoreSettings),
       this.calculateScore(allTrades, 'yearly', targetDate, scoreSettings)
     ]);
+
+    console.log('ScoreService: Multi-period scores calculated', {
+      daily: { overall: daily.currentScore.overall, tradesCount: this.getTradesForPeriod(allTrades, 'daily', targetDate).length },
+      weekly: { overall: weekly.currentScore.overall, tradesCount: this.getTradesForPeriod(allTrades, 'weekly', targetDate).length },
+      monthly: { overall: monthly.currentScore.overall, tradesCount: this.getTradesForPeriod(allTrades, 'monthly', targetDate).length },
+      yearly: { overall: yearly.currentScore.overall, tradesCount: this.getTradesForPeriod(allTrades, 'yearly', targetDate).length }
+    });
 
     return {
       daily,

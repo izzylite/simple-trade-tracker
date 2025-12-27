@@ -457,13 +457,15 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
    * @param calendarId - Calendar ID to search within
    * @param year - Year (e.g., 2024)
    * @param month - Month index (0-11, where 0 = January)
-   * @returns Array of trades for the specified month
+   * @param fields - Optional array of fields to select (e.g., ['trade_date', 'amount'])
+   * @returns Array of trades (full or partial based on fields parameter)
    */
-  async getTradesByMonth(
+  async getTradesByMonth<K extends keyof Trade>(
     calendarId: string,
     year: number,
-    month: number
-  ): Promise<Trade[]> {
+    month: number,
+    fields?: K[]
+  ): Promise<Pick<Trade, K>[]> {
     try {
       // Validate month (0-11)
       if (month < 0 || month > 11) {
@@ -478,12 +480,15 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
       const endOfMonth = new Date(year, month + 1, 0); // Last day of month
       endOfMonth.setHours(23, 59, 59, 999);
 
-      logger.log(`📅 Fetching trades for ${year}-${month + 1} (${startOfMonth.toISOString()} to ${endOfMonth.toISOString()})`);
+      // Build select clause - use specific fields or all
+      const selectClause = fields ? fields.join(',') : '*';
+
+      logger.log(`📅 Fetching trades for ${year}-${month + 1} (fields: ${selectClause})`);
 
       // Query trades for the month
       const { data, error } = await supabase
         .from('trades')
-        .select('*')
+        .select(selectClause)
         .eq('calendar_id', calendarId)
         .gte('trade_date', startOfMonth.toISOString())
         .lte('trade_date', endOfMonth.toISOString())
@@ -494,13 +499,91 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         throw error;
       }
 
-      const trades = data ? data.map(item => transformSupabaseTrade(item)) : [];
+      // Transform data - for partial fields, only transform what's needed
+      const trades = data ? (data as Record<string, any>[]).map(item => {
+        if (fields) {
+          // Partial transform for selected fields only
+          const partial: Partial<Trade> = {};
+          for (const field of fields) {
+            if (field === 'trade_date' && item.trade_date) {
+              partial.trade_date = new Date(item.trade_date);
+            } else if (field in item) {
+              (partial as any)[field] = item[field];
+            }
+          }
+          return partial as Pick<Trade, K>;
+        }
+        return transformSupabaseTrade(item) as Pick<Trade, K>;
+      }) : [];
 
       logger.log(`✅ Found ${trades.length} trades for ${year}-${month + 1}`);
 
       return trades;
     } catch (error) {
       logger.error('Error in getTradesByMonth:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get trades for a specific day
+   * Used for calculating day total P&L in DayHeader
+   * @param calendarId - Calendar ID to search within
+   * @param date - The date to get trades for
+   * @param fields - Optional array of fields to select (e.g., ['amount'])
+   * @returns Array of trades (full or partial based on fields parameter)
+   */
+  async getTradesByDay<K extends keyof Trade>(
+    calendarId: string,
+    date: Date,
+    fields?: K[]
+  ): Promise<Pick<Trade, K>[]> {
+    try {
+      // Calculate start and end of day
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // Build select clause - use specific fields or all
+      const selectClause = fields ? fields.join(',') : '*';
+
+      const { data, error } = await supabase
+        .from('trades')
+        .select(selectClause)
+        .eq('calendar_id', calendarId)
+        .gte('trade_date', startOfDay.toISOString())
+        .lte('trade_date', endOfDay.toISOString())
+        .order('trade_date', { ascending: false });
+
+      if (error) {
+        logger.error('Error fetching trades by day:', error);
+        throw error;
+      }
+
+      // Transform data based on whether specific fields were requested
+      const trades = data ? (data as Record<string, any>[]).map(item => {
+        if (fields) {
+          // Partial transform for selected fields only
+          const partial: Partial<Trade> = {};
+          for (const field of fields) {
+            if (field === 'trade_date' && item.trade_date) {
+              partial.trade_date = new Date(item.trade_date);
+            } else if (field in item) {
+              (partial as any)[field] = item[field];
+            }
+          }
+          return partial as Pick<Trade, K>;
+        }
+        return transformSupabaseTrade(item) as Pick<Trade, K>;
+      }) : [];
+
+      logger.log(`✅ Found ${trades.length} trades for ${date.toDateString()}`);
+
+      return trades;
+    } catch (error) {
+      logger.error('Error in getTradesByDay:', error);
       return [];
     }
   }
@@ -547,6 +630,80 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     } catch (error) {
       logger.error('Error in getTradesByDateRange:', error);
       return [];
+    }
+  }
+
+  /**
+   * Get trades for a specific year with pagination support
+   * Used for lazy-loading in TradeGalleryDialog
+   * @param calendarId - Calendar ID
+   * @param year - Year (e.g., 2024)
+   * @param page - Page number (1-indexed)
+   * @param pageSize - Number of trades per page
+   * @returns Paginated result with trades ordered by date (ascending - Jan to Dec)
+   */
+  async getTradesForYearPaginated(
+    calendarId: string,
+    year: number,
+    page: number = 1,
+    pageSize: number = 20
+  ): Promise<{
+    trades: Trade[];
+    totalCount: number;
+    hasMore: boolean;
+    currentPage: number;
+    totalPages: number;
+  }> {
+    try {
+      // Calculate date range for the year
+      const startOfYear = new Date(year, 0, 1);
+      startOfYear.setHours(0, 0, 0, 0);
+      const endOfYear = new Date(year, 11, 31);
+      endOfYear.setHours(23, 59, 59, 999);
+
+      // Calculate pagination offset
+      const offset = (page - 1) * pageSize;
+
+      logger.log(`📅 Fetching trades for year ${year}, page ${page} (offset: ${offset}, pageSize: ${pageSize})`);
+
+      // Query with count for total
+      const { data, count, error } = await supabase
+        .from('trades')
+        .select('*', { count: 'exact' })
+        .eq('calendar_id', calendarId)
+        .gte('trade_date', startOfYear.toISOString())
+        .lte('trade_date', endOfYear.toISOString())
+        .order('trade_date', { ascending: true }) // Jan to Dec
+        .range(offset, offset + pageSize - 1);
+
+      if (error) {
+        logger.error('Error fetching trades for year:', error);
+        throw error;
+      }
+
+      const trades = data ? data.map(item => transformSupabaseTrade(item)) : [];
+      const totalCount = count || 0;
+      const totalPages = Math.ceil(totalCount / pageSize);
+      const hasMore = totalCount > offset + pageSize;
+
+      logger.log(`✅ Found ${trades.length} trades for year ${year}, page ${page}/${totalPages} (total: ${totalCount})`);
+
+      return {
+        trades,
+        totalCount,
+        hasMore,
+        currentPage: page,
+        totalPages
+      };
+    } catch (error) {
+      logger.error('Error in getTradesForYearPaginated:', error);
+      return {
+        trades: [],
+        totalCount: 0,
+        hasMore: false,
+        currentPage: page,
+        totalPages: 0
+      };
     }
   }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Typography,
   Box,
@@ -10,12 +10,14 @@ import {
 import {
   ViewCarousel as GalleryIcon
 } from '@mui/icons-material';
-import { Trade } from '../../types/dualWrite';
+import { Trade, Calendar } from '../../types/dualWrite';
 import TradeList from '../trades/TradeList';
 import { BaseDialog } from '../common';
 import DayHeader from '../trades/DayHeader';
-import { calculateCumulativePnL, startOfNextDay } from '../trades/TradeFormDialog';
+import { startOfNextDay } from '../trades/TradeFormDialog';
+import { calculateCumulativePnLToDateAsync } from '../../utils/dynamicRiskUtils';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip } from 'recharts';
+import { logger } from '../../utils/logger';
 import { formatCurrency } from '../../utils/formatters';
 import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
 import { TradeOperationsProps } from '../../types/tradeOperations';
@@ -24,15 +26,13 @@ interface TradesDialogProps {
   // Component-specific props
   open: boolean;
   trades: Trade[];
-  title?: string;
+  title: string;
   subtitle?: string;
-  date: string;
   expandedTradeId: string | null;
   showChartInfo?: boolean;
   onClose: () => void;
   onTradeExpand: (tradeId: string) => void;
   account_balance: number;
-  allTrades: Trade[];
 
   // Trade operations - required
   tradeOperations: TradeOperationsProps;
@@ -43,16 +43,14 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   trades,
   title,
   subtitle,
-  date,
   showChartInfo,
   expandedTradeId,
   onClose,
   onTradeExpand,
   account_balance,
-  allTrades,
   tradeOperations
 }) => {
-  // Destructure from tradeOperations
+  // Destructure from tradeOperations (isTradeUpdating now comes from TradeSyncContext)
   const {
     onZoomImage,
     onUpdateTradeProperty,
@@ -61,12 +59,45 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
     onDeleteMultipleTrades,
     onOpenGalleryMode,
     calendarId,
-    isTradeUpdating,
-    economicFilter
+    economicFilter,
+    calendar
   } = tradeOperations;
 
   const theme = useTheme();
+
+  // State for cumulative P&L
+  const [cumulativePnL, setCumulativePnL] = useState<number>(0);
   const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
+
+  // Fetch cumulative P&L when dialog opens or trades change
+  useEffect(() => {
+    const fetchCumulativePnL = async () => {
+      if (!open || !calendar || trades.length === 0) return;
+
+      try {
+        // Use the most recent trade's date to calculate cumulative P&L
+        const mostRecentTrade = trades.reduce((latest, trade) =>
+          new Date(trade.trade_date) > new Date(latest.trade_date) ? trade : latest
+        );
+
+        // Validate the trade date before proceeding
+        const targetDate = startOfNextDay(mostRecentTrade.trade_date);
+        if (isNaN(targetDate.getTime())) {
+          logger.warn('Invalid trade date, skipping cumulative P&L calculation');
+          setCumulativePnL(0);
+          return;
+        }
+
+        const pnl = await calculateCumulativePnLToDateAsync(targetDate, calendar);
+        setCumulativePnL(pnl);
+      } catch (error) {
+        logger.error('Error fetching cumulative P&L:', error);
+        setCumulativePnL(0);
+      }
+    };
+
+    fetchCumulativePnL();
+  }, [open, trades, calendar]);
   // Format data for the chart based on selected metric
   const [chartData, setChartData] = React.useState<any[] | undefined>(undefined);
 
@@ -137,9 +168,9 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   const dialogTitle = (
     <>
       <Typography variant="h6">
-        {trades.length} {trades.length === 1 ? 'Trade' : 'Trades'} for {(title || date).toLowerCase()}
+        {trades.length} {trades.length === 1 ? 'Trade' : 'Trades'}{title ? ` for ${title.toLowerCase()}` : ''}
       </Typography>
-       
+
     </>
 
   );
@@ -177,7 +208,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
         {/* DayHeader with navigation buttons hidden */}
         <DayHeader
           title={subtitle || ''}
-          account_balance={account_balance + calculateCumulativePnL(startOfNextDay(date), allTrades)}
+          account_balance={account_balance + cumulativePnL}
           formInputVisible={true} // Set to true to hide navigation buttons
           total_pnl={total_pnl}
           onPrevDay={() => { }} // Empty function since we're hiding the buttons

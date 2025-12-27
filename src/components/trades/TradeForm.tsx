@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import {
   TextField,
   FormControl,
@@ -17,7 +17,9 @@ import {
   alpha,
   useTheme,
   Autocomplete,
-  Button
+  Button,
+  CircularProgress,
+  InputAdornment
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers';
 import { Trade, TradeEconomicEvent } from '../../types/dualWrite';
@@ -29,11 +31,7 @@ import TagsInput from './TagsInput';
 import { isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { DynamicRiskSettings } from '../../utils/dynamicRiskUtils';
 import RichTextEditor from '../common/RichTextEditor';
-import {
-  generateContextualTradeNameSuggestions,
-  generateCommonTradeNamePatterns
-}
-  from '../../utils/tradeNameSuggestions';
+import { fetchAndGenerateTradeNameSuggestions } from '../../utils/tradeNameSuggestions';
 import { Currency } from '../../types/economicCalendar';
 import { CURRENCY_PAIRS } from '../../services/tradeEconomicEventService';
 import { Z_INDEX } from '../../styles/zIndex';
@@ -88,8 +86,8 @@ interface TradeFormProps {
   newTrade: NewTradeForm;
   editingTrade: Trade | null;
   allTags: string[];
-  allTrades?: Trade[];
   isSubmitting: boolean;
+  isLoadingPrecalculatedValues?: boolean;
   accountBalance: number;
   dynamicRiskSettings: DynamicRiskSettings;
   calculateCumulativePnl(newTrade?: NewTradeForm): number;
@@ -124,8 +122,8 @@ const TradeForm: React.FC<TradeFormProps> = ({
   newTrade,
   editingTrade,
   allTags,
-  allTrades = [],
   isSubmitting,
+  isLoadingPrecalculatedValues = false,
   accountBalance,
   dynamicRiskSettings,
   calculateAmountFromRiskToReward,
@@ -155,6 +153,27 @@ const TradeForm: React.FC<TradeFormProps> = ({
   onOpenGalleryMode
 }) => {
   const theme = useTheme();
+
+  // State for trade name suggestions
+  const [tradeNameSuggestions, setTradeNameSuggestions] = useState<string[]>([]);
+
+  // Fetch and generate trade name suggestions
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (!calendarId) return;
+
+      const suggestions = await fetchAndGenerateTradeNameSuggestions(
+        calendarId,
+        newTrade.tags,
+        newTrade.session || undefined,
+        newTrade.name,
+        8
+      );
+      setTradeNameSuggestions(suggestions);
+    };
+
+    fetchSuggestions();
+  }, [calendarId, newTrade.tags, newTrade.session, newTrade.name]);
 
   const tagsWithPairs = useMemo(() => {
     return Array.from(new Set([...allTags, ...CURRENCY_PAIRS.map(pair => `${DEFAULT_PAIRS_TAG_GROUP}:${pair}`)]));
@@ -208,34 +227,6 @@ const TradeForm: React.FC<TradeFormProps> = ({
 
     return amount;
   };
-
-  // Add trade name suggestions logic
-  const tradeNameSuggestions = useMemo(() => {
-    if (!allTrades || allTrades.length === 0) {
-      return generateCommonTradeNamePatterns(newTrade.name);
-    }
-
-    const contextualSuggestions = generateContextualTradeNameSuggestions(
-      allTrades,
-      newTrade.tags,
-      newTrade.session || undefined,
-      newTrade.name,
-      8
-    );
-
-    // If no contextual suggestions, add some common patterns
-    if (contextualSuggestions.length < 5) {
-      const commonPatterns = generateCommonTradeNamePatterns(newTrade.name);
-      const uniquePatterns = commonPatterns.filter(pattern =>
-        !contextualSuggestions.includes(pattern)
-      );
-      return [...contextualSuggestions, ...uniquePatterns].slice(0, 8);
-    }
-
-    return contextualSuggestions;
-  }, [allTrades, newTrade.name, newTrade.tags, newTrade.session]);
-
-
 
 
   const handleRiskToRewardChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -406,6 +397,16 @@ const TradeForm: React.FC<TradeFormProps> = ({
             }}
             fullWidth
             disabled
+            InputLabelProps={{
+              shrink: true
+            }}
+            InputProps={{
+              endAdornment: isLoadingPrecalculatedValues ? (
+                <InputAdornment position="end">
+                  <CircularProgress size={20} />
+                </InputAdornment>
+              ) : null
+            }}
             helperText={
               dynamicRiskSettings?.dynamic_risk_enabled &&
                 dynamicRiskSettings.increased_risk_percentage &&

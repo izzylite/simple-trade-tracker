@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -12,40 +12,70 @@ import {
 } from '@mui/icons-material';
 import { format, startOfDay, startOfWeek, endOfWeek } from 'date-fns';
 import { Trade, Calendar } from '../../types/dualWrite';
+import { TradeRepository } from '../../services/repository/repositories/TradeRepository';
+import { calculateCumulativePnLToDateAsync } from '../../utils/dynamicRiskUtils';
+import { logger } from '../../utils/logger';
 
 interface ProgressSectionProps {
-  allTrades: Trade[];
+  calendarId: string;
   currentBalance: number;
   currentDate: Date; // The date to determine which week to show progress for
-  calendar?: Calendar; // Calendar data to get targets from
+  calendar: Calendar; // Calendar data to get targets from
 }
 
 const ProgressSection: React.FC<ProgressSectionProps> = ({
-  allTrades,
+  calendarId,
   currentBalance,
   currentDate,
   calendar
 }) => {
+  // State
+  const [weekTrades, setWeekTrades] = useState<Trade[]>([]);
+  const [cumulativePnLBeforeWeek, setCumulativePnLBeforeWeek] = useState<number>(0);
+
   // Extract targets from calendar
   const weeklyTargetPercentage = calendar?.weekly_target;
   const accountBalance = calendar?.account_balance || 0;
+
+  // Get week boundaries for the current date - memoized to prevent infinite re-renders
+  const { weekStart, weekEnd, weekStartTime } = useMemo(() => {
+    const start = startOfWeek(currentDate, { weekStartsOn: 0 }); // Sunday
+    const end = endOfWeek(currentDate, { weekStartsOn: 0 }); // Saturday
+    return { weekStart: start, weekEnd: end, weekStartTime: start.getTime() };
+  }, [currentDate.getTime()]);
+
+  // Use calendar.id for dependency instead of calendar object to prevent re-renders
+  const calendarIdForEffect = calendar?.id;
+
+  // Fetch week trades and cumulative P&L before week
+  useEffect(() => {
+    const fetchWeekData = async () => {
+      if (!calendarId || !calendar) return;
+
+      try {
+        const tradeRepo = new TradeRepository();
+
+        // Fetch trades for the current week
+        const trades = await tradeRepo.getTradesByDateRange(calendarId, weekStart, weekEnd);
+        setWeekTrades(trades);
+
+        // Calculate cumulative P&L before the week start
+        const pnl = await calculateCumulativePnLToDateAsync(weekStart, calendar);
+        setCumulativePnLBeforeWeek(pnl);
+      } catch (error) {
+        logger.error('Error fetching week data:', error);
+        setWeekTrades([]);
+        setCumulativePnLBeforeWeek(0);
+      }
+    };
+
+    fetchWeekData();
+  }, [calendarId, calendarIdForEffect, weekStartTime]);
 
   // Don't render if no targets are set
   if (!weeklyTargetPercentage || !accountBalance) {
     return null;
   }
-
-  // Get week boundaries for the current date
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 }); // Sunday
-  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 }); // Saturday
-
-  // Filter trades to current week and exclude invalid dates
-  const weekTrades = allTrades.filter(trade => {
-    if (!trade.trade_date) return false;
-    const tradeDate = new Date(trade.trade_date);
-    if (isNaN(tradeDate.getTime())) return false;
-    return tradeDate >= weekStart && tradeDate <= weekEnd;
-  });
 
   // Calculate traded days (unique days with trades in current week)
   const tradedDaysCount = new Set(
@@ -56,14 +86,7 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
   const totalPnL = weekTrades.reduce((sum, trade) => sum + trade.amount, 0);
 
   // Calculate account balance at start of week for dynamic risk
-  const tradesBeforeWeek = allTrades.filter(trade => {
-    if (!trade.trade_date) return false;
-    const tradeDate = new Date(trade.trade_date);
-    if (isNaN(tradeDate.getTime())) return false;
-    return tradeDate < weekStart;
-  });
-  
-  const baselineAccountValue = accountBalance + tradesBeforeWeek.reduce((sum, trade) => sum + trade.amount, 0);
+  const baselineAccountValue = accountBalance + cumulativePnLBeforeWeek;
 
   // Calculate target amount using baseline account value (accounts for dynamic risk)
   const profitTarget = baselineAccountValue > 0 ? (weeklyTargetPercentage / 100) * baselineAccountValue : 0;

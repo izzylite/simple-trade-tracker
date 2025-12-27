@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -46,7 +46,6 @@ const safeFormatDate = (date: Date | undefined | null, formatStr: string, fallba
 
 interface CalendarCardProps {
   calendar: Calendar;
-  stats: CalendarStats;
   onCalendarClick: (calendarId: string) => void;
   onEditCalendar: (calendar: Calendar) => void;
   onDuplicateCalendar: (calendar: Calendar) => void;
@@ -57,7 +56,6 @@ interface CalendarCardProps {
 
 const CalendarCard: React.FC<CalendarCardProps> = ({
   calendar,
-  stats,
   onCalendarClick,
   onEditCalendar,
   onDuplicateCalendar,
@@ -81,6 +79,38 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
     handleMenuClose();
     action();
   }, [handleMenuClose]);
+
+  
+  const stats: CalendarStats = useMemo(() => {
+    return {  // Extract stats from calendar object (stats are auto-calculated by Supabase)
+      total_pnl: calendar.total_pnl || 0,
+      win_rate: calendar.win_rate || 0,
+      total_trades: calendar.total_trades || 0,
+      growth_percentage: calendar.pnl_performance || 0,
+      avg_win: calendar.avg_win || 0,
+      avg_loss: calendar.avg_loss || 0,
+      profit_factor: calendar.profit_factor || 0,
+      max_drawdown: calendar.max_drawdown || 0,
+      drawdown_recovery_needed: calendar.drawdown_recovery_needed || 0,
+      drawdown_duration: calendar.drawdown_duration || 0,
+      drawdown_start_date: calendar.drawdown_start_date || null,
+      drawdown_end_date: calendar.drawdown_end_date || null,
+      target_progress: calendar.target_progress || 0,
+      pnl_performance: calendar.pnl_performance || 0,
+      win_count: calendar.win_count || 0,
+      loss_count: calendar.loss_count || 0,
+      current_balance: calendar.current_balance || calendar.account_balance,
+      initial_balance: calendar.account_balance,
+      weekly_pnl: calendar.weekly_pnl,
+      monthly_pnl: calendar.monthly_pnl,
+      yearly_pnl: calendar.yearly_pnl,
+      weekly_pnl_percentage: calendar.weekly_pnl_percentage,
+      monthly_pnl_percentage: calendar.monthly_pnl_percentage,
+      yearly_pnl_percentage: calendar.yearly_pnl_percentage,
+      weekly_progress: calendar.weekly_progress,
+      monthly_progress: calendar.monthly_progress
+    };
+  }, [calendar])
 
   function renderAccountGrowth(
     stats: CalendarStats,
@@ -245,6 +275,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
             <Typography
               variant="body2"
               sx={{
+                
                 fontWeight: 500,
                 opacity: 0.7,
                 fontSize: '0.9rem'
@@ -254,59 +285,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
             </Typography>
           </Box>
         )}
-
-        {/* Attribution overlay - only show for actual images */}
-        {/* {calendar.hero_image_url && calendar.hero_image_attribution && (
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: 8,
-              right: 8,
-              background: `linear-gradient(135deg, ${alpha(theme.palette.common.black, 0.8)} 0%, ${alpha(theme.palette.common.black, 0.6)} 100%)`,
-              backdropFilter: 'blur(8px)',
-              color: 'white',
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 2,
-              zIndex: 2,
-              border: `1px solid ${alpha(theme.palette.common.white, 0.1)}`,
-              transition: 'opacity 0.3s ease'
-            }}
-          >
-            <Typography variant="caption" sx={{ fontSize: '0.65rem', display: 'block', fontWeight: 500 }}>
-              📸{' '}
-              <a
-                href={calendar.hero_image_attribution.photographerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  color: 'white',
-                  textDecoration: 'none',
-                  borderBottom: '1px solid rgba(255,255,255,0.3)',
-                  transition: 'border-color 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {calendar.hero_image_attribution.photographer}
-              </a>
-              {' '}on{' '}
-              <a
-                href={calendar.hero_image_attribution.unsplashUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  color: 'white',
-                  textDecoration: 'none',
-                  borderBottom: '1px solid rgba(255,255,255,0.3)',
-                  transition: 'border-color 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                Unsplash
-              </a>
-            </Typography>
-          </Box>
-        )} */}
+ 
       </Box>
 
       {/* Content Section */}
@@ -323,6 +302,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
           <Box sx={{ mb: 1.5 }}>
             <Typography
               variant="h5"
+              component="div"
               sx={{
                 fontWeight: 700,
                 color: 'text.primary',
@@ -332,10 +312,22 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                 mb: 0.5,
                 fontSize: '1.4rem',
                 letterSpacing: '-0.02em',
-                lineHeight: 1.2
+                lineHeight: 1.2,
+                minWidth: 0
               }}
             >
-              {calendar.name}
+              <Box
+                component="span"
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  minWidth: 0,
+                  flex: 1
+                }}
+              >
+                {calendar.name}
+              </Box>
               {stats.total_pnl > 0 && (
                 <Box sx={{
                   display: 'flex',

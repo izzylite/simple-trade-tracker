@@ -26,8 +26,8 @@ export interface SessionStats {
   breakevens: number;
   win_rate: number;
   total_pnl: number;
-  average_pnl: number;
-  pnl_percentage: number;
+  averagePnL: number;
+  pnlPercentage: number;
 }
 
 export const getNormalizedDate = (selectedDate: Date) => {
@@ -268,8 +268,8 @@ export const calculateSessionStats = (
       breakevens,
       win_rate: winRate,
       total_pnl: totalPnL,
-      average_pnl: averagePnL,
-      pnl_percentage: pnlPercentage
+      averagePnL,
+      pnlPercentage
     };
   });
 };
@@ -591,8 +591,8 @@ export const calculateSessionStatsAsync = async (
       breakevens,
       win_rate: winRate,
       total_pnl: totalPnL,
-      average_pnl: averagePnL,
-      pnl_percentage: pnlPercentage
+      averagePnL,
+      pnlPercentage
     };
   });
 };

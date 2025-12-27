@@ -39,6 +39,7 @@ import { useTheme } from '@mui/material/styles';
 import TradeDetailExpanded from '../TradeDetailExpanded';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
+import { useTradeSyncContextOptional } from '../../contexts/TradeSyncContext';
 
 // Memoized component for tag display to prevent recalculating on every render
 const TradeTagsDisplay: React.FC<{ tags: string[] }> = React.memo(({ tags }) => {
@@ -222,8 +223,11 @@ const TradeList: React.FC<TradeListProps> = ({
     onDeleteTrade: onDeleteClick,
     onDeleteMultipleTrades: onDeleteMultiple,
     deletingTradeIds = [],
-    isTradeUpdating,
   } = tradeOperations;
+
+  // Subscribe to global trade sync context for updating state (single source of truth)
+  const tradeSync = useTradeSyncContextOptional();
+
   const theme = useTheme();
   const [selectedTradeIds, setSelectedTradeIds] = useState<string[]>([]);
   const [displayedCount, setDisplayedCount] = useState<number>(initialPageSize);
@@ -278,7 +282,10 @@ const TradeList: React.FC<TradeListProps> = ({
   const isTradeBeingDeleted = useCallback((tradeId: string) => deletingTradeIds.includes(tradeId), [deletingTradeIds]);
 
   // Helper function to check if a trade is being updated
-  const isTradeBeingUpdated = useCallback((tradeId: string) => isTradeUpdating?.(tradeId) || false, [isTradeUpdating]);
+  // Uses global context as single source of truth
+  const isTradeBeingUpdated = useCallback((tradeId: string) => {
+    return tradeSync?.isTradeUpdating(tradeId) || false;
+  }, [tradeSync]);
 
   // Helper function to check if a trade is selected
   const isTradeSelected = useCallback((tradeId: string) => selectedTradeIds.includes(tradeId), [selectedTradeIds]);

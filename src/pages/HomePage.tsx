@@ -85,7 +85,7 @@ const Home: React.FC<HomeProps> = ({
     refreshInterval: 300000, // Refresh every 5 minutes
   });
   const { recentTrades: recentTrades_, isLoading: loadingTrades } = useRecentTrades(user?.uid, calendars, {
-    limit: 5,
+    limit: 4,
   });
   // Track if trash tab has been selected (for lazy loading)
   const [hasLoadedTrash, setHasLoadedTrash] = useState(false);
@@ -293,10 +293,7 @@ const Home: React.FC<HomeProps> = ({
     return calendars.find(c => c.id === selectedTradeCalendarId) || null;
   }, [calendars, selectedTradeCalendarId]);
 
-  const tradesForTradeDialog = useMemo(() => {
-    if (!selectedTradeCalendar) return [];
-    return recentTrades?.filter(trade => trade.calendar_id === selectedTradeCalendar.id) || [];
-  }, [recentTrades, selectedTradeCalendar]);
+ 
 
   const dynamicRiskSettingsForTrade: DynamicRiskSettings = useMemo(() => {
     if (!selectedTradeCalendar) {
@@ -973,6 +970,7 @@ const Home: React.FC<HomeProps> = ({
               flex: 1,
               borderRadius: 1,
               height: { xs: 'auto', md: '620px' },
+              pb: 2,
               minHeight: { xs: '400px', md: '620px' },
               maxWidth: recentCalendars.length <= 1 ? { xs: 'none', md: '400px' } : 'none',
               p: { xs: 0.5, sm: 1 },
@@ -1049,41 +1047,11 @@ const Home: React.FC<HomeProps> = ({
                   flexDirection: 'row',
                   gap: 1
                 }}>
-                  {recentCalendars.map((calendar) => {
-                    // Extract stats from calendar object (stats are auto-calculated by Supabase)
-                    const stats = {
-                      total_pnl: calendar.total_pnl || 0,
-                      win_rate: calendar.win_rate || 0,
-                      total_trades: calendar.total_trades || 0,
-                      growth_percentage: calendar.pnl_performance || 0,
-                      avg_win: calendar.avg_win || 0,
-                      avg_loss: calendar.avg_loss || 0,
-                      profit_factor: calendar.profit_factor || 0,
-                      max_drawdown: calendar.max_drawdown || 0,
-                      drawdown_recovery_needed: calendar.drawdown_recovery_needed || 0,
-                      drawdown_duration: calendar.drawdown_duration || 0,
-                      drawdown_start_date: calendar.drawdown_start_date || null,
-                      drawdown_end_date: calendar.drawdown_end_date || null,
-                      target_progress: calendar.target_progress || 0,
-                      pnl_performance: calendar.pnl_performance || 0,
-                      win_count: calendar.win_count || 0,
-                      loss_count: calendar.loss_count || 0,
-                      current_balance: calendar.current_balance || calendar.account_balance,
-                      initial_balance: calendar.account_balance,
-                      weekly_pnl: calendar.weekly_pnl,
-                      monthly_pnl: calendar.monthly_pnl,
-                      yearly_pnl: calendar.yearly_pnl,
-                      weekly_pnl_percentage: calendar.weekly_pnl_percentage,
-                      monthly_pnl_percentage: calendar.monthly_pnl_percentage,
-                      yearly_pnl_percentage: calendar.yearly_pnl_percentage,
-                      weekly_progress: calendar.weekly_progress,
-                      monthly_progress: calendar.monthly_progress
-                    };
+                  {recentCalendars.map((calendar) => { 
                     return (
                       <CalendarCard
                         key={calendar.id}
-                        calendar={calendar}
-                        stats={stats}
+                        calendar={calendar} 
                         onCalendarClick={handleCalendarClick}
                         onEditCalendar={handleEditCalendar}
                         onDuplicateCalendar={handleDuplicateCalendar}
@@ -1449,20 +1417,18 @@ const Home: React.FC<HomeProps> = ({
           onClose={handleTradeFormClose}
           newMainTrade={newTrade || undefined}
           trade_date={new Date()}
-          showForm={{ open: isTradeFormOpen, editTrade: undefined, createTempTrade: false }}
-          trades={tradesForTradeDialog}
+          showForm={{ open: isTradeFormOpen, editTrade: undefined, createTempTrade: false }} 
           account_balance={accountBalanceForTradeDialog}
           onAddTrade={handleAddTradeFromHome}
           setZoomedImage={setZoomedImage}
           setNewMainTrade={handleSetNewMainTrade}
           onCancel={handleTradeFormCancel}
-          allTrades={tradesForTradeDialog}
+          calendar={selectedTradeCalendar!}
           dynamicRiskSettings={dynamicRiskSettingsForTrade}
           tags={tagsForTradeDialog}
           requiredTagGroups={requiredTagGroupsForTradeDialog}
           calendars={calendars}
-          onCalendarChange={handleTradeCalendarChange}
-          selectedCalendarId={selectedTradeCalendarId}
+          onCalendarChange={handleTradeCalendarChange} 
         />
       )}
 

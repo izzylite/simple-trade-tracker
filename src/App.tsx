@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Trade, Calendar } from './types/dualWrite';
 import { AuthProvider } from './contexts/SupabaseAuthContext';
 import { useAuthState, AuthStateProvider } from './contexts/AuthStateContext';
+import { TradeSyncProvider } from './contexts/TradeSyncContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
@@ -345,14 +346,16 @@ function App() {
   return (
     <AuthProvider>
       <AuthStateProvider>
-        <LocalizationProvider dateAdapter={AdapterDateFns}>
-          <Router>
-            <ScrollToTop />
-            <Suspense fallback={<LoadingFallback />}>
-              <AppContent />
-            </Suspense>
-          </Router>
-        </LocalizationProvider>
+        <TradeSyncProvider>
+          <LocalizationProvider dateAdapter={AdapterDateFns}>
+            <Router>
+              <ScrollToTop />
+              <Suspense fallback={<LoadingFallback />}>
+                <AppContent />
+              </Suspense>
+            </Router>
+          </LocalizationProvider>
+        </TradeSyncProvider>
       </AuthStateProvider>
     </AuthProvider>
   );

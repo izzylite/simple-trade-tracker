@@ -138,7 +138,7 @@ const DailyPnLChart: React.FC<DailyPnLChartProps> = ({
                   setMultipleTradesDialog({
                     open: true,
                     trades: payload.trades,
-                    date: formattedDate,
+                    title: formattedDate,
                     expandedTradeId: payload.trades.length === 1 ? payload.trades[0].id : null
                   });
                 }

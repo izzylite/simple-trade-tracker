@@ -1,10 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   Typography,
   Paper,
   alpha,
-  TextField,
   Switch,
   FormControlLabel,
   Tooltip
@@ -21,7 +20,6 @@ import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 interface AccountBalanceProps {
   balance: number;
   totalProfit: number;
-  onChange: (balance: number) => void;
   trades: Trade[];
   onPerformanceClick?: () => void;
   risk_per_trade?: number;
@@ -35,7 +33,6 @@ interface AccountBalanceProps {
 
 const AccountBalance: React.FC<AccountBalanceProps> = ({
   balance,
-  onChange,
   trades,
   totalProfit,
   onPerformanceClick,
@@ -45,8 +42,6 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
   isDynamicRiskToggled = true, // Default to true (using actual amounts)
   isReadOnly = false
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [tempBalance, setTempBalance] = useState(balance.toString());
 
   // Profit percentage calculation - should be based on original account balance for threshold comparison
   const profitPercentage = trades.length > 0 && balance > 0 ? (totalProfit / balance * 100).toFixed(2) : '0';
@@ -67,26 +62,6 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
 
   // Calculate total account value
   const totalAccountValue = balance + totalProfit;
-
-  const handleSubmit = () => {
-    const newBalance = parseFloat(tempBalance);
-    if (!isNaN(newBalance) && newBalance > 0) {
-      onChange(newBalance);
-      setIsEditing(false);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSubmit();
-    } else if (e.key === 'Escape') {
-      setIsEditing(false);
-      setTempBalance(balance.toString());
-    }
-  };
-
-
-
 
   return (
     <Paper
@@ -112,57 +87,19 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
             Account Balance
           </Typography>
         </Box>
-        {isEditing ? (
-          <TextField
-            value={tempBalance}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setTempBalance(value);
-              }
-            }}
-            onBlur={handleSubmit}
-            onKeyDown={handleKeyPress}
-            size="small"
-            autoFocus
-            sx={{
-              width: '150px',
-              '& .MuiInputBase-input': {
-                py: 0.8,
-                px: 1.5,
-                fontSize: '1.1rem',
-                fontWeight: 600,
-                color: 'text.primary'
-              }
-            }}
-            InputProps={{
-              startAdornment: (
-                <Typography sx={{ color: 'text.secondary', fontSize: '1.1rem', mr: 0.5, fontWeight: 600 }}>
-                  $
-                </Typography>
-              )
-            }}
-          />
-        ) : (
-          <Typography
-            onClick={isReadOnly ? undefined : () => setIsEditing(true)}
-            sx={{
-              cursor: isReadOnly ? 'default' : 'pointer',
-              fontSize: '1.5rem',
-              fontWeight: 700,
-              color: 'text.primary',
-              '&:hover': isReadOnly ? {} : {
-                color: 'primary.main'
-              },
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.5
-            }}
-          >
-            <Box component="span" sx={{ fontSize: '1.1rem', color: 'text.secondary', fontWeight: 500 }}>$</Box>
-            {balance.toLocaleString()}
-          </Typography>
-        )}
+        <Typography
+          sx={{
+            fontSize: '1.5rem',
+            fontWeight: 700,
+            color: 'text.primary',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5
+          }}
+        >
+          <Box component="span" sx={{ fontSize: '1.1rem', color: 'text.secondary', fontWeight: 500 }}>$</Box>
+          {balance.toLocaleString()}
+        </Typography>
       </Box>
 
       <Box sx={{

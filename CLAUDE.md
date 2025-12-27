@@ -186,29 +186,8 @@ This project uses specialized AI subagents for specific domains. Claude Code sho
 
 ## Important Files and Patterns
 
-### Configuration Files
-- `.cursor/rules/` - Cursor AI coding rules and patterns
+### Configuration Files 
 - `supabase/config.toml` - Supabase configuration
 - `supabase/migrations/` - Database schema and migrations
 
-### Core Components
-- `src/components/trades/TradeForm.tsx` - Main trade creation/editing
-- `src/components/common/RichTextEditor/` - Custom Draft.js implementation
-- `src/components/charts/` - Performance visualization components
-- `src/components/economicCalendar/` - Economic event display
-
-### Edge Functions
-- `supabase/functions/process-economic-events/` - Economic calendar data processing
-- `supabase/functions/handle-trade-changes/` - Trade change event handling
-- `supabase/functions/*-share-link/` - Trade/calendar sharing functionality
-
-## Migration Notes
-
-The project is actively migrating from Firebase to Supabase:
-- Database: Firestore → Supabase PostgreSQL
-- Auth: Firebase Auth → Supabase Auth (planned)
-- Storage: Firebase Storage → Supabase Storage (completed)
-- Functions: Firebase Functions → Supabase Edge Functions (in progress)
-
-When working with data operations, check both Firebase and Supabase implementations as some features may exist in both systems during the transition.
 

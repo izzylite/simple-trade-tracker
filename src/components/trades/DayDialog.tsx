@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -9,8 +9,11 @@ import { format, isAfter, startOfDay } from 'date-fns';
 import { Trade, Calendar } from '../../types/dualWrite';
 import { BaseDialog } from '../common';
 import { DayHeader, TradeList, ProgressSection } from './';
-import { calculateCumulativePnL, startOfNextDay } from './TradeFormDialog';
+import { startOfNextDay } from './TradeFormDialog';
+import { calculateCumulativePnLToDateAsync } from '../../utils/dynamicRiskUtils';
 import { TradeOperationsProps } from '../../types/tradeOperations';
+import { TradeRepository } from '../../services/repository/repositories/TradeRepository';
+import { logger } from '../../utils/logger';
 interface DayDialogProps {
   open: boolean;
   onClose: () => void;
@@ -23,15 +26,14 @@ interface DayDialogProps {
   onDeleteMultipleTrades?: (tradeIds: string[]) => void;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
-  allTrades?: Trade[];
   calendarId: string;
   deletingTradeIds?: string[];
-  isTradeUpdating?: (tradeId: string) => boolean;
+  // isTradeUpdating now comes from TradeSyncContext
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
   // Open AI chat mode for a specific trade
   onOpenAIChatMode?: (trades: Trade[], tradeId: string, title?: string) => void;
   // Calendar data for economic events filtering and progress tracking
-  calendar?: Calendar;
+  calendar: Calendar;
   // Update calendar properties (for pinning events, etc.)
   onUpdateCalendarProperty?: (
     calendarId: string,
@@ -57,10 +59,8 @@ const DayDialog: React.FC<DayDialogProps> = ({
   onDateChange,
   onUpdateTradeProperty,
   setZoomedImage,
-  allTrades = [],
   calendarId,
   deletingTradeIds,
-  isTradeUpdating,
   onOpenGalleryMode,
   onOpenAIChatMode,
   calendar,
@@ -69,9 +69,50 @@ const DayDialog: React.FC<DayDialogProps> = ({
 }) => {
 
   // State
-
-  
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
+  const [dayTotalPnL, setDayTotalPnL] = useState<number>(0);
+  const [cumulativePnL, setCumulativePnL] = useState<number>(0);
+
+  // Use stable primitives for useEffect dependencies to prevent infinite re-renders
+  const dateTime = date.getTime();
+  const calendarIdForEffect = calendar?.id;
+
+  // Fetch cumulative P&L when dialog opens or date changes
+  useEffect(() => {
+    const fetchCumulativePnL = async () => {
+      if (!open || !calendar) return;
+
+      try {
+        const targetDate = startOfNextDay(date);
+        const pnl = await calculateCumulativePnLToDateAsync(targetDate, calendar);
+        setCumulativePnL(pnl);
+      } catch (error) {
+        logger.error('Error fetching cumulative P&L:', error);
+        setCumulativePnL(0);
+      }
+    };
+
+    fetchCumulativePnL();
+  }, [open, dateTime, calendarIdForEffect]);
+
+  // Fetch day's total P&L when dialog opens or date changes
+  useEffect(() => {
+    const fetchDayTotalPnL = async () => {
+      if (!open || !calendarId) return;
+
+      try {
+        const tradeRepo = new TradeRepository();
+        const dayTrades = await tradeRepo.getTradesByDay(calendarId, date, ['amount']);
+        const total = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
+        setDayTotalPnL(total);
+      } catch (error) {
+        logger.error('Error fetching day total P&L:', error);
+        setDayTotalPnL(0);
+      }
+    };
+
+    fetchDayTotalPnL();
+  }, [open, dateTime, calendarId]);
   
  
 
@@ -121,7 +162,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
     }
   }, [onOpenAIChatMode, trades, date]);
 
-  // Create tradeOperations object for TradeList
+  // Create tradeOperations object for TradeList (isTradeUpdating now comes from TradeSyncContext)
   const tradeOperations: TradeOperationsProps = useMemo(() => ({
     onEditTrade: handleEditClick,
     onDeleteTrade,
@@ -129,14 +170,13 @@ const DayDialog: React.FC<DayDialogProps> = ({
     onZoomImage: setZoomedImage,
     onUpdateTradeProperty: isReadOnly ? undefined : onUpdateTradeProperty,
     deletingTradeIds: deletingTradeIds || [],
-    isTradeUpdating,
     calendarId,
     onOpenGalleryMode,
     onOpenAIChat: onOpenAIChatMode ? handleOpenAIChat : undefined,
     economicFilter: undefined,
     calendar,
     onUpdateCalendarProperty: isReadOnly ? undefined : onUpdateCalendarProperty
-  }), [onDeleteTrade, onDeleteMultipleTrades, setZoomedImage, isReadOnly, onUpdateTradeProperty, deletingTradeIds, isTradeUpdating, calendarId, onOpenGalleryMode, onOpenAIChatMode, calendar, onUpdateCalendarProperty]);
+  }), [onDeleteTrade, onDeleteMultipleTrades, setZoomedImage, isReadOnly, onUpdateTradeProperty, deletingTradeIds, calendarId, onOpenGalleryMode, onOpenAIChatMode, calendar, onUpdateCalendarProperty]);
 
   return (
     <>
@@ -172,16 +212,16 @@ const DayDialog: React.FC<DayDialogProps> = ({
 
           <DayHeader
             title={format(date, 'EEEE, MMMM d, yyyy')}
-            account_balance={account_balance + calculateCumulativePnL(startOfNextDay(date), allTrades)}
+            account_balance={account_balance + cumulativePnL}
             formInputVisible={false}
-            total_pnl={trades.reduce((sum, trade) => sum + trade.amount, 0)}
+            total_pnl={dayTotalPnL}
             onPrevDay={handlePrevDay}
             onNextDay={handleNextDay}
           />
 
           <ProgressSection
-            allTrades={allTrades}
-            currentBalance={account_balance + calculateCumulativePnL(startOfNextDay(date), allTrades)}
+            calendarId={calendarId}
+            currentBalance={account_balance + cumulativePnL}
             currentDate={date}
             calendar={calendar}
           />

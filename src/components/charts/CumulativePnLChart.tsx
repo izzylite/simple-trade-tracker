@@ -186,7 +186,7 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
                       setMultipleTradesDialog({
                         open: true,
                         trades: dataPoint.trades,
-                        date: formattedDate,
+                        title: formattedDate,
                         expandedTradeId: dataPoint.trades.length === 1 ? dataPoint.trades[0].id : null
                       });
                     }

@@ -44,7 +44,8 @@ import { calculatePercentageOfValueAtDate } from '../utils/dynamicRiskUtils';
 import { calculateTargetProgress } from '../utils/statsUtils';
 import { error } from '../utils/logger';
 import { ImportMappingDialog } from './import/ImportMappingDialog';
-import PerformanceCharts from './PerformanceCharts';
+import PerformanceCharts, { TimePeriod, TIME_PERIOD_TABS } from './PerformanceCharts';
+import RoundedTabs from './common/RoundedTabs';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 
 
@@ -97,6 +98,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   const menuOpen = Boolean(menuAnchorEl);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
+  const [performanceTimePeriod, setPerformanceTimePeriod] = useState<TimePeriod>('month');
 
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
@@ -198,7 +200,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   const handleImportComplete = async (importedTrades: Partial<Trade>[]) => {
     if (!onImportTrades) return;
 
-    try { 
+    try {
       // Wait for import to complete before closing dialog
       await onImportTrades(importedTrades);
 
@@ -693,14 +695,27 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
             }
           }}
         >
-          <DialogTitle>
+          <DialogTitle sx={{ pb: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
               <Typography variant="h6">
-                Performance Analytics
+                Performance Analytics for {performanceTimePeriod === 'month'
+                  ? format(currentDate, 'MMMM yyyy')
+                  : performanceTimePeriod === 'year'
+                    ? format(currentDate, 'yyyy')
+                    : 'All Time'
+                }
               </Typography>
-              <IconButton onClick={() => setIsPerformanceDialogOpen(false)} size="small">
-                <CloseIcon />
-              </IconButton>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <RoundedTabs
+                  tabs={TIME_PERIOD_TABS}
+                  activeTab={TIME_PERIOD_TABS.findIndex(t => t.value === performanceTimePeriod)}
+                  onTabChange={(_, index) => setPerformanceTimePeriod(TIME_PERIOD_TABS[index].value)}
+                  size="small"
+                />
+                <IconButton onClick={() => setIsPerformanceDialogOpen(false)} size="small">
+                  <CloseIcon />
+                </IconButton>
+              </Box>
             </Box>
           </DialogTitle>
           <DialogContent sx={{ p: 0 }}>
@@ -712,6 +727,9 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               calendarId={calendarId}
               scoreSettings={scoreSettings}
               dynamicRiskSettings={dynamicRiskSettings}
+              timePeriod={performanceTimePeriod}
+              onTimePeriodChange={setPerformanceTimePeriod}
+              hideTimePeriodTabs={true}
               onEditTrade={onEditTrade}
               onDeleteTrade={onDeleteTrade}
               onUpdateTradeProperty={onUpdateTradeProperty}

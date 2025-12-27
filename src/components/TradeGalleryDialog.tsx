@@ -13,7 +13,8 @@ import {
   List,
   ListItem,
   ListItemButton,
-  Alert
+  Alert,
+  CircularProgress
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -47,6 +48,9 @@ import EconomicEventDetailDialog from './economicCalendar/EconomicEventDetailDia
 import NoteEditorDialog from './notes/NoteEditorDialog';
 import { logger } from '../utils/logger';
 import { Z_INDEX } from '../styles/zIndex';
+import { getTradeRepository } from '../services/calendarService';
+import { useTradeSyncContextOptional } from '../contexts/TradeSyncContext';
+import { normalizeTradeDates } from '../utils/tradeUtils';
 
 interface TradeGalleryDialogProps {
   open: boolean;
@@ -61,10 +65,15 @@ interface TradeGalleryDialogProps {
   // AI-only mode: starts on Assistant tab
   aiOnlyMode?: boolean;
   isReadOnly?: boolean;
+  // Fetch mode: if set, dialog will fetch trades for this year when trades array is empty
+  fetchYear?: number;
 
   // Trade operations - required
   tradeOperations: TradeOperationsProps;
 }
+
+// Page size for paginated fetching
+const GALLERY_PAGE_SIZE = 20;
 
 const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   open,
@@ -77,6 +86,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   calendar,
   aiOnlyMode = false,
   isReadOnly = false,
+  fetchYear,
   tradeOperations
 }) => {
   // Destructure from tradeOperations directly
@@ -89,18 +99,40 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     onUpdateCalendarProperty,
     isTradeUpdating
   } = tradeOperations;
+
+  // Subscribe to trade sync context for real-time updates
+  const tradeSync = useTradeSyncContextOptional();
+  const lastProcessedTimestamp = useRef(0);
+
   const theme = useTheme();
   const { user } = useAuthState();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   // In aiOnlyMode, always show Assistant tab (index 1)
   const [activeTab, setActiveTab] = useState(aiOnlyMode ? 1 : 0);
 
+  // Fetch mode state - used when trades array is empty and fetchYear is set
+  const [internalTrades, setInternalTrades] = useState<Trade[]>([]);
+  const [isLoadingTrades, setIsLoadingTrades] = useState(false);
+  const [hasMoreTrades, setHasMoreTrades] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  // Derive initial total count from calendar year_stats, then update from API response
+  const initialTotalCount = fetchYear !== undefined
+    ? calendar?.year_stats?.[fetchYear.toString()]?.total_trades ?? 0
+    : 0;
+  const [totalTradeCount, setTotalTradeCount] = useState(initialTotalCount);
+
+  // Determine if we're in fetch mode (no trades provided but fetchYear is set)
+  const isFetchMode = trades.length === 0 && fetchYear !== undefined && calendarId !== undefined;
+
+  // Use either provided trades or internally fetched trades
+  const effectiveTrades = isFetchMode ? internalTrades : trades;
+
   // Find initial index based on initialTradeId
   const initialIndex = useMemo(() => {
     if (!initialTradeId) return 0;
-    const index = trades.findIndex(trade => trade.id === initialTradeId);
+    const index = effectiveTrades.findIndex(trade => trade.id === initialTradeId);
     return index >= 0 ? index : 0;
-  }, [trades, initialTradeId]);
+  }, [effectiveTrades, initialTradeId]);
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
@@ -109,10 +141,144 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     setCurrentIndex(initialIndex);
   }, [initialIndex]);
 
-  // Get current trade
+  // Ensure currentIndex is within bounds (might be stale from previous session)
+  const safeCurrentIndex = useMemo(() => {
+    if (effectiveTrades.length === 0) return 0;
+    return Math.min(Math.max(0, currentIndex), effectiveTrades.length - 1);
+  }, [currentIndex, effectiveTrades.length]);
+
+  // Get current trade using safe index
   const currentTrade = useMemo(() => {
-    return trades[currentIndex] || null;
-  }, [trades, currentIndex]);
+    if (effectiveTrades.length === 0) return null;
+    return effectiveTrades[safeCurrentIndex] || null;
+  }, [effectiveTrades, safeCurrentIndex]);
+
+  // Fetch initial trades when in fetch mode and dialog opens
+  useEffect(() => {
+    const fetchInitialTrades = async () => {
+      if (!isFetchMode || !open || !calendarId || fetchYear === undefined) return;
+
+      // Don't re-fetch if we already have trades
+      if (internalTrades.length > 0) return;
+
+      setIsLoadingTrades(true);
+      try {
+        const result = await getTradeRepository().getTradesForYearPaginated(
+          calendarId,
+          fetchYear,
+          1,
+          GALLERY_PAGE_SIZE
+        );
+
+        setInternalTrades(result.trades);
+        setHasMoreTrades(result.hasMore);
+        setCurrentPage(1);
+        setTotalTradeCount(result.totalCount);
+        setCurrentIndex(0);
+
+        logger.log(`📖 Gallery: Initial fetch - ${result.trades.length} trades, hasMore: ${result.hasMore}, total: ${result.totalCount}`);
+      } catch (error) {
+        logger.error('Error fetching initial trades:', error);
+      } finally {
+        setIsLoadingTrades(false);
+      }
+    };
+
+    fetchInitialTrades();
+  }, [isFetchMode, open, calendarId, fetchYear]);
+
+  // Load more trades when approaching the end (within last 2 trades)
+  const loadMoreTrades = useCallback(async () => {
+    if (!isFetchMode || isLoadingTrades || !hasMoreTrades || !calendarId || fetchYear === undefined) {
+      return;
+    }
+
+    setIsLoadingTrades(true);
+    try {
+      const nextPage = currentPage + 1;
+      const result = await getTradeRepository().getTradesForYearPaginated(
+        calendarId,
+        fetchYear,
+        nextPage,
+        GALLERY_PAGE_SIZE
+      );
+
+      setInternalTrades(prev => [...prev, ...result.trades]);
+      setHasMoreTrades(result.hasMore);
+      setCurrentPage(nextPage);
+
+      logger.log(`📖 Gallery: Loaded page ${nextPage} - ${result.trades.length} more trades, hasMore: ${result.hasMore}`);
+    } catch (error) {
+      logger.error('Error loading more trades:', error);
+    } finally {
+      setIsLoadingTrades(false);
+    }
+  }, [isFetchMode, isLoadingTrades, hasMoreTrades, calendarId, fetchYear, currentPage]);
+
+  // Trigger load more when user is near the end
+  useEffect(() => {
+    if (!isFetchMode || !hasMoreTrades || isLoadingTrades) return;
+
+    // Load more when within last 2 trades (use safeCurrentIndex for accurate calculation)
+    const tradesRemaining = effectiveTrades.length - safeCurrentIndex - 1;
+    if (tradesRemaining <= 1) {
+      loadMoreTrades();
+    }
+  }, [safeCurrentIndex, effectiveTrades.length, isFetchMode, hasMoreTrades, isLoadingTrades, loadMoreTrades]);
+
+  // Reset internal state when dialog closes, sync totalTradeCount when opening
+  useEffect(() => {
+    if (!open) {
+      setInternalTrades([]);
+      setCurrentPage(1);
+      setHasMoreTrades(false);
+      setTotalTradeCount(initialTotalCount);
+    } else {
+      // Sync total count from calendar stats when dialog opens
+      setTotalTradeCount(initialTotalCount);
+    }
+  }, [open, initialTotalCount]);
+
+  // Handle trade sync events from other components (e.g., useCalendarTrades)
+  useEffect(() => {
+    if (!tradeSync?.lastSyncEvent || !open) return;
+
+    const { type, trade, timestamp } = tradeSync.lastSyncEvent;
+
+    // Avoid processing the same event twice
+    if (timestamp <= lastProcessedTimestamp.current) return;
+    lastProcessedTimestamp.current = timestamp;
+
+    // Only process events for trades in our calendar
+    if (calendarId && trade.calendar_id !== calendarId) return;
+
+    const normalizedTrade = normalizeTradeDates(trade);
+
+    // Update internalTrades if in fetch mode
+    if (isFetchMode) {
+      setInternalTrades(prevTrades => {
+        switch (type) {
+          case 'update': {
+            const tradeIndex = prevTrades.findIndex(t => t.id === trade.id);
+            if (tradeIndex === -1) return prevTrades;
+
+            const updatedTrades = [...prevTrades];
+            updatedTrades[tradeIndex] = normalizedTrade;
+            logger.log(`📖 Gallery: Synced trade update for ${trade.id}`);
+            return updatedTrades;
+          }
+          case 'delete': {
+            const filteredTrades = prevTrades.filter(t => t.id !== trade.id);
+            if (filteredTrades.length === prevTrades.length) return prevTrades;
+            logger.log(`📖 Gallery: Synced trade delete for ${trade.id}`);
+            return filteredTrades;
+          }
+          default:
+            return prevTrades;
+        }
+      });
+    }
+  }, [tradeSync?.lastSyncEvent, open, calendarId, isFetchMode]);
 
   // History sliding view state (like AIChatDrawer)
   const [showHistoryView, setShowHistoryView] = useState(false);
@@ -134,7 +300,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   useEffect(() => {
     setActiveTab(aiOnlyMode ? 1 : 0);
     setShowHistoryView(false);
-  }, [currentIndex, aiOnlyMode]);
+  }, [safeCurrentIndex, aiOnlyMode]);
 
   // Initialize AI chat with trade-scoped context
   const aiChat = useAIChat({
@@ -238,15 +404,37 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   }, []);
 
   // Navigation functions
+  // Check if we're at the last trade and loading more (use safeCurrentIndex for accurate checks)
+  const isAtEnd = safeCurrentIndex >= effectiveTrades.length - 1;
+  const isAtStart = safeCurrentIndex <= 0;
+  const isLoadingNext = isLoadingTrades && isAtEnd && hasMoreTrades;
+  const isLoadingPrev = isLoadingTrades && isAtStart && isFetchMode;
+
   const navigateNext = useCallback(() => {
-    if (trades.length <= 1) return;
-    setCurrentIndex((prev) => (prev + 1) % trades.length);
-  }, [trades.length]);
+    if (effectiveTrades.length <= 1) return;
+    // In fetch mode, don't wrap around - just go to next if available
+    if (isFetchMode) {
+      if (safeCurrentIndex < effectiveTrades.length - 1) {
+        setCurrentIndex(safeCurrentIndex + 1);
+      }
+    } else {
+      // Normal mode - wrap around
+      setCurrentIndex((safeCurrentIndex + 1) % effectiveTrades.length);
+    }
+  }, [effectiveTrades.length, isFetchMode, safeCurrentIndex]);
 
   const navigatePrevious = useCallback(() => {
-    if (trades.length <= 1) return;
-    setCurrentIndex((prev) => (prev - 1 + trades.length) % trades.length);
-  }, [trades.length]);
+    if (effectiveTrades.length <= 1) return;
+    // In fetch mode, don't wrap around
+    if (isFetchMode) {
+      if (safeCurrentIndex > 0) {
+        setCurrentIndex(safeCurrentIndex - 1);
+      }
+    } else {
+      // Normal mode - wrap around
+      setCurrentIndex((safeCurrentIndex - 1 + effectiveTrades.length) % effectiveTrades.length);
+    }
+  }, [effectiveTrades.length, isFetchMode, safeCurrentIndex]);
 
   // Scroll functions
   const scrollUp = useCallback(() => {
@@ -296,7 +484,11 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     };
   }, [open, navigatePrevious, navigateNext, scrollUp, scrollDown, onClose]);
 
-  if (!currentTrade) {
+  // Determine if we're in initial loading state (fetch mode, loading, no trades yet)
+  const isInitialLoading = isFetchMode && isLoadingTrades && effectiveTrades.length === 0;
+
+  // Only return null if not in fetch mode and no trade
+  if (!currentTrade && !isInitialLoading) {
     return null;
   }
 
@@ -334,15 +526,15 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
             {/* Previous Button */}
             <Tooltip
-              title="Previous trade (←)"
+              title={isInitialLoading ? "Loading..." : isAtStart && isFetchMode ? "At first trade" : "Previous trade (←)"}
               slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
             >
               <span>
                 <IconButton
                   onClick={navigatePrevious}
-                  disabled={trades.length <= 1}
+                  disabled={isInitialLoading || effectiveTrades.length <= 1 || (isAtStart && isFetchMode)}
                   sx={{
-                    color: trades.length <= 1 ? 'text.disabled' : 'text.primary',
+                    color: isInitialLoading || effectiveTrades.length <= 1 || (isAtStart && isFetchMode) ? 'text.disabled' : 'text.primary',
                     '&:hover': {
                       backgroundColor: alpha(theme.palette.primary.main, 0.1)
                     }
@@ -363,44 +555,59 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 {title}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                <Chip
-                  size="small"
-                  label={`${currentIndex + 1} of ${trades.length}`}
-                  sx={{
-                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                    color: 'primary.main',
-                    fontWeight: 600
-                  }}
-                />
+                {isInitialLoading ? (
+                  <Shimmer height={24} width={80} borderRadius={12} variant="wave" intensity="medium" />
+                ) : (
+                  <Chip
+                    size="small"
+                    label={isFetchMode
+                      ? `${safeCurrentIndex + 1} of ${totalTradeCount}`
+                      : `${safeCurrentIndex + 1} of ${effectiveTrades.length}`
+                    }
+                    sx={{
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                      color: 'primary.main',
+                      fontWeight: 600
+                    }}
+                  />
+                )}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                  <Typography variant="caption" color="text.secondary" sx={{
-                    wordBreak: 'break-word',
-                    overflowWrap: 'break-word'
-                  }}>
-                    {format(new Date(currentTrade.trade_date), 'MMM d, yyyy')}
-                  </Typography>
+                  {isInitialLoading ? (
+                    <Shimmer height={14} width={100} borderRadius={4} variant="wave" intensity="low" />
+                  ) : (
+                    <Typography variant="caption" color="text.secondary" sx={{
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word'
+                    }}>
+                      {format(new Date(currentTrade!.trade_date), 'MMM d, yyyy')}
+                    </Typography>
+                  )}
                 </Box>
               </Box>
             </Box>
 
             {/* Next Button */}
             <Tooltip
-              title="Next trade (→)"
+              title={isLoadingNext ? "Loading more trades..." : isAtEnd && !hasMoreTrades && isFetchMode ? "At last trade" : "Next trade (→)"}
               slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
             >
               <span>
                 <IconButton
                   onClick={navigateNext}
-                  disabled={trades.length <= 1}
+                  disabled={effectiveTrades.length <= 1 || isLoadingNext || (isAtEnd && !hasMoreTrades && isFetchMode)}
                   sx={{
-                    color: trades.length <= 1 ? 'text.disabled' : 'text.primary',
+                    color: effectiveTrades.length <= 1 || (isAtEnd && !hasMoreTrades && isFetchMode) ? 'text.disabled' : 'text.primary',
                     '&:hover': {
                       backgroundColor: alpha(theme.palette.primary.main, 0.1)
                     }
                   }}
                 >
-                  <ArrowForwardIcon />
+                  {isLoadingNext ? (
+                    <CircularProgress size={20} color="primary" />
+                  ) : (
+                    <ArrowForwardIcon />
+                  )}
                 </IconButton>
               </span>
             </Tooltip>
@@ -419,11 +626,11 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             size="small"
           />
 
-          {/* Edit Button - only show when not read-only */}
-          {!isReadOnly && onEditTrade && (
+          {/* Edit Button - only show when not read-only and we have a trade */}
+          {!isReadOnly && onEditTrade && currentTrade && (
             <Button
               size="small"
-              variant="outlined" 
+              variant="outlined"
               onClick={() => {
                 onEditTrade(currentTrade);
                 onClose();
@@ -509,13 +716,142 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             ...scrollbarStyles(theme)
           }}
         >
-          <TradeDetailExpanded
-            tradeData={currentTrade}
-            isExpanded={true}
-            animate={false}
-            trades={trades}
-            tradeOperations={tradeOperations}
-          />
+          {isInitialLoading ? (
+            // Shimmer loading state matching TradeDetailExpanded structure
+            <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* Trade name row: Icon + Name + Action buttons */}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Shimmer height={28} width={28} borderRadius={4} variant="wave" intensity="medium" />
+                  <Shimmer height={28} width={120} borderRadius={4} variant="wave" intensity="medium" />
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Shimmer height={32} width={32} borderRadius="50%" variant="wave" intensity="low" />
+                  <Shimmer height={32} width={32} borderRadius="50%" variant="wave" intensity="low" />
+                  <Shimmer height={32} width={32} borderRadius="50%" variant="wave" intensity="low" />
+                </Box>
+              </Box>
+
+              {/* Properties Section Header */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Shimmer height={16} width={16} borderRadius={4} variant="wave" intensity="low" />
+                <Shimmer height={16} width={80} borderRadius={4} variant="wave" intensity="low" />
+              </Box>
+
+              {/* Properties 2x2 Grid */}
+              <Box sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                gap: 2
+              }}>
+                {/* PnL Card */}
+                <Box sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.background.paper, 0.6),
+                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                    <Shimmer height={14} width={14} borderRadius={4} variant="wave" intensity="low" />
+                    <Shimmer height={14} width={30} borderRadius={4} variant="wave" intensity="low" />
+                  </Box>
+                  <Shimmer height={28} width={80} borderRadius={4} variant="wave" intensity="medium" />
+                </Box>
+
+                {/* Date Card */}
+                <Box sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.background.paper, 0.6),
+                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                    <Shimmer height={14} width={14} borderRadius={4} variant="wave" intensity="low" />
+                    <Shimmer height={14} width={35} borderRadius={4} variant="wave" intensity="low" />
+                  </Box>
+                  <Shimmer height={20} width={130} borderRadius={4} variant="wave" intensity="medium" />
+                </Box>
+
+                {/* Risk to Reward Card */}
+                <Box sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.background.paper, 0.6),
+                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                    <Shimmer height={14} width={14} borderRadius={4} variant="wave" intensity="low" />
+                    <Shimmer height={14} width={90} borderRadius={4} variant="wave" intensity="low" />
+                  </Box>
+                  <Shimmer height={24} width={40} borderRadius={4} variant="wave" intensity="medium" sx={{ mb: 0.5 }} />
+                  <Shimmer height={14} width={120} borderRadius={4} variant="wave" intensity="low" />
+                </Box>
+
+                {/* Session Card */}
+                <Box sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.background.paper, 0.6),
+                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                    <Shimmer height={14} width={14} borderRadius={4} variant="wave" intensity="low" />
+                    <Shimmer height={14} width={55} borderRadius={4} variant="wave" intensity="low" />
+                  </Box>
+                  <Shimmer height={20} width={60} borderRadius={4} variant="wave" intensity="medium" />
+                </Box>
+              </Box>
+
+              {/* Images Section */}
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <Shimmer height={16} width={16} borderRadius={4} variant="wave" intensity="low" />
+                  <Shimmer height={16} width={55} borderRadius={4} variant="wave" intensity="low" />
+                </Box>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Shimmer height={100} width="100%" borderRadius={2} variant="wave" intensity="medium" sx={{ flex: 1 }} />
+                  <Shimmer height={100} width="100%" borderRadius={2} variant="wave" intensity="medium" sx={{ flex: 1 }} />
+                  <Shimmer height={100} width="100%" borderRadius={2} variant="wave" intensity="medium" sx={{ flex: 1 }} />
+                </Box>
+              </Box>
+
+              {/* Tags Section */}
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Shimmer height={16} width={16} borderRadius={4} variant="wave" intensity="low" />
+                    <Shimmer height={16} width={40} borderRadius={4} variant="wave" intensity="low" />
+                  </Box>
+                  <Shimmer height={20} width={20} borderRadius={4} variant="wave" intensity="low" />
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  {[140, 180, 100, 160, 80, 100, 80, 120].map((width, i) => (
+                    <Shimmer key={i} height={28} width={width} borderRadius={14} variant="wave" intensity="medium" />
+                  ))}
+                </Box>
+              </Box>
+
+              {/* Economic Events Section */}
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <Shimmer height={16} width={16} borderRadius={4} variant="wave" intensity="low" />
+                  <Shimmer height={16} width={180} borderRadius={4} variant="wave" intensity="low" />
+                </Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Shimmer height={40} width="100%" borderRadius={8} variant="wave" intensity="low" />
+                  <Shimmer height={40} width="100%" borderRadius={8} variant="wave" intensity="low" />
+                </Box>
+              </Box>
+            </Box>
+          ) : currentTrade ? (
+            <TradeDetailExpanded
+              tradeData={currentTrade}
+              isExpanded={true}
+              animate={false}
+              trades={trades}
+              tradeOperations={tradeOperations}
+            />
+          ) : null}
         </Box>
       </TabPanel>
 
@@ -555,8 +891,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 autoScroll={aiChat.messages.length > 0}
                 onTradeClick={(tradeId, contextTrades) => {
                   // Navigate to the trade within the gallery
-                  const tradeIndex = trades.findIndex(t => t.id === tradeId);
-                  if (tradeIndex >= 0 && trades.length <=5) {
+                  const tradeIndex = effectiveTrades.findIndex(t => t.id === tradeId);
+                  if (tradeIndex >= 0 && effectiveTrades.length <= 5) {
                     setCurrentIndex(tradeIndex);
                     setActiveTab(0); // Switch to Trade tab
                   } else if (onOpenGalleryMode) {
