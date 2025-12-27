@@ -184,6 +184,19 @@ This project uses specialized AI subagents for specific domains. Claude Code sho
 - Test edge functions with Deno test framework
 - Verify database operations with transactions
 
+### Security - NEVER Commit Secrets
+⚠️ **CRITICAL**: Never commit API keys, service keys, or secrets to the repository.
+
+- **Never hardcode** Supabase service role keys, anon keys, or any API keys in code
+- **Always use environment variables** for sensitive configuration
+- **Check before committing**: Review any new `.js`, `.ts`, or `.sh` files for hardcoded credentials
+- **Patterns to avoid**:
+  - `const supabaseKey = 'eyJ...'` (JWT tokens)
+  - `const apiKey = '...'`
+  - Any file named `apply-migration*.js`, `test-*.ts`, `*-env-setup.sh`
+- **If you need a utility script** that requires secrets, use `process.env.VARIABLE_NAME` and document required env vars
+- Files matching these patterns are gitignored: `apply-migration*.js`, `test-*.ts`, `*-env-setup.sh`
+
 ## Important Files and Patterns
 
 ### Configuration Files 
