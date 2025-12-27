@@ -68,3 +68,8 @@ nul
 # Migration scripts and backups
 /scripts/
 *-backup.json
+
+# Utility scripts with potential secrets (use env vars instead)
+apply-migration*.js
+test-*.ts
+*-env-setup.sh
