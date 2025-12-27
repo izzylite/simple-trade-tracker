@@ -100,7 +100,6 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, index, totalCards, isHovered,
 
   // Z-index: reversed so first card appears on top when stacked
   const zIndex = totalCards - index;
-
   // Calculate staggered animation delay - cards appear one after another
   const animationDelay = `${index * 0.1}s`;
 
