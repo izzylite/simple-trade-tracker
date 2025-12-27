@@ -183,6 +183,7 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
         tradeData={trade}
         animate={false}
         isExpanded={true}
+        isReadOnly={true}
         tradeOperations={{
           onZoomImage: (url: string, allImages?: string[], initialIndex?: number) => {
             setZoomedImages({

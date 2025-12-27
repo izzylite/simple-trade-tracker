@@ -232,6 +232,9 @@ const TradeList: React.FC<TradeListProps> = ({
   const [selectedTradeIds, setSelectedTradeIds] = useState<string[]>([]);
   const [displayedCount, setDisplayedCount] = useState<number>(initialPageSize);
 
+  // Safe access to trades length
+  const tradesLength = trades?.length || 0;
+
   // Menu state for per-trade actions
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [menuTrade, setMenuTrade] = useState<Trade | null>(null);
@@ -263,20 +266,20 @@ const TradeList: React.FC<TradeListProps> = ({
   // Reset displayed count when trades array changes (e.g., filtering, new data)
   useEffect(() => {
     setDisplayedCount(initialPageSize);
-  }, [trades.length, initialPageSize]);
+  }, [tradesLength, initialPageSize]);
 
   // Get the trades to display based on pagination
   const displayedTrades = useMemo(() => {
-    return trades.slice(0, displayedCount);
+    return (trades || []).slice(0, displayedCount);
   }, [trades, displayedCount]);
 
   // Check if there are more trades to load
-  const hasMoreTrades = displayedCount < trades.length;
+  const hasMoreTrades = displayedCount < tradesLength;
 
   // Handle load more - wrapped in useCallback
   const handleLoadMore = useCallback(() => {
-    setDisplayedCount(prev => Math.min(prev + pageSize, trades.length));
-  }, [pageSize, trades.length]);
+    setDisplayedCount(prev => Math.min(prev + pageSize, tradesLength));
+  }, [pageSize, tradesLength]);
 
   // Helper function to check if a trade is being deleted
   const isTradeBeingDeleted = useCallback((tradeId: string) => deletingTradeIds.includes(tradeId), [deletingTradeIds]);
@@ -321,7 +324,7 @@ const TradeList: React.FC<TradeListProps> = ({
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Typography variant="subtitle1" sx={{ mr: 1 }}>
-           {displayedCount < trades.length ? `${displayedCount} of ${trades.length}` : trades.length} Trades
+           {displayedCount < tradesLength ? `${displayedCount} of ${tradesLength}` : tradesLength} Trades
           </Typography>
         
           {enableBulkSelection && selectedTradeIds.length > 0 && (
@@ -363,7 +366,7 @@ const TradeList: React.FC<TradeListProps> = ({
         )}
       </Box>
 
-      {trades.length === 0 ? (
+      {tradesLength === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
           No trades for this day
         </Typography>
@@ -646,7 +649,7 @@ const TradeList: React.FC<TradeListProps> = ({
                   }
                 }}
               >
-                Load More ({trades.length - displayedCount} remaining)
+                Load More ({tradesLength - displayedCount} remaining)
               </Button>
             </Box>
           )}

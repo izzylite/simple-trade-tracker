@@ -175,7 +175,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   // Keep multipleTradesDialog.trades in sync with the main trades array
   // Only run when trades array changes (by ID), not when dialog trades change
   useEffect(() => {
-    if (tradesDialog.open && tradesDialog.trades.length > 0) {
+    if (tradesDialog.open && tradesDialog.trades && tradesDialog.trades.length > 0) {
       // Create a Map for O(1) lookup instead of O(n) with .find()
       const tradesMap = new Map(trades.map(t => [t.id, t]));
 

@@ -41,7 +41,8 @@ import {
   ExpandLess as ExpandLessIcon,
   FilterList as FilterIcon,
   ListAlt as ListAltIcon,
-  SmartToy as AIIcon
+  SmartToy as AIIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
 import { AnimatedDropdown } from './Animations';
 import { TagsDisplay } from './common';
@@ -71,6 +72,8 @@ interface TradeDetailExpandedProps {
   animate?: boolean;
   trades?: Array<{ id: string;[key: string]: any }>;
   tradeOperations: TradeOperationsProps;
+  isReadOnly?: boolean;
+  showAIButton?: boolean;
 }
 
 // Define shimmer animation
@@ -112,7 +115,9 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   isExpanded,
   animate,
   trades,
-  tradeOperations
+  tradeOperations,
+  isReadOnly = false,
+  showAIButton = true
 }) => {
   // Destructure from tradeOperations directly
   const {
@@ -123,7 +128,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     economicFilter,
     onOpenAIChat,
     calendar,
-    onUpdateCalendarProperty
+    onUpdateCalendarProperty,
+    onEditTrade
   } = tradeOperations;
 
   // Use global context for trade updating state
@@ -463,7 +469,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 justifyContent: { xs: 'flex-end', sm: 'flex-start' }
               }}>
                 {/* AI Analysis Button */}
-                {onOpenAIChat && (
+                {showAIButton && onOpenAIChat && (
                   <Tooltip
                     title="AI Analysis"
                     slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
@@ -479,6 +485,26 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       }}
                     >
                       <AIIcon sx={{ fontSize: 20 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {/* Edit Button */}
+                {!isReadOnly && onEditTrade && (
+                  <Tooltip
+                    title="Edit Trade"
+                    slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+                  >
+                    <IconButton
+                      onClick={() => onEditTrade(trade)}
+                      sx={{
+                        color: 'text.secondary',
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                          color: 'primary.main'
+                        }
+                      }}
+                    >
+                      <EditIcon sx={{ fontSize: 20 }} />
                     </IconButton>
                   </Tooltip>
                 )}

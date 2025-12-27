@@ -146,7 +146,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
   }, [showAddForm]);
 
   const handleGalleryModeClick = useCallback(() => {
-    if (onOpenGalleryMode && trades.length > 0) {
+    if (onOpenGalleryMode && trades && trades.length > 0) {
       const title = `${format(date, 'EEEE, MMMM d, yyyy')} - ${trades.length} Trade${trades.length > 1 ? 's' : ''}`;
       onOpenGalleryMode(trades, expandedTradeId || trades[0].id, title);
       onClose(); // Close the day dialog when opening gallery mode
@@ -161,6 +161,8 @@ const DayDialog: React.FC<DayDialogProps> = ({
       // Don't close DayDialog - only close when opening gallery mode
     }
   }, [onOpenAIChatMode, trades, date]);
+
+  const tradesLength = trades?.length || 0;
 
   // Create tradeOperations object for TradeList (isTradeUpdating now comes from TradeSyncContext)
   const tradeOperations: TradeOperationsProps = useMemo(() => ({
@@ -194,7 +196,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
         primaryButtonAction={isReadOnly ? undefined : () => handleAddClick()}
         hideFooterCancelButton={false}
         actions={
-          onOpenGalleryMode && trades.length > 0 ? (
+          onOpenGalleryMode && tradesLength > 0 ? (
             <Tooltip title="View trades in gallery mode">
               <Button
                 variant="outlined"
@@ -232,7 +234,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
             onTradeClick={handleTradeClick}
             tradeOperations={tradeOperations}
             hideActions={isReadOnly} // Hide edit/delete actions in read-only mode
-            enableBulkSelection={isReadOnly ? false : trades.length > 1} // Disable bulk selection in read-only mode
+            enableBulkSelection={isReadOnly ? false : tradesLength > 1} // Disable bulk selection in read-only mode
           />
         </Box>
       </BaseDialog>

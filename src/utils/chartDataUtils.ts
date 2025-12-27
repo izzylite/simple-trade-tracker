@@ -43,6 +43,8 @@ export const getNormalizedDate = (selectedDate: Date) => {
 
 // Function to filter trades based on selected time period
 export const getFilteredTrades = (trades: Trade[], selectedDate: Date, period: TimePeriod): Trade[] => {
+  if (!trades) return [];
+
   switch (period) {
     case 'month':
       return trades.filter(trade => isSameMonth(new Date(trade.trade_date), selectedDate));
@@ -55,6 +57,18 @@ export const getFilteredTrades = (trades: Trade[], selectedDate: Date, period: T
   }
 };
 export const getTradesStats = (trades: Trade[]) => {
+  // Guard against undefined trades
+  if (!trades || trades.length === 0) {
+    return {
+      trades: [],
+      wins: 0,
+      losses: 0,
+      breakevens: 0,
+      totalTrades: 0,
+      winRate: 0,
+      total_pnl: 0
+    };
+  }
 
   // Create a map to store stats for each tag
   const stats = { wins: 0, losses: 0, breakevens: 0, total_pnl: 0 };
@@ -89,9 +103,14 @@ export const getTradesStats = (trades: Trade[]) => {
 
 export const getTagDayOfWeekChartData = (
 trades: Trade[],  theme: Theme, winRateMetric : boolean = true) => {
+  // Guard against undefined trades
+  if (!trades || trades.length === 0) {
+    return [];
+  }
+
   // Day of week names
   const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  
+
 
   // Group trades by day of week
   const tradesByDay = DAYS_OF_WEEK.map((day, index) => {

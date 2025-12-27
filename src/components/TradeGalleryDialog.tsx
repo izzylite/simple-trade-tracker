@@ -614,7 +614,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           </Box>
         </Box>
 
-        {/* Tabs, Edit, and History Controls */}
+        {/* Tabs and History Controls */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
           <RoundedTabs
             tabs={[
@@ -626,28 +626,6 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             size="small"
           />
 
-          {/* Edit Button - only show when not read-only and we have a trade */}
-          {!isReadOnly && onEditTrade && currentTrade && (
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => {
-                onEditTrade(currentTrade);
-                onClose();
-              }}
-              sx={{
-                textTransform: 'none',
-                borderRadius: 2,
-                px: 1.5,
-                py: 0.5,
-                mr: 1,
-                fontSize: '0.8rem'
-              }}
-            >
-              Edit Trade
-            </Button>
-          )}
- 
           {/* History controls - only show when on Assistant tab */}
           {activeTab === 1 && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 1 }}>
@@ -850,6 +828,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
               animate={false}
               trades={trades}
               tradeOperations={tradeOperations}
+              isReadOnly={isReadOnly}
+              showAIButton={false}
             />
           ) : null}
         </Box>

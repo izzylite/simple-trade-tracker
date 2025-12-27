@@ -156,6 +156,10 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   const [isLoadingPrecalculatedValues, setIsLoadingPrecalculatedValues] = useState(false);
   const [dayTotalPnL, setDayTotalPnL] = useState<number>(0);
 
+  // Original risk amount derived from editing trade (preserves historical calculation context)
+  // For wins: riskAmount = amount / R:R, For losses: riskAmount = |amount|
+  const [originalRiskAmount, setOriginalRiskAmount] = useState<number | null>(null);
+
   // Track if component is mounted for safe state updates after async operations
   const isMountedRef = useRef(true);
   useEffect(() => {
@@ -236,6 +240,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   // Function to create empty trade - defined before useEffect that uses it
   const createEmptyTrade = useCallback(async () => {
     setEditingTrade(null);
+    setOriginalRiskAmount(null); // Clear original risk amount for new trades
     // Set creating empty trade state to true to disable cancel/close buttons
     setIsCreatingEmptyTrade(true);
     // Create a temporary trade object to display in the UI
@@ -298,8 +303,22 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       // Do NOT reinitialize when parent updates showForm.editTrade with fresh
       // database data during an active edit session - this would lose pending images
       if (isDialogOpening || isSwitchingTrade) {
-        setEditingTrade(showForm.editTrade);
-        setNewTrade(createEditTradeData(showForm.editTrade));
+        const trade = showForm.editTrade;
+        setEditingTrade(trade);
+        setNewTrade(createEditTradeData(trade));
+
+        // Derive and store the original risk amount from the trade
+        // This preserves the historical calculation context even if year_stats changed
+        if (trade.risk_to_reward && trade.risk_to_reward > 0) {
+          // For wins: riskAmount = amount / R:R
+          // For losses: riskAmount = |amount|
+          const derivedRiskAmount = trade.trade_type === 'win'
+            ? Math.abs(trade.amount) / trade.risk_to_reward
+            : Math.abs(trade.amount);
+          setOriginalRiskAmount(derivedRiskAmount);
+        } else {
+          setOriginalRiskAmount(null);
+        }
       }
     }
 
@@ -348,9 +367,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     }
 
     setEditingTrade(null);
+    setOriginalRiskAmount(null); // Clear original risk amount
     setNewMainTrade(() => null);
-
-
   };
 
 
@@ -476,12 +494,22 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   }
 
   // Calculate amount based on risk per trade (as percentage of account balance) and risk-to-reward ratio
-  // Uses precalculated values from useEffect
+  // When editing: uses the original risk amount derived from the trade to preserve historical context
+  // When creating: uses precalculated values from current cumulative P&L
   const calculateAmountFromRiskToReward = (risk_to_reward: number): number => {
     if (!newTrade || !risk_to_reward || !account_balance || newTrade.trade_type === 'breakeven') return 0;
 
-    const effectiveRiskPercentage = precalculatedRiskPercentage || dynamicRiskSettings.risk_per_trade || 0;
-    const riskAmount = calculateRiskAmount(effectiveRiskPercentage, account_balance, precalculatedPnL);
+    // Use original risk amount when editing (preserves the historical calculation context)
+    // For new trades, calculate from current cumulative P&L
+    let riskAmount: number;
+    if (originalRiskAmount !== null) {
+      // Editing: use the derived original risk amount
+      riskAmount = originalRiskAmount;
+    } else {
+      // New trade: calculate from current state
+      const effectiveRiskPercentage = precalculatedRiskPercentage || dynamicRiskSettings.risk_per_trade || 0;
+      riskAmount = calculateRiskAmount(effectiveRiskPercentage, account_balance, precalculatedPnL);
+    }
 
     // For win trades: risk amount * R:R
     // For loss trades: risk amount
@@ -1094,13 +1122,6 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       return;
     }
 
-    // Prevent saving while precalculated values are loading (would result in incorrect amounts)
-    if (isLoadingPrecalculatedValues) {
-      logger.warn('Precalculated values still loading, prevented update');
-      showErrorSnackbar('Please wait for risk calculations to complete');
-      return;
-    }
-
     // Validate form
     if (!newTrade.amount) {
       logger.error('Validation error: Amount is required');
@@ -1253,7 +1274,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           (e?: React.FormEvent) => handleEditSubmit(e) :
           (e?: React.FormEvent) => handleSubmit(e)
         )}
-        isSubmitting={isSubmitting || isCreatingEmptyTrade || isLoadingPrecalculatedValues} // Disable while creating empty trade or loading risk calculations
+        isSubmitting={isSubmitting || isCreatingEmptyTrade || (!editingTrade && isLoadingPrecalculatedValues)} // Disable while creating empty trade or loading risk calculations (only for new trades)
         cancelButtonAction={() => {
           // Only allow canceling if we're not in the process of creating an empty trade
           if (!isCreatingEmptyTrade) {
@@ -1262,6 +1283,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           }
         }}
         hideFooterCancelButton={false}
+        sx={{ zIndex: Z_INDEX.DIALOG_POPUP }} // Higher z-index to appear above TradeGalleryDialog
       >
         <Box sx={{ p: 3 }}>
 
@@ -1315,7 +1337,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               editingTrade={editingTrade}
               allTags={allTags}
               isSubmitting={isSubmitting}
-              isLoadingPrecalculatedValues={isLoadingPrecalculatedValues}
+              isLoadingPrecalculatedValues={!editingTrade && isLoadingPrecalculatedValues}
               calculateAmountFromRiskToReward={calculateAmountFromRiskToReward}
               onNameChange={handleNameChange}
               onAmountChange={handleAmountChange}

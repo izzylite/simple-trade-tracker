@@ -5,7 +5,7 @@
  * Manually refreshes economic calendar data for specific dates/currencies
  * by fetching from MyFXBook API and updating the database
  */
-import { createClient } from "supabase";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // CORS headers
 const corsHeaders = {

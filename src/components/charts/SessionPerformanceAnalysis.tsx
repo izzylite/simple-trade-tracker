@@ -80,14 +80,14 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
               onClick={() => {
                 if (session.total_trades > 0) {
                   const sessionTrades = trades.filter(trade =>
-                    trade.session === session.session &&
+                    trade.session?.toLowerCase() === session.session?.toLowerCase() &&
                     (timePeriod === 'month' ? isSameMonth(new Date(trade.trade_date), selectedDate) :
                      timePeriod === 'year' ? new Date(trade.trade_date).getFullYear() === selectedDate.getFullYear() :
                      true)
                   );
                   setMultipleTradesDialog({
                     open: true,
-                    tradeIds: sessionTrades.map(t => t.id),
+                    trades: sessionTrades,
                     title: `${session.session} Session Trades`,
                     expandedTradeId: sessionTrades.length === 1 ? sessionTrades[0].id : null
                   });

@@ -95,7 +95,7 @@ import ShareButton from '../components/sharing/ShareButton';
 
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import NotesDrawer from '../components/notes/NotesDrawer';
-import CalendarDayReminder from '../components/CalendarDayReminder';
+import { StackedNotesWidget } from '../components/reminderNotes';
 
 import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import AnimatedBackground from '../components/common/AnimatedBackground';
@@ -619,41 +619,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [removingNotifications, setRemovingNotifications] = useState<Set<string>>(new Set());
   const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null>(null);
 
-  // Hero image override from reminder notes - only applied when calendar has hero image
-  // Use two layers for crossfade animation between reminder images
-  const [reminderImageA, setReminderImageA] = useState<string | null>(null);
-  const [reminderImageB, setReminderImageB] = useState<string | null>(null);
-  const [activeLayer, setActiveLayer] = useState<'A' | 'B'>('A');
-  const activeLayerRef = React.useRef<'A' | 'B'>('A');
-
-  // Callback to handle reminder note image changes with crossfade
-  // Uses ref to avoid recreating callback and causing useEffect loops in child
-  const handleReminderImageChange = useCallback((imageUrl: string | null) => {
-    // Only allow override if calendar has a hero image AND note has a cover image
-    // If note has no image, keep the original hero image (don't clear it)
-    if (heroImageUrl && imageUrl) {
-      // Set the new image on the inactive layer, then switch active layer
-      if (activeLayerRef.current === 'A') {
-        setReminderImageB(imageUrl);
-        setActiveLayer('B');
-        activeLayerRef.current = 'B';
-      } else {
-        setReminderImageA(imageUrl);
-        setActiveLayer('A');
-        activeLayerRef.current = 'A';
-      }
-    } else {
-      // Clear both layers when no override
-      setReminderImageA(null);
-      setReminderImageB(null);
-    }
-  }, [heroImageUrl]);
-
-  // Determine which hero image to display (for non-animated fallback)
-  const reminderImageOverride = activeLayer === 'A' ? reminderImageA : reminderImageB;
-
-  // Determine which hero image to display
-  const displayHeroImageUrl = reminderImageOverride || heroImageUrl;
 
   const breadcrumbButtons = useMemo<BreadcrumbButton[]>(() => [
     ...((!isReadOnly) ? [{
@@ -1256,7 +1221,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       />
 
       {/* Hero Image Banner */}
-      {displayHeroImageUrl && (
+      {heroImageUrl && (
         <Box
           sx={{
             position: 'relative',
@@ -1265,48 +1230,16 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             borderRadius: 0,
           }}
         >
-          {/* Base hero image layer */}
-          {heroImageUrl && (
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                backgroundImage: `url(${heroImageUrl})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                zIndex: 0,
-              }}
-            />
-          )}
-
-          {/* Override image layer A with crossfade animation */}
+          {/* Hero image layer */}
           <Box
             sx={{
               position: 'absolute',
               inset: 0,
-              backgroundImage: reminderImageA ? `url(${reminderImageA})` : 'none',
+              backgroundImage: `url(${heroImageUrl})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
-              opacity: activeLayer === 'A' && reminderImageA ? 1 : 0,
-              transition: 'opacity 0.5s ease-in-out',
-              zIndex: 1,
-            }}
-          />
-
-          {/* Override image layer B with crossfade animation */}
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage: reminderImageB ? `url(${reminderImageB})` : 'none',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              opacity: activeLayer === 'B' && reminderImageB ? 1 : 0,
-              transition: 'opacity 0.5s ease-in-out',
-              zIndex: 1,
+              zIndex: 0,
             }}
           />
 
@@ -1321,8 +1254,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             }}
           />
 
-          {/* Only show attribution when displaying the original hero image (not an override) */}
-          <Fade in={!reminderImageOverride && !!heroImageAttribution} timeout={300}>
+          {/* Attribution */}
+          <Fade in={!!heroImageAttribution} timeout={300}>
             <Box
               sx={{
                 position: 'absolute',
@@ -1350,13 +1283,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
-      {/* Calendar Day Reminder */}
-      {calendarId && (
-        <CalendarDayReminder
-          calendarId={calendarId}
-          onReminderImageChange={handleReminderImageChange}
-        />
-      )}
+      {/* Stacked Notes Widget */}
+      {calendarId && <StackedNotesWidget calendarId={calendarId} />}
 
       {/* Main Content Container */}
       <Box sx={{

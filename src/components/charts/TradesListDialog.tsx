@@ -72,7 +72,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   // Fetch cumulative P&L when dialog opens or trades change
   useEffect(() => {
     const fetchCumulativePnL = async () => {
-      if (!open || !calendar || trades.length === 0) return;
+      if (!open || !calendar || !trades || trades.length === 0) return;
 
       try {
         // Use the most recent trade's date to calculate cumulative P&L
@@ -105,7 +105,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   const tradeStats = React.useMemo(() => {
     let containWins = false;
     let containLosses = false;
-    trades.forEach((trade) => {
+    (trades || []).forEach((trade) => {
       if (trade.trade_type === 'win') containWins = true;
       else if (trade.trade_type === 'loss') containLosses = true;
     });
@@ -120,6 +120,11 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
     let isMounted = true;
 
     const fetchChartData = async () => {
+      if (!trades || trades.length === 0) {
+        if (isMounted) setChartData(undefined);
+        return;
+      }
+
       // If getTagDayOfWeekChartData is async, await it; otherwise, wrap in Promise.resolve
       const result = await Promise.resolve(
         getTagDayOfWeekChartData(trades, theme, selectedMetric === "winRate" && tradeStats.containBoth)
@@ -143,8 +148,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
 
   // Gallery mode handler
   const handleGalleryModeClick = () => {
-    if (onOpenGalleryMode && trades.length > 0) {
-      ;
+    if (onOpenGalleryMode && trades && trades.length > 0) {
       onOpenGalleryMode(trades, expandedTradeId || trades[0].id,
         `${title} - ${trades.length} Trade${trades.length > 1 ? 's' : ''}`);
       onClose(); // Close the dialog when opening gallery mode
@@ -158,17 +162,18 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
     let isMounted = true;
     const calculateTotalPnL = async () => {
       // Simulate async calculation, replace with real async logic if needed
-      const sum = trades.reduce((acc, trade) => acc + trade.amount, 0);
+      const sum = (trades || []).reduce((acc, trade) => acc + trade.amount, 0);
       if (isMounted) setTotalPnL(sum);
     };
     calculateTotalPnL();
     return () => { isMounted = false; };
   }, [trades]);
 
+  const tradesLength = trades?.length || 0;
   const dialogTitle = (
     <>
       <Typography variant="h6">
-        {trades.length} {trades.length === 1 ? 'Trade' : 'Trades'}{title ? ` for ${title.toLowerCase()}` : ''}
+        {tradesLength} {tradesLength === 1 ? 'Trade' : 'Trades'}{title ? ` for ${title.toLowerCase()}` : ''}
       </Typography>
 
     </>
@@ -176,7 +181,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   );
 
   // Custom actions for the dialog
-  const dialogActions = onOpenGalleryMode && trades.length > 0 ? (
+  const dialogActions = onOpenGalleryMode && tradesLength > 0 ? (
     <Tooltip title="View trades in gallery mode">
       <Button
         variant="contained"
@@ -330,7 +335,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
           expandedTradeId={expandedTradeId}
           onTradeClick={onTradeExpand}
           hideActions={!onEditTrade && !onDeleteTrade}
-          enableBulkSelection={trades.length > 1 && !!onDeleteMultipleTrades}
+          enableBulkSelection={tradesLength > 1 && !!onDeleteMultipleTrades}
           tradeOperations={tradeOperations}
         />
       </Box>
