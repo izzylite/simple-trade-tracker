@@ -37,6 +37,11 @@ const AuthCallback: React.FC = () => {
       return;
     }
 
+    // Check if we have a code parameter (PKCE flow)
+    // The code exchange happens async, so we need to wait for it
+    const hasCode = searchParams.has('code');
+    logger.info('AuthCallback: Has code param:', hasCode);
+
     // Set up auth state listener for event-driven authentication
     // This is the recommended Supabase pattern instead of polling
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -59,17 +64,39 @@ const AuthCallback: React.FC = () => {
         hasRedirected.current = true;
         navigate('/dashboard', { replace: true });
       } else if (event === 'INITIAL_SESSION' && !session) {
-        // No session found after initial check
-        logger.error('No session found after OAuth callback');
-        setError('Authentication failed: No session created');
-        setIsProcessing(false);
+        // No session on initial check - but if we have a code, wait for SIGNED_IN
+        // PKCE code exchange happens async after INITIAL_SESSION fires
+        if (hasCode) {
+          logger.info('AuthCallback: No session yet, but code present - waiting for PKCE exchange');
+          // Don't set error yet, wait for code exchange to complete
+        } else {
+          // No code and no session - this is a direct navigation, redirect home
+          logger.info('AuthCallback: No code and no session - redirecting to home');
+          hasRedirected.current = true;
+          navigate('/', { replace: true });
+        }
       }
     });
+
+    // Set a timeout for PKCE code exchange - if it takes too long, show error
+    let timeoutId: NodeJS.Timeout | undefined;
+    if (hasCode) {
+      timeoutId = setTimeout(() => {
+        if (!hasRedirected.current) {
+          logger.error('AuthCallback: PKCE code exchange timeout');
+          setError('Authentication timed out. Please try signing in again.');
+          setIsProcessing(false);
+        }
+      }, 15000); // 15 second timeout for code exchange
+    }
 
     // Cleanup function to unsubscribe from auth changes
     return () => {
       logger.info('AuthCallback: Cleaning up auth listener');
       subscription.unsubscribe();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, [navigate, searchParams]);
 
