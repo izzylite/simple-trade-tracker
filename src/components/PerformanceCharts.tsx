@@ -69,6 +69,7 @@ interface PerformanceChartsProps {
   dynamicRiskSettings?: DynamicRiskSettings;
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
   calendar?: Calendar;
+  isReadOnly?: boolean;
 }
 
 const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
@@ -91,7 +92,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   dynamicRiskSettings: dynamicRiskSettingsProp,
   onOpenGalleryMode,
   economicFilter,
-  calendar
+  calendar,
+  isReadOnly = false
 }) => {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
@@ -481,19 +483,20 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     setTagAnalysisTab(newValue);
   }, []);
 
-  // Construct tradeOperations object
+  // Construct tradeOperations object - hide edit/delete in read-only mode
   const tradeOperations: TradeOperationsProps = useMemo(() => ({
-    onEditTrade: onEditTrade,
-    onDeleteTrade: onDeleteTrade,
+    onEditTrade: isReadOnly ? undefined : onEditTrade,
+    onDeleteTrade: isReadOnly ? undefined : onDeleteTrade,
     onDeleteMultipleTrades: undefined,
-    onUpdateTradeProperty: onUpdateTradeProperty,
+    onUpdateTradeProperty: isReadOnly ? undefined : onUpdateTradeProperty,
     onZoomImage: handleZoomImage,
     onOpenGalleryMode: onOpenGalleryMode,
     economicFilter: economicFilterFn,
     calendarId: calendarId,
     calendar: calendar,
-    isTradeUpdating: undefined
-  }), [onEditTrade, onDeleteTrade, onUpdateTradeProperty, onOpenGalleryMode, economicFilterFn, calendarId, calendar]);
+    isTradeUpdating: undefined,
+    isReadOnly: isReadOnly
+  }), [onEditTrade, onDeleteTrade, onUpdateTradeProperty, onOpenGalleryMode, economicFilterFn, calendarId, calendar, isReadOnly]);
 
 
 

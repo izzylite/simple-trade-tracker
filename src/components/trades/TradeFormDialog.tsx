@@ -1371,7 +1371,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         autoHideDuration={4000}
         onClose={handleCloseError}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        sx={{ zIndex: Z_INDEX.DIALOG_POPUP }}
+        sx={{ zIndex: Z_INDEX.SNACKBAR }}
       >
         <Alert onClose={handleCloseError} severity="error" variant="filled" sx={{ width: '100%' }}>
           {errorMessage}

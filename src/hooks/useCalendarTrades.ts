@@ -40,6 +40,7 @@ export interface UseCalendarTradesOptions {
    * @default true
    */
   enableRealtime?: boolean;
+
 }
 
 /**

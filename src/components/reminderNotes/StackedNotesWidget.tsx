@@ -8,6 +8,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Box } from '@mui/material';
 import { useReminderNotes } from './useReminderNotes';
 import NoteCard from './NoteCard';
+import PlaceholderNoteCard from './PlaceholderNoteCard';
 import NotesBottomSheet from './NotesBottomSheet';
 import { Z_INDEX } from '../../styles/zIndex';
 import { Note } from '../../types/note';
@@ -78,15 +79,31 @@ const StackedNotesWidget: React.FC<StackedNotesWidgetProps> = ({ calendarId }) =
           transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
+        {/* Render placeholder cards when there's only 1 note for animation effect */}
+        {visibleNotes.length === 1 && (
+          <>
+            
+            <PlaceholderNoteCard
+              index={1}
+              totalCards={2}
+              isHovered={isHovered}
+              hasAnimated={hasAnimated}
+            />
+          </>
+        )}
+
         {/* Render cards in reverse order so first card is on top */}
         {[...visibleNotes].reverse().map((note, reversedIndex) => {
           const originalIndex = visibleNotes.length - 1 - reversedIndex;
+          // When we have only 1 note, render it at index 0 with totalCards=3 for proper stacking
+          const displayIndex = visibleNotes.length === 1 ? 0 : originalIndex;
+          const displayTotal = visibleNotes.length === 1 ? 3 : visibleNotes.length;
           return (
             <NoteCard
               key={note.id}
               note={note}
-              index={originalIndex}
-              totalCards={visibleNotes.length}
+              index={displayIndex}
+              totalCards={displayTotal}
               isHovered={isHovered}
               hasAnimated={hasAnimated}
             />

@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { ViewCarousel as GalleryIcon } from '@mui/icons-material';
 import { format, isAfter, startOfDay } from 'date-fns';
-import { Trade, Calendar } from '../../types/dualWrite';
+import { Trade } from '../../types/dualWrite';
 import { BaseDialog } from '../common';
 import { DayHeader, TradeList, ProgressSection } from './';
 import { startOfNextDay } from './TradeFormDialog';
@@ -14,6 +14,7 @@ import { calculateCumulativePnLToDateAsync } from '../../utils/dynamicRiskUtils'
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { TradeRepository } from '../../services/repository/repositories/TradeRepository';
 import { logger } from '../../utils/logger';
+
 interface DayDialogProps {
   open: boolean;
   onClose: () => void;
@@ -21,26 +22,12 @@ interface DayDialogProps {
   trades: Trade[];
   account_balance: number;
   onDateChange: (date: Date) => void;
-  showAddForm: (ediTrade?: Trade | null) => void;
-  onDeleteTrade: (tradeId: string) => void;
-  onDeleteMultipleTrades?: (tradeIds: string[]) => void;
-  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade, createIfNotExists?: (tradeId: string) => Trade) => Promise<Trade | undefined>;
-  setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
-  calendarId: string;
-  deletingTradeIds?: string[];
-  // isTradeUpdating now comes from TradeSyncContext
-  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
-  // Open AI chat mode for a specific trade
+  // Form handler - DayDialog-specific, not part of tradeOperations
+  showAddForm: (editTrade?: Trade | null) => void;
+  // Unified trade operations from parent
+  tradeOperations: TradeOperationsProps;
+  // AI chat mode opener - needs trades context from DayDialog
   onOpenAIChatMode?: (trades: Trade[], tradeId: string, title?: string) => void;
-  // Calendar data for economic events filtering and progress tracking
-  calendar: Calendar;
-  // Update calendar properties (for pinning events, etc.)
-  onUpdateCalendarProperty?: (
-    calendarId: string,
-    updateCallback: (calendar: Calendar) => Calendar
-  ) => Promise<Calendar | undefined>;
-  // Read-only mode for shared calendars
-  isReadOnly?: boolean;
 }
 
 
@@ -53,20 +40,18 @@ const DayDialog: React.FC<DayDialogProps> = ({
   date,
   trades,
   account_balance,
-  onDeleteTrade,
-  onDeleteMultipleTrades,
   showAddForm,
   onDateChange,
-  onUpdateTradeProperty,
-  setZoomedImage,
-  calendarId,
-  deletingTradeIds,
-  onOpenGalleryMode,
-  onOpenAIChatMode,
-  calendar,
-  onUpdateCalendarProperty,
-  isReadOnly = false
+  tradeOperations,
+  onOpenAIChatMode
 }) => {
+  // Destructure from tradeOperations
+  const {
+    calendarId,
+    calendar,
+    onOpenGalleryMode,
+    isReadOnly = false
+  } = tradeOperations;
 
   // State
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
@@ -164,21 +149,14 @@ const DayDialog: React.FC<DayDialogProps> = ({
 
   const tradesLength = trades?.length || 0;
 
-  // Create tradeOperations object for TradeList (isTradeUpdating now comes from TradeSyncContext)
-  const tradeOperations: TradeOperationsProps = useMemo(() => ({
-    onEditTrade: handleEditClick,
-    onDeleteTrade,
-    onDeleteMultipleTrades,
-    onZoomImage: setZoomedImage,
-    onUpdateTradeProperty: isReadOnly ? undefined : onUpdateTradeProperty,
-    deletingTradeIds: deletingTradeIds || [],
-    calendarId,
-    onOpenGalleryMode,
-    onOpenAIChat: onOpenAIChatMode ? handleOpenAIChat : undefined,
-    economicFilter: undefined,
-    calendar,
-    onUpdateCalendarProperty: isReadOnly ? undefined : onUpdateCalendarProperty
-  }), [onDeleteTrade, onDeleteMultipleTrades, setZoomedImage, isReadOnly, onUpdateTradeProperty, deletingTradeIds, calendarId, onOpenGalleryMode, onOpenAIChatMode, calendar, onUpdateCalendarProperty]);
+  // Merge parent's tradeOperations with DayDialog-specific overrides
+  const mergedTradeOperations: TradeOperationsProps = useMemo(() => ({
+    ...tradeOperations,
+    // Override onEditTrade to use DayDialog's form handler
+    onEditTrade: isReadOnly ? undefined : handleEditClick,
+    // Override onOpenAIChat to include trades context from DayDialog
+    onOpenAIChat: onOpenAIChatMode ? handleOpenAIChat : undefined
+  }), [tradeOperations, isReadOnly, handleEditClick, onOpenAIChatMode, handleOpenAIChat]);
 
   return (
     <>
@@ -221,18 +199,20 @@ const DayDialog: React.FC<DayDialogProps> = ({
             onNextDay={handleNextDay}
           />
 
-          <ProgressSection
-            calendarId={calendarId}
-            currentBalance={account_balance + cumulativePnL}
-            currentDate={date}
-            calendar={calendar}
-          />
+          {calendarId && calendar && (
+            <ProgressSection
+              calendarId={calendarId}
+              currentBalance={account_balance + cumulativePnL}
+              currentDate={date}
+              calendar={calendar}
+            />
+          )}
 
           <TradeList
             trades={trades}
             expandedTradeId={expandedTradeId}
             onTradeClick={handleTradeClick}
-            tradeOperations={tradeOperations}
+            tradeOperations={mergedTradeOperations}
             hideActions={isReadOnly} // Hide edit/delete actions in read-only mode
             enableBulkSelection={isReadOnly ? false : tradesLength > 1} // Disable bulk selection in read-only mode
           />

@@ -275,12 +275,13 @@ const SharedCalendarPage: React.FC = () => {
 
 
         {/* Calendar Content - Using TradeCalendar in read-only mode */}
+        {/* Trades are fetched directly by useCalendarTrades via RLS policies */}
         <TradeCalendar
           calendar={calendarData.calendar}
           setLoading={handleSetLoading}
           onToggleTheme={handleToggleTheme}
           mode={mode}
-          isReadOnly={true} // Enable read-only mode for shared calendars
+          isReadOnly={true}
         />
 
         {/* Share Statistics */}

@@ -65,7 +65,7 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   onTradeClick,
   tradeOperations
 }) => {
-  const { calendar, isReadOnly = false } = tradeOperations;
+  const { calendar } = tradeOperations;
   const theme = useTheme();
 
   // Tab state
@@ -83,24 +83,25 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
   const [isLoadingPinned, setIsLoadingPinned] = useState(false);
 
   // Fetch pinned trades when drawer opens
+  // RLS policies allow public read access for shared calendars
   useEffect(() => {
-    const fetchPinnedTrades = async () => {
+    const loadPinnedTrades = async () => {
       if (!open || !calendarId) return;
 
       setIsLoadingPinned(true);
       try {
         const trades = await calendarService.getTradeRepository().fetchPinnedTrades(calendarId);
         setPinnedTrades(trades);
-        logger.log(`📌 Loaded ${trades.length} pinned trades`);
+        logger.log(`📌 Loaded ${trades.length} pinned trades from database`);
       } catch (error) {
-        logger.error('Error fetching pinned trades:', error);
+        logger.error('Error loading pinned trades:', error);
         setPinnedTrades([]);
       } finally {
         setIsLoadingPinned(false);
       }
     };
 
-    fetchPinnedTrades();
+    loadPinnedTrades();
   }, [open, calendarId]);
 
   // Get pinned events from calendar

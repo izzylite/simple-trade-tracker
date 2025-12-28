@@ -4,7 +4,7 @@
  * Replaces edge functions with direct database operations
  */
 
-import { supabase } from '../../../config/supabase';
+import { supabase, supabaseUrl } from '../../../config/supabase';
 import { RepositoryResult } from './BaseRepository';
 import { Trade, Calendar } from '../../../types/dualWrite';
 import { handleSupabaseError } from '../../../utils/supabaseErrorHandler';
@@ -348,36 +348,43 @@ export class ShareRepository {
   /**
    * Get a shared trade by share ID (for public viewing)
    * This will be used by the public shared trade page
+   * Uses edge function to bypass RLS policies for unauthenticated access
    */
   async getSharedTrade(shareId: string): Promise<RepositoryResult<SharedTradeData | null>> {
     try {
       logger.log(`Fetching shared trade ${shareId}`);
 
-      const { data: trade, error } = await supabase
-        .from('trades')
-        .select('*')
-        .eq('share_id', shareId)
-        .eq('is_shared', true)
-        .single();
+      // Call edge function instead of direct query to bypass RLS
+      const response = await fetch(`${supabaseUrl}/functions/v1/get-shared-trade`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ shareId })
+      });
 
-      if (error) {
-        throw error;
+      if (!response.ok) {
+        if (response.status === 404) {
+          return {
+            success: true,
+            data: null,
+            timestamp: new Date()
+          };
+        }
+        throw new Error(`Edge function error: ${response.status}`);
       }
 
-      if (!trade) {
-        return {
-          success: true,
-          data: null,
-          timestamp: new Date()
-        };
-      }
+      const result = await response.json();
+
+      // Edge function wraps response in { success: true, data: {...} }
+      const responseData = result.data || result;
 
       return {
         success: true,
         data: {
-          trade: trade as Trade,
-          viewCount: 0, // We'll implement view counting later if needed
-          sharedAt: new Date(trade.shared_at)
+          trade: responseData.trade as Trade,
+          viewCount: responseData.viewCount || 0,
+          sharedAt: new Date(responseData.sharedAt)
         },
         timestamp: new Date()
       };
@@ -402,12 +409,13 @@ export class ShareRepository {
   /**
    * Get a shared calendar by share ID (for public viewing)
    * This will be used by the public shared calendar page
+   * Uses direct Supabase queries - RLS policies allow public read access to shared calendars
    */
   async getSharedCalendar(shareId: string): Promise<RepositoryResult<SharedCalendarData | null>> {
     try {
       logger.log(`Fetching shared calendar ${shareId}`);
 
-      // Get calendar
+      // Query calendar directly - RLS allows public read of shared calendars
       const { data: calendar, error: calendarError } = await supabase
         .from('calendars')
         .select('*')
@@ -415,36 +423,35 @@ export class ShareRepository {
         .eq('is_shared', true)
         .single();
 
-      if (calendarError) {
-        throw calendarError;
+      if (calendarError || !calendar) {
+        if (calendarError?.code === 'PGRST116') {
+          // No rows returned
+          return {
+            success: true,
+            data: null,
+            timestamp: new Date()
+          };
+        }
+        throw calendarError || new Error('Calendar not found');
       }
 
-      if (!calendar) {
-        return {
-          success: true,
-          data: null,
-          timestamp: new Date()
-        };
-      }
+      // Increment view count using database function (SECURITY DEFINER allows this)
+      const { data: viewCountResult } = await supabase
+        .rpc('increment_shared_calendar_view_count', { p_share_id: shareId });
 
-      // Get all trades for this calendar
-      const { data: trades, error: tradesError } = await supabase
-        .from('trades')
-        .select('*')
-        .eq('calendar_id', calendar.id)
-        .order('trade_date', { ascending: false });
+      const viewCount = viewCountResult?.viewCount || (calendar.share_view_count || 0) + 1;
 
-      if (tradesError) {
-        throw tradesError;
-      }
+      // Note: Trades are NOT fetched here - useCalendarTrades will fetch them directly
+      // via Supabase using the updated RLS policy that allows public read of trades
+      // belonging to shared calendars
 
       return {
         success: true,
         data: {
           calendar: calendar as Calendar,
-          trades: (trades || []) as Trade[],
+          trades: [], // Trades will be fetched by useCalendarTrades
           shareInfo: {
-            viewCount: 0, // We'll implement view counting later if needed
+            viewCount,
             sharedAt: new Date(calendar.shared_at)
           }
         },

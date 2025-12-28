@@ -828,7 +828,6 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
               animate={false}
               trades={trades}
               tradeOperations={tradeOperations}
-              isReadOnly={isReadOnly}
               showAIButton={false}
             />
           ) : null}

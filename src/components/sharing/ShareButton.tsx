@@ -7,8 +7,6 @@ import {
   ListItemIcon,
   ListItemText,
   CircularProgress,
-  Snackbar,
-  Alert,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -34,6 +32,7 @@ import {
   deactivateCalendarShareLink,
   generateCalendarShareLink
 } from '../../services/sharingService';
+import { Z_INDEX } from '../../styles/zIndex';
 
 // Generic interface for shareable items
 interface ShareableItem {
@@ -85,15 +84,6 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
   const [isSharing, setIsSharing] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareLink, setShareLink] = useState<string>('');
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'info';
-  }>({
-    open: false,
-    message: '',
-    severity: 'success'
-  });
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation(); // Prevent event from bubbling up to parent components
@@ -105,11 +95,6 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
   };
 
   const handleShare = async () => {
-    if (!user) {
-      showSnackbar(`You must be logged in to share ${type}s`, 'error');
-      return;
-    }
-
     setIsSharing(true);
     handleClose();
 
@@ -118,7 +103,13 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
       if (item.share_link && item.is_shared) {
         setShareLink(item.share_link);
         setShareDialogOpen(true);
-        showSnackbar('Using existing share link', 'info');
+        setIsSharing(false);
+        return;
+      }
+
+      // For generating new share links, user must be logged in
+      if (!user) {
+        logger.warn(`User must be logged in to share ${type}s`);
         setIsSharing(false);
         return;
       }
@@ -143,19 +134,17 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
             sharedAt: new Date(),
             shareId: data.shareId
           }));
- 
+
         } catch (error) {
           logger.error(`Error updating ${type} with sharing information:`, error);
           // Still show the share dialog even if the item update fails
         }
-      }  
+      }
 
       setShareLink(shareLink);
       setShareDialogOpen(true);
-      showSnackbar('Share link generated successfully!', 'success');
     } catch (error) {
       logger.error(`Error sharing ${type}:`, error);
-      showSnackbar('Failed to generate share link', 'error');
     } finally {
       setIsSharing(false);
     }
@@ -164,17 +153,15 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareLink);
-      showSnackbar('Link copied to clipboard!', 'success');
       setShareDialogOpen(false);
     } catch (error) {
       logger.error('Error copying to clipboard:', error);
-      showSnackbar('Failed to copy link', 'error');
     }
   };
 
   const handleUnshare = async () => {
     if (!item.share_id) {
-      showSnackbar(`No active share found for this ${type}`, 'error');
+      logger.warn(`No active share found for this ${type}`);
       return;
     }
 
@@ -192,43 +179,33 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
       // Update the item to remove sharing information using onUpdateItemProperty if available
       if (onUpdateItemProperty) {
         try {
-          const updatedItem = await onUpdateItemProperty(item.id, (currentItem: any) => ({
+          await onUpdateItemProperty(item.id, (currentItem: any) => ({
             ...currentItem,
             shareLink: undefined,
             isShared: false,
             shareId: undefined
           }));
 
-         
         } catch (error) {
           logger.error(`Error updating ${type} to remove sharing information:`, error);
-          // Still show success message even if the item update fails
         }
-      }  
+      }
 
-      showSnackbar(`${type === 'trade' ? 'Trade' : 'Calendar'} sharing stopped`, 'success');
+      logger.log(`${type === 'trade' ? 'Trade' : 'Calendar'} sharing stopped`);
     } catch (error) {
       logger.error(`Error unsharing ${type}:`, error);
-      showSnackbar('Failed to stop sharing', 'error');
     } finally {
       setIsSharing(false);
     }
   };
 
-  const showSnackbar = (message: string, severity: 'success' | 'error' | 'info') => {
-    setSnackbar({ open: true, message, severity });
-  };
-
-  const handleSnackbarClose = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
   const isCurrentlyShared = item.is_shared && item.share_link;
   const itemDisplayName = type === 'trade' ? 'trade' : 'calendar';
- 
+  const tooltipText = isCurrentlyShared ? "Manage sharing" : `Share ${itemDisplayName}`;
+
     return (
       <>
-        <Tooltip title={isCurrentlyShared ? "Manage sharing" : `Share ${itemDisplayName}`}>
+        <Tooltip title={tooltipText}>
           <IconButton
             onClick={handleClick}
             size={size}
@@ -259,6 +236,7 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
             vertical: 'top',
             horizontal: 'right',
           }}
+          sx={{ zIndex: Z_INDEX.TOOLTIP }}
         >
           {!isCurrentlyShared ? (
             <MenuItem onClick={handleShare}>
@@ -296,6 +274,7 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
           onClick={(e) => e.stopPropagation()}
           maxWidth="sm"
           fullWidth
+          sx={{ zIndex: Z_INDEX.TOOLTIP }}
         >
           <DialogTitle>Share Trade</DialogTitle>
           <DialogContent>
@@ -326,22 +305,6 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
             </Button>
           </DialogActions>
         </Dialog>
-
-        {/* Snackbar for notifications */}
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={4000}
-          onClose={handleSnackbarClose}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert
-            onClose={handleSnackbarClose}
-            severity={snackbar.severity}
-            variant="filled"
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
       </>
     );
    

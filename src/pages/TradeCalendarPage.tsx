@@ -455,7 +455,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
-  const { calendarId } = useParams();
+  const { calendarId: calendarIdFromParams } = useParams();
+  // Use calendarId from URL params, or fall back to calendar prop ID (for shared calendars)
+  const calendarId = calendarIdFromParams || selectedCalendar?.id;
 
   // Fetch trades using custom hook - this now handles all trade CRUD operations
   const {
@@ -480,7 +482,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     calendarId,
     selectedCalendar,
     setLoading,
-    enableRealtime: !isReadOnly, // Disable real-time for real-only mode
+    enableRealtime: !isReadOnly // Disable real-time for read-only mode
   });
 
   // Show notifications from useCalendarTrades hook
@@ -978,10 +980,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const handleTodayClick = () => {
     setCurrentDate(new Date());
   };
-  const hasPinnedTrades = useMemo(() => {
-    const pinnedTrades = trades.filter(trade => trade.is_pinned);
-    return pinnedTrades.length;
-  }, [trades]);
+
 
   // Handle single trade deletion
   const handleDeleteClick = (tradeId: string) => {
@@ -1283,8 +1282,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
-      {/* Stacked Notes Widget */}
-      {calendarId && <StackedNotesWidget calendarId={calendarId} />}
+      {/* Stacked Notes Widget - hidden in read-only mode */}
+      {calendarId && !isReadOnly && <StackedNotesWidget calendarId={calendarId} />}
 
       {/* Main Content Container */}
       <Box sx={{
@@ -1482,8 +1481,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   </Button>
                 )}
 
-                {/* Notes Button - Moved from FAB */}
-                {!isReadOnly && (
+                {/* Notes Button - Moved from FAB */} 
                   <Tooltip title="Notes for this calendar" arrow>
                     <Button
                       startIcon={<NotesIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
@@ -1513,7 +1511,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                       Notes
                     </Button>
                   </Tooltip>
-                )}
+               
 
               </Box>
 
@@ -1527,7 +1525,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 <Button
                   startIcon={<PinIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
                   onClick={() => setPinnedTradesDrawerOpen(true)}
-                  variant={hasPinnedTrades > 0 ? "contained" : "outlined"}
+                  variant={"outlined"}
                   size="small"
                   sx={{
                     flex: { xs: 1, sm: 'none' },
@@ -1538,22 +1536,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                     fontSize: { xs: '0.8125rem', sm: '0.875rem' },
                     py: { xs: 0.75, sm: 1 },
                     px: { xs: 1.5, sm: 2 },
-                    ...(hasPinnedTrades > 0 ? {
-                      bgcolor: alpha(theme.palette.secondary.main, 0.9),
-                      color: 'white',
-                      boxShadow: `0 4px 12px ${alpha(theme.palette.secondary.main, 0.3)}`,
-                      '&:hover': {
-                        bgcolor: theme.palette.secondary.main,
-                        transform: 'translateY(-1px)',
-                        boxShadow: `0 6px 16px ${alpha(theme.palette.secondary.main, 0.4)}`
-                      }
-                    } : {
+                    ...({
                       borderColor: alpha(theme.palette.text.secondary, 0.3),
                       color: 'text.secondary',
                       '&:hover': {
-                        borderColor: 'secondary.main',
-                        bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                        color: 'secondary.main',
+                        borderColor: 'info.main',
+                        bgcolor: alpha(theme.palette.info.main, 0.1),
+                        color: 'info.main',
                         transform: 'translateY(-1px)'
                       }
                     }),
@@ -1570,37 +1559,35 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   onOpenDrawer={() => setIsSearchDrawerOpen(true)}
                 />
 
-                {!isReadOnly && (
-                  <Tooltip title="Manage tags and required tag groups" arrow>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<TagIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                      onClick={() => setIsTagManagementDrawerOpen(true)}
-                      sx={{
-                        flex: { xs: 1, sm: 'none' },
-                        minWidth: { xs: 'auto', sm: '120px' },
-                        borderRadius: 2,
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-                        py: { xs: 0.75, sm: 1 },
-                        px: { xs: 1.5, sm: 2 },
-                        borderColor: alpha(theme.palette.text.secondary, 0.3),
-                        color: 'text.secondary',
-                        '&:hover': {
-                          borderColor: 'primary.main',
-                          bgcolor: alpha(theme.palette.primary.main, 0.1),
-                          color: 'primary.main',
-                          transform: 'translateY(-1px)'
-                        },
-                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                      }}
-                    >
-                      Tags
-                    </Button>
-                  </Tooltip>
-                )}
+                <Tooltip title={isReadOnly ? "View tags and definitions" : "Manage tags and required tag groups"} arrow>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<TagIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
+                    onClick={() => setIsTagManagementDrawerOpen(true)}
+                    sx={{
+                      flex: { xs: 1, sm: 'none' },
+                      minWidth: { xs: 'auto', sm: '120px' },
+                      borderRadius: 2,
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                      py: { xs: 0.75, sm: 1 },
+                      px: { xs: 1.5, sm: 2 },
+                      borderColor: alpha(theme.palette.text.secondary, 0.3),
+                      color: 'text.secondary',
+                      '&:hover': {
+                        borderColor: 'info.main',
+                        bgcolor: alpha(theme.palette.info.main, 0.1),
+                        color: 'info.main',
+                        transform: 'translateY(-1px)'
+                      },
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                  >
+                    Tags
+                  </Button>
+                </Tooltip>
               </Box>
             </Box>
           </Box>
@@ -1756,19 +1743,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           }}
           date={selectedDate || new Date()}
           trades={selectedDate ? tradesForSelectedDay : []}
-          onUpdateTradeProperty={isReadOnly ? undefined : handleUpdateTradeProperty}
-          onDeleteTrade={isReadOnly ? () => { } : handleDeleteClick}
-          onDeleteMultipleTrades={isReadOnly ? undefined : handleDeleteMultipleTrades}
-          calendarId={calendarId!!}
           onDateChange={handleDayChange}
-          setZoomedImage={setZoomedImage}
           account_balance={accountBalance}
-          deletingTradeIds={deletingTradeIds}
-          onOpenGalleryMode={openGalleryMode}
+          tradeOperations={tradeOperations}
           onOpenAIChatMode={isReadOnly ? undefined : openGalleryModeAI}
-          calendar={calendar}
-          onUpdateCalendarProperty={isReadOnly ? undefined : onUpdateCalendarProperty}
-          isReadOnly={isReadOnly}
         />
 
 
@@ -1794,13 +1772,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               setShowAddForm(null);
             }}
             showForm={{ open: showAddForm?.open || false, editTrade: showAddForm?.editTrade || null, createTempTrade: showAddForm?.createTempTrade || false }}
-            trade_date={showAddForm?.trade_date || new Date()} 
+            trade_date={showAddForm?.trade_date || new Date()}
             onAddTrade={handleAddTrade}
             newMainTrade={newTrade}
             setNewMainTrade={prev => setNewTrade(prev(newTrade!!))}
             onTagUpdated={handleTagUpdated}
             onUpdateTradeProperty={handleUpdateTradeProperty}
-            onDeleteTrades={handleDeleteTrades} 
+            onDeleteTrades={handleDeleteTrades}
             setZoomedImage={setZoomedImage}
             account_balance={accountBalance}
             onAccountBalanceChange={handleAccountBalanceChange}
@@ -1846,6 +1824,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           requiredTagGroups={requiredTagGroups}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
           isReadOnly={isReadOnly}
+          calendarOwnerId={calendar?.user_id}
         />
 
         {/* Snackbar for notifications */}
@@ -2041,6 +2020,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         open={isNotesDrawerOpen}
         onClose={() => setIsNotesDrawerOpen(false)}
         calendarId={calendarId}
+        isReadOnly={isReadOnly}
       />
 
 

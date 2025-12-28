@@ -33,6 +33,7 @@ import UnifiedDrawer from '../common/UnifiedDrawer';
 import RoundedTabs from '../common/RoundedTabs';
 import NoteListItem from './NoteListItem';
 import NoteEditorDialog from './NoteEditorDialog';
+import NoteViewerDialog from './NoteViewerDialog';
 import { Note } from '../../types/note';
 import { Calendar } from '../../types/calendar';
 import * as notesService from '../../services/notesService';
@@ -48,6 +49,7 @@ interface NotesDrawerProps {
   calendarId?: string; // If provided, filter to calendar; otherwise show all
   showCalendarPicker?: boolean; // Show calendar selection for new notes (HomePage)
   onNoteClick?: (note: Note) => void;
+  isReadOnly?: boolean; // Hide edit actions for shared calendars
 }
 
 type TabValue = 'all' | 'pinned' | 'archived';
@@ -97,7 +99,8 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
   onClose,
   calendarId,
   showCalendarPicker = false,
-  onNoteClick
+  onNoteClick,
+  isReadOnly = false
 }) => {
   const theme = useTheme();
   const { user } = useAuthState();
@@ -110,6 +113,8 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
   const [selectedCalendarForNew, setSelectedCalendarForNew] = useState<string | undefined>(calendarId);
   const [selectedCalendarFilter, setSelectedCalendarFilter] = useState<string>('all'); // For filtering notes by calendar
   const [creatorFilter, setCreatorFilter] = useState<'assistant' | 'me'>('me'); // Filter by creator
+  const [viewerOpen, setViewerOpen] = useState(false); // Read-only viewer dialog
+  const [viewerNote, setViewerNote] = useState<Note | null>(null);
 
   // Use custom hook for notes management
   const {
@@ -178,10 +183,22 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
   };
 
   const handleNoteClick = (note: Note) => {
+    // In read-only mode, open the viewer dialog instead of editor
+    if (isReadOnly) {
+      setViewerNote(note);
+      setViewerOpen(true);
+      if (onNoteClick) onNoteClick(note);
+      return;
+    }
     setSelectedNote(note);
     setSelectedCalendarForNew(note.calendar_id);
     setEditorOpen(true);
     if (onNoteClick) onNoteClick(note);
+  };
+
+  const handleViewerClose = () => {
+    setViewerOpen(false);
+    setViewerNote(null);
   };
 
   const handleEditorClose = () => {
@@ -235,8 +252,8 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
     return calendars.find(c => c.id === note.calendar_id);
   };
 
-  // Header actions
-  const headerActions = (
+  // Header actions - hide in read-only mode
+  const headerActions = isReadOnly ? null : (
     <Button
       variant="contained"
       size="small"
@@ -402,7 +419,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
                       ? 'Create your first note to get started'
                       : ''}
                 </Typography>
-                {!searchQuery && activeTab === 'all' && (
+                {!searchQuery && activeTab === 'all' && !isReadOnly && (
                   <Button
                     variant="contained"
                     startIcon={<AddIcon />}
@@ -421,9 +438,9 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
                       key={note.id}
                       note={note}
                       onClick={handleNoteClick}
-                      onPin={handlePin}
-                      onArchive={handleArchive}
-                      onUnarchive={handleArchive}
+                      onPin={isReadOnly ? undefined : handlePin}
+                      onArchive={isReadOnly ? undefined : handleArchive}
+                      onUnarchive={isReadOnly ? undefined : handleArchive}
                       calendar={getCalendarForNote(note)}
                       showCalendarBadge={showCalendarPicker && !calendarId}
                     />
@@ -473,6 +490,13 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
           onDelete={(noteId: string) => removeNote(noteId)}
         />
       )}
+
+      {/* Note Viewer Dialog (Read-only mode) */}
+      <NoteViewerDialog
+        open={viewerOpen}
+        onClose={handleViewerClose}
+        note={viewerNote}
+      />
     </>
   );
 };

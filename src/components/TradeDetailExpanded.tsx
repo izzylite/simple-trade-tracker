@@ -72,7 +72,6 @@ interface TradeDetailExpandedProps {
   animate?: boolean;
   trades?: Array<{ id: string;[key: string]: any }>;
   tradeOperations: TradeOperationsProps;
-  isReadOnly?: boolean;
   showAIButton?: boolean;
 }
 
@@ -116,7 +115,6 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   animate,
   trades,
   tradeOperations,
-  isReadOnly = false,
   showAIButton = true
 }) => {
   // Destructure from tradeOperations directly
@@ -129,7 +127,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     onOpenAIChat,
     calendar,
     onUpdateCalendarProperty,
-    onEditTrade
+    onEditTrade,
+    isReadOnly = false
   } = tradeOperations;
 
   // Use global context for trade updating state
@@ -170,6 +169,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
   const filterSetting: EconomicCalendarFilterSettings = economicFilter ? economicFilter(calendarId!) : DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
 
+  
   // Update local trade state when tradeData prop changes
   useEffect(() => {
     setTrade(tradeData);
@@ -379,6 +379,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     },
   });
 
+   
+
   useEffect(() => {
     if (!showEconomicEvents || !tradeDateIsToday) return;
 
@@ -536,8 +538,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                     </IconButton>
                   </Tooltip>
                 )}
-                {/* Share Button */}
-                {calendarId && (
+                {/* Share Button - hide in read-only mode */}
+                {calendarId && !isReadOnly && (
                   <ShareButton
                     type="trade"
                     item={trade}
@@ -969,7 +971,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   </Box>
                 )}
                 {/* Notes */}
-                {trade.notes && (
+                {trade.notes && JSON.parse(trade.notes || '').blocks.find((data : any)=> data.text !="") && (
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                       <NoteIcon sx={{ fontSize: 16, color: 'text.secondary' }} />

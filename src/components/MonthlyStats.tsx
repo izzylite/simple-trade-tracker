@@ -736,6 +736,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               onUpdateCalendarProperty={onUpdateCalendarProperty}
               onOpenGalleryMode={onOpenGalleryMode}
               economicFilter={economicFilter}
+              isReadOnly={isReadOnly}
             />
           </DialogContent>
         </Dialog>
