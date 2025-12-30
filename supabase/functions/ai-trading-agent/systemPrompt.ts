@@ -243,26 +243,19 @@ WHERE t.user_id = 'USER_ID' AND t.calendar_id = 'CALENDAR_ID'
 `;
 
 const CARD_DISPLAY_REFERENCE = `
-## Card Display Format
+## Card Display Format — ID GROUNDING CRITICAL
 
 Reference trades/events/notes with self-closing XML tags:
 - <trade-ref id="uuid"/>
 - <event-ref id="uuid"/>
 - <note-ref id="uuid"/>
+Note: COPY the exact UUID string (e.g., "9ee94f92-1b7b-4f95-9fe5-29f56f481010") from the sql query
+ 
 
-Format rules:
+### Format Rules
 - Each tag on its own line
 - Blank lines before/after each tag
 - Text content separate from tags
-
-Example:
-"Here are your top trades:
-
-<trade-ref id="f46e5852-070e-488b-8144-25663ff52f06"/>
-
-<trade-ref id="ccc10d28-c9b2-4edd-a729-d6273d2f0939"/>
-
-These show excellent risk management."
 `;
 
 // =============================================================================
@@ -357,6 +350,7 @@ REQUIRED FILTER: user_id = '${userId}'${
 - NEVER create notes without user request (except AGENT_MEMORY)
 - NEVER guess data — if query returns empty, say so
 - NEVER mention anything related to Supabase database to the user
+- NEVER fabricate/invent UUIDs for <trade-ref/>, <event-ref/>, <note-ref/> tags — use ONLY exact IDs from your SQL query results (server validates and removes fake IDs)
 
 ## ACTION-ORIENTED BEHAVIOR — Critical
 - DO NOT describe what you will do — JUST DO IT by calling the appropriate tool

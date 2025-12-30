@@ -191,7 +191,7 @@ export const permanentlyDeleteCalendar = async (calendarId: string): Promise<boo
 export const createCalendar = async (
   userId: string,
   calendar: Omit<Calendar, 'id' | 'user_id' | 'created_at' | 'updated_at'>
-): Promise<string> => {
+): Promise<Calendar> => {
   try {
     const result = await calendarRepository.create({
       ...calendar,
@@ -200,7 +200,7 @@ export const createCalendar = async (
     if (!result.success || !result.data) {
       throw new Error('Failed to create calendar');
     }
-    return result.data.id;
+    return result.data;
   } catch (error) {
     logger.error('Error creating calendar:', error);
     throw error;
@@ -254,7 +254,7 @@ export const duplicateCalendar = async (
     }
 
     // Create new calendar with same settings
-    const newCalendarId = await createCalendar(userId, {
+    const data : Calendar = await createCalendar(userId, {
       name: newName,
       account_balance: sourceCalendar.account_balance,
       max_daily_drawdown: sourceCalendar.max_daily_drawdown,
@@ -278,14 +278,14 @@ export const duplicateCalendar = async (
       for (const trade of trades) {
         // Omit id, created_at, updated_at as they will be auto-generated
         const { id, created_at, updated_at, ...tradeData } = trade;
-        await addTrade(newCalendarId, {
+        await addTrade(data.id, {
           ...tradeData,
-          calendar_id: newCalendarId
+          calendar_id: data.id
         });
       }
     }
 
-    const newCalendar = await getCalendar(newCalendarId);
+    const newCalendar = await getCalendar(data.id);
     if (!newCalendar) {
       throw new Error('Failed to retrieve duplicated calendar');
     }

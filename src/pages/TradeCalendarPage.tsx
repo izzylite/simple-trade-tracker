@@ -1070,14 +1070,16 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     const dateKey = format(trade_date, 'yyyy-MM-dd');
     const trades = tradesByDay.get(dateKey) || [];
 
-    if (trades.length === 0) {
+    // When weekly target is set, always show DayDialog first (shows progress section)
+    // When no weekly target, go directly to add trade form for empty days
+    if (trades.length === 0 && !weeklyTarget) {
       setNewTrade(createNewTradeData);
       setShowAddForm({ open: true, trade_date: trade_date, showDayDialogWhenDone: true });
     }
     else {
       setSelectedDate(trade_date);
     }
-  }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk]);
+  }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk, weeklyTarget]);
   const handleDayChange = (trade_date: Date) => {
     setSelectedDate(trade_date);
   };
@@ -1747,6 +1749,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           account_balance={accountBalance}
           tradeOperations={tradeOperations}
           onOpenAIChatMode={isReadOnly ? undefined : openGalleryModeAI}
+          weekTrades={selectedDate
+            ? weeklyStatsMap.get(format(startOfWeek(selectedDate, { weekStartsOn: 0 }), 'yyyy-MM-dd'))?.weekTrades
+            : undefined
+          }
         />
 
 

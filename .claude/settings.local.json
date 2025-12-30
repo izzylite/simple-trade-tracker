@@ -55,7 +55,9 @@
       "mcp__playwright__browser_close",
       "mcp__playwright__browser_type",
       "mcp__playwright__browser_press_key",
-      "mcp__playwright__*"
+      "mcp__playwright__*",
+      "Skill(context-engineer)",
+      "Skill(context-engineer:*)"
     ],
     "deny": [],
     "ask": []

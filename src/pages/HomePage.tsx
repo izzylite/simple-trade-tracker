@@ -347,7 +347,7 @@ const Home: React.FC<HomeProps> = ({
   const handleCreateCalendarSubmit = async (data: CalendarFormData) => {
     setIsCreatingCalendar(true);
     try {
-      await onCreateCalendar(
+      const newCalendar = await onCreateCalendar(
         data.name,
         data.account_balance,
         data.max_daily_drawdown,
@@ -363,17 +363,7 @@ const Home: React.FC<HomeProps> = ({
       );
 
       setIsCreateCalendarDialogOpen(false);
-
-      // Wait a brief moment for the calendar to be added to the calendars array
-      setTimeout(() => {
-        // Find the most recently created calendar (highest updated_at timestamp)
-        const mostRecentCalendar = [...calendars]
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-
-        if (mostRecentCalendar) {
-          navigate(`/calendar/${mostRecentCalendar.id}`);
-        }
-      }, 100);
+      navigate(`/calendar/${newCalendar.id}`);
     } catch (error) {
       logger.error('Error creating calendar:', error);
     } finally {
