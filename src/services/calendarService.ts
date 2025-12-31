@@ -297,6 +297,66 @@ export const duplicateCalendar = async (
   }
 };
 
+// =====================================================
+// CALENDAR LINKING (ONE-WAY TRADE SYNC)
+// =====================================================
+
+/**
+ * Link a calendar to another calendar for one-way trade sync
+ * Trades created in sourceCalendarId will be automatically copied to targetCalendarId
+ */
+export const linkCalendar = async (
+  sourceCalendarId: string,
+  targetCalendarId: string
+): Promise<void> => {
+  try {
+    if (sourceCalendarId === targetCalendarId) {
+      throw new Error('Cannot link a calendar to itself');
+    }
+
+    await calendarRepository.update(sourceCalendarId, {
+      linked_to_calendar_id: targetCalendarId
+    });
+
+    logger.log('Calendar linked successfully', { sourceCalendarId, targetCalendarId });
+  } catch (error) {
+    logger.error('Error linking calendar:', error);
+    throw error;
+  }
+};
+
+/**
+ * Unlink a calendar (remove one-way trade sync)
+ */
+export const unlinkCalendar = async (calendarId: string): Promise<void> => {
+  try {
+    await calendarRepository.update(calendarId, {
+      linked_to_calendar_id: null
+    });
+
+    logger.log('Calendar unlinked successfully', { calendarId });
+  } catch (error) {
+    logger.error('Error unlinking calendar:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get the linked calendar for a given calendar (if any)
+ */
+export const getLinkedCalendar = async (calendarId: string): Promise<Calendar | null> => {
+  try {
+    const calendar = await getCalendar(calendarId);
+    if (!calendar?.linked_to_calendar_id) {
+      return null;
+    }
+
+    return await getCalendar(calendar.linked_to_calendar_id);
+  } catch (error) {
+    logger.error('Error getting linked calendar:', error);
+    return null;
+  }
+};
 
 // =====================================================
 // TRADE CRUD OPERATIONS

@@ -66,6 +66,7 @@ export interface Calendar {
   profit_threshold_percentage?: number
   duplicated_calendar?: boolean
   source_calendar_id?: string
+  linked_to_calendar_id?: string // Target calendar for one-way trade sync
   deleted_at?: string
   deleted_by?: string
   auto_delete_at?: string
@@ -129,6 +130,8 @@ export interface Trade {
   tags?: string[]
   is_temporary?: boolean
   is_pinned?: boolean
+  source_trade_id?: string // Reference to original trade if this is a synced copy
+  is_synced_copy?: boolean // True if auto-created by calendar linking
   share_link?: string
   is_shared?: boolean
   shared_at?: string

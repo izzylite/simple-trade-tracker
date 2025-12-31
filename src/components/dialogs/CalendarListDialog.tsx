@@ -31,7 +31,8 @@ import {
   Schedule as ScheduleIcon,
   ExpandMore,
   ExpandLess,
-  InfoOutlined
+  InfoOutlined,
+  Link as LinkIcon
 } from '@mui/icons-material';
 import { format, isValid } from 'date-fns';
 import { Calendar } from '../../types/calendar';
@@ -50,6 +51,7 @@ interface CalendarListDialogProps {
   onCalendarClick: (calendarId: string) => void;
   onEditCalendar?: (calendar: Calendar) => void;
   onDuplicateCalendar?: (calendar: Calendar) => void;
+  onLinkCalendar?: (calendar: Calendar) => void;
   onDeleteCalendar?: (calendarId: string) => void;
   onUpdateCalendarProperty?: (
     calendarId: string,
@@ -67,6 +69,7 @@ interface CompactCalendarItemProps {
   onClick: () => void;
   onEdit?: () => void;
   onDuplicate?: () => void;
+  onLink?: () => void;
   onDelete?: () => void;
   onUpdateCalendarProperty?: (
     calendarId: string,
@@ -97,6 +100,7 @@ const CompactCalendarItem: React.FC<CompactCalendarItemProps> = ({
   onClick,
   onEdit,
   onDuplicate,
+  onLink,
   onDelete,
   onUpdateCalendarProperty
 }) => {
@@ -128,6 +132,12 @@ const CompactCalendarItem: React.FC<CompactCalendarItemProps> = ({
     e.stopPropagation();
     handleMenuClose();
     onDuplicate?.();
+  };
+
+  const handleLink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleMenuClose();
+    onLink?.();
   };
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -282,6 +292,12 @@ const CompactCalendarItem: React.FC<CompactCalendarItemProps> = ({
                   <DuplicateIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText>Duplicate</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={handleLink}>
+                <ListItemIcon>
+                  <LinkIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Link Calendar</ListItemText>
               </MenuItem>
               <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
                 <ListItemIcon>
@@ -558,6 +574,7 @@ const CalendarListDialog: React.FC<CalendarListDialogProps> = ({
   onCalendarClick,
   onEditCalendar,
   onDuplicateCalendar,
+  onLinkCalendar,
   onDeleteCalendar,
   onUpdateCalendarProperty,
   onRestoreCalendar,
@@ -755,6 +772,7 @@ const CalendarListDialog: React.FC<CalendarListDialogProps> = ({
                 onClick={() => handleCalendarClick(calendar.id)}
                 onEdit={() => onEditCalendar?.(calendar)}
                 onDuplicate={() => onDuplicateCalendar?.(calendar)}
+                onLink={() => onLinkCalendar?.(calendar)}
                 onDelete={() => onDeleteCalendar?.(calendar.id)}
                 onUpdateCalendarProperty={onUpdateCalendarProperty}
               />

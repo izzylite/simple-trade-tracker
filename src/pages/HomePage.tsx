@@ -53,6 +53,7 @@ import { dialogProps } from '../styles/dialogStyles';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
 import AnimatedBackground from '../components/common/AnimatedBackground';
 import { DuplicateCalendarDialog } from '../components/dialogs/DuplicateCalendarDialog';
+import { CalendarLinkDialog } from '../components/dialogs/CalendarLinkDialog';
 import CalendarListDialog from '../components/dialogs/CalendarListDialog';
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import TradeFormDialog from '../components/trades/TradeFormDialog';
@@ -128,11 +129,14 @@ const Home: React.FC<HomeProps> = ({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDuplicateOptionsDialogOpen, setIsDuplicateOptionsDialogOpen] = useState(false);
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [calendarToDelete, setCalendarToDelete] = useState<string | null>(null);
   const [calendarToEdit, setCalendarToEdit] = useState<Calendar | null>(null);
   const [calendarToDuplicate, setCalendarToDuplicate] = useState<Calendar | null>(null);
+  const [calendarToLink, setCalendarToLink] = useState<Calendar | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
+  const [isLinking, setIsLinking] = useState(false);
 
   // Check if screen is large (xl breakpoint = 1536px+)
   const isLargeScreen = useMediaQuery(theme.breakpoints.up('xl'));
@@ -168,6 +172,11 @@ const Home: React.FC<HomeProps> = ({
   const handleDuplicateCalendar = (calendar: Calendar) => {
     setCalendarToDuplicate(calendar);
     setIsDuplicateOptionsDialogOpen(true);
+  };
+
+  const handleLinkCalendar = (calendar: Calendar) => {
+    setCalendarToLink(calendar);
+    setIsLinkDialogOpen(true);
   };
 
   const handleDeleteCalendar = (calendarId: string) => {
@@ -252,6 +261,40 @@ const Home: React.FC<HomeProps> = ({
       logger.error('Error duplicating calendar:', error);
     } finally {
       setIsDuplicating(false);
+    }
+  };
+
+  const handleLinkSubmit = async (targetCalendarId: string) => {
+    if (!calendarToLink) return;
+
+    setIsLinking(true);
+    try {
+      await calendarService.linkCalendar(calendarToLink.id, targetCalendarId);
+      await refreshCalendars();
+      setIsLinkDialogOpen(false);
+      setCalendarToLink(null);
+    } catch (error) {
+      logger.error('Error linking calendar:', error);
+      throw error;
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
+  const handleUnlinkSubmit = async () => {
+    if (!calendarToLink) return;
+
+    setIsLinking(true);
+    try {
+      await calendarService.unlinkCalendar(calendarToLink.id);
+      await refreshCalendars();
+      setIsLinkDialogOpen(false);
+      setCalendarToLink(null);
+    } catch (error) {
+      logger.error('Error unlinking calendar:', error);
+      throw error;
+    } finally {
+      setIsLinking(false);
     }
   };
 
@@ -1041,10 +1084,11 @@ const Home: React.FC<HomeProps> = ({
                     return (
                       <CalendarCard
                         key={calendar.id}
-                        calendar={calendar} 
+                        calendar={calendar}
                         onCalendarClick={handleCalendarClick}
                         onEditCalendar={handleEditCalendar}
                         onDuplicateCalendar={handleDuplicateCalendar}
+                        onLinkCalendar={handleLinkCalendar}
                         onDeleteCalendar={handleDeleteCalendar}
                         onUpdateCalendarProperty={handleUpdateCalendarProperty}
                         formatCurrency={formatCurrency}
@@ -1465,10 +1509,25 @@ const Home: React.FC<HomeProps> = ({
         onCalendarClick={handleCalendarClick}
         onEditCalendar={handleEditCalendar}
         onDuplicateCalendar={handleDuplicateCalendar}
+        onLinkCalendar={handleLinkCalendar}
         onDeleteCalendar={handleDeleteCalendar}
         onUpdateCalendarProperty={handleUpdateCalendarProperty}
         onRestoreCalendar={handleRestoreCalendar}
         onPermanentDeleteCalendar={handlePermanentDeleteCalendar}
+      />
+
+      {/* Calendar Link Dialog */}
+      <CalendarLinkDialog
+        open={isLinkDialogOpen}
+        calendar={calendarToLink}
+        calendars={calendars}
+        isLoading={isLinking}
+        onClose={() => {
+          setIsLinkDialogOpen(false);
+          setCalendarToLink(null);
+        }}
+        onLink={handleLinkSubmit}
+        onUnlink={handleUnlinkSubmit}
       />
 
       {/* Delete Calendar Dialog */}

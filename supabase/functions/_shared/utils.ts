@@ -147,7 +147,7 @@ export async function imageExistsInCalendar(
 }
 
 /**
- * Check if an image can be safely deleted (considering duplicated calendars)
+ * Check if an image can be safely deleted (considering duplicated and linked calendars)
  */
 export async function canDeleteImage(
   supabase: SupabaseClient,
@@ -158,7 +158,7 @@ export async function canDeleteImage(
     // Get calendar information
     const { data: calendar, error: calendarError } = await supabase
       .from('calendars')
-      .select('duplicated_calendar, source_calendar_id, user_id')
+      .select('duplicated_calendar, source_calendar_id, linked_to_calendar_id, user_id')
       .eq('id', currentCalendarId)
       .single()
 
@@ -169,11 +169,11 @@ export async function canDeleteImage(
 
     const isDuplicatedCalendar = calendar.duplicated_calendar
     const sourceCalendarId = calendar.source_calendar_id
+    const linkedToCalendarId = calendar.linked_to_calendar_id
 
+    // === Check duplicated calendars ===
     if (isDuplicatedCalendar && sourceCalendarId) {
       // Deletion from duplicated calendar - check source and other duplicates
-      
-      // Check if image exists in source calendar
       const existsInSource = await imageExistsInCalendar(supabase, imageId, sourceCalendarId)
       if (existsInSource) {
         return false
@@ -198,8 +198,6 @@ export async function canDeleteImage(
           return false
         }
       }
-
-      return true
     } else {
       // Deletion from original calendar - check all duplicated calendars
       const { data: duplicatedCalendars, error: duplicatesError } = await supabase
@@ -219,9 +217,36 @@ export async function canDeleteImage(
           return false
         }
       }
-
-      return true
     }
+
+    // === Check linked calendars ===
+    // If this calendar links TO another calendar, check the target
+    if (linkedToCalendarId) {
+      const existsInLinked = await imageExistsInCalendar(supabase, imageId, linkedToCalendarId)
+      if (existsInLinked) {
+        return false
+      }
+    }
+
+    // Check if any other calendar links TO this calendar (reverse lookup)
+    const { data: linkingCalendars, error: linkingError } = await supabase
+      .from('calendars')
+      .select('id')
+      .eq('linked_to_calendar_id', currentCalendarId)
+
+    if (linkingError) {
+      console.error('Error finding linking calendars:', linkingError)
+      return false
+    }
+
+    for (const linking of linkingCalendars || []) {
+      const existsInLinking = await imageExistsInCalendar(supabase, imageId, linking.id)
+      if (existsInLinking) {
+        return false
+      }
+    }
+
+    return true
   } catch (error) {
     console.error('Error in canDeleteImage:', error)
     return false // Err on the side of caution

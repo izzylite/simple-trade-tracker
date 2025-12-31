@@ -25,7 +25,8 @@ import {
   ContentCopy as CopyIcon,
   Delete as TrashIcon,
   Edit as EditIcon,
-  CalendarToday as CalendarIcon
+  CalendarToday as CalendarIcon,
+  Link as LinkIcon
 } from '@mui/icons-material';
 import { format, isValid } from 'date-fns';
 import { Calendar } from '../types/calendar';
@@ -49,6 +50,7 @@ interface CalendarCardProps {
   onCalendarClick: (calendarId: string) => void;
   onEditCalendar: (calendar: Calendar) => void;
   onDuplicateCalendar: (calendar: Calendar) => void;
+  onLinkCalendar?: (calendar: Calendar) => void;
   onDeleteCalendar: (calendarId: string) => void;
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: Calendar) => Calendar) => Promise<Calendar | undefined>;
   formatCurrency: (amount: number) => string;
@@ -59,6 +61,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
   onCalendarClick,
   onEditCalendar,
   onDuplicateCalendar,
+  onLinkCalendar,
   onDeleteCalendar,
   onUpdateCalendarProperty,
   formatCurrency
@@ -455,7 +458,14 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               <ListItemText>Duplicate</ListItemText>
             </MenuItem>
 
-
+            {onLinkCalendar && (
+              <MenuItem onClick={() => handleMenuItemClick(() => onLinkCalendar(calendar))}>
+                <ListItemIcon>
+                  <LinkIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Link</ListItemText>
+              </MenuItem>
+            )}
 
             <MenuItem
               onClick={() => handleMenuItemClick(() => onDeleteCalendar(calendar.id))}
