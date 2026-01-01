@@ -9,7 +9,8 @@
 ALTER TABLE calendars
 ADD COLUMN IF NOT EXISTS linked_to_calendar_id UUID REFERENCES calendars(id) ON DELETE SET NULL;
 
--- Prevent self-linking
+-- Prevent self-linking (drop first if exists to make migration idempotent)
+ALTER TABLE calendars DROP CONSTRAINT IF EXISTS no_self_link;
 ALTER TABLE calendars
 ADD CONSTRAINT no_self_link CHECK (linked_to_calendar_id IS NULL OR linked_to_calendar_id != id);
 

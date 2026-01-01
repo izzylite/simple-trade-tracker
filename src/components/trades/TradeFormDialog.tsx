@@ -169,6 +169,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     };
   }, []);
 
+  // Ref to guard against double invocation of createEmptyTrade (React StrictMode, etc.)
+  const isCreatingEmptyTradeRef = useRef(false);
+
   
 
   // Check if calendar selection is required (when calendars prop is provided)
@@ -239,6 +242,13 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
   // Function to create empty trade - defined before useEffect that uses it
   const createEmptyTrade = useCallback(async () => {
+    // Guard against double invocation (React StrictMode, rapid state changes)
+    if (isCreatingEmptyTradeRef.current) {
+      logger.warn('createEmptyTrade already in progress, skipping');
+      return;
+    }
+    isCreatingEmptyTradeRef.current = true;
+
     setEditingTrade(null);
     setOriginalRiskAmount(null); // Clear original risk amount for new trades
     // Set creating empty trade state to true to disable cancel/close buttons
@@ -278,6 +288,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     } finally {
       // Re-enable cancel/close buttons regardless of success or failure
       setIsCreatingEmptyTrade(false);
+      isCreatingEmptyTradeRef.current = false;
     }
   }, [calendar?.id, onAddTrade, trade_date]);
 

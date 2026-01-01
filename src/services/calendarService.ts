@@ -399,12 +399,17 @@ export const addTrade = async (
 ): Promise<Trade> => {
   try {
     // Create the trade
-   const result = await tradeRepository.create({
+    const result = await tradeRepository.create({
       ...trade,
       calendar_id: calendarId
     });
- 
-    return result.data!;
+
+    // Check if creation was successful (repository returns { success: false } on error instead of throwing)
+    if (!result.success || !result.data) {
+      throw new Error(result.error?.message || 'Failed to create trade');
+    }
+
+    return result.data;
   } catch (error) {
     logger.error('Error adding trade:', error);
     throw error;
@@ -414,15 +419,21 @@ export const addTrade = async (
 /**
  * Update a trade
  */
-export const updateTrade = async ( 
+export const updateTrade = async (
   trade: Trade,
   updateCallback: (trade: Trade) => Trade
 ): Promise<Trade | null> => {
-  try { 
+  try {
     // Apply updates
     const updatedTrade = updateCallback(trade);
     // Update in database
-    await tradeRepository.update(trade.id, updatedTrade);
+    const result = await tradeRepository.update(trade.id, updatedTrade);
+
+    // Check if update was successful (repository returns { success: false } on error instead of throwing)
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Failed to update trade');
+    }
+
     return updatedTrade;
   } catch (error) {
     logger.error('Error updating trade:', error);

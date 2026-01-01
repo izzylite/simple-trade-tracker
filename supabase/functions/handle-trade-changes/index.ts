@@ -408,20 +408,19 @@ async function syncToLinkedCalendar(
 
     if (operation === 'INSERT' && newTrade) {
       // Prepare synced trade using utility (handles field stripping and amount calculation)
+      // This sets is_synced_copy: true and source_trade_id to prevent infinite loops
       const syncedTradeData = prepareSyncedTrade(newTrade, linkedCalendarId, targetSettings);
 
-      // Use RPC function for consistency with normal trade creation
-      // This ensures: tags are merged, user_id is set from target calendar, year stats update via webhook
+      // Use RPC function for consistency - tags merged, user_id set, year stats via webhook
       const { error: insertError } = await supabase.rpc('add_trade_with_tags', {
         p_trade: syncedTradeData,
         p_calendar_id: linkedCalendarId
       });
 
       if (insertError) {
-        log('Error creating synced trade via RPC', 'error', insertError);
+        log('Error creating synced trade', 'error', insertError);
       } else {
-        log('Synced trade created successfully via RPC');
-        // Year stats updated via webhook triggered by RPC
+        log('Synced trade created successfully');
       }
     } else if (operation === 'UPDATE' && newTrade) {
       // Check 24-hour window using utility
@@ -443,21 +442,20 @@ async function syncToLinkedCalendar(
         return;
       }
 
-      // Prepare updated trade data (strips metadata fields, recalculates amount)
-      const { source_trade_id: _source, is_synced_copy: _synced, ...updateData } = prepareSyncedTrade(newTrade, linkedCalendarId, targetSettings);
+      // Prepare updated trade data
+      const syncedTradeData = prepareSyncedTrade(newTrade, linkedCalendarId, targetSettings);
 
-      // Use RPC function for consistency with normal trade updates
+      // Use RPC function for consistency
       const { error: updateError } = await supabase.rpc('update_trade_with_tags', {
         p_trade_id: syncedTrade.id,
-        p_trade: updateData,
+        p_trade_updates: syncedTradeData,
         p_calendar_id: linkedCalendarId
       });
 
       if (updateError) {
-        log('Error updating synced trade via RPC', 'error', updateError);
+        log('Error updating synced trade', 'error', updateError);
       } else {
-        log('Synced trade updated successfully via RPC');
-        // Year stats updated via webhook triggered by RPC
+        log('Synced trade updated successfully');
       }
     } else if (operation === 'DELETE' && oldTrade) {
       // Check 24-hour window using utility
@@ -479,16 +477,15 @@ async function syncToLinkedCalendar(
         return;
       }
 
-      // Use RPC function for consistency with normal trade deletion
+      // Use RPC function for consistency
       const { error: deleteError } = await supabase.rpc('delete_trade_transactional', {
         p_trade_id: syncedTrade.id
       });
 
       if (deleteError) {
-        log('Error deleting synced trade via RPC', 'error', deleteError);
+        log('Error deleting synced trade', 'error', deleteError);
       } else {
-        log('Synced trade deleted successfully via RPC');
-        // Year stats updated via webhook triggered by RPC
+        log('Synced trade deleted successfully');
       }
     }
   } catch (error) {

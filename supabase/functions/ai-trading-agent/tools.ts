@@ -166,9 +166,8 @@ export const createNoteTool: GeminiFunctionDeclaration = {
 
 USE CASES:
 - Save trading strategies, insights, lessons learned, or game plans for the user
-- Maintain YOUR OWN AGENT MEMORY by creating a note titled "Trading Agent Memory - [Calendar Name]" with tag "AGENT_MEMORY"
 
-AGENT MEMORY: Store discovered patterns, user preferences, and lessons learned across sessions. Create after identifying significant patterns, update incrementally.
+⚠️ CANNOT create AGENT_MEMORY notes - use update_memory tool instead (it auto-creates if needed).
 
 Content should be in plain text format. User ID and Calendar ID are automatically provided from context.`,
   parameters: {
@@ -230,9 +229,10 @@ export const updateMemoryTool: GeminiFunctionDeclaration = {
 CRITICAL: Provide ONLY the new information to add. The system will automatically merge it with existing content.
 
 SECTIONS (choose one):
-- TRADER_PROFILE: Trading style, risk tolerance, emotional patterns, timeframes
+- TRADER_PROFILE: Trading style, risk tolerance, experience level, timeframes
 - PERFORMANCE_PATTERNS: Setups/sessions that work, with win rates and evidence
 - STRATEGY_PREFERENCES: User-stated rules, entry criteria, risk management
+- PSYCHOLOGICAL_PATTERNS: Emotional triggers, tilt patterns, confidence cycles, behavioral tendencies
 - LESSONS_LEARNED: Errors to avoid, corrections received, communication preferences
 - ACTIVE_FOCUS: Current goals, things to watch (this section CAN be replaced)
 
@@ -241,7 +241,8 @@ FORMAT each insight as: "[Pattern/Rule]: [Evidence] [Confidence: High/Med/Low] [
 EXAMPLES:
 - "London session scalps: 72% win rate on 15 trades [High] [2024-12]"
 - "Avoids trading during FOMC: User preference stated [High] [2024-12]"
-- "Struggles with counter-trend entries: 30% win rate [Med] [2024-12]"`,
+- "Struggles with counter-trend entries: 30% win rate [Med] [2024-12]"
+- "Tends to overtrade after 2+ consecutive wins: Observed pattern [Med] [2024-12]"`,
   parameters: {
     type: "object",
     properties: {
@@ -251,6 +252,7 @@ EXAMPLES:
           "TRADER_PROFILE",
           "PERFORMANCE_PATTERNS",
           "STRATEGY_PREFERENCES",
+          "PSYCHOLOGICAL_PATTERNS",
           "LESSONS_LEARNED",
           "ACTIVE_FOCUS",
         ],
@@ -816,6 +818,12 @@ export async function createNote(
   try {
     log(`Creating note: ${title}`, "info");
 
+    // Block creation of AGENT_MEMORY notes - must use update_memory tool instead
+    // update_memory auto-creates memory if it doesn't exist and properly merges content
+    if (tags && tags.includes("AGENT_MEMORY")) {
+      return `Cannot create AGENT_MEMORY notes with create_note. Use the update_memory tool instead - it automatically creates the memory note if needed and properly merges new insights with existing memory.`;
+    }
+
     // Assistant Colors Palette (Semantic)
     const ASSISTANT_COLORS = [
       "red",
@@ -1077,6 +1085,7 @@ type MemorySection =
   | "TRADER_PROFILE"
   | "PERFORMANCE_PATTERNS"
   | "STRATEGY_PREFERENCES"
+  | "PSYCHOLOGICAL_PATTERNS"
   | "LESSONS_LEARNED"
   | "ACTIVE_FOCUS";
 
@@ -1084,6 +1093,7 @@ const MEMORY_SECTION_ORDER: MemorySection[] = [
   "TRADER_PROFILE",
   "PERFORMANCE_PATTERNS",
   "STRATEGY_PREFERENCES",
+  "PSYCHOLOGICAL_PATTERNS",
   "LESSONS_LEARNED",
   "ACTIVE_FOCUS",
 ];
@@ -1096,6 +1106,7 @@ function parseMemorySections(content: string): Record<MemorySection, string[]> {
     TRADER_PROFILE: [],
     PERFORMANCE_PATTERNS: [],
     STRATEGY_PREFERENCES: [],
+    PSYCHOLOGICAL_PATTERNS: [],
     LESSONS_LEARNED: [],
     ACTIVE_FOCUS: [],
   };
@@ -1108,7 +1119,7 @@ function parseMemorySections(content: string): Record<MemorySection, string[]> {
 
   // Split by section headers
   const sectionPattern =
-    /^## (TRADER_PROFILE|PERFORMANCE_PATTERNS|STRATEGY_PREFERENCES|LESSONS_LEARNED|ACTIVE_FOCUS)\s*$/gm;
+    /^## (TRADER_PROFILE|PERFORMANCE_PATTERNS|STRATEGY_PREFERENCES|PSYCHOLOGICAL_PATTERNS|LESSONS_LEARNED|ACTIVE_FOCUS)\s*$/gm;
   const parts = content.split(sectionPattern);
 
   // Debug: log how many parts were found
@@ -1232,6 +1243,7 @@ async function createInitialMemory(
     TRADER_PROFILE: [],
     PERFORMANCE_PATTERNS: [],
     STRATEGY_PREFERENCES: [],
+    PSYCHOLOGICAL_PATTERNS: [],
     LESSONS_LEARNED: [],
     ACTIVE_FOCUS: [],
   };
@@ -1342,7 +1354,7 @@ export async function updateMemory(
 
     // Debug: Log what was parsed from each section
     log(
-      `[updateMemory] Parsed sections - TRADER_PROFILE: ${sections.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${sections.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${sections.STRATEGY_PREFERENCES.length}, LESSONS_LEARNED: ${sections.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${sections.ACTIVE_FOCUS.length}`,
+      `[updateMemory] Parsed sections - TRADER_PROFILE: ${sections.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${sections.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${sections.STRATEGY_PREFERENCES.length}, PSYCHOLOGICAL_PATTERNS: ${sections.PSYCHOLOGICAL_PATTERNS.length}, LESSONS_LEARNED: ${sections.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${sections.ACTIVE_FOCUS.length}`,
       "info",
     );
 
@@ -1414,7 +1426,7 @@ export async function updateMemory(
     // Debug: Verify all sections are present in rebuilt content
     const verifyParsed = parseMemorySections(updatedContent);
     log(
-      `[updateMemory] VERIFY after rebuild - TRADER_PROFILE: ${verifyParsed.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${verifyParsed.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${verifyParsed.STRATEGY_PREFERENCES.length}, LESSONS_LEARNED: ${verifyParsed.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${verifyParsed.ACTIVE_FOCUS.length}`,
+      `[updateMemory] VERIFY after rebuild - TRADER_PROFILE: ${verifyParsed.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${verifyParsed.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${verifyParsed.STRATEGY_PREFERENCES.length}, PSYCHOLOGICAL_PATTERNS: ${verifyParsed.PSYCHOLOGICAL_PATTERNS.length}, LESSONS_LEARNED: ${verifyParsed.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${verifyParsed.ACTIVE_FOCUS.length}`,
       "info",
     );
 
