@@ -27,6 +27,9 @@ import {
   Menu,
   MenuItem,
   Popover,
+  Switch,
+  FormControlLabel,
+  Tooltip,
 } from '@mui/material';
 import {
   pink,
@@ -60,6 +63,8 @@ import {
   LocalOffer as TagIcon,
   Label as LabelIcon,
   Add as AddIcon,
+  Public as GlobalIcon,
+  Lock as PrivateIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -164,6 +169,9 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   const [isTagsExpanded, setIsTagsExpanded] = useState(false);
   const [hasExistingGuideline, setHasExistingGuideline] = useState(false);
 
+  // Global note state (null calendar_id = visible in all calendars)
+  const [isGlobal, setIsGlobal] = useState(false);
+
   // Default tags list
   const allDays: DayAbbreviation[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const defaultTags = Object.keys(DEFAULT_NOTE_TAGS_MAP);
@@ -206,6 +214,9 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         // Initialize tags states
         setTags(initialNote.tags || []);
         setIsTagsExpanded(false);
+
+        // Initialize global state (null calendar_id = global note)
+        setIsGlobal(initialNote.calendar_id === null);
       } else {
         // Creating new note - reset to defaults
         setNote(null);
@@ -225,6 +236,9 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         setTags([]);
         setIsTagsExpanded(false);
         setNewTagInput('');
+
+        // Reset global state (default to calendar-specific)
+        setIsGlobal(false);
       }
     }
   }, [open, initialNote]);
@@ -246,6 +260,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           reminder_days: reminderDays,
           is_reminder_active: isReminderActive,
           color: noteColor ?? null,
+          calendar_id: isGlobal ? null : calendarId, // null = global note
         };
 
         // Only update tags for user-created notes
@@ -265,7 +280,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         // Create new note
         const newNote = await notesService.createNote({
           user_id: user.uid,
-          calendar_id: calendarId,
+          calendar_id: isGlobal ? null : calendarId, // null = global note
           title,
           content,
           cover_image: coverImage,
@@ -309,9 +324,10 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       const reminderActiveChanged = isReminderActive !== (note.is_reminder_active || false);
       const tagsChanged = JSON.stringify(tags) !== JSON.stringify(note.tags || []);
       const colorChanged = noteColor !== note.color;
+      const globalChanged = isGlobal !== (note.calendar_id === null);
 
       return titleChanged || contentChanged || coverImageChanged || reminderTypeChanged ||
-        reminderDateChanged || reminderDaysChanged || reminderActiveChanged || tagsChanged || colorChanged;
+        reminderDateChanged || reminderDaysChanged || reminderActiveChanged || tagsChanged || colorChanged || globalChanged;
     }
   };
 
@@ -326,7 +342,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
     }, 1000); // 1 second debounce
 
     return () => clearTimeout(timeout);
-  }, [title, content, coverImage, tags, open, note]);
+  }, [title, content, coverImage, tags, isGlobal, open, note]);
 
   const handleClose = async () => {
     // If it's a new note and has content, save it before closing
@@ -883,6 +899,68 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               )}
             </Box>
           </Collapse>
+
+          {/* Visibility Sub-Header (Global/Private toggle) */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 3,
+              py: 1,
+              bgcolor: alpha(theme.palette.primary.main, 0.04),
+              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            }}
+          >
+            {/* Left side - Visibility label */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+              }}
+            >
+              {isGlobal ? (
+                <GlobalIcon sx={{ color: 'primary.main', fontSize: '1.1rem' }} />
+              ) : (
+                <PrivateIcon sx={{ color: 'text.secondary', fontSize: '1.1rem' }} />
+              )}
+              <Typography
+                variant="subtitle2"
+                fontWeight={600}
+                sx={{ color: isGlobal ? 'primary.main' : 'text.secondary' }}
+              >
+                {isGlobal ? 'Global Note' : 'Calendar Note'}
+              </Typography>
+            </Box>
+
+            {/* Right side - Toggle switch */}
+            <Tooltip
+              title={isGlobal
+                ? 'This note is visible in all calendars'
+                : 'This note is only visible in the current calendar'
+              }
+              placement="left"
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={isGlobal}
+                    onChange={(e) => setIsGlobal(e.target.checked)}
+                    size="small"
+                    color="primary"
+                  />
+                }
+                label={
+                  <Typography variant="caption" color="text.secondary">
+                    {isGlobal ? 'All calendars' : 'This calendar only'}
+                  </Typography>
+                }
+                labelPlacement="start"
+                sx={{ mr: 0 }}
+              />
+            </Tooltip>
+          </Box>
 
           {/* Tags Sub-Header */}
           <Box

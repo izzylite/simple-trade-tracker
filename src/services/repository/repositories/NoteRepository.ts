@@ -183,10 +183,11 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
 
   async findByCalendarId(calendarId: string): Promise<Note[]> {
     try {
+      // Include both calendar-specific notes AND global notes (calendar_id = null)
       const { data, error } = await supabase
         .from("notes")
         .select("*")
-        .eq("calendar_id", calendarId)
+        .or(`calendar_id.eq.${calendarId},calendar_id.is.null`)
         .order("updated_at", { ascending: false });
 
       if (error) {
@@ -218,11 +219,11 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
         offset = 0,
       } = options;
 
-      // Build the query
+      // Build the query - include both calendar-specific notes AND global notes (calendar_id = null)
       let query = supabase
         .from("notes")
         .select("*", { count: "exact" })
-        .eq("calendar_id", calendarId);
+        .or(`calendar_id.eq.${calendarId},calendar_id.is.null`);
 
       // Apply filters
       if (isPinned !== undefined) {
@@ -429,10 +430,11 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
     dayAbbreviation: string,
   ): Promise<Note[]> {
     try {
+      // Include both calendar-specific notes AND global notes (calendar_id = null)
       const { data, error } = await supabase
         .from("notes")
         .select("*")
-        .eq("calendar_id", calendarId)
+        .or(`calendar_id.eq.${calendarId},calendar_id.is.null`)
         .eq("reminder_type", "weekly")
         .eq("is_reminder_active", true)
         .eq("is_archived", false)
@@ -459,10 +461,11 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
     try {
       const dateStr = date.toISOString().split("T")[0]; // Format: YYYY-MM-DD
 
+      // Include both calendar-specific notes AND global notes (calendar_id = null)
       const { data, error } = await supabase
         .from("notes")
         .select("*")
-        .eq("calendar_id", calendarId)
+        .or(`calendar_id.eq.${calendarId},calendar_id.is.null`)
         .eq("reminder_type", "once")
         .eq("is_reminder_active", true)
         .eq("is_archived", false)

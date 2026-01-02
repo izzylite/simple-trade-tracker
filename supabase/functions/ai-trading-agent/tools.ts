@@ -1099,6 +1099,52 @@ const MEMORY_SECTION_ORDER: MemorySection[] = [
 ];
 
 /**
+ * Normalize content to handle various edge cases:
+ * - Convert CRLF to LF
+ * - Fix bullets with asterisks or no space after dash
+ * - Normalize section headers (case-insensitive, remove trailing text)
+ */
+function normalizeMemoryContent(content: string): string {
+  // Normalize line endings (CRLF -> LF)
+  let normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  // Fix section headers: case-insensitive match and remove trailing text
+  // e.g., "## strategy_preferences - note" -> "## STRATEGY_PREFERENCES"
+  for (const section of MEMORY_SECTION_ORDER) {
+    const headerPattern = new RegExp(
+      `^## ?${section}[^\\n]*$`,
+      "gmi"
+    );
+    normalized = normalized.replace(headerPattern, `## ${section}`);
+  }
+
+  // Fix bullet points:
+  // - Convert asterisks to dashes: "* item" -> "- item"
+  // - Add space after dash if missing: "-item" -> "- item"
+  normalized = normalized
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      // Convert "* item" to "- item"
+      if (trimmed.startsWith("* ")) {
+        return line.replace(/^\s*\* /, "- ");
+      }
+      // Convert "*item" to "- item"
+      if (trimmed.startsWith("*") && !trimmed.startsWith("* ")) {
+        return line.replace(/^\s*\*/, "- ");
+      }
+      // Convert "-item" (no space) to "- item"
+      if (trimmed.startsWith("-") && !trimmed.startsWith("- ") && trimmed.length > 1) {
+        return line.replace(/^(\s*)-([^\s])/, "$1- $2");
+      }
+      return line;
+    })
+    .join("\n");
+
+  return normalized;
+}
+
+/**
  * Parse memory content into sections
  */
 function parseMemorySections(content: string): Record<MemorySection, string[]> {
@@ -1117,10 +1163,13 @@ function parseMemorySections(content: string): Record<MemorySection, string[]> {
     return sections;
   }
 
+  // Normalize content to handle edge cases (CRLF, asterisks, case issues, etc.)
+  const normalizedContent = normalizeMemoryContent(content);
+
   // Split by section headers
   const sectionPattern =
     /^## (TRADER_PROFILE|PERFORMANCE_PATTERNS|STRATEGY_PREFERENCES|PSYCHOLOGICAL_PATTERNS|LESSONS_LEARNED|ACTIVE_FOCUS)\s*$/gm;
-  const parts = content.split(sectionPattern);
+  const parts = normalizedContent.split(sectionPattern);
 
   // Debug: log how many parts were found
   const sectionNamesFound = parts.filter((_, i) => i % 2 === 1);
@@ -1430,6 +1479,29 @@ export async function updateMemory(
       "info",
     );
 
+    // 5.5 DATA LOSS PREVENTION: Check if other sections lost data during the update
+    // Compare sections (except the one being updated) to ensure no data was lost
+    const originalParsed = parseMemorySections(existingContent);
+    for (const sectionKey of MEMORY_SECTION_ORDER) {
+      if (sectionKey === section) continue; // Skip the section being updated
+
+      const originalCount = originalParsed[sectionKey].length;
+      const newCount = sections[sectionKey].length;
+
+      // If a section that HAD data now has LESS data, this is data loss
+      if (originalCount > 0 && newCount < originalCount) {
+        log(
+          `[updateMemory] DATA LOSS DETECTED in ${sectionKey}: was ${originalCount}, now ${newCount}. Aborting update.`,
+          "error",
+        );
+        log(
+          `[updateMemory] Original ${sectionKey} items: ${JSON.stringify(originalParsed[sectionKey])}`,
+          "error",
+        );
+        return `Memory update aborted: Data loss detected in ${sectionKey} section. Original had ${originalCount} items, new has ${newCount}. Please report this issue.`;
+      }
+    }
+
     // 6. Check size limit (~2000 tokens ≈ 8000 chars)
     if (updatedContent.length > 8000) {
       log(
@@ -1528,14 +1600,14 @@ export async function searchNotes(
       "info",
     );
 
-    // Build the query
+    // Build the query - include both calendar-specific notes AND global notes (calendar_id = null)
     let query = supabase
       .from("notes")
       .select(
         "id, title, content, by_assistant, is_pinned, is_archived, created_at, updated_at, reminder_type, reminder_date, reminder_days, tags",
       )
       .eq("user_id", userId)
-      .eq("calendar_id", calendarId);
+      .or(`calendar_id.eq.${calendarId},calendar_id.is.null`);
 
     // Filter by archived status
     if (!includeArchived) {
@@ -1990,6 +2062,7 @@ export async function executeCustomTool(
             | "TRADER_PROFILE"
             | "PERFORMANCE_PATTERNS"
             | "STRATEGY_PREFERENCES"
+            | "PSYCHOLOGICAL_PATTERNS"
             | "LESSONS_LEARNED"
             | "ACTIVE_FOCUS"
           : "PERFORMANCE_PATTERNS";

@@ -191,7 +191,9 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
       return;
     }
     setSelectedNote(note);
-    setSelectedCalendarForNew(note.calendar_id);
+    // For global notes (calendar_id = null), use the current calendar as fallback
+    // This allows editing global notes and toggling them to calendar-specific if desired
+    setSelectedCalendarForNew(note.calendar_id ?? calendarId ?? selectedCalendarFilter);
     setEditorOpen(true);
     if (onNoteClick) onNoteClick(note);
   };
@@ -478,12 +480,13 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
       </UnifiedDrawer>
 
       {/* Note Editor Dialog */}
-      {editorOpen && selectedCalendarForNew && (
+      {/* Allow editing if: we have a calendarId for new notes, OR we're editing an existing note */}
+      {editorOpen && (selectedCalendarForNew || selectedNote) && (
         <NoteEditorDialog
           open={editorOpen}
           onClose={handleEditorClose}
           note={selectedNote}
-          calendarId={selectedCalendarForNew}
+          calendarId={selectedCalendarForNew || selectedNote?.calendar_id || calendarId || ''}
           onSave={(note: Note, isCreated?: boolean) =>
             isCreated ? addNote(note) : updateNote(note.id, note)
           }
