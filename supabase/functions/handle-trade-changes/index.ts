@@ -114,7 +114,14 @@ async function calculateYearStats(
     // Calculate stats for each year
     const yearStatsMap: Record<string, YearStats> = {};
 
-    for (const [year, yearTrades] of tradesByYear.entries()) {
+    // Sort years in ascending order to properly carry over balance
+    const sortedYears = Array.from(tradesByYear.keys()).sort((a, b) => a - b);
+
+    // Track the running balance across years - starts at account balance
+    let carryOverBalance = accountBalance;
+
+    for (const year of sortedYears) {
+      const yearTrades = tradesByYear.get(year)!;
       log(`Calculating stats for year ${year} with ${yearTrades.length} trades`);
 
       // Initialize monthly stats array (12 months, indices 0-11)
@@ -132,7 +139,9 @@ async function calculateYearStats(
       }
 
       // Group trades by month and calculate monthly stats
-      let runningBalance = accountBalance;
+      // Use carryOverBalance from previous year (or accountBalance for first year)
+      const yearStartBalance = carryOverBalance; // Save for growth percentage calculation
+      let runningBalance = carryOverBalance;
       const monthlyTrades = new Map<number, Trade[]>();
 
       yearTrades.forEach((trade) => {
@@ -183,8 +192,9 @@ async function calculateYearStats(
       const winCount = yearTrades.filter((t) => t.trade_type === 'win').length;
       const lossCount = yearTrades.filter((t) => t.trade_type === 'loss').length;
       const winRate = totalTrades > 0 ? (winCount / totalTrades) * 100 : 0;
-      const yearlyGrowthPercentage = accountBalance > 0
-        ? (yearlyPnL / accountBalance) * 100
+      // Use year's starting balance for growth percentage (includes prior years' P&L)
+      const yearlyGrowthPercentage = yearStartBalance > 0
+        ? (yearlyPnL / yearStartBalance) * 100
         : 0;
 
       // Find best month (month with highest P&L)
@@ -217,6 +227,9 @@ async function calculateYearStats(
         win_rate: winRate.toFixed(2),
         best_month: bestMonthIndex,
       });
+
+      // Carry over the ending balance to the next year
+      carryOverBalance = runningBalance;
     }
 
     log('Year stats calculation completed', 'info', {

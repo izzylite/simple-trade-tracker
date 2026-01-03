@@ -1,12 +1,19 @@
-import React from 'react';
-import { Box, Breadcrumbs as MuiBreadcrumbs, Link, Typography, useTheme, alpha, IconButton, Tooltip } from '@mui/material';
-import { NavigateNext as NavigateNextIcon } from '@mui/icons-material';
+import React, { useState, useRef } from 'react';
+import { Box, Breadcrumbs as MuiBreadcrumbs, Link, Typography, useTheme, alpha, IconButton, Tooltip, Menu, MenuItem, ListItemText } from '@mui/material';
+import { NavigateNext as NavigateNextIcon, KeyboardArrowDown as ArrowDownIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+
+export interface DropdownItem {
+  label: string;
+  path: string;
+  active?: boolean;
+}
 
 export interface BreadcrumbItem {
   label: string;
   path?: string;
   icon?: React.ReactNode;
+  dropdown?: DropdownItem[]; // Optional dropdown items for this breadcrumb
 }
 
 export interface BreadcrumbButton {
@@ -26,12 +33,31 @@ interface BreadcrumbsProps {
 const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, buttons, rightContent }) => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [dropdownItemIndex, setDropdownItemIndex] = useState<number | null>(null);
 
   const handleClick = (event: React.MouseEvent<HTMLAnchorElement>, path?: string) => {
     event.preventDefault();
     if (path) {
       navigate(path);
     }
+  };
+
+  const handleDropdownClick = (event: React.MouseEvent<HTMLElement>, index: number) => {
+    event.stopPropagation();
+    event.preventDefault();
+    setAnchorEl(event.currentTarget);
+    setDropdownItemIndex(index);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setDropdownItemIndex(null);
+  };
+
+  const handleDropdownItemClick = (path: string) => {
+    navigate(path);
+    handleMenuClose();
   };
 
   // Hide breadcrumbs if there's only one item (main page)
@@ -66,13 +92,23 @@ const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, buttons, rightContent 
             const isFirst = index === 0;
 
             if (isLast) {
+              const hasDropdown = Boolean(item.dropdown && item.dropdown.length > 0);
+
               return (
                 <Box
                   key={item.label}
+                  onClick={hasDropdown ? (e) => handleDropdownClick(e, index) : undefined}
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 0.5
+                    gap: 0.5,
+                    cursor: hasDropdown ? 'pointer' : 'default',
+                    position: 'relative',
+                    '&:hover': hasDropdown ? {
+                      '& .dropdown-arrow': {
+                        color: theme.palette.primary.main
+                      }
+                    } : {}
                   }}
                 >
                   {item.icon}
@@ -89,6 +125,16 @@ const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, buttons, rightContent 
                   >
                     {item.label}
                   </Typography>
+                  {hasDropdown && (
+                    <ArrowDownIcon
+                      className="dropdown-arrow"
+                      sx={{
+                        fontSize: 16,
+                        color: 'text.secondary',
+                        transition: 'color 0.2s'
+                      }}
+                    />
+                  )}
                 </Box>
               );
             }
@@ -143,6 +189,63 @@ const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, buttons, rightContent 
           </Box>
         )}
       </Box>
+
+      {/* Dropdown Menu */}
+      {dropdownItemIndex !== null && items[dropdownItemIndex]?.dropdown && (
+        <Menu
+          anchorEl={anchorEl}
+          open={Boolean(anchorEl)}
+          onClose={handleMenuClose}
+          slotProps={{
+            paper: {
+              sx: {
+                mt: 0.5,
+                minWidth: 200,
+                maxWidth: 350,
+                maxHeight: 400,
+                bgcolor: alpha(theme.palette.background.paper, 0.95),
+                backdropFilter: 'blur(20px)',
+                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                boxShadow: theme.shadows[8]
+              }
+            }
+          }}
+          transformOrigin={{ horizontal: 'left', vertical: 'top' }}
+          anchorOrigin={{ horizontal: 'left', vertical: 'bottom' }}
+        >
+          {items[dropdownItemIndex].dropdown!.map((dropdownItem) => (
+            <MenuItem
+              key={dropdownItem.path}
+              onClick={() => handleDropdownItemClick(dropdownItem.path)}
+              selected={dropdownItem.active}
+              sx={{
+                py: 1,
+                px: 2,
+                fontSize: '0.875rem',
+                '&.Mui-selected': {
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  '&:hover': {
+                    bgcolor: alpha(theme.palette.primary.main, 0.15)
+                  }
+                }
+              }}
+            >
+              <ListItemText
+                primary={dropdownItem.label}
+                primaryTypographyProps={{
+                  fontSize: '0.875rem',
+                  fontWeight: dropdownItem.active ? 600 : 400,
+                  noWrap: true,
+                  sx: {
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }
+                }}
+              />
+            </MenuItem>
+          ))}
+        </Menu>
+      )}
     </Box>
   );
 };

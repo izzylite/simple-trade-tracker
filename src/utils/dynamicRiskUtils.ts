@@ -33,10 +33,31 @@ export const calculateCumulativePnLToDateSync = (
   const yearStats = calendar.year_stats?.[year.toString()];
   const monthStats = yearStats?.monthly_stats?.[month];
 
+  let accountValueAtMonthStart: number;
+
+  if (monthStats?.account_value_at_start !== undefined) {
+    // Use the stored value for this month
+    accountValueAtMonthStart = monthStats.account_value_at_start;
+  } else if (yearStats) {
+    // Year exists but month doesn't have value yet - use account_balance as fallback
+    accountValueAtMonthStart = calendar.account_balance;
+  } else {
+    // No year_stats for this year - calculate from previous years
+    // Sum up all yearly P&L from previous years
+    let totalPreviousYearsPnL = 0;
+    if (calendar.year_stats) {
+      for (const [statsYear, stats] of Object.entries(calendar.year_stats)) {
+        const statsYearNum = parseInt(statsYear, 10);
+        if (statsYearNum < year && stats.yearly_pnl !== undefined) {
+          totalPreviousYearsPnL += stats.yearly_pnl;
+        }
+      }
+    }
+    accountValueAtMonthStart = calendar.account_balance + totalPreviousYearsPnL;
+  }
+
   // account_value_at_start = account_balance + all historical P&L up to month start
   // So cumulative P&L at month start = account_value_at_start - account_balance
-  const accountValueAtMonthStart = monthStats?.account_value_at_start
-    ?? calendar.account_balance;
   const cumulativePnLAtMonthStart = accountValueAtMonthStart - calendar.account_balance;
 
   // Filter trades: before targetDate (exclusive)
@@ -75,8 +96,30 @@ export const calculateCumulativePnLToDateAsync = async (
   // Get account_value_at_start from year_stats
   const yearStats = calendar.year_stats?.[year.toString()];
   const monthStats = yearStats?.monthly_stats?.[month];
-  const accountValueAtMonthStart = monthStats?.account_value_at_start
-    ?? calendar.account_balance;
+
+  let accountValueAtMonthStart: number;
+
+  if (monthStats?.account_value_at_start !== undefined) {
+    // Use the stored value for this month
+    accountValueAtMonthStart = monthStats.account_value_at_start;
+  } else if (yearStats) {
+    // Year exists but month doesn't have value yet - use account_balance as fallback
+    accountValueAtMonthStart = calendar.account_balance;
+  } else {
+    // No year_stats for this year - calculate from previous years
+    // Sum up all yearly P&L from previous years
+    let totalPreviousYearsPnL = 0;
+    if (calendar.year_stats) {
+      for (const [statsYear, stats] of Object.entries(calendar.year_stats)) {
+        const statsYearNum = parseInt(statsYear, 10);
+        if (statsYearNum < year && stats.yearly_pnl !== undefined) {
+          totalPreviousYearsPnL += stats.yearly_pnl;
+        }
+      }
+    }
+    accountValueAtMonthStart = calendar.account_balance + totalPreviousYearsPnL;
+  }
+
   const cumulativePnLAtMonthStart = accountValueAtMonthStart - calendar.account_balance;
 
   // Use provided trades or fetch from database

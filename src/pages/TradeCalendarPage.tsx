@@ -81,9 +81,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
 
-import Breadcrumbs, { BreadcrumbItem, BreadcrumbButton } from '../components/common/Breadcrumbs';
+import Breadcrumbs, { BreadcrumbItem, BreadcrumbButton, DropdownItem } from '../components/common/Breadcrumbs';
 import { NewTradeForm, TradeImage } from '../components/trades/TradeForm';
 import { Calendar } from '../types/calendar';
+import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
 import MonthlyStats from '../components/MonthlyStats';
 import AccountStats from '../components/AccountStats';
 import TradeFormDialog, { createEditTradeData } from '../components/trades/TradeFormDialog';
@@ -621,6 +622,25 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [removingNotifications, setRemovingNotifications] = useState<Set<string>>(new Set());
   const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null>(null);
 
+  // User calendars for breadcrumb dropdown
+  const [userCalendars, setUserCalendars] = useState<Calendar[]>([]);
+
+  // Fetch user's calendars for breadcrumb dropdown
+  useEffect(() => {
+    const loadUserCalendars = async () => {
+      if (!calendar?.user_id) return;
+
+      try {
+        const calendarRepo = new CalendarRepository();
+        const calendars = await calendarRepo.findByUserId(calendar.user_id);
+        setUserCalendars(calendars);
+      } catch (error) {
+        logger.error('Error loading user calendars for dropdown:', error);
+      }
+    };
+
+    loadUserCalendars();
+  }, [calendar?.user_id]);
 
   const breadcrumbButtons = useMemo<BreadcrumbButton[]>(() => [
     ...((!isReadOnly) ? [{
@@ -640,11 +660,24 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
 
   // Breadcrumb items
-  const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => [
-    { label: 'Home', path: '/', icon: <HomeIcon sx={{ fontSize: 18 }} /> },
-    { label: 'Calendars', path: '/dashboard', icon: <CalendarIcon sx={{ fontSize: 18 }} /> },
-    { label: calendarName || 'Calendar', path: `/calendar/${calendarId}` }
-  ], [calendarName, calendarId]);
+  const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => {
+    // Create dropdown items from user calendars
+    const dropdownItems: DropdownItem[] = userCalendars.map(cal => ({
+      label: cal.name,
+      path: `/calendar/${cal.id}`,
+      active: cal.id === calendarId
+    }));
+
+    return [
+      { label: 'Home', path: '/', icon: <HomeIcon sx={{ fontSize: 18 }} /> },
+      { label: 'Calendars', path: '/dashboard', icon: <CalendarIcon sx={{ fontSize: 18 }} /> },
+      {
+        label: calendarName || 'Calendar',
+        path: `/calendar/${calendarId}`,
+        dropdown: dropdownItems.length > 0 ? dropdownItems : undefined
+      }
+    ];
+  }, [calendarName, calendarId, userCalendars]);
 
   // Use optimized hook for high-impact economic events
   const { highImpactEventDates: monthlyHighImpactEvents } = useHighImpactEvents({
