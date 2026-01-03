@@ -292,19 +292,27 @@ const TradeForm: React.FC<TradeFormProps> = ({
         <FormField sx={{ flex: 1 }}>
           <TextField
             label="Entry Price"
+            type="number"
             value={newTrade.entry_price == 0? undefined : newTrade.entry_price}
             onChange={onEntryChange}
             fullWidth
             placeholder="Optional entry price"
+            slotProps={{
+              htmlInput: { step: 0.00001 }
+            }}
           />
         </FormField>
         <FormField sx={{ flex: 1 }}>
           <TextField
             label="Exit Price"
+            type="number"
             value={newTrade.exit_price == 0? undefined : newTrade.exit_price}
             onChange={onExitChange}
             fullWidth
             placeholder="Optional exit price"
+            slotProps={{
+              htmlInput: { step: 0.00001 }
+            }}
           />
         </FormField>
       </Box>
@@ -313,19 +321,27 @@ const TradeForm: React.FC<TradeFormProps> = ({
         <FormField sx={{ flex: 1 }}>
           <TextField
             label="Stop Loss"
+            type="number"
             value={newTrade.stop_loss == 0? undefined : newTrade.stop_loss}
             onChange={onStopLossChange}
             fullWidth
             placeholder="Optional stop loss"
+            slotProps={{
+              htmlInput: { step: 0.00001 }
+            }}
           />
         </FormField>
         <FormField sx={{ flex: 1 }}>
           <TextField
             label="Take Profit"
+            type="number"
             value={newTrade.take_profit == 0? undefined : newTrade.take_profit}
             onChange={onTakeProfitChange}
             fullWidth
             placeholder="Optional take profit"
+            slotProps={{
+              htmlInput: { step: 0.00001 }
+            }}
           />
         </FormField>
       </Box>
