@@ -44,6 +44,17 @@ const parseOptionalDate = (dateValue: any): Date | undefined => {
 };
 
 /**
+ * Safely convert a date value to ISO string
+ * Handles both Date objects and string values
+ */
+const toISOString = (dateValue: Date | string | undefined | null): string => {
+  if (!dateValue) return new Date().toISOString();
+  if (typeof dateValue === 'string') return dateValue;
+  if (dateValue instanceof Date) return dateValue.toISOString();
+  return new Date(dateValue).toISOString();
+};
+
+/**
  * Sort tags alphabetically (case-insensitive)
  * Optimized for performance with 1000+ trades by using faster comparison
  */
@@ -819,7 +830,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         user_id: user.id, // Use authenticated user's ID for RLS
         name: trade.name,
         trade_type: trade.trade_type,
-        trade_date: (trade.trade_date || now).toISOString(), 
+        trade_date: toISOString(trade.trade_date || now), 
         session: trade.session,
         amount: trade.amount,
         entry_price: trade.entry_price ?? null,
@@ -937,7 +948,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         user_id: trade.user_id,
         name: trade.name,
         trade_type: trade.trade_type,
-        trade_date: trade.trade_date.toISOString(),
+        trade_date: toISOString(trade.trade_date),
         session: trade.session,
         amount: trade.amount,
         entry_price: trade.entry_price ?? null,
@@ -1237,7 +1248,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         id: trade.id,
         name: trade.name,
         trade_type: trade.trade_type,
-        trade_date: trade.trade_date.toISOString(),
+        trade_date: toISOString(trade.trade_date),
         session: trade.session || null, // Convert empty string to null for DB constraint
         amount: trade.amount,
         entry_price: trade.entry_price ?? null,
@@ -1297,7 +1308,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         p_trade_id: tradeId,
         p_trade_updates: {
           ...trade,
-          trade_date: trade.trade_date.toISOString(),
+          trade_date: toISOString(trade.trade_date),
           session: trade.session || null, // Convert empty string to null for DB constraint
           tags: sortTags(trade.tags),
         },
