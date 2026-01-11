@@ -19,6 +19,7 @@ import {
   MenuItem,
   Select,
   FormControl,
+  Tooltip,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -247,7 +248,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
     }
   };
 
-  
+
 
   // Get calendar for note (for multi-calendar view)
   const getCalendarForNote = (note: Note): Calendar | undefined => {
@@ -279,7 +280,25 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
         onClose={onClose}
         title="Notes"
         icon={<NotesIcon />}
-        headerActions={headerActions}
+        headerActions={
+          !isReadOnly && (
+            <Tooltip title="Create new note" arrow>
+              <IconButton
+                color="primary"
+                onClick={handleNewNote}
+                disabled={showCalendarPicker && (calendars.length === 0 || selectedCalendarFilter === 'all')}
+                sx={{
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  '&:hover': {
+                    bgcolor: alpha(theme.palette.primary.main, 0.2)
+                  }
+                }}
+              >
+                <AddIcon />
+              </IconButton>
+            </Tooltip>
+          )
+        }
         width={{ xs: '100%', sm: 450 }}
         headerVariant="enhanced"
         keepMounted={true}

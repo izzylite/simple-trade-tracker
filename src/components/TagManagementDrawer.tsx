@@ -33,9 +33,11 @@ import {
   Info as InfoIcon,
   Tag as TagIcon,
   Close as CloseIcon,
+  Add as AddIcon
 } from '@mui/icons-material';
 import UnifiedDrawer from './common/UnifiedDrawer';
 import TagEditDialog from './TagEditDialog';
+import TagCreateDialog from './TagCreateDialog';
 import {
   getTagChipStyles,
   formatTagForDisplay,
@@ -45,7 +47,7 @@ import {
 } from '../utils/tagColors';
 import { Calendar } from '../types/calendar';
 import { logger } from '../utils/logger';
-import { supabase } from '../config/supabase';
+import { tagService } from '../services/tagService';
 import { useAuthState } from '../contexts/AuthStateContext';
 
 interface TagManagementDrawerProps {
@@ -79,6 +81,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
   const [selectedTagGroup, setSelectedTagGroup] = useState<string>('');
   const [tagToEdit, setTagToEdit] = useState<string | null>(null);
   const [tagToView, setTagToView] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [localRequiredGroups, setLocalRequiredGroups] = useState<string[]>(requiredTagGroups);
   const [tagDefinitions, setTagDefinitions] = useState<Record<string, string>>({});
 
@@ -95,23 +98,8 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
     if (!userId) return;
 
     try {
-      const { data, error } = await supabase
-        .from('tag_definitions')
-        .select('tag_name, definition')
-        .eq('user_id', userId);
-
-      if (error) {
-        logger.error('Error fetching tag definitions:', error);
-        return;
-      }
-
-      if (data) {
-        const definitions: Record<string, string> = {};
-        data.forEach((item) => {
-          definitions[item.tag_name] = item.definition;
-        });
-        setTagDefinitions(definitions);
-      }
+      const definitions = await tagService.fetchTagDefinitions(userId);
+      setTagDefinitions(definitions);
     } catch (err) {
       logger.error('Error fetching tag definitions:', err);
     }
@@ -233,6 +221,21 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
     }
   };
 
+  const handleTagCreated = async (newTag: string) => {
+    if (onUpdateCalendarProperty) {
+      await onUpdateCalendarProperty(calendarId, (calendar) => {
+        const currentTags = calendar.tags || [];
+        if (currentTags.includes(newTag)) return calendar;
+        return {
+          ...calendar,
+          tags: [...currentTags, newTag]
+        };
+      });
+      // Refresh definitions to include the new one
+      fetchTagDefinitions();
+    }
+  };
+
   return (
     <UnifiedDrawer
       open={open}
@@ -241,6 +244,24 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
       icon={<TagIcon />}
       width={{ xs: '100%', sm: 500 }}
       headerVariant="enhanced"
+      headerActions={
+        !isReadOnly && (
+          <Tooltip title="Create new tag" arrow>
+            <IconButton
+              color="primary"
+              onClick={() => setIsCreateDialogOpen(true)}
+              sx={{
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                '&:hover': {
+                  bgcolor: alpha(theme.palette.primary.main, 0.2)
+                }
+              }}
+            >
+              <AddIcon />
+            </IconButton>
+          </Tooltip>
+        )
+      }
       contentSx={{ p: 2, ...scrollbarStyles(theme) }}
     >
       {/* Content */}
@@ -254,7 +275,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 When a tag group is set as required, every new trade must include at least one tag from this group.
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{mt: 4}}>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
                 Adding definitions to your tags helps the AI assistant and traders understand your trading terminology and provide more accurate analysis.
               </Typography>
             </>
@@ -469,6 +490,17 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
           initialDefinition={tagDefinitions[tagToEdit] || ''}
         />
       )}
+
+      <TagCreateDialog
+        open={isCreateDialogOpen}
+        onClose={(created) => {
+          setIsCreateDialogOpen(false);
+          if (created) fetchTagDefinitions();
+        }}
+        calendarId={calendarId}
+        allTags={allTags}
+        onTagCreated={handleTagCreated}
+      />
 
       {/* Tag View Dialog */}
       <Dialog
