@@ -37,10 +37,10 @@ export const calculateCumulativePnLToDateSync = (
 
   if (monthStats?.account_value_at_start !== undefined) {
     // Use the stored value for this month
-    accountValueAtMonthStart = monthStats.account_value_at_start;
+    accountValueAtMonthStart = Number(monthStats.account_value_at_start);
   } else if (yearStats) {
     // Year exists but month doesn't have value yet - use account_balance as fallback
-    accountValueAtMonthStart = calendar.account_balance;
+    accountValueAtMonthStart = Number(calendar.account_balance);
   } else {
     // No year_stats for this year - calculate from previous years
     // Sum up all yearly P&L from previous years
@@ -49,28 +49,26 @@ export const calculateCumulativePnLToDateSync = (
       for (const [statsYear, stats] of Object.entries(calendar.year_stats)) {
         const statsYearNum = parseInt(statsYear, 10);
         if (statsYearNum < year && stats.yearly_pnl !== undefined) {
-          totalPreviousYearsPnL += stats.yearly_pnl;
+          totalPreviousYearsPnL += Number(stats.yearly_pnl);
         }
       }
     }
-    accountValueAtMonthStart = calendar.account_balance + totalPreviousYearsPnL;
+    accountValueAtMonthStart = Number(calendar.account_balance) + totalPreviousYearsPnL;
   }
 
   // account_value_at_start = account_balance + all historical P&L up to month start
   // So cumulative P&L at month start = account_value_at_start - account_balance
-  const cumulativePnLAtMonthStart = accountValueAtMonthStart - calendar.account_balance;
+  const cumulativePnLAtMonthStart = accountValueAtMonthStart - Number(calendar.account_balance);
 
-  // Filter trades: before targetDate (exclusive)
-  const targetStart = new Date(targetDate);
-  targetStart.setHours(0, 0, 0, 0);
+  // Filter trades: before targetDate (exclusive) - use full timestamp comparison
+  const targetTime = targetDate.getTime();
 
   const monthPnLBeforeTarget = monthTrades
     .filter(trade => {
-      const tradeDate = new Date(trade.trade_date);
-      tradeDate.setHours(0, 0, 0, 0);
-      return tradeDate < targetStart;
+      const tradeTime = new Date(trade.trade_date).getTime();
+      return tradeTime < targetTime;
     })
-    .reduce((sum, trade) => sum + trade.amount, 0);
+    .reduce((sum, trade) => sum + Number(trade.amount), 0);
 
   // Total cumulative P&L = historical + this month's trades before target
   return cumulativePnLAtMonthStart + monthPnLBeforeTarget;
@@ -101,10 +99,10 @@ export const calculateCumulativePnLToDateAsync = async (
 
   if (monthStats?.account_value_at_start !== undefined) {
     // Use the stored value for this month
-    accountValueAtMonthStart = monthStats.account_value_at_start;
+    accountValueAtMonthStart = Number(monthStats.account_value_at_start);
   } else if (yearStats) {
     // Year exists but month doesn't have value yet - use account_balance as fallback
-    accountValueAtMonthStart = calendar.account_balance;
+    accountValueAtMonthStart = Number(calendar.account_balance);
   } else {
     // No year_stats for this year - calculate from previous years
     // Sum up all yearly P&L from previous years
@@ -113,14 +111,14 @@ export const calculateCumulativePnLToDateAsync = async (
       for (const [statsYear, stats] of Object.entries(calendar.year_stats)) {
         const statsYearNum = parseInt(statsYear, 10);
         if (statsYearNum < year && stats.yearly_pnl !== undefined) {
-          totalPreviousYearsPnL += stats.yearly_pnl;
+          totalPreviousYearsPnL += Number(stats.yearly_pnl);
         }
       }
     }
-    accountValueAtMonthStart = calendar.account_balance + totalPreviousYearsPnL;
+    accountValueAtMonthStart = Number(calendar.account_balance) + totalPreviousYearsPnL;
   }
 
-  const cumulativePnLAtMonthStart = accountValueAtMonthStart - calendar.account_balance;
+  const cumulativePnLAtMonthStart = accountValueAtMonthStart - Number(calendar.account_balance);
 
   // Use provided trades or fetch from database
   let monthTrades: Pick<Trade, 'trade_date' | 'amount'>[];
@@ -139,17 +137,15 @@ export const calculateCumulativePnLToDateAsync = async (
     monthTrades = await tradeRepo.getTradesByMonth(calendar.id!, year, month, ['trade_date', 'amount']);
   }
 
-  // Filter trades before targetDate and sum their amounts
-  const targetStart = new Date(targetDate);
-  targetStart.setHours(0, 0, 0, 0);
+  // Filter trades before targetDate and sum their amounts - use full timestamp comparison
+  const targetTime = targetDate.getTime();
 
   const monthPnLBeforeTarget = monthTrades
     .filter(trade => {
-      const tradeDate = new Date(trade.trade_date);
-      tradeDate.setHours(0, 0, 0, 0);
-      return tradeDate < targetStart;
+      const tradeTime = new Date(trade.trade_date).getTime();
+      return tradeTime < targetTime;
     })
-    .reduce((sum, trade) => sum + trade.amount, 0);
+    .reduce((sum, trade) => sum + Number(trade.amount), 0);
 
   return cumulativePnLAtMonthStart + monthPnLBeforeTarget;
 };
@@ -243,8 +239,8 @@ export const calculatePercentageOfCurrentValue = (
   accountBalance: number,
   allTrades: Trade[]
 ): number => {
-  const currentTotalValue = calculateCurrentTotalValue(accountBalance, allTrades);
-  return currentTotalValue > 0 ? (amount / currentTotalValue) * 100 : 0;
+  const currentTotalValue = calculateCurrentTotalValue(Number(accountBalance), allTrades);
+  return currentTotalValue > 0 ? (Number(amount) / currentTotalValue) * 100 : 0;
 };
 
 /**
@@ -257,9 +253,10 @@ export const calculatePercentageOfValueAtDate = (
   allTrades: Trade[],
   excludeAfterDate: Date
 ): number => {
-  const relevantTrades = allTrades.filter(trade => new Date(trade.trade_date) < excludeAfterDate);
-  const baselineValue = calculateCurrentTotalValue(accountBalance, relevantTrades);
-  return baselineValue > 0 ? (amount / baselineValue) * 100 : 0;
+  const targetTime = excludeAfterDate.getTime();
+  const relevantTrades = allTrades.filter(trade => new Date(trade.trade_date).getTime() < targetTime);
+  const baselineValue = calculateCurrentTotalValue(Number(accountBalance), relevantTrades);
+  return baselineValue > 0 ? (Number(amount) / baselineValue) * 100 : 0;
 };
 
 /**
@@ -270,8 +267,8 @@ export const calculateRiskAmount = (
   accountBalance: number,
   cumulativePnL: number = 0
 ): number => {
-  const totalAccountValue = accountBalance + cumulativePnL;
-  return (totalAccountValue * effectiveRiskPercentage) / 100;
+  const totalAccountValue = Number(accountBalance) + Number(cumulativePnL);
+  return (totalAccountValue * Number(effectiveRiskPercentage)) / 100;
 };
 
 /**
@@ -333,17 +330,15 @@ export const normalizeTradeAmount = (
       dynamicRiskSettings.profit_threshold_percentage &&
       dynamicRiskSettings.account_balance > 0) {
 
-    // Calculate cumulative P&L up to (but not including) this trade
-    const targetStart = new Date(trade.trade_date);
-    targetStart.setHours(0, 0, 0, 0);
+    // Calculate cumulative P&L up to (but not including) this trade - use full timestamp comparison
+    const targetTime = new Date(trade.trade_date).getTime();
 
     const cumulativePnL = allTrades
       .filter(t => {
-        const tradeDate = new Date(t.trade_date);
-        tradeDate.setHours(0, 0, 0, 0);
-        return tradeDate < targetStart;
+        const tradeTime = new Date(t.trade_date).getTime();
+        return tradeTime < targetTime;
       })
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + Number(t.amount), 0);
 
     const profitPercentage = (cumulativePnL / dynamicRiskSettings.account_balance) * 100;
     if (profitPercentage >= dynamicRiskSettings.profit_threshold_percentage) {

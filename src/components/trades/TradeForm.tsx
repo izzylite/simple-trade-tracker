@@ -36,7 +36,7 @@ import { Currency } from '../../types/economicCalendar';
 import { CURRENCY_PAIRS } from '../../services/tradeEconomicEventService';
 import { Z_INDEX } from '../../styles/zIndex';
 
-export const DEFAULT_PAIRS_TAG_GROUP ="Pairs"
+export const DEFAULT_PAIRS_TAG_GROUP = "Pairs"
 export interface NewTradeForm {
   id: string;
   name: string;
@@ -48,7 +48,7 @@ export interface NewTradeForm {
   take_profit: number;
   risk_to_reward: number;
   trade_date?: Date | null;
-  tags: string[]; 
+  tags: string[];
   partials_taken: boolean;
   session: 'Asia' | 'London' | 'NY AM' | 'NY PM' | '';
   notes: string;
@@ -207,16 +207,16 @@ const TradeForm: React.FC<TradeFormProps> = ({
 
   const cumulativePnl = calculateCumulativePnl(newTrade);
 
- 
+
 
   // Calculate and update the amount based on risk
   const calculateAmountFromRisk = (): number => {
     if (!dynamicRiskSettings.risk_per_trade || !newTrade.risk_to_reward) return 0;
 
-    const rr = newTrade.risk_to_reward;
+    const rr = Number(newTrade.risk_to_reward);
     if (isNaN(rr)) return 0;
 
-    const amount = calculateAmountFromRiskToReward(rr, cumulativePnl);
+    const amount = calculateAmountFromRiskToReward(rr, Number(cumulativePnl));
 
     // Ensure the amount is updated in the form state
     // This is important to make sure the amount is saved correctly
@@ -293,7 +293,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
           <TextField
             label="Entry Price"
             type="number"
-            value={newTrade.entry_price == 0? undefined : newTrade.entry_price}
+            value={newTrade.entry_price == 0 ? undefined : newTrade.entry_price}
             onChange={onEntryChange}
             fullWidth
             placeholder="Optional entry price"
@@ -306,7 +306,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
           <TextField
             label="Exit Price"
             type="number"
-            value={newTrade.exit_price == 0? undefined : newTrade.exit_price}
+            value={newTrade.exit_price == 0 ? undefined : newTrade.exit_price}
             onChange={onExitChange}
             fullWidth
             placeholder="Optional exit price"
@@ -322,7 +322,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
           <TextField
             label="Stop Loss"
             type="number"
-            value={newTrade.stop_loss == 0? undefined : newTrade.stop_loss}
+            value={newTrade.stop_loss == 0 ? undefined : newTrade.stop_loss}
             onChange={onStopLossChange}
             fullWidth
             placeholder="Optional stop loss"
@@ -335,7 +335,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
           <TextField
             label="Take Profit"
             type="number"
-            value={newTrade.take_profit == 0? undefined : newTrade.take_profit}
+            value={newTrade.take_profit == 0 ? undefined : newTrade.take_profit}
             onChange={onTakeProfitChange}
             fullWidth
             placeholder="Optional take profit"
@@ -395,7 +395,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
           <TextField
             label="Amount"
             type="number"
-            value={newTrade.amount ==0 ? undefined : newTrade.amount}
+            value={newTrade.amount == 0 ? undefined : newTrade.amount}
             onChange={(e) => onAmountChange(parseFloat(e.target.value) || 0)}
             fullWidth
             required
@@ -427,9 +427,9 @@ const TradeForm: React.FC<TradeFormProps> = ({
               dynamicRiskSettings?.dynamic_risk_enabled &&
                 dynamicRiskSettings.increased_risk_percentage &&
                 dynamicRiskSettings.profit_threshold_percentage &&
-                (cumulativePnl / accountBalance * 100) >= dynamicRiskSettings.profit_threshold_percentage
+                (Number(cumulativePnl) / Number(accountBalance) * 100) >= dynamicRiskSettings.profit_threshold_percentage
                 ? `Based on ${dynamicRiskSettings.increased_risk_percentage}% of account balance (INCREASED from ${dynamicRiskSettings.risk_per_trade}%)`
-                : `Based on ${dynamicRiskSettings.risk_per_trade}% of account balance (${formatCurrency((accountBalance * (dynamicRiskSettings.risk_per_trade || 0)) / 100)})`
+                : `Based on ${dynamicRiskSettings.risk_per_trade}% of account balance (${formatCurrency((Number(accountBalance) * (dynamicRiskSettings.risk_per_trade || 0)) / 100)})`
             }
           />
         </FormField>
@@ -456,7 +456,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
       <FormField>
         <TextField
           label="Risk to Reward"
-          value={newTrade.risk_to_reward == 0? undefined : newTrade.risk_to_reward}
+          value={newTrade.risk_to_reward == 0 ? undefined : newTrade.risk_to_reward}
           onChange={handleRiskToRewardChange}
           fullWidth
           type="number"
@@ -533,7 +533,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
           </Box>
         )}
 
-     
+
 
         <TagsInput
           tags={newTrade.tags}

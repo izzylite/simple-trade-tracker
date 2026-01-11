@@ -8,7 +8,7 @@ import {
   Snackbar,
   Alert
 } from '@mui/material';
-import { endOfDay, format } from 'date-fns';
+import { endOfDay, format, isSameDay } from 'date-fns';
 import { Trade, Calendar } from '../../types/dualWrite';
 import { BaseDialog } from '../common';
 import * as calendarService from '../../services/calendarService';
@@ -34,7 +34,7 @@ interface FormDialogProps {
   onClose: () => void;
   newMainTrade?: NewTradeForm | null
   trade_date: Date;
-  showForm: FormProps; 
+  showForm: FormProps;
   account_balance: number;
 
   onAddTrade?: (trade: Trade & { id?: string }) => Promise<void>;
@@ -45,7 +45,7 @@ interface FormDialogProps {
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
   setNewMainTrade: (prev: (trade: NewTradeForm) => NewTradeForm | null) => void
   onCancel: () => void;
-  dynamicRiskSettings: DynamicRiskSettings; 
+  dynamicRiskSettings: DynamicRiskSettings;
   /** Calendar object with year_stats for cumulative P&L calculation */
   calendar: Calendar;
   tags: string[];
@@ -54,7 +54,7 @@ interface FormDialogProps {
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
   // Optional props for calendar selection (used when opened from Home.tsx)
   calendars?: Calendar[];
-  onCalendarChange?: (calendarId: string) => void; 
+  onCalendarChange?: (calendarId: string) => void;
 }
 
 interface FormProps {
@@ -124,7 +124,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   onClose,
   newMainTrade,
   setNewMainTrade,
-  trade_date, 
+  trade_date,
   account_balance,
   showForm,
   onCancel,
@@ -132,7 +132,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   onTagUpdated,
   onUpdateTradeProperty,
   onDeleteTrades,
-  dynamicRiskSettings, 
+  dynamicRiskSettings,
   calendar,
   tags = [],
   requiredTagGroups = [],
@@ -172,7 +172,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   // Ref to guard against double invocation of createEmptyTrade (React StrictMode, etc.)
   const isCreatingEmptyTradeRef = useRef(false);
 
-  
+
 
   // Check if calendar selection is required (when calendars prop is provided)
   const isCalendarSelectionMode = !!calendars;
@@ -190,14 +190,33 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     const fetchPrecalculatedValues = async () => {
       if (!open || !calendar || !calendarId) return;
 
-      const targetDate = newTrade?.trade_date || trade_date;
-
       setIsLoadingPrecalculatedValues(true);
       try {
+        let targetDateForPnL = newTrade?.trade_date || trade_date;
+
+        // If adding a new trade and the time is 00:00:00 (default from calendar click),
+        // we want to include all trades already recorded for that day for the risk calculation.
+        // This makes the risk basis consistent with the "Current Total" the user sees.
+        if (!showForm.editTrade &&
+          targetDateForPnL.getHours() === 0 &&
+          targetDateForPnL.getMinutes() === 0 &&
+          targetDateForPnL.getSeconds() === 0) {
+
+          const now = new Date();
+          if (isSameDay(targetDateForPnL, now)) {
+            // If it's today, use current time
+            targetDateForPnL = now;
+          } else {
+            // For past days, use the end of the day to include everything
+            targetDateForPnL = endOfDay(targetDateForPnL);
+          }
+        }
+
         const [pnl, riskPct] = await Promise.all([
-          calculateCumulativePnLToDateAsync(targetDate, calendar),
-          calculateEffectiveRiskPercentageAsync(targetDate, calendar, dynamicRiskSettings)
+          calculateCumulativePnLToDateAsync(targetDateForPnL, calendar),
+          calculateEffectiveRiskPercentageAsync(targetDateForPnL, calendar, dynamicRiskSettings)
         ]);
+
         if (isMountedRef.current) {
           setPrecalculatedPnL(pnl);
           setPrecalculatedRiskPercentage(riskPct);
@@ -212,7 +231,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     };
 
     fetchPrecalculatedValues();
-  }, [open, calendarId, tradeDateTimestamp, newTradeDateTimestamp]);
+  }, [open, calendarId, tradeDateTimestamp, newTradeDateTimestamp, showForm.editTrade]);
 
   // Fetch day's total P&L when dialog opens or trade_date changes
   useEffect(() => {
@@ -507,7 +526,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   // Calculate amount based on risk per trade (as percentage of account balance) and risk-to-reward ratio
   // When editing: uses the original risk amount derived from the trade to preserve historical context
   // When creating: uses precalculated values from current cumulative P&L
-  const calculateAmountFromRiskToReward = (risk_to_reward: number): number => {
+  const calculateAmountFromRiskToReward = (risk_to_reward: number, alternatePnL?: number): number => {
     if (!newTrade || !risk_to_reward || !account_balance || newTrade.trade_type === 'breakeven') return 0;
 
     // Use original risk amount when editing (preserves the historical calculation context)
@@ -519,14 +538,18 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     } else {
       // New trade: calculate from current state
       const effectiveRiskPercentage = precalculatedRiskPercentage || dynamicRiskSettings.risk_per_trade || 0;
-      riskAmount = calculateRiskAmount(effectiveRiskPercentage, account_balance, precalculatedPnL);
+      const currentPnL = alternatePnL !== undefined ? alternatePnL : precalculatedPnL;
+      riskAmount = calculateRiskAmount(effectiveRiskPercentage, account_balance, currentPnL);
     }
 
     // For win trades: risk amount * R:R
     // For loss trades: risk amount
-    return newTrade.trade_type === 'win'
-      ? Math.round(riskAmount * risk_to_reward)
+    const riskToRewardValue = Number(risk_to_reward);
+    const amount = newTrade.trade_type === 'win'
+      ? Math.round(riskAmount * riskToRewardValue)
       : Math.round(riskAmount);
+
+    return amount;
   };
 
 
