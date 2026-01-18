@@ -556,10 +556,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
 
   const handlePartialsTakenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const partialsTaken = e.target.checked;
-    setNewTrade(prev => ({ ...prev!, partialsTaken }));
-
-
+    const partials_taken = e.target.checked;
+    setNewTrade(prev => ({ ...prev!, partials_taken }));
   };
 
   const handleSessionChange = (e: any) => {

@@ -375,6 +375,12 @@ async function syncToLinkedCalendar(
       return;
     }
 
+    // Skip temporary trades (placeholder trades being edited)
+    if (trade.is_temporary) {
+      log('Skipping sync - trade is temporary');
+      return;
+    }
+
     const supabase = createServiceClient();
 
     // Get the linked calendar ID for this calendar
