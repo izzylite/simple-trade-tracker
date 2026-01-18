@@ -724,7 +724,9 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     const dropdownItems: DropdownItem[] = userCalendars.map(cal => ({
       label: cal.name,
       path: `/calendar/${cal.id}`,
-      active: cal.id === calendarId
+      active: cal.id === calendarId,
+      totalTrades: cal.total_trades,
+      pnl: cal.total_pnl
     }));
 
     return [
@@ -872,6 +874,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         hero_image_url: formData.hero_image_url,
         hero_image_attribution: formData.hero_image_attribution,
       }));
+      // Update userCalendars state to reflect name change in breadcrumb dropdown
+      setUserCalendars(prev => prev.map(cal =>
+        cal.id === calendarId ? { ...cal, name: formData.name } : cal
+      ));
       setIsCalendarEditOpen(false);
       showSnackbar('Calendar updated successfully', 'success');
     } catch (error) {

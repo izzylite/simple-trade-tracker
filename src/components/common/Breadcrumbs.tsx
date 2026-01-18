@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Box, Breadcrumbs as MuiBreadcrumbs, Link, Typography, useTheme, alpha, IconButton, Tooltip, Menu, MenuItem, ListItemText } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Breadcrumbs as MuiBreadcrumbs, Link, Typography, useTheme, alpha, IconButton, Tooltip, Menu, MenuItem, Stack } from '@mui/material';
 import { NavigateNext as NavigateNextIcon, KeyboardArrowDown as ArrowDownIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,6 +7,8 @@ export interface DropdownItem {
   label: string;
   path: string;
   active?: boolean;
+  totalTrades?: number;
+  pnl?: number;
 }
 
 export interface BreadcrumbItem {
@@ -213,37 +215,75 @@ const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, buttons, rightContent 
           transformOrigin={{ horizontal: 'left', vertical: 'top' }}
           anchorOrigin={{ horizontal: 'left', vertical: 'bottom' }}
         >
-          {items[dropdownItemIndex].dropdown!.map((dropdownItem) => (
-            <MenuItem
-              key={dropdownItem.path}
-              onClick={() => handleDropdownItemClick(dropdownItem.path)}
-              selected={dropdownItem.active}
-              sx={{
-                py: 1,
-                px: 2,
-                fontSize: '0.875rem',
-                '&.Mui-selected': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.primary.main, 0.15)
-                  }
-                }
-              }}
-            >
-              <ListItemText
-                primary={dropdownItem.label}
-                primaryTypographyProps={{
+          {items[dropdownItemIndex].dropdown!.map((dropdownItem) => {
+            const hasPnl = dropdownItem.pnl !== undefined;
+            const isPositive = (dropdownItem.pnl ?? 0) >= 0;
+            const formattedPnl = hasPnl
+              ? `${isPositive ? '+' : ''}$${Math.abs(dropdownItem.pnl!).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : null;
+
+            return (
+              <MenuItem
+                key={dropdownItem.path}
+                onClick={() => handleDropdownItemClick(dropdownItem.path)}
+                selected={dropdownItem.active}
+                sx={{
+                  py: 1,
+                  px: 2,
                   fontSize: '0.875rem',
-                  fontWeight: dropdownItem.active ? 600 : 400,
-                  noWrap: true,
-                  sx: {
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
+                  '&.Mui-selected': {
+                    bgcolor: alpha(theme.palette.primary.main, 0.1),
+                    '&:hover': {
+                      bgcolor: alpha(theme.palette.primary.main, 0.15)
+                    }
                   }
                 }}
-              />
-            </MenuItem>
-          ))}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 2 }}>
+                  <Typography
+                    sx={{
+                      fontSize: '0.875rem',
+                      fontWeight: dropdownItem.active ? 600 : 400,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      flex: 1,
+                      minWidth: 0
+                    }}
+                  >
+                    {dropdownItem.label}
+                  </Typography>
+                  {(dropdownItem.totalTrades !== undefined || hasPnl) && (
+                    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexShrink: 0 }}>
+                      {dropdownItem.totalTrades !== undefined && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: 'text.secondary',
+                            fontSize: '0.75rem'
+                          }}
+                        >
+                          {dropdownItem.totalTrades} trades
+                        </Typography>
+                      )}
+                      {hasPnl && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: '0.75rem',
+                            color: isPositive ? 'success.main' : 'error.main'
+                          }}
+                        >
+                          {formattedPnl}
+                        </Typography>
+                      )}
+                    </Stack>
+                  )}
+                </Box>
+              </MenuItem>
+            );
+          })}
         </Menu>
       )}
     </Box>

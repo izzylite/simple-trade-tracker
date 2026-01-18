@@ -630,6 +630,11 @@ const CalendarListDialog: React.FC<CalendarListDialogProps> = ({
     });
   };
 
+  const handleDeleteClick = (calendar: Calendar) => {
+    onClose();
+    onDeleteCalendar?.(calendar.id);
+  };
+
   return (
     <Dialog
       open={open}
@@ -771,9 +776,12 @@ const CalendarListDialog: React.FC<CalendarListDialogProps> = ({
                 onToggleExpand={() => handleToggleExpand(calendar.id)}
                 onClick={() => handleCalendarClick(calendar.id)}
                 onEdit={() => onEditCalendar?.(calendar)}
-                onDuplicate={() => onDuplicateCalendar?.(calendar)}
+                onDuplicate={() => {
+                  
+                  onDuplicateCalendar?.(calendar);
+                }}
                 onLink={() => onLinkCalendar?.(calendar)}
-                onDelete={() => onDeleteCalendar?.(calendar.id)}
+                onDelete={() => handleDeleteClick(calendar)}
                 onUpdateCalendarProperty={onUpdateCalendarProperty}
               />
             ))}
