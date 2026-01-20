@@ -274,28 +274,23 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     setIsCreatingEmptyTrade(true);
     // Create a temporary trade object to display in the UI
 
-    // Create an empty trade
+    // Create an empty trade state WITHOUT saving to DB yet
     try {
-      if (calendar?.id && onAddTrade) {
+      // Initialize form with a generated ID so we have one ready if the user adds images
+      // but DO NOT call onAddTrade yet. The trade stays client-side until saved or an image is added.
+      const data = createNewTradeData();
+      const generatedId = uuidv4();
 
-        // Update the form with the temporary trade ID and isTemporary flag
-        const data = createNewTradeData();
-        setNewTrade(() => ({
-          ...data,
-          is_temporary: true,
-          name: 'New Trade',
-          trade_date: trade_date // Initialize with the selected date from DayDialog
-        }));
-
-        const tradeData = await createFinalTradeData(data, trade_date);
-        await onAddTrade({ ...tradeData, name: 'New Trade', is_temporary: true });
-      } else {
-        // Handle case where calendar_id or onAddTrade is missing
-        throw new Error('Unable to create trade: Missing calendar ID or add trade function');
-      }
+      setNewTrade(() => ({
+        ...data,
+        id: generatedId,
+        is_temporary: false, // Start as false so handleSubmit treats it as a new permanent trade unless images make it temp in DB
+        name: 'New Trade',
+        trade_date: trade_date // Initialize with the selected date from DayDialog
+      }));
 
     } catch (error) {
-      logger.error('Error creating empty trade:', error);
+      logger.error('Error initializing empty trade:', error);
       // We are no longer showing local snackbar for this, as the parent component handles global notifications
       // or we accept that this error is logged but not flashed to the user in the dialog context immediately.
 
@@ -309,7 +304,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       setIsCreatingEmptyTrade(false);
       isCreatingEmptyTradeRef.current = false;
     }
-  }, [calendar?.id, onAddTrade, trade_date]);
+  }, [trade_date]);
 
   useEffect(() => {
     // Only call handleAddClick when showForm changes from not meeting conditions to meeting them
@@ -1290,7 +1285,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         open={open}
         onClose={() => {
           // Only allow closing if we're not in the process of creating an empty trade
-          if (!isCreatingEmptyTrade) {
+          if (!isCreatingEmptyTrade && !isLoadingPrecalculatedValues) {
             if (editingTrade) {
               resetForm();
             }
@@ -1300,16 +1295,16 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         title="Daily Trades"
         maxWidth="md"
         fullWidth
-        hideCloseButton={isCreatingEmptyTrade} // Disable close button when creating empty trade
+        hideCloseButton={isCreatingEmptyTrade || isLoadingPrecalculatedValues} // Disable close button when creating empty trade
         primaryButtonText={(editingTrade ? 'Update Trade' : 'Add Trade')}
         primaryButtonAction={(editingTrade ?
           (e?: React.FormEvent) => handleEditSubmit(e) :
           (e?: React.FormEvent) => handleSubmit(e)
         )}
-        isSubmitting={isSubmitting || isCreatingEmptyTrade || (!editingTrade && isLoadingPrecalculatedValues)} // Disable while creating empty trade or loading risk calculations (only for new trades)
+        isSubmitting={isSubmitting || isCreatingEmptyTrade || isLoadingPrecalculatedValues} // Disable while creating empty trade or loading risk calculations (only for new trades)
         cancelButtonAction={() => {
           // Only allow canceling if we're not in the process of creating an empty trade
-          if (!isCreatingEmptyTrade) {
+          if (!isCreatingEmptyTrade && !isLoadingPrecalculatedValues) {
             resetForm();
             onCancel();
           }
@@ -1369,7 +1364,6 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               editingTrade={editingTrade}
               allTags={allTags}
               isSubmitting={isSubmitting}
-              isLoadingPrecalculatedValues={!editingTrade && isLoadingPrecalculatedValues}
               calculateAmountFromRiskToReward={calculateAmountFromRiskToReward}
               onNameChange={handleNameChange}
               onAmountChange={handleAmountChange}

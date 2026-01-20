@@ -585,7 +585,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
         }}>
           {months.map((month, index) => {
             const stats = monthlyStats.get(index)!;
-            const { monthPnL, targetProgress, growthPercentage } = stats;
+            const { monthPnL, targetProgress, growthPercentage, tradeCount } = stats;
             const hasEntries = monthPnL !== 0;
 
             return (
@@ -700,6 +700,23 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
                           fontSize: '0.75rem'
                         }}>
                           {growthPercentage}%
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                      }}>
+                        <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.secondary', fontSize: '0.75rem' }}>
+                          Trades:
+                        </Typography>
+                        <Typography variant="caption" sx={{
+                          fontWeight: 600,
+                          color: 'text.primary',
+                          fontSize: '0.75rem'
+                        }}>
+                          {tradeCount}
                         </Typography>
                       </Box>
                     </Box>

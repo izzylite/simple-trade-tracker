@@ -87,7 +87,6 @@ interface TradeFormProps {
   editingTrade: Trade | null;
   allTags: string[];
   isSubmitting: boolean;
-  isLoadingPrecalculatedValues?: boolean;
   accountBalance: number;
   dynamicRiskSettings: DynamicRiskSettings;
   calculateCumulativePnl(newTrade?: NewTradeForm): number;
@@ -123,7 +122,6 @@ const TradeForm: React.FC<TradeFormProps> = ({
   editingTrade,
   allTags,
   isSubmitting,
-  isLoadingPrecalculatedValues = false,
   accountBalance,
   dynamicRiskSettings,
   calculateAmountFromRiskToReward,
@@ -415,13 +413,6 @@ const TradeForm: React.FC<TradeFormProps> = ({
             disabled
             InputLabelProps={{
               shrink: true
-            }}
-            InputProps={{
-              endAdornment: isLoadingPrecalculatedValues ? (
-                <InputAdornment position="end">
-                  <CircularProgress size={20} />
-                </InputAdornment>
-              ) : null
             }}
             helperText={
               dynamicRiskSettings?.dynamic_risk_enabled &&
