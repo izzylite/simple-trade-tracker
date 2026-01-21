@@ -14,13 +14,18 @@ import {
   Tooltip,
   TextField,
   CircularProgress,
-  Button
+  Button,
+  Collapse
 } from '@mui/material';
 import {
   PushPin as PinIcon,
   PushPinOutlined as PinOutlinedIcon,
-  ViewCarousel as GalleryIcon
+  ViewCarousel as GalleryIcon,
+  AutoAwesome as AutoAwesomeIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
+import ReactMarkdown from 'react-markdown';
 import { EconomicEvent } from '../../types/economicCalendar';
 import { Trade } from '../../types/dualWrite';
 import { Calendar } from '../../types/calendar';
@@ -30,6 +35,10 @@ import { cleanEventNameForPinning, eventMatchV1, eventMatchV3 } from '../../util
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
 import Shimmer from '../Shimmer';
+import { supabaseAIChatService } from '../../services/supabaseAIChatService';
+import { supabase } from '../../config/supabase';
+import { hasApiKey } from '../../services/apiKeyStorage';
+import ApiKeySettingsDialog from '../aiChat/ApiKeySettingsDialog';
 
 interface EconomicEventDetailDialogProps {
   open: boolean;
@@ -59,6 +68,12 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   const [pinning, setPinning] = useState(false);
   const initialNotesRef = useRef<string>('');
 
+  // AI Analysis State
+  const [aiAnalysis, setAiAnalysis] = useState<string>('');
+  const [aiAnalysisExpanded, setAiAnalysisExpanded] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [apiKeySettingsOpen, setApiKeySettingsOpen] = useState(false);
+
   // State for event trades
   const [eventTrades, setEventTrades] = useState<Trade[]>([]);
   const [isLoadingTrades, setIsLoadingTrades] = useState(false);
@@ -68,6 +83,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     const fetchEventTrades = async () => {
       if (!open || !calendarId) {
         setEventTrades([]);
+        setAiAnalysis(''); // Reset AI analysis when dialog closes/reopens
         return;
       }
 
@@ -99,7 +115,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     if (!calendar || !('pinned_events' in calendar) || !calendar.pinned_events) {
       return null;
     }
- 
+
     // First try to match by event_id (exact match), then fallback to name matching
     return calendar.pinned_events.find(pe =>
       pe.event_id ? pe.event_id === event.id : eventMatchV1(event, pe)
@@ -235,6 +251,67 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     return { total, wins, losses, breakevens, win_rate };
   }, [eventTrades]);
 
+  // Handle Ask AI
+  const handleAskAI = async () => {
+    // Check if API key exists
+    if (!hasApiKey()) {
+      setApiKeySettingsOpen(true);
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const prompt = `
+Analyze the economic event: ${event.event_name} for ${event.currency} with ${event.impact} impact.
+Please answer:
+1. What does this event mean?
+2. How does it usually affect ${event.currency} trades?
+3. Based on my trading history below, should I trade during this event?
+
+My Trading History for this event:
+- Total Trades: ${stats.total}
+- Win Rate: ${stats.win_rate}%
+- Wins: ${stats.wins}
+- Losses: ${stats.losses}
+- Breakeven: ${stats.breakevens}
+
+Data for your analysis. Analyze the trade's images, tags, etc to get deep understanding. (DO NOT list these trade IDs or any <trade-ref> tags in your response, just use them to analyze my performance):
+${eventTrades.map(t => `- ${t.id}`).join('\n')}
+      `.trim();
+
+      const response = await supabaseAIChatService.sendMessage(
+        prompt,
+        session.user.id,
+        calendar as Calendar, // Cast if calendar is available, though it might be Partial
+        [], // No conversation history context needed for this one-shot query
+      );
+
+      if (response.success) {
+        setAiAnalysis(response.message);
+        setAiAnalysisExpanded(true);
+      } else {
+        setAiAnalysis('Failed to get analysis. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error asking AI:', error);
+
+      // If error is about API key (e.g. from backend), prompt for it
+      if (error instanceof Error && error.message.includes('API key')) {
+        setApiKeySettingsOpen(true);
+      }
+
+      setAiAnalysis('An error occurred while analyzing the event. Please check your API key settings.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+
   // Dialog actions with gallery mode button
   const dialogActions = onOpenGalleryMode && eventTrades.length > 0 && !isReadOnly ? (
     <Button
@@ -254,217 +331,293 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   ) : undefined;
 
   return (
-    <BaseDialog
-      open={open}
-      onClose={handleClose}
-      sx={{
-        zIndex: Z_INDEX.ECONOMIC_CALENDAR_DETAIL
-      }}
-      title={
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
-          {event.flag_url && (
-            <img
-              src={event.flag_url}
-              alt={event.currency}
-              style={{
-                width: 24,
-                height: 18,
-                borderRadius: 3,
-                objectFit: 'cover'
-              }}
-            />
-          )}
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
-              {event.event_name}
-            </Typography>
+    <>
+      <BaseDialog
+        open={open}
+        onClose={handleClose}
+        sx={{
+          zIndex: Z_INDEX.ECONOMIC_CALENDAR_DETAIL
+        }}
+        title={
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
+            {event.flag_url && (
+              <img
+                src={event.flag_url}
+                alt={event.currency}
+                style={{
+                  width: 24,
+                  height: 18,
+                  borderRadius: 3,
+                  objectFit: 'cover'
+                }}
+              />
+            )}
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
+                {event.event_name}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <Chip
+                label={event.currency}
+                size="small"
+                sx={{
+                  height: 24,
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                  color: 'primary.main'
+                }}
+              />
+              <Chip
+                label={event.impact}
+                size="small"
+                sx={{
+                  height: 24,
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  backgroundColor: alpha(getImpactColor(event.impact), 0.1),
+                  color: getImpactColor(event.impact)
+                }}
+              />
+              {calendar && 'pinned_events' in calendar && onUpdateCalendarProperty && !isReadOnly && (
+                <Tooltip title={isPinned ? "Unpin event" : "Pin event"}>
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={pinning ? undefined : handleTogglePin}
+                      disabled={pinning}
+                      sx={{
+                        color: isPinned ? 'warning.main' : 'text.secondary',
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.warning.main, 0.1)
+                        },
+                        '&.Mui-disabled': {
+                          color: 'text.disabled'
+                        }
+                      }}
+                    >
+                      {pinning ? (
+                        <CircularProgress size={18} color="inherit" />
+                      ) : (
+                        isPinned ? <PinIcon sx={{ fontSize: 20 }} /> : <PinOutlinedIcon sx={{ fontSize: 20 }} />
+                      )}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              )}
+            </Box>
           </Box>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Chip
-              label={event.currency}
-              size="small"
-              sx={{
-                height: 24,
-                fontWeight: 600,
-                fontSize: '0.75rem',
-                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                color: 'primary.main'
-              }}
-            />
-            <Chip
-              label={event.impact}
-              size="small"
-              sx={{
-                height: 24,
-                fontWeight: 600,
-                fontSize: '0.75rem',
-                backgroundColor: alpha(getImpactColor(event.impact), 0.1),
-                color: getImpactColor(event.impact)
-              }}
-            />
-            {calendar && 'pinned_events' in calendar && onUpdateCalendarProperty && !isReadOnly && (
-              <Tooltip title={isPinned ? "Unpin event" : "Pin event"}>
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={pinning ? undefined : handleTogglePin}
-                    disabled={pinning}
-                    sx={{
-                      color: isPinned ? 'warning.main' : 'text.secondary',
+        }
+        maxWidth="sm"
+        fullWidth
+        actions={dialogActions}
+        hideFooterCancelButton
+      >
+        <Box>
+          {/* Stats Section with Ask AI Button */}
+          <Box sx={{
+            mb: 3,
+            mt: 3,
+            p: 2,
+            borderRadius: 2,
+            backgroundColor: alpha(theme.palette.background.paper, 0.5),
+            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            position: 'relative' // For Ask AI button positioning if needed
+          }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.secondary' }}>
+                Stats
+              </Typography>
+              {!aiAnalysis && (
+                <Button
+                  variant="text"
+                  size="small"
+                  startIcon={isAnalyzing ? <CircularProgress size={14} color="inherit" /> : <AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                  onClick={handleAskAI}
+                  disabled={isAnalyzing}
+                  sx={{
+                    fontSize: '0.75rem',
+                    color: theme.palette.primary.main,
+                    textTransform: 'none',
+                    minWidth: 'auto',
+                    padding: '4px 8px'
+                  }}
+                >
+                  {isAnalyzing ? 'Analyzing...' : 'Ask AI'}
+                </Button>
+              )}
+            </Box>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(5, 1fr)' }, gap: 1.25 }}>
+              <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.background.paper, 0.3), border: `1px solid ${alpha(theme.palette.divider, 0.15)}` }}>
+                <Typography variant="caption" color="text.secondary">Total Trades</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{stats.total}</Typography>
+              </Box>
+              <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.success.main, 0.06), border: `1px solid ${alpha(theme.palette.success.main, 0.15)}` }}>
+                <Typography variant="caption" color="text.secondary">Wins</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'success.main' }}>{stats.wins}</Typography>
+              </Box>
+              <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.error.main, 0.06), border: `1px solid ${alpha(theme.palette.error.main, 0.15)}` }}>
+                <Typography variant="caption" color="text.secondary">Losses</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'error.main' }}>{stats.losses}</Typography>
+              </Box>
+              <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.warning.main, 0.06), border: `1px solid ${alpha(theme.palette.warning.main, 0.15)}` }}>
+                <Typography variant="caption" color="text.secondary">Breakeven</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'warning.main' }}>{stats.breakevens}</Typography>
+              </Box>
+              <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.primary.main, 0.06), border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}` }}>
+                <Typography variant="caption" color="text.secondary">Win Rate</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>{`${stats.win_rate}%`}</Typography>
+              </Box>
+            </Box>
+          </Box>
+
+          {/* AI Analysis Result */}
+          {aiAnalysis && (
+            <Box sx={{
+              mb: 3,
+              borderRadius: 2,
+              backgroundColor: alpha(theme.palette.primary.main, 0.05),
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+              overflow: 'hidden'
+            }}>
+              <Box
+                onClick={() => setAiAnalysisExpanded(!aiAnalysisExpanded)}
+                sx={{
+                  p: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.08)
+                  }
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <AutoAwesomeIcon sx={{ fontSize: 16 }} />
+                  AI Analysis
+                </Typography>
+                <IconButton size="small" sx={{ color: 'primary.main' }}>
+                  {aiAnalysisExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+              </Box>
+
+              <Collapse in={aiAnalysisExpanded}>
+                <Box sx={{
+                  p: 2,
+                  pt: 0,
+                  typography: 'body2',
+                  '& p': { mb: 1, '&:last-child': { mb: 0 } },
+                  '& ul, & ol': { pl: 2, mb: 1, mt: 0 },
+                  '& li': { mb: 0.5 }
+                }}>
+                  <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
+                </Box>
+              </Collapse>
+            </Box>
+          )}
+
+          {/* Notes Section - Only visible when pinned */}
+          {isPinned && (
+            <Box sx={{ mb: 3 }}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                placeholder="Add notes about this event (max 250 characters)..."
+                value={notesText}
+                onChange={(e) => handleNotesChange(e.target.value)}
+                disabled={isReadOnly}
+                slotProps={{
+                  input: {
+                    sx: {
+                      backgroundColor: alpha(theme.palette.warning.main, 0.05),
                       '&:hover': {
-                        backgroundColor: alpha(theme.palette.warning.main, 0.1)
+                        backgroundColor: alpha(theme.palette.warning.main, 0.08)
                       },
-                      '&.Mui-disabled': {
-                        color: 'text.disabled'
+                      '&.Mui-focused': {
+                        backgroundColor: alpha(theme.palette.warning.main, 0.08)
                       }
+                    }
+                  }
+                }}
+                helperText={`${notesText.length}/250 characters${hasNotesChanged ? ' • Unsaved changes (saves on close)' : ''}`}
+              />
+            </Box>
+          )}
+
+          {/* Trades List */}
+          <Box>
+            {isLoadingTrades ? (
+              // Show shimmer loading state while fetching trades
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {[1, 2, 3].map((index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                      backgroundColor: alpha(theme.palette.background.paper, 0.3),
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1
                     }}
                   >
-                    {pinning ? (
-                      <CircularProgress size={18} color="inherit" />
-                    ) : (
-                      isPinned ? <PinIcon sx={{ fontSize: 20 }} /> : <PinOutlinedIcon sx={{ fontSize: 20 }} />
-                    )}
-                  </IconButton>
-                </span>
-              </Tooltip>
+                    {/* Trade header shimmer */}
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <Shimmer width={60} height={24} borderRadius={4} intensity="medium" />
+                      <Shimmer width={80} height={24} borderRadius={4} intensity="medium" />
+                      <Box sx={{ flex: 1 }} />
+                      <Shimmer width={70} height={28} borderRadius={4} intensity="high" />
+                    </Box>
+                    {/* Trade details shimmer */}
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Shimmer width="40%" height={20} borderRadius={4} intensity="low" />
+                      <Shimmer width="30%" height={20} borderRadius={4} intensity="low" />
+                    </Box>
+                    {/* Trade amount shimmer */}
+                    <Shimmer width="25%" height={20} borderRadius={4} intensity="low" />
+                  </Box>
+                ))}
+              </Box>
+            ) : eventTrades.length === 0 ? (
+              <Box
+                sx={{
+                  textAlign: 'center',
+                  py: 3,
+                  backgroundColor: alpha(theme.palette.background.paper, 0.3),
+                  borderRadius: 1,
+                  border: `1px dashed ${alpha(theme.palette.divider, 0.3)}`
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  No trades found for this event
+                </Typography>
+              </Box>
+            ) : (
+              <TradeList
+                trades={eventTrades}
+                expandedTradeId={expandedTradeId}
+                onTradeClick={(id) => setExpandedTradeId(prev => prev === id ? null : id)}
+                hideActions={isReadOnly}
+                tradeOperations={tradeOperations}
+              />
             )}
           </Box>
         </Box>
-      }
-      maxWidth="sm"
-      fullWidth
-      actions={dialogActions}
-      hideFooterCancelButton
-    >
-      <Box>
-        {/* Stats Section */}
-        <Box sx={{
-          mb: 3,
-          mt: 3,
-          p: 2,
-          borderRadius: 2,
-          backgroundColor: alpha(theme.palette.background.paper, 0.5),
-          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
-        }}>
-          <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, fontSize: '0.875rem', color: 'text.secondary' }}>
-            Stats
-          </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(5, 1fr)' }, gap: 1.25 }}>
-            <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.background.paper, 0.3), border: `1px solid ${alpha(theme.palette.divider, 0.15)}` }}>
-              <Typography variant="caption" color="text.secondary">Total Trades</Typography>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{stats.total}</Typography>
-            </Box>
-            <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.success.main, 0.06), border: `1px solid ${alpha(theme.palette.success.main, 0.15)}` }}>
-              <Typography variant="caption" color="text.secondary">Wins</Typography>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'success.main' }}>{stats.wins}</Typography>
-            </Box>
-            <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.error.main, 0.06), border: `1px solid ${alpha(theme.palette.error.main, 0.15)}` }}>
-              <Typography variant="caption" color="text.secondary">Losses</Typography>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'error.main' }}>{stats.losses}</Typography>
-            </Box>
-            <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.warning.main, 0.06), border: `1px solid ${alpha(theme.palette.warning.main, 0.15)}` }}>
-              <Typography variant="caption" color="text.secondary">Breakeven</Typography>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'warning.main' }}>{stats.breakevens}</Typography>
-            </Box>
-            <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.primary.main, 0.06), border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}` }}>
-              <Typography variant="caption" color="text.secondary">Win Rate</Typography>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>{`${stats.win_rate}%`}</Typography>
-            </Box>
-          </Box>
-        </Box>
+      </BaseDialog>
 
-        {/* Notes Section - Only visible when pinned */}
-        {isPinned && (
-          <Box sx={{ mb: 3 }}>
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              placeholder="Add notes about this event (max 250 characters)..."
-              value={notesText}
-              onChange={(e) => handleNotesChange(e.target.value)}
-              disabled={isReadOnly}
-              slotProps={{
-                input: {
-                  sx: {
-                    backgroundColor: alpha(theme.palette.warning.main, 0.05),
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.warning.main, 0.08)
-                    },
-                    '&.Mui-focused': {
-                      backgroundColor: alpha(theme.palette.warning.main, 0.08)
-                    }
-                  }
-                }
-              }}
-              helperText={`${notesText.length}/250 characters${hasNotesChanged ? ' • Unsaved changes (saves on close)' : ''}`}
-            />
-          </Box>
-        )}
-
-        {/* Trades List */}
-        <Box>
-          {isLoadingTrades ? (
-            // Show shimmer loading state while fetching trades
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {[1, 2, 3].map((index) => (
-                <Box
-                  key={index}
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                    backgroundColor: alpha(theme.palette.background.paper, 0.3),
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 1
-                  }}
-                >
-                  {/* Trade header shimmer */}
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                    <Shimmer width={60} height={24} borderRadius={4} intensity="medium" />
-                    <Shimmer width={80} height={24} borderRadius={4} intensity="medium" />
-                    <Box sx={{ flex: 1 }} />
-                    <Shimmer width={70} height={28} borderRadius={4} intensity="high" />
-                  </Box>
-                  {/* Trade details shimmer */}
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Shimmer width="40%" height={20} borderRadius={4} intensity="low" />
-                    <Shimmer width="30%" height={20} borderRadius={4} intensity="low" />
-                  </Box>
-                  {/* Trade amount shimmer */}
-                  <Shimmer width="25%" height={20} borderRadius={4} intensity="low" />
-                </Box>
-              ))}
-            </Box>
-          ) : eventTrades.length === 0 ? (
-            <Box
-              sx={{
-                textAlign: 'center',
-                py: 3,
-                backgroundColor: alpha(theme.palette.background.paper, 0.3),
-                borderRadius: 1,
-                border: `1px dashed ${alpha(theme.palette.divider, 0.3)}`
-              }}
-            >
-              <Typography variant="body2" color="text.secondary">
-                No trades found for this event
-              </Typography>
-            </Box>
-          ) : (
-            <TradeList
-              trades={eventTrades}
-              expandedTradeId={expandedTradeId}
-              onTradeClick={(id) => setExpandedTradeId(prev => prev === id ? null : id)}
-              hideActions={isReadOnly}
-              tradeOperations={tradeOperations}
-            />
-          )}
-        </Box>
-      </Box>
-    </BaseDialog>
+      {/* API Key Settings Dialog */}
+      <ApiKeySettingsDialog
+        open={apiKeySettingsOpen}
+        onClose={() => setApiKeySettingsOpen(false)}
+      />
+    </>
   );
 };
 
 export default EconomicEventDetailDialog;
+
 
