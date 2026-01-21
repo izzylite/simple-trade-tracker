@@ -133,7 +133,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
         // Check if trade count matches (to ensure analysis is fresh for current data)
         if (parsed.tradeCount === tradeCount) {
           setAiAnalysis(parsed.analysis);
-          setAiAnalysisExpanded(true);
+          setAiAnalysisExpanded(false);
         } else {
           // Cache invalid
           localStorage.removeItem(cacheKey);
