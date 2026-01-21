@@ -31,7 +31,7 @@ import { Trade } from '../../types/dualWrite';
 import { Calendar } from '../../types/calendar';
 import { BaseDialog } from '../common';
 import TradeList from '../trades/TradeList';
-import { cleanEventNameForPinning, eventMatchV1, eventMatchV3 } from '../../utils/eventNameUtils';
+import { cleanEventNameForPinning, eventMatchV1 } from '../../utils/eventNameUtils';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
 import Shimmer from '../Shimmer';
@@ -77,17 +77,19 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   // State for event trades
   const [eventTrades, setEventTrades] = useState<Trade[]>([]);
   const [isLoadingTrades, setIsLoadingTrades] = useState(false);
+  const hasInitialLoad = useRef(false);
 
   // Fetch trades for this event when dialog opens
   useEffect(() => {
     const fetchEventTrades = async () => {
       if (!open || !calendarId) {
         setEventTrades([]);
-        setAiAnalysis(''); // Reset AI analysis when dialog closes/reopens
+        // Don't reset AI analysis here, we'll handle it via cache or trades update
         return;
       }
 
       setIsLoadingTrades(true);
+      hasInitialLoad.current = false;
       try {
         const calendarServiceModule = await import('../../services/calendarService');
         const cleanedName = cleanEventNameForPinning(event.event_name);
@@ -104,11 +106,48 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
         setEventTrades([]);
       } finally {
         setIsLoadingTrades(false);
+        hasInitialLoad.current = true;
       }
     };
 
     fetchEventTrades();
   }, [open, calendarId, event.event_name, event.currency, event.impact]);
+
+  // Load cached AI analysis when trades are loaded
+  useEffect(() => {
+    if (!open) return; // Don't check cache if dialog is closed (prevent clearing on close)
+    if (!calendarId || !event.id) return;
+    if (isLoadingTrades) return; // Don't check while loading
+    if (!hasInitialLoad.current) return; // Don't check before initial load completes
+    const cleanedName = cleanEventNameForPinning(event.event_name);
+    const cacheKey = `ai_analysis_${calendarId}_${cleanedName}`;
+    const cachedData = localStorage.getItem(cacheKey);
+
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        // timestamp check removed as per user request
+        // const now = Date.now();
+        const tradeCount = eventTrades.length;
+
+        // Check if trade count matches (to ensure analysis is fresh for current data)
+        if (parsed.tradeCount === tradeCount) {
+          setAiAnalysis(parsed.analysis);
+          setAiAnalysisExpanded(true);
+        } else {
+          // Cache invalid
+          localStorage.removeItem(cacheKey);
+          setAiAnalysis('');
+        }
+      } catch (e) {
+        console.error('Error parsing cached AI analysis', e);
+        localStorage.removeItem(cacheKey);
+        setAiAnalysis('');
+      }
+    } else {
+      setAiAnalysis('');
+    }
+  }, [calendarId, event.id, eventTrades.length, open, isLoadingTrades]); // Depend on trade count to invalidate/reload
 
   // Check if event is pinned and get pinned event data
   const pinnedEventData = useMemo(() => {
@@ -294,6 +333,21 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
       if (response.success) {
         setAiAnalysis(response.message);
         setAiAnalysisExpanded(true);
+
+        // Cache the successful response
+        try {
+          const cleanedName = cleanEventNameForPinning(event.event_name);
+          const cacheKey = `ai_analysis_${calendarId}_${cleanedName}`;
+          const cacheData = {
+            // timestamp: Date.now(), // No longer needed
+            tradeCount: stats.total, // Use stats.total which comes from eventTrades.length
+            analysis: response.message
+          };
+          localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        } catch (e) {
+          console.error('Failed to cache AI analysis', e);
+        }
+
       } else {
         setAiAnalysis('Failed to get analysis. Please try again.');
       }

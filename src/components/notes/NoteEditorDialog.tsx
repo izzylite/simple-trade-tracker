@@ -339,7 +339,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
 
     const timeout = setTimeout(() => {
       saveNote();
-    }, 1000); // 1 second debounce
+    }, 60000); // 1 minute debounce
 
     return () => clearTimeout(timeout);
   }, [title, content, coverImage, tags, isGlobal, open, note]);
