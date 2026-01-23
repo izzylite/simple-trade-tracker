@@ -106,7 +106,7 @@ export const createEditTradeData = (trade: Trade): NewTradeForm => {
     pending_images: [],
     is_temporary: trade.is_temporary,
     economic_events: trade.economic_events || [],
-    uploaded_images: trade.images ? trade.images.filter(img => img).map((img, index) => ({
+    uploaded_images: Array.isArray(trade.images) ? trade.images.filter(img => img).map((img, index) => ({
       ...img,
       // Ensure ID is present - generate one if missing to prevent delete issues
       id: img.id || calendarService.generateImageId(),

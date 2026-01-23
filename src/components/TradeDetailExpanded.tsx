@@ -192,7 +192,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
   // Initialize loading state for all images
   useEffect(() => {
-    if (trade && trade.images && trade.images.length > 0) {
+    if (trade && Array.isArray(trade.images) && trade.images.length > 0) {
       const initialLoadingState: { [key: string]: boolean } = {};
 
       trade.images.forEach(image => {
@@ -797,7 +797,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 <Divider sx={{ my: 1.5 }} />
 
                 {/* Images */}
-                {trade.images && trade.images.length > 0 && (
+                {Array.isArray(trade.images) && trade.images.length > 0 && (
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                       <ImageIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
@@ -967,9 +967,9 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                         }}
                                         onClick={() => {
                                           // Get all non-pending image URLs
-                                          const allImageUrls = trade.images
-                                            ?.filter(img => !isPendingImage(img))
-                                            .map(img => img.url) || [];
+                                          const allImageUrls = (Array.isArray(trade.images) ? trade.images : [])
+                                            .filter(img => !isPendingImage(img))
+                                            .map(img => img.url);
 
                                           // Find the index of the current image
                                           const currentIndex = allImageUrls.findIndex(url => url === image.url);

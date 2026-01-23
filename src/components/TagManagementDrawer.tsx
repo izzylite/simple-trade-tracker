@@ -23,7 +23,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Collapse
 } from '@mui/material';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import {
@@ -33,7 +34,9 @@ import {
   Info as InfoIcon,
   Tag as TagIcon,
   Close as CloseIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import UnifiedDrawer from './common/UnifiedDrawer';
 import TagEditDialog from './TagEditDialog';
@@ -84,6 +87,14 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [localRequiredGroups, setLocalRequiredGroups] = useState<string[]>(requiredTagGroups);
   const [tagDefinitions, setTagDefinitions] = useState<Record<string, string>>({});
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (group: string) => {
+    setCollapsedGroups(prev => ({
+      ...prev,
+      [group]: !prev[group]
+    }));
+  };
 
   // Update local state when props change
   useEffect(() => {
@@ -296,6 +307,10 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
                     color="primary"
                     variant="outlined"
                     sx={{ fontWeight: 600 }}
+                    onDelete={() => {
+                      const updatedGroups = localRequiredGroups.filter(g => g !== group);
+                      handleRequiredTagGroupsChange(updatedGroups);
+                    }}
                   />
                 ))
               ) : (
@@ -381,84 +396,87 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
                                 size="small"
                               />
                             }
-                            label={
-                              <Typography variant="caption" sx={{ fontWeight: 500 }}>
-                                Required
-                              </Typography>
-                            }
+                            label={null}
                           />
                           <Tooltip title="When a tag group is set as required, every new trade must include at least one tag from this group">
-                            <InfoIcon sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.875rem' }} />
+                            <InfoIcon sx={{ ml: -1.5, color: 'text.secondary', fontSize: '0.875rem' }} />
                           </Tooltip>
                         </Box>
                       )}
                     </Box>
-                    <Typography variant="caption" color="text.secondary">
-                      {tags.length} tag{tags.length !== 1 ? 's' : ''}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        {tags.length} tag{tags.length !== 1 ? 's' : ''}
+                      </Typography>
+                      <IconButton size="small" onClick={() => toggleGroup(group)}>
+                        {collapsedGroups[group] ? <ExpandMoreIcon fontSize="small" /> : <ExpandLessIcon fontSize="small" />}
+                      </IconButton>
+                    </Box>
                   </Box>
                   <Divider />
-                  <List disablePadding>
-                    {tags.map((tag) => (
-                      <ListItem
-                        key={tag}
-                        disablePadding
-                        secondaryAction={
-                          !isReadOnly ? (
-                            <Button
-                              color="primary"
-                              sx={{ minWidth: 'auto', p: 0.5 }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setTagToEdit(tag);
-                              }}
-                            >
-                              Edit
-                            </Button>
-                          ) : undefined
-                        }
-                      >
-                        <ListItemButton
-                          onClick={() => setTagToView(tag)}
-                          sx={{
-                            '&:hover': {
-                              bgcolor: alpha(theme.palette.primary.main, 0.05)
-                            }
-                          }}
-                        >
-                          <ListItemText
-                            primary={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Chip
-                                  label={formatTagForDisplay(tag, true)}
-                                  size="small"
-                                  sx={getTagChipStyles(tag, theme)}
-                                />
-                              </Box>
-                            }
-                            secondary={
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                sx={{
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 4,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  mt: 0.5,
-                                  ml: 0.5,
-                                  opacity: tagDefinitions[tag] ? 1 : 0.6
+                  <Collapse in={!collapsedGroups[group]} timeout="auto" unmountOnExit>
+                    <List disablePadding>
+                      {tags.map((tag) => (
+                        <ListItem
+                          key={tag}
+                          disablePadding
+                          secondaryAction={
+                            !isReadOnly ? (
+                              <Button
+                                color="primary"
+                                sx={{ minWidth: 'auto', p: 0.5 }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTagToEdit(tag);
                                 }}
                               >
-                                {tagDefinitions[tag] || (isReadOnly ? 'No definition' : 'No definition — click Edit to add one')}
-                              </Typography>
-                            }
-                          />
-                        </ListItemButton>
-                      </ListItem>
-                    ))}
-                  </List>
+                                Edit
+                              </Button>
+                            ) : undefined
+                          }
+                        >
+                          <ListItemButton
+                            onClick={() => setTagToView(tag)}
+                            sx={{
+                              '&:hover': {
+                                bgcolor: alpha(theme.palette.primary.main, 0.05)
+                              }
+                            }}
+                          >
+                            <ListItemText
+                              primary={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Chip
+                                    label={formatTagForDisplay(tag, true)}
+                                    size="small"
+                                    sx={getTagChipStyles(tag, theme)}
+                                  />
+                                </Box>
+                              }
+                              secondary={
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 4,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    mt: 0.5,
+                                    ml: 0.5,
+                                    opacity: tagDefinitions[tag] ? 1 : 0.6
+                                  }}
+                                >
+                                  {tagDefinitions[tag] || (isReadOnly ? 'No definition' : 'No definition — click Edit to add one')}
+                                </Typography>
+                              }
+                            />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Collapse>
                 </Box>
               ))
             ) : (

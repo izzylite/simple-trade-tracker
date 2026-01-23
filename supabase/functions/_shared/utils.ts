@@ -149,104 +149,70 @@ export async function imageExistsInCalendar(
 /**
  * Check if an image can be safely deleted (considering duplicated and linked calendars)
  */
+/**
+ * Check if an image can be safely deleted
+ * replacing the complex graph traversal with a direct global check
+ * 
+ * @param supabase - The Supabase client
+ * @param imageId - The ID of the image to check
+ * @param currentCalendarId - The calendar ID performing the cleanup
+ * @param ignoreCurrentCalendar - If true, ignores usages in the current calendar (use for calendar usage/deletion)
+ * @param ignoreTradeId - If provided, ignores this specific trade ID (use for trade update/delete to prevent self-matching)
+ */
 export async function canDeleteImage(
   supabase: SupabaseClient,
   imageId: string,
-  currentCalendarId: string
+  currentCalendarId: string,
+  ignoreCurrentCalendar = false,
+  ignoreTradeId?: string
 ): Promise<boolean> {
   try {
-    // Get calendar information
+    // Get user_id from calendar to scope the query
     const { data: calendar, error: calendarError } = await supabase
       .from('calendars')
-      .select('duplicated_calendar, source_calendar_id, linked_to_calendar_id, user_id')
+      .select('user_id')
       .eq('id', currentCalendarId)
       .single()
 
     if (calendarError || !calendar) {
-      console.error('Calendar not found:', calendarError)
-      return false
+      console.error('Calendar not found during image check:', calendarError)
+      return false // Safety first
     }
 
-    const isDuplicatedCalendar = calendar.duplicated_calendar
-    const sourceCalendarId = calendar.source_calendar_id
-    const linkedToCalendarId = calendar.linked_to_calendar_id
+    const userId = calendar.user_id
 
-    // === Check duplicated calendars ===
-    if (isDuplicatedCalendar && sourceCalendarId) {
-      // Deletion from duplicated calendar - check source and other duplicates
-      const existsInSource = await imageExistsInCalendar(supabase, imageId, sourceCalendarId)
-      if (existsInSource) {
-        return false
-      }
+    // Check for ANY usage of this image in the user's trades
+    // We use the @> JSONB operator to check if the images array contains the specific image ID
+    // The images column structure is: [{"id": "...", "url": "..."}]
+    let query = supabase
+      .from('trades')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .contains('images', [{ id: imageId }])
 
-      // Check if image exists in other duplicated calendars
-      const { data: otherDuplicates, error: duplicatesError } = await supabase
-        .from('calendars')
-        .select('id')
-        .eq('source_calendar_id', sourceCalendarId)
-        .eq('duplicated_calendar', true)
-        .neq('id', currentCalendarId)
-
-      if (duplicatesError) {
-        console.error('Error finding duplicated calendars:', duplicatesError)
-        return false
-      }
-
-      for (const duplicate of otherDuplicates || []) {
-        const existsInDuplicate = await imageExistsInCalendar(supabase, imageId, duplicate.id)
-        if (existsInDuplicate) {
-          return false
-        }
-      }
-    } else {
-      // Deletion from original calendar - check all duplicated calendars
-      const { data: duplicatedCalendars, error: duplicatesError } = await supabase
-        .from('calendars')
-        .select('id')
-        .eq('source_calendar_id', currentCalendarId)
-        .eq('duplicated_calendar', true)
-
-      if (duplicatesError) {
-        console.error('Error finding duplicated calendars:', duplicatesError)
-        return false
-      }
-
-      for (const duplicate of duplicatedCalendars || []) {
-        const existsInDuplicate = await imageExistsInCalendar(supabase, imageId, duplicate.id)
-        if (existsInDuplicate) {
-          return false
-        }
-      }
+    // If we're deleting the whole calendar, we don't care if trades inside it use the image
+    // (because they are being deleted too)
+    if (ignoreCurrentCalendar) {
+      query = query.neq('calendar_id', currentCalendarId)
     }
 
-    // === Check linked calendars ===
-    // If this calendar links TO another calendar, check the target
-    if (linkedToCalendarId) {
-      const existsInLinked = await imageExistsInCalendar(supabase, imageId, linkedToCalendarId)
-      if (existsInLinked) {
-        return false
-      }
+    // If we're processing a specific trade update/delete, we must ignore that trade
+    // to avoid race conditions where the DB might still show the old state
+    if (ignoreTradeId) {
+      query = query.neq('id', ignoreTradeId)
     }
 
-    // Check if any other calendar links TO this calendar (reverse lookup)
-    const { data: linkingCalendars, error: linkingError } = await supabase
-      .from('calendars')
-      .select('id')
-      .eq('linked_to_calendar_id', currentCalendarId)
+    const { count, error } = await query
 
-    if (linkingError) {
-      console.error('Error finding linking calendars:', linkingError)
-      return false
+    if (error) {
+      console.error('Error checking image usage:', error)
+      return false // Err on the side of caution
     }
 
-    for (const linking of linkingCalendars || []) {
-      const existsInLinking = await imageExistsInCalendar(supabase, imageId, linking.id)
-      if (existsInLinking) {
-        return false
-      }
-    }
+    // If count is 0, no one else is using it -> Safe to delete
+    // If count > 0, someone uses it -> Keep it
+    return count === 0
 
-    return true
   } catch (error) {
     console.error('Error in canDeleteImage:', error)
     return false // Err on the side of caution

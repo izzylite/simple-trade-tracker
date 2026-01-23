@@ -62,7 +62,17 @@
       "mcp__supabase__list_edge_functions",
       "mcp__supabase__execute_sql",
       "mcp__supabase__list_tables",
-      "mcp__supabase__get_edge_function"
+      "mcp__supabase__get_edge_function",
+      "Bash(node -e:*)",
+      "Bash(node scripts/analyze-images.js:*)",
+      "Bash(node scripts/migrate-firebase-to-supabase.js:*)",
+      "Bash(set \"SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3dWJ6YXVlbGlsemlhcW5zZmFjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjQ0MjQwMywiZXhwIjoyMDY4MDE4NDAzfQ.ATcbDJAbz_OZ8DS6uZXfk8V-3GGn5xlKZVLps51wmuU\")",
+      "Bash(cmd /c \"set SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3dWJ6YXVlbGlsemlhcW5zZmFjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjQ0MjQwMywiZXhwIjoyMDY4MDE4NDAzfQ.ATcbDJAbz_OZ8DS6uZXfk8V-3GGn5xlKZVLps51wmuU && node scripts/migrate-firebase-to-supabase.js --limit=2\")",
+      "Bash(timeout:*)",
+      "Bash(ping:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

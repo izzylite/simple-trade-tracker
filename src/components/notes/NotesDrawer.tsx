@@ -14,7 +14,7 @@ import {
   alpha,
   Stack,
   IconButton,
-  Skeleton,
+
   CircularProgress,
   MenuItem,
   Select,
@@ -33,6 +33,7 @@ import {
 import UnifiedDrawer from '../common/UnifiedDrawer';
 import RoundedTabs from '../common/RoundedTabs';
 import NoteListItem from './NoteListItem';
+import Shimmer from '../Shimmer';
 import NoteEditorDialog from './NoteEditorDialog';
 import NoteViewerDialog from './NoteViewerDialog';
 import { Note } from '../../types/note';
@@ -69,26 +70,33 @@ const NoteListItemShimmer: React.FC = () => {
         py: 1.5,
         px: 2,
         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+        bgcolor: alpha(theme.palette.background.paper, 0.6),
       }}
     >
       <Stack direction="row" spacing={1.5} alignItems="center">
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {/* Title */}
-          <Skeleton variant="text" width="60%" height={20} sx={{ mb: 0.5 }} />
+          <Box sx={{ mb: 0.5 }}>
+            <Shimmer height={20} width="60%" borderRadius={4} variant="wave" intensity="medium" />
+          </Box>
 
           {/* Content preview */}
-          <Skeleton variant="text" width="100%" height={16} sx={{ mb: 0.3 }} />
-          <Skeleton variant="text" width="80%" height={16} sx={{ mb: 0.5 }} />
+          <Box sx={{ mb: 0.5 }}>
+            <Shimmer height={16} width="100%" borderRadius={4} variant="wave" intensity="medium" sx={{ mb: 0.3 }} />
+            <Shimmer height={16} width="80%" borderRadius={4} variant="wave" intensity="medium" />
+          </Box>
 
           {/* Date */}
-          <Skeleton variant="text" width="30%" height={14} />
+          <Shimmer height={14} width="30%" borderRadius={4} variant="wave" intensity="medium" />
         </Box>
 
-        <Skeleton
-          variant="rectangular"
-          width={60}
+        <Shimmer
           height={60}
-          sx={{ borderRadius: 1.5, flexShrink: 0 }}
+          width={60}
+          borderRadius={1}
+          variant="wave"
+          intensity="medium"
+          sx={{ flexShrink: 0 }}
         />
       </Stack>
     </Box>

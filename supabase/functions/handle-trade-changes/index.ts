@@ -44,7 +44,8 @@ import type { Trade, TradeWebhookPayload, YearStats, MonthlyStats } from '../_sh
     // (check if they're used in duplicated calendars)
     const finalImagesToDelete: string[] = [];
     for (const imageId of imagesToDelete) {
-      const canDelete = await canDeleteImage(supabase, imageId, calendarId);
+      // 4th arg: ignoreTradeId - ensure we don't count the trade itself (critical for race conditions)
+      const canDelete = await canDeleteImage(supabase, imageId, calendarId, false, oldTrade?.id);
       if (canDelete) {
         finalImagesToDelete.push(imageId);
         log(`Image ${imageId} can be safely deleted`);
@@ -99,7 +100,7 @@ async function calculateYearStats(
 
     // Group trades by year
     const tradesByYear = new Map<number, Trade[]>();
-    trades.forEach((trade) => {
+    trades.forEach((trade: Trade) => {
       const tradeDate = new Date(trade.trade_date);
       const year = tradeDate.getFullYear();
 
@@ -416,7 +417,7 @@ async function syncToLinkedCalendar(
         .lt('trade_date', trade.trade_date);
 
       if (targetTrades) {
-        cumulativePnL = targetTrades.reduce((sum, t) => sum + (t.amount || 0), 0);
+        cumulativePnL = targetTrades.reduce((sum: any, t: { amount: any; }) => sum + (t.amount || 0), 0);
       }
     }
 

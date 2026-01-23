@@ -460,7 +460,7 @@ const TradeList: React.FC<TradeListProps> = ({
                         )}
                       </Box>
                       <Box sx={{ display: 'flex', flexDirection: 'row', gap: { xs: 0.75, sm: 1, md: 1.5 }, alignItems: 'center', mt: { xs: 0.25, sm: 0.5 }, flexWrap: 'wrap' }}>
-                        {trade.images && trade.images.length > 0 && (
+                        {Array.isArray(trade.images) && trade.images.length > 0 && (
                           <Tooltip title={`${trade.images.length} image${trade.images.length > 1 ? 's' : ''}`}>
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                               <ImageIcon

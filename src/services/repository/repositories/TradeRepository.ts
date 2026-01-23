@@ -375,11 +375,19 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
           .map(term => term.trim())
           .filter(term => term.length > 0);
 
-        if (searchTerms.length > 0) {
+        // Check if search is a full UUID (for exact ID match)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const isFullUuid = searchTerms.length === 1 && uuidRegex.test(searchTerms[0]);
+
+        if (isFullUuid) {
+          // Exact UUID match
+          query = query.eq('id', searchTerms[0]);
+        } else if (searchTerms.length > 0) {
           // For each search term, apply AND logic (all terms must match)
           searchTerms.forEach(term => {
             // Use OR across all searchable fields
             // economic_events_text is a computed column that contains all event names
+            // Note: id is UUID type and can't be searched with ilike directly
             query = query.or(
               `name.ilike.%${term}%,` +
               `notes.ilike.%${term}%,` +

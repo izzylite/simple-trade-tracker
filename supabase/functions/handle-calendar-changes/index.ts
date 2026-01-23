@@ -55,7 +55,7 @@ import type { Calendar, Trade, CalendarWebhookPayload } from '../_shared/types.t
     const supabase = createServiceClient();
     const imageIdsToDelete = new Set<string>();
     const deleteChecks = await Promise.all(Array.from(imageIdsToCheck).map(async (imageId) => {
-      const canDelete = await canDeleteImage(supabase, imageId, calendarId);
+      const canDelete = await canDeleteImage(supabase, imageId, calendarId, true);
       return {
         imageId,
         canDelete
