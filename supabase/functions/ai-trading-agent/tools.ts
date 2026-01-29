@@ -415,25 +415,25 @@ Returns both user-created and AI-created notes. User ID and Calendar ID are auto
 export const analyzeImageTool: GeminiFunctionDeclaration = {
   name: "analyze_image",
   description:
-    "Analyze a trade chart image to extract insights about entries, exits, patterns, and price action. Use this when reviewing trades that have attached images. Pass the image URL from trade.images[].url field.",
+    "Analyze an image to extract insights. For trade charts, can analyze entries, exits, patterns, and price action. For other images (screenshots, diagrams, reference material), use 'general' focus to describe the content.",
   parameters: {
     type: "object",
     properties: {
       image_url: {
         type: "string",
         description:
-          "The URL of the trade image to analyze (from trade.images[].url)",
+          "The URL of the image to analyze",
       },
       analysis_focus: {
         type: "string",
         description:
-          "What to focus the analysis on: entry quality, exit timing, pattern identification, support/resistance, or general overview",
-        enum: ["entry", "exit", "patterns", "levels", "overview"],
+          "What to focus the analysis on: 'general' for non-chart images (screenshots, diagrams, notes), or chart-specific: entry, exit, patterns, levels, overview",
+        enum: ["general", "entry", "exit", "patterns", "levels", "overview"],
       },
       trade_context: {
         type: "string",
         description:
-          'Optional context about the trade (e.g., "Long EUR/USD, won 2R") to help interpret the chart',
+          'Optional context to help interpret the image (e.g., "Long EUR/USD, won 2R" for charts, or "Risk management rules" for note images)',
       },
     },
     required: ["image_url"],
@@ -1601,6 +1601,7 @@ export async function searchNotes(
     );
 
     // Build the query - include both calendar-specific notes AND global notes (calendar_id = null)
+    // NOTE: We use a single .or() call for calendar filter to avoid conflicts with search filtering
     let query = supabase
       .from("notes")
       .select(
@@ -1622,22 +1623,54 @@ export async function searchNotes(
       }
     }
 
-    // Apply search filter if provided
-    if (searchQuery && searchQuery.trim()) {
-      query = query.or(
-        `title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`,
-      );
-    }
+    // NOTE: Search filtering is done in-memory after fetching to avoid
+    // PostgREST issues with multiple .or() calls that can conflict
 
     // Order by pinned first, then by updated date
     query = query.order("is_pinned", { ascending: false })
       .order("updated_at", { ascending: false });
 
-    const { data: notes, error } = await query;
+    const { data: rawNotes, error } = await query;
 
     if (error) {
       log(`Error searching notes: ${error.message}`, "error");
       return `Failed to search notes: ${error.message}`;
+    }
+
+    // Apply search query filter in-memory (to avoid PostgREST multiple .or() issues)
+    let notes = rawNotes || [];
+    if (searchQuery && searchQuery.trim() && notes.length > 0) {
+      const searchLower = searchQuery.toLowerCase().trim();
+      notes = notes.filter((note) => {
+        // Search in title
+        if (note.title?.toLowerCase().includes(searchLower)) {
+          return true;
+        }
+        // Search in content - handle both plain text and Draft.js JSON
+        if (note.content) {
+          const contentLower = note.content.toLowerCase();
+          if (contentLower.includes(searchLower)) {
+            return true;
+          }
+          // Also try to extract plain text from Draft.js JSON
+          try {
+            const parsed = JSON.parse(note.content);
+            if (parsed.blocks) {
+              const plainText = parsed.blocks
+                .map((b: { text?: string }) => b.text || "")
+                .join(" ")
+                .toLowerCase();
+              if (plainText.includes(searchLower)) {
+                return true;
+              }
+            }
+          } catch {
+            // Content is not JSON, already searched as plain text
+          }
+        }
+        return false;
+      });
+      log(`After search filter: ${notes.length} notes match "${searchQuery}"`, "info");
     }
 
     if (!notes || notes.length === 0) {
@@ -1659,10 +1692,41 @@ export async function searchNotes(
       // Add note-ref tag on its own line for card display
       result += `<note-ref id="${note.id}"/>`;
 
+      // Include note title and content so AI can read and use the information
+      result += `\n**${note.title || "Untitled Note"}**`;
+
+      // Extract plain text content from Draft.js JSON or use as-is
+      if (note.content) {
+        let plainContent = "";
+        try {
+          const parsed = JSON.parse(note.content);
+          if (parsed.blocks && Array.isArray(parsed.blocks)) {
+            // Extract text from Draft.js blocks
+            plainContent = parsed.blocks
+              .map((block: { text?: string }) => block.text || "")
+              .join("\n")
+              .trim();
+          }
+        } catch {
+          // Content is plain text, not JSON
+          plainContent = note.content.trim();
+        }
+
+        if (plainContent) {
+          result += `\n${plainContent}`;
+        }
+      }
+
       // Extract and include embedded images from content
       const contentImages = extractImagesFromContent(note.content);
       if (contentImages.length > 0) {
         result += `\n[Embedded images: ${contentImages.join(", ")}]`;
+        result += `\n[Tip: Use analyze_image tool with analysis_focus="general" for note images, or "overview"/"patterns"/"levels" if it's a chart]`;
+      }
+
+      // Show tags if present
+      if (note.tags && note.tags.length > 0) {
+        result += `\n[Tags: ${note.tags.join(", ")}]`;
       }
 
       result += "\n\n";
@@ -1839,20 +1903,27 @@ export function analyzeImage(
         "Focus on support/resistance levels: Identify key horizontal levels, trend lines, and areas of interest. Where are the key decision points?",
       overview:
         "Provide a general analysis of this trade chart including: entry/exit quality, patterns, key levels, and any notable observations.",
+      general:
+        "Describe this image in detail. What do you see? If it's a chart, describe the price action. If it's a screenshot, describe the content. If it's a diagram or reference material, explain what it shows.",
     };
 
     const focusInstruction = focusPrompts[analysisFocus] ||
       focusPrompts.overview;
     const contextNote = tradeContext
-      ? ` Trade context: "${tradeContext}".`
+      ? ` Context: "${tradeContext}".`
       : "";
 
+    // Use different prompts for general vs chart-focused analysis
+    const isGeneralFocus = analysisFocus === "general";
+    const taskInstruction = isGeneralFocus
+      ? "YOUR TASK: Describe what you SEE in this image and respond with your findings (3-5 bullet points). Be specific about visual elements, text, diagrams, or any relevant details."
+      : "YOUR TASK: Analyze what you SEE in this image and respond with your findings (3-5 bullet points). Describe specific visual elements you observe: candlesticks, indicators, levels, patterns, entry/exit markers, platform UI, annotations, etc.";
+
     // Return marker with image URL - conversation builder will inject the actual image
-    // The prompt tells the model to generate its own analysis (not return instructions)
     return `[IMAGE_ANALYSIS:${imageUrl}]
-IMAGE LOADED SUCCESSFULLY. You are now viewing the chart image above.
+IMAGE LOADED SUCCESSFULLY. You are now viewing the image above.
 ${focusInstruction}${contextNote}
-YOUR TASK: Analyze what you SEE in this image and respond with your findings (3-5 bullet points). Describe specific visual elements you observe: candlesticks, indicators, levels, patterns, entry/exit markers, platform UI, annotations, etc.`;
+${taskInstruction}`;
   } catch (error) {
     log(`Image preparation error: ${error}`, "error");
     return `Image analysis error: ${
