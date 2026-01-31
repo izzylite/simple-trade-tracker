@@ -398,93 +398,106 @@ class EconomicEventWatcher {
 
   /**
    * Trigger an update for a group of events with the same release time
+   * Uses fetch-mql5-event batch mode for efficient fetching
    */
   private async triggerEventGroupUpdate(events: EconomicEvent[], calendarId: string) {
     if (!this.callbacks || events.length === 0) return;
 
     try {
-      logger.log(`🔄 Triggering update for ${events.length} event(s) releasing at the same time`);
+      logger.log(`🔄 Triggering batch update for ${events.length} event(s) releasing at the same time`);
 
-      // Get unique currencies from the event group
-      const currencySet = new Set(events.map(e => e.currency));
-      const currencies = Array.from(currencySet) as Currency[];
-      const targetDate = events[0].event_date; // All events should have the same date
+      // Build the batch request payload
+      const batchEvents = events.map((event) => {
+        const country = event.country || this.currencyToCountry(event.currency);
+        return {
+          event_name: event.event_name,
+          country: country || 'Unknown',
+          originalEvent: event, // Keep reference for later
+        };
+      }).filter((e) => e.country !== 'Unknown');
 
-      // Transform events for the edge function - it expects 'id' to be the external_id for matching
-      const transformedEvents = events.map(event => ({
-        external_id: event.external_id, // Use external_id for matching with scraped events
-        event: event.event_name,
-        currency: event.currency,
-        actual: event.actual_value,
-        forecast: event.forecast_value,
-        previous: event.previous_value,
-        time_utc: event.time_utc
-      }));
-
-      // Call Supabase edge function to refresh economic calendar data for all events
-      const { data, error: callError } = await supabase.functions.invoke('refresh-economic-calendar', {
-        body: {
-          targetDate,
-          currencies,
-          events: transformedEvents // Pass transformed events with external_id as id
-        }
-      });
-
-      if (callError) {
-        logger.error('❌ Error calling refresh-economic-calendar function:', callError);
-        return;
+      // Warn about events without country mapping
+      const unmappedCount = events.length - batchEvents.length;
+      if (unmappedCount > 0) {
+        logger.warn(`⚠️ Could not determine country for ${unmappedCount} event(s)`);
       }
 
-      // Extract updated events from the edge function result
-      // Note: successResponse wraps data under .data, so we need to unwrap it
-      const responseData = data as any;
-      const actualData = responseData?.data || responseData; // Handle both wrapped and unwrapped responses
-      const targetEvents: EconomicEvent[] = actualData?.targetEvents || [];
-      const foundEvents: EconomicEvent[] = actualData?.foundEvents || [];
-
-      logger.log(`📊 Edge function returned ${targetEvents.length} total events, ${foundEvents.length} specifically requested events`);
-
-      // Process each event in the group
       const updatedEvents: EconomicEvent[] = [];
-      for (const originalEvent of events) {
-        // First try to find in foundEvents (more specific), then fall back to targetEvents
-        // Match by external_id since that's the consistent identifier from MyFXBook parsing
-        let updatedEvent = foundEvents.find(e =>   e.external_id === originalEvent.external_id);
-       
 
-        const eventToNotify: EconomicEvent = updatedEvent ? {
-          ...originalEvent,
-          actual_value: updatedEvent.actual_value || originalEvent.actual_value,
-          forecast_value: updatedEvent.forecast_value || originalEvent.forecast_value,
-          previous_value: updatedEvent.previous_value || originalEvent.previous_value
-        } : originalEvent;
+      if (batchEvents.length > 0) {
+        // Call fetch-mql5-event with batch payload
+        const { data, error: callError } = await supabase.functions.invoke('fetch-mql5-event', {
+          body: {
+            events: batchEvents.map(({ event_name, country }) => ({ event_name, country }))
+          }
+        });
 
-        updatedEvents.push(eventToNotify);
-
-        // Log individual event updates
-        if (updatedEvent) {
-          logger.log(`📊 Event "${originalEvent.event_name}" updated successfully:`);
-          logger.log(`   Actual: ${originalEvent.actual_value} → ${updatedEvent.actual_value}`);
-          logger.log(`   Forecast: ${originalEvent.forecast_value} → ${updatedEvent.forecast_value}`);
-          logger.log(`   Previous: ${originalEvent.previous_value} → ${updatedEvent.previous_value}`);
+        if (callError) {
+          logger.error('❌ Error fetching batch events:', callError);
+          // Fall back to original events
+          updatedEvents.push(...events);
         } else {
-          logger.log(`⚠️ Event "${originalEvent.event_name}" not found in updated results, using original data`);
+          // Process batch results
+          const responseData = data as any;
+          const results = responseData?.results || [];
+
+          logger.log(`📊 Batch fetch complete: ${responseData?.succeeded || 0} succeeded, ${responseData?.failed || 0} failed`);
+
+          // Map results back to original events
+          for (const batchEvent of batchEvents) {
+            const result = results.find(
+              (r: any) => r.event_name === batchEvent.event_name && r.country === batchEvent.country
+            );
+
+            if (result?.success && result.data) {
+              const fetchedData = result.data;
+
+              // Update the event with fresh data
+              const eventToNotify: EconomicEvent = {
+                ...batchEvent.originalEvent,
+                actual_value: fetchedData.actual_value || batchEvent.originalEvent.actual_value,
+                forecast_value: fetchedData.forecast_value || batchEvent.originalEvent.forecast_value,
+                previous_value: fetchedData.previous_value || batchEvent.originalEvent.previous_value,
+                impact: fetchedData.impact || batchEvent.originalEvent.impact,
+              };
+
+              updatedEvents.push(eventToNotify);
+
+              // Log the update
+              const cached = fetchedData.cached ? ' (cached)' : ' (fresh from MQL5)';
+              logger.log(`📊 Event "${batchEvent.event_name}"${cached}:`);
+              logger.log(`   Actual: ${batchEvent.originalEvent.actual_value} → ${fetchedData.actual_value}`);
+            } else {
+              // Use original event if fetch failed
+              logger.warn(`⚠️ Failed to fetch "${batchEvent.event_name}": ${result?.error || 'Unknown error'}`);
+              updatedEvents.push(batchEvent.originalEvent);
+            }
+          }
         }
       }
+
+      // Add unmapped events as-is
+      const unmappedEvents = events.filter(
+        (e) => !e.country && !this.currencyToCountry(e.currency)
+      );
+      updatedEvents.push(...unmappedEvents);
+
       // Remove the events from the queue
       const queue = this.eventQueues.get(calendarId);
       if (queue) {
         const eventIds = events.map((e) => e.id);
-        queue.events = queue.events.filter((e) => !eventIds.includes(e.id)) || []; 
+        queue.events = queue.events.filter((e) => !eventIds.includes(e.id)) || [];
       }
-      this.callbacks.onEventsUpdated(updatedEvents, targetEvents, calendarId);
+
+      // Notify with updated events
+      this.callbacks.onEventsUpdated(updatedEvents, updatedEvents, calendarId);
 
       // Remove this event group from watching
       this.watchedEventGroups.delete(calendarId);
 
       // Continue watching if still active
       if (this.isActive) {
-        // Wait a bit for the cloud function to complete, then start watching next event group
+        // Wait a bit before watching next event group
         setTimeout(() => {
           this.continueWatching(calendarId);
         }, 5000);
@@ -494,6 +507,38 @@ class EconomicEventWatcher {
       error('❌ Error updating event group:', err);
       this.callbacks.onError(err as Error, calendarId);
     }
+  }
+
+  /**
+   * Map currency code to country name for MQL5 lookups
+   */
+  private currencyToCountry(currency: string): string | null {
+    const currencyCountryMap: Record<string, string> = {
+      'USD': 'United States',
+      'EUR': 'Euro Area',
+      'GBP': 'United Kingdom',
+      'JPY': 'Japan',
+      'CHF': 'Switzerland',
+      'CAD': 'Canada',
+      'AUD': 'Australia',
+      'NZD': 'New Zealand',
+      'CNY': 'China',
+      'CNH': 'China',
+      'HKD': 'Hong Kong',
+      'SGD': 'Singapore',
+      'INR': 'India',
+      'KRW': 'South Korea',
+      'MXN': 'Mexico',
+      'BRL': 'Brazil',
+      'ZAR': 'South Africa',
+      'TRY': 'Turkey',
+      'RUB': 'Russia',
+      'SEK': 'Sweden',
+      'NOK': 'Norway',
+      'DKK': 'Denmark',
+      'PLN': 'Poland',
+    };
+    return currencyCountryMap[currency] || null;
   }
 
 

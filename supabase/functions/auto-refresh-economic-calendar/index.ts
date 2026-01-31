@@ -2,10 +2,90 @@
  * Auto Refresh Economic Calendar Edge Function
  * Replaces Firebase autoRefreshEconomicCalendarV2 scheduled function
  *
- * Runs every 30 minutes to fetch economic calendar data from MyFXBook
- * and update the database with the latest events
+ * Runs 4x daily (6 AM, 10 AM, 2 PM, 6 PM UTC) to fetch economic calendar data
+ * from MyFXBook/MQL5 and update the database with the latest events
+ *
+ * SMART SKIP LOGIC (saves ScraperAPI credits):
+ * - Skips weekends (no events on Sat/Sun)
+ * - Skips if no events today and last fetch was < 12 hours ago
  */
 import { errorResponse, successResponse, handleCors, log } from '../_shared/supabase.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+function createServiceClient() {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) {
+    throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  }
+  return createClient(url, key);
+}
+
+// 12 hours in milliseconds
+const SKIP_THRESHOLD_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * Check if we should skip this refresh to save ScraperAPI credits
+ * Returns { skip: boolean, reason: string }
+ */
+async function shouldSkipRefresh(): Promise<{ skip: boolean; reason: string }> {
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay(); // 0 = Sunday, 6 = Saturday
+
+  // Skip weekends - no economic events
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    return { skip: true, reason: `Weekend (${dayOfWeek === 0 ? 'Sunday' : 'Saturday'}) - no events` };
+  }
+
+  // Check if there are events today
+  const supabase = createServiceClient();
+  const todayStart = new Date(now);
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const todayEnd = new Date(now);
+  todayEnd.setUTCHours(23, 59, 59, 999);
+
+  const { data: todayEvents, error: eventsError } = await supabase
+    .from('economic_events')
+    .select('id, last_updated')
+    .gte('event_time', todayStart.toISOString())
+    .lte('event_time', todayEnd.toISOString())
+    .limit(1);
+
+  if (eventsError) {
+    log('Error checking today events, proceeding with refresh', 'warn', eventsError);
+    return { skip: false, reason: 'Error checking events, proceeding anyway' };
+  }
+
+  // If there are events today, always refresh to get latest actual values
+  if (todayEvents && todayEvents.length > 0) {
+    return { skip: false, reason: 'Events exist today - refreshing for updates' };
+  }
+
+  // No events today - check when we last fetched
+  const { data: lastFetch, error: fetchError } = await supabase
+    .from('economic_events')
+    .select('last_updated')
+    .order('last_updated', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (fetchError || !lastFetch?.last_updated) {
+    return { skip: false, reason: 'No previous fetch found - need initial data' };
+  }
+
+  const lastFetchTime = new Date(lastFetch.last_updated).getTime();
+  const timeSinceLastFetch = now.getTime() - lastFetchTime;
+
+  if (timeSinceLastFetch < SKIP_THRESHOLD_MS) {
+    const hoursAgo = Math.round(timeSinceLastFetch / (60 * 60 * 1000));
+    return {
+      skip: true,
+      reason: `No events today and last fetch was ${hoursAgo}h ago (< 12h threshold)`
+    };
+  }
+
+  return { skip: false, reason: 'No events today but last fetch was > 12h ago' };
+}
 
 /**
  * Auto refresh economic calendar data
@@ -78,11 +158,28 @@ import { errorResponse, successResponse, handleCors, log } from '../_shared/supa
   if (corsResponse) return corsResponse;
   try {
     log('Auto refresh economic calendar scheduled function triggered');
+
+    // Check if we should skip this refresh to save ScraperAPI credits
+    const skipCheck = await shouldSkipRefresh();
+    if (skipCheck.skip) {
+      log(`Skipping refresh: ${skipCheck.reason}`);
+      return successResponse({
+        success: true,
+        skipped: true,
+        reason: skipCheck.reason,
+        message: `Refresh skipped to save ScraperAPI credits`,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    log(`Proceeding with refresh: ${skipCheck.reason}`);
+
     // This function can be called by Supabase Cron or manually
     // No authentication required for scheduled calls
     const result = await autoRefreshEconomicCalendar();
     const response: Record<string, unknown> = {
       success: true,
+      skipped: false,
       message: `Auto refresh completed: ${result.eventsStored} events updated`,
       eventsProcessed: result.eventsProcessed,
       eventsStored: result.eventsStored,
