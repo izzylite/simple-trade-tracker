@@ -1,0 +1,3482 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - link "MQL5 - Language of trade strategies built-in the MetaTrader 5 client terminal" [ref=e4] [cursor=pointer]:
+        - /url: https://www.mql5.com
+      - generic [ref=e5]:
+        - link "Calendar" [ref=e7] [cursor=pointer]:
+          - /url: "#"
+          - generic [ref=e8]: Calendar
+        - generic [ref=e10]:
+          - 'textbox "Type / to search: @user, $symbol, ..." [ref=e11]':
+            - /placeholder: Search
+          - button [ref=e12] [cursor=pointer]
+        - checkbox [ref=e13]
+      - navigation [ref=e16]:
+        - list [ref=e17]:
+          - listitem [ref=e18]:
+            - link "Log in" [ref=e19] [cursor=pointer]:
+              - /url: https://www.mql5.com/en/auth_login
+          - listitem [ref=e20]:
+            - link "Create an account" [ref=e21] [cursor=pointer]:
+              - /url: https://www.mql5.com/en/auth_register
+    - main [ref=e25]:
+      - iframe [ref=e27]:
+        - link "Best articles and CodeBase updates in MQL5.community channels Follow us to ensure you never miss out on important updates" [ref=f1e2] [cursor=pointer]:
+          - /url: https://www.mql5.com/ff/go?link=https://www.mql5.com/en/forum/455636%3Futm_source=www.mql5.com%26utm_medium=display%26utm_content=follow.channel%26utm_campaign=AAA380.mql5.socials&a=dgazvhktsxqakdvarucjbvmvzenwlyje&s=98a038fe082e458df8c4a1d8e116e3a6646fd5517f06e48b2356b7ee005817d6&uid=&ref=https://www.mql5.com/en/economic-calendar&id=bfogggabsofabcpxuzmgaibarmaxasdrj&fz_uniq=5076879518654367842
+          - generic [ref=f1e4]:
+            - generic [ref=f1e5]: Best articles and CodeBase updates in MQL5.community channels
+            - generic [ref=f1e6]: Follow us to ensure you never miss out on important updates
+      - article [ref=e28]:
+        - generic [ref=e29]:
+          - generic [ref=e30]:
+            - generic [ref=e31]:
+              - generic [ref=e32]: Economic Calendar
+              - textbox [ref=e35]: 26 Jan - 1 Feb, 2026
+              - list [ref=e36]:
+                - listitem [ref=e37]:
+                  - radio "Current week" [checked] [ref=e38]
+                  - generic [ref=e39] [cursor=pointer]: Current week
+                - listitem [ref=e41]:
+                  - radio "Previous week" [ref=e42]
+                  - generic [ref=e43] [cursor=pointer]: Previous week
+                - listitem [ref=e44]:
+                  - radio "Next week" [ref=e45]
+                  - generic [ref=e46] [cursor=pointer]: Next week
+                - listitem [ref=e47]:
+                  - radio "Current month" [ref=e48]
+                  - generic [ref=e49] [cursor=pointer]: Current month
+                - listitem [ref=e50]:
+                  - radio "Previous month" [ref=e51]
+                  - generic [ref=e52] [cursor=pointer]: Previous month
+                - listitem [ref=e53]:
+                  - radio "Next month" [ref=e54]
+                  - generic [ref=e55] [cursor=pointer]: Next month
+              - heading "Event importance" [level=4] [ref=e56]
+              - list [ref=e57]:
+                - listitem [ref=e58]:
+                  - checkbox "Holidays" [checked] [ref=e59]
+                  - generic [ref=e60] [cursor=pointer]: Holidays
+                - listitem [ref=e62]:
+                  - checkbox "Low" [checked] [ref=e63]
+                  - generic [ref=e64] [cursor=pointer]: Low
+                - listitem [ref=e66]:
+                  - checkbox "Medium" [checked] [ref=e67]
+                  - generic [ref=e68] [cursor=pointer]: Medium
+                - listitem [ref=e70]:
+                  - checkbox "High" [checked] [ref=e71]
+                  - generic [ref=e72] [cursor=pointer]: High
+              - heading "Currencies" [level=4] [ref=e74]
+              - list [ref=e75]:
+                - listitem [ref=e76]:
+                  - checkbox "AUD - Australian Dollar" [checked] [ref=e77]
+                  - generic [ref=e78] [cursor=pointer]: AUD - Australian Dollar
+                - listitem [ref=e79]:
+                  - checkbox "BRL - Brazilian real" [checked] [ref=e80]
+                  - generic [ref=e81] [cursor=pointer]: BRL - Brazilian real
+                - listitem [ref=e82]:
+                  - checkbox "CAD - Canadian dollar" [checked] [ref=e83]
+                  - generic [ref=e84] [cursor=pointer]: CAD - Canadian dollar
+                - listitem [ref=e85]:
+                  - checkbox "CHF - Swiss frank" [checked] [ref=e86]
+                  - generic [ref=e87] [cursor=pointer]: CHF - Swiss frank
+                - listitem [ref=e88]:
+                  - checkbox "CNY - Chinese yuan" [checked] [ref=e89]
+                  - generic [ref=e90] [cursor=pointer]: CNY - Chinese yuan
+                - listitem [ref=e91]:
+                  - checkbox "EUR - Euro" [checked] [ref=e92]
+                  - generic [ref=e93] [cursor=pointer]: EUR - Euro
+                - listitem [ref=e94]:
+                  - checkbox "GBP - Pound sterling" [checked] [ref=e95]
+                  - generic [ref=e96] [cursor=pointer]: GBP - Pound sterling
+                - listitem [ref=e97]:
+                  - checkbox "HKD - Hong Kong dollar" [checked] [ref=e98]
+                  - generic [ref=e99] [cursor=pointer]: HKD - Hong Kong dollar
+                - listitem [ref=e100]:
+                  - checkbox "INR - Indian rupee" [checked] [ref=e101]
+                  - generic [ref=e102] [cursor=pointer]: INR - Indian rupee
+                - listitem [ref=e103]:
+                  - checkbox "JPY - Japanese yen" [checked] [ref=e104]
+                  - generic [ref=e105] [cursor=pointer]: JPY - Japanese yen
+                - listitem [ref=e106]:
+                  - checkbox "KRW - South Korean won" [checked] [ref=e107]
+                  - generic [ref=e108] [cursor=pointer]: KRW - South Korean won
+                - listitem [ref=e109]:
+                  - checkbox "MXN - Mexican peso" [checked] [ref=e110]
+                  - generic [ref=e111] [cursor=pointer]: MXN - Mexican peso
+                - listitem [ref=e112]:
+                  - checkbox "NOK - Norwegian Krone" [checked] [ref=e113]
+                  - generic [ref=e114] [cursor=pointer]: NOK - Norwegian Krone
+                - listitem [ref=e115]:
+                  - checkbox "NZD - New Zealand dollar" [checked] [ref=e116]
+                  - generic [ref=e117] [cursor=pointer]: NZD - New Zealand dollar
+                - listitem [ref=e118]:
+                  - checkbox "SEK - Swedish krona" [checked] [ref=e119]
+                  - generic [ref=e120] [cursor=pointer]: SEK - Swedish krona
+                - listitem [ref=e121]:
+                  - checkbox "SGD - Singapore dollar" [checked] [ref=e122]
+                  - generic [ref=e123] [cursor=pointer]: SGD - Singapore dollar
+                - listitem [ref=e124]:
+                  - checkbox "USD - US dollar" [checked] [ref=e125]
+                  - generic [ref=e126] [cursor=pointer]: USD - US dollar
+                - listitem [ref=e127]:
+                  - checkbox "ZAR - South African rand" [checked] [ref=e128]
+                  - generic [ref=e129] [cursor=pointer]: ZAR - South African rand
+                - listitem [ref=e130]:
+                  - checkbox "Select all" [checked] [ref=e131]
+                  - generic [ref=e132] [cursor=pointer]: Select all
+            - generic [ref=e133]:
+              - generic [ref=e134]: Countries
+              - list [ref=e136]:
+                - listitem [ref=e137]:
+                  - link "Australia" [ref=e138] [cursor=pointer]:
+                    - /url: /en/economic-calendar/australia
+                    - text: Australia
+                - listitem [ref=e140]:
+                  - link "Brazil" [ref=e141] [cursor=pointer]:
+                    - /url: /en/economic-calendar/brazil
+                    - text: Brazil
+                - listitem [ref=e143]:
+                  - link "Canada" [ref=e144] [cursor=pointer]:
+                    - /url: /en/economic-calendar/canada
+                    - text: Canada
+                - listitem [ref=e146]:
+                  - link "China" [ref=e147] [cursor=pointer]:
+                    - /url: /en/economic-calendar/china
+                    - text: China
+                - listitem [ref=e149]:
+                  - link "European Union" [ref=e150] [cursor=pointer]:
+                    - /url: /en/economic-calendar/european-union
+                    - text: European Union
+                - listitem [ref=e152]:
+                  - link "France" [ref=e153] [cursor=pointer]:
+                    - /url: /en/economic-calendar/france
+                    - text: France
+                - listitem [ref=e155]:
+                  - link "Germany" [ref=e156] [cursor=pointer]:
+                    - /url: /en/economic-calendar/germany
+                    - text: Germany
+                - listitem [ref=e158]:
+                  - link "Hong Kong" [ref=e159] [cursor=pointer]:
+                    - /url: /en/economic-calendar/hong-kong
+                    - text: Hong Kong
+                - listitem [ref=e161]:
+                  - link "India" [ref=e162] [cursor=pointer]:
+                    - /url: /en/economic-calendar/india
+                    - text: India
+                - listitem [ref=e164]:
+                  - link "Italy" [ref=e165] [cursor=pointer]:
+                    - /url: /en/economic-calendar/italy
+                    - text: Italy
+                - listitem [ref=e167]:
+                  - link "Japan" [ref=e168] [cursor=pointer]:
+                    - /url: /en/economic-calendar/japan
+                    - text: Japan
+                - listitem [ref=e170]:
+                  - link "Mexico" [ref=e171] [cursor=pointer]:
+                    - /url: /en/economic-calendar/mexico
+                    - text: Mexico
+                - listitem [ref=e173]:
+                  - link "New Zealand" [ref=e174] [cursor=pointer]:
+                    - /url: /en/economic-calendar/new-zealand
+                    - text: New Zealand
+                - listitem [ref=e176]:
+                  - link "Norway" [ref=e177] [cursor=pointer]:
+                    - /url: /en/economic-calendar/norway
+                    - text: Norway
+                - listitem [ref=e179]:
+                  - link "Singapore" [ref=e180] [cursor=pointer]:
+                    - /url: /en/economic-calendar/singapore
+                    - text: Singapore
+                - listitem [ref=e182]:
+                  - link "South Africa" [ref=e183] [cursor=pointer]:
+                    - /url: /en/economic-calendar/south-africa
+                    - text: South Africa
+                - listitem [ref=e185]:
+                  - link "South Korea" [ref=e186] [cursor=pointer]:
+                    - /url: /en/economic-calendar/south-korea
+                    - text: South Korea
+                - listitem [ref=e188]:
+                  - link "Spain" [ref=e189] [cursor=pointer]:
+                    - /url: /en/economic-calendar/spain
+                    - text: Spain
+                - listitem [ref=e191]:
+                  - link "Sweden" [ref=e192] [cursor=pointer]:
+                    - /url: /en/economic-calendar/sweden
+                    - text: Sweden
+                - listitem [ref=e194]:
+                  - link "Switzerland" [ref=e195] [cursor=pointer]:
+                    - /url: /en/economic-calendar/switzerland
+                    - text: Switzerland
+                - listitem [ref=e197]:
+                  - link "United Kingdom" [ref=e198] [cursor=pointer]:
+                    - /url: /en/economic-calendar/united-kingdom
+                    - text: United Kingdom
+                - listitem [ref=e200]:
+                  - link "United States" [ref=e201] [cursor=pointer]:
+                    - /url: /en/economic-calendar/united-states
+                    - text: United States
+            - link "Add widget to your website" [ref=e204] [cursor=pointer]:
+              - /url: /en/economic-calendar/widgets
+              - text: Add widget to your website
+            - link [ref=e207] [cursor=pointer]:
+              - /url: https://www.mql5.com/ff/go?link=https%3A%2F%2Fwww.mql5.com%2Fen%2Fsignals%2Fmt5%2Fpage1%3Fpreset%3D2%26utm_source%3Dwww.mql5.com%26utm_medium%3Ddisplay.left.margin%26utm_term%3Dmax.profit.signals%26utm_content%3Dsubscribe.signal%26utm_campaign%3D0622.MQL5.com.Internal&a=vssuvpfwyzqfbryvztaxywiganfivxlp&s=61c6319c1d668ed85e4c8b0e8d7a12232938067324200ac302ef60b4e80a064c&v=1&host=https%3A%2F%2Fwww.mql5.com%2Fff%2F&id=vgckrufggwxdtfscpyalmenexmvhljduja&uid=xodgzkevkoifvtrwhcqtyalhqyvtrtms&ssn=1769870944950137095&ssn_dr=1&ssn_sr=0&fv_date=1769870944&ref=https%3A%2F%2Fwww.mql5.com%2Fen%2Feconomic-calendar&title=Economic%20Calendar%20%7C%20Financial%20%26%20Forex%20News%20%7C%20World%20Economy%20Events%20in%20Real-Time&scr_res=1920x1080&ac=176987094527913847&fz_uniq=5076879518654367842&sv=2552
+              - img [ref=e208]
+          - generic [ref=e209]:
+            - generic [ref=e210]:
+              - heading "Economic Calendar" [level=1] [ref=e211]
+              - generic [ref=e212]: This is an indispensable tool for fundamental analysis of financial markets based on economic news. More than 900 indexes of the world's largest economies are based on real-time data collected from public sources.
+              - generic [ref=e213]:
+                - link "Follow news in the Economic Calendar" [ref=e214] [cursor=pointer]:
+                  - /url: https://www.tradays.com/en/download?utm_source=www.mql5.com&utm_campaign=metaquotes.mql5.com&utm_medium=cpc&utm_term=follow.news&utm_content=visit.tradays.com
+                  - generic [ref=e215]:
+                    - text: Follow news in the
+                    - generic [ref=e216]: Economic Calendar
+                - link "Add to website" [ref=e217] [cursor=pointer]:
+                  - /url: /en/economic-calendar/widgets
+                  - text: Add to website
+            - generic [ref=e219]:
+              - generic [ref=e220]:
+                - generic [ref=e221]:
+                  - generic [ref=e222]:
+                    - text: Time,
+                    - generic [ref=e223] [cursor=pointer]: 15:52
+                  - generic [ref=e224]: Currency
+                - generic:
+                  - generic [ref=e225]: Event
+                  - generic [ref=e226]:
+                    - generic [ref=e227]: Actual
+                    - generic [ref=e228]: Forecast
+                    - generic [ref=e229]: Previous
+              - generic [ref=e230]:
+                - generic [ref=e231]:
+                  - generic [ref=e233] [cursor=pointer]: 19 - 25 Jan, 2026
+                  - generic [ref=e235]: 26 Jan - 1 Feb, 2026
+                  - generic [ref=e237] [cursor=pointer]: 2 - 8 Feb, 2026
+                - generic [ref=e239]: 26 January, Monday
+                - generic [ref=e240]:
+                  - generic [ref=e241]:
+                    - generic [ref=e242]:
+                      - generic [ref=e243]: All day
+                      - generic "Holidays" [ref=e244]
+                    - generic [ref=e246]: AUD
+                  - generic [ref=e248]: Australia Day
+                - generic [ref=e253]:
+                  - generic [ref=e254]:
+                    - generic [ref=e255]:
+                      - generic [ref=e256]: 04:00
+                      - generic "Medium" [ref=e257]
+                    - generic [ref=e259]: EUR
+                  - link "Bbk Executive Board Member Balz Speech" [ref=e262] [cursor=pointer]:
+                    - /url: /en/economic-calendar/germany/bbk-vice-president-balz-speech
+                - generic [ref=e267]:
+                  - generic [ref=e268]:
+                    - generic [ref=e269]:
+                      - generic [ref=e270]: 06:00
+                      - generic "Low" [ref=e271]
+                    - generic [ref=e273]: JPY
+                  - generic:
+                    - link "Coincident Index" [ref=e276] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/coincident-index
+                    - generic [ref=e277]:
+                      - generic [ref=e278]: "114.9"
+                      - generic [ref=e279]: "115.2"
+                      - generic [ref=e281]: "115.2"
+                - generic [ref=e282]:
+                  - generic [ref=e283]:
+                    - generic [ref=e284]:
+                      - generic [ref=e285]: 06:00
+                      - generic "Low" [ref=e286]
+                    - generic [ref=e288]: JPY
+                  - generic:
+                    - link "Leading Index" [ref=e291] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/leading-index
+                    - generic [ref=e292]:
+                      - generic [ref=e293]: "109.9"
+                      - generic [ref=e294]: "110.5"
+                      - generic [ref=e296]: "110.5"
+                - generic [ref=e297]:
+                  - generic [ref=e298]:
+                    - generic [ref=e299]:
+                      - generic [ref=e300]: 06:00
+                      - generic "Low" [ref=e301]
+                    - generic [ref=e303]: JPY
+                  - generic:
+                    - link "Coincident Index m/m" [ref=e306] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/coincident-index-mm
+                    - generic [ref=e307]:
+                      - generic [ref=e308]: "-1.0%"
+                      - generic [ref=e311]: "-0.7%"
+                - generic [ref=e312]:
+                  - generic [ref=e313]:
+                    - generic [ref=e314]:
+                      - generic [ref=e315]: 06:00
+                      - generic "Low" [ref=e316]
+                    - generic [ref=e318]: JPY
+                  - generic:
+                    - link "Leading Index m/m" [ref=e321] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/leading-index-mm
+                    - generic [ref=e322]:
+                      - generic [ref=e323]: 0.1%
+                      - generic [ref=e326]: 0.7%
+                - generic [ref=e327]:
+                  - generic [ref=e328]:
+                    - generic [ref=e329]:
+                      - generic [ref=e330]: 09:00
+                      - generic "Low" [ref=e331]
+                    - generic [ref=e333]: EUR
+                  - generic:
+                    - link "PPI y/y" [ref=e336] [cursor=pointer]:
+                      - /url: /en/economic-calendar/spain/ppi-yy
+                    - generic [ref=e337]:
+                      - generic [ref=e338]: "-3.0%"
+                      - generic [ref=e339]: "-2.9%"
+                      - generic [ref=e341]: "-2.5%"
+                - generic [ref=e342]:
+                  - generic [ref=e343]:
+                    - generic [ref=e344]:
+                      - generic [ref=e345]: 12:00
+                      - generic "Low" [ref=e346]
+                    - generic [ref=e348]: BRL
+                  - generic:
+                    - link "FGV Consumer Confidence" [ref=e351] [cursor=pointer]:
+                      - /url: /en/economic-calendar/brazil/fgv-consumer-confidence
+                    - generic [ref=e353]: N/D
+                - generic [ref=e356]:
+                  - generic [ref=e357]:
+                    - generic [ref=e358]:
+                      - generic [ref=e359]: 12:30
+                      - generic "Medium" [ref=e360]
+                    - generic [ref=e362]: BRL
+                  - link "BCB Focus Market Report" [ref=e365] [cursor=pointer]:
+                    - /url: /en/economic-calendar/brazil/bcb-focus-market-report
+                - generic [ref=e370]:
+                  - generic [ref=e371]:
+                    - generic [ref=e372]:
+                      - generic [ref=e373]: 13:00
+                      - generic "Low" [ref=e374]
+                    - generic [ref=e376]: MXN
+                  - generic:
+                    - link "Unemployment Rate" [ref=e379] [cursor=pointer]:
+                      - /url: /en/economic-calendar/mexico/unemployment-rate
+                    - generic [ref=e381]: N/D
+                - generic [ref=e384]:
+                  - generic [ref=e385]:
+                    - generic [ref=e386]:
+                      - generic [ref=e387]: 13:00
+                      - generic "Low" [ref=e388]
+                    - generic [ref=e390]: MXN
+                  - generic:
+                    - link "Unemployment Rate n.s.a." [ref=e393] [cursor=pointer]:
+                      - /url: /en/economic-calendar/mexico/unemployment-rate-nsa
+                    - generic [ref=e395]: N/D
+                - generic [ref=e398]:
+                  - generic [ref=e399]:
+                    - generic [ref=e400]:
+                      - generic [ref=e401]: 14:30
+                      - generic "High" [ref=e402]
+                    - generic [ref=e404]: USD
+                  - generic:
+                    - link "Durable Goods Orders m/m" [ref=e407] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/durable-goods-orders
+                    - generic [ref=e408]:
+                      - generic [ref=e409]: 5.3%
+                      - generic [ref=e410]: 6.8%
+                      - generic [ref=e411]: "-2.1%"
+                - generic [ref=e412]:
+                  - generic [ref=e413]:
+                    - generic [ref=e414]:
+                      - generic [ref=e415]: 14:30
+                      - generic "Medium" [ref=e416]
+                    - generic [ref=e418]: USD
+                  - generic:
+                    - link "Core Durable Goods Orders m/m" [ref=e421] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/durable-goods-orders-ex-transportation
+                    - generic [ref=e422]:
+                      - generic [ref=e423]: 0.5%
+                      - generic [ref=e424]: 0.3%
+                      - generic [ref=e425]: 0.1%
+                - generic [ref=e426]:
+                  - generic [ref=e427]:
+                    - generic [ref=e428]:
+                      - generic [ref=e429]: 14:30
+                      - generic "Low" [ref=e430]
+                    - generic [ref=e432]: USD
+                  - generic:
+                    - link "Durable Goods Orders excl. Defense m/m" [ref=e435] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/durable-goods-orders-ex-defense-mm
+                    - generic [ref=e436]:
+                      - generic [ref=e437]: 6.6%
+                      - generic [ref=e438]: 2.0%
+                      - generic [ref=e439]: "-1.3%"
+                - generic [ref=e440]:
+                  - generic [ref=e441]:
+                    - generic [ref=e442]:
+                      - generic [ref=e443]: 14:30
+                      - generic "Low" [ref=e444]
+                    - generic [ref=e446]: USD
+                  - generic:
+                    - link "Nondefense Capital Goods Orders excl. Aircraft m/m" [ref=e449] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/nondefense-capital-goods-orders-ex-aircraft-mm
+                    - generic [ref=e450]:
+                      - generic [ref=e451]: 0.7%
+                      - generic [ref=e452]: 0.0%
+                      - generic [ref=e453]: 0.3%
+                - generic [ref=e454]:
+                  - generic [ref=e455]:
+                    - generic [ref=e456]:
+                      - generic [ref=e457]: 14:30
+                      - generic "Low" [ref=e458]
+                    - generic [ref=e460]: USD
+                  - generic:
+                    - link "Nondefense Capital Goods Shipments excl. Aircraft m/m" [ref=e463] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/nondefense-capital-goods-shipments-ex-aircraft-mm
+                    - generic [ref=e464]:
+                      - generic [ref=e465]: 0.4%
+                      - generic [ref=e466]: 0.5%
+                      - generic [ref=e467]: 0.8%
+                - generic [ref=e468]:
+                  - generic [ref=e469]:
+                    - generic [ref=e470]:
+                      - generic [ref=e471]: 14:57
+                      - generic "Low" [ref=e472]
+                    - generic [ref=e474]: EUR
+                  - generic:
+                    - link "3-Month BTF Auction" [ref=e477] [cursor=pointer]:
+                      - /url: /en/economic-calendar/france/3-month-btf-auction
+                    - generic [ref=e478]:
+                      - generic [ref=e479]: 2.021%
+                      - generic [ref=e482]: 2.019%
+                - generic [ref=e483]:
+                  - generic [ref=e484]:
+                    - generic [ref=e485]:
+                      - generic [ref=e486]: 14:57
+                      - generic "Low" [ref=e487]
+                    - generic [ref=e489]: EUR
+                  - generic:
+                    - link "6-Month BTF Auction" [ref=e492] [cursor=pointer]:
+                      - /url: /en/economic-calendar/france/6-month-btf-auction
+                    - generic [ref=e493]:
+                      - generic [ref=e494]: 2.045%
+                      - generic [ref=e497]: 2.048%
+                - generic [ref=e498]:
+                  - generic [ref=e499]:
+                    - generic [ref=e500]:
+                      - generic [ref=e501]: 14:57
+                      - generic "Low" [ref=e502]
+                    - generic [ref=e504]: EUR
+                  - generic:
+                    - link "12-Month BTF Auction" [ref=e507] [cursor=pointer]:
+                      - /url: /en/economic-calendar/france/12-month-btf-auction
+                    - generic [ref=e508]:
+                      - generic [ref=e509]: 2.084%
+                      - generic [ref=e512]: 2.085%
+                - generic [ref=e513]:
+                  - generic [ref=e514]:
+                    - generic [ref=e515]:
+                      - generic [ref=e516]: 17:30
+                      - generic "Low" [ref=e517]
+                    - generic [ref=e519]: USD
+                  - generic:
+                    - link "3-Month Bill Auction" [ref=e522] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/3-month-bill-auction
+                    - generic [ref=e523]:
+                      - generic [ref=e524]: 3.580%
+                      - generic [ref=e527]: 3.590%
+                - generic [ref=e528]:
+                  - generic [ref=e529]:
+                    - generic [ref=e530]:
+                      - generic [ref=e531]: 17:30
+                      - generic "Low" [ref=e532]
+                    - generic [ref=e534]: USD
+                  - generic:
+                    - link "6-Month Bill Auction" [ref=e537] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/6-month-bill-auction
+                    - generic [ref=e538]:
+                      - generic [ref=e539]: 3.525%
+                      - generic [ref=e542]: 3.520%
+                - generic [ref=e543]:
+                  - generic [ref=e544]:
+                    - generic [ref=e545]:
+                      - generic [ref=e546]: 19:00
+                      - generic "Medium" [ref=e547]
+                    - generic [ref=e549]: USD
+                  - generic:
+                    - link "2-Year Note Auction" [ref=e552] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/2-year-note-auction
+                    - generic [ref=e553]:
+                      - generic [ref=e554]: 3.580%
+                      - generic [ref=e557]: 3.499%
+                - generic [ref=e558]:
+                  - generic [ref=e559]:
+                    - generic [ref=e560]:
+                      - generic [ref=e561]: 22:00
+                      - generic "Low" [ref=e562]
+                    - generic [ref=e564]: KRW
+                  - generic:
+                    - link "BOK Manufacturing BSI" [ref=e567] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-korea/bok-manufacturing-bsi
+                    - generic [ref=e568]:
+                      - generic [ref=e569]: "73"
+                      - generic [ref=e570]: "71"
+                      - generic [ref=e572]: "70"
+                - generic [ref=e573]: 27 January, Tuesday
+                - generic [ref=e574]:
+                  - generic [ref=e575]:
+                    - generic [ref=e576]:
+                      - generic [ref=e577]: 00:50
+                      - generic "Low" [ref=e578]
+                    - generic [ref=e580]: JPY
+                  - generic:
+                    - link "BoJ Corporate Services Price Index y/y" [ref=e583] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/corporate-service-price-yy
+                    - generic [ref=e584]:
+                      - generic [ref=e585]: 2.6%
+                      - generic [ref=e586]: 2.7%
+                      - generic [ref=e588]: 2.7%
+                - generic [ref=e589]:
+                  - generic [ref=e590]:
+                    - generic [ref=e591]:
+                      - generic [ref=e592]: 02:30
+                      - generic "Low" [ref=e593]
+                    - generic [ref=e595]: CNY
+                  - generic:
+                    - link "Industrial Profit YTD y/y" [ref=e598] [cursor=pointer]:
+                      - /url: /en/economic-calendar/china/industrial-profit-ytd-yy
+                    - generic [ref=e599]:
+                      - generic [ref=e600]: 0.6%
+                      - generic [ref=e603]: 0.1%
+                - generic [ref=e604]:
+                  - generic [ref=e605]:
+                    - generic [ref=e606]:
+                      - generic [ref=e607]: 03:00
+                      - generic "Low" [ref=e608]
+                    - generic [ref=e610]: NZD
+                  - generic:
+                    - link "RBNZ Credit Card Spending y/y" [ref=e613] [cursor=pointer]:
+                      - /url: /en/economic-calendar/new-zealand/rbnz-credit-card-spending-yy
+                    - generic [ref=e614]:
+                      - generic [ref=e615]: "-0.3%"
+                      - generic [ref=e616]: 1.2%
+                      - generic [ref=e617]: 4.4%
+                - generic [ref=e618]:
+                  - generic [ref=e619]:
+                    - generic [ref=e620]:
+                      - generic [ref=e621]: 06:00
+                      - generic "Medium" [ref=e622]
+                    - generic [ref=e624]: JPY
+                  - generic:
+                    - link "BoJ Trimmed Mean Core CPI y/y" [ref=e627] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/boj-trimmed-mean-core-cpi-yy
+                    - generic [ref=e628]:
+                      - generic [ref=e629]: 1.9%
+                      - generic [ref=e630]: 2.2%
+                      - generic [ref=e632]: 2.2%
+                - generic [ref=e633]:
+                  - generic [ref=e634]:
+                    - generic [ref=e635]:
+                      - generic [ref=e636]: 06:00
+                      - generic "Medium" [ref=e637]
+                    - generic [ref=e639]: JPY
+                  - generic:
+                    - link "BoJ Weighted Median Core CPI y/y" [ref=e642] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/boj-weighted-median-core-cpi-yy
+                    - generic [ref=e643]:
+                      - generic [ref=e644]: 0.8%
+                      - generic [ref=e645]: 1.6%
+                      - generic [ref=e647]: 1.3%
+                - generic [ref=e648]:
+                  - generic [ref=e649]:
+                    - generic [ref=e650]:
+                      - generic [ref=e651]: 08:00
+                      - generic "Low" [ref=e652]
+                    - generic [ref=e654]: SEK
+                  - generic:
+                    - link "PPI m/m" [ref=e657] [cursor=pointer]:
+                      - /url: /en/economic-calendar/sweden/ppi-mm
+                    - generic [ref=e658]:
+                      - generic [ref=e659]: "-1.1%"
+                      - generic [ref=e660]: 0.2%
+                      - generic [ref=e662]: 1.2%
+                - generic [ref=e663]:
+                  - generic [ref=e664]:
+                    - generic [ref=e665]:
+                      - generic [ref=e666]: 08:00
+                      - generic "Low" [ref=e667]
+                    - generic [ref=e669]: SEK
+                  - generic:
+                    - link "PPI y/y" [ref=e672] [cursor=pointer]:
+                      - /url: /en/economic-calendar/sweden/ppi-yy
+                    - generic [ref=e673]:
+                      - generic [ref=e674]: "-2.7%"
+                      - generic [ref=e675]: "-4.3%"
+                      - generic [ref=e677]: "-1.4%"
+                - generic [ref=e678]:
+                  - generic [ref=e679]:
+                    - generic [ref=e680]:
+                      - generic [ref=e681]: 08:00
+                      - generic "Low" [ref=e682]
+                    - generic [ref=e684]: SEK
+                  - generic:
+                    - link "Goods Trade Balance" [ref=e687] [cursor=pointer]:
+                      - /url: /en/economic-calendar/sweden/goods-trade-balance
+                    - generic [ref=e688]:
+                      - generic [ref=e689]: Kr0.0 B
+                      - generic [ref=e690]: Kr0.0 B
+                      - generic [ref=e691]: Kr0.0 B
+                - generic [ref=e692]:
+                  - generic [ref=e693]:
+                    - generic [ref=e694]:
+                      - generic [ref=e695]: 08:45
+                      - generic "Low" [ref=e696]
+                    - generic [ref=e698]: EUR
+                  - generic:
+                    - link "Consumer Confidence Index" [ref=e701] [cursor=pointer]:
+                      - /url: /en/economic-calendar/france/consumer-confidence-index
+                    - generic [ref=e702]:
+                      - generic [ref=e703]: "90"
+                      - generic [ref=e704]: "92"
+                      - generic [ref=e706]: "90"
+                - generic [ref=e707]:
+                  - generic [ref=e708]:
+                    - generic [ref=e709]:
+                      - generic [ref=e710]: 09:00
+                      - generic "Low" [ref=e711]
+                    - generic [ref=e713]: EUR
+                  - generic:
+                    - link "Unemployment Rate" [ref=e716] [cursor=pointer]:
+                      - /url: /en/economic-calendar/spain/unemployment-rate
+                    - generic [ref=e717]:
+                      - generic [ref=e718]: 9.93%
+                      - generic [ref=e719]: 9.85%
+                      - generic [ref=e721]: 10.45%
+                - generic [ref=e722]:
+                  - generic [ref=e723]:
+                    - generic [ref=e724]:
+                      - generic [ref=e725]: 09:30
+                      - generic "Low" [ref=e726]
+                    - generic [ref=e728]: HKD
+                  - generic:
+                    - link "Exports y/y" [ref=e731] [cursor=pointer]:
+                      - /url: /en/economic-calendar/hong-kong/exports-yy
+                    - generic [ref=e732]:
+                      - generic [ref=e733]: 26.1%
+                      - generic [ref=e734]: 17.9%
+                      - generic [ref=e736]: 18.8%
+                - generic [ref=e737]:
+                  - generic [ref=e738]:
+                    - generic [ref=e739]:
+                      - generic [ref=e740]: 09:30
+                      - generic "Low" [ref=e741]
+                    - generic [ref=e743]: HKD
+                  - generic:
+                    - link "Imports y/y" [ref=e746] [cursor=pointer]:
+                      - /url: /en/economic-calendar/hong-kong/imports-yy
+                    - generic [ref=e747]:
+                      - generic [ref=e748]: 30.6%
+                      - generic [ref=e749]: 18.5%
+                      - generic [ref=e751]: 18.1%
+                - generic [ref=e752]:
+                  - generic [ref=e753]:
+                    - generic [ref=e754]:
+                      - generic [ref=e755]: 09:30
+                      - generic "Low" [ref=e756]
+                    - generic [ref=e758]: HKD
+                  - generic:
+                    - link "Trade Balance" [ref=e761] [cursor=pointer]:
+                      - /url: /en/economic-calendar/hong-kong/trade-balance
+                    - generic [ref=e762]:
+                      - generic [ref=e763]: HK$-63.300 B
+                      - generic [ref=e764]: HK$-37.069 B
+                      - generic [ref=e766]: HK$-48.500 B
+                - generic [ref=e767]:
+                  - generic [ref=e768]:
+                    - generic [ref=e769]:
+                      - generic [ref=e770]: 11:45
+                      - generic "Low" [ref=e771]
+                    - generic [ref=e773]: EUR
+                  - generic:
+                    - link "2-Year Note Auction" [ref=e776] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/2-year-note-auction
+                    - generic [ref=e777]:
+                      - generic [ref=e778]: 2.14%
+                      - generic [ref=e781]: 2.11%
+                - generic [ref=e782]:
+                  - generic [ref=e783]:
+                    - generic [ref=e784]:
+                      - generic [ref=e785]: 13:00
+                      - generic "Low" [ref=e786]
+                    - generic [ref=e788]: BRL
+                  - generic:
+                    - link "Mid-Month CPI m/m" [ref=e791] [cursor=pointer]:
+                      - /url: /en/economic-calendar/brazil/mid-month-cpi-mm
+                    - generic [ref=e792]:
+                      - generic [ref=e793]: 0.20%
+                      - generic [ref=e794]: 0.46%
+                      - generic [ref=e796]: 0.25%
+                - generic [ref=e797]:
+                  - generic [ref=e798]:
+                    - generic [ref=e799]:
+                      - generic [ref=e800]: 13:00
+                      - generic "Low" [ref=e801]
+                    - generic [ref=e803]: BRL
+                  - generic:
+                    - link "Mid-Month CPI y/y" [ref=e806] [cursor=pointer]:
+                      - /url: /en/economic-calendar/brazil/mid-month-cpi-yy
+                    - generic [ref=e807]:
+                      - generic [ref=e808]: 4.50%
+                      - generic [ref=e809]: 4.11%
+                      - generic [ref=e811]: 4.41%
+                - generic [ref=e812]:
+                  - generic [ref=e813]:
+                    - generic [ref=e814]:
+                      - generic [ref=e815]: 13:00
+                      - generic "Low" [ref=e816]
+                    - generic [ref=e818]: MXN
+                  - generic:
+                    - link "Trade Balance n.s.a." [ref=e821] [cursor=pointer]:
+                      - /url: /en/economic-calendar/mexico/trade-balance-nsa
+                    - generic [ref=e822]:
+                      - generic [ref=e823]: $2.430 B
+                      - generic [ref=e824]: $1.573 B
+                      - generic [ref=e826]: $0.663 B
+                - generic [ref=e827]:
+                  - generic [ref=e828]:
+                    - generic [ref=e829]:
+                      - generic [ref=e830]: 13:00
+                      - generic "Low" [ref=e831]
+                    - generic [ref=e833]: MXN
+                  - generic:
+                    - link "Trade Balance" [ref=e836] [cursor=pointer]:
+                      - /url: /en/economic-calendar/mexico/trade-balance
+                    - generic [ref=e838]: N/D
+                - generic [ref=e841]:
+                  - generic [ref=e842]:
+                    - generic [ref=e843]:
+                      - generic [ref=e844]: 15:00
+                      - generic "Low" [ref=e845]
+                    - generic [ref=e847]: USD
+                  - generic:
+                    - link "HPI m/m" [ref=e850] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/housing-price-index-mm
+                    - generic [ref=e851]:
+                      - generic [ref=e852]: 0.6%
+                      - generic [ref=e853]: 0.2%
+                      - generic [ref=e855]: 0.4%
+                - generic [ref=e856]:
+                  - generic [ref=e857]:
+                    - generic [ref=e858]:
+                      - generic [ref=e859]: 15:00
+                      - generic "Low" [ref=e860]
+                    - generic [ref=e862]: USD
+                  - generic:
+                    - link "HPI y/y" [ref=e865] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/house-price-index-yy
+                    - generic [ref=e866]:
+                      - generic [ref=e867]: 1.9%
+                      - generic [ref=e868]: 1.1%
+                      - generic [ref=e869]: 1.8%
+                - generic [ref=e870]:
+                  - generic [ref=e871]:
+                    - generic [ref=e872]:
+                      - generic [ref=e873]: 15:00
+                      - generic "Low" [ref=e874]
+                    - generic [ref=e876]: USD
+                  - generic:
+                    - link "HPI" [ref=e879] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/house-price-index
+                    - generic [ref=e880]:
+                      - generic [ref=e881]: "439.3"
+                      - generic [ref=e882]: "437.2"
+                      - generic [ref=e883]: "436.8"
+                - generic [ref=e884]:
+                  - generic [ref=e885]:
+                    - generic [ref=e886]:
+                      - generic [ref=e887]: 15:00
+                      - generic "Medium" [ref=e888]
+                    - generic [ref=e890]: USD
+                  - generic:
+                    - link "S&P/CS HPI Composite-20 y/y" [ref=e893] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/sp-case-shiller-home-price-index-composite-20-yy
+                    - generic [ref=e895]: N/D
+                - generic [ref=e898]:
+                  - generic [ref=e899]:
+                    - generic [ref=e900]:
+                      - generic [ref=e901]: 15:00
+                      - generic "Medium" [ref=e902]
+                    - generic [ref=e904]: USD
+                  - generic:
+                    - link "S&P/CS HPI Composite-20 n.s.a. m/m" [ref=e907] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/sp-case-shiller-home-price-index-composite-20-nsa-mm
+                    - generic [ref=e909]: N/D
+                - generic [ref=e912]:
+                  - generic [ref=e913]:
+                    - generic [ref=e914]:
+                      - generic [ref=e915]: 15:00
+                      - generic "Low" [ref=e916]
+                    - generic [ref=e918]: USD
+                  - generic:
+                    - link "S&P/CS HPI Composite-20 s.a. m/m" [ref=e921] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/sp-case-shiller-home-price-index-composite-20-sa-mm
+                    - generic [ref=e923]: N/D
+                - generic [ref=e926]:
+                  - generic [ref=e927]:
+                    - generic [ref=e928]:
+                      - generic [ref=e929]: 16:00
+                      - generic "High" [ref=e930]
+                    - generic [ref=e932]: USD
+                  - generic:
+                    - link "CB Consumer Confidence Index" [ref=e935] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/consumer-confidence-index
+                    - generic [ref=e936]:
+                      - generic [ref=e937]: "84.5"
+                      - generic [ref=e938]: "86.8"
+                      - generic [ref=e939]: "94.2"
+                - generic [ref=e940]:
+                  - generic [ref=e941]:
+                    - generic [ref=e942]:
+                      - generic [ref=e943]: 17:00
+                      - generic "High" [ref=e944]
+                    - generic [ref=e946]: EUR
+                  - link "ECB President Lagarde Speech" [ref=e949] [cursor=pointer]:
+                    - /url: /en/economic-calendar/european-union/ecb-president-lagarde-speech
+                - generic [ref=e954]:
+                  - generic [ref=e955]:
+                    - generic [ref=e956]:
+                      - generic [ref=e957]: 19:00
+                      - generic "Medium" [ref=e958]
+                    - generic [ref=e960]: USD
+                  - generic:
+                    - link "5-Year Note Auction" [ref=e963] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/5-year-note-auction
+                    - generic [ref=e964]:
+                      - generic [ref=e965]: 3.823%
+                      - generic [ref=e968]: 3.747%
+                - generic [ref=e969]: 28 January, Wednesday
+                - generic [ref=e970]:
+                  - generic [ref=e971]:
+                    - generic [ref=e972]:
+                      - generic [ref=e973]: 10:00
+                      - generic "Low" [ref=e974]
+                    - generic [ref=e976]: EUR
+                  - generic:
+                    - link "Business Confidence" [ref=e979] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/business-confidence
+                    - generic [ref=e980]:
+                      - generic [ref=e981]: "89.2"
+                      - generic [ref=e982]: "88.9"
+                      - generic [ref=e983]: "88.5"
+                - generic [ref=e984]:
+                  - generic [ref=e985]:
+                    - generic [ref=e986]:
+                      - generic [ref=e987]: 10:00
+                      - generic "Low" [ref=e988]
+                    - generic [ref=e990]: EUR
+                  - generic:
+                    - link "Consumer Confidence" [ref=e993] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/consumer-confidence
+                    - generic [ref=e994]:
+                      - generic [ref=e995]: "96.8"
+                      - generic [ref=e996]: "96.3"
+                      - generic [ref=e998]: "96.6"
+                - generic [ref=e999]:
+                  - generic [ref=e1000]:
+                    - generic [ref=e1001]:
+                      - generic [ref=e1002]: 10:00
+                      - generic "Low" [ref=e1003]
+                    - generic [ref=e1005]: CHF
+                  - generic:
+                    - link "Credit Suisse Economic Expectations" [ref=e1008] [cursor=pointer]:
+                      - /url: /en/economic-calendar/switzerland/credit-suisse-economic-expectations
+                    - generic [ref=e1010]: N/D
+                - generic [ref=e1013]:
+                  - generic [ref=e1014]:
+                    - generic [ref=e1015]:
+                      - generic [ref=e1016]: 11:00
+                      - generic "Medium" [ref=e1017]
+                    - generic [ref=e1019]: EUR
+                  - link "ECB Executive Board Member Elderson Speech" [ref=e1022] [cursor=pointer]:
+                    - /url: /en/economic-calendar/european-union/ecb-executive-board-member-elderson-speech
+                - generic [ref=e1027]:
+                  - generic [ref=e1028]:
+                    - generic [ref=e1029]:
+                      - generic [ref=e1030]: 11:45
+                      - generic "Medium" [ref=e1031]
+                    - generic [ref=e1033]: EUR
+                  - generic:
+                    - link "10-Year Bond Auction" [ref=e1036] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/10-year-bond-auction
+                    - generic [ref=e1037]:
+                      - generic [ref=e1038]: 2.85%
+                      - generic [ref=e1041]: 2.83%
+                - generic [ref=e1042]:
+                  - generic [ref=e1043]:
+                    - generic [ref=e1044]:
+                      - generic [ref=e1045]: 11:57
+                      - generic "Low" [ref=e1046]
+                    - generic [ref=e1048]: EUR
+                  - generic:
+                    - link "6-Month BOT Auction" [ref=e1051] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/6-month-bot-auction
+                    - generic [ref=e1052]:
+                      - generic [ref=e1053]: 2.040%
+                      - generic [ref=e1056]: 2.036%
+                - generic [ref=e1057]:
+                  - generic [ref=e1058]:
+                    - generic [ref=e1059]:
+                      - generic [ref=e1060]: 15:45
+                      - generic "Medium" [ref=e1061]
+                    - generic [ref=e1063]: CAD
+                  - link "BoC Monetary Policy Report" [ref=e1066] [cursor=pointer]:
+                    - /url: /en/economic-calendar/canada/boc-monetary-policy-report
+                - generic [ref=e1071]:
+                  - generic [ref=e1072]:
+                    - generic [ref=e1073]:
+                      - generic [ref=e1074]: 15:45
+                      - generic "High" [ref=e1075]
+                    - generic [ref=e1077]: CAD
+                  - generic:
+                    - link "BoC Interest Rate Decision" [ref=e1080] [cursor=pointer]:
+                      - /url: /en/economic-calendar/canada/boc-interest-rate-decision
+                    - generic [ref=e1081]:
+                      - generic [ref=e1082]: 2.00%
+                      - generic [ref=e1085]: 2.00%
+                - generic [ref=e1086]:
+                  - generic [ref=e1087]:
+                    - generic [ref=e1088]:
+                      - generic [ref=e1089]: 15:45
+                      - generic "Medium" [ref=e1090]
+                    - generic [ref=e1092]: CAD
+                  - link "BoC Rate Statement" [ref=e1095] [cursor=pointer]:
+                    - /url: /en/economic-calendar/canada/boc-rate-statement
+                - generic [ref=e1100]:
+                  - generic [ref=e1101]:
+                    - generic [ref=e1102]:
+                      - generic [ref=e1103]: 16:30
+                      - generic "High" [ref=e1104]
+                    - generic [ref=e1106]: USD
+                  - generic:
+                    - link "EIA Crude Oil Stocks Change" [ref=e1109] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/eia-crude-oil-stocks-change
+                    - generic [ref=e1110]:
+                      - generic [ref=e1111]: "-2.295 M"
+                      - generic [ref=e1112]: 0.256 M
+                      - generic [ref=e1114]: 3.602 M
+                - generic [ref=e1115]:
+                  - generic [ref=e1116]:
+                    - generic [ref=e1117]:
+                      - generic [ref=e1118]: 16:30
+                      - generic "Medium" [ref=e1119]
+                    - generic [ref=e1121]: USD
+                  - generic:
+                    - link "EIA Cushing Crude Oil Stocks Change" [ref=e1124] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/eia-cushing-crude-oil-stocks-change
+                    - generic [ref=e1125]:
+                      - generic [ref=e1126]: "-0.278 M"
+                      - generic [ref=e1127]: 2.062 M
+                      - generic [ref=e1129]: 1.478 M
+                - generic [ref=e1130]:
+                  - generic [ref=e1131]:
+                    - generic [ref=e1132]:
+                      - generic [ref=e1133]: 16:30
+                      - generic "Low" [ref=e1134]
+                    - generic [ref=e1136]: USD
+                  - generic:
+                    - link "EIA Crude Oil Imports Change" [ref=e1139] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/eia-crude-oil-imports-change
+                    - generic [ref=e1140]:
+                      - generic [ref=e1141]: "-1.706 M"
+                      - generic [ref=e1142]: 0.607 M
+                      - generic [ref=e1144]: "-0.027 M"
+                - generic [ref=e1145]:
+                  - generic [ref=e1146]:
+                    - generic [ref=e1147]:
+                      - generic [ref=e1148]: 16:30
+                      - generic "Low" [ref=e1149]
+                    - generic [ref=e1151]: USD
+                  - generic:
+                    - link "EIA Distillate Fuel Production Change" [ref=e1154] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/eia-distillate-fuel-production-change
+                    - generic [ref=e1155]:
+                      - generic [ref=e1156]: "-0.268 M"
+                      - generic [ref=e1157]: "-0.075 M"
+                      - generic [ref=e1159]: "-0.209 M"
+                - generic [ref=e1160]:
+                  - generic [ref=e1161]:
+                    - generic [ref=e1162]:
+                      - generic [ref=e1163]: 16:30
+                      - generic "Low" [ref=e1164]
+                    - generic [ref=e1166]: USD
+                  - generic:
+                    - link "EIA Distillates Stocks Change" [ref=e1169] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/eia-distillates-stocks-change
+                    - generic [ref=e1170]:
+                      - generic [ref=e1171]: 0.329 M
+                      - generic [ref=e1172]: "-0.271 M"
+                      - generic [ref=e1174]: 3.348 M
+                - generic [ref=e1175]:
+                  - generic [ref=e1176]:
+                    - generic [ref=e1177]:
+                      - generic [ref=e1178]: 16:30
+                      - generic "Low" [ref=e1179]
+                    - generic [ref=e1181]: USD
+                  - generic:
+                    - link "EIA Gasoline Production Change" [ref=e1184] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/eia-gasoline-production-change
+                    - generic [ref=e1185]:
+                      - generic [ref=e1186]: 0.791 M
+                      - generic [ref=e1187]: 0.242 M
+                      - generic [ref=e1189]: "-0.246 M"
+                - generic [ref=e1190]:
+                  - generic [ref=e1191]:
+                    - generic [ref=e1192]:
+                      - generic [ref=e1193]: 16:30
+                      - generic "Low" [ref=e1194]
+                    - generic [ref=e1196]: USD
+                  - generic:
+                    - link "EIA Heating Oil Stocks Change" [ref=e1199] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/eia-heating-oil-stocks-change
+                    - generic [ref=e1200]:
+                      - generic [ref=e1201]: 0.026 M
+                      - generic [ref=e1202]: "-0.047 M"
+                      - generic [ref=e1204]: 0.279 M
+                - generic [ref=e1205]:
+                  - generic [ref=e1206]:
+                    - generic [ref=e1207]:
+                      - generic [ref=e1208]: 16:30
+                      - generic "Low" [ref=e1209]
+                    - generic [ref=e1211]: USD
+                  - generic:
+                    - link "EIA Gasoline Stocks Change" [ref=e1214] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/eia-gasoline-stocks-change
+                    - generic [ref=e1215]:
+                      - generic [ref=e1216]: 0.223 M
+                      - generic [ref=e1217]: 7.415 M
+                      - generic [ref=e1219]: 5.977 M
+                - generic [ref=e1220]:
+                  - generic [ref=e1221]:
+                    - generic [ref=e1222]:
+                      - generic [ref=e1223]: 16:30
+                      - generic "Low" [ref=e1224]
+                    - generic [ref=e1226]: USD
+                  - generic:
+                    - link "EIA Refinery Crude Oil Daily Inputs Change" [ref=e1229] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/eia-refinery-crude-oil-daily-inputs-change
+                    - generic [ref=e1230]:
+                      - generic [ref=e1231]: "-0.395 M"
+                      - generic [ref=e1234]: "-0.354 M"
+                - generic [ref=e1235]:
+                  - generic [ref=e1236]:
+                    - generic [ref=e1237]:
+                      - generic [ref=e1238]: 16:30
+                      - generic "Low" [ref=e1239]
+                    - generic [ref=e1241]: USD
+                  - generic:
+                    - link "EIA Refinery Utilization Rate Change" [ref=e1244] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/eia-refinery-utilization-rate-change
+                    - generic [ref=e1245]:
+                      - generic [ref=e1246]: "-2.4%"
+                      - generic [ref=e1249]: "-2.0%"
+                - generic [ref=e1250]:
+                  - generic [ref=e1251]:
+                    - generic [ref=e1252]:
+                      - generic [ref=e1253]: 18:30
+                      - generic "Low" [ref=e1254]
+                    - generic [ref=e1256]: BRL
+                  - generic:
+                    - link "Foreign Exchange Flows" [ref=e1259] [cursor=pointer]:
+                      - /url: /en/economic-calendar/brazil/foreign-exchange-flows
+                    - generic [ref=e1261]: N/D
+                - generic [ref=e1264]:
+                  - generic [ref=e1265]:
+                    - generic [ref=e1266]:
+                      - generic [ref=e1267]: 19:00
+                      - generic "Medium" [ref=e1268]
+                    - generic [ref=e1270]: EUR
+                  - link "ECB Executive Board Member Schnabel Speech" [ref=e1273] [cursor=pointer]:
+                    - /url: /en/economic-calendar/european-union/ecb-executive-board-member-schnabel-speech
+                - generic [ref=e1278]:
+                  - generic [ref=e1279]:
+                    - generic [ref=e1280]:
+                      - generic [ref=e1281]: 20:00
+                      - generic "Medium" [ref=e1282]
+                    - generic [ref=e1284]: USD
+                  - link "FOMC Statement" [ref=e1287] [cursor=pointer]:
+                    - /url: /en/economic-calendar/united-states/fomc-meeting-statement
+                - generic [ref=e1292]:
+                  - generic [ref=e1293]:
+                    - generic [ref=e1294]:
+                      - generic [ref=e1295]: 20:00
+                      - generic "High" [ref=e1296]
+                    - generic [ref=e1298]: USD
+                  - generic:
+                    - link "Fed Interest Rate Decision" [ref=e1301] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/fed-interest-rate-decision
+                    - generic [ref=e1302]:
+                      - generic [ref=e1303]: 3.75%
+                      - generic [ref=e1306]: 3.75%
+                - generic [ref=e1307]:
+                  - generic [ref=e1308]:
+                    - generic [ref=e1309]:
+                      - generic [ref=e1310]: 20:30
+                      - generic "High" [ref=e1311]
+                    - generic [ref=e1313]: USD
+                  - link "FOMC Press Conference" [ref=e1316] [cursor=pointer]:
+                    - /url: /en/economic-calendar/united-states/fomc-press-conference
+                - generic [ref=e1321]:
+                  - generic [ref=e1322]:
+                    - generic [ref=e1323]:
+                      - generic [ref=e1324]: 22:00
+                      - generic "Medium" [ref=e1325]
+                    - generic [ref=e1327]: BRL
+                  - generic:
+                    - link "BCB Interest Rate Decision" [ref=e1330] [cursor=pointer]:
+                      - /url: /en/economic-calendar/brazil/bcb-interest-rate-decision
+                    - generic [ref=e1331]:
+                      - generic [ref=e1332]: N/D
+                      - generic [ref=e1335]: 15.00%
+                - generic [ref=e1336]:
+                  - generic [ref=e1337]:
+                    - generic [ref=e1338]:
+                      - generic [ref=e1339]: 22:45
+                      - generic "Low" [ref=e1340]
+                    - generic [ref=e1342]: NZD
+                  - generic:
+                    - link "Exports" [ref=e1345] [cursor=pointer]:
+                      - /url: /en/economic-calendar/new-zealand/exports
+                    - generic [ref=e1346]:
+                      - generic [ref=e1347]: $7.655 B
+                      - generic [ref=e1349]: $6.812 B
+                - generic [ref=e1350]:
+                  - generic [ref=e1351]:
+                    - generic [ref=e1352]:
+                      - generic [ref=e1353]: 22:45
+                      - generic "Low" [ref=e1354]
+                    - generic [ref=e1356]: NZD
+                  - generic:
+                    - link "Imports" [ref=e1359] [cursor=pointer]:
+                      - /url: /en/economic-calendar/new-zealand/imports
+                    - generic [ref=e1360]:
+                      - generic [ref=e1361]: $7.603 B
+                      - generic [ref=e1363]: $7.147 B
+                - generic [ref=e1364]:
+                  - generic [ref=e1365]:
+                    - generic [ref=e1366]:
+                      - generic [ref=e1367]: 22:45
+                      - generic "Low" [ref=e1368]
+                    - generic [ref=e1370]: NZD
+                  - generic:
+                    - link "Trade Balance" [ref=e1373] [cursor=pointer]:
+                      - /url: /en/economic-calendar/new-zealand/trade-balance
+                    - generic [ref=e1374]:
+                      - generic [ref=e1375]: $0.052 B
+                      - generic [ref=e1376]: $0.197 B
+                      - generic [ref=e1377]: $-0.335 B
+                - generic [ref=e1378]:
+                  - generic [ref=e1379]:
+                    - generic [ref=e1380]:
+                      - generic [ref=e1381]: 22:45
+                      - generic "Medium" [ref=e1382]
+                    - generic [ref=e1384]: NZD
+                  - generic:
+                    - link "Trade Balance 12-Months" [ref=e1387] [cursor=pointer]:
+                      - /url: /en/economic-calendar/new-zealand/trade-balance-12-months
+                    - generic [ref=e1388]:
+                      - generic [ref=e1389]: $-2.203 B
+                      - generic [ref=e1390]: $-1.901 B
+                      - generic [ref=e1391]: $-2.220 B
+                - generic [ref=e1392]: 29 January, Thursday
+                - generic [ref=e1393]:
+                  - generic [ref=e1394]:
+                    - generic [ref=e1395]:
+                      - generic [ref=e1396]: 00:00
+                      - generic "Medium" [ref=e1397]
+                    - generic [ref=e1399]: EUR
+                  - generic:
+                    - link "Jobseekers Total" [ref=e1402] [cursor=pointer]:
+                      - /url: /en/economic-calendar/france/jobseekers-total
+                    - generic [ref=e1403]:
+                      - generic [ref=e1404]: 3117.4 K
+                      - generic [ref=e1405]: 3125.7 K
+                      - generic [ref=e1406]: 3129.3 K
+                - generic [ref=e1407]:
+                  - generic [ref=e1408]:
+                    - generic [ref=e1409]:
+                      - generic [ref=e1410]: 00:50
+                      - generic "Low" [ref=e1411]
+                    - generic [ref=e1413]: JPY
+                  - generic:
+                    - link "Foreign Bond Investment" [ref=e1416] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/foreign-bond-investment
+                    - generic [ref=e1417]:
+                      - generic [ref=e1418]: ¥177.6 B
+                      - generic [ref=e1420]: ¥-361.1 B
+                - generic [ref=e1421]:
+                  - generic [ref=e1422]:
+                    - generic [ref=e1423]:
+                      - generic [ref=e1424]: 00:50
+                      - generic "Low" [ref=e1425]
+                    - generic [ref=e1427]: JPY
+                  - generic:
+                    - link "Foreign Investment in Japan Stocks" [ref=e1430] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/foreign-investment-in-japan-stocks
+                    - generic [ref=e1431]:
+                      - generic [ref=e1432]: ¥328.1 B
+                      - generic [ref=e1434]: ¥878.9 B
+                - generic [ref=e1435]:
+                  - generic [ref=e1436]:
+                    - generic [ref=e1437]:
+                      - generic [ref=e1438]: 01:00
+                      - generic "Low" [ref=e1439]
+                    - generic [ref=e1441]: NZD
+                  - generic:
+                    - link "ANZ Business Confidence" [ref=e1444] [cursor=pointer]:
+                      - /url: /en/economic-calendar/new-zealand/anz-business-confidence
+                    - generic [ref=e1445]:
+                      - generic [ref=e1446]: "64.1"
+                      - generic [ref=e1447]: "66.3"
+                      - generic [ref=e1449]: "73.6"
+                - generic [ref=e1450]:
+                  - generic [ref=e1451]:
+                    - generic [ref=e1452]:
+                      - generic [ref=e1453]: 01:00
+                      - generic "Low" [ref=e1454]
+                    - generic [ref=e1456]: NZD
+                  - generic:
+                    - link "ANZ Activity Outlook" [ref=e1459] [cursor=pointer]:
+                      - /url: /en/economic-calendar/new-zealand/anz-activity-outlook
+                    - generic [ref=e1460]:
+                      - generic [ref=e1461]: "51.6"
+                      - generic [ref=e1462]: "53.6"
+                      - generic [ref=e1464]: "60.9"
+                - generic [ref=e1465]:
+                  - generic [ref=e1466]:
+                    - generic [ref=e1467]:
+                      - generic [ref=e1468]: 01:30
+                      - generic "Low" [ref=e1469]
+                    - generic [ref=e1471]: AUD
+                  - generic:
+                    - link "Export Price Index q/q" [ref=e1474] [cursor=pointer]:
+                      - /url: /en/economic-calendar/australia/export-price-index-qq
+                    - generic [ref=e1475]:
+                      - generic [ref=e1476]: 3.2%
+                      - generic [ref=e1477]: "-0.4%"
+                      - generic [ref=e1479]: "-0.9%"
+                - generic [ref=e1480]:
+                  - generic [ref=e1481]:
+                    - generic [ref=e1482]:
+                      - generic [ref=e1483]: 01:30
+                      - generic "Low" [ref=e1484]
+                    - generic [ref=e1486]: AUD
+                  - generic:
+                    - link "Import Price Index q/q" [ref=e1489] [cursor=pointer]:
+                      - /url: /en/economic-calendar/australia/import-price-index-qq
+                    - generic [ref=e1490]:
+                      - generic [ref=e1491]: 0.9%
+                      - generic [ref=e1492]: 0.0%
+                      - generic [ref=e1494]: "-0.4%"
+                - generic [ref=e1495]:
+                  - generic [ref=e1496]:
+                    - generic [ref=e1497]:
+                      - generic [ref=e1498]: 02:00
+                      - generic "Low" [ref=e1499]
+                    - generic [ref=e1501]: CNY
+                  - generic:
+                    - link "Foreign Direct Investment YTD y/y" [ref=e1504] [cursor=pointer]:
+                      - /url: /en/economic-calendar/china/foreign-direct-investment-ytd-yy
+                    - generic [ref=e1505]:
+                      - generic [ref=e1506]: N/D
+                      - generic [ref=e1507]: "-9.4%"
+                      - generic [ref=e1509]: "-7.5%"
+                - generic [ref=e1510]:
+                  - generic [ref=e1511]:
+                    - generic [ref=e1512]:
+                      - generic [ref=e1513]: 03:30
+                      - generic "Low" [ref=e1514]
+                    - generic [ref=e1516]: SGD
+                  - generic:
+                    - link "Unemployment Rate" [ref=e1519] [cursor=pointer]:
+                      - /url: /en/economic-calendar/singapore/unemployment-rate
+                    - generic [ref=e1520]:
+                      - generic [ref=e1521]: 2.0%
+                      - generic [ref=e1522]: 2.0%
+                      - generic [ref=e1524]: 2.0%
+                - generic [ref=e1525]:
+                  - generic [ref=e1526]:
+                    - generic [ref=e1527]:
+                      - generic [ref=e1528]: 08:00
+                      - generic "Low" [ref=e1529]
+                    - generic [ref=e1531]: NOK
+                  - generic:
+                    - link "General Public Domestic Loan Debt y/y" [ref=e1534] [cursor=pointer]:
+                      - /url: /en/economic-calendar/norway/general-public-domestic-loan-debt-yy
+                    - generic [ref=e1535]:
+                      - generic [ref=e1536]: 4.4%
+                      - generic [ref=e1537]: 4.0%
+                      - generic [ref=e1539]: 3.9%
+                - generic [ref=e1540]:
+                  - generic [ref=e1541]:
+                    - generic [ref=e1542]:
+                      - generic [ref=e1543]: 08:00
+                      - generic "Medium" [ref=e1544]
+                    - generic [ref=e1546]: SEK
+                  - generic:
+                    - link "GDP q/q" [ref=e1549] [cursor=pointer]:
+                      - /url: /en/economic-calendar/sweden/gdp-qq
+                    - generic [ref=e1550]:
+                      - generic [ref=e1551]: 0.2%
+                      - generic [ref=e1552]: 0.8%
+                      - generic [ref=e1554]: 1.1%
+                - generic [ref=e1555]:
+                  - generic [ref=e1556]:
+                    - generic [ref=e1557]:
+                      - generic [ref=e1558]: 08:00
+                      - generic "Medium" [ref=e1559]
+                    - generic [ref=e1561]: SEK
+                  - generic:
+                    - link "GDP y/y" [ref=e1564] [cursor=pointer]:
+                      - /url: /en/economic-calendar/sweden/gdp-yy
+                    - generic [ref=e1565]:
+                      - generic [ref=e1566]: 1.8%
+                      - generic [ref=e1567]: 1.6%
+                      - generic [ref=e1568]: 2.4%
+                - generic [ref=e1569]:
+                  - generic [ref=e1570]:
+                    - generic [ref=e1571]:
+                      - generic [ref=e1572]: 08:00
+                      - generic "Low" [ref=e1573]
+                    - generic [ref=e1575]: SEK
+                  - generic:
+                    - link "Households Loans y/y" [ref=e1578] [cursor=pointer]:
+                      - /url: /en/economic-calendar/sweden/households-loans-yy
+                    - generic [ref=e1579]:
+                      - generic [ref=e1580]: 2.9%
+                      - generic [ref=e1581]: "-0.1%"
+                      - generic [ref=e1583]: 2.8%
+                - generic [ref=e1584]:
+                  - generic [ref=e1585]:
+                    - generic [ref=e1586]:
+                      - generic [ref=e1587]: 08:00
+                      - generic "Low" [ref=e1588]
+                    - generic [ref=e1590]: SEK
+                  - generic:
+                    - link "Non-Financial Corporations Loans y/y" [ref=e1593] [cursor=pointer]:
+                      - /url: /en/economic-calendar/sweden/non-financial-corporations-loans-yy
+                    - generic [ref=e1594]:
+                      - generic [ref=e1595]: 3.6%
+                      - generic [ref=e1598]: 3.5%
+                - generic [ref=e1599]:
+                  - generic [ref=e1600]:
+                    - generic [ref=e1601]:
+                      - generic [ref=e1602]: 08:00
+                      - generic "Low" [ref=e1603]
+                    - generic [ref=e1605]: SEK
+                  - generic:
+                    - link "M3 Money Supply y/y" [ref=e1608] [cursor=pointer]:
+                      - /url: /en/economic-calendar/sweden/m3-money-supply-yy
+                    - generic [ref=e1609]:
+                      - generic [ref=e1610]: 3.2%
+                      - generic [ref=e1613]: 3.4%
+                - generic [ref=e1614]:
+                  - generic [ref=e1615]:
+                    - generic [ref=e1616]:
+                      - generic [ref=e1617]: 08:00
+                      - generic "Low" [ref=e1618]
+                    - generic [ref=e1620]: CHF
+                  - generic:
+                    - link "Exports" [ref=e1623] [cursor=pointer]:
+                      - /url: /en/economic-calendar/switzerland/exports
+                    - generic [ref=e1624]:
+                      - generic [ref=e1625]: N/D
+                      - generic [ref=e1628]: ₣23.478 B
+                - generic [ref=e1629]:
+                  - generic [ref=e1630]:
+                    - generic [ref=e1631]:
+                      - generic [ref=e1632]: 08:00
+                      - generic "Low" [ref=e1633]
+                    - generic [ref=e1635]: CHF
+                  - generic:
+                    - link "Imports" [ref=e1638] [cursor=pointer]:
+                      - /url: /en/economic-calendar/switzerland/imports
+                    - generic [ref=e1639]:
+                      - generic [ref=e1640]: N/D
+                      - generic [ref=e1643]: ₣19.637 B
+                - generic [ref=e1644]:
+                  - generic [ref=e1645]:
+                    - generic [ref=e1646]:
+                      - generic [ref=e1647]: 08:00
+                      - generic "Low" [ref=e1648]
+                    - generic [ref=e1650]: CHF
+                  - generic:
+                    - link "Trade Balance" [ref=e1653] [cursor=pointer]:
+                      - /url: /en/economic-calendar/switzerland/trade-balance
+                    - generic [ref=e1654]:
+                      - generic [ref=e1655]: N/D
+                      - generic [ref=e1656]: ₣4.425 B
+                      - generic [ref=e1658]: ₣3.841 B
+                - generic [ref=e1659]:
+                  - generic [ref=e1660]:
+                    - generic [ref=e1661]:
+                      - generic [ref=e1662]: 09:00
+                      - generic "Low" [ref=e1663]
+                    - generic [ref=e1665]: EUR
+                  - generic:
+                    - link "Retail Sales y/y" [ref=e1668] [cursor=pointer]:
+                      - /url: /en/economic-calendar/spain/retail-sales-yy
+                    - generic [ref=e1669]:
+                      - generic [ref=e1670]: 2.9%
+                      - generic [ref=e1671]: 4.9%
+                      - generic [ref=e1673]: 6.0%
+                - generic [ref=e1674]:
+                  - generic [ref=e1675]:
+                    - generic [ref=e1676]:
+                      - generic [ref=e1677]: 10:00
+                      - generic "Low" [ref=e1678]
+                    - generic [ref=e1680]: EUR
+                  - generic:
+                    - link "Trade Balance Non-EU" [ref=e1683] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/trade-balance-non-eu
+                    - generic [ref=e1684]:
+                      - generic [ref=e1685]: €8.385 B
+                      - generic [ref=e1687]: €7.037 B
+                - generic [ref=e1688]:
+                  - generic [ref=e1689]:
+                    - generic [ref=e1690]:
+                      - generic [ref=e1691]: 10:00
+                      - generic "Low" [ref=e1692]
+                    - generic [ref=e1694]: EUR
+                  - generic:
+                    - link "ECB M3 Money Supply y/y" [ref=e1697] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/ecb-m3-money-supply-yy
+                    - generic [ref=e1698]:
+                      - generic [ref=e1699]: 2.8%
+                      - generic [ref=e1702]: 3.0%
+                - generic [ref=e1703]:
+                  - generic [ref=e1704]:
+                    - generic [ref=e1705]:
+                      - generic [ref=e1706]: 10:00
+                      - generic "Medium" [ref=e1707]
+                    - generic [ref=e1709]: EUR
+                  - generic:
+                    - link "ECB Households Loans y/y" [ref=e1712] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/ecb-households-loans-yy
+                    - generic [ref=e1713]:
+                      - generic [ref=e1714]: 3.0%
+                      - generic [ref=e1717]: 2.9%
+                - generic [ref=e1718]:
+                  - generic [ref=e1719]:
+                    - generic [ref=e1720]:
+                      - generic [ref=e1721]: 10:00
+                      - generic "Low" [ref=e1722]
+                    - generic [ref=e1724]: EUR
+                  - generic:
+                    - link "ECB Non-Financial Corporations Loans y/y" [ref=e1727] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/ecb-non-financial-corporations-loans-yy
+                    - generic [ref=e1728]:
+                      - generic [ref=e1729]: 3.0%
+                      - generic [ref=e1732]: 3.1%
+                - generic [ref=e1733]:
+                  - generic [ref=e1734]:
+                    - generic [ref=e1735]:
+                      - generic [ref=e1736]: 10:00
+                      - generic "Low" [ref=e1737]
+                    - generic [ref=e1739]: EUR
+                  - generic:
+                    - link "ECB Private Sector Loans y/y" [ref=e1742] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/ecb-private-sector-loans-yy
+                    - generic [ref=e1743]:
+                      - generic [ref=e1744]: 3.3%
+                      - generic [ref=e1747]: 3.4%
+                - generic [ref=e1748]:
+                  - generic [ref=e1749]:
+                    - generic [ref=e1750]:
+                      - generic [ref=e1751]: 10:30
+                      - generic "Low" [ref=e1752]
+                    - generic [ref=e1754]: ZAR
+                  - generic:
+                    - link "PPI m/m" [ref=e1757] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-africa/ppi-mm
+                    - generic [ref=e1758]:
+                      - generic [ref=e1759]: 0.2%
+                      - generic [ref=e1760]: 0.1%
+                      - generic [ref=e1762]: 0.0%
+                - generic [ref=e1763]:
+                  - generic [ref=e1764]:
+                    - generic [ref=e1765]:
+                      - generic [ref=e1766]: 10:30
+                      - generic "Low" [ref=e1767]
+                    - generic [ref=e1769]: ZAR
+                  - generic:
+                    - link "PPI y/y" [ref=e1772] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-africa/ppi-yy
+                    - generic [ref=e1773]:
+                      - generic [ref=e1774]: 2.9%
+                      - generic [ref=e1775]: 2.0%
+                      - generic [ref=e1777]: 2.9%
+                - generic [ref=e1778]:
+                  - generic [ref=e1779]:
+                    - generic [ref=e1780]:
+                      - generic [ref=e1781]: 11:00
+                      - generic "Low" [ref=e1782]
+                    - generic [ref=e1784]: EUR
+                  - generic:
+                    - link "Industrial Sales m/m" [ref=e1787] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/industrial-sales-mm
+                    - generic [ref=e1788]:
+                      - generic [ref=e1789]: "-0.1%"
+                      - generic [ref=e1790]: "-0.2%"
+                      - generic [ref=e1791]: "-0.6%"
+                - generic [ref=e1792]:
+                  - generic [ref=e1793]:
+                    - generic [ref=e1794]:
+                      - generic [ref=e1795]: 11:00
+                      - generic "Low" [ref=e1796]
+                    - generic [ref=e1798]: EUR
+                  - generic:
+                    - link "Industrial Sales y/y" [ref=e1801] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/industrial-sales-yy
+                    - generic [ref=e1802]:
+                      - generic [ref=e1803]: 0.0%
+                      - generic [ref=e1804]: 3.3%
+                      - generic [ref=e1806]: 1.7%
+                - generic [ref=e1807]:
+                  - generic [ref=e1808]:
+                    - generic [ref=e1809]:
+                      - generic [ref=e1810]: 11:00
+                      - generic "Low" [ref=e1811]
+                    - generic [ref=e1813]: EUR
+                  - generic:
+                    - link "Business Climate Indicator" [ref=e1816] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/business-climate-indicator
+                    - generic [ref=e1817]:
+                      - generic [ref=e1818]: N/D
+                      - generic [ref=e1819]: "-0.40"
+                      - generic [ref=e1821]: "-0.56"
+                - generic [ref=e1822]:
+                  - generic [ref=e1823]:
+                    - generic [ref=e1824]:
+                      - generic [ref=e1825]: 11:00
+                      - generic "Low" [ref=e1826]
+                    - generic [ref=e1828]: EUR
+                  - generic:
+                    - link "Industrial Confidence Indicator" [ref=e1831] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/industrial-confidence-indicator
+                    - generic [ref=e1832]:
+                      - generic [ref=e1833]: "-6.8"
+                      - generic [ref=e1834]: "-8.8"
+                      - generic [ref=e1835]: "-8.5"
+                - generic [ref=e1836]:
+                  - generic [ref=e1837]:
+                    - generic [ref=e1838]:
+                      - generic [ref=e1839]: 11:00
+                      - generic "Low" [ref=e1840]
+                    - generic [ref=e1842]: EUR
+                  - generic:
+                    - link "Services Sentiment Indicator" [ref=e1845] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/services-sentiment-indicator
+                    - generic [ref=e1846]:
+                      - generic [ref=e1847]: "7.2"
+                      - generic [ref=e1848]: "4.9"
+                      - generic [ref=e1849]: "5.8"
+                - generic [ref=e1850]:
+                  - generic [ref=e1851]:
+                    - generic [ref=e1852]:
+                      - generic [ref=e1853]: 11:00
+                      - generic "Medium" [ref=e1854]
+                    - generic [ref=e1856]: EUR
+                  - generic:
+                    - link "Economic Sentiment Indicator" [ref=e1859] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/economic-sentiment-indicator
+                    - generic [ref=e1860]:
+                      - generic [ref=e1861]: "99.4"
+                      - generic [ref=e1862]: "95.2"
+                      - generic [ref=e1863]: "97.2"
+                - generic [ref=e1864]:
+                  - generic [ref=e1865]:
+                    - generic [ref=e1866]:
+                      - generic [ref=e1867]: 11:00
+                      - generic "Low" [ref=e1868]
+                    - generic [ref=e1870]: EUR
+                  - generic:
+                    - link "Consumer Confidence Index" [ref=e1873] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/consumer-confidence-indicator
+                    - generic [ref=e1874]:
+                      - generic [ref=e1875]: "-12.4"
+                      - generic [ref=e1876]: "-12.4"
+                      - generic [ref=e1878]: "-12.4"
+                - generic [ref=e1879]:
+                  - generic [ref=e1880]:
+                    - generic [ref=e1881]:
+                      - generic [ref=e1882]: 11:00
+                      - generic "High" [ref=e1883]
+                    - generic [ref=e1885]: EUR
+                  - generic:
+                    - link "Consumer Price Expectations" [ref=e1888] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/consumer-price-expectations
+                    - generic [ref=e1889]:
+                      - generic [ref=e1890]: "24.1"
+                      - generic [ref=e1891]: "24.1"
+                      - generic [ref=e1893]: "26.7"
+                - generic [ref=e1894]:
+                  - generic [ref=e1895]:
+                    - generic [ref=e1896]:
+                      - generic [ref=e1897]: 11:00
+                      - generic "Low" [ref=e1898]
+                    - generic [ref=e1900]: EUR
+                  - generic:
+                    - link "Industry Selling Price Expectations" [ref=e1903] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/industry-selling-price-expectations
+                    - generic [ref=e1904]:
+                      - generic [ref=e1905]: "10.0"
+                      - generic [ref=e1906]: "10.4"
+                      - generic [ref=e1907]: "10.8"
+                - generic [ref=e1908]:
+                  - generic [ref=e1909]:
+                    - generic [ref=e1910]:
+                      - generic [ref=e1911]: 12:00
+                      - generic "Low" [ref=e1912]
+                    - generic [ref=e1914]: BRL
+                  - generic:
+                    - link "FGV IGP-M Inflation Index m/m" [ref=e1917] [cursor=pointer]:
+                      - /url: /en/economic-calendar/brazil/fgv-igp-m-inflation-index-mm
+                    - generic [ref=e1918]:
+                      - generic [ref=e1919]: 0.41%
+                      - generic [ref=e1920]: 0.27%
+                      - generic [ref=e1922]: "-0.01%"
+                - generic [ref=e1923]:
+                  - generic [ref=e1924]:
+                    - generic [ref=e1925]:
+                      - generic [ref=e1926]: 12:27
+                      - generic "Low" [ref=e1927]
+                    - generic [ref=e1929]: EUR
+                  - generic:
+                    - link "5-Year BTP Auction" [ref=e1932] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/5-year-btp-auction
+                    - generic [ref=e1933]:
+                      - generic [ref=e1934]: 2.74%
+                      - generic [ref=e1937]: 2.74%
+                - generic [ref=e1938]:
+                  - generic [ref=e1939]:
+                    - generic [ref=e1940]:
+                      - generic [ref=e1941]: 12:27
+                      - generic "Low" [ref=e1942]
+                    - generic [ref=e1944]: EUR
+                  - generic:
+                    - link "10-Year BTP Auction" [ref=e1947] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/10-year-btp-auction
+                    - generic [ref=e1948]:
+                      - generic [ref=e1949]: 3.44%
+                      - generic [ref=e1952]: 3.44%
+                - generic [ref=e1953]:
+                  - generic [ref=e1954]:
+                    - generic [ref=e1955]:
+                      - generic [ref=e1956]: 12:59
+                      - generic "Low" [ref=e1957]
+                    - generic [ref=e1959]: EUR
+                  - generic:
+                    - link "Business Confidence" [ref=e1962] [cursor=pointer]:
+                      - /url: /en/economic-calendar/spain/business-confidence
+                    - generic [ref=e1963]:
+                      - generic [ref=e1964]: "-3.0"
+                      - generic [ref=e1965]: "-3.0"
+                      - generic [ref=e1966]: "-3.4"
+                - generic [ref=e1967]:
+                  - generic [ref=e1968]:
+                    - generic [ref=e1969]:
+                      - generic [ref=e1970]: 14:00
+                      - generic "Medium" [ref=e1971]
+                    - generic [ref=e1973]: ZAR
+                  - generic:
+                    - link "SARB Interest Rate Decision" [ref=e1976] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-africa/sarb-interest-rate-decision
+                    - generic [ref=e1977]:
+                      - generic [ref=e1978]: 6.75%
+                      - generic [ref=e1981]: 6.75%
+                - generic [ref=e1982]:
+                  - generic [ref=e1983]:
+                    - generic [ref=e1984]:
+                      - generic [ref=e1985]: 14:00
+                      - generic "Low" [ref=e1986]
+                    - generic [ref=e1988]: ZAR
+                  - generic:
+                    - link "SARB Prime Rate" [ref=e1991] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-africa/sarb-prime-rate
+                    - generic [ref=e1992]:
+                      - generic [ref=e1993]: 10.25%
+                      - generic [ref=e1996]: 10.25%
+                - generic [ref=e1997]:
+                  - generic [ref=e1998]:
+                    - generic [ref=e1999]:
+                      - generic [ref=e2000]: 14:30
+                      - generic "Low" [ref=e2001]
+                    - generic [ref=e2003]: CAD
+                  - generic:
+                    - link "Imports" [ref=e2006] [cursor=pointer]:
+                      - /url: /en/economic-calendar/canada/imports
+                    - generic [ref=e2007]:
+                      - generic [ref=e2008]: $66.140 B
+                      - generic [ref=e2010]: $66.177 B
+                - generic [ref=e2011]:
+                  - generic [ref=e2012]:
+                    - generic [ref=e2013]:
+                      - generic [ref=e2014]: 14:30
+                      - generic "Low" [ref=e2015]
+                    - generic [ref=e2017]: CAD
+                  - generic:
+                    - link "Exports" [ref=e2020] [cursor=pointer]:
+                      - /url: /en/economic-calendar/canada/exports
+                    - generic [ref=e2021]:
+                      - generic [ref=e2022]: $63.943 B
+                      - generic [ref=e2024]: $65.782 B
+                - generic [ref=e2025]:
+                  - generic [ref=e2026]:
+                    - generic [ref=e2027]:
+                      - generic [ref=e2028]: 14:30
+                      - generic "Medium" [ref=e2029]
+                    - generic [ref=e2031]: CAD
+                  - generic:
+                    - link "Trade Balance" [ref=e2034] [cursor=pointer]:
+                      - /url: /en/economic-calendar/canada/trade-balance
+                    - generic [ref=e2035]:
+                      - generic [ref=e2036]: $-2.197 B
+                      - generic [ref=e2037]: $1.585 B
+                      - generic [ref=e2038]: $-0.395 B
+                - generic [ref=e2039]:
+                  - generic [ref=e2040]:
+                    - generic [ref=e2041]:
+                      - generic [ref=e2042]: 14:30
+                      - generic "Medium" [ref=e2043]
+                    - generic [ref=e2045]: USD
+                  - generic:
+                    - link "Trade Balance" [ref=e2048] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/trade-balance
+                    - generic [ref=e2049]:
+                      - generic [ref=e2050]: $-56.825 B
+                      - generic [ref=e2051]: $-41.091 B
+                      - generic [ref=e2052]: $-29.206 B
+                - generic [ref=e2053]:
+                  - generic [ref=e2054]:
+                    - generic [ref=e2055]:
+                      - generic [ref=e2056]: 14:30
+                      - generic "Medium" [ref=e2057]
+                    - generic [ref=e2059]: USD
+                  - generic:
+                    - link "Exports" [ref=e2062] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/exports
+                    - generic [ref=e2063]:
+                      - generic [ref=e2064]: $292.052 B
+                      - generic [ref=e2066]: $302.919 B
+                - generic [ref=e2067]:
+                  - generic [ref=e2068]:
+                    - generic [ref=e2069]:
+                      - generic [ref=e2070]: 14:30
+                      - generic "Medium" [ref=e2071]
+                    - generic [ref=e2073]: USD
+                  - generic:
+                    - link "Imports" [ref=e2076] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/imports
+                    - generic [ref=e2077]:
+                      - generic [ref=e2078]: $348.877 B
+                      - generic [ref=e2080]: $332.124 B
+                - generic [ref=e2081]:
+                  - generic [ref=e2082]:
+                    - generic [ref=e2083]:
+                      - generic [ref=e2084]: 14:30
+                      - generic "Medium" [ref=e2085]
+                    - generic [ref=e2087]: USD
+                  - generic:
+                    - link "Nonfarm Productivity q/q" [ref=e2090] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/nonfarm-productivity-qq
+                    - generic [ref=e2091]:
+                      - generic [ref=e2092]: 4.9%
+                      - generic [ref=e2093]: 4.9%
+                      - generic [ref=e2095]: 4.9%
+                - generic [ref=e2096]:
+                  - generic [ref=e2097]:
+                    - generic [ref=e2098]:
+                      - generic [ref=e2099]: 14:30
+                      - generic "Medium" [ref=e2100]
+                    - generic [ref=e2102]: USD
+                  - generic:
+                    - link "Unit Labor Costs q/q" [ref=e2105] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/unit-labor-costs-qq
+                    - generic [ref=e2106]:
+                      - generic [ref=e2107]: "-1.9%"
+                      - generic [ref=e2108]: "-1.9%"
+                      - generic [ref=e2110]: "-1.9%"
+                - generic [ref=e2111]:
+                  - generic [ref=e2112]:
+                    - generic [ref=e2113]:
+                      - generic [ref=e2114]: 14:30
+                      - generic "High" [ref=e2115]
+                    - generic [ref=e2117]: USD
+                  - generic:
+                    - link "Initial Jobless Claims" [ref=e2120] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/initial-jobless-claims
+                    - generic [ref=e2121]:
+                      - generic [ref=e2122]: 209 K
+                      - generic [ref=e2123]: 211 K
+                      - generic [ref=e2124]: 210 K
+                - generic [ref=e2125]:
+                  - generic [ref=e2126]:
+                    - generic [ref=e2127]:
+                      - generic [ref=e2128]: 14:30
+                      - generic "Medium" [ref=e2129]
+                    - generic [ref=e2131]: USD
+                  - generic:
+                    - link "Continuing Jobless Claims" [ref=e2134] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/continuing-jobless-claims
+                    - generic [ref=e2135]:
+                      - generic [ref=e2136]: 1.827 M
+                      - generic [ref=e2137]: 1.871 M
+                      - generic [ref=e2138]: 1.865 M
+                - generic [ref=e2139]:
+                  - generic [ref=e2140]:
+                    - generic [ref=e2141]:
+                      - generic [ref=e2142]: 14:30
+                      - generic "Low" [ref=e2143]
+                    - generic [ref=e2145]: USD
+                  - generic:
+                    - link "Initial Jobless Claims 4-Week Average" [ref=e2148] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/initial-jobless-claims-4-week-average
+                    - generic [ref=e2149]:
+                      - generic [ref=e2150]: 206.250 K
+                      - generic [ref=e2151]: 197.730 K
+                      - generic [ref=e2152]: 204.000 K
+                - generic [ref=e2153]:
+                  - generic [ref=e2154]:
+                    - generic [ref=e2155]:
+                      - generic [ref=e2156]: 16:00
+                      - generic "Medium" [ref=e2157]
+                    - generic [ref=e2159]: USD
+                  - generic:
+                    - link "Factory Orders m/m" [ref=e2162] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/factory-orders
+                    - generic [ref=e2163]:
+                      - generic [ref=e2164]: 2.7%
+                      - generic [ref=e2165]: "-1.2%"
+                      - generic [ref=e2166]: "-1.2%"
+                - generic [ref=e2167]:
+                  - generic [ref=e2168]:
+                    - generic [ref=e2169]:
+                      - generic [ref=e2170]: 16:00
+                      - generic "Low" [ref=e2171]
+                    - generic [ref=e2173]: USD
+                  - generic:
+                    - link "Wholesale Inventories m/m" [ref=e2176] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/wholesale-inventories
+                    - generic [ref=e2177]:
+                      - generic [ref=e2178]: 0.2%
+                      - generic [ref=e2179]: 0.3%
+                      - generic [ref=e2181]: 0.2%
+                - generic [ref=e2182]:
+                  - generic [ref=e2183]:
+                    - generic [ref=e2184]:
+                      - generic [ref=e2185]: 16:00
+                      - generic "Low" [ref=e2186]
+                    - generic [ref=e2188]: USD
+                  - generic:
+                    - link "Factory Orders excl. Transportation m/m" [ref=e2191] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/factory-orders-ex-transportation-mm
+                    - generic [ref=e2192]:
+                      - generic [ref=e2193]: 0.2%
+                      - generic [ref=e2194]: 0.1%
+                      - generic [ref=e2196]: "-0.1%"
+                - generic [ref=e2197]:
+                  - generic [ref=e2198]:
+                    - generic [ref=e2199]:
+                      - generic [ref=e2200]: 16:00
+                      - generic "Low" [ref=e2201]
+                    - generic [ref=e2203]: USD
+                  - generic:
+                    - link "Nondefense Capital Goods Shipments excl. Aircraft m/m" [ref=e2206] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/nondefense-capital-goods-shipments-ex-aircraft-mm
+                    - generic [ref=e2207]:
+                      - generic [ref=e2208]: 0.2%
+                      - generic [ref=e2209]: 0.4%
+                      - generic [ref=e2211]: 0.4%
+                - generic [ref=e2212]:
+                  - generic [ref=e2213]:
+                    - generic [ref=e2214]:
+                      - generic [ref=e2215]: 16:00
+                      - generic "Low" [ref=e2216]
+                    - generic [ref=e2218]: USD
+                  - generic:
+                    - link "Wholesale Sales m/m" [ref=e2221] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/wholesale-sales-mm
+                    - generic [ref=e2222]:
+                      - generic [ref=e2223]: 1.3%
+                      - generic [ref=e2224]: "-0.1%"
+                      - generic [ref=e2226]: "-0.4%"
+                - generic [ref=e2227]:
+                  - generic [ref=e2228]:
+                    - generic [ref=e2229]:
+                      - generic [ref=e2230]: 16:00
+                      - generic "Low" [ref=e2231]
+                    - generic [ref=e2233]: USD
+                  - generic:
+                    - link "Dallas Fed Trimmed Mean PCE Inflation Rate" [ref=e2236] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/dallas-fed-trimmed-mean-pce-inflation-rate
+                    - generic [ref=e2238]: N/D
+                - generic [ref=e2241]:
+                  - generic [ref=e2242]:
+                    - generic [ref=e2243]:
+                      - generic [ref=e2244]: 16:30
+                      - generic "Low" [ref=e2245]
+                    - generic [ref=e2247]: USD
+                  - generic:
+                    - link "EIA Natural Gas Storage Change" [ref=e2250] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/eia-natural-gas-storage-change
+                    - generic [ref=e2251]:
+                      - generic [ref=e2252]: "-242 B"
+                      - generic [ref=e2253]: "-131 B"
+                      - generic [ref=e2255]: "-120 B"
+                - generic [ref=e2256]:
+                  - generic [ref=e2257]:
+                    - generic [ref=e2258]:
+                      - generic [ref=e2259]: 17:00
+                      - generic "Low" [ref=e2260]
+                    - generic [ref=e2262]: SGD
+                  - generic:
+                    - link "Bank Loans" [ref=e2265] [cursor=pointer]:
+                      - /url: /en/economic-calendar/singapore/bank-loans
+                    - generic [ref=e2266]:
+                      - generic [ref=e2267]: S$886.110 B
+                      - generic [ref=e2268]: S$876.334 B
+                      - generic [ref=e2270]: S$873.129 B
+                - generic [ref=e2271]:
+                  - generic [ref=e2272]:
+                    - generic [ref=e2273]:
+                      - generic [ref=e2274]: 17:30
+                      - generic "Low" [ref=e2275]
+                    - generic [ref=e2277]: USD
+                  - generic:
+                    - link "4-Week Bill Auction" [ref=e2280] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/4-week-bill-auction
+                    - generic [ref=e2281]:
+                      - generic [ref=e2282]: 3.630%
+                      - generic [ref=e2285]: 3.630%
+                - generic [ref=e2286]:
+                  - generic [ref=e2287]:
+                    - generic [ref=e2288]:
+                      - generic [ref=e2289]: 17:30
+                      - generic "Low" [ref=e2290]
+                    - generic [ref=e2292]: USD
+                  - generic:
+                    - link "8-Week Bill Auction" [ref=e2295] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/8-week-bill-auction
+                    - generic [ref=e2296]:
+                      - generic [ref=e2297]: 3.635%
+                      - generic [ref=e2300]: 3.630%
+                - generic [ref=e2301]:
+                  - generic [ref=e2302]:
+                    - generic [ref=e2303]:
+                      - generic [ref=e2304]: 19:00
+                      - generic "Medium" [ref=e2305]
+                    - generic [ref=e2307]: USD
+                  - generic:
+                    - link "7-Year Note Auction" [ref=e2310] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/7-year-note-auction
+                    - generic [ref=e2311]:
+                      - generic [ref=e2312]: 4.018%
+                      - generic [ref=e2315]: 3.930%
+                - generic [ref=e2316]: 30 January, Friday
+                - generic [ref=e2317]:
+                  - generic [ref=e2318]:
+                    - generic [ref=e2319]:
+                      - generic [ref=e2320]: 00:00
+                      - generic "Low" [ref=e2321]
+                    - generic [ref=e2323]: KRW
+                  - generic:
+                    - link "Industrial Production m/m" [ref=e2326] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-korea/industrial-production-mm
+                    - generic [ref=e2327]:
+                      - generic [ref=e2328]: 1.7%
+                      - generic [ref=e2329]: 2.6%
+                      - generic [ref=e2330]: 0.8%
+                - generic [ref=e2331]:
+                  - generic [ref=e2332]:
+                    - generic [ref=e2333]:
+                      - generic [ref=e2334]: 00:00
+                      - generic "Low" [ref=e2335]
+                    - generic [ref=e2337]: KRW
+                  - generic:
+                    - link "Industrial Production y/y" [ref=e2340] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-korea/industrial-production-yy
+                    - generic [ref=e2341]:
+                      - generic [ref=e2342]: "-0.3%"
+                      - generic [ref=e2343]: 2.1%
+                      - generic [ref=e2344]: "-1.2%"
+                - generic [ref=e2345]:
+                  - generic [ref=e2346]:
+                    - generic [ref=e2347]:
+                      - generic [ref=e2348]: 00:00
+                      - generic "Low" [ref=e2349]
+                    - generic [ref=e2351]: KRW
+                  - generic:
+                    - link "Retail Sales m/m" [ref=e2354] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-korea/retail-sales-mm
+                    - generic [ref=e2355]:
+                      - generic [ref=e2356]: 0.9%
+                      - generic [ref=e2357]: "-0.1%"
+                      - generic [ref=e2358]: "-3.2%"
+                - generic [ref=e2359]:
+                  - generic [ref=e2360]:
+                    - generic [ref=e2361]:
+                      - generic [ref=e2362]: 00:00
+                      - generic "Low" [ref=e2363]
+                    - generic [ref=e2365]: KRW
+                  - generic:
+                    - link "Index of Services m/m" [ref=e2368] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-korea/index-of-services-mm
+                    - generic [ref=e2369]:
+                      - generic [ref=e2370]: 1.1%
+                      - generic [ref=e2371]: "-0.6%"
+                      - generic [ref=e2372]: 0.5%
+                - generic [ref=e2373]:
+                  - generic [ref=e2374]:
+                    - generic [ref=e2375]:
+                      - generic [ref=e2376]: 00:30
+                      - generic "Low" [ref=e2377]
+                    - generic [ref=e2379]: JPY
+                  - generic:
+                    - link "Tokyo CPI y/y" [ref=e2382] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/tokyo-consumer-price-index-yy
+                    - generic [ref=e2383]:
+                      - generic [ref=e2384]: 1.5%
+                      - generic [ref=e2385]: 2.3%
+                      - generic [ref=e2387]: 2.0%
+                - generic [ref=e2388]:
+                  - generic [ref=e2389]:
+                    - generic [ref=e2390]:
+                      - generic [ref=e2391]: 00:30
+                      - generic "High" [ref=e2392]
+                    - generic [ref=e2394]: JPY
+                  - generic:
+                    - link "Tokyo CPI excl. Food and Energy y/y" [ref=e2397] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/tokyo-consumer-price-index-ex-food-energy-yy
+                    - generic [ref=e2398]:
+                      - generic [ref=e2399]: 2.4%
+                      - generic [ref=e2400]: 2.5%
+                      - generic [ref=e2402]: 2.6%
+                - generic [ref=e2403]:
+                  - generic [ref=e2404]:
+                    - generic [ref=e2405]:
+                      - generic [ref=e2406]: 00:30
+                      - generic "Medium" [ref=e2407]
+                    - generic [ref=e2409]: JPY
+                  - generic:
+                    - link "Tokyo Core CPI y/y" [ref=e2412] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/tokyo-consumer-price-index-ex-fresh-food-yy
+                    - generic [ref=e2413]:
+                      - generic [ref=e2414]: 2.0%
+                      - generic [ref=e2415]: 2.3%
+                      - generic [ref=e2417]: 2.3%
+                - generic [ref=e2418]:
+                  - generic [ref=e2419]:
+                    - generic [ref=e2420]:
+                      - generic [ref=e2421]: 00:30
+                      - generic "Low" [ref=e2422]
+                    - generic [ref=e2424]: JPY
+                  - generic:
+                    - link "Unemployment Rate" [ref=e2427] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/unemployment-rate
+                    - generic [ref=e2428]:
+                      - generic [ref=e2429]: 2.6%
+                      - generic [ref=e2430]: 2.4%
+                      - generic [ref=e2432]: 2.6%
+                - generic [ref=e2433]:
+                  - generic [ref=e2434]:
+                    - generic [ref=e2435]:
+                      - generic [ref=e2436]: 00:30
+                      - generic "Low" [ref=e2437]
+                    - generic [ref=e2439]: JPY
+                  - generic:
+                    - link "Tokyo CPI s.a. m/m" [ref=e2442] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/tokyo-consumer-price-index-sa-mm
+                    - generic [ref=e2443]:
+                      - generic [ref=e2444]: "-0.1%"
+                      - generic [ref=e2446]: "-0.1%"
+                - generic [ref=e2447]:
+                  - generic [ref=e2448]:
+                    - generic [ref=e2449]:
+                      - generic [ref=e2450]: 00:30
+                      - generic "Low" [ref=e2451]
+                    - generic [ref=e2453]: JPY
+                  - generic:
+                    - link "Jobs to Applicants Ratio" [ref=e2456] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/jobs-to-applicants-ratio
+                    - generic [ref=e2457]:
+                      - generic [ref=e2458]: "1.19"
+                      - generic [ref=e2459]: "1.17"
+                      - generic [ref=e2461]: "1.18"
+                - generic [ref=e2462]:
+                  - generic [ref=e2463]:
+                    - generic [ref=e2464]:
+                      - generic [ref=e2465]: 00:50
+                      - generic "High" [ref=e2466]
+                    - generic [ref=e2468]: JPY
+                  - generic:
+                    - link "Retail Sales m/m" [ref=e2471] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/retail-sales-mm
+                    - generic [ref=e2473]: N/D
+                - generic [ref=e2476]:
+                  - generic [ref=e2477]:
+                    - generic [ref=e2478]:
+                      - generic [ref=e2479]: 00:50
+                      - generic "Low" [ref=e2480]
+                    - generic [ref=e2482]: JPY
+                  - generic:
+                    - link "Retail Sales y/y" [ref=e2485] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/retail-sales-yy
+                    - generic [ref=e2487]: N/D
+                - generic [ref=e2490]:
+                  - generic [ref=e2491]:
+                    - generic [ref=e2492]:
+                      - generic [ref=e2493]: 00:50
+                      - generic "Medium" [ref=e2494]
+                    - generic [ref=e2496]: JPY
+                  - generic:
+                    - link "Large Retailer's Sales y/y" [ref=e2499] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/large-retailers-sales-yy
+                    - generic [ref=e2501]: N/D
+                - generic [ref=e2504]:
+                  - generic [ref=e2505]:
+                    - generic [ref=e2506]:
+                      - generic [ref=e2507]: 00:50
+                      - generic "Medium" [ref=e2508]
+                    - generic [ref=e2510]: JPY
+                  - generic:
+                    - link "Industrial Production m/m" [ref=e2513] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/industrial-production-mm
+                    - generic [ref=e2515]: N/D
+                - generic [ref=e2518]:
+                  - generic [ref=e2519]:
+                    - generic [ref=e2520]:
+                      - generic [ref=e2521]: 00:50
+                      - generic "Low" [ref=e2522]
+                    - generic [ref=e2524]: JPY
+                  - generic:
+                    - link "Industrial Production y/y" [ref=e2527] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/industrial-production-yy
+                    - generic [ref=e2529]: N/D
+                - generic [ref=e2532]:
+                  - generic [ref=e2533]:
+                    - generic [ref=e2534]:
+                      - generic [ref=e2535]: 00:50
+                      - generic "Low" [ref=e2536]
+                    - generic [ref=e2538]: JPY
+                  - generic:
+                    - link "Industrial Production Forecast 1-month Ahead m/m" [ref=e2541] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/industrial-production-forecast-1-month-ahead-mm
+                    - generic [ref=e2543]: N/D
+                - generic [ref=e2546]:
+                  - generic [ref=e2547]:
+                    - generic [ref=e2548]:
+                      - generic [ref=e2549]: 00:50
+                      - generic "Low" [ref=e2550]
+                    - generic [ref=e2552]: JPY
+                  - generic:
+                    - link "Industrial Production Forecast 2-month Ahead m/m" [ref=e2555] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/industrial-production-forecast-2-month-ahead-mm
+                    - generic [ref=e2557]: N/D
+                - generic [ref=e2560]:
+                  - generic [ref=e2561]:
+                    - generic [ref=e2562]:
+                      - generic [ref=e2563]: 01:30
+                      - generic "Medium" [ref=e2564]
+                    - generic [ref=e2566]: AUD
+                  - generic:
+                    - link "PPI q/q" [ref=e2569] [cursor=pointer]:
+                      - /url: /en/economic-calendar/australia/ppi-qq
+                    - generic [ref=e2570]:
+                      - generic [ref=e2571]: 0.8%
+                      - generic [ref=e2572]: 0.9%
+                      - generic [ref=e2574]: 1.0%
+                - generic [ref=e2575]:
+                  - generic [ref=e2576]:
+                    - generic [ref=e2577]:
+                      - generic [ref=e2578]: 01:30
+                      - generic "Medium" [ref=e2579]
+                    - generic [ref=e2581]: AUD
+                  - generic:
+                    - link "PPI y/y" [ref=e2584] [cursor=pointer]:
+                      - /url: /en/economic-calendar/australia/ppi-yy
+                    - generic [ref=e2585]:
+                      - generic [ref=e2586]: 3.5%
+                      - generic [ref=e2587]: 2.7%
+                      - generic [ref=e2589]: 3.5%
+                - generic [ref=e2590]:
+                  - generic [ref=e2591]:
+                    - generic [ref=e2592]:
+                      - generic [ref=e2593]: 01:30
+                      - generic "Low" [ref=e2594]
+                    - generic [ref=e2596]: AUD
+                  - generic:
+                    - link "RBA Housing Credit m/m" [ref=e2599] [cursor=pointer]:
+                      - /url: /en/economic-calendar/australia/rba-housing-credit-mm
+                    - generic [ref=e2600]:
+                      - generic [ref=e2601]: 0.7%
+                      - generic [ref=e2604]: 0.6%
+                - generic [ref=e2605]:
+                  - generic [ref=e2606]:
+                    - generic [ref=e2607]:
+                      - generic [ref=e2608]: 01:30
+                      - generic "Low" [ref=e2609]
+                    - generic [ref=e2611]: AUD
+                  - generic:
+                    - link "RBA Private Sector Credit m/m" [ref=e2614] [cursor=pointer]:
+                      - /url: /en/economic-calendar/australia/rba-private-sector-credit-mm
+                    - generic [ref=e2615]:
+                      - generic [ref=e2616]: 0.8%
+                      - generic [ref=e2617]: 0.6%
+                      - generic [ref=e2619]: 0.6%
+                - generic [ref=e2620]:
+                  - generic [ref=e2621]:
+                    - generic [ref=e2622]:
+                      - generic [ref=e2623]: 06:00
+                      - generic "Low" [ref=e2624]
+                    - generic [ref=e2626]: JPY
+                  - generic:
+                    - link "Construction Orders y/y" [ref=e2629] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/construction-orders-yy
+                    - generic [ref=e2630]:
+                      - generic [ref=e2631]: 20.2%
+                      - generic [ref=e2632]: 39.7%
+                      - generic [ref=e2634]: 9.5%
+                - generic [ref=e2635]:
+                  - generic [ref=e2636]:
+                    - generic [ref=e2637]:
+                      - generic [ref=e2638]: 06:00
+                      - generic "Low" [ref=e2639]
+                    - generic [ref=e2641]: JPY
+                  - generic:
+                    - link "Housing Starts y/y" [ref=e2644] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/housing-starts-yy
+                    - generic [ref=e2645]:
+                      - generic [ref=e2646]: "-1.3%"
+                      - generic [ref=e2647]: "-5.6%"
+                      - generic [ref=e2649]: "-8.5%"
+                - generic [ref=e2650]:
+                  - generic [ref=e2651]:
+                    - generic [ref=e2652]:
+                      - generic [ref=e2653]: 06:00
+                      - generic "Low" [ref=e2654]
+                    - generic [ref=e2656]: JPY
+                  - generic:
+                    - link "Annualized Housing Starts" [ref=e2659] [cursor=pointer]:
+                      - /url: /en/economic-calendar/japan/annualized-housing-starts
+                    - generic [ref=e2660]:
+                      - generic [ref=e2661]: 0.771 M
+                      - generic [ref=e2664]: 0.718 M
+                - generic [ref=e2665]:
+                  - generic [ref=e2666]:
+                    - generic [ref=e2667]:
+                      - generic [ref=e2668]: 07:00
+                      - generic "Low" [ref=e2669]
+                    - generic [ref=e2671]: ZAR
+                  - generic:
+                    - link "SARB Private Sector Credit y/y" [ref=e2674] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-africa/sarb-private-sector-credit-yy
+                    - generic [ref=e2676]: N/D
+                - generic [ref=e2679]:
+                  - generic [ref=e2680]:
+                    - generic [ref=e2681]:
+                      - generic [ref=e2682]: 07:00
+                      - generic "Low" [ref=e2683]
+                    - generic [ref=e2685]: ZAR
+                  - generic:
+                    - link "SARB M3 Money Supply y/y" [ref=e2688] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-africa/sarb-m3-money-supply-yy
+                    - generic [ref=e2690]: N/D
+                - generic [ref=e2693]:
+                  - generic [ref=e2694]:
+                    - generic [ref=e2695]:
+                      - generic [ref=e2696]: 07:30
+                      - generic "Medium" [ref=e2697]
+                    - generic [ref=e2699]: EUR
+                  - generic:
+                    - link "GDP q/q" [ref=e2702] [cursor=pointer]:
+                      - /url: /en/economic-calendar/france/gdp-qq
+                    - generic [ref=e2703]:
+                      - generic [ref=e2704]: 0.2%
+                      - generic [ref=e2705]: 0.3%
+                      - generic [ref=e2707]: 0.5%
+                - generic [ref=e2708]:
+                  - generic [ref=e2709]:
+                    - generic [ref=e2710]:
+                      - generic [ref=e2711]: 07:30
+                      - generic "Medium" [ref=e2712]
+                    - generic [ref=e2714]: EUR
+                  - generic:
+                    - link "GDP y/y" [ref=e2717] [cursor=pointer]:
+                      - /url: /en/economic-calendar/france/gdp-yy
+                    - generic [ref=e2718]:
+                      - generic [ref=e2719]: 1.1%
+                      - generic [ref=e2720]: 0.8%
+                      - generic [ref=e2722]: 0.9%
+                - generic [ref=e2723]:
+                  - generic [ref=e2724]:
+                    - generic [ref=e2725]:
+                      - generic [ref=e2726]: 07:30
+                      - generic "Medium" [ref=e2727]
+                    - generic [ref=e2729]: EUR
+                  - generic:
+                    - link "Consumer Spending m/m" [ref=e2732] [cursor=pointer]:
+                      - /url: /en/economic-calendar/france/consumer-spending-mm
+                    - generic [ref=e2733]:
+                      - generic [ref=e2734]: "-0.6%"
+                      - generic [ref=e2735]: 0.2%
+                      - generic [ref=e2737]: "-0.3%"
+                - generic [ref=e2738]:
+                  - generic [ref=e2739]:
+                    - generic [ref=e2740]:
+                      - generic [ref=e2741]: 08:00
+                      - generic "Low" [ref=e2742]
+                    - generic [ref=e2744]: EUR
+                  - generic:
+                    - link "Import Price Index m/m" [ref=e2747] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/import-price-index-mm
+                    - generic [ref=e2748]:
+                      - generic [ref=e2749]: "-0.1%"
+                      - generic [ref=e2750]: "-0.1%"
+                      - generic [ref=e2752]: 0.5%
+                - generic [ref=e2753]:
+                  - generic [ref=e2754]:
+                    - generic [ref=e2755]:
+                      - generic [ref=e2756]: 08:00
+                      - generic "Low" [ref=e2757]
+                    - generic [ref=e2759]: EUR
+                  - generic:
+                    - link "Import Price Index y/y" [ref=e2762] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/import-price-index-yy
+                    - generic [ref=e2763]:
+                      - generic [ref=e2764]: "-2.3%"
+                      - generic [ref=e2765]: "-3.2%"
+                      - generic [ref=e2767]: "-1.9%"
+                - generic [ref=e2768]:
+                  - generic [ref=e2769]:
+                    - generic [ref=e2770]:
+                      - generic [ref=e2771]: 08:00
+                      - generic "Low" [ref=e2772]
+                    - generic [ref=e2774]: EUR
+                  - generic:
+                    - link "Export Price Index m/m" [ref=e2777] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/export-price-index-mm
+                    - generic [ref=e2778]:
+                      - generic [ref=e2779]: "-0.1%"
+                      - generic [ref=e2780]: "-0.1%"
+                      - generic [ref=e2782]: 0.2%
+                - generic [ref=e2783]:
+                  - generic [ref=e2784]:
+                    - generic [ref=e2785]:
+                      - generic [ref=e2786]: 08:00
+                      - generic "Low" [ref=e2787]
+                    - generic [ref=e2789]: EUR
+                  - generic:
+                    - link "Export Price Index y/y" [ref=e2792] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/export-price-index-yy
+                    - generic [ref=e2793]:
+                      - generic [ref=e2794]: 0.0%
+                      - generic [ref=e2795]: 0.0%
+                      - generic [ref=e2797]: 0.3%
+                - generic [ref=e2798]:
+                  - generic [ref=e2799]:
+                    - generic [ref=e2800]:
+                      - generic [ref=e2801]: 08:00
+                      - generic "High" [ref=e2802]
+                    - generic [ref=e2804]: EUR
+                  - generic:
+                    - link "GDP q/q" [ref=e2807] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/gdp-qq
+                    - generic [ref=e2808]:
+                      - generic [ref=e2809]: 0.3%
+                      - generic [ref=e2810]: "-0.4%"
+                      - generic [ref=e2812]: 0.0%
+                - generic [ref=e2813]:
+                  - generic [ref=e2814]:
+                    - generic [ref=e2815]:
+                      - generic [ref=e2816]: 08:00
+                      - generic "Medium" [ref=e2817]
+                    - generic [ref=e2819]: EUR
+                  - generic:
+                    - link "GDP y/y" [ref=e2822] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/gdp-yy
+                    - generic [ref=e2823]:
+                      - generic [ref=e2824]: 0.6%
+                      - generic [ref=e2825]: 0.1%
+                      - generic [ref=e2827]: 0.3%
+                - generic [ref=e2828]:
+                  - generic [ref=e2829]:
+                    - generic [ref=e2830]:
+                      - generic [ref=e2831]: 08:00
+                      - generic "Low" [ref=e2832]
+                    - generic [ref=e2834]: NOK
+                  - generic:
+                    - link "Retail Sales m/m" [ref=e2837] [cursor=pointer]:
+                      - /url: /en/economic-calendar/norway/retail-sales-mm
+                    - generic [ref=e2838]:
+                      - generic [ref=e2839]: "-0.7%"
+                      - generic [ref=e2840]: 0.5%
+                      - generic [ref=e2841]: 1.2%
+                - generic [ref=e2842]:
+                  - generic [ref=e2843]:
+                    - generic [ref=e2844]:
+                      - generic [ref=e2845]: 08:00
+                      - generic "Low" [ref=e2846]
+                    - generic [ref=e2848]: NOK
+                  - generic:
+                    - link "Retail Sales y/y" [ref=e2851] [cursor=pointer]:
+                      - /url: /en/economic-calendar/norway/retail-sales-yy
+                    - generic [ref=e2852]:
+                      - generic [ref=e2853]: 3.2%
+                      - generic [ref=e2854]: 4.7%
+                      - generic [ref=e2856]: 5.2%
+                - generic [ref=e2857]:
+                  - generic [ref=e2858]:
+                    - generic [ref=e2859]:
+                      - generic [ref=e2860]: 08:00
+                      - generic "Low" [ref=e2861]
+                    - generic [ref=e2863]: SEK
+                  - generic:
+                    - link "Retail Sales m/m" [ref=e2866] [cursor=pointer]:
+                      - /url: /en/economic-calendar/sweden/retail-sales-mm
+                    - generic [ref=e2867]:
+                      - generic [ref=e2868]: "-0.7%"
+                      - generic [ref=e2869]: "-0.3%"
+                      - generic [ref=e2871]: 1.1%
+                - generic [ref=e2872]:
+                  - generic [ref=e2873]:
+                    - generic [ref=e2874]:
+                      - generic [ref=e2875]: 08:00
+                      - generic "Low" [ref=e2876]
+                    - generic [ref=e2878]: SEK
+                  - generic:
+                    - link "Retail Sales y/y" [ref=e2881] [cursor=pointer]:
+                      - /url: /en/economic-calendar/sweden/retail-sales-yy
+                    - generic [ref=e2882]:
+                      - generic [ref=e2883]: 1.5%
+                      - generic [ref=e2884]: 2.8%
+                      - generic [ref=e2885]: 6.9%
+                - generic [ref=e2886]:
+                  - generic [ref=e2887]:
+                    - generic [ref=e2888]:
+                      - generic [ref=e2889]: 08:45
+                      - generic "Low" [ref=e2890]
+                    - generic [ref=e2892]: EUR
+                  - generic:
+                    - link "PPI m/m" [ref=e2895] [cursor=pointer]:
+                      - /url: /en/economic-calendar/france/ppi-mm
+                    - generic [ref=e2896]:
+                      - generic [ref=e2897]: 2.8%
+                      - generic [ref=e2898]: 1.4%
+                      - generic [ref=e2900]: 0.0%
+                - generic [ref=e2901]:
+                  - generic [ref=e2902]:
+                    - generic [ref=e2903]:
+                      - generic [ref=e2904]: 08:45
+                      - generic "Low" [ref=e2905]
+                    - generic [ref=e2907]: EUR
+                  - generic:
+                    - link "Nonfarm Payrolls q/q" [ref=e2910] [cursor=pointer]:
+                      - /url: /en/economic-calendar/france/nonfarm-payrolls-qq
+                    - generic [ref=e2911]:
+                      - generic [ref=e2912]: "-0.1%"
+                      - generic [ref=e2913]: 0.0%
+                      - generic [ref=e2914]: "-0.1%"
+                - generic [ref=e2915]:
+                  - generic [ref=e2916]:
+                    - generic [ref=e2917]:
+                      - generic [ref=e2918]: 09:00
+                      - generic "Low" [ref=e2919]
+                    - generic [ref=e2921]: EUR
+                  - generic:
+                    - link "CPI m/m" [ref=e2924] [cursor=pointer]:
+                      - /url: /en/economic-calendar/spain/cpi-mm
+                    - generic [ref=e2925]:
+                      - generic [ref=e2926]: "-0.4%"
+                      - generic [ref=e2927]: "-0.2%"
+                      - generic [ref=e2929]: 0.3%
+                - generic [ref=e2930]:
+                  - generic [ref=e2931]:
+                    - generic [ref=e2932]:
+                      - generic [ref=e2933]: 09:00
+                      - generic "Medium" [ref=e2934]
+                    - generic [ref=e2936]: EUR
+                  - generic:
+                    - link "CPI y/y" [ref=e2939] [cursor=pointer]:
+                      - /url: /en/economic-calendar/spain/cpi-yy
+                    - generic [ref=e2940]:
+                      - generic [ref=e2941]: 2.4%
+                      - generic [ref=e2942]: 2.8%
+                      - generic [ref=e2944]: 2.9%
+                - generic [ref=e2945]:
+                  - generic [ref=e2946]:
+                    - generic [ref=e2947]:
+                      - generic [ref=e2948]: 09:00
+                      - generic "Low" [ref=e2949]
+                    - generic [ref=e2951]: EUR
+                  - generic:
+                    - link "HICP m/m" [ref=e2954] [cursor=pointer]:
+                      - /url: /en/economic-calendar/spain/hicp-mm
+                    - generic [ref=e2955]:
+                      - generic [ref=e2956]: "-0.7%"
+                      - generic [ref=e2957]: "-0.2%"
+                      - generic [ref=e2959]: 0.3%
+                - generic [ref=e2960]:
+                  - generic [ref=e2961]:
+                    - generic [ref=e2962]:
+                      - generic [ref=e2963]: 09:00
+                      - generic "Medium" [ref=e2964]
+                    - generic [ref=e2966]: EUR
+                  - generic:
+                    - link "HICP y/y" [ref=e2969] [cursor=pointer]:
+                      - /url: /en/economic-calendar/spain/hicp-yy
+                    - generic [ref=e2970]:
+                      - generic [ref=e2971]: 2.5%
+                      - generic [ref=e2972]: 2.8%
+                      - generic [ref=e2974]: 3.0%
+                - generic [ref=e2975]:
+                  - generic [ref=e2976]:
+                    - generic [ref=e2977]:
+                      - generic [ref=e2978]: 09:00
+                      - generic "Medium" [ref=e2979]
+                    - generic [ref=e2981]: EUR
+                  - generic:
+                    - link "GDP q/q" [ref=e2984] [cursor=pointer]:
+                      - /url: /en/economic-calendar/spain/gdp-qq
+                    - generic [ref=e2985]:
+                      - generic [ref=e2986]: 0.8%
+                      - generic [ref=e2987]: 0.6%
+                      - generic [ref=e2989]: 0.6%
+                - generic [ref=e2990]:
+                  - generic [ref=e2991]:
+                    - generic [ref=e2992]:
+                      - generic [ref=e2993]: 09:00
+                      - generic "Low" [ref=e2994]
+                    - generic [ref=e2996]: EUR
+                  - generic:
+                    - link "GDP y/y" [ref=e2999] [cursor=pointer]:
+                      - /url: /en/economic-calendar/spain/gdp-yy
+                    - generic [ref=e3000]:
+                      - generic [ref=e3001]: 2.6%
+                      - generic [ref=e3002]: 2.8%
+                      - generic [ref=e3004]: 2.8%
+                - generic [ref=e3005]:
+                  - generic [ref=e3006]:
+                    - generic [ref=e3007]:
+                      - generic [ref=e3008]: 09:00
+                      - generic "Medium" [ref=e3009]
+                    - generic [ref=e3011]: CHF
+                  - generic:
+                    - link "KOF Economic Barometer" [ref=e3014] [cursor=pointer]:
+                      - /url: /en/economic-calendar/switzerland/kof-economic-barometer
+                    - generic [ref=e3015]:
+                      - generic [ref=e3016]: "102.5"
+                      - generic [ref=e3017]: "100.3"
+                      - generic [ref=e3018]: "103.6"
+                - generic [ref=e3019]:
+                  - generic [ref=e3020]:
+                    - generic [ref=e3021]:
+                      - generic [ref=e3022]: 09:30
+                      - generic "Low" [ref=e3023]
+                    - generic [ref=e3025]: HKD
+                  - generic:
+                    - link "HKMA M3 Money Supply y/y" [ref=e3028] [cursor=pointer]:
+                      - /url: /en/economic-calendar/hong-kong/hkma-m3-money-supply-yy
+                    - generic [ref=e3029]:
+                      - generic [ref=e3030]: 4.2%
+                      - generic [ref=e3031]: 4.5%
+                      - generic [ref=e3033]: 4.5%
+                - generic [ref=e3034]:
+                  - generic [ref=e3035]:
+                    - generic [ref=e3036]:
+                      - generic [ref=e3037]: 09:30
+                      - generic "Low" [ref=e3038]
+                    - generic [ref=e3040]: HKD
+                  - generic:
+                    - link "GDP q/q" [ref=e3043] [cursor=pointer]:
+                      - /url: /en/economic-calendar/hong-kong/gdp-qq
+                    - generic [ref=e3044]:
+                      - generic [ref=e3045]: 1.0%
+                      - generic [ref=e3046]: 0.3%
+                      - generic [ref=e3047]: 0.9%
+                - generic [ref=e3048]:
+                  - generic [ref=e3049]:
+                    - generic [ref=e3050]:
+                      - generic [ref=e3051]: 09:30
+                      - generic "Low" [ref=e3052]
+                    - generic [ref=e3054]: HKD
+                  - generic:
+                    - link "GDP y/y" [ref=e3057] [cursor=pointer]:
+                      - /url: /en/economic-calendar/hong-kong/gdp-yy
+                    - generic [ref=e3058]:
+                      - generic [ref=e3059]: 3.8%
+                      - generic [ref=e3060]: 3.4%
+                      - generic [ref=e3061]: 3.7%
+                - generic [ref=e3062]:
+                  - generic [ref=e3063]:
+                    - generic [ref=e3064]:
+                      - generic [ref=e3065]: 09:55
+                      - generic "Medium" [ref=e3066]
+                    - generic [ref=e3068]: EUR
+                  - generic:
+                    - link "Unemployment Change" [ref=e3071] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/unemployment-change
+                    - generic [ref=e3072]:
+                      - generic [ref=e3073]: 0 K
+                      - generic [ref=e3074]: "-3 K"
+                      - generic [ref=e3076]: 3 K
+                - generic [ref=e3077]:
+                  - generic [ref=e3078]:
+                    - generic [ref=e3079]:
+                      - generic [ref=e3080]: 09:55
+                      - generic "Medium" [ref=e3081]
+                    - generic [ref=e3083]: EUR
+                  - generic:
+                    - link "Unemployment Rate" [ref=e3086] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/unemployment-rate
+                    - generic [ref=e3087]:
+                      - generic [ref=e3088]: 6.3%
+                      - generic [ref=e3089]: 6.3%
+                      - generic [ref=e3091]: 6.3%
+                - generic [ref=e3092]:
+                  - generic [ref=e3093]:
+                    - generic [ref=e3094]:
+                      - generic [ref=e3095]: 09:55
+                      - generic "Low" [ref=e3096]
+                    - generic [ref=e3098]: EUR
+                  - generic:
+                    - link "Unemployment n.s.a." [ref=e3101] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/unemployment-nsa
+                    - generic [ref=e3102]:
+                      - generic [ref=e3103]: 3.085 M
+                      - generic [ref=e3104]: 2.937 M
+                      - generic [ref=e3106]: 2.908 M
+                - generic [ref=e3107]:
+                  - generic [ref=e3108]:
+                    - generic [ref=e3109]:
+                      - generic [ref=e3110]: 09:55
+                      - generic "Medium" [ref=e3111]
+                    - generic [ref=e3113]: EUR
+                  - generic:
+                    - link "Unemployment" [ref=e3116] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/unemployment
+                    - generic [ref=e3117]:
+                      - generic [ref=e3118]: 2.976 M
+                      - generic [ref=e3119]: 2.976 M
+                      - generic [ref=e3120]: 2.976 M
+                - generic [ref=e3121]:
+                  - generic [ref=e3122]:
+                    - generic [ref=e3123]:
+                      - generic [ref=e3124]: 10:00
+                      - generic "Low" [ref=e3125]
+                    - generic [ref=e3127]: EUR
+                  - generic:
+                    - link "GDP q/q" [ref=e3130] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/gdp-qq
+                    - generic [ref=e3131]:
+                      - generic [ref=e3132]: 0.3%
+                      - generic [ref=e3133]: 0.2%
+                      - generic [ref=e3134]: 0.2%
+                - generic [ref=e3135]:
+                  - generic [ref=e3136]:
+                    - generic [ref=e3137]:
+                      - generic [ref=e3138]: 10:00
+                      - generic "Low" [ref=e3139]
+                    - generic [ref=e3141]: EUR
+                  - generic:
+                    - link "GDP y/y" [ref=e3144] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/gdp-yy
+                    - generic [ref=e3145]:
+                      - generic [ref=e3146]: 0.8%
+                      - generic [ref=e3147]: 0.6%
+                      - generic [ref=e3149]: 0.6%
+                - generic [ref=e3150]:
+                  - generic [ref=e3151]:
+                    - generic [ref=e3152]:
+                      - generic [ref=e3153]: 10:00
+                      - generic "Low" [ref=e3154]
+                    - generic [ref=e3156]: NOK
+                  - generic:
+                    - link "NAV Unemployment Rate n.s.a." [ref=e3159] [cursor=pointer]:
+                      - /url: /en/economic-calendar/norway/nav-unemployment-rate-nsa
+                    - generic [ref=e3160]:
+                      - generic [ref=e3161]: 2.3%
+                      - generic [ref=e3162]: 2.2%
+                      - generic [ref=e3164]: 2.1%
+                - generic [ref=e3165]:
+                  - generic [ref=e3166]:
+                    - generic [ref=e3167]:
+                      - generic [ref=e3168]: 10:00
+                      - generic "Low" [ref=e3169]
+                    - generic [ref=e3171]: NOK
+                  - generic:
+                    - link "NAV Unemployment Change" [ref=e3174] [cursor=pointer]:
+                      - /url: /en/economic-calendar/norway/nav-unemployment-change
+                    - generic [ref=e3175]:
+                      - generic [ref=e3176]: 76.849 K
+                      - generic [ref=e3177]: 45.631 K
+                      - generic [ref=e3178]: 77.040 K
+                - generic [ref=e3179]:
+                  - generic [ref=e3180]:
+                    - generic [ref=e3181]:
+                      - generic [ref=e3182]: 10:00
+                      - generic "Low" [ref=e3183]
+                    - generic [ref=e3185]: EUR
+                  - generic:
+                    - link "Current Account" [ref=e3188] [cursor=pointer]:
+                      - /url: /en/economic-calendar/spain/current-account
+                    - generic [ref=e3189]:
+                      - generic [ref=e3190]: €0.210 B
+                      - generic [ref=e3191]: €5.553 B
+                      - generic [ref=e3193]: €7.180 B
+                - generic [ref=e3194]:
+                  - generic [ref=e3195]:
+                    - generic [ref=e3196]:
+                      - generic [ref=e3197]: 10:30
+                      - generic "Low" [ref=e3198]
+                    - generic [ref=e3200]: GBP
+                  - generic:
+                    - link "BoE Consumer Credit m/m" [ref=e3203] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-kingdom/boe-consumer-credit
+                    - generic [ref=e3204]:
+                      - generic [ref=e3205]: £1.524 B
+                      - generic [ref=e3206]: £1.410 B
+                      - generic [ref=e3207]: £2.143 B
+                - generic [ref=e3208]:
+                  - generic [ref=e3209]:
+                    - generic [ref=e3210]:
+                      - generic [ref=e3211]: 10:30
+                      - generic "Low" [ref=e3212]
+                    - generic [ref=e3214]: GBP
+                  - generic:
+                    - link "BoE M4 Money Supply m/m" [ref=e3217] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-kingdom/boe-m4-money-supply-mm
+                    - generic [ref=e3218]:
+                      - generic [ref=e3219]: 0.3%
+                      - generic [ref=e3220]: 0.6%
+                      - generic [ref=e3222]: 0.8%
+                - generic [ref=e3223]:
+                  - generic [ref=e3224]:
+                    - generic [ref=e3225]:
+                      - generic [ref=e3226]: 10:30
+                      - generic "Low" [ref=e3227]
+                    - generic [ref=e3229]: GBP
+                  - generic:
+                    - link "BoE Mortgage Approvals" [ref=e3232] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-kingdom/boe-mortgage-approvals
+                    - generic [ref=e3233]:
+                      - generic [ref=e3234]: 61.013 K
+                      - generic [ref=e3235]: 64.664 K
+                      - generic [ref=e3236]: 64.072 K
+                - generic [ref=e3237]:
+                  - generic [ref=e3238]:
+                    - generic [ref=e3239]:
+                      - generic [ref=e3240]: 10:30
+                      - generic "Low" [ref=e3241]
+                    - generic [ref=e3243]: GBP
+                  - generic:
+                    - link "BoE Mortgage Lending m/m" [ref=e3246] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-kingdom/boe-mortgage-lending
+                    - generic [ref=e3247]:
+                      - generic [ref=e3248]: £4.601 B
+                      - generic [ref=e3249]: £4.529 B
+                      - generic [ref=e3250]: £4.593 B
+                - generic [ref=e3251]:
+                  - generic [ref=e3252]:
+                    - generic [ref=e3253]:
+                      - generic [ref=e3254]: 10:30
+                      - generic "Low" [ref=e3255]
+                    - generic [ref=e3257]: GBP
+                  - generic:
+                    - link "BoE Net Lending to Individuals m/m" [ref=e3260] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-kingdom/boe-net-lending-to-individuals
+                    - generic [ref=e3261]:
+                      - generic [ref=e3262]: £6.126 B
+                      - generic [ref=e3263]: £6.022 B
+                      - generic [ref=e3264]: £6.737 B
+                - generic [ref=e3265]:
+                  - generic [ref=e3266]:
+                    - generic [ref=e3267]:
+                      - generic [ref=e3268]: 11:00
+                      - generic "Low" [ref=e3269]
+                    - generic [ref=e3271]: EUR
+                  - generic:
+                    - link "Unemployment Rate" [ref=e3274] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/unemployment-rate
+                    - generic [ref=e3275]:
+                      - generic [ref=e3276]: 5.6%
+                      - generic [ref=e3277]: 5.9%
+                      - generic [ref=e3278]: 5.6%
+                - generic [ref=e3279]:
+                  - generic [ref=e3280]:
+                    - generic [ref=e3281]:
+                      - generic [ref=e3282]: 11:00
+                      - generic "Medium" [ref=e3283]
+                    - generic [ref=e3285]: EUR
+                  - generic:
+                    - link "GDP q/q" [ref=e3288] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/gross-domestic-product-qq
+                    - generic [ref=e3289]:
+                      - generic [ref=e3290]: 0.3%
+                      - generic [ref=e3291]: 0.1%
+                      - generic [ref=e3292]: 0.3%
+                - generic [ref=e3293]:
+                  - generic [ref=e3294]:
+                    - generic [ref=e3295]:
+                      - generic [ref=e3296]: 11:00
+                      - generic "Medium" [ref=e3297]
+                    - generic [ref=e3299]: EUR
+                  - generic:
+                    - link "GDP y/y" [ref=e3302] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/gross-domestic-product-yy
+                    - generic [ref=e3303]:
+                      - generic [ref=e3304]: 1.3%
+                      - generic [ref=e3305]: 1.3%
+                      - generic [ref=e3307]: 1.4%
+                - generic [ref=e3308]:
+                  - generic [ref=e3309]:
+                    - generic [ref=e3310]:
+                      - generic [ref=e3311]: 11:00
+                      - generic "Medium" [ref=e3312]
+                    - generic [ref=e3314]: EUR
+                  - generic:
+                    - link "Unemployment Rate" [ref=e3317] [cursor=pointer]:
+                      - /url: /en/economic-calendar/european-union/unemployment-rate
+                    - generic [ref=e3318]:
+                      - generic [ref=e3319]: 6.2%
+                      - generic [ref=e3320]: 6.4%
+                      - generic [ref=e3322]: 6.3%
+                - generic [ref=e3323]:
+                  - generic [ref=e3324]:
+                    - generic [ref=e3325]:
+                      - generic [ref=e3326]: 11:37
+                      - generic "Low" [ref=e3327]
+                    - generic [ref=e3329]: INR
+                  - generic:
+                    - link "Fiscal Balance" [ref=e3332] [cursor=pointer]:
+                      - /url: /en/economic-calendar/india/fiscal-balance
+                    - generic [ref=e3333]:
+                      - generic [ref=e3334]: ₹-8.558 T
+                      - generic [ref=e3337]: ₹-9.767 T
+                - generic [ref=e3338]:
+                  - generic [ref=e3339]:
+                    - generic [ref=e3340]:
+                      - generic [ref=e3341]: 12:00
+                      - generic "Low" [ref=e3342]
+                    - generic [ref=e3344]: EUR
+                  - generic:
+                    - link "PPI m/m" [ref=e3347] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/ppi-mm
+                    - generic [ref=e3348]:
+                      - generic [ref=e3349]: "-0.7%"
+                      - generic [ref=e3350]: 0.1%
+                      - generic [ref=e3352]: 1.0%
+                - generic [ref=e3353]:
+                  - generic [ref=e3354]:
+                    - generic [ref=e3355]:
+                      - generic [ref=e3356]: 12:00
+                      - generic "Low" [ref=e3357]
+                    - generic [ref=e3359]: EUR
+                  - generic:
+                    - link "PPI y/y" [ref=e3362] [cursor=pointer]:
+                      - /url: /en/economic-calendar/italy/ppi-yy
+                    - generic [ref=e3363]:
+                      - generic [ref=e3364]: "-1.4%"
+                      - generic [ref=e3365]: "-1.7%"
+                      - generic [ref=e3367]: "-0.2%"
+                - generic [ref=e3368]:
+                  - generic [ref=e3369]:
+                    - generic [ref=e3370]:
+                      - generic [ref=e3371]: 12:30
+                      - generic "Low" [ref=e3372]
+                    - generic [ref=e3374]: INR
+                  - generic:
+                    - link "Infrastructure Output y/y" [ref=e3377] [cursor=pointer]:
+                      - /url: /en/economic-calendar/india/infrastructure-output-yy
+                    - generic [ref=e3378]:
+                      - generic [ref=e3379]: 3.7%
+                      - generic [ref=e3382]: 2.1%
+                - generic [ref=e3383]:
+                  - generic [ref=e3384]:
+                    - generic [ref=e3385]:
+                      - generic [ref=e3386]: 12:30
+                      - generic "Low" [ref=e3387]
+                    - generic [ref=e3389]: INR
+                  - generic:
+                    - link "Foreign Exchange Reserves" [ref=e3392] [cursor=pointer]:
+                      - /url: /en/economic-calendar/india/foreign-exchange-reserves
+                    - generic [ref=e3393]:
+                      - generic [ref=e3394]: $709.413 B
+                      - generic [ref=e3395]: $709.161 B
+                      - generic [ref=e3397]: $701.360 B
+                - generic [ref=e3398]:
+                  - generic [ref=e3399]:
+                    - generic [ref=e3400]:
+                      - generic [ref=e3401]: 12:30
+                      - generic "Medium" [ref=e3402]
+                    - generic [ref=e3404]: INR
+                  - link "RBI Monetary and Credit Information Review" [ref=e3407] [cursor=pointer]:
+                    - /url: /en/economic-calendar/india/rbi-monetary-credit-information-review
+                - generic [ref=e3412]:
+                  - generic [ref=e3413]:
+                    - generic [ref=e3414]:
+                      - generic [ref=e3415]: 12:30
+                      - generic "Low" [ref=e3416]
+                    - generic [ref=e3418]: EUR
+                  - generic:
+                    - link "Consumer Confidence" [ref=e3421] [cursor=pointer]:
+                      - /url: /en/economic-calendar/spain/consumer-confidence
+                    - generic [ref=e3423]: N/D
+                - generic [ref=e3426]:
+                  - generic [ref=e3427]:
+                    - generic [ref=e3428]:
+                      - generic [ref=e3429]: 13:00
+                      - generic "Medium" [ref=e3430]
+                    - generic [ref=e3432]: BRL
+                  - generic:
+                    - link "Unemployment Rate 3-months" [ref=e3435] [cursor=pointer]:
+                      - /url: /en/economic-calendar/brazil/unemployment-rate-3-months
+                    - generic [ref=e3436]:
+                      - generic [ref=e3437]: 5.1%
+                      - generic [ref=e3438]: 5.0%
+                      - generic [ref=e3440]: 5.2%
+                - generic [ref=e3441]:
+                  - generic [ref=e3442]:
+                    - generic [ref=e3443]:
+                      - generic [ref=e3444]: 13:00
+                      - generic "Medium" [ref=e3445]
+                    - generic [ref=e3447]: MXN
+                  - generic:
+                    - link "GDP q/q" [ref=e3450] [cursor=pointer]:
+                      - /url: /en/economic-calendar/mexico/gdp-qq
+                    - generic [ref=e3451]:
+                      - generic [ref=e3452]: 0.8%
+                      - generic [ref=e3453]: 0.4%
+                      - generic [ref=e3455]: "-0.3%"
+                - generic [ref=e3456]:
+                  - generic [ref=e3457]:
+                    - generic [ref=e3458]:
+                      - generic [ref=e3459]: 13:00
+                      - generic "Medium" [ref=e3460]
+                    - generic [ref=e3462]: MXN
+                  - generic:
+                    - link "GDP n.s.a. y/y" [ref=e3465] [cursor=pointer]:
+                      - /url: /en/economic-calendar/mexico/gdp-nsa-yy
+                    - generic [ref=e3466]:
+                      - generic [ref=e3467]: 1.6%
+                      - generic [ref=e3468]: 0.1%
+                      - generic [ref=e3470]: "-0.2%"
+                - generic [ref=e3471]:
+                  - generic [ref=e3472]:
+                    - generic [ref=e3473]:
+                      - generic [ref=e3474]: 13:00
+                      - generic "Low" [ref=e3475]
+                    - generic [ref=e3477]: ZAR
+                  - generic:
+                    - link "Trade Balance" [ref=e3480] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-africa/trade-balance
+                    - generic [ref=e3481]:
+                      - generic [ref=e3482]: R23.177 B
+                      - generic [ref=e3485]: R37.920 B
+                - generic [ref=e3486]:
+                  - generic [ref=e3487]:
+                    - generic [ref=e3488]:
+                      - generic [ref=e3489]: 14:00
+                      - generic "Medium" [ref=e3490]
+                    - generic [ref=e3492]: EUR
+                  - generic:
+                    - link "CPI m/m" [ref=e3495] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/cpi-mm
+                    - generic [ref=e3496]:
+                      - generic [ref=e3497]: 0.1%
+                      - generic [ref=e3498]: 0.1%
+                      - generic [ref=e3500]: 0.0%
+                - generic [ref=e3501]:
+                  - generic [ref=e3502]:
+                    - generic [ref=e3503]:
+                      - generic [ref=e3504]: 14:00
+                      - generic "Medium" [ref=e3505]
+                    - generic [ref=e3507]: EUR
+                  - generic:
+                    - link "CPI y/y" [ref=e3510] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/cpi-yy
+                    - generic [ref=e3511]:
+                      - generic [ref=e3512]: 2.1%
+                      - generic [ref=e3513]: 1.7%
+                      - generic [ref=e3515]: 1.8%
+                - generic [ref=e3516]:
+                  - generic [ref=e3517]:
+                    - generic [ref=e3518]:
+                      - generic [ref=e3519]: 14:00
+                      - generic "Low" [ref=e3520]
+                    - generic [ref=e3522]: EUR
+                  - generic:
+                    - link "HICP m/m" [ref=e3525] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/hicp-mm
+                    - generic [ref=e3526]:
+                      - generic [ref=e3527]: "-0.1%"
+                      - generic [ref=e3528]: 0.1%
+                      - generic [ref=e3530]: 0.2%
+                - generic [ref=e3531]:
+                  - generic [ref=e3532]:
+                    - generic [ref=e3533]:
+                      - generic [ref=e3534]: 14:00
+                      - generic "Low" [ref=e3535]
+                    - generic [ref=e3537]: EUR
+                  - generic:
+                    - link "HICP y/y" [ref=e3540] [cursor=pointer]:
+                      - /url: /en/economic-calendar/germany/hicp-yy
+                    - generic [ref=e3541]:
+                      - generic [ref=e3542]: 2.1%
+                      - generic [ref=e3543]: 1.7%
+                      - generic [ref=e3545]: 2.0%
+                - generic [ref=e3546]:
+                  - generic [ref=e3547]:
+                    - generic [ref=e3548]:
+                      - generic [ref=e3549]: 14:30
+                      - generic "Medium" [ref=e3550]
+                    - generic [ref=e3552]: CAD
+                  - generic:
+                    - link "GDP m/m" [ref=e3555] [cursor=pointer]:
+                      - /url: /en/economic-calendar/canada/gdp-mm
+                    - generic [ref=e3556]:
+                      - generic [ref=e3557]: 0.0%
+                      - generic [ref=e3558]: 0.0%
+                      - generic [ref=e3560]: "-0.3%"
+                - generic [ref=e3561]:
+                  - generic [ref=e3562]:
+                    - generic [ref=e3563]:
+                      - generic [ref=e3564]: 14:30
+                      - generic "Medium" [ref=e3565]
+                    - generic [ref=e3567]: CAD
+                  - generic:
+                    - link "GDP y/y" [ref=e3570] [cursor=pointer]:
+                      - /url: /en/economic-calendar/canada/gdp-yy
+                    - generic [ref=e3571]:
+                      - generic [ref=e3572]: 0.6%
+                      - generic [ref=e3573]: 0.4%
+                      - generic [ref=e3574]: 0.5%
+                - generic [ref=e3575]:
+                  - generic [ref=e3576]:
+                    - generic [ref=e3577]:
+                      - generic [ref=e3578]: 14:30
+                      - generic "High" [ref=e3579]
+                    - generic [ref=e3581]: USD
+                  - generic:
+                    - link "PPI m/m" [ref=e3584] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/producer-price-index-mm
+                    - generic [ref=e3585]:
+                      - generic [ref=e3586]: 0.5%
+                      - generic [ref=e3587]: 0.5%
+                      - generic [ref=e3589]: 0.2%
+                - generic [ref=e3590]:
+                  - generic [ref=e3591]:
+                    - generic [ref=e3592]:
+                      - generic [ref=e3593]: 14:30
+                      - generic "Medium" [ref=e3594]
+                    - generic [ref=e3596]: USD
+                  - generic:
+                    - link "Core PPI m/m" [ref=e3599] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/producer-price-index-ex-food-energy-mm
+                    - generic [ref=e3600]:
+                      - generic [ref=e3601]: 0.7%
+                      - generic [ref=e3602]: "-0.6%"
+                      - generic [ref=e3604]: 0.0%
+                - generic [ref=e3605]:
+                  - generic [ref=e3606]:
+                    - generic [ref=e3607]:
+                      - generic [ref=e3608]: 14:30
+                      - generic "Low" [ref=e3609]
+                    - generic [ref=e3611]: USD
+                  - generic:
+                    - link "PPI y/y" [ref=e3614] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/producer-price-index-yy
+                    - generic [ref=e3615]:
+                      - generic [ref=e3616]: 3.0%
+                      - generic [ref=e3617]: 2.2%
+                      - generic [ref=e3619]: 3.0%
+                - generic [ref=e3620]:
+                  - generic [ref=e3621]:
+                    - generic [ref=e3622]:
+                      - generic [ref=e3623]: 14:30
+                      - generic "Low" [ref=e3624]
+                    - generic [ref=e3626]: USD
+                  - generic:
+                    - link "Core PPI y/y" [ref=e3629] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/producer-price-index-ex-food-energy-yy
+                    - generic [ref=e3630]:
+                      - generic [ref=e3631]: 3.3%
+                      - generic [ref=e3632]: 2.5%
+                      - generic [ref=e3634]: 3.0%
+                - generic [ref=e3635]:
+                  - generic [ref=e3636]:
+                    - generic [ref=e3637]:
+                      - generic [ref=e3638]: 15:45
+                      - generic "High" [ref=e3639]
+                    - generic [ref=e3641]: USD
+                  - generic:
+                    - link "MNI Chicago Business Barometer" [ref=e3644] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/chicago-pmi
+                    - generic [ref=e3646]: N/D
+                - generic [ref=e3649]:
+                  - generic [ref=e3650]:
+                    - generic [ref=e3651]:
+                      - generic [ref=e3652]: 17:00
+                      - generic "Low" [ref=e3653]
+                    - generic [ref=e3655]: CAD
+                  - generic:
+                    - link "Budget Balance" [ref=e3658] [cursor=pointer]:
+                      - /url: /en/economic-calendar/canada/budgetary-balance
+                    - generic [ref=e3659]:
+                      - generic [ref=e3660]: N/D
+                      - generic [ref=e3661]: $-3.761 B
+                      - generic [ref=e3663]: $-2.278 B
+                - generic [ref=e3664]:
+                  - generic [ref=e3665]:
+                    - generic [ref=e3666]:
+                      - generic [ref=e3667]: 17:00
+                      - generic "Low" [ref=e3668]
+                    - generic [ref=e3670]: CAD
+                  - generic:
+                    - link "Budget Balance, Fiscal Year" [ref=e3673] [cursor=pointer]:
+                      - /url: /en/economic-calendar/canada/budgetary-balance-fiscal-year
+                    - generic [ref=e3674]:
+                      - generic [ref=e3675]: N/D
+                      - generic [ref=e3676]: $-14.665 B
+                      - generic [ref=e3678]: $-18.369 B
+                - generic [ref=e3679]:
+                  - generic [ref=e3680]:
+                    - generic [ref=e3681]:
+                      - generic [ref=e3682]: 19:00
+                      - generic "Medium" [ref=e3683]
+                    - generic [ref=e3685]: USD
+                  - generic:
+                    - link "Baker Hughes US Oil Rig Count" [ref=e3688] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/baker-hughes-us-oil-rig-count
+                    - generic [ref=e3689]:
+                      - generic [ref=e3690]: "411"
+                      - generic [ref=e3693]: "411"
+                - generic [ref=e3694]:
+                  - generic [ref=e3695]:
+                    - generic [ref=e3696]:
+                      - generic [ref=e3697]: 19:00
+                      - generic "Medium" [ref=e3698]
+                    - generic [ref=e3700]: USD
+                  - generic:
+                    - link "Baker Hughes US Total Rig Count" [ref=e3703] [cursor=pointer]:
+                      - /url: /en/economic-calendar/united-states/baker-hughes-us-total-rig-count
+                    - generic [ref=e3704]:
+                      - generic [ref=e3705]: "546"
+                      - generic [ref=e3708]: "544"
+                - generic [ref=e3709]:
+                  - generic [ref=e3710]:
+                    - generic [ref=e3711]:
+                      - generic [ref=e3712]: 22:54
+                      - generic "Low" [ref=e3713]
+                    - generic [ref=e3715]: MXN
+                  - generic:
+                    - link "Fiscal Balance" [ref=e3718] [cursor=pointer]:
+                      - /url: /en/economic-calendar/mexico/fiscal-balance
+                    - generic [ref=e3719]:
+                      - generic [ref=e3720]: Mex$-414.437 B
+                      - generic [ref=e3721]: Mex$-0.900 B
+                      - generic [ref=e3722]: Mex$-199.621 B
+                - generic [ref=e3723]:
+                  - generic [ref=e3724]:
+                    - generic [ref=e3725]:
+                      - generic [ref=e3726]: 23:00
+                      - generic "Medium" [ref=e3727]
+                    - generic [ref=e3729]: USD
+                  - link "Fed Governor Bowman Speech" [ref=e3732] [cursor=pointer]:
+                    - /url: /en/economic-calendar/united-states/fed-governor-bowman-speech
+                - generic [ref=e3737]: 31 January, Saturday
+                - generic [ref=e3738]:
+                  - generic [ref=e3739]:
+                    - generic [ref=e3740]:
+                      - generic [ref=e3741]: 02:00
+                      - generic "High" [ref=e3742]
+                    - generic [ref=e3744]: CNY
+                  - generic:
+                    - link "Manufacturing PMI" [ref=e3747] [cursor=pointer]:
+                      - /url: /en/economic-calendar/china/manufacturing-pmi
+                    - generic [ref=e3748]:
+                      - generic [ref=e3749]: "49.3"
+                      - generic [ref=e3750]: "49.4"
+                      - generic [ref=e3752]: "50.1"
+                - generic [ref=e3753]:
+                  - generic [ref=e3754]:
+                    - generic [ref=e3755]:
+                      - generic [ref=e3756]: 02:00
+                      - generic "Medium" [ref=e3757]
+                    - generic [ref=e3759]: CNY
+                  - generic:
+                    - link "Non-Manufacturing PMI" [ref=e3762] [cursor=pointer]:
+                      - /url: /en/economic-calendar/china/non-manufacturing-pmi
+                    - generic [ref=e3763]:
+                      - generic [ref=e3764]: "49.4"
+                      - generic [ref=e3765]: "50.1"
+                      - generic [ref=e3767]: "50.2"
+                - generic [ref=e3768]:
+                  - generic [ref=e3769]:
+                    - generic [ref=e3770]:
+                      - generic [ref=e3771]: 02:00
+                      - generic "Medium" [ref=e3772]
+                    - generic [ref=e3774]: CNY
+                  - generic:
+                    - link "Composite PMI" [ref=e3777] [cursor=pointer]:
+                      - /url: /en/economic-calendar/china/composite-pmi
+                    - generic [ref=e3778]:
+                      - generic [ref=e3779]: "49.8"
+                      - generic [ref=e3782]: "50.7"
+                - generic [ref=e3783]: 1 February, Sunday
+                - generic [ref=e3784]:
+                  - generic [ref=e3785]:
+                    - generic [ref=e3786]:
+                      - generic [ref=e3787]: 01:00
+                      - generic "Low" [ref=e3788]
+                    - generic [ref=e3790]: KRW
+                  - generic:
+                    - link "Exports y/y" [ref=e3793] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-korea/exports-yy
+                    - generic [ref=e3794]:
+                      - generic [ref=e3796]: 11.1%
+                      - generic [ref=e3798]: 13.3%
+                - generic [ref=e3799]:
+                  - generic [ref=e3800]:
+                    - generic [ref=e3801]:
+                      - generic [ref=e3802]: 01:00
+                      - generic "Low" [ref=e3803]
+                    - generic [ref=e3805]: KRW
+                  - generic:
+                    - link "Imports y/y" [ref=e3808] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-korea/imports-yy
+                    - generic [ref=e3809]:
+                      - generic [ref=e3811]: 3.3%
+                      - generic [ref=e3813]: 4.6%
+                - generic [ref=e3814]:
+                  - generic [ref=e3815]:
+                    - generic [ref=e3816]:
+                      - generic [ref=e3817]: 01:00
+                      - generic "Low" [ref=e3818]
+                    - generic [ref=e3820]: KRW
+                  - generic:
+                    - link "Trade Balance" [ref=e3823] [cursor=pointer]:
+                      - /url: /en/economic-calendar/south-korea/trade-balance
+                    - generic [ref=e3824]:
+                      - generic [ref=e3826]: $9.176 B
+                      - generic [ref=e3828]: $12.170 B
+                - generic [ref=e3829]:
+                  - generic [ref=e3830]:
+                    - generic [ref=e3831]:
+                      - generic [ref=e3832]: 07:00
+                      - generic "Medium" [ref=e3833]
+                    - generic [ref=e3835]: INR
+                  - link "Union Budget Release" [ref=e3838] [cursor=pointer]:
+                    - /url: /en/economic-calendar/india/union-budget-release
+                - generic [ref=e3843]:
+                  - generic [ref=e3845] [cursor=pointer]: 19 - 25 Jan, 2026
+                  - generic [ref=e3847]: 26 Jan - 1 Feb, 2026
+                  - generic [ref=e3849] [cursor=pointer]: 2 - 8 Feb, 2026
+            - generic [ref=e3851]:
+              - heading "Frequently Asked Questions" [level=2] [ref=e3852]
+              - generic [ref=e3853]:
+                - heading "🞢 What is the Economic Calendar?" [level=3] [ref=e3855]
+                - heading "🞢 How to read the Forex Economic Calendar?" [level=3] [ref=e3857]
+                - heading "🞢 How to trade using the Economic Calendar?" [level=3] [ref=e3859]
+    - contentinfo [ref=e3860]:
+      - generic [ref=e3861]:
+        - listitem [ref=e3862]:
+          - navigation [ref=e3863]:
+            - list [ref=e3864]:
+              - listitem [ref=e3865]:
+                - link [ref=e3866] [cursor=pointer]:
+                  - /url: https://web.metatrader.app/terminal?mode=demo&lang=en
+                  - text: Online trading / WebTerminal
+              - listitem [ref=e3867]:
+                - link [ref=e3868] [cursor=pointer]:
+                  - /url: /en/code
+                  - text: Free technical indicators and robots
+              - listitem [ref=e3869]:
+                - link [ref=e3870] [cursor=pointer]:
+                  - /url: /en/articles
+                  - text: Articles about programming and trading
+              - listitem [ref=e3871]:
+                - link [ref=e3872] [cursor=pointer]:
+                  - /url: /en/job
+                  - text: Order trading robots on the Freelance
+              - listitem [ref=e3873]:
+                - link [ref=e3874] [cursor=pointer]:
+                  - /url: /en/market
+                  - text: Market of Expert Advisors and applications
+              - listitem [ref=e3875]:
+                - link [ref=e3876] [cursor=pointer]:
+                  - /url: /en/signals
+                  - text: Follow forex signals
+              - listitem [ref=e3877]:
+                - link [ref=e3878] [cursor=pointer]:
+                  - /url: /en/vps
+                  - text: Low latency forex VPS
+              - listitem [ref=e3879]:
+                - link [ref=e3880] [cursor=pointer]:
+                  - /url: /en/forum
+                  - text: Traders forum
+              - listitem [ref=e3881]:
+                - link [ref=e3882] [cursor=pointer]:
+                  - /url: /en/blogs
+                  - text: Trading blogs
+              - listitem [ref=e3883]:
+                - link [ref=e3884] [cursor=pointer]:
+                  - /url: /en/charts
+                  - text: Charts
+              - listitem [ref=e3885]:
+                - link [ref=e3886] [cursor=pointer]:
+                  - /url: /en/widgets
+                  - text: Free widgets
+        - listitem [ref=e3887]:
+          - navigation [ref=e3888]:
+            - list [ref=e3889]:
+              - listitem [ref=e3890]:
+                - link [ref=e3891] [cursor=pointer]:
+                  - /url: https://www.metatrader5.com
+                  - text: MetaTrader 5 Trading Platform
+              - listitem [ref=e3892]:
+                - link [ref=e3893] [cursor=pointer]:
+                  - /url: https://www.metatrader5.com/en/releasenotes
+                  - text: MetaTrader 5 latest updates
+              - listitem [ref=e3894]:
+                - link [ref=e3895] [cursor=pointer]:
+                  - /url: https://www.metatrader5.com/en/news
+                  - text: News, implementations and technology
+              - listitem [ref=e3896]:
+                - link [ref=e3897] [cursor=pointer]:
+                  - /url: https://www.metatrader5.com/en/terminal/help
+                  - text: MetaTrader 5 User Manual
+              - listitem [ref=e3898]:
+                - link [ref=e3899] [cursor=pointer]:
+                  - /url: /en/docs
+                  - text: MQL5 language of trading strategies
+              - listitem [ref=e3900]:
+                - link [ref=e3901] [cursor=pointer]:
+                  - /url: https://cloud.mql5.com
+                  - text: MQL5 Cloud Network
+              - listitem [ref=e3902]:
+                - link [ref=e3903] [cursor=pointer]:
+                  - /url: https://forge.mql5.io/?lang=en
+                  - text: MQL5 Algo Forge
+              - listitem [ref=e3904]:
+                - link [ref=e3905] [cursor=pointer]:
+                  - /url: https://download.terminal.free/cdn/web/metaquotes.ltd/mt5/mt5setup.exe?utm_source=www.mql5.com&utm_campaign=download
+                  - text: Download MetaTrader 5
+              - listitem [ref=e3906]:
+                - link [ref=e3907] [cursor=pointer]:
+                  - /url: https://www.metatrader5.com/en/terminal/help/start_advanced/installation
+                  - text: Install Platform
+              - listitem [ref=e3908]:
+                - link [ref=e3909] [cursor=pointer]:
+                  - /url: https://www.metatrader5.com/en/terminal/help/start_advanced/deinstallation
+                  - text: Uninstall Platform
+        - listitem [ref=e3910]:
+          - navigation [ref=e3911]:
+            - list [ref=e3912]:
+              - listitem [ref=e3913]:
+                - link [ref=e3914] [cursor=pointer]:
+                  - /url: /en/about
+                  - text: About
+              - listitem [ref=e3915]:
+                - link [ref=e3916] [cursor=pointer]:
+                  - /url: /en/wall
+                  - text: Timeline
+              - listitem [ref=e3917]:
+                - link [ref=e3918] [cursor=pointer]:
+                  - /url: /en/about/terms
+                  - text: Terms and Conditions
+              - listitem [ref=e3919]:
+                - link [ref=e3920] [cursor=pointer]:
+                  - /url: /en/about/autopayments
+                  - text: Recurring Payment Agreement
+              - listitem [ref=e3921]:
+                - link [ref=e3922] [cursor=pointer]:
+                  - /url: /en/about/agencyagreement
+                  - text: Agency Agreement – Offer
+              - listitem [ref=e3923]:
+                - link [ref=e3924] [cursor=pointer]:
+                  - /url: /en/about/privacy
+                  - text: Privacy and Data Protection Policy
+              - listitem [ref=e3925]:
+                - link [ref=e3926] [cursor=pointer]:
+                  - /url: /en/about/cookies
+                  - text: Cookies Policy
+              - listitem [ref=e3927]:
+                - link [ref=e3928] [cursor=pointer]:
+                  - /url: /en/contact
+                  - text: Contacts and requests
+        - listitem [ref=e3929]:
+          - generic [ref=e3930]:
+            - generic [ref=e3931]:
+              - link [ref=e3932] [cursor=pointer]:
+                - /url: https://www.metatrader5.com
+                - text: MetaTrader 5
+              - generic [ref=e3933]:
+                - link [ref=e3934] [cursor=pointer]:
+                  - /url: https://download.terminal.free/cdn/web/metaquotes.ltd/mt5/mt5setup.exe?utm_source=www.mql5.com&utm_campaign=download
+                - link [ref=e3935] [cursor=pointer]:
+                  - /url: https://download.terminal.free/cdn/web/metaquotes.ltd/mt5/MetaTrader5.pkg.zip?utm_source=www.mql5.com&utm_campaign=download
+                - link [ref=e3936] [cursor=pointer]:
+                  - /url: https://www.mql5.com/en/articles/625?utm_source=www.mql5.com&utm_campaign=download
+                - link [ref=e3937] [cursor=pointer]:
+                  - /url: https://web.metatrader.app/terminal?mode=demo&lang=en
+                - link [ref=e3938] [cursor=pointer]:
+                  - /url: https://download.terminal.free/cdn/mobile/mt5/ios?utm_source=www.mql5.com&utm_campaign=install.metaquotes&hl=en
+                - link [ref=e3939] [cursor=pointer]:
+                  - /url: https://download.terminal.free/cdn/mobile/mt5/android?utm_source=www.mql5.com&utm_campaign=install.metaquotes&hl=en
+                - link [ref=e3940] [cursor=pointer]:
+                  - /url: https://download.terminal.free/cdn/mobile/mt5/android/app-gallery?utm_source=www.mql5.com&utm_campaign=install.metaquotes
+                - link [ref=e3941] [cursor=pointer]:
+                  - /url: https://download.terminal.free/cdn/web/metaquotes.software.corp/mt5/metatrader5.apk?utm_source=www.mql5.com&utm_campaign=install.metaquotes
+            - generic [ref=e3942]:
+              - generic [ref=e3943]:
+                - link [ref=e3944] [cursor=pointer]:
+                  - /url: https://www.metatrader5.com/en/news/2270
+                  - text: MQL5 Channels
+                - generic [ref=e3945]:
+                  - link [ref=e3946] [cursor=pointer]:
+                    - /url: https://download.terminal.free/cdn/mobile/mql5.channels/ios?utm_source=www.mql5.com&utm_campaign=download&hl=en
+                  - link [ref=e3947] [cursor=pointer]:
+                    - /url: https://download.terminal.free/cdn/mobile/mql5.channels/android?utm_source=www.mql5.com&utm_campaign=download&hl=en
+                  - link [ref=e3948] [cursor=pointer]:
+                    - /url: https://download.terminal.free/cdn/mobile/mql5.channels/android/app-gallery?utm_source=www.mql5.com&utm_campaign=download
+                  - link [ref=e3949] [cursor=pointer]:
+                    - /url: https://download.terminal.free/cdn/web/metaquotes.software.corp/mql5channels/mql5channels.apk?utm_source=www.mql5.com&utm_campaign=download
+              - generic [ref=e3950]:
+                - link [ref=e3951] [cursor=pointer]:
+                  - /url: https://www.tradays.com/en/download?utm_source=www.mql5.com&utm_campaign=download
+                  - text: Economic Calendar
+                - generic [ref=e3952]:
+                  - link [ref=e3953] [cursor=pointer]:
+                    - /url: https://download.terminal.free/cdn/mobile/tradays/ios?utm_source=www.mql5.com&utm_campaign=download&hl=en
+                  - link [ref=e3954] [cursor=pointer]:
+                    - /url: https://download.terminal.free/cdn/mobile/tradays/android?utm_source=www.mql5.com&utm_campaign=download&hl=en
+                  - link [ref=e3955] [cursor=pointer]:
+                    - /url: https://download.terminal.free/cdn/mobile/tradays/android/app-gallery?utm_source=www.mql5.com&utm_campaign=download
+                  - link [ref=e3956] [cursor=pointer]:
+                    - /url: https://download.terminal.free/cdn/web/metaquotes.software.corp/tradays/tradays.apk?utm_source=www.mql5.com&utm_campaign=download
+          - generic [ref=e3957]:
+            - generic [ref=e3958]:
+              - link [ref=e3959] [cursor=pointer]:
+                - /url: https://www.facebook.com/mql5.community/
+              - link [ref=e3961] [cursor=pointer]:
+                - /url: https://t.me/mql5dev
+              - link [ref=e3963] [cursor=pointer]:
+                - /url: https://x.com/mql5com
+            - text: Follow us on socials for top articles and CodeBase updates
+          - generic [ref=e3965]:
+            - generic [ref=e3966]: Not a broker, no real trading accounts
+            - generic [ref=e3967]: 35 Dodekanisou str, Germasogeia, 4043, Limassol, Cyprus
+            - generic [ref=e3968]: Copyright 2000-2026, MetaQuotes Ltd
+  - generic [ref=e3969]:
+    - text: This website uses cookies. Learn more about our
+    - link "Cookies Policy" [ref=e3970] [cursor=pointer]:
+      - /url: /en/about/cookies
+    - text: .

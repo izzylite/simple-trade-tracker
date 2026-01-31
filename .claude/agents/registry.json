@@ -1,0 +1,146 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2024-01-15T10:00:00Z",
+  "agents": {
+    "existing": [
+      {
+        "name": "crewai-specialist",
+        "description": "CrewAI framework, multi-agent systems, agent optimization",
+        "domains": ["crewai", "multi-agent", "llm-optimization"],
+        "tools": ["Read", "Write", "Edit", "MultiEdit", "Grep", "Glob", "TodoWrite"],
+        "mcpTools": [],
+        "createdAt": "built-in",
+        "usageCount": 0,
+        "successRate": null
+      },
+      {
+        "name": "supabase-backend-expert",
+        "description": "Database design, RLS policies, edge functions, Supabase operations",
+        "domains": ["database", "supabase", "backend", "rls", "edge-functions"],
+        "tools": ["Read", "Write", "Edit", "Bash", "TodoWrite"],
+        "mcpTools": ["supabase-mcp"],
+        "createdAt": "built-in",
+        "usageCount": 0,
+        "successRate": null
+      },
+      {
+        "name": "frontend-developer",
+        "description": "React components, responsive layouts, client-side state management",
+        "domains": ["react", "frontend", "ui", "javascript", "css"],
+        "tools": ["Read", "Write", "Edit", "MultiEdit", "Grep", "Glob", "TodoWrite"],
+        "mcpTools": [],
+        "createdAt": "built-in",
+        "usageCount": 0,
+        "successRate": null
+      },
+      {
+        "name": "documentation-manager",
+        "description": "Documentation updates, README maintenance, technical docs",
+        "domains": ["documentation", "markdown", "readme", "technical-writing"],
+        "tools": ["Read", "Write", "Edit", "MultiEdit", "Grep", "Glob"],
+        "mcpTools": [],
+        "createdAt": "built-in",
+        "usageCount": 0,
+        "successRate": null
+      },
+      {
+        "name": "pragmatic-code-review",
+        "description": "Code quality reviews, best practices, security audits",
+        "domains": ["code-review", "quality", "best-practices", "security"],
+        "tools": ["Bash", "Glob", "Grep", "Read", "Edit", "MultiEdit", "TodoWrite"],
+        "mcpTools": ["playwright"],
+        "createdAt": "built-in",
+        "usageCount": 0,
+        "successRate": null
+      },
+      {
+        "name": "design-review",
+        "description": "UI/UX reviews, visual consistency, accessibility compliance",
+        "domains": ["design", "ui", "ux", "accessibility", "visual-design"],
+        "tools": ["Grep", "Read", "Edit", "MultiEdit", "TodoWrite"],
+        "mcpTools": ["playwright"],
+        "createdAt": "built-in",
+        "usageCount": 0,
+        "successRate": null
+      },
+      {
+        "name": "validation-gates",
+        "description": "Testing, quality assurance, test automation",
+        "domains": ["testing", "qa", "automation", "validation"],
+        "tools": ["Bash", "Read", "Edit", "MultiEdit", "Grep", "Glob", "TodoWrite"],
+        "mcpTools": [],
+        "createdAt": "built-in",
+        "usageCount": 0,
+        "successRate": null
+      },
+      {
+        "name": "task-orchestrator",
+        "description": "Task coordination, dependency management, parallel execution",
+        "domains": ["task-management", "coordination", "planning"],
+        "tools": ["*"],
+        "mcpTools": ["task-master-ai"],
+        "createdAt": "built-in",
+        "usageCount": 0,
+        "successRate": null
+      },
+      {
+        "name": "task-executor",
+        "description": "Individual task implementation and completion",
+        "domains": ["implementation", "execution", "development"],
+        "tools": ["*"],
+        "mcpTools": ["task-master-ai"],
+        "createdAt": "built-in",
+        "usageCount": 0,
+        "successRate": null
+      },
+      {
+        "name": "task-checker",
+        "description": "Task verification and quality assurance",
+        "domains": ["verification", "review", "quality-check"],
+        "tools": ["*"],
+        "mcpTools": ["task-master-ai"],
+        "createdAt": "built-in",
+        "usageCount": 0,
+        "successRate": null
+      },
+      {
+        "name": "subagent-factory",
+        "description": "Dynamic subagent creation specialist",
+        "domains": ["agent-creation", "meta-programming", "automation"],
+        "tools": ["Read", "Write", "Edit", "MultiEdit", "Grep", "Glob", "TodoWrite"],
+        "mcpTools": [],
+        "createdAt": "built-in",
+        "usageCount": 0,
+        "successRate": null
+      }
+    ],
+    "custom": []
+  },
+  "mcpConfigurations": {
+    "supabase-mcp": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@supabase/mcp-server-supabase", "--project-ref={{PROJECT_REF}}"],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "{{ACCESS_TOKEN}}"
+      }
+    },
+    "task-master-ai": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "task-master-ai"],
+      "env": {}
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/playwright-mcp"],
+      "env": {}
+    }
+  },
+  "statistics": {
+    "totalAgents": 11,
+    "customAgents": 0,
+    "totalDelegations": 0,
+    "averageSuccessRate": null
+  }
+}
