@@ -263,7 +263,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           }}
         >
           {/* Attached Images (for user messages) */}
-          {isUser && message.images && message.images.length > 0 && (
+          {isUser && Array.isArray(message.images) && message.images.length > 0 && (
             <Box
               sx={{
                 display: 'flex',

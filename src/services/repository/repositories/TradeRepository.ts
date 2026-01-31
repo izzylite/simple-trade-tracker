@@ -44,6 +44,17 @@ const parseOptionalDate = (dateValue: any): Date | undefined => {
 };
 
 /**
+ * Safely convert a date value to ISO string
+ * Handles both Date objects and string values
+ */
+const toISOString = (dateValue: Date | string | undefined | null): string => {
+  if (!dateValue) return new Date().toISOString();
+  if (typeof dateValue === 'string') return dateValue;
+  if (dateValue instanceof Date) return dateValue.toISOString();
+  return new Date(dateValue).toISOString();
+};
+
+/**
  * Sort tags alphabetically (case-insensitive)
  * Optimized for performance with 1000+ trades by using faster comparison
  */
@@ -364,11 +375,19 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
           .map(term => term.trim())
           .filter(term => term.length > 0);
 
-        if (searchTerms.length > 0) {
+        // Check if search is a full UUID (for exact ID match)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const isFullUuid = searchTerms.length === 1 && uuidRegex.test(searchTerms[0]);
+
+        if (isFullUuid) {
+          // Exact UUID match
+          query = query.eq('id', searchTerms[0]);
+        } else if (searchTerms.length > 0) {
           // For each search term, apply AND logic (all terms must match)
           searchTerms.forEach(term => {
             // Use OR across all searchable fields
             // economic_events_text is a computed column that contains all event names
+            // Note: id is UUID type and can't be searched with ilike directly
             query = query.or(
               `name.ilike.%${term}%,` +
               `notes.ilike.%${term}%,` +
@@ -819,7 +838,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         user_id: user.id, // Use authenticated user's ID for RLS
         name: trade.name,
         trade_type: trade.trade_type,
-        trade_date: (trade.trade_date || now).toISOString(), 
+        trade_date: toISOString(trade.trade_date || now), 
         session: trade.session,
         amount: trade.amount,
         entry_price: trade.entry_price ?? null,
@@ -937,7 +956,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         user_id: trade.user_id,
         name: trade.name,
         trade_type: trade.trade_type,
-        trade_date: trade.trade_date.toISOString(),
+        trade_date: toISOString(trade.trade_date),
         session: trade.session,
         amount: trade.amount,
         entry_price: trade.entry_price ?? null,
@@ -1237,7 +1256,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         id: trade.id,
         name: trade.name,
         trade_type: trade.trade_type,
-        trade_date: trade.trade_date.toISOString(),
+        trade_date: toISOString(trade.trade_date),
         session: trade.session || null, // Convert empty string to null for DB constraint
         amount: trade.amount,
         entry_price: trade.entry_price ?? null,
@@ -1297,7 +1316,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         p_trade_id: tradeId,
         p_trade_updates: {
           ...trade,
-          trade_date: trade.trade_date.toISOString(),
+          trade_date: toISOString(trade.trade_date),
           session: trade.session || null, // Convert empty string to null for DB constraint
           tags: sortTags(trade.tags),
         },

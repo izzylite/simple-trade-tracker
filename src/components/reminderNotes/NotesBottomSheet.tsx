@@ -116,11 +116,12 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
-      } else if (e.key === 'ArrowLeft') {
-        handlePrevious();
-      } else if (e.key === 'ArrowRight') {
-        handleNext();
-      }
+      } 
+      // else if (e.key === 'ArrowLeft') {
+      //   handlePrevious();
+      // } else if (e.key === 'ArrowRight') {
+      //   handleNext();
+      // }
     };
 
     window.addEventListener('keydown', handleKeyDown);

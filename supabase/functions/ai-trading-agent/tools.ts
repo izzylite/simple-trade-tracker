@@ -166,9 +166,8 @@ export const createNoteTool: GeminiFunctionDeclaration = {
 
 USE CASES:
 - Save trading strategies, insights, lessons learned, or game plans for the user
-- Maintain YOUR OWN AGENT MEMORY by creating a note titled "Trading Agent Memory - [Calendar Name]" with tag "AGENT_MEMORY"
 
-AGENT MEMORY: Store discovered patterns, user preferences, and lessons learned across sessions. Create after identifying significant patterns, update incrementally.
+⚠️ CANNOT create AGENT_MEMORY notes - use update_memory tool instead (it auto-creates if needed).
 
 Content should be in plain text format. User ID and Calendar ID are automatically provided from context.`,
   parameters: {
@@ -230,9 +229,10 @@ export const updateMemoryTool: GeminiFunctionDeclaration = {
 CRITICAL: Provide ONLY the new information to add. The system will automatically merge it with existing content.
 
 SECTIONS (choose one):
-- TRADER_PROFILE: Trading style, risk tolerance, emotional patterns, timeframes
+- TRADER_PROFILE: Trading style, risk tolerance, experience level, timeframes
 - PERFORMANCE_PATTERNS: Setups/sessions that work, with win rates and evidence
 - STRATEGY_PREFERENCES: User-stated rules, entry criteria, risk management
+- PSYCHOLOGICAL_PATTERNS: Emotional triggers, tilt patterns, confidence cycles, behavioral tendencies
 - LESSONS_LEARNED: Errors to avoid, corrections received, communication preferences
 - ACTIVE_FOCUS: Current goals, things to watch (this section CAN be replaced)
 
@@ -241,7 +241,8 @@ FORMAT each insight as: "[Pattern/Rule]: [Evidence] [Confidence: High/Med/Low] [
 EXAMPLES:
 - "London session scalps: 72% win rate on 15 trades [High] [2024-12]"
 - "Avoids trading during FOMC: User preference stated [High] [2024-12]"
-- "Struggles with counter-trend entries: 30% win rate [Med] [2024-12]"`,
+- "Struggles with counter-trend entries: 30% win rate [Med] [2024-12]"
+- "Tends to overtrade after 2+ consecutive wins: Observed pattern [Med] [2024-12]"`,
   parameters: {
     type: "object",
     properties: {
@@ -251,6 +252,7 @@ EXAMPLES:
           "TRADER_PROFILE",
           "PERFORMANCE_PATTERNS",
           "STRATEGY_PREFERENCES",
+          "PSYCHOLOGICAL_PATTERNS",
           "LESSONS_LEARNED",
           "ACTIVE_FOCUS",
         ],
@@ -413,25 +415,25 @@ Returns both user-created and AI-created notes. User ID and Calendar ID are auto
 export const analyzeImageTool: GeminiFunctionDeclaration = {
   name: "analyze_image",
   description:
-    "Analyze a trade chart image to extract insights about entries, exits, patterns, and price action. Use this when reviewing trades that have attached images. Pass the image URL from trade.images[].url field.",
+    "Analyze an image to extract insights. For trade charts, can analyze entries, exits, patterns, and price action. For other images (screenshots, diagrams, reference material), use 'general' focus to describe the content.",
   parameters: {
     type: "object",
     properties: {
       image_url: {
         type: "string",
         description:
-          "The URL of the trade image to analyze (from trade.images[].url)",
+          "The URL of the image to analyze",
       },
       analysis_focus: {
         type: "string",
         description:
-          "What to focus the analysis on: entry quality, exit timing, pattern identification, support/resistance, or general overview",
-        enum: ["entry", "exit", "patterns", "levels", "overview"],
+          "What to focus the analysis on: 'general' for non-chart images (screenshots, diagrams, notes), or chart-specific: entry, exit, patterns, levels, overview",
+        enum: ["general", "entry", "exit", "patterns", "levels", "overview"],
       },
       trade_context: {
         type: "string",
         description:
-          'Optional context about the trade (e.g., "Long EUR/USD, won 2R") to help interpret the chart',
+          'Optional context to help interpret the image (e.g., "Long EUR/USD, won 2R" for charts, or "Risk management rules" for note images)',
       },
     },
     required: ["image_url"],
@@ -816,6 +818,12 @@ export async function createNote(
   try {
     log(`Creating note: ${title}`, "info");
 
+    // Block creation of AGENT_MEMORY notes - must use update_memory tool instead
+    // update_memory auto-creates memory if it doesn't exist and properly merges content
+    if (tags && tags.includes("AGENT_MEMORY")) {
+      return `Cannot create AGENT_MEMORY notes with create_note. Use the update_memory tool instead - it automatically creates the memory note if needed and properly merges new insights with existing memory.`;
+    }
+
     // Assistant Colors Palette (Semantic)
     const ASSISTANT_COLORS = [
       "red",
@@ -1077,6 +1085,7 @@ type MemorySection =
   | "TRADER_PROFILE"
   | "PERFORMANCE_PATTERNS"
   | "STRATEGY_PREFERENCES"
+  | "PSYCHOLOGICAL_PATTERNS"
   | "LESSONS_LEARNED"
   | "ACTIVE_FOCUS";
 
@@ -1084,9 +1093,56 @@ const MEMORY_SECTION_ORDER: MemorySection[] = [
   "TRADER_PROFILE",
   "PERFORMANCE_PATTERNS",
   "STRATEGY_PREFERENCES",
+  "PSYCHOLOGICAL_PATTERNS",
   "LESSONS_LEARNED",
   "ACTIVE_FOCUS",
 ];
+
+/**
+ * Normalize content to handle various edge cases:
+ * - Convert CRLF to LF
+ * - Fix bullets with asterisks or no space after dash
+ * - Normalize section headers (case-insensitive, remove trailing text)
+ */
+function normalizeMemoryContent(content: string): string {
+  // Normalize line endings (CRLF -> LF)
+  let normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  // Fix section headers: case-insensitive match and remove trailing text
+  // e.g., "## strategy_preferences - note" -> "## STRATEGY_PREFERENCES"
+  for (const section of MEMORY_SECTION_ORDER) {
+    const headerPattern = new RegExp(
+      `^## ?${section}[^\\n]*$`,
+      "gmi"
+    );
+    normalized = normalized.replace(headerPattern, `## ${section}`);
+  }
+
+  // Fix bullet points:
+  // - Convert asterisks to dashes: "* item" -> "- item"
+  // - Add space after dash if missing: "-item" -> "- item"
+  normalized = normalized
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      // Convert "* item" to "- item"
+      if (trimmed.startsWith("* ")) {
+        return line.replace(/^\s*\* /, "- ");
+      }
+      // Convert "*item" to "- item"
+      if (trimmed.startsWith("*") && !trimmed.startsWith("* ")) {
+        return line.replace(/^\s*\*/, "- ");
+      }
+      // Convert "-item" (no space) to "- item"
+      if (trimmed.startsWith("-") && !trimmed.startsWith("- ") && trimmed.length > 1) {
+        return line.replace(/^(\s*)-([^\s])/, "$1- $2");
+      }
+      return line;
+    })
+    .join("\n");
+
+  return normalized;
+}
 
 /**
  * Parse memory content into sections
@@ -1096,6 +1152,7 @@ function parseMemorySections(content: string): Record<MemorySection, string[]> {
     TRADER_PROFILE: [],
     PERFORMANCE_PATTERNS: [],
     STRATEGY_PREFERENCES: [],
+    PSYCHOLOGICAL_PATTERNS: [],
     LESSONS_LEARNED: [],
     ACTIVE_FOCUS: [],
   };
@@ -1106,10 +1163,13 @@ function parseMemorySections(content: string): Record<MemorySection, string[]> {
     return sections;
   }
 
+  // Normalize content to handle edge cases (CRLF, asterisks, case issues, etc.)
+  const normalizedContent = normalizeMemoryContent(content);
+
   // Split by section headers
   const sectionPattern =
-    /^## (TRADER_PROFILE|PERFORMANCE_PATTERNS|STRATEGY_PREFERENCES|LESSONS_LEARNED|ACTIVE_FOCUS)\s*$/gm;
-  const parts = content.split(sectionPattern);
+    /^## (TRADER_PROFILE|PERFORMANCE_PATTERNS|STRATEGY_PREFERENCES|PSYCHOLOGICAL_PATTERNS|LESSONS_LEARNED|ACTIVE_FOCUS)\s*$/gm;
+  const parts = normalizedContent.split(sectionPattern);
 
   // Debug: log how many parts were found
   const sectionNamesFound = parts.filter((_, i) => i % 2 === 1);
@@ -1232,6 +1292,7 @@ async function createInitialMemory(
     TRADER_PROFILE: [],
     PERFORMANCE_PATTERNS: [],
     STRATEGY_PREFERENCES: [],
+    PSYCHOLOGICAL_PATTERNS: [],
     LESSONS_LEARNED: [],
     ACTIVE_FOCUS: [],
   };
@@ -1342,7 +1403,7 @@ export async function updateMemory(
 
     // Debug: Log what was parsed from each section
     log(
-      `[updateMemory] Parsed sections - TRADER_PROFILE: ${sections.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${sections.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${sections.STRATEGY_PREFERENCES.length}, LESSONS_LEARNED: ${sections.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${sections.ACTIVE_FOCUS.length}`,
+      `[updateMemory] Parsed sections - TRADER_PROFILE: ${sections.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${sections.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${sections.STRATEGY_PREFERENCES.length}, PSYCHOLOGICAL_PATTERNS: ${sections.PSYCHOLOGICAL_PATTERNS.length}, LESSONS_LEARNED: ${sections.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${sections.ACTIVE_FOCUS.length}`,
       "info",
     );
 
@@ -1414,9 +1475,32 @@ export async function updateMemory(
     // Debug: Verify all sections are present in rebuilt content
     const verifyParsed = parseMemorySections(updatedContent);
     log(
-      `[updateMemory] VERIFY after rebuild - TRADER_PROFILE: ${verifyParsed.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${verifyParsed.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${verifyParsed.STRATEGY_PREFERENCES.length}, LESSONS_LEARNED: ${verifyParsed.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${verifyParsed.ACTIVE_FOCUS.length}`,
+      `[updateMemory] VERIFY after rebuild - TRADER_PROFILE: ${verifyParsed.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${verifyParsed.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${verifyParsed.STRATEGY_PREFERENCES.length}, PSYCHOLOGICAL_PATTERNS: ${verifyParsed.PSYCHOLOGICAL_PATTERNS.length}, LESSONS_LEARNED: ${verifyParsed.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${verifyParsed.ACTIVE_FOCUS.length}`,
       "info",
     );
+
+    // 5.5 DATA LOSS PREVENTION: Check if other sections lost data during the update
+    // Compare sections (except the one being updated) to ensure no data was lost
+    const originalParsed = parseMemorySections(existingContent);
+    for (const sectionKey of MEMORY_SECTION_ORDER) {
+      if (sectionKey === section) continue; // Skip the section being updated
+
+      const originalCount = originalParsed[sectionKey].length;
+      const newCount = sections[sectionKey].length;
+
+      // If a section that HAD data now has LESS data, this is data loss
+      if (originalCount > 0 && newCount < originalCount) {
+        log(
+          `[updateMemory] DATA LOSS DETECTED in ${sectionKey}: was ${originalCount}, now ${newCount}. Aborting update.`,
+          "error",
+        );
+        log(
+          `[updateMemory] Original ${sectionKey} items: ${JSON.stringify(originalParsed[sectionKey])}`,
+          "error",
+        );
+        return `Memory update aborted: Data loss detected in ${sectionKey} section. Original had ${originalCount} items, new has ${newCount}. Please report this issue.`;
+      }
+    }
 
     // 6. Check size limit (~2000 tokens ≈ 8000 chars)
     if (updatedContent.length > 8000) {
@@ -1516,14 +1600,15 @@ export async function searchNotes(
       "info",
     );
 
-    // Build the query
+    // Build the query - include both calendar-specific notes AND global notes (calendar_id = null)
+    // NOTE: We use a single .or() call for calendar filter to avoid conflicts with search filtering
     let query = supabase
       .from("notes")
       .select(
         "id, title, content, by_assistant, is_pinned, is_archived, created_at, updated_at, reminder_type, reminder_date, reminder_days, tags",
       )
       .eq("user_id", userId)
-      .eq("calendar_id", calendarId);
+      .or(`calendar_id.eq.${calendarId},calendar_id.is.null`);
 
     // Filter by archived status
     if (!includeArchived) {
@@ -1538,22 +1623,54 @@ export async function searchNotes(
       }
     }
 
-    // Apply search filter if provided
-    if (searchQuery && searchQuery.trim()) {
-      query = query.or(
-        `title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`,
-      );
-    }
+    // NOTE: Search filtering is done in-memory after fetching to avoid
+    // PostgREST issues with multiple .or() calls that can conflict
 
     // Order by pinned first, then by updated date
     query = query.order("is_pinned", { ascending: false })
       .order("updated_at", { ascending: false });
 
-    const { data: notes, error } = await query;
+    const { data: rawNotes, error } = await query;
 
     if (error) {
       log(`Error searching notes: ${error.message}`, "error");
       return `Failed to search notes: ${error.message}`;
+    }
+
+    // Apply search query filter in-memory (to avoid PostgREST multiple .or() issues)
+    let notes = rawNotes || [];
+    if (searchQuery && searchQuery.trim() && notes.length > 0) {
+      const searchLower = searchQuery.toLowerCase().trim();
+      notes = notes.filter((note) => {
+        // Search in title
+        if (note.title?.toLowerCase().includes(searchLower)) {
+          return true;
+        }
+        // Search in content - handle both plain text and Draft.js JSON
+        if (note.content) {
+          const contentLower = note.content.toLowerCase();
+          if (contentLower.includes(searchLower)) {
+            return true;
+          }
+          // Also try to extract plain text from Draft.js JSON
+          try {
+            const parsed = JSON.parse(note.content);
+            if (parsed.blocks) {
+              const plainText = parsed.blocks
+                .map((b: { text?: string }) => b.text || "")
+                .join(" ")
+                .toLowerCase();
+              if (plainText.includes(searchLower)) {
+                return true;
+              }
+            }
+          } catch {
+            // Content is not JSON, already searched as plain text
+          }
+        }
+        return false;
+      });
+      log(`After search filter: ${notes.length} notes match "${searchQuery}"`, "info");
     }
 
     if (!notes || notes.length === 0) {
@@ -1575,10 +1692,41 @@ export async function searchNotes(
       // Add note-ref tag on its own line for card display
       result += `<note-ref id="${note.id}"/>`;
 
+      // Include note title and content so AI can read and use the information
+      result += `\n**${note.title || "Untitled Note"}**`;
+
+      // Extract plain text content from Draft.js JSON or use as-is
+      if (note.content) {
+        let plainContent = "";
+        try {
+          const parsed = JSON.parse(note.content);
+          if (parsed.blocks && Array.isArray(parsed.blocks)) {
+            // Extract text from Draft.js blocks
+            plainContent = parsed.blocks
+              .map((block: { text?: string }) => block.text || "")
+              .join("\n")
+              .trim();
+          }
+        } catch {
+          // Content is plain text, not JSON
+          plainContent = note.content.trim();
+        }
+
+        if (plainContent) {
+          result += `\n${plainContent}`;
+        }
+      }
+
       // Extract and include embedded images from content
       const contentImages = extractImagesFromContent(note.content);
       if (contentImages.length > 0) {
         result += `\n[Embedded images: ${contentImages.join(", ")}]`;
+        result += `\n[Tip: Use analyze_image tool with analysis_focus="general" for note images, or "overview"/"patterns"/"levels" if it's a chart]`;
+      }
+
+      // Show tags if present
+      if (note.tags && note.tags.length > 0) {
+        result += `\n[Tags: ${note.tags.join(", ")}]`;
       }
 
       result += "\n\n";
@@ -1755,20 +1903,27 @@ export function analyzeImage(
         "Focus on support/resistance levels: Identify key horizontal levels, trend lines, and areas of interest. Where are the key decision points?",
       overview:
         "Provide a general analysis of this trade chart including: entry/exit quality, patterns, key levels, and any notable observations.",
+      general:
+        "Describe this image in detail. What do you see? If it's a chart, describe the price action. If it's a screenshot, describe the content. If it's a diagram or reference material, explain what it shows.",
     };
 
     const focusInstruction = focusPrompts[analysisFocus] ||
       focusPrompts.overview;
     const contextNote = tradeContext
-      ? ` Trade context: "${tradeContext}".`
+      ? ` Context: "${tradeContext}".`
       : "";
 
+    // Use different prompts for general vs chart-focused analysis
+    const isGeneralFocus = analysisFocus === "general";
+    const taskInstruction = isGeneralFocus
+      ? "YOUR TASK: Describe what you SEE in this image and respond with your findings (3-5 bullet points). Be specific about visual elements, text, diagrams, or any relevant details."
+      : "YOUR TASK: Analyze what you SEE in this image and respond with your findings (3-5 bullet points). Describe specific visual elements you observe: candlesticks, indicators, levels, patterns, entry/exit markers, platform UI, annotations, etc.";
+
     // Return marker with image URL - conversation builder will inject the actual image
-    // The prompt tells the model to generate its own analysis (not return instructions)
     return `[IMAGE_ANALYSIS:${imageUrl}]
-IMAGE LOADED SUCCESSFULLY. You are now viewing the chart image above.
+IMAGE LOADED SUCCESSFULLY. You are now viewing the image above.
 ${focusInstruction}${contextNote}
-YOUR TASK: Analyze what you SEE in this image and respond with your findings (3-5 bullet points). Describe specific visual elements you observe: candlesticks, indicators, levels, patterns, entry/exit markers, platform UI, annotations, etc.`;
+${taskInstruction}`;
   } catch (error) {
     log(`Image preparation error: ${error}`, "error");
     return `Image analysis error: ${
@@ -1978,6 +2133,7 @@ export async function executeCustomTool(
             | "TRADER_PROFILE"
             | "PERFORMANCE_PATTERNS"
             | "STRATEGY_PREFERENCES"
+            | "PSYCHOLOGICAL_PATTERNS"
             | "LESSONS_LEARNED"
             | "ACTIVE_FOCUS"
           : "PERFORMANCE_PATTERNS";

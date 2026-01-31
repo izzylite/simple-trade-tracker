@@ -24,16 +24,19 @@ SELECT cron.schedule(
 );
 
 -- =============================================================================
--- AUTO REFRESH ECONOMIC CALENDAR (Every 15 minutes)
+-- AUTO REFRESH ECONOMIC CALENDAR (4x daily at 6 AM, 10 AM, 2 PM, 6 PM UTC)
 -- =============================================================================
 
 -- Remove existing job if it exists
 SELECT cron.unschedule('auto-refresh-economic-calendar');
 
 -- Schedule auto refresh of economic calendar
+-- Runs 4x daily evenly spread for trading coverage (every 4 hours during market hours)
+-- SMART SKIP: Skips weekends + days with no events if fetched < 12h ago
+-- Uses ScraperAPI: ~88 weekday runs × 10 credits = ~880 credits/month (within 1000 free tier)
 SELECT cron.schedule(
   'auto-refresh-economic-calendar',
-  '*/15 * * * *',  -- Every 15 minutes
+  '0 6,10,14,18 * * *',  -- 4x daily at 6 AM, 10 AM, 2 PM, 6 PM UTC
   $$
   SELECT net.http_post(
     url := 'https://gwubzauelilziaqnsfac.supabase.co/functions/v1/auto-refresh-economic-calendar',
@@ -177,7 +180,7 @@ For cleanup-expired-calendars:
 
 For auto-refresh-economic-calendar:
 - Name: auto-refresh-economic-calendar
-- Schedule: */15 * * * * (every 15 minutes)
+- Schedule: 0 6,10,14,18 * * * (4x daily at 6 AM, 10 AM, 2 PM, 6 PM UTC)
 - SQL Command:
   SELECT net.http_post(
     'https://gwubzauelilziaqnsfac.supabase.co/functions/v1/auto-refresh-economic-calendar',
@@ -214,8 +217,12 @@ TIMEZONE CONSIDERATIONS:
 - Consider daylight saving time changes
 
 PERFORMANCE CONSIDERATIONS:
-- Economic calendar refresh every 15 minutes ensures timely updates for trading
-- Adjust frequency based on your application's needs
+- Economic calendar refresh runs 4x daily at 6 AM, 10 AM, 2 PM, 6 PM UTC via ScraperAPI
+- SMART SKIP logic saves credits by skipping:
+  - Weekends (no events on Sat/Sun)
+  - Days with no events if already fetched < 12 hours ago
+- MyFXBook costs 10 credits/request (difficult site classification)
+- Uses ~880 ScraperAPI credits/month (88 weekday runs × 10 credits, within 1000 free tier)
 - Monitor database performance impact of scheduled jobs
 
 SECURITY CONSIDERATIONS:

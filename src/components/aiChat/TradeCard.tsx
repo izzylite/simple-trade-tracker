@@ -156,7 +156,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
                     <NoteIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
                   </Tooltip>
                 )}
-                {trade.images && trade.images.length > 0 && showImages && (
+                {Array.isArray(trade.images) && trade.images.length > 0 && showImages && (
                   <Tooltip title={`${trade.images.length} image(s)`}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <ImageIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />

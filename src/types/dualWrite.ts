@@ -85,6 +85,10 @@ export interface Trade {
   is_temporary?: boolean
   is_pinned?: boolean
 
+  // Calendar linking (synced trade tracking)
+  source_trade_id?: string
+  is_synced_copy?: boolean
+
   // Images (stored as JSONB array)
   images?: TradeImageEntity[]
 
@@ -171,6 +175,9 @@ export interface Calendar extends BaseEntity {
   // Duplication tracking
   duplicated_calendar?: boolean;
   source_calendar_id?: string;
+
+  // Calendar linking (one-way trade sync)
+  linked_to_calendar_id?: string | null;
 
   // Soft delete / trash (for trash feature)
   deleted_at?: Date;

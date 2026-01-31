@@ -23,7 +23,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Collapse
 } from '@mui/material';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import {
@@ -33,9 +34,13 @@ import {
   Info as InfoIcon,
   Tag as TagIcon,
   Close as CloseIcon,
+  Add as AddIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import UnifiedDrawer from './common/UnifiedDrawer';
 import TagEditDialog from './TagEditDialog';
+import TagCreateDialog from './TagCreateDialog';
 import {
   getTagChipStyles,
   formatTagForDisplay,
@@ -45,7 +50,7 @@ import {
 } from '../utils/tagColors';
 import { Calendar } from '../types/calendar';
 import { logger } from '../utils/logger';
-import { supabase } from '../config/supabase';
+import { tagService } from '../services/tagService';
 import { useAuthState } from '../contexts/AuthStateContext';
 
 interface TagManagementDrawerProps {
@@ -79,8 +84,17 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
   const [selectedTagGroup, setSelectedTagGroup] = useState<string>('');
   const [tagToEdit, setTagToEdit] = useState<string | null>(null);
   const [tagToView, setTagToView] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [localRequiredGroups, setLocalRequiredGroups] = useState<string[]>(requiredTagGroups);
   const [tagDefinitions, setTagDefinitions] = useState<Record<string, string>>({});
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (group: string) => {
+    setCollapsedGroups(prev => ({
+      ...prev,
+      [group]: !prev[group]
+    }));
+  };
 
   // Update local state when props change
   useEffect(() => {
@@ -95,23 +109,8 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
     if (!userId) return;
 
     try {
-      const { data, error } = await supabase
-        .from('tag_definitions')
-        .select('tag_name, definition')
-        .eq('user_id', userId);
-
-      if (error) {
-        logger.error('Error fetching tag definitions:', error);
-        return;
-      }
-
-      if (data) {
-        const definitions: Record<string, string> = {};
-        data.forEach((item) => {
-          definitions[item.tag_name] = item.definition;
-        });
-        setTagDefinitions(definitions);
-      }
+      const definitions = await tagService.fetchTagDefinitions(userId);
+      setTagDefinitions(definitions);
     } catch (err) {
       logger.error('Error fetching tag definitions:', err);
     }
@@ -233,6 +232,21 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
     }
   };
 
+  const handleTagCreated = async (newTag: string) => {
+    if (onUpdateCalendarProperty) {
+      await onUpdateCalendarProperty(calendarId, (calendar) => {
+        const currentTags = calendar.tags || [];
+        if (currentTags.includes(newTag)) return calendar;
+        return {
+          ...calendar,
+          tags: [...currentTags, newTag]
+        };
+      });
+      // Refresh definitions to include the new one
+      fetchTagDefinitions();
+    }
+  };
+
   return (
     <UnifiedDrawer
       open={open}
@@ -241,6 +255,24 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
       icon={<TagIcon />}
       width={{ xs: '100%', sm: 500 }}
       headerVariant="enhanced"
+      headerActions={
+        !isReadOnly && (
+          <Tooltip title="Create new tag" arrow>
+            <IconButton
+              color="primary"
+              onClick={() => setIsCreateDialogOpen(true)}
+              sx={{
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                '&:hover': {
+                  bgcolor: alpha(theme.palette.primary.main, 0.2)
+                }
+              }}
+            >
+              <AddIcon />
+            </IconButton>
+          </Tooltip>
+        )
+      }
       contentSx={{ p: 2, ...scrollbarStyles(theme) }}
     >
       {/* Content */}
@@ -254,7 +286,7 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 When a tag group is set as required, every new trade must include at least one tag from this group.
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{mt: 4}}>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
                 Adding definitions to your tags helps the AI assistant and traders understand your trading terminology and provide more accurate analysis.
               </Typography>
             </>
@@ -275,6 +307,10 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
                     color="primary"
                     variant="outlined"
                     sx={{ fontWeight: 600 }}
+                    onDelete={() => {
+                      const updatedGroups = localRequiredGroups.filter(g => g !== group);
+                      handleRequiredTagGroupsChange(updatedGroups);
+                    }}
                   />
                 ))
               ) : (
@@ -360,84 +396,87 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
                                 size="small"
                               />
                             }
-                            label={
-                              <Typography variant="caption" sx={{ fontWeight: 500 }}>
-                                Required
-                              </Typography>
-                            }
+                            label={null}
                           />
                           <Tooltip title="When a tag group is set as required, every new trade must include at least one tag from this group">
-                            <InfoIcon sx={{ ml: 0.5, color: 'text.secondary', fontSize: '0.875rem' }} />
+                            <InfoIcon sx={{ ml: -1.5, color: 'text.secondary', fontSize: '0.875rem' }} />
                           </Tooltip>
                         </Box>
                       )}
                     </Box>
-                    <Typography variant="caption" color="text.secondary">
-                      {tags.length} tag{tags.length !== 1 ? 's' : ''}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        {tags.length} tag{tags.length !== 1 ? 's' : ''}
+                      </Typography>
+                      <IconButton size="small" onClick={() => toggleGroup(group)}>
+                        {collapsedGroups[group] ? <ExpandMoreIcon fontSize="small" /> : <ExpandLessIcon fontSize="small" />}
+                      </IconButton>
+                    </Box>
                   </Box>
                   <Divider />
-                  <List disablePadding>
-                    {tags.map((tag) => (
-                      <ListItem
-                        key={tag}
-                        disablePadding
-                        secondaryAction={
-                          !isReadOnly ? (
-                            <Button
-                              color="primary"
-                              sx={{ minWidth: 'auto', p: 0.5 }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setTagToEdit(tag);
-                              }}
-                            >
-                              Edit
-                            </Button>
-                          ) : undefined
-                        }
-                      >
-                        <ListItemButton
-                          onClick={() => setTagToView(tag)}
-                          sx={{
-                            '&:hover': {
-                              bgcolor: alpha(theme.palette.primary.main, 0.05)
-                            }
-                          }}
-                        >
-                          <ListItemText
-                            primary={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Chip
-                                  label={formatTagForDisplay(tag, true)}
-                                  size="small"
-                                  sx={getTagChipStyles(tag, theme)}
-                                />
-                              </Box>
-                            }
-                            secondary={
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                sx={{
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 4,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  mt: 0.5,
-                                  ml: 0.5,
-                                  opacity: tagDefinitions[tag] ? 1 : 0.6
+                  <Collapse in={!collapsedGroups[group]} timeout="auto" unmountOnExit>
+                    <List disablePadding>
+                      {tags.map((tag) => (
+                        <ListItem
+                          key={tag}
+                          disablePadding
+                          secondaryAction={
+                            !isReadOnly ? (
+                              <Button
+                                color="primary"
+                                sx={{ minWidth: 'auto', p: 0.5 }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTagToEdit(tag);
                                 }}
                               >
-                                {tagDefinitions[tag] || (isReadOnly ? 'No definition' : 'No definition — click Edit to add one')}
-                              </Typography>
-                            }
-                          />
-                        </ListItemButton>
-                      </ListItem>
-                    ))}
-                  </List>
+                                Edit
+                              </Button>
+                            ) : undefined
+                          }
+                        >
+                          <ListItemButton
+                            onClick={() => setTagToView(tag)}
+                            sx={{
+                              '&:hover': {
+                                bgcolor: alpha(theme.palette.primary.main, 0.05)
+                              }
+                            }}
+                          >
+                            <ListItemText
+                              primary={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Chip
+                                    label={formatTagForDisplay(tag, true)}
+                                    size="small"
+                                    sx={getTagChipStyles(tag, theme)}
+                                  />
+                                </Box>
+                              }
+                              secondary={
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 4,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    mt: 0.5,
+                                    ml: 0.5,
+                                    opacity: tagDefinitions[tag] ? 1 : 0.6
+                                  }}
+                                >
+                                  {tagDefinitions[tag] || (isReadOnly ? 'No definition' : 'No definition — click Edit to add one')}
+                                </Typography>
+                              }
+                            />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Collapse>
                 </Box>
               ))
             ) : (
@@ -469,6 +508,17 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
           initialDefinition={tagDefinitions[tagToEdit] || ''}
         />
       )}
+
+      <TagCreateDialog
+        open={isCreateDialogOpen}
+        onClose={(created) => {
+          setIsCreateDialogOpen(false);
+          if (created) fetchTagDefinitions();
+        }}
+        calendarId={calendarId}
+        allTags={allTags}
+        onTagCreated={handleTagCreated}
+      />
 
       {/* Tag View Dialog */}
       <Dialog

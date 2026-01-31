@@ -34,6 +34,8 @@ import {
   testApiKey
 } from '../../services/apiKeyStorage';
 
+import { Z_INDEX } from '../../styles/zIndex';
+
 interface ApiKeySettingsDialogProps {
   open: boolean;
   onClose: () => void;
@@ -114,7 +116,7 @@ const ApiKeySettingsDialog: React.FC<ApiKeySettingsDialogProps> = ({ open, onClo
       maxWidth="sm"
       fullWidth
       sx={{
-        zIndex: (theme) => theme.zIndex.modal + 100, // Ensure it's above the AIChatDrawer
+        zIndex: Z_INDEX.DIALOG, // Ensure it's above other layers
       }}
     >
       <DialogTitle>

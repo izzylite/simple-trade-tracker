@@ -191,7 +191,7 @@ export const permanentlyDeleteCalendar = async (calendarId: string): Promise<boo
 export const createCalendar = async (
   userId: string,
   calendar: Omit<Calendar, 'id' | 'user_id' | 'created_at' | 'updated_at'>
-): Promise<string> => {
+): Promise<Calendar> => {
   try {
     const result = await calendarRepository.create({
       ...calendar,
@@ -200,7 +200,7 @@ export const createCalendar = async (
     if (!result.success || !result.data) {
       throw new Error('Failed to create calendar');
     }
-    return result.data.id;
+    return result.data;
   } catch (error) {
     logger.error('Error creating calendar:', error);
     throw error;
@@ -254,7 +254,7 @@ export const duplicateCalendar = async (
     }
 
     // Create new calendar with same settings
-    const newCalendarId = await createCalendar(userId, {
+    const data : Calendar = await createCalendar(userId, {
       name: newName,
       account_balance: sourceCalendar.account_balance,
       max_daily_drawdown: sourceCalendar.max_daily_drawdown,
@@ -266,6 +266,7 @@ export const duplicateCalendar = async (
       increased_risk_percentage: sourceCalendar.increased_risk_percentage,
       profit_threshold_percentage: sourceCalendar.profit_threshold_percentage,
       required_tag_groups: sourceCalendar.required_tag_groups,
+      tags: sourceCalendar.tags,
       score_settings: sourceCalendar.score_settings,
       economic_calendar_filters: sourceCalendar.economic_calendar_filters,
       duplicated_calendar: true,
@@ -278,14 +279,14 @@ export const duplicateCalendar = async (
       for (const trade of trades) {
         // Omit id, created_at, updated_at as they will be auto-generated
         const { id, created_at, updated_at, ...tradeData } = trade;
-        await addTrade(newCalendarId, {
+        await addTrade(data.id, {
           ...tradeData,
-          calendar_id: newCalendarId
+          calendar_id: data.id
         });
       }
     }
 
-    const newCalendar = await getCalendar(newCalendarId);
+    const newCalendar = await getCalendar(data.id);
     if (!newCalendar) {
       throw new Error('Failed to retrieve duplicated calendar');
     }
@@ -297,6 +298,66 @@ export const duplicateCalendar = async (
   }
 };
 
+// =====================================================
+// CALENDAR LINKING (ONE-WAY TRADE SYNC)
+// =====================================================
+
+/**
+ * Link a calendar to another calendar for one-way trade sync
+ * Trades created in sourceCalendarId will be automatically copied to targetCalendarId
+ */
+export const linkCalendar = async (
+  sourceCalendarId: string,
+  targetCalendarId: string
+): Promise<void> => {
+  try {
+    if (sourceCalendarId === targetCalendarId) {
+      throw new Error('Cannot link a calendar to itself');
+    }
+
+    await calendarRepository.update(sourceCalendarId, {
+      linked_to_calendar_id: targetCalendarId
+    });
+
+    logger.log('Calendar linked successfully', { sourceCalendarId, targetCalendarId });
+  } catch (error) {
+    logger.error('Error linking calendar:', error);
+    throw error;
+  }
+};
+
+/**
+ * Unlink a calendar (remove one-way trade sync)
+ */
+export const unlinkCalendar = async (calendarId: string): Promise<void> => {
+  try {
+    await calendarRepository.update(calendarId, {
+      linked_to_calendar_id: null
+    });
+
+    logger.log('Calendar unlinked successfully', { calendarId });
+  } catch (error) {
+    logger.error('Error unlinking calendar:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get the linked calendar for a given calendar (if any)
+ */
+export const getLinkedCalendar = async (calendarId: string): Promise<Calendar | null> => {
+  try {
+    const calendar = await getCalendar(calendarId);
+    if (!calendar?.linked_to_calendar_id) {
+      return null;
+    }
+
+    return await getCalendar(calendar.linked_to_calendar_id);
+  } catch (error) {
+    logger.error('Error getting linked calendar:', error);
+    return null;
+  }
+};
 
 // =====================================================
 // TRADE CRUD OPERATIONS
@@ -339,12 +400,17 @@ export const addTrade = async (
 ): Promise<Trade> => {
   try {
     // Create the trade
-   const result = await tradeRepository.create({
+    const result = await tradeRepository.create({
       ...trade,
       calendar_id: calendarId
     });
- 
-    return result.data!;
+
+    // Check if creation was successful (repository returns { success: false } on error instead of throwing)
+    if (!result.success || !result.data) {
+      throw new Error(result.error?.message || 'Failed to create trade');
+    }
+
+    return result.data;
   } catch (error) {
     logger.error('Error adding trade:', error);
     throw error;
@@ -354,15 +420,21 @@ export const addTrade = async (
 /**
  * Update a trade
  */
-export const updateTrade = async ( 
+export const updateTrade = async (
   trade: Trade,
   updateCallback: (trade: Trade) => Trade
 ): Promise<Trade | null> => {
-  try { 
+  try {
     // Apply updates
     const updatedTrade = updateCallback(trade);
     // Update in database
-    await tradeRepository.update(trade.id, updatedTrade);
+    const result = await tradeRepository.update(trade.id, updatedTrade);
+
+    // Check if update was successful (repository returns { success: false } on error instead of throwing)
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Failed to update trade');
+    }
+
     return updatedTrade;
   } catch (error) {
     logger.error('Error updating trade:', error);

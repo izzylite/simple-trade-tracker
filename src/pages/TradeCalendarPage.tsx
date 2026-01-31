@@ -19,7 +19,7 @@ import {
   Alert,
   Fab,
   Fade,
-
+  LinearProgress
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -38,8 +38,8 @@ import {
   Home as HomeIcon,
   CalendarToday as CalendarIcon,
   Notes as NotesIcon,
-  Edit as EditIcon
-
+  Edit as EditIcon,
+  Flag as TargetIcon
 } from '@mui/icons-material';
 import {
   format,
@@ -81,9 +81,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
 
-import Breadcrumbs, { BreadcrumbItem, BreadcrumbButton } from '../components/common/Breadcrumbs';
+import Breadcrumbs, { BreadcrumbItem, BreadcrumbButton, DropdownItem } from '../components/common/Breadcrumbs';
 import { NewTradeForm, TradeImage } from '../components/trades/TradeForm';
 import { Calendar } from '../types/calendar';
+import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
 import MonthlyStats from '../components/MonthlyStats';
 import AccountStats from '../components/AccountStats';
 import TradeFormDialog, { createEditTradeData } from '../components/trades/TradeFormDialog';
@@ -142,13 +143,14 @@ interface WeeklyPnLProps {
     percentage: string;
     targetProgressValue: number;
   };
+  accountBalance: number;
 }
 
 
 
 
 
-const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({ trade_date, weekIndex, weeklyTarget, sx, weekStats }) => {
+const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({ trade_date, weekIndex, weeklyTarget, sx, weekStats, accountBalance }) => {
   const theme = useTheme();
 
   // Use pre-calculated stats
@@ -156,8 +158,56 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({ trade_date, weekIndex,
 
   const targetProgress = targetProgressValue.toFixed(0);
   const isTargetMet = weeklyTarget ? parseFloat(percentage) >= weeklyTarget : false;
+  const isCurrentWeek = isSameWeek(trade_date, new Date(), { weekStartsOn: 0 });
 
-  return (
+  const weeklyTargetAmount = weeklyTarget ? (accountBalance * weeklyTarget) / 100 : 0;
+  const remainingAmount = Math.max(0, weeklyTargetAmount - netAmount);
+  const cappedProgress = Math.min(Math.max(targetProgressValue, 0), 100);
+
+  const tooltipContent = isCurrentWeek && weeklyTarget ? (
+    <Box sx={{ p: 1, minWidth: 220 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'info.light' }}>
+          Weekly Target
+        </Typography>
+        <Typography variant="caption" sx={{ fontWeight: 700, color: 'white' }}>
+          {weeklyTarget}% (${weeklyTargetAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })})
+        </Typography>
+      </Box>
+
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+        <Box sx={{ flex: 1 }}>
+          <LinearProgress
+            variant="determinate"
+            value={cappedProgress}
+            sx={{
+              height: 6,
+              borderRadius: 3,
+              bgcolor: alpha(theme.palette.common.white, 0.1),
+              '& .MuiLinearProgress-bar': {
+                borderRadius: 3,
+                bgcolor: isTargetMet ? 'success.light' : 'info.main'
+              }
+            }}
+          />
+        </Box>
+        <Typography variant="caption" sx={{ fontWeight: 700, color: isTargetMet ? 'success.light' : 'info.light' }}>
+          {targetProgress}%
+        </Typography>
+      </Box>
+
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          Remaining:
+        </Typography>
+        <Typography variant="caption" sx={{ fontWeight: 600, color: 'white' }}>
+          ${remainingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </Typography>
+      </Box>
+    </Box>
+  ) : '';
+
+  const content = (
     <CalendarCell sx={{
       bgcolor: 'background.paper',
       borderRadius: 1,
@@ -216,7 +266,7 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({ trade_date, weekIndex,
             <TargetBadge
               progress={parseFloat(targetProgress)}
               isMet={isTargetMet}
-              tooltipText={`${isTargetMet ? 'Weekly target achieved' : 'Progress towards weekly target'}: ${targetProgress}%`}
+              tooltipText={isCurrentWeek ? '' : `${isTargetMet ? 'Weekly target achieved' : 'Progress towards weekly target'}: ${targetProgress}%`}
             />
           )}
         </Stack>
@@ -235,6 +285,16 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({ trade_date, weekIndex,
       </Stack>
     </CalendarCell>
   );
+
+  if (isCurrentWeek && weeklyTarget) {
+    return (
+      <Tooltip title={tooltipContent} arrow placement="left">
+        {content}
+      </Tooltip>
+    );
+  }
+
+  return content;
 });
 
 
@@ -621,6 +681,25 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [removingNotifications, setRemovingNotifications] = useState<Set<string>>(new Set());
   const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null>(null);
 
+  // User calendars for breadcrumb dropdown
+  const [userCalendars, setUserCalendars] = useState<Calendar[]>([]);
+
+  // Fetch user's calendars for breadcrumb dropdown
+  useEffect(() => {
+    const loadUserCalendars = async () => {
+      if (!calendar?.user_id) return;
+
+      try {
+        const calendarRepo = new CalendarRepository();
+        const calendars = await calendarRepo.findByUserId(calendar.user_id);
+        setUserCalendars(calendars);
+      } catch (error) {
+        logger.error('Error loading user calendars for dropdown:', error);
+      }
+    };
+
+    loadUserCalendars();
+  }, [calendar?.user_id]);
 
   const breadcrumbButtons = useMemo<BreadcrumbButton[]>(() => [
     ...((!isReadOnly) ? [{
@@ -640,11 +719,26 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
 
   // Breadcrumb items
-  const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => [
-    { label: 'Home', path: '/', icon: <HomeIcon sx={{ fontSize: 18 }} /> },
-    { label: 'Calendars', path: '/dashboard', icon: <CalendarIcon sx={{ fontSize: 18 }} /> },
-    { label: calendarName || 'Calendar', path: `/calendar/${calendarId}` }
-  ], [calendarName, calendarId]);
+  const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => {
+    // Create dropdown items from user calendars
+    const dropdownItems: DropdownItem[] = userCalendars.map(cal => ({
+      label: cal.name,
+      path: `/calendar/${cal.id}`,
+      active: cal.id === calendarId,
+      totalTrades: cal.total_trades,
+      pnl: cal.total_pnl
+    }));
+
+    return [
+      { label: 'Home', path: '/', icon: <HomeIcon sx={{ fontSize: 18 }} /> },
+      { label: 'Calendars', path: '/dashboard', icon: <CalendarIcon sx={{ fontSize: 18 }} /> },
+      {
+        label: calendarName || 'Calendar',
+        path: `/calendar/${calendarId}`,
+        dropdown: dropdownItems.length > 0 ? dropdownItems : undefined
+      }
+    ];
+  }, [calendarName, calendarId, userCalendars]);
 
   // Use optimized hook for high-impact economic events
   const { highImpactEventDates: monthlyHighImpactEvents } = useHighImpactEvents({
@@ -780,6 +874,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         hero_image_url: formData.hero_image_url,
         hero_image_attribution: formData.hero_image_attribution,
       }));
+      // Update userCalendars state to reflect name change in breadcrumb dropdown
+      setUserCalendars(prev => prev.map(cal =>
+        cal.id === calendarId ? { ...cal, name: formData.name } : cal
+      ));
       setIsCalendarEditOpen(false);
       showSnackbar('Calendar updated successfully', 'success');
     } catch (error) {
@@ -1070,14 +1168,16 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     const dateKey = format(trade_date, 'yyyy-MM-dd');
     const trades = tradesByDay.get(dateKey) || [];
 
-    if (trades.length === 0) {
+    // When weekly target is set, always show DayDialog first (shows progress section)
+    // When no weekly target, go directly to add trade form for empty days
+    if (trades.length === 0 && !weeklyTarget) {
       setNewTrade(createNewTradeData);
       setShowAddForm({ open: true, trade_date: trade_date, showDayDialogWhenDone: true });
     }
     else {
       setSelectedDate(trade_date);
     }
-  }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk]);
+  }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk, weeklyTarget]);
   const handleDayChange = (trade_date: Date) => {
     setSelectedDate(trade_date);
   };
@@ -1328,6 +1428,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 }}
                 isDynamicRiskToggled={isDynamicRiskToggled}
                 isReadOnly={isReadOnly}
+                max_daily_drawdown={maxDailyDrawdown}
               />
             </Box>
 
@@ -1481,37 +1582,37 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   </Button>
                 )}
 
-                {/* Notes Button - Moved from FAB */} 
-                  <Tooltip title="Notes for this calendar" arrow>
-                    <Button
-                      startIcon={<NotesIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                      onClick={() => setIsNotesDrawerOpen(true)}
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        flex: { xs: 1, sm: 'none' },
-                        minWidth: { xs: 'auto', sm: '100px' },
-                        borderRadius: 2,
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-                        py: { xs: 0.75, sm: 1 },
-                        px: { xs: 1.5, sm: 2 },
-                        borderColor: alpha(theme.palette.text.secondary, 0.3),
-                        color: 'text.secondary',
-                        '&:hover': {
-                          borderColor: 'info.main',
-                          bgcolor: alpha(theme.palette.info.main, 0.1),
-                          color: 'info.main',
-                          transform: 'translateY(-1px)'
-                        },
-                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                      }}
-                    >
-                      Notes
-                    </Button>
-                  </Tooltip>
-               
+                {/* Notes Button - Moved from FAB */}
+                <Tooltip title="Notes for this calendar" arrow>
+                  <Button
+                    startIcon={<NotesIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
+                    onClick={() => setIsNotesDrawerOpen(true)}
+                    variant="outlined"
+                    size="small"
+                    sx={{
+                      flex: { xs: 1, sm: 'none' },
+                      minWidth: { xs: 'auto', sm: '100px' },
+                      borderRadius: 2,
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                      py: { xs: 0.75, sm: 1 },
+                      px: { xs: 1.5, sm: 2 },
+                      borderColor: alpha(theme.palette.text.secondary, 0.3),
+                      color: 'text.secondary',
+                      '&:hover': {
+                        borderColor: 'info.main',
+                        bgcolor: alpha(theme.palette.info.main, 0.1),
+                        color: 'info.main',
+                        transform: 'translateY(-1px)'
+                      },
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                  >
+                    Notes
+                  </Button>
+                </Tooltip>
+
 
               </Box>
 
@@ -1684,6 +1785,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                         percentage: '0',
                         targetProgressValue: 0
                       }}
+                      accountBalance={accountBalance + totalProfit}
                     />
 
                   </React.Fragment>
@@ -1747,6 +1849,10 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           account_balance={accountBalance}
           tradeOperations={tradeOperations}
           onOpenAIChatMode={isReadOnly ? undefined : openGalleryModeAI}
+          weekTrades={selectedDate
+            ? weeklyStatsMap.get(format(startOfWeek(selectedDate, { weekStartsOn: 0 }), 'yyyy-MM-dd'))?.weekTrades
+            : undefined
+          }
         />
 
 

@@ -18,7 +18,7 @@ export type DayAbbreviation =
 export interface Note {
   id: string;
   user_id: string;
-  calendar_id: string;
+  calendar_id: string | null; // null = global note (visible in all calendars)
   title: string;
   content: string;
   cover_image: string | null;
@@ -44,7 +44,7 @@ export interface Note {
 
 export interface CreateNoteInput {
   user_id: string;
-  calendar_id: string;
+  calendar_id: string | null; // null = global note (visible in all calendars)
   title?: string;
   content?: string;
   cover_image?: string | null;
@@ -67,7 +67,7 @@ export interface UpdateNoteInput {
   title?: string;
   content?: string;
   cover_image?: string | null;
-  calendar_id?: string;
+  calendar_id?: string | null; // null = global note (visible in all calendars)
   is_archived?: boolean;
   is_pinned?: boolean;
 

@@ -147,7 +147,7 @@ const SCHEMA_REFERENCE = `
 Required: id, calendar_id, user_id, trade_type, trade_date, amount
 Price: entry_price, exit_price, stop_loss, take_profit, risk_to_reward
 Session: session — ENUM column ('Asia'|'London'|'NY AM'|'NY PM')
-Tags: tags[] — ARRAY for custom labels, query: 'TagName' = ANY(tags)
+Tags: tags[] — ARRAY for custom labels. Filter: 'TagName' = ANY(tags). Aggregate: use unnest(tags) to GROUP BY
 Meta: notes, images[], economic_events[], is_pinned
 Enums: trade_type ('win'|'loss'|'breakeven')
 
@@ -211,6 +211,59 @@ ORDER BY trade_date DESC LIMIT 10;
 WHERE session IN ('London', 'NY AM')
 \`\`\`
 
+## Tag Analysis with unnest() — CRITICAL for Pattern Discovery
+
+Tags are stored as TEXT ARRAY. To GROUP BY or aggregate individual tags, use unnest().
+
+### Analyze performance by tag category (strategies, confluences, etc.):
+\`\`\`sql
+SELECT
+  tag,
+  COUNT(*) as trade_count,
+  SUM(amount) as total_pnl,
+  ROUND(100.0 * SUM(CASE WHEN trade_type = 'win' THEN 1 ELSE 0 END) / COUNT(*), 1) as win_rate
+FROM trades, unnest(tags) as tag
+WHERE user_id = 'USER_ID' AND calendar_id = 'CALENDAR_ID'
+  AND tag LIKE 'Strategies:%'
+GROUP BY tag
+ORDER BY total_pnl DESC;
+\`\`\`
+
+### Tag prefix patterns (adjust LIKE pattern as needed):
+- Strategies: tag LIKE 'Strategies:%'
+- Confluence: tag LIKE 'Confluence:%'
+- Targets: tag LIKE 'Targets:%'
+- Counter Trend: tag LIKE 'Counter Trend:%'
+- Pairs: tag LIKE 'Pairs:%'
+- Any tag category: tag LIKE 'CategoryName:%'
+
+### Top 10 most profitable tags across ALL categories:
+\`\`\`sql
+SELECT
+  tag,
+  COUNT(*) as trade_count,
+  SUM(amount) as total_pnl
+FROM trades, unnest(tags) as tag
+WHERE user_id = 'USER_ID' AND calendar_id = 'CALENDAR_ID'
+  AND array_length(tags, 1) > 0
+GROUP BY tag
+ORDER BY total_pnl DESC
+LIMIT 10;
+\`\`\`
+
+### Filter by trade outcome when analyzing tags:
+\`\`\`sql
+SELECT tag, COUNT(*) as wins, SUM(amount) as total_profit
+FROM trades, unnest(tags) as tag
+WHERE user_id = 'USER_ID' AND calendar_id = 'CALENDAR_ID'
+  AND trade_type = 'win'
+  AND tag LIKE 'Confluence:%'
+GROUP BY tag
+ORDER BY total_profit DESC;
+\`\`\`
+
+⚠️ IMPORTANT: Always include the security filter (user_id, calendar_id) BEFORE the unnest join.
+
 ## Economic Calendar Queries
 
 ### Upcoming events (use for "what events next week?"):
@@ -243,26 +296,19 @@ WHERE t.user_id = 'USER_ID' AND t.calendar_id = 'CALENDAR_ID'
 `;
 
 const CARD_DISPLAY_REFERENCE = `
-## Card Display Format
+## Card Display Format — ID GROUNDING CRITICAL
 
 Reference trades/events/notes with self-closing XML tags:
 - <trade-ref id="uuid"/>
 - <event-ref id="uuid"/>
 - <note-ref id="uuid"/>
+Note: COPY the exact UUID string (e.g., "9ee94f92-1b7b-4f95-9fe5-29f56f481010") from the sql query
+ 
 
-Format rules:
+### Format Rules
 - Each tag on its own line
 - Blank lines before/after each tag
 - Text content separate from tags
-
-Example:
-"Here are your top trades:
-
-<trade-ref id="f46e5852-070e-488b-8144-25663ff52f06"/>
-
-<trade-ref id="ccc10d28-c9b2-4edd-a729-d6273d2f0939"/>
-
-These show excellent risk management."
 `;
 
 // =============================================================================
@@ -357,6 +403,7 @@ REQUIRED FILTER: user_id = '${userId}'${
 - NEVER create notes without user request (except AGENT_MEMORY)
 - NEVER guess data — if query returns empty, say so
 - NEVER mention anything related to Supabase database to the user
+- NEVER fabricate/invent UUIDs for <trade-ref/>, <event-ref/>, <note-ref/> tags — use ONLY exact IDs from your SQL query results (server validates and removes fake IDs)
 
 ## ACTION-ORIENTED BEHAVIOR — Critical
 - DO NOT describe what you will do — JUST DO IT by calling the appropriate tool
@@ -572,10 +619,12 @@ ${SQL_PATTERNS}
 ${CARD_DISPLAY_REFERENCE}
 
 ## Tags System
-- Format: "Group:Value" (e.g., "Session:NY PM") or simple ("Long", "Short")
+- Format: "Group:Value" (e.g., "Strategies:Daily Volume Setup") or simple ("Long", "Short")
 - calendar.tags: Available vocabulary
 - trade.tags: Assigned tags
-- Query: 'TagName' = ANY(tags) or tag LIKE 'Session:%'
+- Filter single tag: WHERE 'TagName' = ANY(tags)
+- Aggregate by tags: FROM trades, unnest(tags) as tag WHERE ... GROUP BY tag
+- Filter tag category: WHERE tag LIKE 'Strategies:%' (after unnest)
 - Note mentions: Users may say "note:Title" — query notes by title
 
 ## Note Management

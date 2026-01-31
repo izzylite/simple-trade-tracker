@@ -192,7 +192,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
   // Initialize loading state for all images
   useEffect(() => {
-    if (trade && trade.images && trade.images.length > 0) {
+    if (trade && Array.isArray(trade.images) && trade.images.length > 0) {
       const initialLoadingState: { [key: string]: boolean } = {};
 
       trade.images.forEach(image => {
@@ -616,6 +616,48 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       </Box>
                     </Paper>
                   )}
+                  {/* Stop Loss/Take Profit */}
+                  {(trade.stop_loss || trade.take_profit) && (
+                    <Paper elevation={0} sx={{
+                      p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
+                      borderRadius: 2,
+                      backgroundColor: alpha(theme.palette.warning.main, 0.05),
+                      border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 0.5,
+                      gridColumn: { xs: '1', sm: 'span 2' }
+                    }}>
+                      <Box sx={{
+                        display: 'flex',
+                        flexDirection: { xs: 'column', sm: 'row' }, // Stack vertically on mobile
+                        justifyContent: 'space-between',
+                        gap: { xs: 1, sm: 0 }, // Add gap on mobile
+                        width: '100%'
+                      }}>
+                        {trade.stop_loss && (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'warning.main' }}>
+                              Stop Loss
+                            </Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                              {trade.stop_loss}
+                            </Typography>
+                          </Box>
+                        )}
+                        {trade.take_profit && (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'warning.main' }}>
+                              Take Profit
+                            </Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                              {trade.take_profit}
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    </Paper>
+                  )}
                   {/* PnL */}
                   <Paper elevation={0} sx={{
                     p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
@@ -755,7 +797,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 <Divider sx={{ my: 1.5 }} />
 
                 {/* Images */}
-                {trade.images && trade.images.length > 0 && (
+                {Array.isArray(trade.images) && trade.images.length > 0 && (
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                       <ImageIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
@@ -925,9 +967,9 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                         }}
                                         onClick={() => {
                                           // Get all non-pending image URLs
-                                          const allImageUrls = trade.images
-                                            ?.filter(img => !isPendingImage(img))
-                                            .map(img => img.url) || [];
+                                          const allImageUrls = (Array.isArray(trade.images) ? trade.images : [])
+                                            .filter(img => !isPendingImage(img))
+                                            .map(img => img.url);
 
                                           // Find the index of the current image
                                           const currentIndex = allImageUrls.findIndex(url => url === image.url);

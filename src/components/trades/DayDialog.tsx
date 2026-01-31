@@ -28,6 +28,8 @@ interface DayDialogProps {
   tradeOperations: TradeOperationsProps;
   // AI chat mode opener - needs trades context from DayDialog
   onOpenAIChatMode?: (trades: Trade[], tradeId: string, title?: string) => void;
+  // Optional pre-fetched trades for the week (avoids redundant DB query in ProgressSection)
+  weekTrades?: Trade[];
 }
 
 
@@ -43,7 +45,8 @@ const DayDialog: React.FC<DayDialogProps> = ({
   showAddForm,
   onDateChange,
   tradeOperations,
-  onOpenAIChatMode
+  onOpenAIChatMode,
+  weekTrades
 }) => {
   // Destructure from tradeOperations
   const {
@@ -205,6 +208,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
               currentBalance={account_balance + cumulativePnL}
               currentDate={date}
               calendar={calendar}
+              weekTrades={weekTrades}
             />
           )}
 

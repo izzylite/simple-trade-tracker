@@ -14,7 +14,7 @@ import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup, forma
 import { BaseDialog } from './common';
 import { logger } from '../utils/logger';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
-import { supabase } from '../config/supabase';
+import { tagService } from '../services/tagService';
 import { useAuthState } from '../contexts/AuthStateContext';
 
 interface TagEditDialogProps {
@@ -55,19 +55,7 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
 
     setIsLoadingDefinition(true);
     try {
-      const { data, error: fetchError } = await supabase
-        .from('tag_definitions')
-        .select('definition')
-        .eq('user_id', user.id)
-        .eq('tag_name', tagName)
-        .single();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        // PGRST116 = no rows returned, which is fine
-        logger.error('Error fetching tag definition:', fetchError);
-      }
-
-      const def = data?.definition || '';
+      const def = await tagService.fetchTagDefinition(user.id, tagName);
       setDefinition(def);
       setOriginalDefinition(def);
     } catch (err) {
@@ -76,48 +64,6 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
       setIsLoadingDefinition(false);
     }
   }, [user?.id]);
-
-  // Save or update definition
-  const saveDefinition = async (tagName: string, newDefinition: string) => {
-    if (!user?.id) return;
-
-    const trimmedDef = newDefinition.trim();
-
-    if (trimmedDef === originalDefinition) {
-      return; // No change
-    }
-
-    try {
-      if (trimmedDef) {
-        // Upsert definition
-        const { error: upsertError } = await supabase
-          .from('tag_definitions')
-          .upsert({
-            user_id: user.id,
-            tag_name: tagName,
-            definition: trimmedDef,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id,tag_name' });
-
-        if (upsertError) {
-          logger.error('Error saving tag definition:', upsertError);
-        }
-      } else if (originalDefinition) {
-        // Delete definition if cleared
-        const { error: deleteError } = await supabase
-          .from('tag_definitions')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('tag_name', tagName);
-
-        if (deleteError) {
-          logger.error('Error deleting tag definition:', deleteError);
-        }
-      }
-    } catch (err) {
-      logger.error('Error saving tag definition:', err);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,7 +102,9 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
 
         if (result.success) {
           // Save or update the definition for the new tag name
-          await saveDefinition(trimmedNewTag, definition);
+          if (user?.id) {
+            await tagService.saveTagDefinition(user.id, trimmedNewTag, definition, originalDefinition);
+          }
 
           if (onSuccess) {
             onSuccess(trimmedTag, trimmedNewTag, result.tradesUpdated || 0);
@@ -167,7 +115,9 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
         }
       } else {
         // Only definition changed, save it
-        await saveDefinition(trimmedTag, definition);
+        if (user?.id) {
+          await tagService.saveTagDefinition(user.id, trimmedTag, definition, originalDefinition);
+        }
         onClose(true);
       }
     } catch (error) {
@@ -178,11 +128,11 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
     }
   };
 
-  const isGrouped = isGroupedTag(tag); 
+  const isGrouped = isGroupedTag(tag);
   // For grouped tags, extract the tag name part for the input field
   const getTagNamePart = (fullTag: string) => isGroupedTag(fullTag) ? fullTag.split(':')[1] : fullTag;
   const [tagName, setTagName] = useState(getTagNamePart(tag));
-  const [tagGroup, setTagGroup] = useState(isGrouped ? getTagGroup(tag) : '');  
+  const [tagGroup, setTagGroup] = useState(isGrouped ? getTagGroup(tag) : '');
 
 
   // Update state when tag prop changes or dialog opens
@@ -315,10 +265,10 @@ const TagEditDialog: React.FC<TagEditDialogProps> = ({
 
 
         {isGrouped ? (
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}> 
-              <TextField
-                label="Group"
-             value={tagGroup}
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+            <TextField
+              label="Group"
+              value={tagGroup}
               onChange={(e) => {
                 const newGroupName = e.target.value;
                 // Prevent multiple colons in group name

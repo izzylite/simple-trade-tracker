@@ -2,10 +2,14 @@
  * Handle Trade Changes Edge Function
  *
  * Triggered by database webhooks when trades are modified
- * Handles: image cleanup on DELETE and UPDATE operations
- */  
+ * Handles:
+ * - Image cleanup on DELETE and UPDATE operations
+ * - Year stats recalculation
+ * - Trade sync to linked calendars (one-way sync with 24hr window)
+ */
 import { createServiceClient, errorResponse, successResponse, handleCors, log, parseJsonBody } from '../_shared/supabase.ts';
 import { canDeleteImage, deleteTradeImages } from '../_shared/utils.ts';
+import { prepareSyncedTrade, isWithinSyncWindow, buildCalendarRiskSettings, CalendarRiskSettings } from '../_shared/tradeSync.ts';
 import type { Trade, TradeWebhookPayload, YearStats, MonthlyStats } from '../_shared/types.ts';
 /**
  * Clean up removed images when a trade is deleted or updated
@@ -40,7 +44,8 @@ import type { Trade, TradeWebhookPayload, YearStats, MonthlyStats } from '../_sh
     // (check if they're used in duplicated calendars)
     const finalImagesToDelete: string[] = [];
     for (const imageId of imagesToDelete) {
-      const canDelete = await canDeleteImage(supabase, imageId, calendarId);
+      // 4th arg: ignoreTradeId - ensure we don't count the trade itself (critical for race conditions)
+      const canDelete = await canDeleteImage(supabase, imageId, calendarId, false, oldTrade?.id);
       if (canDelete) {
         finalImagesToDelete.push(imageId);
         log(`Image ${imageId} can be safely deleted`);
@@ -95,7 +100,7 @@ async function calculateYearStats(
 
     // Group trades by year
     const tradesByYear = new Map<number, Trade[]>();
-    trades.forEach((trade) => {
+    trades.forEach((trade: Trade) => {
       const tradeDate = new Date(trade.trade_date);
       const year = tradeDate.getFullYear();
 
@@ -110,7 +115,14 @@ async function calculateYearStats(
     // Calculate stats for each year
     const yearStatsMap: Record<string, YearStats> = {};
 
-    for (const [year, yearTrades] of tradesByYear.entries()) {
+    // Sort years in ascending order to properly carry over balance
+    const sortedYears = Array.from(tradesByYear.keys()).sort((a, b) => a - b);
+
+    // Track the running balance across years - starts at account balance
+    let carryOverBalance = accountBalance;
+
+    for (const year of sortedYears) {
+      const yearTrades = tradesByYear.get(year)!;
       log(`Calculating stats for year ${year} with ${yearTrades.length} trades`);
 
       // Initialize monthly stats array (12 months, indices 0-11)
@@ -128,7 +140,9 @@ async function calculateYearStats(
       }
 
       // Group trades by month and calculate monthly stats
-      let runningBalance = accountBalance;
+      // Use carryOverBalance from previous year (or accountBalance for first year)
+      const yearStartBalance = carryOverBalance; // Save for growth percentage calculation
+      let runningBalance = carryOverBalance;
       const monthlyTrades = new Map<number, Trade[]>();
 
       yearTrades.forEach((trade) => {
@@ -179,8 +193,9 @@ async function calculateYearStats(
       const winCount = yearTrades.filter((t) => t.trade_type === 'win').length;
       const lossCount = yearTrades.filter((t) => t.trade_type === 'loss').length;
       const winRate = totalTrades > 0 ? (winCount / totalTrades) * 100 : 0;
-      const yearlyGrowthPercentage = accountBalance > 0
-        ? (yearlyPnL / accountBalance) * 100
+      // Use year's starting balance for growth percentage (includes prior years' P&L)
+      const yearlyGrowthPercentage = yearStartBalance > 0
+        ? (yearlyPnL / yearStartBalance) * 100
         : 0;
 
       // Find best month (month with highest P&L)
@@ -213,6 +228,9 @@ async function calculateYearStats(
         win_rate: winRate.toFixed(2),
         best_month: bestMonthIndex,
       });
+
+      // Carry over the ending balance to the next year
+      carryOverBalance = runningBalance;
     }
 
     log('Year stats calculation completed', 'info', {
@@ -277,6 +295,9 @@ async function calculateYearStats(
     // Calculate and update year_stats for all operations (INSERT, UPDATE, DELETE)
     await updateYearStats(calendarId);
 
+    // Sync trade to linked calendar (if one exists)
+    await syncToLinkedCalendar(payload.operation, payload.old_record, payload.new_record, calendarId);
+
     log('Trade changes processed successfully');
     return successResponse({
       message: 'Trade changes processed successfully',
@@ -332,4 +353,163 @@ async function updateYearStats(calendarId : string) {
       log('Error in year stats calculation/update', 'error', error);
       // Don't fail the webhook on year stats errors - log and continue
     }
+}
+
+/**
+ * Sync trade to linked calendar
+ * One-way sync: trades in source calendar are copied to linked target calendar
+ * 24-hour window: updates/deletes only propagate within 24 hours of trade creation
+ */
+async function syncToLinkedCalendar(
+  operation: 'INSERT' | 'UPDATE' | 'DELETE',
+  oldTrade: Trade | undefined,
+  newTrade: Trade | undefined,
+  calendarId: string
+): Promise<void> {
+  try {
+    const trade = newTrade || oldTrade;
+    if (!trade) return;
+
+    // Skip if this trade is already a synced copy (prevent infinite loops)
+    if (trade.is_synced_copy) {
+      log('Skipping sync - trade is already a synced copy');
+      return;
+    }
+
+    // Skip temporary trades (placeholder trades being edited)
+    if (trade.is_temporary) {
+      log('Skipping sync - trade is temporary');
+      return;
+    }
+
+    const supabase = createServiceClient();
+
+    // Get the linked calendar ID for this calendar
+    const { data: sourceCalendar, error: calendarError } = await supabase
+      .from('calendars')
+      .select('linked_to_calendar_id')
+      .eq('id', calendarId)
+      .single();
+
+    if (calendarError || !sourceCalendar?.linked_to_calendar_id) {
+      // No linked calendar - nothing to sync
+      return;
+    }
+
+    const linkedCalendarId = sourceCalendar.linked_to_calendar_id;
+    log('Syncing trade to linked calendar', 'info', { operation, linkedCalendarId });
+
+    // Fetch target calendar's risk settings for amount recalculation
+    const { data: targetCalendar, error: targetError } = await supabase
+      .from('calendars')
+      .select('account_balance, risk_per_trade, dynamic_risk_enabled, increased_risk_percentage, profit_threshold_percentage')
+      .eq('id', linkedCalendarId)
+      .single();
+
+    // Calculate cumulative P&L for target calendar up to (but not including) the trade date
+    // This matches the frontend calculation for consistent dynamic risk behavior
+    let cumulativePnL = 0;
+    if (targetCalendar && !targetError && trade.trade_date) {
+      const { data: targetTrades } = await supabase
+        .from('trades')
+        .select('amount, trade_date')
+        .eq('calendar_id', linkedCalendarId)
+        .lt('trade_date', trade.trade_date);
+
+      if (targetTrades) {
+        cumulativePnL = targetTrades.reduce((sum: any, t: { amount: any; }) => sum + (t.amount || 0), 0);
+      }
+    }
+
+    // Build target settings (will be undefined if fetch failed, causing raw amount copy)
+    const targetSettings: CalendarRiskSettings | undefined = targetCalendar && !targetError
+      ? buildCalendarRiskSettings(targetCalendar, cumulativePnL)
+      : undefined;
+
+    if (operation === 'INSERT' && newTrade) {
+      // Prepare synced trade using utility (handles field stripping and amount calculation)
+      // This sets is_synced_copy: true and source_trade_id to prevent infinite loops
+      const syncedTradeData = prepareSyncedTrade(newTrade, linkedCalendarId, targetSettings);
+
+      // Use RPC function for consistency - tags merged, user_id set, year stats via webhook
+      const { error: insertError } = await supabase.rpc('add_trade_with_tags', {
+        p_trade: syncedTradeData,
+        p_calendar_id: linkedCalendarId
+      });
+
+      if (insertError) {
+        log('Error creating synced trade', 'error', insertError);
+      } else {
+        log('Synced trade created successfully');
+      }
+    } else if (operation === 'UPDATE' && newTrade) {
+      // Check 24-hour window using utility
+      if (!isWithinSyncWindow(newTrade)) {
+        log('Skipping update sync - outside 24hr window');
+        return;
+      }
+
+      // Find the synced trade's actual ID by source_trade_id
+      const { data: syncedTrade, error: findError } = await supabase
+        .from('trades')
+        .select('id')
+        .eq('source_trade_id', newTrade.id)
+        .eq('calendar_id', linkedCalendarId)
+        .single();
+
+      if (findError || !syncedTrade) {
+        log('Synced trade not found for update', 'warn', { source_trade_id: newTrade.id });
+        return;
+      }
+
+      // Prepare updated trade data
+      const syncedTradeData = prepareSyncedTrade(newTrade, linkedCalendarId, targetSettings);
+
+      // Use RPC function for consistency
+      const { error: updateError } = await supabase.rpc('update_trade_with_tags', {
+        p_trade_id: syncedTrade.id,
+        p_trade_updates: syncedTradeData,
+        p_calendar_id: linkedCalendarId
+      });
+
+      if (updateError) {
+        log('Error updating synced trade', 'error', updateError);
+      } else {
+        log('Synced trade updated successfully');
+      }
+    } else if (operation === 'DELETE' && oldTrade) {
+      // Check 24-hour window using utility
+      if (!isWithinSyncWindow(oldTrade)) {
+        log('Skipping delete sync - outside 24hr window');
+        return;
+      }
+
+      // Find the synced trade's actual ID by source_trade_id
+      const { data: syncedTrade, error: findError } = await supabase
+        .from('trades')
+        .select('id')
+        .eq('source_trade_id', oldTrade.id)
+        .eq('calendar_id', linkedCalendarId)
+        .single();
+
+      if (findError || !syncedTrade) {
+        log('Synced trade not found for delete', 'warn', { source_trade_id: oldTrade.id });
+        return;
+      }
+
+      // Use RPC function for consistency
+      const { error: deleteError } = await supabase.rpc('delete_trade_transactional', {
+        p_trade_id: syncedTrade.id
+      });
+
+      if (deleteError) {
+        log('Error deleting synced trade', 'error', deleteError);
+      } else {
+        log('Synced trade deleted successfully');
+      }
+    }
+  } catch (error) {
+    log('Error in syncToLinkedCalendar', 'error', error);
+    // Don't fail the webhook on sync errors - log and continue
+  }
 }

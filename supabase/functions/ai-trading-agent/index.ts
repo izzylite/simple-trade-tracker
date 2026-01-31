@@ -12,6 +12,7 @@ import {
   executeCustomTool
 } from './tools.ts';
 import { fetchEmbeddedData, type EmbeddedData } from './embedDataFetcher.ts';
+import { validateReferenceIds, hasReferenceTags, type ValidationResult } from './idValidator.ts';
 import { buildSecureSystemPrompt } from "./systemPrompt.ts";
 import { encodeBase64 } from "https://deno.land/std@0.208.0/encoding/base64.ts";
 
@@ -1173,9 +1174,145 @@ function handleStreamingRequest(
         log(`Completed in ${turnCount} turns with ${functionCalls.length} function calls`, 'info');
       }
 
-      // Format response with HTML and citations
+      // ID Validation Feedback Loop
+      // If the AI response contains reference tags with invalid IDs, we give it another
+      // chance to correct itself by sending a correction prompt back as feedback
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      let cleanedFinalText = finalText || '';
+      const maxValidationRetries = 2;
+      let validationRetryCount = 0;
+
+      while (serviceKey && hasReferenceTags(cleanedFinalText) && validationRetryCount < maxValidationRetries) {
+        log(`Validating reference IDs in response (attempt ${validationRetryCount + 1}/${maxValidationRetries})...`, 'info');
+        const validationResult = await validateReferenceIds(
+          cleanedFinalText,
+          supabaseUrl,
+          serviceKey,
+          userId
+        );
+
+        if (validationResult.isValid) {
+          log('ID Validation: All reference IDs are valid', 'info');
+          break; // All IDs are valid, exit validation loop
+        }
+
+        // Invalid IDs detected - give AI feedback to correct
+        validationRetryCount++;
+        log(`ID Validation: Found ${validationResult.invalidCount} invalid refs (trades: ${validationResult.invalidIds.trades.length}, events: ${validationResult.invalidIds.events.length}, notes: ${validationResult.invalidIds.notes.length})`, 'warn');
+
+        if (validationRetryCount >= maxValidationRetries) {
+          // Max retries reached - strip invalid refs and continue
+          log('Max validation retries reached - proceeding with partial response', 'warn');
+          // Remove invalid reference tags from the response
+          for (const id of validationResult.invalidIds.trades) {
+            cleanedFinalText = cleanedFinalText.replace(new RegExp(`<trade-ref\\s+id="${id}"\\s*/?>(</trade-ref>)?`, 'gi'), '');
+          }
+          for (const id of validationResult.invalidIds.events) {
+            cleanedFinalText = cleanedFinalText.replace(new RegExp(`<event-ref\\s+id="${id}"\\s*/?>(</event-ref>)?`, 'gi'), '');
+          }
+          for (const id of validationResult.invalidIds.notes) {
+            cleanedFinalText = cleanedFinalText.replace(new RegExp(`<note-ref\\s+id="${id}"\\s*/?>(</note-ref>)?`, 'gi'), '');
+          }
+          break;
+        }
+
+        // Send correction prompt back to AI
+        if (validationResult.correctionPrompt) {
+          log('Sending correction prompt to AI for ID fix...', 'info');
+
+          // Add the model's response (with invalid IDs) to conversation
+          conversationContents.push({
+            role: 'model',
+            parts: [{ text: cleanedFinalText }]
+          });
+
+          // Add correction prompt as user message
+          conversationContents.push({
+            role: 'user',
+            parts: [{ text: validationResult.correctionPrompt }]
+          });
+
+          // Stream the correction prompt to client
+          await sendSSE(writer, 'text_chunk', { text: '\n\n[Correcting response...]\n\n' });
+
+          // Call Gemini again with correction feedback
+          const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${googleApiKey}`;
+          const requestBody = {
+            contents: conversationContents,
+            tools: allTools.length > 0 ? [{ function_declarations: allTools }] : undefined,
+            tool_config: allTools.length > 0 ? {
+              function_calling_config: { mode: "AUTO" }
+            } : undefined,
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 4000,
+            }
+          };
+
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            log(`Gemini correction call failed: ${response.status} - ${errorText}`, 'error');
+            break;
+          }
+
+          // Process streaming response for correction
+          let correctedText = '';
+          if (response.body) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                  if (!line.trim() || line.startsWith('data: [DONE]')) continue;
+                  const jsonLine = line.startsWith('data: ') ? line.slice(6) : line;
+                  if (!jsonLine.trim()) continue;
+
+                  try {
+                    const chunk = JSON.parse(jsonLine);
+                    const candidate = chunk.candidates?.[0];
+                    const parts = candidate?.content?.parts || [];
+
+                    for (const part of parts) {
+                      if (part.text) {
+                        correctedText += part.text;
+                        await sendSSE(writer, 'text_chunk', { text: part.text });
+                      }
+                    }
+                  } catch (parseError) {
+                    // Skip invalid JSON
+                  }
+                }
+              }
+            } finally {
+              reader.releaseLock();
+            }
+          }
+
+          // Update final text with corrected version for next validation pass
+          cleanedFinalText = correctedText;
+          finalText = correctedText;
+          log(`Received corrected response (${correctedText.length} chars)`, 'info');
+        }
+      }
+
+      // Format response with HTML and citations (using cleaned text)
       const { messageHtml, citations } = formatResponseWithHtmlAndCitations(
-        finalText || '',
+        cleanedFinalText,
         functionCalls as ToolCall[]
       );
 
@@ -1184,11 +1321,10 @@ function handleStreamingRequest(
         await sendSSE(writer, 'citation', { citations });
       }
 
-      // Fetch embedded data
-      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      // Fetch embedded data (now using validated/cleaned text)
       if (serviceKey) {
         const embeddedData: EmbeddedData = await fetchEmbeddedData(
-          finalText || '',
+          cleanedFinalText,
           supabaseUrl,
           serviceKey,
           userId
@@ -1208,9 +1344,9 @@ function handleStreamingRequest(
         }
       }
 
-      // Send done event
+      // Send done event (with cleaned/validated text)
       await sendSSE(writer, 'done', {
-        success: !!finalText,
+        success: !!cleanedFinalText,
         messageHtml,
         metadata: {
           functionCalls,
@@ -1517,21 +1653,117 @@ Deno.serve(async (req: Request) => {
       log('No final text generated', 'warn');
     }
 
-    // Format response with HTML and citations
-    const { messageHtml, citations } = formatResponseWithHtmlAndCitations(
-      finalText || '',
-      functionCalls as ToolCall[]
-    );
-
-    // Fetch embedded data for inline references (trade_id:xxx, event_id:xxx)
-    log('Fetching embedded data for inline references', 'info');
+    // ID Validation Feedback Loop (Non-streaming)
+    // If the AI response contains reference tags with invalid IDs, we give it another
+    // chance to correct itself by sending a correction prompt back as feedback
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!serviceKey) {
       throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
     }
 
+    let cleanedFinalText = finalText || '';
+    const maxValidationRetries = 2;
+    let validationRetryCount = 0;
+
+    while (hasReferenceTags(cleanedFinalText) && validationRetryCount < maxValidationRetries) {
+      log(`Validating reference IDs in response (attempt ${validationRetryCount + 1}/${maxValidationRetries})...`, 'info');
+      const idValidationResult = await validateReferenceIds(
+        cleanedFinalText,
+        supabaseUrl,
+        serviceKey,
+        userId
+      );
+
+      if (idValidationResult.isValid) {
+        log('ID Validation: All reference IDs are valid', 'info');
+        break; // All IDs are valid, exit validation loop
+      }
+
+      // Invalid IDs detected - give AI feedback to correct
+      validationRetryCount++;
+      log(`ID Validation: Found ${idValidationResult.invalidCount} invalid refs (trades: ${idValidationResult.invalidIds.trades.length}, events: ${idValidationResult.invalidIds.events.length}, notes: ${idValidationResult.invalidIds.notes.length})`, 'warn');
+
+      if (validationRetryCount >= maxValidationRetries) {
+        // Max retries reached - strip invalid refs and continue
+        log('Max validation retries reached - proceeding with partial response', 'warn');
+        // Remove invalid reference tags from the response
+        for (const id of idValidationResult.invalidIds.trades) {
+          cleanedFinalText = cleanedFinalText.replace(new RegExp(`<trade-ref\\s+id="${id}"\\s*/?>(</trade-ref>)?`, 'gi'), '');
+        }
+        for (const id of idValidationResult.invalidIds.events) {
+          cleanedFinalText = cleanedFinalText.replace(new RegExp(`<event-ref\\s+id="${id}"\\s*/?>(</event-ref>)?`, 'gi'), '');
+        }
+        for (const id of idValidationResult.invalidIds.notes) {
+          cleanedFinalText = cleanedFinalText.replace(new RegExp(`<note-ref\\s+id="${id}"\\s*/?>(</note-ref>)?`, 'gi'), '');
+        }
+        break;
+      }
+
+      // Send correction prompt back to AI
+      if (idValidationResult.correctionPrompt) {
+        log('Sending correction prompt to AI for ID fix (non-streaming)...', 'info');
+
+        // Add the model's response (with invalid IDs) to conversation
+        conversationContents.push({
+          role: 'model',
+          parts: [{ text: cleanedFinalText }]
+        });
+
+        // Add correction prompt as user message
+        conversationContents.push({
+          role: 'user',
+          parts: [{ text: idValidationResult.correctionPrompt }]
+        });
+
+        // Call Gemini again with correction feedback
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleApiKey}`;
+        const requestBody = {
+          contents: conversationContents,
+          tools: allTools.length > 0 ? [{ function_declarations: allTools }] : undefined,
+          tool_config: allTools.length > 0 ? {
+            function_calling_config: { mode: "AUTO" }
+          } : undefined,
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 4000,
+          }
+        };
+
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          log(`Gemini correction call failed: ${response.status} - ${errorText}`, 'error');
+          break;
+        }
+
+        const data = await response.json();
+        const candidate = data.candidates?.[0];
+        const parts = candidate?.content?.parts || [];
+        const correctedText = parts.map((p: { text?: string }) => p.text || '').join('');
+
+        // Update final text with corrected version for next validation pass
+        cleanedFinalText = correctedText;
+        finalText = correctedText;
+        log(`Received corrected response (${correctedText.length} chars)`, 'info');
+      }
+    }
+
+    // Format response with HTML and citations (using cleaned text)
+    const { messageHtml, citations } = formatResponseWithHtmlAndCitations(
+      cleanedFinalText,
+      functionCalls as ToolCall[]
+    );
+
+    // Fetch embedded data for inline references (trade_id:xxx, event_id:xxx)
+    log('Fetching embedded data for inline references', 'info');
+
     const embeddedData: EmbeddedData = await fetchEmbeddedData(
-      finalText || '',
+      cleanedFinalText,
       supabaseUrl,
       serviceKey,
       userId
@@ -1545,8 +1777,8 @@ Deno.serve(async (req: Request) => {
     log(`Fetched ${embeddedData.trades.size} embedded trades, ${embeddedData.events.size} embedded events, and ${embeddedData.notes.size} embedded notes`, 'info');
 
     const formattedResponse = {
-      success: !!finalText,
-      message: finalText || '',
+      success: !!cleanedFinalText,
+      message: cleanedFinalText,
       messageHtml,
       citations,
       embeddedTrades: Object.keys(embeddedTrades).length > 0 ? embeddedTrades : undefined,
