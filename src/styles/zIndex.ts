@@ -19,6 +19,9 @@ export const Z_INDEX = {
   AI_DRAWER_BACKDROP: 1399,
   AI_DRAWER: 1400,
 
+  // Economic calendar drawer when opened from a dialog (needs to be above the dialog)
+  ECONOMIC_CALENDAR_DRAWER_OVER_DIALOG: 1550,
+
   // Between drawer and dialog (for overlays that need to be above drawer but below dialogs)
   ECONOMIC_CALENDAR_DETAIL: 1450,
 

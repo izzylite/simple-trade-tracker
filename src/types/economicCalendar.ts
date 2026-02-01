@@ -109,6 +109,7 @@ export interface EconomicCalendarDrawerProps {
   payload?: { updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null;
   tradeOperations: TradeOperationsProps;
   isReadOnly?: boolean;
+  initialDate?: Date;
 }
 
 // Service types

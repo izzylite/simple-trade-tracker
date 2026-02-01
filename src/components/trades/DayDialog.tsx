@@ -4,7 +4,7 @@ import {
   Button,
   Tooltip
 } from '@mui/material';
-import { ViewCarousel as GalleryIcon } from '@mui/icons-material';
+import { ViewCarousel as GalleryIcon, Event as EventIcon } from '@mui/icons-material';
 import { format, isAfter, startOfDay } from 'date-fns';
 import { Trade } from '../../types/dualWrite';
 import { BaseDialog } from '../common';
@@ -14,6 +14,7 @@ import { calculateCumulativePnLToDateAsync } from '../../utils/dynamicRiskUtils'
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { TradeRepository } from '../../services/repository/repositories/TradeRepository';
 import { logger } from '../../utils/logger';
+import EconomicCalendarDrawer from '../economicCalendar/EconomicCalendarDrawer';
 
 interface DayDialogProps {
   open: boolean;
@@ -60,6 +61,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
   const [dayTotalPnL, setDayTotalPnL] = useState<number>(0);
   const [cumulativePnL, setCumulativePnL] = useState<number>(0);
+  const [eventsDrawerOpen, setEventsDrawerOpen] = useState(false);
 
   // Use stable primitives for useEffect dependencies to prevent infinite re-renders
   const dateTime = date.getTime();
@@ -150,6 +152,10 @@ const DayDialog: React.FC<DayDialogProps> = ({
     }
   }, [onOpenAIChatMode, trades, date]);
 
+  const handleOpenEventsDrawer = useCallback(() => {
+    setEventsDrawerOpen(true);
+  }, []);
+
   const tradesLength = trades?.length || 0;
 
   // Merge parent's tradeOperations with DayDialog-specific overrides
@@ -177,18 +183,32 @@ const DayDialog: React.FC<DayDialogProps> = ({
         primaryButtonAction={isReadOnly ? undefined : () => handleAddClick()}
         hideFooterCancelButton={false}
         actions={
-          onOpenGalleryMode && tradesLength > 0 ? (
-            <Tooltip title="View trades in gallery mode">
-              <Button
-                variant="outlined"
-                startIcon={<GalleryIcon />}
-                onClick={handleGalleryModeClick}
-                sx={{ mr: 1 }}
-              >
-                Gallery View
-              </Button>
-            </Tooltip>
-          ) : undefined
+          <>
+            {calendar && (
+              <Tooltip title="View economic events for this day">
+                <Button
+                  variant="outlined"
+                  startIcon={<EventIcon />}
+                  onClick={handleOpenEventsDrawer}
+                  sx={{ mr: 1 }}
+                >
+                  Events
+                </Button>
+              </Tooltip>
+            )}
+            {onOpenGalleryMode && tradesLength > 0 && (
+              <Tooltip title="View trades in gallery mode">
+                <Button
+                  variant="outlined"
+                  startIcon={<GalleryIcon />}
+                  onClick={handleGalleryModeClick}
+                  sx={{ mr: 1 }}
+                >
+                  Gallery View
+                </Button>
+              </Tooltip>
+            )}
+          </>
         }
       >
         <Box sx={{ p: 3 }}>
@@ -223,9 +243,17 @@ const DayDialog: React.FC<DayDialogProps> = ({
         </Box>
       </BaseDialog>
 
-     
+      {calendar && (
+        <EconomicCalendarDrawer
+          open={eventsDrawerOpen}
+          onClose={() => setEventsDrawerOpen(false)}
+          calendar={calendar}
+          tradeOperations={tradeOperations}
+          isReadOnly={isReadOnly}
+          initialDate={date}
+        />
+      )}
     </>
-
   );
 };
 

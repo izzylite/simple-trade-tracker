@@ -110,13 +110,14 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   calendar,
   payload,
   tradeOperations,
-  isReadOnly = false
+  isReadOnly = false,
+  initialDate
 }) => {
   const { onUpdateCalendarProperty } = tradeOperations;
   const theme = useTheme();
 
   // Local UI state
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(initialDate || new Date());
   const [customDateRange, setCustomDateRange] = useState<{ start: string | null; end: string | null }>({
     start: null,
     end: null,
@@ -125,6 +126,8 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const [isMonthPickerActive, setIsMonthPickerActive] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
   const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
+  // Track whether we're viewing a specific date (from DayDialog) - disables onlyUpcoming filter
+  const [isViewingSpecificDate, setIsViewingSpecificDate] = useState(!!initialDate);
 
   // Use reusable event pinning hook
   const {
@@ -156,6 +159,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   });
 
   // Use optimized events hook
+  // When viewing a specific date (from DayDialog), disable onlyUpcoming filter
   const {
     events,
     loading,
@@ -169,10 +173,23 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     currentDate,
     currencies: appliedFilters.currencies,
     impacts: appliedFilters.impacts,
-    onlyUpcoming: appliedFilters.onlyUpcoming,
+    onlyUpcoming: isViewingSpecificDate ? false : appliedFilters.onlyUpcoming,
     enabled: open,
     customDateRange,
   });
+
+  // Sync currentDate with initialDate when drawer opens
+  const initialDateTimestamp = initialDate?.getTime();
+  useEffect(() => {
+    if (open && initialDate) {
+      setCurrentDate(initialDate);
+      setIsMonthPickerActive(false);
+      setIsViewingSpecificDate(true);
+    } else if (!open) {
+      // Reset when drawer closes
+      setIsViewingSpecificDate(false);
+    }
+  }, [open, initialDateTimestamp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check if any events are imminent for optimized time updates
   const hasImminent = useMemo(() => hasImminentEvent(events), [events]);
@@ -239,11 +256,13 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     setCustomDateRange({ start: null, end: null });
     setCurrentDate(new Date());
     setIsMonthPickerActive(false);
+    setIsViewingSpecificDate(false); // Exit specific date mode when changing view
   }, [setViewType]);
 
   // Navigation handlers
   const handlePrevious = useCallback(() => {
     setCustomDateRange({ start: null, end: null });
+    setIsViewingSpecificDate(false); // Exit specific date mode when navigating
 
     switch (viewType) {
       case 'day':
@@ -260,6 +279,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
 
   const handleNext = useCallback(() => {
     setCustomDateRange({ start: null, end: null });
+    setIsViewingSpecificDate(false); // Exit specific date mode when navigating
 
     switch (viewType) {
       case 'day':
@@ -278,6 +298,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   const handleMonthChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedDate = new Date(event.target.value + '-01');
     setCurrentDate(selectedDate);
+    setIsViewingSpecificDate(false); // Exit specific date mode when picking month
     setIsMonthPickerActive(true);
   }, []);
 
@@ -341,6 +362,9 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     setSelectedEvent(null);
   }, []);
 
+  // Use higher z-index when opened from a dialog (when initialDate is provided)
+  const drawerZIndex = initialDate ? Z_INDEX.ECONOMIC_CALENDAR_DRAWER_OVER_DIALOG : Z_INDEX.ECONOMIC_CALENDAR_DRAWER;
+
   return (
     <Drawer
       anchor="right"
@@ -348,11 +372,11 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
       onClose={onClose}
       ModalProps={{ keepMounted: true }}
       sx={{
-        zIndex: Z_INDEX.ECONOMIC_CALENDAR_DRAWER,
+        zIndex: drawerZIndex,
         '& .MuiDrawer-paper': {
           width: { xs: '100%', sm: 450 },
           maxWidth: '100vw',
-          zIndex: Z_INDEX.ECONOMIC_CALENDAR_DRAWER,
+          zIndex: drawerZIndex,
           background: theme.palette.mode === 'dark'
             ? 'linear-gradient(135deg, rgba(18, 18, 18, 0.95) 0%, rgba(30, 30, 30, 0.95) 100%)'
             : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',
