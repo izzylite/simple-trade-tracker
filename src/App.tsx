@@ -60,7 +60,7 @@ export interface CalendarManagementProps {
     heroImageUrl?: string,
     heroImageAttribution?: any,
     heroImagePosition?: string
-  ) => void;
+  ) => Promise<Calendar>;
   onDuplicateCalendar: (sourceCalendarId: string, newName: string, includeContent?: boolean) => void;
   onDeleteCalendar: (id: string) => void;
   onUpdateCalendar: (id: string, updates: Partial<Calendar>) => void;
@@ -109,8 +109,11 @@ function AppContent() {
 
   const theme = useMemo(() => createTheme(createAppTheme(mode)), [mode]);
 
-  const handleCreateCalendar = async (name: string, account_balance: number, max_daily_drawdown: number, weekly_target?: number, monthly_target?: number, yearly_target?: number, risk_per_trade?: number, dynamic_risk_enabled?: boolean, increased_risk_percentage?: number, profit_threshold_percentage?: number, heroImageUrl?: string, heroImageAttribution?: any) => {
-    if (!user) return;
+  const handleCreateCalendar = async (name: string, account_balance: number, max_daily_drawdown: number,
+     weekly_target?: number, monthly_target?: number, yearly_target?: number,
+     risk_per_trade?: number, dynamic_risk_enabled?: boolean, increased_risk_percentage?: number,
+      profit_threshold_percentage?: number, heroImageUrl?: string, heroImageAttribution?: any) : Promise<Calendar> =>  {
+    if (!user)  throw new Error('Failed to create calendar... user is undefined');
 
     const newCalendar: Omit<Calendar, 'id' | 'user_id'> = {
       name,
@@ -130,11 +133,13 @@ function AppContent() {
     };
 
     try {
-      await calendarService.createCalendar(user.uid, newCalendar);
+      const data = await calendarService.createCalendar(user.uid, newCalendar);
       // Refresh calendars from database to get properly sorted list (by updated_at desc)
       await refreshCalendars();
+      return data;
     } catch (error) {
       console.error('Error creating calendar:', error);
+      throw error;
     }
   };
 
