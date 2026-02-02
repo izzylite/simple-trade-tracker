@@ -158,6 +158,12 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     onUpdateCalendarProperty,
   });
 
+  // Compute effective values directly to avoid race condition on first open
+  // When open becomes true with initialDate, we need to use initialDate immediately
+  // without waiting for the useEffect state update
+  const effectiveCurrentDate = (open && initialDate) ? initialDate : currentDate;
+  const effectiveIsViewingSpecificDate = !!(open && initialDate) || isViewingSpecificDate;
+
   // Use optimized events hook
   // When viewing a specific date (from DayDialog), disable onlyUpcoming filter
   const {
@@ -170,15 +176,15 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     refresh,
   } = useEconomicEvents({
     viewType,
-    currentDate,
+    currentDate: effectiveCurrentDate,
     currencies: appliedFilters.currencies,
     impacts: appliedFilters.impacts,
-    onlyUpcoming: isViewingSpecificDate ? false : appliedFilters.onlyUpcoming,
+    onlyUpcoming: effectiveIsViewingSpecificDate ? false : appliedFilters.onlyUpcoming,
     enabled: open,
     customDateRange,
   });
 
-  // Sync currentDate with initialDate when drawer opens
+  // Sync currentDate state with initialDate when drawer opens (for UI display and navigation)
   const initialDateTimestamp = initialDate?.getTime();
   useEffect(() => {
     if (open && initialDate) {
