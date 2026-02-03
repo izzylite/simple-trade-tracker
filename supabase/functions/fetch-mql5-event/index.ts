@@ -160,6 +160,7 @@ async function updateEventInDatabase(
       forecast_value: mql5Data.forecast_value,
       previous_value: mql5Data.previous_value,
       impact: mql5Data.impact,
+      actual_result_type: mql5Data.actual_result_type,
       last_updated: new Date().toISOString(),
       data_source: "mql5",
     };
@@ -236,6 +237,119 @@ const SLUG_EXPANSIONS: Record<string, string> = {
   // 'pmi' stays as 'pmi' - MQL5 uses abbreviation
 };
 
+// Direct event name to MQL5 slug mappings for better accuracy
+// These are known event patterns that need specific transformations
+const EVENT_NAME_MAPPINGS: Record<string, string> = {
+  // Building/Construction
+  'Building Permits': 'building-approvals',
+  'Building Permits MoM': 'building-approvals-mm',
+  'Building Permits YoY': 'building-approvals-yy',
+  'Building Consents': 'building-consents',
+
+  // Inflation
+  'Harmonised Inflation Rate': 'hicp',
+  'Harmonised Inflation Rate MoM': 'hicp-mm',
+  'Harmonised Inflation Rate YoY': 'hicp-yy',
+  'Inflation Rate': 'cpi',
+  'Inflation Rate MoM': 'cpi-mm',
+  'Inflation Rate YoY': 'cpi-yy',
+  'Core Inflation Rate': 'core-cpi',
+  'Core Inflation Rate MoM': 'consumer-price-index-ex-food-energy-mm',
+  'Core Inflation Rate YoY': 'consumer-price-index-ex-food-energy-yy',
+  'CPI': 'consumer-price-index',
+  'Core CPI': 'core-consumer-price-index',
+
+  // Employment
+  'JOLTs Job Openings': 'jolts-job-openings',
+  'JOLTs Job Quits': 'jolts-job-quits',
+  'Unemployment Change': 'unemployment-change',
+  'Unemployment Rate': 'unemployment-rate',
+  'Employment Change': 'employment-change',
+  'ADP Employment Change': 'adp-nonfarm-employment-change',
+  'ADP Nonfarm Employment Change': 'adp-nonfarm-employment-change',
+  'Nonfarm Payrolls': 'nonfarm-payrolls',
+  'Initial Jobless Claims': 'initial-jobless-claims',
+  'Continuing Jobless Claims': 'continuing-jobless-claims',
+
+  // Central Bank
+  'RBA Interest Rate Decision': 'rba-interest-rate-decision',
+  'RBA Press Conference': 'rba-monetary-policy-statement',
+  'RBA Rate Statement': 'rba-rate-statement',
+  'RBA Monetary Policy Statement': 'rba-monetary-policy-statement',
+  'ECB Interest Rate Decision': 'ecb-interest-rate-decision',
+  'ECB Press Conference': 'ecb-monetary-policy-press-conference',
+  'ECB Monetary Policy Press Conference': 'ecb-monetary-policy-press-conference',
+  'BoE Interest Rate Decision': 'boe-interest-rate-decision',
+  'BoE MPC Meeting Minutes': 'boe-mpc-meeting-minutes',
+  'BoJ Monetary Base': 'monetary-base',
+  'BoJ Interest Rate Decision': 'boj-interest-rate-decision',
+  'Fed Interest Rate Decision': 'fomc-interest-rate-decision',
+
+  // PMI
+  'Manufacturing PMI': 'manufacturing-pmi',
+  'Services PMI': 'services-pmi',
+  'Composite PMI': 'composite-pmi',
+  'ISM Manufacturing PMI': 'ism-manufacturing-pmi',
+  'ISM Non-Manufacturing PMI': 'ism-non-manufacturing-pmi',
+  'ISM Services PMI': 'ism-non-manufacturing-pmi',
+
+  // GDP
+  'GDP Growth Rate': 'gdp-growth-rate',
+  'GDP Growth Rate QoQ': 'gdp-growth-rate-qq',
+  'GDP Growth Rate YoY': 'gdp-growth-rate-yy',
+
+  // Trade
+  'Trade Balance': 'trade-balance',
+  'Exports': 'exports',
+  'Imports': 'imports',
+
+  // Retail
+  'Retail Sales': 'retail-sales',
+  'Retail Sales MoM': 'retail-sales-mm',
+  'Retail Sales YoY': 'retail-sales-yy',
+
+  // Industrial
+  'Industrial Production': 'industrial-production',
+  'Industrial Production MoM': 'industrial-production-mm',
+  'Industrial Production YoY': 'industrial-production-yy',
+
+  // Consumer
+  'Consumer Confidence': 'consumer-confidence',
+  'Michigan Consumer Sentiment': 'michigan-consumer-sentiment',
+
+  // Housing
+  'HPI': 'hpi',
+  'House Price Index': 'house-price-index',
+  'Nationwide HPI': 'nationwide-hpi',
+  'Halifax HPI': 'halifax-house-price-index',
+
+  // Auctions
+  '10-Year JGB Auction': '10-year-jgb-auction',
+  '30-Year JGB Auction': '30-year-jgb-auction',
+  '10-Year Bond Auction': '10-year-bond-auction',
+  '10-Year Treasury Gilt Auction': '10-year-treasury-gilt-auction',
+
+  // Budget
+  'Budget Balance': 'government-budget-balance',
+  'Government Budget Balance': 'government-budget-balance',
+
+  // PPI
+  'PPI': 'producer-price-index',
+  'PPI MoM': 'producer-price-index-mm',
+  'PPI YoY': 'producer-price-index-yy',
+
+  // Tourist
+  'Tourist Arrivals': 'tourist-arrivals',
+  'Tourist Arrivals YoY': 'tourist-arrivals-yy',
+
+  // Redbook
+  'Redbook': 'redbook',
+  'Redbook YoY': 'redbook-yy',
+
+  // LMI
+  'LMI Logistics Managers Index': 'lmi-logistics-managers-index',
+};
+
 /**
  * Convert event name to MQL5 URL slug
  * e.g., "Nonfarm Payrolls (Jan)" -> "nonfarm-payrolls"
@@ -245,9 +359,24 @@ const SLUG_EXPANSIONS: Record<string, string> = {
  * e.g., "CPI" -> "consumer-price-index"
  */
 function eventNameToSlug(name: string): string {
-  let slug = name
+  // Remove date/period info in parentheses like (Dec), (Jan), (Q4), etc.
+  const cleanName = name.replace(/\s*\([^)]*\)\s*/g, '').trim();
+
+  // Check for direct mapping first (case-insensitive)
+  for (const [key, value] of Object.entries(EVENT_NAME_MAPPINGS)) {
+    if (cleanName.toLowerCase() === key.toLowerCase()) {
+      return value;
+    }
+    // Also check if the clean name starts with the key (for partial matches)
+    if (cleanName.toLowerCase().startsWith(key.toLowerCase())) {
+      const suffix = cleanName.slice(key.length).trim();
+      if (!suffix) return value;
+    }
+  }
+
+  // Apply transformation rules if no direct mapping found
+  let slug = cleanName
     .toLowerCase()
-    .replace(/\([^)]*\)/g, '')      // Remove parentheses and contents (e.g., "(Jan)")
     .replace(/&/g, '')              // Remove ampersands
     .replace(/[.']/g, '')           // Remove periods and apostrophes
     // MQL5 uses abbreviations: yy/mm/qq instead of yoy/mom/qoq
@@ -317,6 +446,7 @@ interface MQL5EventData {
   forecast_value: string | null;
   previous_value: string | null;
   impact: string | null;
+  actual_result_type: 'good' | 'bad' | '' | null; // green=good, red=bad, neutral=''
 
   // Next release data
   next_release_date: string | null;
@@ -374,6 +504,7 @@ function parseMql5Html(html: string, eventName: string, country: string, url: st
     forecast_value: null,
     previous_value: null,
     impact: null,
+    actual_result_type: null,
     next_release_date: null,
     next_forecast: null,
     days_until_next: null,
@@ -415,6 +546,20 @@ function parseMql5Html(html: string, eventName: string, country: string, url: st
     const impactMatch = html.match(/class="event-table__importance[^"]*"[^>]*>([^<]+)</i);
     if (impactMatch) {
       result.impact = decodeHtmlEntities(impactMatch[1]);
+    }
+
+    // Extract actual_result_type (color) from event-table__actual class
+    // MQL5 uses: class="event-table__actual red" or "event-table__actual green"
+    const colorMatch = html.match(/class="event-table__actual\s+(red|green)"/i);
+    if (colorMatch) {
+      const color = colorMatch[1].toLowerCase();
+      result.actual_result_type = color === 'green' ? 'good' : color === 'red' ? 'bad' : '';
+    } else {
+      // Check if there's an actual value but no color (neutral = empty string)
+      const hasActual = html.match(/class="event-table__actual"[^>]*>[\s\S]*?<span[^>]*class="[^"]*actual__value/i);
+      if (hasActual) {
+        result.actual_result_type = '';
+      }
     }
 
     // Extract actual value from event-table__actual class
@@ -595,6 +740,7 @@ async function processEvent(eventName: string, country: string): Promise<EventRe
         forecast_value: cachedData.forecast_value,
         previous_value: cachedData.previous_value,
         impact: cachedData.impact,
+        actual_result_type: null, // Not available from cache
         next_release_date: null,
         next_forecast: null,
         days_until_next: null,
@@ -631,6 +777,7 @@ async function processEvent(eventName: string, country: string): Promise<EventRe
           forecast_value: cachedData.forecast_value,
           previous_value: cachedData.previous_value,
           impact: cachedData.impact,
+          actual_result_type: null, // Not available from cache
           next_release_date: null,
           next_forecast: null,
           days_until_next: null,

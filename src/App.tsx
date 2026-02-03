@@ -82,6 +82,7 @@ function AppContent() {
   const [loadingAction, setLoadingAction] = useState<'loading' | 'importing' | 'exporting'>('loading');
 
   const { user } = useAuthState();
+  
 
   // Use SWR to fetch calendars with automatic focus revalidation
   // This solves the Chrome Energy Saver tab freezing issue

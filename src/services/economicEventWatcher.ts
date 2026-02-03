@@ -459,6 +459,7 @@ class EconomicEventWatcher {
                 forecast_value: fetchedData.forecast_value || batchEvent.originalEvent.forecast_value,
                 previous_value: fetchedData.previous_value || batchEvent.originalEvent.previous_value,
                 impact: fetchedData.impact || batchEvent.originalEvent.impact,
+                actual_result_type: fetchedData.actual_result_type ?? batchEvent.originalEvent.actual_result_type,
               };
 
               updatedEvents.push(eventToNotify);
