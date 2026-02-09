@@ -148,37 +148,61 @@ class EconomicEventWatcher {
   }
 
   /**
-   * Refresh economic calendar data by calling the Supabase edge function
+   * Refresh economic calendar data by calling the fetch-mql5-event edge function
+   * Queries today's events from DB, then batch-fetches fresh data from MQL5
    */
   private async refreshCalendarData(currencies: Currency[], calendarId: string) {
     try {
       log(`🔄 Refreshing economic calendar data for calendar ${calendarId}, currencies: ${currencies.join(', ')}`);
 
       const today = new Date();
-      const targetDate = format(today, 'yyyy-MM-dd');
+      const todayStart = startOfDay(today).toISOString();
+      const todayEnd = endOfDay(today).toISOString();
 
-      // Call Supabase edge function to refresh today's economic calendar data
-      const { data, error: callError } = await supabase.functions.invoke('refresh-economic-calendar', {
+      // Query today's events from DB to know what to refresh
+      const { data: todayEvents, error: queryError } = await supabase
+        .from('economic_events')
+        .select('event_name, country')
+        .in('currency', currencies)
+        .gte('event_time', todayStart)
+        .lte('event_time', todayEnd);
+
+      if (queryError || !todayEvents || todayEvents.length === 0) {
+        if (queryError) {
+          logger.error('❌ Error querying today\'s events:', queryError);
+        } else {
+          log('⏭️ No events found for today, skipping refresh');
+        }
+        return;
+      }
+
+      log(`📊 Found ${todayEvents.length} events for today, batch-fetching from MQL5`);
+
+      // Deduplicate events by name+country
+      const uniqueEvents = Array.from(
+        new Map(todayEvents.map(e => [`${e.event_name}|${e.country}`, e])).values()
+      ).filter(e => e.event_name && e.country);
+
+      // Call fetch-mql5-event in batch mode (no ScraperAPI credits used)
+      const { data, error: callError } = await supabase.functions.invoke('fetch-mql5-event', {
         body: {
-          targetDate,
-          currencies
-          // No specific events - refresh all events for today
+          events: uniqueEvents.map(e => ({
+            event_name: e.event_name,
+            country: e.country
+          }))
         }
       });
 
       if (callError) {
-        logger.error('❌ Error calling refresh-economic-calendar function:', callError);
+        logger.error('❌ Error calling fetch-mql5-event function:', callError);
         return;
       }
 
       const responseData = data as any;
-      const updatedCount = responseData?.updatedCount || 0;
-      const foundEventsCount = responseData?.foundEvents?.length || 0;
+      const succeeded = responseData?.succeeded || 0;
+      const failed = responseData?.failed || 0;
 
-      logger.log(`✅ Economic calendar refreshed for calendar ${calendarId}: ${updatedCount} total events updated`);
-      if (foundEventsCount > 0) {
-        logger.log(`📊 Found ${foundEventsCount} events with current data`);
-      }
+      logger.log(`✅ MQL5 refresh for calendar ${calendarId}: ${succeeded} succeeded, ${failed} failed`);
 
       // Save the refresh time to localStorage
       this.saveRefreshTime(calendarId);
