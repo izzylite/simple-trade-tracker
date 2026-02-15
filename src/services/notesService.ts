@@ -86,6 +86,35 @@ export const queryCalendarNotes = async (
 };
 
 /**
+ * Get a week note by calendar ID and week key
+ */
+export const getWeekNote = async (
+  calendarId: string,
+  weekKey: string,
+): Promise<Note | null> => {
+  try {
+    return await noteRepository.findByWeekKey(calendarId, weekKey);
+  } catch (error) {
+    logger.error("Error getting week note:", error);
+    return null;
+  }
+};
+
+/**
+ * Get all week keys that have notes for a calendar
+ */
+export const getWeekNoteKeys = async (
+  calendarId: string,
+): Promise<Set<string>> => {
+  try {
+    return await noteRepository.findWeekNoteKeys(calendarId);
+  } catch (error) {
+    logger.error("Error getting week note keys:", error);
+    return new Set();
+  }
+};
+
+/**
  * Get a single note by ID
  */
 export const getNote = async (noteId: string): Promise<Note | null> => {

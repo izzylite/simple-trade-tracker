@@ -203,6 +203,59 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
   }
 
   /**
+   * Find a week note by calendar ID and week key
+   */
+  async findByWeekKey(
+    calendarId: string,
+    weekKey: string,
+  ): Promise<Note | null> {
+    try {
+      const { data, error } = await supabase
+        .from("notes")
+        .select("*")
+        .eq("calendar_id", calendarId)
+        .eq("week_key", weekKey)
+        .maybeSingle();
+
+      if (error) {
+        logger.error("Error finding note by week key:", error);
+        return null;
+      }
+
+      return data ? transformSupabaseNote(data) : null;
+    } catch (error) {
+      logger.error("Exception finding note by week key:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Find all week note keys for a calendar (for visual indicators)
+   */
+  async findWeekNoteKeys(calendarId: string): Promise<Set<string>> {
+    try {
+      const { data, error } = await supabase
+        .from("notes")
+        .select("week_key")
+        .eq("calendar_id", calendarId)
+        .not("week_key", "is", null)
+        .eq("is_archived", false);
+
+      if (error) {
+        logger.error("Error finding week note keys:", error);
+        return new Set();
+      }
+
+      return new Set(
+        data?.map((item: { week_key: string }) => item.week_key) ?? [],
+      );
+    } catch (error) {
+      logger.error("Exception finding week note keys:", error);
+      return new Set();
+    }
+  }
+
+  /**
    * Query notes by calendar ID with filtering, search, and pagination
    */
   async queryByCalendarId(

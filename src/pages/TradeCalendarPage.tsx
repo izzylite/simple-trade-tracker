@@ -96,7 +96,10 @@ import ShareButton from '../components/sharing/ShareButton';
 
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import NotesDrawer from '../components/notes/NotesDrawer';
+import NoteEditorDialog from '../components/notes/NoteEditorDialog';
 import { StackedNotesWidget } from '../components/reminderNotes';
+import * as notesService from '../services/notesService';
+import { Note } from '../types/note';
 
 import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import AnimatedBackground from '../components/common/AnimatedBackground';
@@ -144,13 +147,14 @@ interface WeeklyPnLProps {
     targetProgressValue: number;
   };
   accountBalance: number;
+  onWeekClick?: (weekStart: Date) => void;
+  hasNote?: boolean;
 }
 
-
-
-
-
-const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({ trade_date, weekIndex, weeklyTarget, sx, weekStats, accountBalance }) => {
+const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({
+  trade_date, weekIndex, weeklyTarget, sx, weekStats, accountBalance,
+  onWeekClick, hasNote,
+}) => {
   const theme = useTheme();
 
   // Use pre-calculated stats
@@ -208,23 +212,32 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({ trade_date, weekIndex,
   ) : '';
 
   const content = (
-    <CalendarCell sx={{
-      bgcolor: 'background.paper',
-      borderRadius: 1,
-      border: `2px solid ${netAmount > 0
-        ? alpha(theme.palette.success.main, 0.3)
-        : netAmount < 0
-          ? alpha(theme.palette.error.main, 0.3)
-          : alpha(theme.palette.divider, 0.2)
-        }`,
-      justifyContent: 'center',
-      alignItems: 'center',
-      position: 'relative',
-      ...sx
-    }}>
+    <CalendarCell
+      onClick={() => onWeekClick?.(trade_date)}
+      sx={{
+        bgcolor: 'background.paper',
+        borderRadius: 1,
+        cursor: onWeekClick ? 'pointer' : 'default',
+        border: `2px solid ${netAmount > 0
+          ? alpha(theme.palette.success.main, 0.3)
+          : netAmount < 0
+            ? alpha(theme.palette.error.main, 0.3)
+            : alpha(theme.palette.divider, 0.2)
+          }`,
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'relative',
+        '&:hover': onWeekClick ? {
+          borderColor: alpha(theme.palette.info.main, 0.5),
+        } : {},
+        ...sx
+      }}
+    >
       <Stack spacing={0.5} sx={{ alignItems: 'center', p: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-
+          {hasNote && (
+            <NotesIcon sx={{ fontSize: '0.85rem', color: 'info.main' }} />
+          )}
           <Typography
             variant="caption"
             sx={{
@@ -675,6 +688,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
 
+  // Week note state
+  const [weekNoteKeys, setWeekNoteKeys] = useState<Set<string>>(new Set());
+  const [weekNoteDialog, setWeekNoteDialog] = useState<{
+    open: boolean;
+    weekKey: string;
+    note: Note | null;
+  } | null>(null);
+
   // Economic event notification state
   // Notification stack state (moved from App.tsx)
   const [notifications, setNotifications] = useState<EconomicEvent[]>([]);
@@ -1062,6 +1083,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     return map;
   }, [currentDate, filteredTrades, accountBalance, weeklyTarget]);
 
+  // Load week note keys for visual indicators
+  useEffect(() => {
+    if (!calendarId) return;
+    notesService.getWeekNoteKeys(calendarId).then(setWeekNoteKeys);
+  }, [calendarId, currentDate]);
+
   // Calculate session statistics for the monthly statistics section
   const sessionStats = useMemo(() => {
     return calculateSessionStats(filteredTrades, currentDate, 'month', accountBalance);
@@ -1178,6 +1205,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       setSelectedDate(trade_date);
     }
   }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk, weeklyTarget]);
+
+  const handleWeekClick = useCallback(async (weekStart: Date) => {
+    if (isReadOnly || !calendarId) return;
+    const weekKey = format(weekStart, 'yyyy-MM-dd');
+    const existingNote = await notesService.getWeekNote(calendarId, weekKey);
+    setWeekNoteDialog({ open: true, weekKey, note: existingNote });
+  }, [calendarId, isReadOnly]);
+
   const handleDayChange = (trade_date: Date) => {
     setSelectedDate(trade_date);
   };
@@ -1786,6 +1821,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                         targetProgressValue: 0
                       }}
                       accountBalance={accountBalance + totalProfit}
+                      onWeekClick={handleWeekClick}
+                      hasNote={weekNoteKeys.has(format(weekStart, 'yyyy-MM-dd'))}
                     />
 
                   </React.Fragment>
@@ -2128,6 +2165,37 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         calendarId={calendarId}
         isReadOnly={isReadOnly}
       />
+
+      {/* Week Note Editor */}
+      {weekNoteDialog && (
+        <NoteEditorDialog
+          open={weekNoteDialog.open}
+          onClose={() => setWeekNoteDialog(null)}
+          note={weekNoteDialog.note ?? undefined}
+          calendarId={calendarId!}
+          weekKey={weekNoteDialog.weekKey}
+          onSave={(savedNote, isCreated) => {
+            if (isCreated && savedNote.week_key) {
+              setWeekNoteKeys(prev => {
+                const next = new Set(Array.from(prev));
+                next.add(savedNote.week_key!);
+                return next;
+              });
+            }
+            setWeekNoteDialog(null);
+          }}
+          onDelete={() => {
+            if (weekNoteDialog.weekKey) {
+              setWeekNoteKeys(prev => {
+                const next = new Set(prev);
+                next.delete(weekNoteDialog.weekKey);
+                return next;
+              });
+            }
+            setWeekNoteDialog(null);
+          }}
+        />
+      )}
 
 
       {/* Notification stack container (bottom left, global) */}

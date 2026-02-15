@@ -40,6 +40,9 @@ export interface Note {
 
   // Tags for categorization
   tags?: string[];
+
+  // Week association (null for regular notes)
+  week_key?: string | null;
 }
 
 export interface CreateNoteInput {
@@ -61,6 +64,9 @@ export interface CreateNoteInput {
 
   // Tags for categorization
   tags?: string[];
+
+  // Week association
+  week_key?: string | null;
 }
 
 export interface UpdateNoteInput {
@@ -82,6 +88,9 @@ export interface UpdateNoteInput {
 
   // Tags for categorization
   tags?: string[];
+
+  // Week association
+  week_key?: string | null;
 }
 
 export interface ReminderConfig {

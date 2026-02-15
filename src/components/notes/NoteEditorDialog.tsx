@@ -114,6 +114,7 @@ interface NoteEditorDialogProps {
   calendarId: string; // Required for new notes
   onSave?: (note: Note, isCreated?: boolean) => void;
   onDelete?: (noteId: string) => void;
+  weekKey?: string; // If set, this is a week note
 }
 
 const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
@@ -123,6 +124,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   calendarId,
   onSave,
   onDelete,
+  weekKey,
 }) => {
   const theme = useTheme();
   const { user } = useAuthState();
@@ -220,7 +222,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       } else {
         // Creating new note - reset to defaults
         setNote(null);
-        setTitle('');
+        setTitle(weekKey ? `Week of ${weekKey}` : '');
         setContent('');
         setCoverImage(null);
 
@@ -280,7 +282,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         // Create new note
         const newNote = await notesService.createNote({
           user_id: user.uid,
-          calendar_id: isGlobal ? null : calendarId, // null = global note
+          calendar_id: isGlobal && !weekKey ? null : calendarId,
           title,
           content,
           cover_image: coverImage,
@@ -290,6 +292,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           is_reminder_active: isReminderActive,
           color: (noteColor ?? null) as any,
           tags,
+          week_key: weekKey ?? null,
         });
         setNote(newNote);
         if (onSave) onSave(newNote, true);
@@ -900,7 +903,8 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
             </Box>
           </Collapse>
 
-          {/* Visibility Sub-Header (Global/Private toggle) */}
+          {/* Visibility Sub-Header (Global/Private toggle) - hidden for week notes */}
+          {!weekKey && (
           <Box
             sx={{
               display: 'flex',
@@ -961,6 +965,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               />
             </Tooltip>
           </Box>
+          )}
 
           {/* Tags Sub-Header */}
           <Box
