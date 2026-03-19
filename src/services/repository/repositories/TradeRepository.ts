@@ -204,7 +204,8 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     calendarId: string,
     cleanedEventName: string,
     currency: string,
-    impact: string
+    impact: string,
+    session?: string
   ): Promise<Trade[]> {
     try {
       const normalizedName = cleanedEventName.toLowerCase();
@@ -213,7 +214,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
       // - cleaned_name
       // - currency
       // - impact
-      const { data, error } = await supabase
+      let query = supabase
         .from('trades')
         .select('*')
         .eq('calendar_id', calendarId)
@@ -222,7 +223,13 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
           cleaned_name: normalizedName,
           currency,
           impact
-        }]))
+        }]));
+
+      if (session) {
+        query = query.eq('session', session);
+      }
+
+      const { data, error } = await query
         .order('trade_date', { ascending: false });
 
       if (error) {
@@ -248,7 +255,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
    */
   async fetchTradeCountsByEvents(
     calendarId: string,
-    events: Array<{ id: string; event_name: string; currency: string; impact: string }>
+    events: Array<{ id: string; event_name: string; currency: string; impact: string; session?: string }>
   ): Promise<Map<string, number>> {
     try {
       if (events.length === 0) {
@@ -271,12 +278,18 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         }]);
 
         // Execute server-side count query using head:true to avoid downloading data
-        const { count, error } = await supabase
+        let query = supabase
           .from('trades')
           .select('*', { count: 'exact', head: true })
           .eq('calendar_id', calendarId)
           .not('economic_events', 'is', null)
           .filter('economic_events', 'cs', eventFilter);
+
+        if (event.session) {
+          query = query.eq('session', event.session);
+        }
+
+        const { count, error } = await query;
 
         if (error) {
           logger.error(`Error counting trades for event ${event.id}:`, error);
