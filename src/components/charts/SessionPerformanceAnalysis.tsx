@@ -3,6 +3,7 @@ import { Box, Paper, Typography, useTheme, Stack, alpha } from '@mui/material';
 import { isSameMonth } from 'date-fns';
 import { Trade } from '../../types/dualWrite';
 import { formatValue } from '../../utils/formatters';
+import { SESSION_COLORS } from '../../utils/sessionTimeUtils';
 
 interface SessionPerformanceAnalysisProps {
   sessionStats: any[];
@@ -27,14 +28,6 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
     loss: '#f44336',
     zero: '#9e9e9e',
     breakEven: '#ff9800'
-  };
-
-  // Define session-specific colors
-  const SESSION_COLORS = {
-    'Asia': '#2962ff',
-    'London': '#388e3c',
-    'NY AM': '#f57c00',
-    'NY PM': '#9c27b0'
   };
 
   return (
