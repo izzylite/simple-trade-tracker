@@ -11,6 +11,14 @@ export interface SessionTimeRange {
   end: Date;
 }
 
+/** Session-specific colors shared across components */
+export const SESSION_COLORS: Record<TradingSession, string> = {
+  'Asia': '#2962ff',
+  'London': '#388e3c',
+  'NY AM': '#f57c00',
+  'NY PM': '#9c27b0'
+};
+
 /**
  * Determine if a given date falls within daylight saving time
  * Uses actual DST transition rules for better accuracy
@@ -211,6 +219,101 @@ export function getSessionMappings(session: string): string[] {
     'NY AM': ['NY AM'],
     'NY PM': ['NY PM']
   };
-  
+
   return sessionMappings[session] || [];
+}
+
+/**
+ * Determine which trading session a UTC timestamp falls under.
+ * Iterates sessions so that on exact boundaries, the later session wins.
+ * Returns null for invalid input or timestamps in gaps between sessions.
+ *
+ * Uses exact hour boundaries (inclusive start, exclusive end converted to
+ * the start of the boundary hour) so that gaps between sessions return null.
+ * Also checks Asia session for the next calendar day to handle timestamps
+ * that fall after midnight UTC but are part of the Asia open window.
+ */
+export function getSessionForTimestamp(timeUtc: string): TradingSession | null {
+  if (!timeUtc) return null;
+  const date = new Date(timeUtc);
+  if (isNaN(date.getTime())) return null;
+
+  // Build exact-boundary UTC ranges for each session given a reference date.
+  // range.end is the exclusive upper bound (start of the closing hour).
+  function getExactRange(session: TradingSession, refDate: Date): SessionTimeRange {
+    const y = refDate.getUTCFullYear();
+    const m = refDate.getUTCMonth();
+    const d = refDate.getUTCDate();
+
+    const isEuDST = isDaylightSavingTime(refDate, 'EU');
+    const isUsDST = isDaylightSavingTime(refDate, 'US');
+
+    switch (session) {
+      case 'London': {
+        const startH = isEuDST ? 7 : 8;
+        const endH = isEuDST ? 12 : 13;
+        return {
+          start: new Date(Date.UTC(y, m, d, startH, 0, 0)),
+          end: new Date(Date.UTC(y, m, d, endH, 0, 0))
+        };
+      }
+      case 'NY AM': {
+        const startH = isUsDST ? 12 : 13;
+        const endH = isUsDST ? 17 : 18;
+        return {
+          start: new Date(Date.UTC(y, m, d, startH, 0, 0)),
+          end: new Date(Date.UTC(y, m, d, endH, 0, 0))
+        };
+      }
+      case 'NY PM': {
+        const startH = isUsDST ? 17 : 18;
+        const endH = isUsDST ? 21 : 22;
+        return {
+          start: new Date(Date.UTC(y, m, d, startH, 0, 0)),
+          end: new Date(Date.UTC(y, m, d, endH, 0, 0))
+        };
+      }
+      case 'Asia': {
+        // Asia opens at 22:00 (DST) or 23:00 (non-DST) on the previous day
+        // and closes at 07:00 (DST) or 08:00 (non-DST) on refDate
+        const startH = isEuDST ? 22 : 23;
+        const endH = isEuDST ? 7 : 8;
+        return {
+          start: new Date(Date.UTC(y, m, d - 1, startH, 0, 0)),
+          end: new Date(Date.UTC(y, m, d, endH, 0, 0))
+        };
+      }
+    }
+  }
+
+  // Check non-Asia sessions against the current date.
+  // Check Asia for both the current date (covers early-morning UTC times)
+  // and the next calendar date (covers post-22:00 UTC times that open Asia).
+  // Use [start, end) interval: date >= start && date < end.
+  // Iterate in order so later sessions override on exact boundaries.
+  const nonAsiaSessions: TradingSession[] = ['London', 'NY AM', 'NY PM'];
+  let match: TradingSession | null = null;
+
+  // Asia: check current day (early morning) and next day (late evening)
+  for (const dayOffset of [0, 1]) {
+    const refDate = new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate() + dayOffset
+    ));
+    const range = getExactRange('Asia', refDate);
+    if (date >= range.start && date < range.end) {
+      match = 'Asia';
+    }
+  }
+
+  // Non-Asia sessions on the current UTC date
+  for (const session of nonAsiaSessions) {
+    const range = getExactRange(session, date);
+    if (date >= range.start && date < range.end) {
+      match = session;
+    }
+  }
+
+  return match;
 }
