@@ -238,6 +238,10 @@ const CURRENCY_OPTIONS = [
             ) || events.find((e: any) =>
               e.name?.toLowerCase() === eventName?.toLowerCase()
             );
+
+            // DEBUG: Log filter data for session mismatches
+            console.log(`[SessionFilter] Event: "${eventName}" | Trade session: ${trade.session} | economic_events type: ${typeof trade.economic_events} | events count: ${events.length} | event names: [${events.map((e: any) => e.name).join(', ')}] | matchingEvent: ${matchingEvent ? JSON.stringify({ name: matchingEvent.name, time_utc: matchingEvent.time_utc }) : 'NOT FOUND'} | eventSession: ${matchingEvent?.time_utc ? getSessionForTimestamp(matchingEvent.time_utc) : 'N/A'} | KEEP: ${!matchingEvent?.time_utc ? 'yes (no time_utc)' : (!getSessionForTimestamp(matchingEvent.time_utc) ? 'yes (no session)' : trade.session === getSessionForTimestamp(matchingEvent.time_utc) ? 'yes (match)' : 'NO (mismatch)')}`);
+
             if (!matchingEvent?.time_utc) return true;
             const eventSession = getSessionForTimestamp(matchingEvent.time_utc);
             return !eventSession || trade.session === eventSession;
