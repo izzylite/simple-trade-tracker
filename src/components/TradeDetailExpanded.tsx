@@ -42,7 +42,8 @@ import {
   FilterList as FilterIcon,
   ListAlt as ListAltIcon,
   SmartToy as AIIcon,
-  Edit as EditIcon
+  Edit as EditIcon,
+  StickyNote2 as GamePlanIcon
 } from '@mui/icons-material';
 import { AnimatedDropdown } from './Animations';
 import { TagsDisplay } from './common';
@@ -62,6 +63,12 @@ import { TradeOperationsProps } from '../types/tradeOperations';
 import { Z_INDEX } from '../styles/zIndex';
 import { useTradeSyncContextOptional } from '../contexts/TradeSyncContext';
 import { normalizeTradeDates } from '../utils/tradeUtils';
+import { Note, DayAbbreviation } from '../types/note';
+import {
+  getReminderNotesForDay,
+  getReminderNotesForDate
+} from '../services/notesService';
+import { NotesBottomSheet } from './reminderNotes';
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -166,6 +173,11 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   // Add state
   const [selectedImpacts, setSelectedImpacts] = useState<ImpactLevel[]>(['High']
   );
+
+  // Game plan (reminder notes) state
+  const [gamePlanNotes, setGamePlanNotes] = useState<Note[]>([]);
+  const [loadingGamePlan, setLoadingGamePlan] = useState(false);
+  const [gamePlanOpen, setGamePlanOpen] = useState(false);
 
   const filterSetting: EconomicCalendarFilterSettings = economicFilter ? economicFilter(calendarId!) : DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
 
@@ -311,6 +323,50 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     }
   };
 
+  // Function to fetch game plan notes for the trade's date
+  const fetchGamePlanNotes = async () => {
+    if (!trade.trade_date || !calendarId) return;
+
+    try {
+      setLoadingGamePlan(true);
+      const tradeDate = typeof trade.trade_date === 'string'
+        ? parseISO(trade.trade_date) : trade.trade_date;
+      const dayAbbr = format(tradeDate, 'EEE') as DayAbbreviation;
+
+      // Fetch both weekly and one-time reminders in parallel
+      const [weeklyNotes, dateNotes] = await Promise.all([
+        getReminderNotesForDay(calendarId, dayAbbr),
+        getReminderNotesForDate(calendarId, tradeDate)
+      ]);
+
+      // Exclude notes that remind every day — those aren't
+      // day-specific game plans. One-time date reminders always qualify.
+      const daySpecificNotes = weeklyNotes.filter(
+        note => !note.reminder_days || note.reminder_days.length < 7
+      );
+
+      // Merge and deduplicate
+      const allNotes = [...daySpecificNotes, ...dateNotes];
+      const uniqueNotes = allNotes.filter(
+        (note, idx, arr) => arr.findIndex(n => n.id === note.id) === idx
+      );
+      setGamePlanNotes(uniqueNotes);
+    } catch (error) {
+      logger.error('Error fetching game plan notes:', error);
+      setGamePlanNotes([]);
+    } finally {
+      setLoadingGamePlan(false);
+    }
+  };
+
+  // Open game plan bottom sheet
+  const handleOpenGamePlan = async () => {
+    if (gamePlanNotes.length === 0 && !loadingGamePlan) {
+      await fetchGamePlanNotes();
+    }
+    setGamePlanOpen(true);
+  };
+
   // Re-fetch economic events when trade changes (for gallery mode)
   // Use stable string representation of trade_date to prevent unnecessary refetches
   const tradeDateString = trade.trade_date
@@ -329,6 +385,13 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trade.id, tradeDateString, trade.session]);
+
+  // Clear game plan when trade changes
+  useEffect(() => {
+    setGamePlanNotes([]);
+    setGamePlanOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trade.id, tradeDateString]);
 
   // Subscribe to economic events updates only if trade date is today
   // No point subscribing to past events as they don't change
@@ -470,6 +533,34 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 width: { xs: '100%', sm: 'auto' },
                 justifyContent: { xs: 'flex-end', sm: 'flex-start' }
               }}>
+                {/* Game Plan Button */}
+                {calendarId && (
+                  <Tooltip
+                    title={`Game Plan (${format(
+                      typeof trade.trade_date === 'string'
+                        ? parseISO(trade.trade_date)
+                        : trade.trade_date,
+                      'EEE, MMM d'
+                    )})`}
+                    slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+                  >
+                    <IconButton
+                      onClick={handleOpenGamePlan}
+                      disabled={loadingGamePlan}
+                      sx={{
+                        color: 'text.secondary',
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                          color: 'primary.main'
+                        }
+                      }}
+                    >
+                      {loadingGamePlan
+                        ? <CircularProgress size={20} color="inherit" />
+                        : <GamePlanIcon sx={{ fontSize: 20 }} />}
+                    </IconButton>
+                  </Tooltip>
+                )}
                 {/* AI Analysis Button */}
                 {showAIButton && onOpenAIChat && (
                   <Tooltip
@@ -725,12 +816,21 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                         Date
                       </Typography>
                     </Box>
-                    <Typography variant="h6" sx={{
-                      fontWeight: 700,
-                      fontSize: { xs: '1rem', sm: '1.1rem' } // Smaller on mobile
-                    }}>
-                      {format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'MMMM d, yyyy')}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                      <Typography variant="h6" sx={{
+                        fontWeight: 700,
+                        fontSize: { xs: '1rem', sm: '1.1rem' }
+                      }}>
+                        {format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'MMMM d, yyyy')}
+                      </Typography>
+                      <Typography variant="caption" sx={{
+                        fontWeight: 600,
+                        color: 'primary.main',
+                        fontSize: '0.75rem'
+                      }}>
+                        {format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'EEEE')}
+                      </Typography>
+                    </Box>
                   </Paper>
 
                   {/* Risk to Reward */}
@@ -1337,11 +1437,31 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     );
   }
 
-  return animate ? (
+  const content = animate ? (
     <AnimatedDropdown>
       {buildContent()}
     </AnimatedDropdown>
-  ) : buildContent()
+  ) : buildContent();
+
+  return (
+    <>
+      {content}
+      {calendarId && (
+        <NotesBottomSheet
+          open={gamePlanOpen}
+          onClose={() => setGamePlanOpen(false)}
+          notes={gamePlanNotes}
+          calendarId={calendarId}
+          fullDayName={format(
+            typeof trade.trade_date === 'string'
+              ? parseISO(trade.trade_date)
+              : trade.trade_date,
+            'EEEE'
+          )}
+        />
+      )}
+    </>
+  );
 };
 
 export default TradeDetailExpanded;
