@@ -93,16 +93,6 @@ const groupEventsByDate = (events: EconomicEvent[]) => {
   }));
 };
 
-// Check if any event is imminent (within 60 minutes)
-const hasImminentEvent = (events: EconomicEvent[]): boolean => {
-  const now = new Date();
-  return events.some(event => {
-    const eventDate = parseISO(event.time_utc);
-    const diffMs = eventDate.getTime() - now.getTime();
-    const diffMinutes = diffMs / (1000 * 60);
-    return diffMinutes > 0 && diffMinutes <= 60;
-  });
-};
 
 
 const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
@@ -198,11 +188,9 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
     }
   }, [open, initialDateTimestamp]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Check if any events are imminent for optimized time updates
-  const hasImminent = useMemo(() => hasImminentEvent(events), [events]);
-
-  // Use shared time hook - only updates every second when there are imminent events
-  const { currentTime } = useEventCountdownTime(hasImminent, open);
+  // Use shared time hook - automatically detects imminent events and
+  // switches to 1-second updates when any event is within 60 minutes
+  const { currentTime } = useEventCountdownTime(events, open);
 
   // State for trade counts
   const [eventTradeCountMap, setEventTradeCountMap] = useState<Map<string, number>>(new Map());

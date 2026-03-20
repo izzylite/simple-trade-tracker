@@ -70,14 +70,45 @@ export function useCurrentTime(options: UseCurrentTimeOptions = {}) {
 
 /**
  * Shared time provider for economic calendar events.
- * Provides time updates optimized for event countdowns.
+ * Automatically detects imminent events and switches to 1-second updates.
+ *
+ * Uses a separate 30-second imminence check so the countdown interval
+ * doesn't depend on a stale useMemo. Once any event is within 60 minutes
+ * the timer switches from 60s to 1s updates.
  */
-export function useEventCountdownTime(hasImminentEvents: boolean, enabled: boolean = true) {
+export function useEventCountdownTime(
+  events: Array<{ time_utc: string }>,
+  enabled: boolean = true
+) {
+  const [hasImminent, setHasImminent] = useState(() => checkImminence(events));
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+
+  // Re-check imminence every 30 seconds so we catch events entering the
+  // 60-minute window without waiting for the events array to change.
+  useEffect(() => {
+    if (!enabled) return;
+
+    const check = () => setHasImminent(checkImminence(eventsRef.current));
+    check(); // run immediately on mount / events change
+    const id = setInterval(check, 30_000);
+    return () => clearInterval(id);
+  }, [enabled, events]);
+
   return useCurrentTime({
-    normalInterval: 60000, // 1 minute for normal events
-    imminentInterval: 1000, // 1 second for imminent events
-    isImminent: hasImminentEvents,
+    normalInterval: 60000,
+    imminentInterval: 1000,
+    isImminent: hasImminent,
     enabled,
+  });
+}
+
+/** Check if any event is within 60 minutes from now */
+function checkImminence(events: Array<{ time_utc: string }>): boolean {
+  const now = Date.now();
+  return events.some(e => {
+    const diff = new Date(e.time_utc).getTime() - now;
+    return diff > 0 && diff <= 60 * 60 * 1000;
   });
 }
 
