@@ -112,15 +112,29 @@ async function getCachedEventData(
   }
 
   try {
-    // Query by event_name and country (case-insensitive match)
-    const { data, error } = await supabase
+    // Try exact match first, fall back to partial match
+    // Exact match prevents "Retail Sales" from matching "Retail Sales Ex Autos"
+    let { data, error } = await supabase
       .from("economic_events")
       .select("*")
-      .ilike("event_name", `%${eventName}%`)
+      .ilike("event_name", eventName)
       .ilike("country", country)
       .order("event_date", { ascending: false })
       .limit(1)
       .single();
+
+    // Fall back to partial match if exact match fails
+    if (error || !data) {
+      log(`No exact match for "${eventName}", trying partial match...`);
+      ({ data, error } = await supabase
+        .from("economic_events")
+        .select("*")
+        .ilike("event_name", `%${eventName}%`)
+        .ilike("country", country)
+        .order("event_date", { ascending: false })
+        .limit(1)
+        .single());
+    }
 
     if (error || !data) {
       log(`No cached data found for ${eventName} (${country})`);
@@ -142,48 +156,102 @@ async function getCachedEventData(
 }
 
 /**
+ * Compare two dates to see if they represent the same calendar day
+ * Handles ISO strings, date strings (YYYY-MM-DD), and Date objects
+ */
+function isSameDay(date1: string | Date | null, date2: string | Date | null): boolean {
+  if (!date1 || !date2) return false;
+
+  try {
+    const d1 = typeof date1 === 'string' ? new Date(date1) : date1;
+    const d2 = typeof date2 === 'string' ? new Date(date2) : date2;
+
+    // Compare year, month, and day (ignoring time)
+    return d1.getUTCFullYear() === d2.getUTCFullYear() &&
+           d1.getUTCMonth() === d2.getUTCMonth() &&
+           d1.getUTCDate() === d2.getUTCDate();
+  } catch {
+    return false;
+  }
+}
+
+interface UpdateResult {
+  updated: boolean;
+  skipped: boolean;
+  reason?: string;
+}
+
+/**
  * Update event data in Supabase after fetching from MQL5
+ * Validates that MQL5 data date matches the cached event date before updating
  */
 async function updateEventInDatabase(
   cachedEvent: CachedEventData | null,
   mql5Data: MQL5EventData
-): Promise<void> {
+): Promise<UpdateResult> {
   const supabase = getSupabaseClient();
   if (!supabase) {
     log("Could not initialize Supabase client for update", "error");
-    return;
+    return { updated: false, skipped: true, reason: "No Supabase client" };
+  }
+
+  // No cached event to update
+  if (!cachedEvent) {
+    log(`No existing record to update for ${mql5Data.event_name} (${mql5Data.country}). Skipping insert.`);
+    return { updated: false, skipped: true, reason: "No cached event found" };
+  }
+
+  // DATE VALIDATION: Compare MQL5's last_release_date with cached event's event_date
+  // This prevents updating December's event with November's data from MQL5
+  if (mql5Data.last_release_date && cachedEvent.event_date) {
+    if (!isSameDay(mql5Data.last_release_date, cachedEvent.event_date)) {
+      const mql5DateStr = new Date(mql5Data.last_release_date).toISOString().split('T')[0];
+      const eventDateStr = cachedEvent.event_date.split('T')[0];
+      log(`Date mismatch: MQL5 has data for ${mql5DateStr}, but event date is ${eventDateStr}. Skipping update to prevent stale data.`, "error");
+      return {
+        updated: false,
+        skipped: true,
+        reason: `Date mismatch: MQL5 data is for ${mql5DateStr}, event is for ${eventDateStr}`
+      };
+    }
+    log(`Date validation passed: MQL5 date matches event date ${cachedEvent.event_date}`);
+  } else {
+    log(`Warning: Could not validate dates (mql5_date=${mql5Data.last_release_date}, event_date=${cachedEvent.event_date})`);
   }
 
   try {
-    const updateData = {
+    // Preserve impact from primary source — MQL5 uses different ratings
+    // Only use MQL5 impact if the event has no impact set yet
+    const updateData: Record<string, unknown> = {
       actual_value: mql5Data.actual_value,
       forecast_value: mql5Data.forecast_value,
       previous_value: mql5Data.previous_value,
-      impact: mql5Data.impact,
       actual_result_type: mql5Data.actual_result_type,
       last_updated: new Date().toISOString(),
       data_source: "mql5",
     };
-
-    if (cachedEvent) {
-      // Update existing record
-      const { error } = await supabase
-        .from("economic_events")
-        .update(updateData)
-        .eq("id", cachedEvent.id);
-
-      if (error) {
-        log(`Failed to update event ${cachedEvent.id}`, "error", error);
-      } else {
-        log(`Updated event ${cachedEvent.id} with MQL5 data`);
-      }
-    } else {
-      // No existing record - log but don't insert (bulk refresh handles inserts)
-      log(`No existing record to update for ${mql5Data.event_name} (${mql5Data.country}). Skipping insert.`);
+    if (!cachedEvent.impact && mql5Data.impact) {
+      updateData.impact = mql5Data.impact;
     }
 
+    // Update existing record
+    const { error } = await supabase
+      .from("economic_events")
+      .update(updateData)
+      .eq("id", cachedEvent.id);
+
+    if (error) {
+      log(`Failed to update event ${cachedEvent.id}`, "error", error);
+      return { updated: false, skipped: false, reason: error.message };
+    }
+
+    log(`Updated event ${cachedEvent.id} with MQL5 data`);
+    return { updated: true, skipped: false };
+
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     log("Error updating event in database", "error", error);
+    return { updated: false, skipped: false, reason: errMsg };
   }
 }
 
@@ -656,48 +724,86 @@ function parseMql5Html(html: string, eventName: string, country: string, url: st
 /**
  * Fetch event data from MQL5
  */
+// Values MQL5 shows when data hasn't been released yet
+const PLACEHOLDER_VALUES = ['N/D', 'n/d', 'N/A', 'n/a'];
+
+function isPlaceholderValue(value: string | null): boolean {
+  return !!value && PLACEHOLDER_VALUES.includes(value.trim());
+}
+
+// Retry config: 3 attempts with increasing delays (10s, 15s, 20s)
+const RETRY_DELAYS_MS = [10000, 15000, 20000];
+
 async function fetchMql5Event(eventName: string, country: string): Promise<MQL5EventData | null> {
   const url = buildMql5Url(eventName, country);
   if (!url) {
     return null;
   }
 
-  log(`Fetching MQL5 event: ${url}`);
+  let lastResult: MQL5EventData | null = null;
+  const maxAttempts = 1 + RETRY_DELAYS_MS.length; // 1 initial + 3 retries
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-      },
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      log(`MQL5 HTTP ${response.status} for ${url}`, "error");
-      return null;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      const delay = RETRY_DELAYS_MS[attempt - 1];
+      log(`Actual value is placeholder "${lastResult?.actual_value}" - retrying in ${delay / 1000}s (attempt ${attempt + 1}/${maxAttempts})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
 
-    const html = await response.text();
-    log(`MQL5 response: ${response.status}, length: ${html.length}`);
+    log(`Fetching MQL5 event: ${url} (attempt ${attempt + 1}/${maxAttempts})`);
 
-    return parseMql5Html(html, eventName, country, url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if ((error as Error).name === 'AbortError') {
-      log(`MQL5 request timed out for ${url}`, "error");
-    } else {
-      log(`MQL5 fetch error for ${url}`, "error", error);
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.5",
+        },
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        log(`MQL5 HTTP ${response.status} for ${url}`, "error");
+        return lastResult;
+      }
+
+      const html = await response.text();
+      log(`MQL5 response: ${response.status}, length: ${html.length}`);
+
+      lastResult = parseMql5Html(html, eventName, country, url);
+
+      // If actual value is a real value (not placeholder), return immediately
+      if (lastResult && !isPlaceholderValue(lastResult.actual_value)) {
+        if (attempt > 0) {
+          log(`Got actual value "${lastResult.actual_value}" on attempt ${attempt + 1}`);
+        }
+        return lastResult;
+      }
+
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if ((error as Error).name === 'AbortError') {
+        log(`MQL5 request timed out for ${url} (attempt ${attempt + 1})`, "error");
+      } else {
+        log(`MQL5 fetch error for ${url} (attempt ${attempt + 1})`, "error", error);
+      }
+      // Continue retrying on error
     }
-    return null;
   }
+
+  // All retries exhausted - null out placeholder actual_value
+  if (lastResult && isPlaceholderValue(lastResult.actual_value)) {
+    log(`All ${maxAttempts} attempts returned placeholder "${lastResult.actual_value}" - nulling out actual_value`);
+    lastResult.actual_value = null;
+    lastResult.actual_result_type = null;
+  }
+
+  return lastResult;
 }
 
 interface EventRequest {
@@ -719,6 +825,10 @@ interface EventResult {
   success: boolean;
   data?: MQL5EventData & { cached?: boolean; stale?: boolean; cache_age_seconds?: number };
   error?: string;
+  // Date mismatch fields - when MQL5 returns data for a different date than the event
+  date_mismatch?: boolean;
+  mql5_date?: string | null;
+  event_date?: string | null;
 }
 
 /**
@@ -805,10 +915,24 @@ async function processEvent(eventName: string, country: string): Promise<EventRe
       };
     }
 
-    // Step 3: Update Supabase with fresh MQL5 data
-    await updateEventInDatabase(cachedData, eventData);
+    // Step 3: Update Supabase with fresh MQL5 data (with date validation)
+    const updateResult = await updateEventInDatabase(cachedData, eventData);
 
-    log(`Successfully fetched event data from MQL5 for ${eventName}`);
+    // If date mismatch occurred, return error with explanation
+    if (updateResult.skipped && updateResult.reason?.includes('Date mismatch')) {
+      log(`Date mismatch prevented update for ${eventName}`, "error");
+      return {
+        event_name: eventName,
+        country,
+        success: false,
+        error: updateResult.reason,
+        date_mismatch: true,
+        mql5_date: eventData.last_release_date,
+        event_date: cachedData?.event_date,
+      };
+    }
+
+    log(`Successfully fetched event data from MQL5 for ${eventName} (updated: ${updateResult.updated})`);
     return {
       event_name: eventName,
       country,
