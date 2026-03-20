@@ -225,16 +225,21 @@ const CURRENCY_OPTIONS = [
           if (!trades) return [];
           return trades.filter((trade: any) => {
             if (!trade.session) return true;
-            const events: any[] = trade.economic_events || [];
-            // Find the event matching this event type by name
+            // Parse economic_events — may be string if doubly-serialized
+            let events: any[] = trade.economic_events || [];
+            if (typeof events === 'string') {
+              try { events = JSON.parse(events); } catch { return true; }
+            }
+            if (!Array.isArray(events) || events.length === 0) return true;
+            // Find event by name (exact, then case-insensitive)
+            const eventName = eventType.event;
             const matchingEvent = events.find((e: any) =>
-              e.name === eventType.event
+              e.name === eventName
+            ) || events.find((e: any) =>
+              e.name?.toLowerCase() === eventName?.toLowerCase()
             );
-            if (!matchingEvent) return true; // shouldn't happen, but keep trade
-            // Check if the event's time_utc maps to the trade's session
-            const timeUtc = matchingEvent.time_utc;
-            if (!timeUtc) return true; // old data without time_utc
-            const eventSession = getSessionForTimestamp(timeUtc);
+            if (!matchingEvent?.time_utc) return true;
+            const eventSession = getSessionForTimestamp(matchingEvent.time_utc);
             return !eventSession || trade.session === eventSession;
           });
         };
