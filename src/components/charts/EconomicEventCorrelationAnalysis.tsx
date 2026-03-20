@@ -224,14 +224,17 @@ const CURRENCY_OPTIONS = [
         const filterTradesBySession = (trades: any[]) => {
           if (!trades) return [];
           return trades.filter((trade: any) => {
-            if (!trade.session || !trade.economic_events) return true;
-            // Find the matching event in the trade's economic_events
-            const matchingEvent = trade.economic_events.find(
-              (e: any) => e.name === eventType.event
+            if (!trade.session) return true;
+            const events: any[] = trade.economic_events || [];
+            // Find the event matching this event type by name
+            const matchingEvent = events.find((e: any) =>
+              e.name === eventType.event
             );
-            if (!matchingEvent?.time_utc) return true;
-            const eventSession = getSessionForTimestamp(matchingEvent.time_utc);
-            // Keep trade if no session could be determined, or if it matches
+            if (!matchingEvent) return true; // shouldn't happen, but keep trade
+            // Check if the event's time_utc maps to the trade's session
+            const timeUtc = matchingEvent.time_utc;
+            if (!timeUtc) return true; // old data without time_utc
+            const eventSession = getSessionForTimestamp(timeUtc);
             return !eventSession || trade.session === eventSession;
           });
         };
