@@ -48,6 +48,7 @@ import EconomicCalendarFilters from './EconomicCalendarFilters';
 import EconomicEventDetailDialog from './EconomicEventDetailDialog';
 import EconomicEventShimmer from './EconomicEventShimmer';
 import { logger } from '../../utils/logger';
+import { getSessionForTimestamp } from '../../utils/sessionTimeUtils';
 // Optimized hooks
 import { useEconomicEvents, ViewType } from '../../hooks/useEconomicEvents';
 import { useEventPinning } from '../../hooks/useEventPinning';
@@ -243,7 +244,10 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
             id: event.id,
             event_name: event.event_name,
             currency: event.currency,
-            impact: event.impact
+            impact: event.impact,
+            session: event.is_all_day
+              ? undefined
+              : getSessionForTimestamp(event.time_utc) ?? undefined
           }))
         );
         setEventTradeCountMap(counts);
