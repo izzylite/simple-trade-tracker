@@ -32,6 +32,7 @@ import { Calendar } from '../../types/calendar';
 import { BaseDialog } from '../common';
 import TradeList from '../trades/TradeList';
 import { cleanEventNameForPinning, eventMatchV1 } from '../../utils/eventNameUtils';
+import { getSessionForTimestamp, SESSION_COLORS } from '../../utils/sessionTimeUtils';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
 import Shimmer from '../Shimmer';
@@ -79,6 +80,12 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   const [isLoadingTrades, setIsLoadingTrades] = useState(false);
   const hasInitialLoad = useRef(false);
 
+  // Determine which trading session this event falls under
+  const eventSession = useMemo(
+    () => event.is_all_day ? null : getSessionForTimestamp(event.time_utc),
+    [event.time_utc, event.is_all_day]
+  );
+
   // Fetch trades for this event when dialog opens
   useEffect(() => {
     const fetchEventTrades = async () => {
@@ -98,7 +105,8 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
           calendarId,
           cleanedName,
           event.currency,
-          event.impact
+          event.impact,
+          eventSession ?? undefined
         );
         setEventTrades(trades);
       } catch (error) {
@@ -111,7 +119,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     };
 
     fetchEventTrades();
-  }, [open, calendarId, event.event_name, event.currency, event.impact]);
+  }, [open, calendarId, event.event_name, event.currency, event.impact, eventSession]);
 
   // Load cached AI analysis when trades are loaded
   useEffect(() => {
@@ -434,6 +442,22 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
                   color: getImpactColor(event.impact)
                 }}
               />
+              {eventSession && (
+                <Chip
+                  label={eventSession}
+                  size="small"
+                  sx={{
+                    height: 24,
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    backgroundColor: alpha(
+                      SESSION_COLORS[eventSession] || theme.palette.info.main,
+                      0.1
+                    ),
+                    color: SESSION_COLORS[eventSession] || theme.palette.info.main
+                  }}
+                />
+              )}
               {calendar && 'pinned_events' in calendar && onUpdateCalendarProperty && !isReadOnly && (
                 <Tooltip title={isPinned ? "Unpin event" : "Pin event"}>
                   <span>
