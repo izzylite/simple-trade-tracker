@@ -30,6 +30,7 @@ import { formatValue } from '../../utils/formatters';
 
 import RoundedTabs from '../common/RoundedTabs';
 import { getCurrenciesForPair } from '../../services/tradeEconomicEventService';
+import { getSessionForTimestamp } from '../../utils/sessionTimeUtils';
 
 // Helper function to get flag URL
 const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {
@@ -214,7 +215,53 @@ const CURRENCY_OPTIONS = [
 
     setLosingTradeCorrelations(filterByCurrency(impactData.losingTradeCorrelations || []));
     setWinningTradeCorrelations(filterByCurrency(impactData.winningTradeCorrelations || []));
-    setCorrelationStats(impactData.correlationStats || {});
+
+    // Post-filter mostCommonEventTypes: only keep trades whose session
+    // matches the session derived from the event's time_utc
+    const stats = { ...(impactData.correlationStats || {}) };
+    if (stats.mostCommonEventTypes) {
+      stats.mostCommonEventTypes = stats.mostCommonEventTypes.map((eventType: any) => {
+        const filterTradesBySession = (trades: any[]) => {
+          if (!trades) return [];
+          return trades.filter((trade: any) => {
+            if (!trade.session || !trade.economic_events) return true;
+            // Find the matching event in the trade's economic_events
+            const matchingEvent = trade.economic_events.find(
+              (e: any) => e.name === eventType.event
+            );
+            if (!matchingEvent?.time_utc) return true;
+            const eventSession = getSessionForTimestamp(matchingEvent.time_utc);
+            // Keep trade if no session could be determined, or if it matches
+            return !eventSession || trade.session === eventSession;
+          });
+        };
+
+        const filteredLosing = filterTradesBySession(eventType.losingTrades);
+        const filteredWinning = filterTradesBySession(eventType.winningTrades);
+        const losingCount = filteredLosing.length;
+        const winningCount = filteredWinning.length;
+        const totalCount = losingCount + winningCount;
+        const totalLoss = filteredLosing.reduce(
+          (sum: number, t: any) => sum + Math.abs(t.amount || 0), 0
+        );
+        const totalWin = filteredWinning.reduce(
+          (sum: number, t: any) => sum + (t.amount || 0), 0
+        );
+
+        return {
+          ...eventType,
+          losingTrades: filteredLosing,
+          winningTrades: filteredWinning,
+          count: totalCount,
+          totalLoss,
+          totalWin,
+          avg_loss: losingCount > 0 ? totalLoss / losingCount : 0,
+          avg_win: winningCount > 0 ? totalWin / winningCount : 0,
+          win_rate: totalCount > 0 ? (winningCount / totalCount) * 100 : 0
+        };
+      }).filter((eventType: any) => eventType.count > 0);
+    }
+    setCorrelationStats(stats);
   }, [economicCorrelations, selectedImpact, selectedCurrency]);
 
   // Get losing and winning trades (kept for legacy compatibility)
