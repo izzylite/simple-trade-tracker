@@ -15,17 +15,23 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
-  CircularProgress
+  CircularProgress,
+  TextField,
+  InputAdornment,
+  ToggleButtonGroup,
+  ToggleButton
 } from '@mui/material';
 import {
   InfoOutlined,
   Analytics,
   TrendingDown,
   TrendingUp,
-  EventNote
+  EventNote,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { Trade, TradeEconomicEvent, Calendar } from '../../types/dualWrite';
 import { ImpactLevel, Currency } from '../../types/economicCalendar';
+import { cleanEventNameForPinning } from '../../utils/eventNameUtils';
 import { formatValue } from '../../utils/formatters';
 
 import RoundedTabs from '../common/RoundedTabs';
@@ -114,6 +120,8 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
   const theme = useTheme();
   const [selectedImpact, setSelectedImpact] = useState<ImpactLevel>('High');
   const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
+  const [eventSearch, setEventSearch] = useState<string>('');
+  const [groupEvents, setGroupEvents] = useState<boolean>(false);
 
   // Async calculation states
   const [losingTradeCorrelations, setLosingTradeCorrelations] = useState<any[]>([]);
@@ -231,16 +239,15 @@ const CURRENCY_OPTIONS = [
               try { events = JSON.parse(events); } catch { return true; }
             }
             if (!Array.isArray(events) || events.length === 0) return true;
-            // Find event by name (exact, then case-insensitive)
+            // Find event by name + currency (exact, then case-insensitive)
             const eventName = eventType.event;
+            const eventCurrency = eventType.currency;
             const matchingEvent = events.find((e: any) =>
-              e.name === eventName
+              e.name === eventName && (!eventCurrency || e.currency === eventCurrency)
             ) || events.find((e: any) =>
-              e.name?.toLowerCase() === eventName?.toLowerCase()
+              e.name?.toLowerCase() === eventName?.toLowerCase() &&
+              (!eventCurrency || e.currency?.toLowerCase() === eventCurrency?.toLowerCase())
             );
-
-            // DEBUG: Log filter data for session mismatches
-            console.log(`[SessionFilter] Event: "${eventName}" | Trade session: ${trade.session} | economic_events type: ${typeof trade.economic_events} | events count: ${events.length} | event names: [${events.map((e: any) => e.name).join(', ')}] | matchingEvent: ${matchingEvent ? JSON.stringify({ name: matchingEvent.name, time_utc: matchingEvent.time_utc }) : 'NOT FOUND'} | eventSession: ${matchingEvent?.time_utc ? getSessionForTimestamp(matchingEvent.time_utc) : 'N/A'} | KEEP: ${!matchingEvent?.time_utc ? 'yes (no time_utc)' : (!getSessionForTimestamp(matchingEvent.time_utc) ? 'yes (no session)' : trade.session === getSessionForTimestamp(matchingEvent.time_utc) ? 'yes (match)' : 'NO (mismatch)')}`);
 
             if (!matchingEvent?.time_utc) return true;
             const eventSession = getSessionForTimestamp(matchingEvent.time_utc);
@@ -600,9 +607,85 @@ const CURRENCY_OPTIONS = [
         {/* Most Common Event Types */}
         <Card>
           <CardContent>
-            <Typography variant="h6" sx={{ mb: 2 }}>Most Common Event Types</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">Most Common Event Types</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ToggleButtonGroup
+                  size="small"
+                  value={groupEvents ? 'grouped' : 'individual'}
+                  exclusive
+                  onChange={(_, val) => { if (val) setGroupEvents(val === 'grouped'); }}
+                >
+                  <ToggleButton value="individual" sx={{ textTransform: 'none', px: 1.5, py: 0.5 }}>
+                    Individual
+                  </ToggleButton>
+                  <ToggleButton value="grouped" sx={{ textTransform: 'none', px: 1.5, py: 0.5 }}>
+                    Grouped
+                  </ToggleButton>
+                </ToggleButtonGroup>
+                <TextField
+                  size="small"
+                  placeholder="Search events..."
+                  value={eventSearch}
+                  onChange={(e) => setEventSearch(e.target.value)}
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    }
+                  }}
+                  sx={{ width: 250 }}
+                />
+              </Box>
+            </Box>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {(correlationStats.mostCommonEventTypes || []).map((eventType: any, index: number) => (
+                {(() => {
+                  let events = correlationStats.mostCommonEventTypes || [];
+                  // Group events by cleaned name + currency when enabled
+                  if (groupEvents) {
+                    const grouped = new Map<string, any>();
+                    events.forEach((eventType: any) => {
+                      const cleanedName = cleanEventNameForPinning(eventType.event);
+                      const key = `${cleanedName}::${eventType.currency || ''}`;
+                      if (grouped.has(key)) {
+                        const existing = grouped.get(key);
+                        const mergedLosing = [...(existing.losingTrades || []), ...(eventType.losingTrades || [])];
+                        const mergedWinning = [...(existing.winningTrades || []), ...(eventType.winningTrades || [])];
+                        const losingCount = mergedLosing.length;
+                        const winningCount = mergedWinning.length;
+                        const totalCount = losingCount + winningCount;
+                        const totalLoss = mergedLosing.reduce((s: number, t: any) => s + Math.abs(t.amount || 0), 0);
+                        const totalWin = mergedWinning.reduce((s: number, t: any) => s + (t.amount || 0), 0);
+                        grouped.set(key, {
+                          ...existing,
+                          event: cleanedName,
+                          losingTrades: mergedLosing,
+                          winningTrades: mergedWinning,
+                          count: totalCount,
+                          totalLoss,
+                          totalWin,
+                          avg_loss: losingCount > 0 ? totalLoss / losingCount : 0,
+                          avg_win: winningCount > 0 ? totalWin / winningCount : 0,
+                          win_rate: totalCount > 0 ? (winningCount / totalCount) * 100 : 0
+                        });
+                      } else {
+                        grouped.set(key, { ...eventType, event: cleanedName });
+                      }
+                    });
+                    events = Array.from(grouped.values()).sort((a: any, b: any) => b.count - a.count);
+                  }
+                  return events
+                    .filter((eventType: any) => {
+                      if (!eventSearch.trim()) return true;
+                      const query = eventSearch.toLowerCase();
+                      return eventType.event?.toLowerCase().includes(query) ||
+                        eventType.currency?.toLowerCase().includes(query);
+                    })
+                    .slice(0, eventSearch.trim() ? 20 : 9)
+                    .map((eventType: any, index: number) => (
                 <Card
                   key={index}
                   variant="outlined"
@@ -722,7 +805,8 @@ const CURRENCY_OPTIONS = [
                     </Box>
                   </CardContent>
                 </Card>
-              ))}
+              ));
+                })()}
                 {(correlationStats.mostCommonEventTypes || []).length === 0 && (
                   <Typography variant="body2" color="text.secondary">
                     No common event types found

@@ -94,7 +94,7 @@ export const createEditTradeData = (trade: Trade): NewTradeForm => {
     amount: Math.abs(trade.amount),
     trade_type: trade.trade_type,
     entry_price: trade.entry_price || 0,
-    trade_date: trade.trade_date,
+    trade_date: trade.trade_date instanceof Date ? trade.trade_date : new Date(trade.trade_date),
     exit_price: trade.exit_price || 0,
     stop_loss: trade.stop_loss || 0,
     take_profit: trade.take_profit || 0,
