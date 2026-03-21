@@ -340,7 +340,9 @@ function formatTradeContext(trade: Record<string, unknown>): string {
   }
 
   const images = trade.images as unknown[] | undefined;
-  if (images?.length) lines.push(`Chart Images: ${images.length} attached`);
+  if (images?.length) {
+    lines.push(`Chart Images: ${images.length} attached (pre-loaded into your context — analyze them directly)`);
+  }
 
   if (trade.notes) {
     const noteStr = String(trade.notes);
@@ -376,7 +378,7 @@ ${tradeContext}
 CRITICAL INSTRUCTIONS:
 1. ALL user questions relate to THIS trade — use the data above as your primary context
 2. When the user mentions an instrument, session, or price — it refers to THIS trade
-3. If the trade has images, use analyze_image tool to review them
+3. Chart images are PRE-LOADED into this conversation — you can see and analyze them directly without calling analyze_image
 4. Compare against user's history for context when relevant
 5. Do NOT analyze unrelated trades unless explicitly asked
 6. Reference this trade with <trade-ref id="${focusedTradeId}"/> in your response

@@ -250,6 +250,52 @@ async function fetchFocusedTrade(
 }
 
 /**
+ * Fetch trade images and convert to base64 data URLs so they are
+ * injected directly into the Gemini context (no tool call needed).
+ * Limited to first 4 images to keep token budget reasonable.
+ */
+async function fetchTradeImages(
+  trade: Record<string, unknown>
+): Promise<Array<{ url: string; mimeType: string }>> {
+  const images = trade.images as Array<Record<string, unknown>> | undefined;
+  if (!images?.length) return [];
+
+  const MAX_TRADE_IMAGES = 4;
+  const toFetch = images.slice(0, MAX_TRADE_IMAGES);
+  const results: Array<{ url: string; mimeType: string }> = [];
+
+  await Promise.all(
+    toFetch.map(async (img) => {
+      const imageUrl = img.url as string | undefined;
+      if (!imageUrl) return;
+
+      try {
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+          log(`[TradeImages] Failed to fetch ${imageUrl.substring(0, 50)}: ${response.status}`, 'warn');
+          return;
+        }
+
+        const buffer = await response.arrayBuffer();
+        const base64 = encodeBase64(new Uint8Array(buffer));
+        const contentType = response.headers.get('content-type') || 'image/png';
+        const mimeType = contentType.split(';')[0].trim();
+
+        results.push({
+          url: `data:${mimeType};base64,${base64}`,
+          mimeType
+        });
+        log(`[TradeImages] Loaded image: ${mimeType}, ${base64.length} chars`, 'info');
+      } catch (error) {
+        log(`[TradeImages] Error fetching image: ${error}`, 'warn');
+      }
+    })
+  );
+
+  return results;
+}
+
+/**
  * Get MCP tools with caching
  * Returns cached tools if available and not expired, otherwise fetches fresh
  */
@@ -1524,6 +1570,17 @@ Deno.serve(async (req: Request) => {
       ? await fetchFocusedTrade(focusedTradeId, userId)
       : null;
 
+    // Pre-fetch trade chart images so the AI can see them without a tool call
+    const tradeImages = preloadedTrade
+      ? await fetchTradeImages(preloadedTrade)
+      : [];
+
+    // Merge trade images with user-attached images (user images take priority)
+    const allImages = [...tradeImages, ...(images || [])].slice(0, 4);
+    if (tradeImages.length > 0) {
+      log(`Injecting ${tradeImages.length} trade chart images into context`, 'info');
+    }
+
     // Build system prompt with pre-loaded memory and trade context
     const systemPrompt = buildSecureSystemPrompt(userId, calendarId, calendarContext, focusedTradeId, preloadedMemory, preloadedTrade);
 
@@ -1550,7 +1607,7 @@ Deno.serve(async (req: Request) => {
         projectRef,
         supabaseAccessToken,
         supabaseUrl,
-        images // Pass user-attached images
+        allImages.length > 0 ? allImages : images // Trade + user images
       );
     }
 
