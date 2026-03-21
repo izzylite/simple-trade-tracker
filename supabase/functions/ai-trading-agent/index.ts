@@ -211,6 +211,45 @@ async function fetchAgentMemory(
 }
 
 /**
+ * Pre-fetch focused trade data so the AI has instrument/session/date
+ * context from turn 0 (prevents irrelevant tool calls).
+ */
+async function fetchFocusedTrade(
+  tradeId: string,
+  userId: string
+): Promise<Record<string, unknown> | null> {
+  try {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+      .from('trades')
+      .select(
+        'id, name, amount, trade_type, trade_date, session, ' +
+        'entry_price, exit_price, stop_loss, take_profit, ' +
+        'risk_to_reward, tags, notes, economic_events, images'
+      )
+      .eq('id', tradeId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      log(`[FocusedTrade] Query error: ${error.message}`, 'warn');
+      return null;
+    }
+
+    if (data) {
+      log(`[FocusedTrade] Loaded trade: ${data.name || data.id}`, 'info');
+      return data;
+    }
+
+    log('[FocusedTrade] Trade not found', 'warn');
+    return null;
+  } catch (error) {
+    log(`[FocusedTrade] Error fetching: ${error}`, 'error');
+    return null;
+  }
+}
+
+/**
  * Get MCP tools with caching
  * Returns cached tools if available and not expired, otherwise fetches fresh
  */
@@ -1480,8 +1519,13 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
     const preloadedMemory = await fetchAgentMemory(supabaseUrl, supabaseServiceKey, userId, calendarId);
 
-    // Build system prompt with pre-loaded memory
-    const systemPrompt = buildSecureSystemPrompt(userId, calendarId, calendarContext, focusedTradeId, preloadedMemory);
+    // Pre-fetch focused trade data so the AI has full context from turn 0
+    const preloadedTrade = focusedTradeId
+      ? await fetchFocusedTrade(focusedTradeId, userId)
+      : null;
+
+    // Build system prompt with pre-loaded memory and trade context
+    const systemPrompt = buildSecureSystemPrompt(userId, calendarId, calendarContext, focusedTradeId, preloadedMemory, preloadedTrade);
 
     log('Sending request to Gemini with tools', 'info');
 

@@ -312,6 +312,88 @@ Note: COPY the exact UUID string (e.g., "9ee94f92-1b7b-4f95-9fe5-29f56f481010") 
 `;
 
 // =============================================================================
+// FOCUS MODE BUILDER (Pre-loaded trade context)
+// =============================================================================
+
+function formatTradeContext(trade: Record<string, unknown>): string {
+  const lines: string[] = [];
+
+  if (trade.name) lines.push(`Instrument: ${trade.name}`);
+  lines.push(`Result: ${trade.trade_type} | P&L: ${trade.amount}`);
+  if (trade.trade_date) lines.push(`Date: ${trade.trade_date}`);
+  if (trade.session) lines.push(`Session: ${trade.session}`);
+  if (trade.entry_price) lines.push(`Entry: ${trade.entry_price}`);
+  if (trade.exit_price) lines.push(`Exit: ${trade.exit_price}`);
+  if (trade.stop_loss) lines.push(`Stop Loss: ${trade.stop_loss}`);
+  if (trade.take_profit) lines.push(`Take Profit: ${trade.take_profit}`);
+  if (trade.risk_to_reward) lines.push(`R:R: ${trade.risk_to_reward}`);
+
+  const tags = trade.tags as string[] | undefined;
+  if (tags?.length) lines.push(`Tags: ${tags.join(', ')}`);
+
+  const events = trade.economic_events as Array<Record<string, unknown>> | undefined;
+  if (events?.length) {
+    const eventSummary = events
+      .map(e => `${e.name} (${e.currency}, ${e.impact})`)
+      .join('; ');
+    lines.push(`Economic Events: ${eventSummary}`);
+  }
+
+  const images = trade.images as unknown[] | undefined;
+  if (images?.length) lines.push(`Chart Images: ${images.length} attached`);
+
+  if (trade.notes) {
+    const noteStr = String(trade.notes);
+    const truncated = noteStr.length > 200
+      ? noteStr.substring(0, 200) + '...'
+      : noteStr;
+    lines.push(`Notes: ${truncated}`);
+  }
+
+  return lines.join('\n');
+}
+
+function buildFocusModeSection(
+  focusedTradeId: string,
+  userId: string,
+  preloadedTrade?: Record<string, unknown> | null,
+): string {
+  const tradeContext = preloadedTrade
+    ? `
+TRADE DATA (pre-loaded):
+${formatTradeContext(preloadedTrade)}
+`
+    : `
+NOTE: Trade data could not be pre-loaded. Fetch it immediately:
+SELECT * FROM trades WHERE id = '${focusedTradeId}' AND user_id = '${userId}'
+`;
+
+  return `
+## FOCUS MODE: Single Trade Analysis
+
+You are analyzing a SPECIFIC trade. Trade ID: ${focusedTradeId}
+${tradeContext}
+CRITICAL INSTRUCTIONS:
+1. ALL user questions relate to THIS trade — use the data above as your primary context
+2. When the user mentions an instrument, session, or price — it refers to THIS trade
+3. If the trade has images, use analyze_image tool to review them
+4. Compare against user's history for context when relevant
+5. Do NOT analyze unrelated trades unless explicitly asked
+6. Reference this trade with <trade-ref id="${focusedTradeId}"/> in your response
+7. You may query for additional trade details if needed (e.g., for deeper analysis)
+
+Focus areas for single trade analysis:
+- Entry/exit quality and timing
+- Risk management (stop loss, take profit, R:R)
+- Tags and patterns
+- Economic events during the trade
+- Chart pattern recognition
+- What worked vs what could improve
+- Similar trades from history for comparison
+`;
+}
+
+// =============================================================================
 // CORE SYSTEM PROMPT BUILDER
 // =============================================================================
 
@@ -321,6 +403,7 @@ export function buildSecureSystemPrompt(
   calendarContext?: Partial<Calendar>,
   focusedTradeId?: string,
   preloadedMemory?: string | null,
+  preloadedTrade?: Record<string, unknown> | null,
 ): string {
   const calendarContextSection = buildCalendarContextSection(calendarContext);
 
@@ -334,29 +417,7 @@ export function buildSecureSystemPrompt(
 
   // Build focus mode section if analyzing a specific trade
   const focusModeSection = focusedTradeId
-    ? `
-## 🎯 FOCUS MODE: Single Trade Analysis
-
-You are analyzing a SPECIFIC trade. Trade ID: ${focusedTradeId}
-
-CRITICAL INSTRUCTIONS:
-1. FIRST: Fetch this trade's full details using execute_sql:
-   SELECT * FROM trades WHERE id = '${focusedTradeId}' AND user_id = '${userId}'
-2. ALL user questions relate to THIS trade specifically
-3. If the trade has images, ALWAYS use analyze_image tool to review them
-4. Compare this trade against user's history for context when relevant
-5. Do NOT analyze unrelated trades unless explicitly asked
-6. Reference this trade with <trade-ref id="${focusedTradeId}"/> in your response
-
-Focus areas for single trade analysis:
-- Entry/exit quality and timing
-- Risk management (stop loss, take profit, R:R)
-- Tags used during the trade for finding patterns
-- Economic events that occur during the trade
-- Pattern recognition from charts
-- What worked vs what could improve
-- Similar trades from history for comparison
-`
+    ? buildFocusModeSection(focusedTradeId, userId, preloadedTrade)
     : "";
 
   // ==========================================================================
