@@ -39,7 +39,8 @@ import {
   CalendarToday as CalendarIcon,
   Notes as NotesIcon,
   Edit as EditIcon,
-  Flag as TargetIcon
+  Flag as TargetIcon,
+  EventNote as GamePlanIcon,
 } from '@mui/icons-material';
 import {
   format,
@@ -98,8 +99,9 @@ import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import NotesDrawer from '../components/notes/NotesDrawer';
 import NoteEditorDialog from '../components/notes/NoteEditorDialog';
 import { StackedNotesWidget } from '../components/reminderNotes';
+import NotesBottomSheet from '../components/reminderNotes/NotesBottomSheet';
 import * as notesService from '../services/notesService';
-import { Note } from '../types/note';
+import { Note, DayAbbreviation } from '../types/note';
 
 import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import AnimatedBackground from '../components/common/AnimatedBackground';
@@ -696,6 +698,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     note: Note | null;
   } | null>(null);
 
+  // Game plan quick-create state
+  const [gamePlanDialog, setGamePlanDialog] = useState<{
+    day: DayAbbreviation;
+    existingNote: Note | null;
+  } | null>(null);
+  const [gamePlanNotes, setGamePlanNotes] = useState<Map<string, Note>>(new Map());
+
   // Economic event notification state
   // Notification stack state (moved from App.tsx)
   const [notifications, setNotifications] = useState<EconomicEvent[]>([]);
@@ -1089,6 +1098,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     notesService.getWeekNoteKeys(calendarId).then(setWeekNoteKeys);
   }, [calendarId, currentDate]);
 
+  // Load game plan notes for day indicators and instant viewing
+  useEffect(() => {
+    if (!calendarId) return;
+    notesService.getGamePlanNotesByDay(calendarId).then(setGamePlanNotes);
+  }, [calendarId]);
+
   // Calculate session statistics for the monthly statistics section
   const sessionStats = useMemo(() => {
     return calculateSessionStats(filteredTrades, currentDate, 'month', accountBalance);
@@ -1205,6 +1220,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       setSelectedDate(trade_date);
     }
   }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk, weeklyTarget]);
+
+  const handleDayHeaderClick = useCallback((day: DayAbbreviation) => {
+    if (isReadOnly || !calendarId) return;
+    const existingNote = gamePlanNotes.get(day) ?? null;
+    setGamePlanDialog({ day, existingNote });
+  }, [calendarId, isReadOnly, gamePlanNotes]);
 
   const handleWeekClick = useCallback(async (weekStart: Date) => {
     if (isReadOnly || !calendarId) return;
@@ -1743,25 +1764,60 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               gap: { xs: 1, md: 1.5 },
               mb: { xs: 1, md: 2 }
             }}>
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Week'].map((day, index) => (
-                <WeekdayHeader
-                  key={day}
-                  sx={{
-                    display: index === 7 ? { xs: 'none', sm: 'flex' } : 'flex',
-                    cursor: 'default',
-                    position: 'relative',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    p: { xs: 1, md: 1.5 },
-                    fontWeight: 600,
-                    fontSize: { xs: '0.875rem', md: '1rem' },
-                    color: 'text.secondary',
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  }}
-                >
-                  {day}
-                </WeekdayHeader>
-              ))}
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Week'].map((day, index) => {
+                const isDayHeader = index < 7;
+                const isClickable = isDayHeader && !isReadOnly;
+                const hasGamePlan = isDayHeader && gamePlanNotes.has(day);
+                return (
+                  <Tooltip
+                    key={day}
+                    title={isClickable
+                      ? (hasGamePlan
+                        ? `View ${day} Game Plan`
+                        : `Create ${day} Game Plan`)
+                      : ''}
+                    arrow
+                    disableHoverListener={!isClickable}
+                  >
+                    <WeekdayHeader
+                      onClick={isClickable ? () => {
+                        handleDayHeaderClick(day as DayAbbreviation);
+                      } : undefined}
+                      sx={{
+                        display: index === 7
+                          ? { xs: 'none', sm: 'flex' } : 'flex',
+                        cursor: isClickable ? 'pointer' : 'default',
+                        position: 'relative',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: 0.5,
+                        p: { xs: 1, md: 1.5 },
+                        fontWeight: 600,
+                        fontSize: { xs: '0.875rem', md: '1rem' },
+                        color: 'text.secondary',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        ...(isClickable && {
+                          '&:hover': {
+                            color: 'primary.main',
+                            bgcolor: (t: Theme) =>
+                              alpha(t.palette.primary.main, 0.08),
+                          },
+                        }),
+                      }}
+                    >
+                      {day}
+                      {hasGamePlan && (
+                        <GamePlanIcon
+                          sx={{
+                            fontSize: '0.85rem',
+                            color: 'inherit',
+                          }}
+                        />
+                      )}
+                    </WeekdayHeader>
+                  </Tooltip>
+                );
+              })}
             </Box>
             {/* Enhanced Calendar Grid */}
             <Box sx={{
@@ -2199,6 +2255,53 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         />
       )}
 
+      {/* Game Plan - View existing via BottomSheet */}
+      {gamePlanDialog?.existingNote && (
+        <NotesBottomSheet
+          open
+          onClose={() => setGamePlanDialog(null)}
+          notes={[gamePlanDialog.existingNote]}
+          calendarId={calendarId!}
+          fullDayName={{
+            Sun: 'Sunday', Mon: 'Monday', Tue: 'Tuesday',
+            Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday',
+            Sat: 'Saturday',
+          }[gamePlanDialog.day]}
+          availableTradeTags={allTags}
+          onNoteSaved={() => {
+            if (calendarId) {
+              notesService.getGamePlanNotesByDay(calendarId)
+                .then(setGamePlanNotes);
+            }
+          }}
+          onNoteDeleted={() => {
+            setGamePlanDialog(null);
+            if (calendarId) {
+              notesService.getGamePlanNotesByDay(calendarId)
+                .then(setGamePlanNotes);
+            }
+          }}
+        />
+      )}
+
+      {/* Game Plan - Create new via Editor */}
+      {gamePlanDialog && !gamePlanDialog.existingNote && (
+        <NoteEditorDialog
+          open
+          onClose={() => setGamePlanDialog(null)}
+          calendarId={calendarId!}
+          gamePlanDay={gamePlanDialog.day}
+          availableTradeTags={allTags}
+          onSave={() => {
+            setGamePlanDialog(null);
+            if (calendarId) {
+              notesService.getGamePlanNotesByDay(calendarId)
+                .then(setGamePlanNotes);
+            }
+          }}
+          onDelete={() => setGamePlanDialog(null)}
+        />
+      )}
 
       {/* Notification stack container (bottom left, global) */}
       <Box

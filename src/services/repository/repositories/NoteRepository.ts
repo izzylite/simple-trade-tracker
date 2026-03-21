@@ -255,6 +255,30 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
     }
   }
 
+  async findGamePlanNotes(
+    calendarId: string,
+  ): Promise<Note[]> {
+    try {
+      const { data, error } = await supabase
+        .from("notes")
+        .select("*")
+        .or(`calendar_id.eq.${calendarId},calendar_id.is.null`)
+        .eq("reminder_type", "weekly")
+        .eq("is_reminder_active", true)
+        .eq("is_archived", false)
+        .contains("tags", ["GAME_PLAN"]);
+
+      if (error) {
+        logger.error("Error finding game plan notes:", error);
+        return [];
+      }
+      return data ? data.map((item) => transformSupabaseNote(item)) : [];
+    } catch (error) {
+      logger.error("Exception finding game plan notes:", error);
+      return [];
+    }
+  }
+
   /**
    * Query notes by calendar ID with filtering, search, and pagination
    */

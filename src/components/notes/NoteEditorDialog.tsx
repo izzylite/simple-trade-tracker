@@ -115,8 +115,25 @@ interface NoteEditorDialogProps {
   onSave?: (note: Note, isCreated?: boolean) => void;
   onDelete?: (noteId: string) => void;
   weekKey?: string; // If set, this is a week note
+  gamePlanDay?: DayAbbreviation; // If set, pre-fill as game plan template
   availableTradeTags?: string[]; // Trade tags from calendar for inline insertion
 }
+
+// Full day names for game plan titles
+const DAY_FULL_NAMES: Record<DayAbbreviation, string> = {
+  Sun: 'Sunday', Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday',
+  Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday',
+};
+
+// Curated cover images for game plan notes
+const GAME_PLAN_COVERS = [
+  'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1535320903710-d993d3d77d29?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1504607798333-52571ff7fba3?w=800&h=400&fit=crop',
+];
 
 const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   open,
@@ -126,6 +143,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   onSave,
   onDelete,
   weekKey,
+  gamePlanDay,
   availableTradeTags = [],
 }) => {
   const theme = useTheme();
@@ -228,28 +246,44 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       } else {
         // Creating new note - reset to defaults
         setNote(null);
-        setTitle(weekKey ? `Week of ${weekKey}` : '');
-        setContent('');
-        setCoverImage(null);
 
-        // Reset reminder states
-        setReminderType('none');
-        setReminderDate(null);
-        setReminderDays([]);
-        setIsReminderActive(false);
-        setIsReminderExpanded(false);
-        setNoteColor(undefined);
+        if (gamePlanDay) {
+          // Game plan template
+          const fullDay = DAY_FULL_NAMES[gamePlanDay];
+          const randomCover = GAME_PLAN_COVERS[
+            Math.floor(Math.random() * GAME_PLAN_COVERS.length)
+          ];
+          setTitle(`${fullDay} Game Plan`);
+          setContent('');
+          setCoverImage(randomCover);
+          setReminderType('weekly');
+          setReminderDate(null);
+          setReminderDays([gamePlanDay]);
+          setIsReminderActive(true);
+          setIsReminderExpanded(false);
+          setNoteColor(undefined);
+          setTags(['GAME_PLAN']);
+          setIsTagsExpanded(false);
+        } else {
+          setTitle(weekKey ? `Week of ${weekKey}` : '');
+          setContent('');
+          setCoverImage(null);
+          setReminderType('none');
+          setReminderDate(null);
+          setReminderDays([]);
+          setIsReminderActive(false);
+          setIsReminderExpanded(false);
+          setNoteColor(undefined);
+          setTags([]);
+          setIsTagsExpanded(false);
+        }
 
-        // Reset tags states
-        setTags([]);
-        setIsTagsExpanded(false);
         setNewTagInput('');
-
         // Reset global state (default to calendar-specific)
         setIsGlobal(false);
       }
     }
-  }, [open, initialNote]);
+  }, [open, initialNote, gamePlanDay]);
 
   const saveNote = async () => {
     if (!user?.uid) return;

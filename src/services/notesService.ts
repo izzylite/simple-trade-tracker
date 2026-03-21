@@ -280,6 +280,27 @@ export const getReminderNotesForDay = async (
 };
 
 /**
+ * Get game plan notes mapped by day abbreviation
+ */
+export const getGamePlanNotesByDay = async (
+  calendarId: string,
+): Promise<Map<string, Note>> => {
+  try {
+    const notes = await noteRepository.findGamePlanNotes(calendarId);
+    const map = new Map<string, Note>();
+    for (const note of notes) {
+      if (note.reminder_days) {
+        for (const d of note.reminder_days) map.set(d, note);
+      }
+    }
+    return map;
+  } catch (error) {
+    logger.error("Error getting game plan notes:", error);
+    return new Map();
+  }
+};
+
+/**
  * Get reminder notes for a specific date (one-time reminders)
  */
 export const getReminderNotesForDate = async (
