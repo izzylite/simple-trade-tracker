@@ -20,7 +20,8 @@ import {
   ListItemIcon,
   ListItemText,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  Skeleton
 } from '@mui/material';
 import {
   TrendingUp,
@@ -40,7 +41,7 @@ import {
 import { Trade } from '../types/dualWrite';
 import { exportTrades } from '../utils/tradeExportImport';
 import { formatCurrency } from '../utils/formatters';
-import { calculatePercentageOfValueAtDate } from '../utils/dynamicRiskUtils';
+
 import { calculateTargetProgress } from '../utils/statsUtils';
 import { error } from '../utils/logger';
 import { ImportMappingDialog } from './import/ImportMappingDialog';
@@ -71,6 +72,8 @@ interface MonthlyStatsProps {
   onEditTrade?: (trade: Trade) => void;
   economicFilter?: (calendarId: string) => import('./economicCalendar/EconomicCalendarDrawer').EconomicCalendarFilterSettings;
   maxDailyDrawdown?: number;
+  pnlBeforeMonth?: number;
+  isPnlLoading?: boolean;
 }
 
 
@@ -91,7 +94,9 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   onUpdateCalendarProperty,
   onEditTrade,
   economicFilter,
-  maxDailyDrawdown
+  maxDailyDrawdown,
+  pnlBeforeMonth,
+  isPnlLoading = false
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -147,20 +152,29 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
     worstDayDate = format(new Date(worstEntry[0]), 'EEE d');
   }
 
-  // Calculate growth percentage using account value at start of month (excluding current month trades)
+  // Calculate account value at start of month
+  // pnlBeforeMonth here is the cumulative PnL before this month (pre-computed by caller)
   const startOfCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  const growthPercentage = trades
-    ? calculatePercentageOfValueAtDate(netAmountForThisMonth, accountBalance, trades, startOfCurrentMonth).toFixed(1)
-    : accountBalance > 0 ? ((netAmountForThisMonth / accountBalance) * 100).toFixed(2) : '0';
+  const accountValueAtStartOfMonth = pnlBeforeMonth !== undefined
+    ? accountBalance + pnlBeforeMonth
+    : (() => {
+        const tradesBeforeMonth = trades.filter(
+          trade => new Date(trade.trade_date) < startOfCurrentMonth
+        );
+        return accountBalance + tradesBeforeMonth.reduce(
+          (sum, trade) => sum + trade.amount, 0
+        );
+      })();
 
-  // Calculate account value at start of month for display
-  const tradesBeforeMonth = trades.filter(trade => new Date(trade.trade_date) < startOfCurrentMonth);
-  const accountValueAtStartOfMonth = accountBalance + tradesBeforeMonth.reduce((sum, trade) => sum + trade.amount, 0);
+  // Calculate growth percentage relative to start-of-month value
+  const growthPercentage = accountValueAtStartOfMonth > 0
+    ? ((netAmountForThisMonth / accountValueAtStartOfMonth) * 100).toFixed(1)
+    : '0';
 
 
-  // Calculate monthly target progress using centralized function
+  // Calculate monthly target progress using start-of-month value as baseline
   const targetProgressValue = monthlyTarget && monthlyTarget > 0
-    ? calculateTargetProgress(monthTrades, accountBalance, monthlyTarget, startOfCurrentMonth, trades)
+    ? calculateTargetProgress(monthTrades, accountValueAtStartOfMonth, monthlyTarget)
     : 0;
   const targetProgress = targetProgressValue.toFixed(0);
   const isTargetMet = monthlyTarget ? parseFloat(growthPercentage) >= monthlyTarget : false;
@@ -442,22 +456,26 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               }}
             >
               {formatCurrency(netAmountForThisMonth)}
-              <Tooltip
-                title={`Percentage calculated based on account value at start of ${format(currentDate, 'MMMM')}: ${formatCurrency(accountValueAtStartOfMonth)} (excluding this month's trades for consistent comparison)`}
-                placement="top"
-              >
-                <Typography
-                  component="span"
-                  sx={{
-                    fontSize: { xs: '0.875rem', sm: '1rem' },
-                    color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.primary',
-                    fontWeight: 600,
-                    cursor: 'help'
-                  }}
+              {isPnlLoading ? (
+                <Skeleton variant="text" width={60} sx={{ fontSize: '1rem', display: 'inline-block', ml: 0.5 }} />
+              ) : (
+                <Tooltip
+                  title={`Percentage based on account value at start of ${format(currentDate, 'MMMM')}: ${formatCurrency(accountValueAtStartOfMonth)}`}
+                  placement="top"
                 >
-                  ({growthPercentage}%)
-                </Typography>
-              </Tooltip>
+                  <Typography
+                    component="span"
+                    sx={{
+                      fontSize: { xs: '0.875rem', sm: '1rem' },
+                      color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.primary',
+                      fontWeight: 600,
+                      cursor: 'help'
+                    }}
+                  >
+                    ({growthPercentage}%)
+                  </Typography>
+                </Tooltip>
+              )}
             </Typography>
 
             {monthlyTarget && (
@@ -582,9 +600,13 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
             <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.75rem' }}>
               Started With
             </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '1rem' }}>
-              {formatCurrency(accountValueAtStartOfMonth)}
-            </Typography>
+            {isPnlLoading ? (
+              <Skeleton variant="text" width={120} sx={{ fontSize: '1rem' }} />
+            ) : (
+              <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '1rem' }}>
+                {formatCurrency(accountValueAtStartOfMonth)}
+              </Typography>
+            )}
           </Box>
 
           {/* Best Day Card */}

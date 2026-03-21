@@ -509,6 +509,16 @@ export const getTradeRepository = () => {
   return tradeRepository;
 };
 
+/**
+ * Get cumulative PnL for all trades before a given date
+ */
+export const getCumulativePnlBeforeDate = async (
+  calendarId: string,
+  beforeDate: Date
+): Promise<number> => {
+  return tradeRepository.getCumulativePnlBeforeDate(calendarId, beforeDate);
+};
+
  
 /**
  * Generate a unique image ID

@@ -1,6 +1,6 @@
 import { Trade } from '../types/dualWrite';
 import { isAfter, isBefore, isSameDay, isSameMonth, isSameWeek, isSameYear, startOfDay } from 'date-fns';
-import { calculateEffectiveMaxDailyDrawdown, calculatePercentageOfValueAtDate, DynamicRiskSettings } from './dynamicRiskUtils';
+import { calculateEffectiveMaxDailyDrawdown, DynamicRiskSettings } from './dynamicRiskUtils';
 import { 
   DayStatus
 } from '../components/StyledComponents'; 
@@ -310,15 +310,18 @@ export const calculateDayStats = (
   maxDailyDrawdown: number,
   dynamicRiskSettings?: DynamicRiskSettings,
   allTrades?: Trade[],
-  dayDate?: Date
+  dayDate?: Date,
+  totalAccountValue?: number
 ): DayStats => {
   // Calculate net amount for the day
   const netAmount = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
 
-  // Calculate percentage loss/gain relative to account value at start of day (excluding current day trades)
-  const percentage = allTrades && dayDate
-    ? calculatePercentageOfValueAtDate(netAmount, accountBalance, allTrades, startOfDay(dayDate)).toFixed(1)
-    : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0';
+  // Calculate percentage relative to total account value (start-of-month balance)
+  // This gives meaningful percentages when trades span only the current month
+  const baseValue = totalAccountValue ?? accountBalance;
+  const percentage = baseValue > 0
+    ? ((netAmount / baseValue) * 100).toFixed(1)
+    : '0';
 
   let status: DayStatus = 'neutral';
   if (dayTrades.length > 0) {
@@ -327,7 +330,7 @@ export const calculateDayStats = (
 
   // Calculate effective max daily drawdown based on dynamic risk settings
   let effectiveMaxDailyDrawdown = maxDailyDrawdown;
- 
+
   if (dynamicRiskSettings && allTrades) {
     effectiveMaxDailyDrawdown = calculateEffectiveMaxDailyDrawdown(
       maxDailyDrawdown,
@@ -336,9 +339,9 @@ export const calculateDayStats = (
     );
   }
 
-  // Check for drawdown violation - if the loss percentage exceeds effectiveMaxDailyDrawdown
-  const percentageValue = parseFloat(percentage);
-  const isDrawdownViolation = status === 'loss' && Math.abs(percentageValue) > effectiveMaxDailyDrawdown;
+  // Check for drawdown violation using dollar amounts against total account value
+  const ddLimitAmount = (effectiveMaxDailyDrawdown / 100) * baseValue;
+  const isDrawdownViolation = status === 'loss' && Math.abs(netAmount) > ddLimitAmount;
 
   return { netAmount, status, percentage, isDrawdownViolation };
 };

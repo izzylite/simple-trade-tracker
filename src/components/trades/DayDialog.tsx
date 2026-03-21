@@ -62,6 +62,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
   const [dayTotalPnL, setDayTotalPnL] = useState<number>(0);
   const [cumulativePnL, setCumulativePnL] = useState<number>(0);
   const [eventsDrawerOpen, setEventsDrawerOpen] = useState(false);
+  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
 
   // Use stable primitives for useEffect dependencies to prevent infinite re-renders
   const dateTime = date.getTime();
@@ -69,24 +70,30 @@ const DayDialog: React.FC<DayDialogProps> = ({
 
   // Fetch cumulative P&L when dialog opens or date changes
   useEffect(() => {
+    let cancelled = false;
     const fetchCumulativePnL = async () => {
       if (!open || !calendar) return;
+      setIsBalanceLoading(true);
 
       try {
         const targetDate = startOfNextDay(date);
         const pnl = await calculateCumulativePnLToDateAsync(targetDate, calendar);
-        setCumulativePnL(pnl);
+        if (!cancelled) setCumulativePnL(pnl);
       } catch (error) {
         logger.error('Error fetching cumulative P&L:', error);
-        setCumulativePnL(0);
+        if (!cancelled) setCumulativePnL(0);
+      } finally {
+        if (!cancelled) setIsBalanceLoading(false);
       }
     };
 
     fetchCumulativePnL();
+    return () => { cancelled = true; };
   }, [open, dateTime, calendarIdForEffect]);
 
   // Fetch day's total P&L when dialog opens or date changes
   useEffect(() => {
+    let cancelled = false;
     const fetchDayTotalPnL = async () => {
       if (!open || !calendarId) return;
 
@@ -94,14 +101,15 @@ const DayDialog: React.FC<DayDialogProps> = ({
         const tradeRepo = new TradeRepository();
         const dayTrades = await tradeRepo.getTradesByDay(calendarId, date, ['amount']);
         const total = dayTrades.reduce((sum, trade) => sum + trade.amount, 0);
-        setDayTotalPnL(total);
+        if (!cancelled) setDayTotalPnL(total);
       } catch (error) {
         logger.error('Error fetching day total P&L:', error);
-        setDayTotalPnL(0);
+        if (!cancelled) setDayTotalPnL(0);
       }
     };
 
     fetchDayTotalPnL();
+    return () => { cancelled = true; };
   }, [open, dateTime, calendarId]);
   
  
@@ -220,6 +228,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
             total_pnl={dayTotalPnL}
             onPrevDay={handlePrevDay}
             onNextDay={handleNextDay}
+            loading={isBalanceLoading}
           />
 
           {calendarId && calendar && (

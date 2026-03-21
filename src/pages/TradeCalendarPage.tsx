@@ -101,9 +101,10 @@ import NoteEditorDialog from '../components/notes/NoteEditorDialog';
 import { StackedNotesWidget } from '../components/reminderNotes';
 import NotesBottomSheet from '../components/reminderNotes/NotesBottomSheet';
 import * as notesService from '../services/notesService';
+import * as calendarService from '../services/calendarService';
 import { Note, DayAbbreviation } from '../types/note';
 
-import { calculatePercentageOfValueAtDate, DynamicRiskSettings } from '../utils/dynamicRiskUtils';
+import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import AnimatedBackground from '../components/common/AnimatedBackground';
 import { Z_INDEX } from '../styles/zIndex';
 
@@ -1014,6 +1015,41 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   }, [filteredTrades, selectedTags, totalPnL]);
 
 
+  // Fetch cumulative PnL before the viewed month for accurate start-of-month value
+  // Always uses unfiltered data (tag filtering is a view concern, not an account value concern)
+  const [pnlBeforeMonth, setPnlBeforeMonth] = useState<number>(0);
+  const [isPnlLoading, setIsPnlLoading] = useState(false);
+  useEffect(() => {
+    if (!calendarId) return;
+    let cancelled = false;
+    const monthStart = startOfMonth(currentDate);
+    const now = new Date();
+    const isCurrentRealMonth = currentDate.getFullYear() === now.getFullYear()
+      && currentDate.getMonth() === now.getMonth();
+
+    if (isCurrentRealMonth && totalPnL !== undefined) {
+      // For current month, derive from calendar.total_pnl (unfiltered all-time)
+      const monthPnL = trades
+        .filter(t => new Date(t.trade_date) >= monthStart)
+        .reduce((sum, t) => sum + t.amount, 0);
+      setPnlBeforeMonth(totalPnL - monthPnL);
+      setIsPnlLoading(false);
+    } else {
+      // For past months, query DB (always unfiltered)
+      setIsPnlLoading(true);
+      calendarService.getCumulativePnlBeforeDate(calendarId, monthStart)
+        .then(val => {
+          if (!cancelled) { setPnlBeforeMonth(val); setIsPnlLoading(false); }
+        })
+        .catch(() => {
+          if (!cancelled) { setPnlBeforeMonth(0); setIsPnlLoading(false); }
+        });
+    }
+    return () => { cancelled = true; };
+  }, [calendarId, currentDate, totalPnL, trades]);
+
+  const totalAccountValue = accountBalance + pnlBeforeMonth;
+
   // Pre-calculate day statistics for all visible days in the calendar grid
   // Includes overflow days from adjacent months to show complete statistics
   const dayStatsMap = useMemo(() => {
@@ -1035,14 +1071,15 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         maxDailyDrawdown || 0,
         dynamicRiskSettings,
         filteredTrades,
-        day
+        day,
+        totalAccountValue
       );
 
       map.set(dayKey, dayStats);
     });
 
     return map;
-  }, [currentDate, tradesByDay, accountBalance, maxDailyDrawdown, dynamicRiskSettings, filteredTrades]);
+  }, [currentDate, tradesByDay, accountBalance, maxDailyDrawdown, dynamicRiskSettings, filteredTrades, totalAccountValue]);
 
   // Pre-calculate weekly statistics for all visible weeks in the calendar grid
   // Includes weeks with overflow days from adjacent months
@@ -1071,14 +1108,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       // Calculate net amount for the week
       const netAmount = weekTrades.reduce((sum, trade) => sum + trade.amount, 0);
 
-      // Calculate percentage - use the centralized function
-      const percentage = filteredTrades
-        ? calculatePercentageOfValueAtDate(netAmount, accountBalance, filteredTrades, weekStart).toFixed(1)
-        : accountBalance > 0 ? ((netAmount / accountBalance) * 100).toFixed(1) : '0';
+      // Calculate percentage relative to total account value
+      const percentage = totalAccountValue > 0
+        ? ((netAmount / totalAccountValue) * 100).toFixed(1)
+        : '0';
 
-      // Calculate target progress
+      // Calculate target progress using total account value as baseline
       const targetProgressValue = weeklyTarget && weeklyTarget > 0
-        ? calculateTargetProgress(weekTrades, accountBalance, weeklyTarget, weekStart, filteredTrades)
+        ? calculateTargetProgress(weekTrades, totalAccountValue, weeklyTarget)
         : 0;
 
       map.set(weekKey, {
@@ -1090,7 +1127,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     });
 
     return map;
-  }, [currentDate, filteredTrades, accountBalance, weeklyTarget]);
+  }, [currentDate, filteredTrades, totalAccountValue, weeklyTarget]);
 
   // Load week note keys for visual indicators
   useEffect(() => {
@@ -1508,6 +1545,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 onEditTrade={handleEditTrade}
                 economicFilter={(_calendarId) => calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS}
                 maxDailyDrawdown={maxDailyDrawdown}
+                pnlBeforeMonth={pnlBeforeMonth}
+                isPnlLoading={isPnlLoading}
               />
 
             </Box>
@@ -1882,7 +1921,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                         percentage: '0',
                         targetProgressValue: 0
                       }}
-                      accountBalance={accountBalance + totalProfit}
+                      accountBalance={totalAccountValue}
                       onWeekClick={handleWeekClick}
                       hasNote={weekNoteKeys.has(format(weekStart, 'yyyy-MM-dd'))}
                     />

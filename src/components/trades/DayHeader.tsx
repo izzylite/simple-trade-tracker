@@ -3,6 +3,7 @@ import {
   Box,
   Typography,
   IconButton,
+  Skeleton,
   useTheme
 } from '@mui/material';
 import { ChevronLeft, ChevronRight } from '@mui/icons-material';
@@ -12,10 +13,11 @@ import { alpha } from '@mui/material/styles';
 interface DayHeaderProps {
   formInputVisible: boolean;
   account_balance: number;
-  title:string,
+  title: string;
   total_pnl: number;
   onPrevDay: () => void;
   onNextDay: () => void;
+  loading?: boolean;
 }
 
 const DayHeader: React.FC<DayHeaderProps> = ({
@@ -24,7 +26,8 @@ const DayHeader: React.FC<DayHeaderProps> = ({
   total_pnl,
   title,
   onPrevDay,
-  onNextDay
+  onNextDay,
+  loading = false
 }) => {
   const theme = useTheme();
   
@@ -68,17 +71,21 @@ const DayHeader: React.FC<DayHeaderProps> = ({
           <Typography variant="body2" color="text.secondary">
             Day P&L
           </Typography>
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: 600,
-              color: total_pnl >= 0
-                ? theme.palette.success.main
-                : theme.palette.error.main
-            }}
-          >
-            {total_pnl >= 0 ? '+' : ''}{total_pnl.toLocaleString()}
-          </Typography>
+          {loading ? (
+            <Skeleton variant="text" width={100} sx={{ fontSize: '1.25rem' }} />
+          ) : (
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 600,
+                color: total_pnl >= 0
+                  ? theme.palette.success.main
+                  : theme.palette.error.main
+              }}
+            >
+              {total_pnl >= 0 ? '+' : ''}{total_pnl.toLocaleString()}
+            </Typography>
+          )}
         </Box>
 
         <Box
@@ -94,9 +101,13 @@ const DayHeader: React.FC<DayHeaderProps> = ({
           <Typography variant="body2" color="text.secondary">
             Balance Of The Day
           </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            ${account_balance.toLocaleString()}
-          </Typography>
+          {loading ? (
+            <Skeleton variant="text" width={120} sx={{ fontSize: '1.25rem' }} />
+          ) : (
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              ${account_balance.toLocaleString()}
+            </Typography>
+          )}
         </Box>
       </Box>
     </Box>

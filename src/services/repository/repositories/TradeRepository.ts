@@ -1387,4 +1387,25 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
       throw error;
     }
   }
+
+  /**
+   * Get cumulative PnL for all trades before a given date
+   */
+  async getCumulativePnlBeforeDate(
+    calendarId: string,
+    beforeDate: Date
+  ): Promise<number> {
+    const { data, error } = await supabase
+      .from('trades')
+      .select('amount')
+      .eq('calendar_id', calendarId)
+      .lt('trade_date', beforeDate.toISOString());
+
+    if (error) {
+      logger.error('Error fetching cumulative PnL:', error);
+      return 0;
+    }
+
+    return (data || []).reduce((sum, t) => sum + Number(t.amount), 0);
+  }
 }
