@@ -1768,6 +1768,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 const isDayHeader = index < 7;
                 const isClickable = isDayHeader && !isReadOnly;
                 const hasGamePlan = isDayHeader && gamePlanNotes.has(day);
+                const isToday = isDayHeader
+                  && new Date().getDay() === index;
                 return (
                   <Tooltip
                     key={day}
@@ -1794,8 +1796,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                         p: { xs: 1, md: 1.5 },
                         fontWeight: 600,
                         fontSize: { xs: '0.875rem', md: '1rem' },
-                        color: 'text.secondary',
+                        color: isToday ? 'primary.main' : 'text.secondary',
                         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        ...(isToday && {
+                          border: 2,
+                          borderColor: 'primary.main',
+                        }),
                         ...(isClickable && {
                           '&:hover': {
                             color: 'primary.main',

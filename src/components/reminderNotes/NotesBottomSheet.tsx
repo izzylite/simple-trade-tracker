@@ -139,8 +139,9 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
   }, [notes.length]);
 
   const handleEditNote = useCallback(() => {
+    onClose();
     setEditorOpen(true);
-  }, []);
+  }, [onClose]);
 
   const handleEditorClose = useCallback(() => {
     setEditorOpen(false);
