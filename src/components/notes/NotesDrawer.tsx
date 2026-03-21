@@ -52,6 +52,7 @@ interface NotesDrawerProps {
   showCalendarPicker?: boolean; // Show calendar selection for new notes (HomePage)
   onNoteClick?: (note: Note) => void;
   isReadOnly?: boolean; // Hide edit actions for shared calendars
+  availableTradeTags?: string[]; // Trade tags for inline insertion in notes
 }
 
 type TabValue = 'all' | 'pinned' | 'archived';
@@ -109,7 +110,8 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
   calendarId,
   showCalendarPicker = false,
   onNoteClick,
-  isReadOnly = false
+  isReadOnly = false,
+  availableTradeTags = [],
 }) => {
   const theme = useTheme();
   const { user } = useAuthState();
@@ -518,6 +520,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
             isCreated ? addNote(note) : updateNote(note.id, note)
           }
           onDelete={(noteId: string) => removeNote(noteId)}
+          availableTradeTags={availableTradeTags}
         />
       )}
 

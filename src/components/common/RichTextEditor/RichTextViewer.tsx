@@ -54,7 +54,7 @@ const RichTextViewer: React.FC<RichTextViewerProps> = ({
         minHeight,
         '& .DraftEditor-root': {
           fontSize: '1rem',
-          lineHeight: 1.7,
+          lineHeight: 2.1,
           color: theme.palette.text.primary,
         },
         '& .public-DraftEditorPlaceholder-root': {

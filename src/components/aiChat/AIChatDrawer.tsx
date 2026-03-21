@@ -791,6 +791,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           }}
           note={selectedNote}
           calendarId={calendar.id}
+          availableTradeTags={calendar.tags || []}
           onSave={(updatedNote) => {
             // Update the note in embedded notes across all messages
             setMessages(prevMessages =>

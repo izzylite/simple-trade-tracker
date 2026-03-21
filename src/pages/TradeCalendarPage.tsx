@@ -2164,6 +2164,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         onClose={() => setIsNotesDrawerOpen(false)}
         calendarId={calendarId}
         isReadOnly={isReadOnly}
+        availableTradeTags={allTags}
       />
 
       {/* Week Note Editor */}
@@ -2174,6 +2175,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           note={weekNoteDialog.note ?? undefined}
           calendarId={calendarId!}
           weekKey={weekNoteDialog.weekKey}
+          availableTradeTags={allTags}
           onSave={(savedNote, isCreated) => {
             if (isCreated && savedNote.week_key) {
               setWeekNoteKeys(prev => {

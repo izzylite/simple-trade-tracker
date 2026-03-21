@@ -52,6 +52,7 @@ interface NotesBottomSheetProps {
   fullDayName: string;
   onNoteSaved?: (note: Note, isCreated?: boolean) => void;
   onNoteDeleted?: (noteId: string) => void;
+  availableTradeTags?: string[];
 }
 
 // Color mapping
@@ -86,6 +87,7 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
   fullDayName,
   onNoteSaved,
   onNoteDeleted,
+  availableTradeTags = [],
 }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -383,6 +385,7 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
         calendarId={calendarId}
         onSave={handleNoteSaved}
         onDelete={handleNoteDeleted}
+        availableTradeTags={availableTradeTags}
       />
     </>
   );

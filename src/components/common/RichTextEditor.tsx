@@ -1,4 +1,7 @@
-import React, { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
+import React, {
+  useState, useRef, useEffect, useMemo,
+  forwardRef, useImperativeHandle, useCallback
+} from 'react';
 import {
   Box,
   Typography,
@@ -8,7 +11,7 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  TextField
+  TextField,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
@@ -26,6 +29,11 @@ import {
   createLinkEntity,
   removeLinkEntity
 } from './RichTextEditor/utils/linkUtils';
+import {
+  insertTagEntity,
+  getAtMentionTrigger,
+  replaceAtMentionWithTag
+} from './RichTextEditor/utils/tagEntityUtils';
 import {
   toggleInlineStyle,
   toggleBlockType,
@@ -67,6 +75,10 @@ export interface RichTextEditorProps {
   calendarId?: string;
   trades?: Array<{ id: string; [key: string]: any }>;
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
+  // Available trade tags for @ mention insertion
+  availableTradeTags?: string[];
+  // Callback when mention state changes (for parent to re-render)
+  onMentionStateChange?: (active: boolean) => void;
 }
 
 // Ref handle for external toolbar control
@@ -82,6 +94,12 @@ export interface RichTextEditorHandle {
   handleLinkClick: () => void;
   handleImageClick: () => void;
   setIsMenuOpen: (isOpen: boolean) => void;
+  insertTag: (tagName: string) => void;
+  // @ mention state for external rendering
+  mentionActive: boolean;
+  mentionFilteredTags: string[];
+  mentionSelectedIndex: number;
+  handleMentionSelect: (tag: string) => void;
 }
 
 
@@ -104,7 +122,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   stickyPosition = 'top',
   calendarId,
   trades,
-  onOpenGalleryMode
+  onOpenGalleryMode,
+  availableTradeTags = [],
+  onMentionStateChange,
 }, ref) => {
   const theme = useTheme();
   const Z_INDEX = 2000;
@@ -128,6 +148,14 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
+
+  // @ mention tag dropdown state
+  const [mentionActive, setMentionActive] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState('');
+  const [mentionTriggerOffset, setMentionTriggerOffset] = useState(0);
+  const [mentionBlockKey, setMentionBlockKey] = useState('');
+  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
+  const mentionAnchorRef = useRef<HTMLSpanElement | null>(null);
 
   // Update editor state when value prop changes (for controlled component behavior)
   useEffect(() => {
@@ -190,6 +218,33 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
 
 
 
+  // Filtered tags for @ mention dropdown
+  const mentionFilteredTags = useMemo(() => {
+    if (!mentionActive || availableTradeTags.length === 0) return [];
+    const q = mentionSearch.toLowerCase();
+    return availableTradeTags.filter((t) => t.toLowerCase().includes(q));
+  }, [mentionActive, mentionSearch, availableTradeTags]);
+
+  // Handle @ mention tag selection
+  const handleMentionSelect = useCallback((tag: string) => {
+    const newState = replaceAtMentionWithTag(
+      editorState, tag, mentionTriggerOffset, mentionBlockKey
+    );
+    setMentionActive(false);
+    setMentionSearch('');
+    setMentionSelectedIndex(0);
+    setEditorState(newState);
+    onMentionStateChange?.(false);
+
+    // Fire onChange
+    if (onChange) {
+      const newRaw = convertToRaw(newState.getCurrentContent());
+      onChange(JSON.stringify(newRaw));
+    }
+
+    setTimeout(() => editorRef.current?.focus(), 50);
+  }, [editorState, mentionTriggerOffset, mentionBlockKey, onChange]);
+
   // Handle editor state changes
   const handleEditorChange = (state: EditorState) => {
     const prevContentState = editorState.getCurrentContent();
@@ -197,15 +252,31 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
 
     // Check character limit if maxLength is specified
     if (maxLength && newContentState.getPlainText().length > maxLength) {
-      // If the new content exceeds the limit, don't update the state
       return;
     }
 
     setEditorState(state);
 
+    // Check for @ mention trigger
+    if (availableTradeTags.length > 0) {
+      const trigger = getAtMentionTrigger(state);
+      if (trigger) {
+        setMentionActive(true);
+        setMentionSearch(trigger.searchText);
+        setMentionTriggerOffset(trigger.triggerOffset);
+        setMentionBlockKey(trigger.blockKey);
+        setMentionSelectedIndex(0);
+        onMentionStateChange?.(true);
+      } else {
+        if (mentionActive) {
+          setMentionActive(false);
+          setMentionSearch('');
+          onMentionStateChange?.(false);
+        }
+      }
+    }
+
     if (onChange) {
-      // Only save if content has actually changed (prevents unnecessary updates)
-      // Compare the raw content to detect actual changes
       const prevRaw = convertToRaw(prevContentState);
       const newRaw = convertToRaw(newContentState);
 
@@ -308,6 +379,58 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     // }, 0);
   };
 
+  // Tag entity handler
+  const handleInsertTag = (tagName: string) => {
+    const newState = insertTagEntity(editorState, tagName);
+    handleEditorChange(newState);
+    setTimeout(() => editorRef.current?.focus(), 100);
+  };
+
+  // Mention keyboard handlers
+  const handleReturn = useCallback(
+    (e: React.KeyboardEvent): 'handled' | 'not-handled' => {
+      if (mentionActive && mentionFilteredTags.length > 0) {
+        e.preventDefault();
+        handleMentionSelect(mentionFilteredTags[mentionSelectedIndex]);
+        return 'handled';
+      }
+      return 'not-handled';
+    },
+    [mentionActive, mentionFilteredTags, mentionSelectedIndex, handleMentionSelect]
+  );
+
+  const handleMentionKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!mentionActive || mentionFilteredTags.length === 0) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionSelectedIndex((prev) => {
+          const next = (prev + 1) % mentionFilteredTags.length;
+          // Defer callback so parent reads the updated index
+          requestAnimationFrame(() => onMentionStateChange?.(true));
+          return next;
+        });
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionSelectedIndex((prev) => {
+          const next = (prev - 1 + mentionFilteredTags.length) %
+            mentionFilteredTags.length;
+          requestAnimationFrame(() => onMentionStateChange?.(true));
+          return next;
+        });
+      } else if (e.key === 'Escape') {
+        setMentionActive(false);
+        setMentionSearch('');
+        onMentionStateChange?.(false);
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        handleMentionSelect(mentionFilteredTags[mentionSelectedIndex]);
+      }
+    },
+    [mentionActive, mentionFilteredTags, mentionSelectedIndex,
+     handleMentionSelect, onMentionStateChange]
+  );
+
   // Image handlers
   const handleImageClick = () => {
     setImageDialogOpen(true);
@@ -326,8 +449,15 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     handleLinkClick,
     handleImageClick,
     setIsMenuOpen,
+    insertTag: handleInsertTag,
+    mentionActive,
+    mentionFilteredTags,
+    mentionSelectedIndex,
+    handleMentionSelect,
   }), [editorState, handleToggleInlineStyle, handleToggleBlockType, handleApplyTextColor,
-      handleApplyBackgroundColor, handleApplyHeading, handleClearFormatting, handleLinkClick, handleImageClick]);
+      handleApplyBackgroundColor, handleApplyHeading, handleClearFormatting, handleLinkClick,
+      handleImageClick, handleInsertTag, mentionActive, mentionFilteredTags,
+      mentionSelectedIndex, handleMentionSelect]);
 
   const handleImageInsert = (src: string, alt?: string) => {
     const newState = insertImage(editorState, src, alt);
@@ -441,7 +571,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
               minHeight: typeof minHeight === 'number' ? `calc(${minHeight}px - ${theme.spacing(3)})` : `calc(${minHeight} - ${theme.spacing(3)})`,
               fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
               fontSize: '0.9rem', // Reduced text size
-              lineHeight: 1.9,
+              lineHeight: 2.1,
               fontWeight: 500,
               color: theme.palette.text.primary,
               position: 'relative',
@@ -521,7 +651,17 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             blockStyleFn={blockStyleFn}
             blockRendererFn={blockRendererFn}
             handleKeyCommand={handleKeyCommandWrapper}
-            keyBindingFn={keyBindingFn}
+            handleReturn={handleReturn}
+            keyBindingFn={(e: any) => {
+              if (mentionActive && mentionFilteredTags.length > 0) {
+                if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight',
+                     'Escape', 'Tab'].includes(e.key)) {
+                  handleMentionKeyDown(e);
+                  return null;
+                }
+              }
+              return keyBindingFn(e);
+            }}
             readOnly={disabled}
             spellCheck={true}
           />

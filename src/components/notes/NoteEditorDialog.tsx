@@ -61,7 +61,6 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   LocalOffer as TagIcon,
-  Label as LabelIcon,
   Add as AddIcon,
   Public as GlobalIcon,
   Lock as PrivateIcon,
@@ -80,6 +79,7 @@ import * as notesService from '../../services/notesService';
 import { Note, ReminderType, DayAbbreviation } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
+import { getTagColor, isGroupedTag, getTagName } from '../../utils/tagColors';
 
 // Default tags with display labels and internal values (for AI compatibility)
 export interface TagInfo {
@@ -115,6 +115,7 @@ interface NoteEditorDialogProps {
   onSave?: (note: Note, isCreated?: boolean) => void;
   onDelete?: (noteId: string) => void;
   weekKey?: string; // If set, this is a week note
+  availableTradeTags?: string[]; // Trade tags from calendar for inline insertion
 }
 
 const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
@@ -125,6 +126,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   onSave,
   onDelete,
   weekKey,
+  availableTradeTags = [],
 }) => {
   const theme = useTheme();
   const { user } = useAuthState();
@@ -173,6 +175,10 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
 
   // Global note state (null calendar_id = visible in all calendars)
   const [isGlobal, setIsGlobal] = useState(false);
+
+  // Track mention state for rendering the tag bar (counter forces re-render)
+  const [mentionVersion, setMentionVersion] = useState(0);
+
 
   // Default tags list
   const allDays: DayAbbreviation[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -484,6 +490,8 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         PaperProps={{
           sx: {
             height: fullScreen ? '100%' : '90vh',
+            width: fullScreen ? '100%' : 700,
+            maxWidth: fullScreen ? '100%' : 700,
             m: fullScreen ? 0 : 2,
           },
         }}
@@ -525,6 +533,67 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               editorRef.current?.setIsMenuOpen(isOpen);
             }}
           />
+        )}
+
+        {/* @ Mention Tag Bar — sticky below toolbar, horizontal scroll */}
+        {editorMounted && editorRef.current?.mentionActive &&
+          (editorRef.current.mentionFilteredTags?.length ?? 0) > 0 && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              px: 1.5,
+              py: 0.5,
+              height: 36,
+              minHeight: 36,
+              maxHeight: 36,
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              flexShrink: 0,
+              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.15)}`,
+              bgcolor: alpha(theme.palette.background.paper, 0.6),
+              whiteSpace: 'nowrap',
+              '&::-webkit-scrollbar': { height: 0, display: 'none' },
+              scrollbarWidth: 'none',
+            }}
+          >
+            {editorRef.current.mentionFilteredTags.map((tag, idx) => {
+              const tagColor = getTagColor(tag);
+              const isSelected = idx === editorRef.current!.mentionSelectedIndex;
+              return (
+                <Chip
+                  key={tag}
+                  ref={isSelected ? (el: HTMLDivElement | null) => {
+                    el?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                  } : undefined}
+                  label={isGroupedTag(tag) ? getTagName(tag) : tag}
+                  size="small"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    editorRef.current?.handleMentionSelect(tag);
+                  }}
+                  sx={{
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    bgcolor: isSelected
+                      ? alpha(tagColor, 0.3)
+                      : alpha(tagColor, 0.12),
+                    color: tagColor,
+                    fontWeight: 600,
+                    fontSize: '0.73rem',
+                    border: isSelected
+                      ? `1.5px solid ${alpha(tagColor, 0.6)}`
+                      : `1px solid ${alpha(tagColor, 0.2)}`,
+                    transition: 'all 0.15s ease',
+                    '&:hover': {
+                      bgcolor: alpha(tagColor, 0.25),
+                    },
+                  }}
+                />
+              );
+            })}
+          </Box>
         )}
 
         <DialogContent
@@ -623,14 +692,19 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                 fontWeight={600}
                 sx={{ color: isReminderActive ? 'info.main' : 'text.secondary' }}
               >
-                Reminder
+                Settings
               </Typography>
               {isReminderActive && reminderType !== 'none' && (
                 <Typography variant="caption" color="text.secondary">
-                  {reminderType === 'weekly'
+                  Reminder: {reminderType === 'weekly'
                     ? `${reminderDays.length} day${reminderDays.length !== 1 ? 's' : ''}`
                     : 'One-time'
                   }
+                </Typography>
+              )}
+              {tags.length > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  {tags.length} tag{tags.length !== 1 ? 's' : ''}
                 </Typography>
               )}
               <IconButton size="small" sx={{ color: 'text.secondary', ml: -0.5 }}>
@@ -900,133 +974,85 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                   )}
                 </Box>
               )}
-            </Box>
-          </Collapse>
-
-          {/* Visibility Sub-Header (Global/Private toggle) - hidden for week notes */}
-          {!weekKey && (
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              px: 3,
-              py: 1,
-              bgcolor: alpha(theme.palette.primary.main, 0.04),
-              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-            }}
-          >
-            {/* Left side - Visibility label */}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-              }}
-            >
-              {isGlobal ? (
-                <GlobalIcon sx={{ color: 'primary.main', fontSize: '1.1rem' }} />
-              ) : (
-                <PrivateIcon sx={{ color: 'text.secondary', fontSize: '1.1rem' }} />
+              {/* Visibility toggle - hidden for week notes */}
+              {!weekKey && (
+                <>
+                  <Divider sx={{ my: 2 }} />
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {isGlobal ? (
+                        <GlobalIcon sx={{ color: 'primary.main', fontSize: '1.1rem' }} />
+                      ) : (
+                        <PrivateIcon sx={{ color: 'text.secondary', fontSize: '1.1rem' }} />
+                      )}
+                      <Typography
+                        variant="subtitle2"
+                        fontWeight={600}
+                        sx={{ color: isGlobal ? 'primary.main' : 'text.secondary' }}
+                      >
+                        {isGlobal ? 'Global Note' : 'Calendar Note'}
+                      </Typography>
+                    </Box>
+                    <Tooltip
+                      title={isGlobal
+                        ? 'This note is visible in all calendars'
+                        : 'This note is only visible in the current calendar'
+                      }
+                      placement="left"
+                    >
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={isGlobal}
+                            onChange={(e) => setIsGlobal(e.target.checked)}
+                            size="small"
+                            color="primary"
+                          />
+                        }
+                        label={
+                          <Typography variant="caption" color="text.secondary">
+                            {isGlobal ? 'All calendars' : 'This calendar only'}
+                          </Typography>
+                        }
+                        labelPlacement="start"
+                        sx={{ mr: 0 }}
+                      />
+                    </Tooltip>
+                  </Box>
+                </>
               )}
-              <Typography
-                variant="subtitle2"
-                fontWeight={600}
-                sx={{ color: isGlobal ? 'primary.main' : 'text.secondary' }}
-              >
-                {isGlobal ? 'Global Note' : 'Calendar Note'}
-              </Typography>
-            </Box>
 
-            {/* Right side - Toggle switch */}
-            <Tooltip
-              title={isGlobal
-                ? 'This note is visible in all calendars'
-                : 'This note is only visible in the current calendar'
-              }
-              placement="left"
-            >
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={isGlobal}
-                    onChange={(e) => setIsGlobal(e.target.checked)}
-                    size="small"
-                    color="primary"
-                  />
-                }
-                label={
+              {/* Tags */}
+              <Divider sx={{ my: 2 }} />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <TagIcon sx={{ color: tags.length > 0 ? 'secondary.main' : 'text.secondary', fontSize: '1.1rem' }} />
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={600}
+                  sx={{ color: tags.length > 0 ? 'secondary.main' : 'text.secondary' }}
+                >
+                  Tags
+                </Typography>
+                {tags.length > 0 && (
                   <Typography variant="caption" color="text.secondary">
-                    {isGlobal ? 'All calendars' : 'This calendar only'}
+                    ({tags.length})
                   </Typography>
-                }
-                labelPlacement="start"
-                sx={{ mr: 0 }}
-              />
-            </Tooltip>
-          </Box>
-          )}
+                )}
+                {note?.by_assistant && (
+                  <Typography variant="caption" color="text.disabled">
+                    (read-only)
+                  </Typography>
+                )}
+              </Box>
 
-          {/* Tags Sub-Header */}
-          <Box
-            onClick={() => setIsTagsExpanded(!isTagsExpanded)}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              px: 3,
-              py: 1,
-              bgcolor: alpha(theme.palette.secondary.main, 0.04),
-              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-              cursor: 'pointer',
-              '&:hover': {
-                opacity: 0.8,
-              },
-            }}
-          >
-            {/* Left side - Tags label */}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-              }}
-            >
-              <TagIcon sx={{ color: tags.length > 0 ? 'secondary.main' : 'text.secondary', fontSize: '1.1rem' }} />
-              <Typography
-                variant="subtitle2"
-                fontWeight={600}
-                sx={{ color: tags.length > 0 ? 'secondary.main' : 'text.secondary' }}
-              >
-                Tags
-              </Typography>
-              {/* AI note indicator */}
-              {note?.by_assistant && (
-                <Typography variant="caption" color="text.disabled">
-                  (read-only)
-                </Typography>
-              )}
-            </Box>
-
-            {/* Right side - Tag count and expand icon */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               {tags.length > 0 && (
-                <Typography variant="caption" color="text.secondary">
-                  {tags.length} tag{tags.length !== 1 ? 's' : ''}
-                </Typography>
-              )}
-              <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                {isTagsExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-              </IconButton>
-            </Box>
-          </Box>
-
-          {/* Collapsible Tags Content */}
-          <Collapse in={isTagsExpanded}>
-            <Box sx={{ px: 3, py: 2, bgcolor: alpha(theme.palette.secondary.main, 0.02) }}>
-              {/* Existing tags */}
-              {tags.length > 0 && (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
                   {tags.map((tag) => (
                     <Chip
                       key={tag}
@@ -1043,67 +1069,62 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                 </Box>
               )}
 
-              {/* Add new tag input - only for user-created notes */}
               {isTagEditingAllowed ? (
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                  <Autocomplete
-                    size="small"
-                    options={defaultTags.filter(t => {
-                      if (tags.includes(t)) return false;
-                      if (t === 'GUIDELINE' && hasExistingGuideline) return false;
-                      return true;
-                    })}
-                    getOptionLabel={(option) => getTagDisplayLabel(option)}
-                    value={null}
-                    inputValue={newTagInput}
-                    onInputChange={(_, value, reason) => {
-                      if (reason !== 'reset') {
-                        setNewTagInput(value);
-                      }
-                    }}
-                    onChange={(_, value) => {
-                      if (value && typeof value === 'string') {
-                        handleAddTag(value);
-                      }
-                      setNewTagInput('');
-                    }}
-                    renderOption={(props, option) => (
-                      <li {...props} style={{ display: 'block' }}>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {getTagDisplayLabel(option)}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {getTagSubtitle(option)}
-                          </Typography>
-                        </Box>
-                      </li>
-                    )}
-                    sx={{ flex: 1 }}
-                    ListboxProps={{
-                      sx: {
-                        ...scrollbarStyles(theme),
-                        maxHeight: 250, // Increase max height slightly for better visibility with subtitles
-                      }
-                    }}
-                    slotProps={{
-                      popper: {
-                        sx: { zIndex: (theme) => theme.zIndex.modal + 200 },
-                      },
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        placeholder="Add a tag..."
-                        InputProps={{
-                          ...params.InputProps,
-                          sx: { borderRadius: 2 },
-                        }}
-                      />
-                    )}
-                  />
-
-                </Box>
+                <Autocomplete
+                  size="small"
+                  options={defaultTags.filter(t => {
+                    if (tags.includes(t)) return false;
+                    if (t === 'GUIDELINE' && hasExistingGuideline) return false;
+                    return true;
+                  })}
+                  getOptionLabel={(option) => getTagDisplayLabel(option)}
+                  value={null}
+                  inputValue={newTagInput}
+                  onInputChange={(_, value, reason) => {
+                    if (reason !== 'reset') {
+                      setNewTagInput(value);
+                    }
+                  }}
+                  onChange={(_, value) => {
+                    if (value && typeof value === 'string') {
+                      handleAddTag(value);
+                    }
+                    setNewTagInput('');
+                  }}
+                  renderOption={(props, option) => (
+                    <li {...props} style={{ display: 'block' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {getTagDisplayLabel(option)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {getTagSubtitle(option)}
+                        </Typography>
+                      </Box>
+                    </li>
+                  )}
+                  ListboxProps={{
+                    sx: {
+                      ...scrollbarStyles(theme),
+                      maxHeight: 250,
+                    }
+                  }}
+                  slotProps={{
+                    popper: {
+                      sx: { zIndex: (theme) => theme.zIndex.modal + 200 },
+                    },
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      placeholder="Add a tag..."
+                      InputProps={{
+                        ...params.InputProps,
+                        sx: { borderRadius: 2 },
+                      }}
+                    />
+                  )}
+                />
               ) : (
                 tags.length === 0 && (
                   <Typography variant="body2" color="text.secondary">
@@ -1111,10 +1132,6 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                   </Typography>
                 )
               )}
-
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                Select a tag from the list
-              </Typography>
             </Box>
           </Collapse>
 
@@ -1171,11 +1188,13 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               ref={editorRef}
               value={content}
               onChange={setContent}
-              placeholder="Document your emotions, game plan, lessons learned, or trading insights..."
+              placeholder="Document your emotions, game plan, lessons learned, or trading insights... (type @ to insert a trade tag)"
               minHeight={300}
               maxLength={5000}
               hideCharacterCount={true}
               toolbarVariant="none"
+              availableTradeTags={availableTradeTags}
+              onMentionStateChange={() => setMentionVersion(v => v + 1)}
             />
           </Box>
         </DialogContent>
