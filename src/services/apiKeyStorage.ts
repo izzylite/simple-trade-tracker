@@ -122,7 +122,7 @@ export async function testApiKey(apiKey: string): Promise<{ valid: boolean; erro
   try {
     // Make a minimal request to Gemini API to test the key
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
