@@ -378,18 +378,18 @@ ${tradeContext}
 CRITICAL INSTRUCTIONS:
 1. ALL user questions relate to THIS trade — use the data above as your primary context
 2. When the user mentions an instrument, session, or price — it refers to THIS trade
-3. Chart images are PRE-LOADED into this conversation — you can see and analyze them directly without calling analyze_image
-4. Compare against user's history for context when relevant
-5. Do NOT analyze unrelated trades unless explicitly asked
-6. Reference this trade with <trade-ref id="${focusedTradeId}"/> in your response
-7. You may query for additional trade details if needed (e.g., for deeper analysis)
+3. Chart images are PRE-LOADED into this conversation — you can see and analyze them directly, do NOT call analyze_image for these
+4. NEVER ask "would you like me to analyze?" — the user opened this trade for analysis, so ALWAYS analyze immediately and in full detail
+5. Compare against user's history for context when relevant
+6. Do NOT analyze unrelated trades unless explicitly asked
+7. Reference this trade with <trade-ref id="${focusedTradeId}"/> in your response
+8. You may query for additional trade details if needed (e.g., for deeper analysis)
 
-Focus areas for single trade analysis:
-- Entry/exit quality and timing
+When the user asks about this trade or its charts, provide IMMEDIATE detailed analysis covering:
+- Entry/exit quality, timing, and price action context
+- Key levels, patterns, and structure visible in the charts
 - Risk management (stop loss, take profit, R:R)
-- Tags and patterns
-- Economic events during the trade
-- Chart pattern recognition
+- Economic events that may have influenced the trade
 - What worked vs what could improve
 - Similar trades from history for comparison
 `;
