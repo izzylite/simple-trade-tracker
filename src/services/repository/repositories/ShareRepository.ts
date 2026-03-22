@@ -41,6 +41,19 @@ export interface SharedCalendarData {
 }
 
 /**
+ * Shared note data for public viewing
+ */
+export interface SharedNoteData {
+  title: string;
+  content: string;
+  cover_image: string | null;
+  color: string | null;
+  tags: string[];
+  created_at: Date;
+  shared_at: Date;
+}
+
+/**
  * Generate a unique share ID
  * Matches the pattern from edge function utils
  */
@@ -215,6 +228,80 @@ export class ShareRepository {
   }
 
   /**
+   * Generate a share link for a note
+   */
+  async generateNoteShareLink(
+    noteId: string,
+    userId: string
+  ): Promise<RepositoryResult<ShareLinkResult>> {
+    try {
+      logger.log(`Generating share link for note ${noteId}`);
+
+      // Verify note ownership directly via user_id
+      const { data: note, error: noteError } = await supabase
+        .from('notes')
+        .select('id, user_id, by_assistant')
+        .eq('id', noteId)
+        .single();
+
+      if (noteError || !note) {
+        throw new Error('Note not found');
+      }
+
+      if (note.user_id !== userId) {
+        throw new Error('Unauthorized access to note');
+      }
+
+      if (note.by_assistant) {
+        throw new Error('AI-created notes cannot be shared');
+      }
+
+      const shareId = `note_share_${noteId}`;
+      const shareLink = `${this.BASE_URL}/shared-note/${shareId}`;
+
+      const { error: updateError } = await supabase
+        .from('notes')
+        .update({
+          share_id: shareId,
+          share_link: shareLink,
+          is_shared: true,
+          shared_at: new Date().toISOString(),
+        })
+        .eq('id', noteId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      logger.log(
+        `Generated share link for note ${noteId}: ${shareLink}`
+      );
+
+      return {
+        success: true,
+        data: { shareLink, shareId, directLink: shareLink },
+        timestamp: new Date(),
+      };
+    } catch (error: any) {
+      const supabaseError = handleSupabaseError(
+        error,
+        `Generating share link for note ${noteId}`,
+        'generateNoteShareLink'
+      );
+      logger.error(
+        'Failed to generate note share link:',
+        supabaseError
+      );
+      return {
+        success: false,
+        error: supabaseError,
+        operation: 'generateNoteShareLink',
+        timestamp: new Date(),
+      };
+    }
+  }
+
+  /**
    * Deactivate a share link for a trade
    */
   async deactivateTradeShareLink(
@@ -346,6 +433,72 @@ export class ShareRepository {
   }
 
   /**
+   * Deactivate a share link for a note
+   */
+  async deactivateNoteShareLink(
+    shareId: string,
+    userId: string
+  ): Promise<RepositoryResult<boolean>> {
+    try {
+      logger.log(`Deactivating note share link ${shareId}`);
+
+      const { data: note, error: noteError } = await supabase
+        .from('notes')
+        .select('id, user_id')
+        .eq('share_id', shareId)
+        .single();
+
+      if (noteError || !note) {
+        throw new Error('Shared note not found');
+      }
+
+      if (note.user_id !== userId) {
+        throw new Error(
+          'You do not have permission to modify this shared note'
+        );
+      }
+
+      const { error: updateError } = await supabase
+        .from('notes')
+        .update({
+          share_id: null,
+          share_link: null,
+          is_shared: false,
+          shared_at: null,
+        })
+        .eq('share_id', shareId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      logger.log(`Deactivated note share link ${shareId}`);
+
+      return {
+        success: true,
+        data: true,
+        timestamp: new Date(),
+      };
+    } catch (error: any) {
+      const supabaseError = handleSupabaseError(
+        error,
+        `Deactivating note share link ${shareId}`,
+        'deactivateNoteShareLink'
+      );
+      logger.error(
+        'Failed to deactivate note share link:',
+        supabaseError
+      );
+      return {
+        success: false,
+        error: supabaseError,
+        operation: 'deactivateNoteShareLink',
+        timestamp: new Date(),
+      };
+    }
+  }
+
+  /**
    * Get a shared trade by share ID (for public viewing)
    * This will be used by the public shared trade page
    * Uses edge function to bypass RLS policies for unauthenticated access
@@ -471,6 +624,73 @@ export class ShareRepository {
         error: supabaseError,
         operation: 'getSharedCalendar',
         timestamp: new Date()
+      };
+    }
+  }
+  /**
+   * Get a shared note by share ID (for public viewing)
+   * Uses edge function to bypass RLS policies for
+   * unauthenticated access
+   */
+  async getSharedNote(
+    shareId: string
+  ): Promise<RepositoryResult<SharedNoteData | null>> {
+    try {
+      logger.log(`Fetching shared note ${shareId}`);
+
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/get-shared-note`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shareId }),
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return {
+            success: true,
+            data: null,
+            timestamp: new Date(),
+          };
+        }
+        throw new Error(
+          `Edge function error: ${response.status}`
+        );
+      }
+
+      const result = await response.json();
+      const data = result.data || result;
+
+      return {
+        success: true,
+        data: {
+          title: data.title,
+          content: data.content,
+          cover_image: data.cover_image,
+          color: data.color,
+          tags: data.tags || [],
+          created_at: new Date(data.created_at),
+          shared_at: new Date(data.shared_at),
+        },
+        timestamp: new Date(),
+      };
+    } catch (error: any) {
+      const supabaseError = handleSupabaseError(
+        error,
+        `Fetching shared note ${shareId}`,
+        'getSharedNote'
+      );
+      logger.error(
+        'Failed to get shared note:',
+        supabaseError
+      );
+      return {
+        success: false,
+        error: supabaseError,
+        operation: 'getSharedNote',
+        timestamp: new Date(),
       };
     }
   }
