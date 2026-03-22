@@ -4,6 +4,8 @@ import { LinkComponent } from '../components/LinkComponent';
 import TagChipComponent from '../components/TagChipComponent';
 import { findLinkEntities } from './linkUtils';
 import { findTagEntities } from './tagEntityUtils';
+import NoteLinkComponent from '../components/NoteLinkComponent';
+import { findNoteLinkEntities } from './noteEntityUtils';
 
 /**
  * Create decorator factory for links and tag chips with props
@@ -11,7 +13,8 @@ import { findTagEntities } from './tagEntityUtils';
 export const createDecorator = (
   calendarId?: string,
   trades?: Array<{ id: string; [key: string]: any }>,
-  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void
+  onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void,
+  onNoteLinkClick?: (noteId: string, noteTitle: string) => void
 ) => {
   return new CompositeDecorator([
     {
@@ -28,6 +31,14 @@ export const createDecorator = (
     {
       strategy: findTagEntities,
       component: TagChipComponent,
+    },
+    {
+      strategy: findNoteLinkEntities,
+      component: (props: any) =>
+        React.createElement(NoteLinkComponent, {
+          ...props,
+          onNoteLinkClick,
+        }),
     },
   ]);
 };
