@@ -35,6 +35,10 @@ import {
   replaceAtMentionWithTag
 } from './RichTextEditor/utils/tagEntityUtils';
 import {
+  getNoteTrigger,
+  replaceNoteTriggerWithLink,
+} from './RichTextEditor/utils/noteEntityUtils';
+import {
   toggleInlineStyle,
   toggleBlockType,
   applyTextColor,
@@ -79,6 +83,16 @@ export interface RichTextEditorProps {
   availableTradeTags?: string[];
   // Callback when mention state changes (for parent to re-render)
   onMentionStateChange?: (active: boolean) => void;
+  // Note linking - available notes for /note picker
+  availableNotes?: Array<{
+    id: string;
+    title: string;
+    color?: string;
+    calendar_name?: string;
+  }>;
+  onNoteLinkStateChange?: (active: boolean) => void;
+  onNoteLinkSearch?: (query: string) => void;
+  onNoteLinkClick?: (noteId: string, noteTitle: string) => void;
 }
 
 // Ref handle for external toolbar control
@@ -100,6 +114,18 @@ export interface RichTextEditorHandle {
   mentionFilteredTags: string[];
   mentionSelectedIndex: number;
   handleMentionSelect: (tag: string) => void;
+  noteLinkActive: boolean;
+  noteLinkFilteredNotes: Array<{
+    id: string;
+    title: string;
+    color?: string;
+    calendar_name?: string;
+  }>;
+  noteLinkSelectedIndex: number;
+  handleNoteLinkSelect: (
+    noteId: string,
+    noteTitle: string
+  ) => void;
 }
 
 
@@ -125,6 +151,10 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   onOpenGalleryMode,
   availableTradeTags = [],
   onMentionStateChange,
+  availableNotes,
+  onNoteLinkStateChange,
+  onNoteLinkSearch,
+  onNoteLinkClick,
 }, ref) => {
   const theme = useTheme();
   const Z_INDEX = 2000;
@@ -137,7 +167,12 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   const savedScrollPositionRef = useRef<number>(0);
 
   // Create decorator with props
-  const decorator = useMemo(() => createDecorator(calendarId, trades, onOpenGalleryMode), [calendarId, trades, onOpenGalleryMode]);
+  const decorator = useMemo(
+    () => createDecorator(
+      calendarId, trades, onOpenGalleryMode, onNoteLinkClick
+    ),
+    [calendarId, trades, onOpenGalleryMode, onNoteLinkClick]
+  );
 
   const [editorState, setEditorState] = useState(() => {
     const initialState = createEditorStateFromValue(value);
@@ -156,6 +191,15 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   const [mentionBlockKey, setMentionBlockKey] = useState('');
   const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
   const mentionAnchorRef = useRef<HTMLSpanElement | null>(null);
+
+  // /note link dropdown state
+  const [noteLinkActive, setNoteLinkActive] = useState(false);
+  const [noteLinkSearch, setNoteLinkSearch] = useState('');
+  const [noteLinkTriggerOffset, setNoteLinkTriggerOffset]
+    = useState(0);
+  const [noteLinkBlockKey, setNoteLinkBlockKey] = useState('');
+  const [noteLinkSelectedIndex, setNoteLinkSelectedIndex]
+    = useState(0);
 
   // Update editor state when value prop changes (for controlled component behavior)
   useEffect(() => {
@@ -245,6 +289,39 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     setTimeout(() => editorRef.current?.focus(), 50);
   }, [editorState, mentionTriggerOffset, mentionBlockKey, onChange]);
 
+  // Handle /note link selection
+  const handleNoteLinkSelect = useCallback(
+    (noteId: string, noteTitle: string) => {
+      const newState = replaceNoteTriggerWithLink(
+        editorState,
+        noteId,
+        noteTitle,
+        noteLinkTriggerOffset,
+        noteLinkBlockKey
+      );
+      setNoteLinkActive(false);
+      setNoteLinkSearch('');
+      setNoteLinkSelectedIndex(0);
+      setEditorState(newState);
+      onNoteLinkStateChange?.(false);
+
+      if (onChange) {
+        const newRaw = convertToRaw(
+          newState.getCurrentContent()
+        );
+        onChange(JSON.stringify(newRaw));
+      }
+
+      setTimeout(() => editorRef.current?.focus(), 50);
+    },
+    [
+      editorState,
+      noteLinkTriggerOffset,
+      noteLinkBlockKey,
+      onChange,
+    ]
+  );
+
   // Handle editor state changes
   const handleEditorChange = (state: EditorState) => {
     const prevContentState = editorState.getCurrentContent();
@@ -257,8 +334,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
 
     setEditorState(state);
 
-    // Check for @ mention trigger
-    if (availableTradeTags.length > 0) {
+    // Check for @ mention trigger (mutually exclusive with /note)
+    if (availableTradeTags.length > 0 && !noteLinkActive) {
       const trigger = getAtMentionTrigger(state);
       if (trigger) {
         setMentionActive(true);
@@ -273,6 +350,24 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
           setMentionSearch('');
           onMentionStateChange?.(false);
         }
+      }
+    }
+
+    // Check for /note trigger (mutually exclusive with @)
+    if (!mentionActive && availableNotes) {
+      const noteTrigger = getNoteTrigger(state);
+      if (noteTrigger) {
+        setNoteLinkActive(true);
+        setNoteLinkSearch(noteTrigger.searchText);
+        setNoteLinkTriggerOffset(noteTrigger.triggerOffset);
+        setNoteLinkBlockKey(noteTrigger.blockKey);
+        setNoteLinkSelectedIndex(0);
+        onNoteLinkStateChange?.(true);
+        onNoteLinkSearch?.(noteTrigger.searchText);
+      } else if (noteLinkActive) {
+        setNoteLinkActive(false);
+        setNoteLinkSearch('');
+        onNoteLinkStateChange?.(false);
       }
     }
 
@@ -389,14 +484,38 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   // Mention keyboard handlers
   const handleReturn = useCallback(
     (e: React.KeyboardEvent): 'handled' | 'not-handled' => {
+      if (noteLinkActive) {
+        const filtered = availableNotes?.filter((n) =>
+          n.title.toLowerCase().includes(
+            noteLinkSearch.toLowerCase()
+          )
+        ) || [];
+        if (filtered.length > 0) {
+          e.preventDefault();
+          const selected = filtered[noteLinkSelectedIndex];
+          if (selected) {
+            handleNoteLinkSelect(
+              selected.id, selected.title
+            );
+          }
+          return 'handled';
+        }
+      }
       if (mentionActive && mentionFilteredTags.length > 0) {
         e.preventDefault();
-        handleMentionSelect(mentionFilteredTags[mentionSelectedIndex]);
+        handleMentionSelect(
+          mentionFilteredTags[mentionSelectedIndex]
+        );
         return 'handled';
       }
       return 'not-handled';
     },
-    [mentionActive, mentionFilteredTags, mentionSelectedIndex, handleMentionSelect]
+    [
+      mentionActive, mentionFilteredTags,
+      mentionSelectedIndex, handleMentionSelect,
+      noteLinkActive, availableNotes, noteLinkSearch,
+      noteLinkSelectedIndex, handleNoteLinkSelect,
+    ]
   );
 
   const handleMentionKeyDown = useCallback(
@@ -431,6 +550,56 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
      handleMentionSelect, onMentionStateChange]
   );
 
+  const handleNoteLinkKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const filtered = availableNotes?.filter((n) =>
+        n.title
+          .toLowerCase()
+          .includes(noteLinkSearch.toLowerCase())
+      ) || [];
+      if (!noteLinkActive || filtered.length === 0) return;
+
+      if (
+        e.key === 'ArrowRight' || e.key === 'ArrowDown'
+      ) {
+        e.preventDefault();
+        setNoteLinkSelectedIndex(
+          (prev) => (prev + 1) % filtered.length
+        );
+      } else if (
+        e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+      ) {
+        e.preventDefault();
+        setNoteLinkSelectedIndex(
+          (prev) =>
+            (prev - 1 + filtered.length) % filtered.length
+        );
+      } else if (e.key === 'Escape') {
+        setNoteLinkActive(false);
+        setNoteLinkSearch('');
+        onNoteLinkStateChange?.(false);
+      } else if (
+        e.key === 'Tab' || e.key === 'Enter'
+      ) {
+        e.preventDefault();
+        const selected = filtered[noteLinkSelectedIndex];
+        if (selected) {
+          handleNoteLinkSelect(
+            selected.id, selected.title
+          );
+        }
+      }
+    },
+    [
+      noteLinkActive,
+      availableNotes,
+      noteLinkSearch,
+      noteLinkSelectedIndex,
+      handleNoteLinkSelect,
+      onNoteLinkStateChange,
+    ]
+  );
+
   // Image handlers
   const handleImageClick = () => {
     setImageDialogOpen(true);
@@ -454,10 +623,23 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     mentionFilteredTags,
     mentionSelectedIndex,
     handleMentionSelect,
-  }), [editorState, handleToggleInlineStyle, handleToggleBlockType, handleApplyTextColor,
-      handleApplyBackgroundColor, handleApplyHeading, handleClearFormatting, handleLinkClick,
-      handleImageClick, handleInsertTag, mentionActive, mentionFilteredTags,
-      mentionSelectedIndex, handleMentionSelect]);
+    noteLinkActive,
+    noteLinkFilteredNotes: availableNotes?.filter((n) =>
+      n.title.toLowerCase().includes(
+        noteLinkSearch.toLowerCase()
+      )
+    ) || [],
+    noteLinkSelectedIndex,
+    handleNoteLinkSelect,
+  }), [editorState, handleToggleInlineStyle,
+      handleToggleBlockType, handleApplyTextColor,
+      handleApplyBackgroundColor, handleApplyHeading,
+      handleClearFormatting, handleLinkClick,
+      handleImageClick, handleInsertTag,
+      mentionActive, mentionFilteredTags,
+      mentionSelectedIndex, handleMentionSelect,
+      noteLinkActive, availableNotes, noteLinkSearch,
+      noteLinkSelectedIndex, handleNoteLinkSelect]);
 
   const handleImageInsert = (src: string, alt?: string) => {
     const newState = insertImage(editorState, src, alt);
@@ -653,10 +835,20 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             handleKeyCommand={handleKeyCommandWrapper}
             handleReturn={handleReturn}
             keyBindingFn={(e: any) => {
-              if (mentionActive && mentionFilteredTags.length > 0) {
-                if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight',
-                     'Escape', 'Tab'].includes(e.key)) {
+              if (mentionActive
+                && mentionFilteredTags.length > 0) {
+                if (['ArrowDown', 'ArrowUp', 'ArrowLeft',
+                  'ArrowRight', 'Escape', 'Tab',
+                ].includes(e.key)) {
                   handleMentionKeyDown(e);
+                  return null;
+                }
+              }
+              if (noteLinkActive) {
+                if (['ArrowDown', 'ArrowUp', 'ArrowLeft',
+                  'ArrowRight', 'Escape', 'Tab', 'Enter',
+                ].includes(e.key)) {
+                  handleNoteLinkKeyDown(e);
                   return null;
                 }
               }
