@@ -3,7 +3,7 @@
  * Full-screen dialog for creating/editing notes
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -30,6 +30,7 @@ import {
   Switch,
   FormControlLabel,
   Tooltip,
+  Snackbar,
 } from '@mui/material';
 import {
   pink,
@@ -64,6 +65,7 @@ import {
   Add as AddIcon,
   Public as GlobalIcon,
   Lock as PrivateIcon,
+  ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -80,6 +82,8 @@ import { Note, ReminderType, DayAbbreviation } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
 import { getTagColor, isGroupedTag, getTagName } from '../../utils/tagColors';
+import NoteShareButton from './NoteShareButton';
+import { useNoteNavigation } from '../../hooks/useNoteNavigation';
 
 // Default tags with display labels and internal values (for AI compatibility)
 export interface TagInfo {
@@ -149,6 +153,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   const theme = useTheme();
   const { user } = useAuthState();
   const fullScreen = useMediaQuery(theme.breakpoints.down('md'));
+  const noteNav = useNoteNavigation();
 
   // Ref for external toolbar control
   const editorRef = useRef<RichTextEditorHandle>(null);
@@ -196,6 +201,19 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
 
   // Track mention state for rendering the tag bar (counter forces re-render)
   const [mentionVersion, setMentionVersion] = useState(0);
+
+  // Share snackbar state
+  const [shareSnackbar, setShareSnackbar] = useState<string | null>(null);
+
+  // Available notes for /note link picker
+  const [availableNotes, setAvailableNotes] = useState<
+    Array<{
+      id: string;
+      title: string;
+      color?: string;
+      calendar_name?: string;
+    }>
+  >([]);
 
 
   // Default tags list
@@ -387,12 +405,80 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
     return () => clearTimeout(timeout);
   }, [title, content, coverImage, tags, isGlobal, open, note]);
 
+  // Load available notes for /note link picker
+  useEffect(() => {
+    if (!open || !user?.uid) return;
+
+    const loadNotes = async () => {
+      try {
+        const result = await notesService.getUserNotes(user.uid);
+        setAvailableNotes(
+          result
+            .filter((n) => !n.is_archived && n.id !== note?.id)
+            .map((n) => ({
+              id: n.id,
+              title: n.title,
+              color: n.color ?? undefined,
+            }))
+        );
+      } catch {
+        setAvailableNotes([]);
+      }
+    };
+
+    loadNotes();
+  }, [open, user?.uid, note?.id]);
+
+  // Load navigated note when navigating via back stack
+  useEffect(() => {
+    if (!noteNav.currentNoteId) return;
+
+    const loadLinkedNote = async () => {
+      try {
+        const linkedNote = await notesService.getNote(
+          noteNav.currentNoteId!
+        );
+        if (linkedNote) {
+          setNote(linkedNote);
+          setTitle(linkedNote.title);
+          setContent(linkedNote.content);
+          setCoverImage(linkedNote.cover_image);
+          setNoteColor(linkedNote.color);
+          setTags(linkedNote.tags || []);
+          setReminderType(linkedNote.reminder_type || 'none');
+          setReminderDate(linkedNote.reminder_date || null);
+          setReminderDays(linkedNote.reminder_days || []);
+          setIsReminderActive(
+            linkedNote.is_reminder_active || false
+          );
+          setIsGlobal(linkedNote.calendar_id === null);
+        } else {
+          noteNav.goBack();
+        }
+      } catch {
+        noteNav.goBack();
+      }
+    };
+
+    loadLinkedNote();
+  }, [noteNav.currentNoteId]);
+
+  // Callback for note link clicks in editor
+  const handleNoteLinkClick = useCallback(
+    (noteId: string, noteTitle: string) => {
+      saveNote();
+      noteNav.navigateTo(noteId, noteTitle);
+    },
+    [noteNav.navigateTo]
+  );
+
   const handleClose = async () => {
     // If it's a new note and has content, save it before closing
     // Or if it's an existing note with changes, save before closing
     if (hasChanges()) {
       await saveNote();
     }
+    noteNav.reset();
     onClose();
   };
 
@@ -533,13 +619,34 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         {/* Toolbar with title and close */}
         <Toolbar
           sx={{
-            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            borderBottom: `1px solid ${alpha(
+              theme.palette.divider, 0.1
+            )}`,
             gap: 1,
           }}
         >
+          {noteNav.isNavigated && (
+            <IconButton size="small" onClick={noteNav.goBack}>
+              <ArrowBackIcon />
+            </IconButton>
+          )}
+
           <Typography variant="h6" sx={{ flex: 1 }}>
             {note ? 'Edit Note' : 'New Note'}
           </Typography>
+
+          {/* Share button -- only for saved, user-created notes */}
+          {note && !note.by_assistant && (
+            <NoteShareButton
+              note={note}
+              onNoteUpdate={(updates) =>
+                setNote((prev) =>
+                  prev ? { ...prev, ...updates } : prev
+                )
+              }
+              onSnackbar={(msg) => setShareSnackbar(msg)}
+            />
+          )}
 
           <IconButton size="small" onClick={handleClose}>
             <CloseIcon />
@@ -627,6 +734,93 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                 />
               );
             })}
+          </Box>
+        )}
+
+        {/* /note Link Picker -- sticky below toolbar */}
+        {editorMounted &&
+          editorRef.current?.noteLinkActive &&
+          (editorRef.current.noteLinkFilteredNotes?.length ??
+            0) > 0 && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              px: 1.5,
+              py: 0.5,
+              height: 36,
+              minHeight: 36,
+              maxHeight: 36,
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              flexShrink: 0,
+              borderBottom: `1px solid ${alpha(
+                theme.palette.divider, 0.15
+              )}`,
+              bgcolor: alpha(
+                theme.palette.background.paper, 0.6
+              ),
+              whiteSpace: 'nowrap',
+              '&::-webkit-scrollbar': {
+                height: 0, display: 'none',
+              },
+              scrollbarWidth: 'none',
+            }}
+          >
+            {editorRef.current.noteLinkFilteredNotes.map(
+              (n, idx) => {
+                const isSelected =
+                  idx ===
+                  editorRef.current!.noteLinkSelectedIndex;
+                return (
+                  <Chip
+                    key={n.id}
+                    label={n.title || 'Untitled'}
+                    size="small"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      editorRef.current
+                        ?.handleNoteLinkSelect(
+                          n.id, n.title
+                        );
+                    }}
+                    sx={{
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      bgcolor: isSelected
+                        ? alpha(
+                            theme.palette.primary.main,
+                            0.2
+                          )
+                        : alpha(
+                            theme.palette.primary.main,
+                            0.08
+                          ),
+                      color: theme.palette.primary.main,
+                      fontWeight: 600,
+                      fontSize: '0.73rem',
+                      border: isSelected
+                        ? `1.5px solid ${alpha(
+                            theme.palette.primary.main,
+                            0.5
+                          )}`
+                        : `1px solid ${alpha(
+                            theme.palette.primary.main,
+                            0.2
+                          )}`,
+                      transition: 'all 0.15s ease',
+                      '&:hover': {
+                        bgcolor: alpha(
+                          theme.palette.primary.main,
+                          0.18
+                        ),
+                      },
+                    }}
+                  />
+                );
+              }
+            )}
           </Box>
         )}
 
@@ -1229,9 +1423,21 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               toolbarVariant="none"
               availableTradeTags={availableTradeTags}
               onMentionStateChange={() => setMentionVersion(v => v + 1)}
+              availableNotes={availableNotes}
+              onNoteLinkClick={handleNoteLinkClick}
+              onNoteLinkStateChange={() => {
+                // Force re-render to show/hide dropdown
+                setMentionVersion((v) => v + 1);
+              }}
             />
           </Box>
         </DialogContent>
+        <Snackbar
+          open={!!shareSnackbar}
+          autoHideDuration={3000}
+          onClose={() => setShareSnackbar(null)}
+          message={shareSnackbar}
+        />
       </Dialog>
 
       {/* Image Picker Dialog */}
