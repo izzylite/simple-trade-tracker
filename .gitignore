@@ -6,4 +6,6 @@ node_modules
 dist
 .DS_Store
 scripts/
+demos/
 .claude/
+.worktrees/
