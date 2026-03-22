@@ -43,6 +43,12 @@ export interface Note {
 
   // Week association (null for regular notes)
   week_key?: string | null;
+
+  // Sharing
+  share_id?: string | null;
+  share_link?: string | null;
+  is_shared?: boolean;
+  shared_at?: Date | null;
 }
 
 export interface CreateNoteInput {
@@ -91,6 +97,12 @@ export interface UpdateNoteInput {
 
   // Week association
   week_key?: string | null;
+
+  // Sharing
+  share_id?: string | null;
+  share_link?: string | null;
+  is_shared?: boolean;
+  shared_at?: Date | null;
 }
 
 export interface ReminderConfig {
