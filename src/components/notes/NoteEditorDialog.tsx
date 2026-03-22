@@ -461,6 +461,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
     };
 
     loadLinkedNote();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteNav.currentNoteId]);
 
   // Callback for note link clicks in editor
@@ -469,6 +470,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
       saveNote();
       noteNav.navigateTo(noteId, noteTitle);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [noteNav.navigateTo]
   );
 

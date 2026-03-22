@@ -319,6 +319,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       noteLinkTriggerOffset,
       noteLinkBlockKey,
       onChange,
+      onNoteLinkStateChange,
     ]
   );
 
