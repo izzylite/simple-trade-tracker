@@ -82,6 +82,7 @@ const TrashCalendarItem: React.FC<TrashCalendarItemProps> = ({
     <Box
       sx={{
         display: 'flex',
+        flexWrap: 'wrap',
         alignItems: 'center',
         gap: 1.5,
         p: 1.5,
@@ -112,7 +113,7 @@ const TrashCalendarItem: React.FC<TrashCalendarItemProps> = ({
       </Avatar>
 
       {/* Calendar Info */}
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={{ flex: 1, minWidth: 120 }}>
         <Typography
           variant="subtitle2"
           sx={{
@@ -125,41 +126,30 @@ const TrashCalendarItem: React.FC<TrashCalendarItemProps> = ({
         >
           {calendar.name}
         </Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={0.5} alignItems="center">
           <ScheduleIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
           <Typography variant="caption" color="text.secondary">
-            {daysUntilDeletion} days until deletion
+            {daysUntilDeletion} days
           </Typography>
         </Stack>
       </Box>
 
       {/* Dates */}
-      <Box sx={{ textAlign: 'right', flexShrink: 0, minWidth: 100 }}>
-        <Stack spacing={0.25}>
-          <Stack direction="row" justifyContent="space-between" spacing={2}>
-            <Typography variant="caption" color="text.secondary">
-              Deleted
-            </Typography>
-            <Typography variant="caption" fontWeight={500}>
-              {safeFormatDate(calendar.deleted_at, 'MMM d, yyyy')}
-            </Typography>
-          </Stack>
-          <Stack direction="row" justifyContent="space-between" spacing={2}>
-            <Typography variant="caption" color="text.secondary">
-              Auto-delete
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {safeFormatDate(calendar.auto_delete_at, 'MMM d, yyyy')}
-            </Typography>
-          </Stack>
-        </Stack>
+      <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+        <Typography variant="caption" color="text.secondary">
+          Deleted {safeFormatDate(calendar.deleted_at, 'MMM d, yyyy')}
+        </Typography>
       </Box>
 
       {/* Actions */}
-      <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+      <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
         <Button
           size="small"
-          startIcon={isRestoring ? <CircularProgress size={14} /> : <RestoreIcon />}
+          startIcon={
+            isRestoring
+              ? <CircularProgress size={14} />
+              : <RestoreIcon />
+          }
           onClick={handleRestore}
           disabled={isRestoring || isDeleting}
           sx={{
@@ -174,7 +164,6 @@ const TrashCalendarItem: React.FC<TrashCalendarItemProps> = ({
         </Button>
         <Button
           size="small"
-          startIcon={isDeleting ? <CircularProgress size={14} /> : <DeleteIcon />}
           onClick={handleDelete}
           disabled={isRestoring || isDeleting}
           sx={{
@@ -182,10 +171,12 @@ const TrashCalendarItem: React.FC<TrashCalendarItemProps> = ({
             color: 'error.main',
             fontSize: '0.75rem',
             minWidth: 'auto',
-            px: 1
+            px: 0.5
           }}
         >
-          Delete
+          {isDeleting
+            ? <CircularProgress size={14} />
+            : <DeleteIcon sx={{ fontSize: 18 }} />}
         </Button>
       </Stack>
     </Box>
