@@ -163,11 +163,7 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
   const currentNote = notes[currentIndex];
   const hasMultipleNotes = notes.length > 1;
 
-  if (!currentNote) {
-    return null;
-  }
-
-  const baseColor = currentNote.color
+  const baseColor = currentNote?.color
     ? colorMap[currentNote.color] || theme.palette.info.main
     : theme.palette.info.main;
 
@@ -200,8 +196,8 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
           left: { xs: 0, sm: 20 },
           right: { xs: 0, sm: 'auto' },
           zIndex: Z_INDEX.AI_DRAWER,
-          height: open ? 500 : 0,
-          maxHeight: '70vh',
+          height: open ? 780 : 0,
+          maxHeight: '85vh',
           width: '100%',
           maxWidth: { xs: '100%', sm: '420px' },
           borderTopLeftRadius: 20,
@@ -238,8 +234,7 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
               p: 2,
               pb: 1.5,
               borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-              background: alpha(baseColor, isDark ? 0.1 : 0.15),
-              borderLeft: `4px solid ${baseColor}`,
+              background: alpha(baseColor, isDark ? 0.1 : 0.15), 
             }}
           >
             {/* Left side - Icon and Title */}
@@ -327,67 +322,73 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
               ...scrollbarStyles(theme),
             }}
           >
-            {/* Cover Image */}
-            {currentNote.cover_image && (
-              <Box
-                sx={{
-                  width: '100%',
-                  height: 160,
-                  backgroundImage: `url(${currentNote.cover_image})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat',
-                }}
-              />
+            {currentNote && (
+              <>
+                {/* Cover Image */}
+                {currentNote.cover_image && (
+                  <Box
+                    sx={{
+                      width: '100%',
+                      height: 160,
+                      backgroundImage: `url(${currentNote.cover_image})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
+                    }}
+                  />
+                )}
+
+                {/* Text Content */}
+                <Box sx={{ p: 2 }}>
+                  {/* Note Title */}
+                  {currentNote.title && currentNote.title.trim() !== '' && (
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 600,
+                        color: 'text.primary',
+                        mb: 2,
+                      }}
+                    >
+                      {currentNote.title}
+                    </Typography>
+                  )}
+
+                  {/* Note Content */}
+                  <Box
+                    sx={{
+                      '& .DraftEditor-root': {
+                        fontSize: '0.95rem',
+                        lineHeight: 1.6,
+                      },
+                    }}
+                  >
+                    <RichTextEditor
+                      value={currentNote.content}
+                      disabled
+                      hideCharacterCount
+                      minHeight={200}
+                    />
+                  </Box>
+                </Box>
+              </>
             )}
-
-            {/* Text Content */}
-            <Box sx={{ p: 2 }}>
-              {/* Note Title */}
-              {currentNote.title && currentNote.title.trim() !== '' && (
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 600,
-                    color: 'text.primary',
-                    mb: 2,
-                  }}
-                >
-                  {currentNote.title}
-                </Typography>
-              )}
-
-              {/* Note Content */}
-              <Box
-                sx={{
-                  '& .DraftEditor-root': {
-                    fontSize: '0.95rem',
-                    lineHeight: 1.6,
-                  },
-                }}
-              >
-                <RichTextEditor
-                  value={currentNote.content}
-                  disabled
-                  hideCharacterCount
-                  minHeight={200}
-                />
-              </Box>
-            </Box>
           </Box>
         </Box>
       </Box>
 
       {/* Note Editor Dialog */}
-      <NoteEditorDialog
-        open={editorOpen}
-        onClose={handleEditorClose}
-        note={currentNote}
-        calendarId={calendarId}
-        onSave={handleNoteSaved}
-        onDelete={handleNoteDeleted}
-        availableTradeTags={availableTradeTags}
-      />
+      {currentNote && (
+        <NoteEditorDialog
+          open={editorOpen}
+          onClose={handleEditorClose}
+          note={currentNote}
+          calendarId={calendarId}
+          onSave={handleNoteSaved}
+          onDelete={handleNoteDeleted}
+          availableTradeTags={availableTradeTags}
+        />
+      )}
     </>
   );
 };

@@ -2301,33 +2301,31 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       )}
 
       {/* Game Plan - View existing via BottomSheet */}
-      {gamePlanDialog?.existingNote && (
-        <NotesBottomSheet
-          open
-          onClose={() => setGamePlanDialog(null)}
-          notes={[gamePlanDialog.existingNote]}
-          calendarId={calendarId!}
-          fullDayName={{
-            Sun: 'Sunday', Mon: 'Monday', Tue: 'Tuesday',
-            Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday',
-            Sat: 'Saturday',
-          }[gamePlanDialog.day]}
-          availableTradeTags={allTags}
-          onNoteSaved={() => {
-            if (calendarId) {
-              notesService.getGamePlanNotesByDay(calendarId)
-                .then(setGamePlanNotes);
-            }
-          }}
-          onNoteDeleted={() => {
-            setGamePlanDialog(null);
-            if (calendarId) {
-              notesService.getGamePlanNotesByDay(calendarId)
-                .then(setGamePlanNotes);
-            }
-          }}
-        />
-      )}
+      <NotesBottomSheet
+        open={!!gamePlanDialog?.existingNote}
+        onClose={() => setGamePlanDialog(null)}
+        notes={gamePlanDialog?.existingNote ? [gamePlanDialog.existingNote] : []}
+        calendarId={calendarId!}
+        fullDayName={gamePlanDialog ? {
+          Sun: 'Sunday', Mon: 'Monday', Tue: 'Tuesday',
+          Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday',
+          Sat: 'Saturday',
+        }[gamePlanDialog.day] : ''}
+        availableTradeTags={allTags}
+        onNoteSaved={() => {
+          if (calendarId) {
+            notesService.getGamePlanNotesByDay(calendarId)
+              .then(setGamePlanNotes);
+          }
+        }}
+        onNoteDeleted={() => {
+          setGamePlanDialog(null);
+          if (calendarId) {
+            notesService.getGamePlanNotesByDay(calendarId)
+              .then(setGamePlanNotes);
+          }
+        }}
+      />
 
       {/* Game Plan - Create new via Editor */}
       {gamePlanDialog && !gamePlanDialog.existingNote && (
