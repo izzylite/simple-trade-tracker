@@ -31,6 +31,9 @@ const AboutPage = lazy(() => import('./pages/AboutPage'));
 const TradeCalendar = lazy(() => import('./pages/TradeCalendarPage').then(module => ({ default: module.TradeCalendar })));
 const SharedTradePage = lazy(() => import('./pages/SharedTradePage'));
 const SharedCalendarPage = lazy(() => import('./pages/SharedCalendarPage'));
+const SharedNotePage = lazy(
+  () => import('./pages/SharedNotePage')
+);
 const AuthCallback = lazy(() => import('./pages/AuthCallbackPage'));
 const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
@@ -300,6 +303,10 @@ function AppContent() {
             <Route
               path="/shared-calendar/:shareId"
               element={<SharedCalendarPage />}
+            />
+            <Route
+              path="/shared-note/:shareId"
+              element={<SharedNotePage />}
             />
             <Route
               path="/auth/callback"
