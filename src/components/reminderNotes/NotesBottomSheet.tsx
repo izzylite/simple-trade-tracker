@@ -95,6 +95,7 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [noteToEdit, setNoteToEdit] = useState<Note | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Reset index when notes change or sheet opens
@@ -139,12 +140,14 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
   }, [notes.length]);
 
   const handleEditNote = useCallback(() => {
-    onClose();
+    setNoteToEdit(notes[currentIndex] || null);
     setEditorOpen(true);
-  }, [onClose]);
+    onClose();
+  }, [onClose, notes, currentIndex]);
 
   const handleEditorClose = useCallback(() => {
     setEditorOpen(false);
+    setNoteToEdit(null);
   }, []);
 
   const handleNoteSaved = useCallback((savedNote: Note, isCreated?: boolean) => {
@@ -378,11 +381,11 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
       </Box>
 
       {/* Note Editor Dialog */}
-      {currentNote && (
+      {noteToEdit && (
         <NoteEditorDialog
           open={editorOpen}
           onClose={handleEditorClose}
-          note={currentNote}
+          note={noteToEdit}
           calendarId={calendarId}
           onSave={handleNoteSaved}
           onDelete={handleNoteDeleted}
