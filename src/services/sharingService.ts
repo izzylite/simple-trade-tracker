@@ -6,11 +6,11 @@
 
 import { Trade, Calendar } from '../types/dualWrite';
 import { logger } from '../utils/logger';
-import { shareRepository, ShareLinkResult, SharedTradeData, SharedCalendarData } from './repository/repositories/ShareRepository';
+import { shareRepository, ShareLinkResult, SharedTradeData, SharedCalendarData, SharedNoteData } from './repository/repositories/ShareRepository';
 import { supabase } from '../config/supabase';
 
 // Export types for use in components
-export type { SharedTradeData, SharedCalendarData, ShareLinkResult };
+export type { SharedTradeData, SharedCalendarData, ShareLinkResult, SharedNoteData };
 
 /**
  * Generate a shareable link for a trade
@@ -72,6 +72,37 @@ export const generateCalendarShareLink = async (
 };
 
 /**
+ * Generate a shareable link for a note
+ */
+export const generateNoteShareLink = async (
+  noteId: string
+): Promise<ShareLinkResult> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const result = await shareRepository.generateNoteShareLink(
+      noteId,
+      user.id
+    );
+
+    if (!result.success) {
+      throw new Error(
+        result.error?.message || 'Failed to generate share link'
+      );
+    }
+
+    logger.log('Note share link generated successfully');
+    return result.data!;
+  } catch (error) {
+    logger.error('Error generating note share link:', error);
+    throw error;
+  }
+};
+
+/**
  * Deactivate a shared trade (stop sharing)
  */
 export const deactivateTradeShareLink = async (shareId: string): Promise<void> => {
@@ -120,6 +151,37 @@ export const deactivateCalendarShareLink = async (shareId: string): Promise<void
 };
 
 /**
+ * Deactivate a shared note (stop sharing)
+ */
+export const deactivateNoteShareLink = async (
+  shareId: string
+): Promise<void> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const result = await shareRepository.deactivateNoteShareLink(
+      shareId,
+      user.id
+    );
+
+    if (!result.success) {
+      throw new Error(
+        result.error?.message ||
+          'Failed to deactivate note share'
+      );
+    }
+
+    logger.log('Note share deactivated successfully');
+  } catch (error) {
+    logger.error('Error deactivating note share:', error);
+    throw error;
+  }
+};
+
+/**
  * Get a shared trade by its share ID (for public viewing)
  * This uses the edge function for public access
  */
@@ -153,6 +215,28 @@ export const getSharedCalendar = async (shareId: string): Promise<SharedCalendar
     return result.data || null;
   } catch (error) {
     logger.error('Error getting shared calendar:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get a shared note by its share ID (for public viewing)
+ */
+export const getSharedNote = async (
+  shareId: string
+): Promise<SharedNoteData | null> => {
+  try {
+    const result = await shareRepository.getSharedNote(shareId);
+
+    if (!result.success) {
+      throw new Error(
+        result.error?.message || 'Failed to load shared note'
+      );
+    }
+
+    return result.data || null;
+  } catch (error) {
+    logger.error('Error getting shared note:', error);
     throw error;
   }
 };
