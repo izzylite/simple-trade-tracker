@@ -2266,6 +2266,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         calendarId={calendarId}
         isReadOnly={isReadOnly}
         availableTradeTags={allTags}
+        pinnedEvents={calendar.pinned_events}
       />
 
       {/* Week Note Editor */}
@@ -2277,6 +2278,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           calendarId={calendarId!}
           weekKey={weekNoteDialog.weekKey}
           availableTradeTags={allTags}
+          pinnedEvents={calendar.pinned_events}
           onSave={(savedNote, isCreated) => {
             if (isCreated && savedNote.week_key) {
               setWeekNoteKeys(prev => {
@@ -2335,6 +2337,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           calendarId={calendarId!}
           gamePlanDay={gamePlanDialog.day}
           availableTradeTags={allTags}
+          pinnedEvents={calendar.pinned_events}
           onSave={() => {
             setGamePlanDialog(null);
             if (calendarId) {

@@ -39,6 +39,14 @@ import {
   replaceNoteTriggerWithLink,
 } from './RichTextEditor/utils/noteEntityUtils';
 import {
+  getEventTrigger,
+  replaceEventTriggerWithLink,
+} from './RichTextEditor/utils/eventEntityUtils';
+import type {
+  ImpactLevel,
+  Currency,
+} from '../../types/economicCalendar';
+import {
   toggleInlineStyle,
   toggleBlockType,
   applyTextColor,
@@ -93,6 +101,20 @@ export interface RichTextEditorProps {
   onNoteLinkStateChange?: (active: boolean) => void;
   onNoteLinkSearch?: (query: string) => void;
   onNoteLinkClick?: (noteId: string, noteTitle: string) => void;
+  // Event linking - pinned events for /event picker
+  availableEvents?: Array<{
+    event_id: string;
+    event: string;
+    currency?: Currency;
+    impact?: ImpactLevel;
+  }>;
+  onEventLinkStateChange?: (active: boolean) => void;
+  onEventLinkClick?: (
+    eventId: string,
+    eventName: string,
+    currency: Currency,
+    impact: ImpactLevel
+  ) => void;
 }
 
 // Ref handle for external toolbar control
@@ -126,6 +148,20 @@ export interface RichTextEditorHandle {
     noteId: string,
     noteTitle: string
   ) => void;
+  eventLinkActive: boolean;
+  eventLinkFilteredEvents: Array<{
+    event_id: string;
+    event: string;
+    currency?: Currency;
+    impact?: ImpactLevel;
+  }>;
+  eventLinkSelectedIndex: number;
+  handleEventLinkSelect: (
+    eventId: string,
+    eventName: string,
+    currency: Currency,
+    impact: ImpactLevel
+  ) => void;
 }
 
 
@@ -155,6 +191,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   onNoteLinkStateChange,
   onNoteLinkSearch,
   onNoteLinkClick,
+  availableEvents,
+  onEventLinkStateChange,
+  onEventLinkClick,
 }, ref) => {
   const theme = useTheme();
   const Z_INDEX = 2000;
@@ -169,9 +208,11 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   // Create decorator with props
   const decorator = useMemo(
     () => createDecorator(
-      calendarId, trades, onOpenGalleryMode, onNoteLinkClick
+      calendarId, trades, onOpenGalleryMode,
+      onNoteLinkClick, onEventLinkClick
     ),
-    [calendarId, trades, onOpenGalleryMode, onNoteLinkClick]
+    [calendarId, trades, onOpenGalleryMode,
+      onNoteLinkClick, onEventLinkClick]
   );
 
   const [editorState, setEditorState] = useState(() => {
@@ -199,6 +240,15 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     = useState(0);
   const [noteLinkBlockKey, setNoteLinkBlockKey] = useState('');
   const [noteLinkSelectedIndex, setNoteLinkSelectedIndex]
+    = useState(0);
+
+  // /event link dropdown state
+  const [eventLinkActive, setEventLinkActive] = useState(false);
+  const [eventLinkSearch, setEventLinkSearch] = useState('');
+  const [eventLinkTriggerOffset, setEventLinkTriggerOffset]
+    = useState(0);
+  const [eventLinkBlockKey, setEventLinkBlockKey] = useState('');
+  const [eventLinkSelectedIndex, setEventLinkSelectedIndex]
     = useState(0);
 
   // Update editor state when value prop changes (for controlled component behavior)
@@ -323,6 +373,47 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     ]
   );
 
+  // Handle /event link selection
+  const handleEventLinkSelect = useCallback(
+    (
+      eventId: string,
+      eventName: string,
+      currency: Currency,
+      impact: ImpactLevel
+    ) => {
+      const newState = replaceEventTriggerWithLink(
+        editorState,
+        eventId,
+        eventName,
+        currency,
+        impact,
+        eventLinkTriggerOffset,
+        eventLinkBlockKey
+      );
+      setEventLinkActive(false);
+      setEventLinkSearch('');
+      setEventLinkSelectedIndex(0);
+      setEditorState(newState);
+      onEventLinkStateChange?.(false);
+
+      if (onChange) {
+        const newRaw = convertToRaw(
+          newState.getCurrentContent()
+        );
+        onChange(JSON.stringify(newRaw));
+      }
+
+      setTimeout(() => editorRef.current?.focus(), 50);
+    },
+    [
+      editorState,
+      eventLinkTriggerOffset,
+      eventLinkBlockKey,
+      onChange,
+      onEventLinkStateChange,
+    ]
+  );
+
   // Handle editor state changes
   const handleEditorChange = (state: EditorState) => {
     const prevContentState = editorState.getCurrentContent();
@@ -335,8 +426,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
 
     setEditorState(state);
 
-    // Check for /tag trigger (mutually exclusive with /note)
-    if (availableTradeTags.length > 0 && !noteLinkActive) {
+    // Check for /tag trigger (mutually exclusive with /note, /event)
+    if (availableTradeTags.length > 0 && !noteLinkActive
+        && !eventLinkActive) {
       const trigger = getAtMentionTrigger(state);
       if (trigger) {
         setMentionActive(true);
@@ -354,8 +446,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       }
     }
 
-    // Check for /note trigger (mutually exclusive with /tag)
-    if (!mentionActive && availableNotes) {
+    // Check for /note trigger (mutually exclusive with /tag, /event)
+    if (!mentionActive && !eventLinkActive && availableNotes) {
       const noteTrigger = getNoteTrigger(state);
       if (noteTrigger) {
         setNoteLinkActive(true);
@@ -369,6 +461,23 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
         setNoteLinkActive(false);
         setNoteLinkSearch('');
         onNoteLinkStateChange?.(false);
+      }
+    }
+
+    // Check for /event trigger (mutually exclusive with /tag, /note)
+    if (!mentionActive && !noteLinkActive && availableEvents) {
+      const eventTrigger = getEventTrigger(state);
+      if (eventTrigger) {
+        setEventLinkActive(true);
+        setEventLinkSearch(eventTrigger.searchText);
+        setEventLinkTriggerOffset(eventTrigger.triggerOffset);
+        setEventLinkBlockKey(eventTrigger.blockKey);
+        setEventLinkSelectedIndex(0);
+        onEventLinkStateChange?.(true);
+      } else if (eventLinkActive) {
+        setEventLinkActive(false);
+        setEventLinkSearch('');
+        onEventLinkStateChange?.(false);
       }
     }
 
@@ -483,8 +592,31 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   };
 
   // Mention keyboard handlers
+  const eventLinkFilteredEvents = useMemo(
+    () => availableEvents?.filter((ev) =>
+      ev.event.toLowerCase().includes(
+        eventLinkSearch.toLowerCase()
+      )
+    ) || [],
+    [availableEvents, eventLinkSearch]
+  );
+
   const handleReturn = useCallback(
     (e: React.KeyboardEvent): 'handled' | 'not-handled' => {
+      if (eventLinkActive && eventLinkFilteredEvents.length > 0) {
+        e.preventDefault();
+        const selected =
+          eventLinkFilteredEvents[eventLinkSelectedIndex];
+        if (selected) {
+          handleEventLinkSelect(
+            selected.event_id,
+            selected.event,
+            (selected.currency || 'USD') as Currency,
+            (selected.impact || 'Medium') as ImpactLevel
+          );
+        }
+        return 'handled';
+      }
       if (noteLinkActive) {
         const filtered = availableNotes?.filter((n) =>
           n.title.toLowerCase().includes(
@@ -516,6 +648,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       mentionSelectedIndex, handleMentionSelect,
       noteLinkActive, availableNotes, noteLinkSearch,
       noteLinkSelectedIndex, handleNoteLinkSelect,
+      eventLinkActive, eventLinkFilteredEvents,
+      eventLinkSelectedIndex, handleEventLinkSelect,
     ]
   );
 
@@ -609,6 +743,65 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     ]
   );
 
+  const handleEventLinkKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!eventLinkActive || eventLinkFilteredEvents.length === 0)
+        return;
+
+      if (
+        e.key === 'ArrowRight' || e.key === 'ArrowDown'
+      ) {
+        e.preventDefault();
+        setEventLinkSelectedIndex((prev) => {
+          const next =
+            (prev + 1) % eventLinkFilteredEvents.length;
+          requestAnimationFrame(
+            () => onEventLinkStateChange?.(true)
+          );
+          return next;
+        });
+      } else if (
+        e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+      ) {
+        e.preventDefault();
+        setEventLinkSelectedIndex((prev) => {
+          const next =
+            (prev - 1 + eventLinkFilteredEvents.length) %
+            eventLinkFilteredEvents.length;
+          requestAnimationFrame(
+            () => onEventLinkStateChange?.(true)
+          );
+          return next;
+        });
+      } else if (e.key === 'Escape') {
+        setEventLinkActive(false);
+        setEventLinkSearch('');
+        onEventLinkStateChange?.(false);
+      } else if (
+        e.key === 'Tab' || e.key === 'Enter'
+      ) {
+        e.preventDefault();
+        const selected =
+          eventLinkFilteredEvents[eventLinkSelectedIndex];
+        if (selected) {
+          handleEventLinkSelect(
+            selected.event_id,
+            selected.event,
+            (selected.currency || 'USD') as Currency,
+            (selected.impact || 'Medium') as ImpactLevel
+          );
+        }
+      }
+    },
+    [
+      eventLinkActive,
+      eventLinkFilteredEvents,
+      eventLinkSelectedIndex,
+      handleEventLinkSelect,
+      onEventLinkStateChange,
+    ]
+  );
+
   // Image handlers
   const handleImageClick = () => {
     setImageDialogOpen(true);
@@ -640,6 +833,10 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     ) || [],
     noteLinkSelectedIndex,
     handleNoteLinkSelect,
+    eventLinkActive,
+    eventLinkFilteredEvents,
+    eventLinkSelectedIndex,
+    handleEventLinkSelect,
   }), [editorState, handleToggleInlineStyle,
       handleToggleBlockType, handleApplyTextColor,
       handleApplyBackgroundColor, handleApplyHeading,
@@ -648,7 +845,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       mentionActive, mentionFilteredTags,
       mentionSelectedIndex, handleMentionSelect,
       noteLinkActive, availableNotes, noteLinkSearch,
-      noteLinkSelectedIndex, handleNoteLinkSelect]);
+      noteLinkSelectedIndex, handleNoteLinkSelect,
+      eventLinkActive, eventLinkFilteredEvents,
+      eventLinkSelectedIndex, handleEventLinkSelect]);
 
   const handleImageInsert = (src: string, alt?: string) => {
     const newState = insertImage(editorState, src, alt);
@@ -862,6 +1061,14 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 ].includes(e.key)) {
                   handleNoteLinkKeyDown(e);
                   return 'note-link-nav';
+                }
+              }
+              if (eventLinkActive) {
+                if (['ArrowDown', 'ArrowUp', 'ArrowLeft',
+                  'ArrowRight', 'Escape', 'Tab', 'Enter',
+                ].includes(e.key)) {
+                  handleEventLinkKeyDown(e);
+                  return 'event-link-nav';
                 }
               }
               return keyBindingFn(e);

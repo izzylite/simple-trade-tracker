@@ -68,6 +68,7 @@ import {
   ArrowBack as ArrowBackIcon,
   StickyNote2Outlined as NoteIcon,
   LocalOfferOutlined as TagIcon2,
+  EventOutlined as EventIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -87,6 +88,12 @@ import { getTagColor, isGroupedTag, getTagName, getTagGroup } from '../../utils/
 import NoteShareButton from './NoteShareButton';
 import { useNoteNavigation } from '../../hooks/useNoteNavigation';
 import { getContentAsJson } from '../common/RichTextEditor/utils/draftUtils';
+import {
+  IMPACT_COLORS, CURRENCY_FLAGS
+} from '../../types/economicCalendar';
+import type {
+  ImpactLevel, Currency
+} from '../../types/economicCalendar';
 
 // Default tags with display labels and internal values (for AI compatibility)
 export interface TagInfo {
@@ -124,6 +131,12 @@ interface NoteEditorDialogProps {
   weekKey?: string; // If set, this is a week note
   gamePlanDay?: DayAbbreviation; // If set, pre-fill as game plan template
   availableTradeTags?: string[]; // Trade tags from calendar for inline insertion
+  pinnedEvents?: Array<{
+    event_id: string;
+    event: string;
+    currency?: Currency;
+    impact?: ImpactLevel;
+  }>;
 }
 
 // Full day names for game plan titles
@@ -152,6 +165,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   weekKey,
   gamePlanDay,
   availableTradeTags = [],
+  pinnedEvents,
 }) => {
   const theme = useTheme();
   const { user } = useAuthState();
@@ -703,30 +717,36 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           />
         )}
 
-        {/* @ Mention Tag Bar — sticky below toolbar, horizontal scroll */}
-        {editorMounted && editorRef.current?.mentionActive &&
-          (editorRef.current.mentionFilteredTags?.length ?? 0) > 0 && (
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.5,
-              px: 1.5,
-              py: 0.5,
-              height: 36,
-              minHeight: 36,
-              maxHeight: 36,
-              overflowX: 'auto',
-              overflowY: 'hidden',
-              flexShrink: 0,
-              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.15)}`,
-              bgcolor: alpha(theme.palette.background.paper, 0.6),
-              whiteSpace: 'nowrap',
-              '&::-webkit-scrollbar': { height: 0, display: 'none' },
-              scrollbarWidth: 'none',
-            }}
-          >
-            {editorRef.current.mentionFilteredTags.map((tag, idx) => {
+        {/* Picker Bar — always visible, shows tags, notes, or placeholder */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5,
+            px: 1.5,
+            py: 0.5,
+            height: 36,
+            minHeight: 36,
+            maxHeight: 36,
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            flexShrink: 0,
+            borderBottom: `1px solid ${alpha(
+              theme.palette.divider, 0.15
+            )}`,
+            bgcolor: alpha(
+              theme.palette.background.paper, 0.6
+            ),
+            whiteSpace: 'nowrap',
+            '&::-webkit-scrollbar': {
+              height: 0, display: 'none',
+            },
+            scrollbarWidth: 'none',
+          }}
+        >
+          {editorMounted && editorRef.current?.mentionActive &&
+            (editorRef.current.mentionFilteredTags?.length ?? 0) > 0 ? (
+            editorRef.current.mentionFilteredTags.map((tag, idx) => {
               const isSelected = idx === editorRef.current!.mentionSelectedIndex;
               const grouped = isGroupedTag(tag);
               const groupName = grouped ? getTagGroup(tag) : '';
@@ -809,42 +829,11 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                   }}
                 />
               );
-            })}
-          </Box>
-        )}
-
-        {/* /note Link Picker -- sticky below toolbar */}
-        {editorMounted &&
-          editorRef.current?.noteLinkActive &&
-          (editorRef.current.noteLinkFilteredNotes?.length ??
-            0) > 0 && (
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.5,
-              px: 1.5,
-              py: 0.5,
-              height: 36,
-              minHeight: 36,
-              maxHeight: 36,
-              overflowX: 'auto',
-              overflowY: 'hidden',
-              flexShrink: 0,
-              borderBottom: `1px solid ${alpha(
-                theme.palette.divider, 0.15
-              )}`,
-              bgcolor: alpha(
-                theme.palette.background.paper, 0.6
-              ),
-              whiteSpace: 'nowrap',
-              '&::-webkit-scrollbar': {
-                height: 0, display: 'none',
-              },
-              scrollbarWidth: 'none',
-            }}
-          >
-            {editorRef.current.noteLinkFilteredNotes.map(
+            })
+          ) : editorMounted &&
+            editorRef.current?.noteLinkActive &&
+            (editorRef.current.noteLinkFilteredNotes?.length ?? 0) > 0 ? (
+            editorRef.current.noteLinkFilteredNotes.map(
               (n, idx) => {
                 const isSelected =
                   idx ===
@@ -915,9 +904,117 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                   />
                 );
               }
-            )}
-          </Box>
-        )}
+            )
+          ) : editorMounted &&
+            editorRef.current?.eventLinkActive &&
+            (editorRef.current.eventLinkFilteredEvents?.length ?? 0) > 0 ? (
+            editorRef.current.eventLinkFilteredEvents.map(
+              (ev, idx) => {
+                const isSelected =
+                  idx ===
+                  editorRef.current!.eventLinkSelectedIndex;
+                const impactColor =
+                  IMPACT_COLORS[
+                    ev.impact as ImpactLevel
+                  ] || theme.palette.text.secondary;
+                const flag =
+                  CURRENCY_FLAGS[
+                    ev.currency as Currency
+                  ] || '';
+                return (
+                  <Chip
+                    key={ev.event_id}
+                    ref={(el: HTMLDivElement | null) => {
+                      if (isSelected && el) {
+                        el.scrollIntoView({
+                          behavior: 'smooth',
+                          block: 'nearest',
+                          inline: 'nearest',
+                        });
+                      }
+                    }}
+                    icon={<EventIcon sx={{
+                      fontSize: '0.85rem',
+                      color: 'inherit',
+                    }} />}
+                    label={
+                      <Box component="span" sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                      }}>
+                        {ev.currency && (
+                          <Box component="span" sx={{
+                            fontWeight: 800,
+                            fontSize: '0.7rem',
+                            letterSpacing: '0.03em',
+                          }}>
+                            {ev.currency}
+                          </Box>
+                        )}
+                        <span>{ev.event}</span>
+                      </Box>
+                    }
+                    size="small"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      editorRef.current
+                        ?.handleEventLinkSelect(
+                          ev.event_id,
+                          ev.event,
+                          (ev.currency || 'USD') as Currency,
+                          (ev.impact || 'Medium') as ImpactLevel
+                        );
+                    }}
+                    sx={{
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      bgcolor: isSelected
+                        ? alpha(impactColor, 0.1)
+                        : alpha(
+                            theme.palette.text.primary,
+                            0.06
+                          ),
+                      color: isSelected
+                        ? impactColor
+                        : theme.palette.text.secondary,
+                      fontWeight: 600,
+                      fontSize: '0.73rem',
+                      border: isSelected
+                        ? `1.5px solid ${alpha(
+                            impactColor, 0.25
+                          )}`
+                        : `1px solid ${alpha(
+                            theme.palette.text.primary,
+                            0.15
+                          )}`,
+                      transition: 'all 0.15s ease',
+                      '&:hover': {
+                        bgcolor: alpha(impactColor, 0.1),
+                        color: impactColor,
+                      },
+                      '& .MuiChip-icon': {
+                        color: 'inherit',
+                      },
+                    }}
+                  />
+                );
+              }
+            )
+          ) : (
+            <Typography
+              variant="caption"
+              sx={{
+                color: alpha(theme.palette.text.secondary, 0.4),
+                fontStyle: 'italic',
+                fontSize: '0.75rem',
+                userSelect: 'none',
+              }}
+            >
+              Type /tag, /note, or /event to embed tags, notes, and events
+            </Typography>
+          )}
+        </Box>
 
         <DialogContent
           sx={{
@@ -1522,6 +1619,10 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               onNoteLinkClick={handleNoteLinkClick}
               onNoteLinkStateChange={() => {
                 // Force re-render to show/hide dropdown
+                setMentionVersion((v) => v + 1);
+              }}
+              availableEvents={pinnedEvents}
+              onEventLinkStateChange={() => {
                 setMentionVersion((v) => v + 1);
               }}
             />

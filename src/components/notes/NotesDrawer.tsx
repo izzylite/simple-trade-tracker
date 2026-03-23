@@ -44,6 +44,7 @@ import { useAuthState } from '../../contexts/AuthStateContext';
 import { CalendarRepository } from '../../services/repository/repositories/CalendarRepository';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { useNotes } from '../../hooks/useNotes';
+import type { Currency, ImpactLevel } from '../../types/economicCalendar';
 
 interface NotesDrawerProps {
   open: boolean;
@@ -53,6 +54,12 @@ interface NotesDrawerProps {
   onNoteClick?: (note: Note) => void;
   isReadOnly?: boolean; // Hide edit actions for shared calendars
   availableTradeTags?: string[]; // Trade tags for inline insertion in notes
+  pinnedEvents?: Array<{
+    event_id: string;
+    event: string;
+    currency?: Currency;
+    impact?: ImpactLevel;
+  }>;
 }
 
 type TabValue = 'all' | 'pinned' | 'archived';
@@ -112,6 +119,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
   onNoteClick,
   isReadOnly = false,
   availableTradeTags = [],
+  pinnedEvents,
 }) => {
   const theme = useTheme();
   const { user } = useAuthState();
@@ -521,6 +529,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
           }
           onDelete={(noteId: string) => removeNote(noteId)}
           availableTradeTags={availableTradeTags}
+          pinnedEvents={pinnedEvents}
         />
       )}
 
