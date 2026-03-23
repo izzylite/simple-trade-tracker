@@ -335,7 +335,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
 
     setEditorState(state);
 
-    // Check for @ mention trigger (mutually exclusive with /note)
+    // Check for /tag trigger (mutually exclusive with /note)
     if (availableTradeTags.length > 0 && !noteLinkActive) {
       const trigger = getAtMentionTrigger(state);
       if (trigger) {
@@ -354,7 +354,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       }
     }
 
-    // Check for /note trigger (mutually exclusive with @)
+    // Check for /note trigger (mutually exclusive with /tag)
     if (!mentionActive && availableNotes) {
       const noteTrigger = getNoteTrigger(state);
       if (noteTrigger) {
@@ -564,17 +564,25 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
         e.key === 'ArrowRight' || e.key === 'ArrowDown'
       ) {
         e.preventDefault();
-        setNoteLinkSelectedIndex(
-          (prev) => (prev + 1) % filtered.length
-        );
+        setNoteLinkSelectedIndex((prev) => {
+          const next = (prev + 1) % filtered.length;
+          requestAnimationFrame(
+            () => onNoteLinkStateChange?.(true)
+          );
+          return next;
+        });
       } else if (
         e.key === 'ArrowLeft' || e.key === 'ArrowUp'
       ) {
         e.preventDefault();
-        setNoteLinkSelectedIndex(
-          (prev) =>
-            (prev - 1 + filtered.length) % filtered.length
-        );
+        setNoteLinkSelectedIndex((prev) => {
+          const next =
+            (prev - 1 + filtered.length) % filtered.length;
+          requestAnimationFrame(
+            () => onNoteLinkStateChange?.(true)
+          );
+          return next;
+        });
       } else if (e.key === 'Escape') {
         setNoteLinkActive(false);
         setNoteLinkSearch('');
@@ -681,6 +689,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
 
   // Create keyboard command handler using utility
   const handleKeyCommandWrapper = (command: string, state: EditorState): 'handled' | 'not-handled' => {
+    if (command === 'note-link-nav' || command === 'mention-nav') {
+      return 'handled';
+    }
     return handleKeyCommand(command, state, {
       clearFormatting: handleClearFormatting,
       handleLinkClick,
@@ -842,7 +853,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                   'ArrowRight', 'Escape', 'Tab',
                 ].includes(e.key)) {
                   handleMentionKeyDown(e);
-                  return null;
+                  return 'mention-nav';
                 }
               }
               if (noteLinkActive) {
@@ -850,7 +861,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                   'ArrowRight', 'Escape', 'Tab', 'Enter',
                 ].includes(e.key)) {
                   handleNoteLinkKeyDown(e);
-                  return null;
+                  return 'note-link-nav';
                 }
               }
               return keyBindingFn(e);

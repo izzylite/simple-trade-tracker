@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
+import NoteIcon from '@mui/icons-material/StickyNote2Outlined';
 import { ContentState } from 'draft-js';
 
 interface NoteLinkProps {
@@ -36,6 +37,7 @@ const NoteLinkComponent: React.FC<NoteLinkProps> = ({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
+        gap: 3,
         backgroundColor: alpha(
           theme.palette.primary.main,
           0.1
@@ -63,6 +65,9 @@ const NoteLinkComponent: React.FC<NoteLinkProps> = ({
           : noteTitle || 'Linked note'
       }
     >
+      <NoteIcon
+        sx={{ fontSize: '0.85rem', flexShrink: 0 }}
+      />
       {children}
     </span>
   );

@@ -18,10 +18,13 @@ interface UseNoteNavigationResult {
   reset: () => void;
   /** Current stack depth (for display) */
   stackDepth: number;
+  /** Increments on every navigation change (for useEffect deps) */
+  navVersion: number;
 }
 
 export const useNoteNavigation = (): UseNoteNavigationResult => {
   const [navStack, setNavStack] = useState<NoteNavState[]>([]);
+  const [navVersion, setNavVersion] = useState(0);
 
   const currentNoteId =
     navStack.length > 0
@@ -33,16 +36,19 @@ export const useNoteNavigation = (): UseNoteNavigationResult => {
   const navigateTo = useCallback(
     (noteId: string, title: string) => {
       setNavStack((prev) => [...prev, { noteId, title }]);
+      setNavVersion((v) => v + 1);
     },
     []
   );
 
   const goBack = useCallback(() => {
     setNavStack((prev) => prev.slice(0, -1));
+    setNavVersion((v) => v + 1);
   }, []);
 
   const reset = useCallback(() => {
     setNavStack([]);
+    setNavVersion(0);
   }, []);
 
   return {
@@ -52,5 +58,6 @@ export const useNoteNavigation = (): UseNoteNavigationResult => {
     goBack,
     reset,
     stackDepth: navStack.length,
+    navVersion,
   };
 };

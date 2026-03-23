@@ -66,6 +66,8 @@ import {
   Public as GlobalIcon,
   Lock as PrivateIcon,
   ArrowBack as ArrowBackIcon,
+  StickyNote2Outlined as NoteIcon,
+  LocalOfferOutlined as TagIcon2,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -81,9 +83,10 @@ import * as notesService from '../../services/notesService';
 import { Note, ReminderType, DayAbbreviation } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
-import { getTagColor, isGroupedTag, getTagName } from '../../utils/tagColors';
+import { getTagColor, isGroupedTag, getTagName, getTagGroup } from '../../utils/tagColors';
 import NoteShareButton from './NoteShareButton';
 import { useNoteNavigation } from '../../hooks/useNoteNavigation';
+import { getContentAsJson } from '../common/RichTextEditor/utils/draftUtils';
 
 // Default tags with display labels and internal values (for AI compatibility)
 export interface TagInfo {
@@ -429,49 +432,71 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
     loadNotes();
   }, [open, user?.uid, note?.id]);
 
-  // Load navigated note when navigating via back stack
+  // Load note when navigating forward or back
   useEffect(() => {
-    if (!noteNav.currentNoteId) return;
+    // Skip initial render (navVersion 0 = no navigation yet)
+    if (noteNav.navVersion === 0) return;
 
-    const loadLinkedNote = async () => {
+    // Determine which note ID to load
+    const targetId = noteNav.currentNoteId || initialNote?.id;
+    if (!targetId) return;
+
+    const loadNote = async () => {
       try {
-        const linkedNote = await notesService.getNote(
-          noteNav.currentNoteId!
-        );
-        if (linkedNote) {
-          setNote(linkedNote);
-          setTitle(linkedNote.title);
-          setContent(linkedNote.content);
-          setCoverImage(linkedNote.cover_image);
-          setNoteColor(linkedNote.color);
-          setTags(linkedNote.tags || []);
-          setReminderType(linkedNote.reminder_type || 'none');
-          setReminderDate(linkedNote.reminder_date || null);
-          setReminderDays(linkedNote.reminder_days || []);
+        // Always fetch fresh from DB to get latest saved state
+        const freshNote = await notesService.getNote(targetId);
+        if (freshNote) {
+          setNote(freshNote);
+          setTitle(freshNote.title);
+          setContent(freshNote.content);
+          setCoverImage(freshNote.cover_image);
+          setNoteColor(freshNote.color);
+          setTags(freshNote.tags || []);
+          setReminderType(freshNote.reminder_type || 'none');
+          setReminderDate(freshNote.reminder_date || null);
+          setReminderDays(freshNote.reminder_days || []);
           setIsReminderActive(
-            linkedNote.is_reminder_active || false
+            freshNote.is_reminder_active || false
           );
-          setIsGlobal(linkedNote.calendar_id === null);
-        } else {
+          setIsGlobal(freshNote.calendar_id === null);
+        } else if (noteNav.currentNoteId) {
           noteNav.goBack();
         }
       } catch {
-        noteNav.goBack();
+        if (noteNav.currentNoteId) {
+          noteNav.goBack();
+        }
       }
     };
 
-    loadLinkedNote();
+    loadNote();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noteNav.currentNoteId]);
+  }, [noteNav.navVersion]);
 
   // Callback for note link clicks in editor
   const handleNoteLinkClick = useCallback(
-    (noteId: string, noteTitle: string) => {
-      saveNote();
+    async (noteId: string, noteTitle: string) => {
+      // Get latest content directly from editor to avoid
+      // stale closure issues with React state
+      if (note && editorRef.current?.editorState) {
+        const latestContent = getContentAsJson(
+          editorRef.current.editorState
+        );
+        setContent(latestContent);
+        await notesService.updateNote(note.id, {
+          title,
+          content: latestContent,
+          cover_image: coverImage ?? undefined,
+          color: noteColor ?? undefined,
+          tags,
+        });
+      } else {
+        await saveNote();
+      }
       noteNav.navigateTo(noteId, noteTitle);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [noteNav.navigateTo]
+    [noteNav.navigateTo, note, title, coverImage, noteColor, tags]
   );
 
   const handleClose = async () => {
@@ -702,15 +727,43 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
             }}
           >
             {editorRef.current.mentionFilteredTags.map((tag, idx) => {
-              const tagColor = getTagColor(tag);
               const isSelected = idx === editorRef.current!.mentionSelectedIndex;
+              const grouped = isGroupedTag(tag);
+              const groupName = grouped ? getTagGroup(tag) : '';
+              const displayName = grouped ? getTagName(tag) : tag;
               return (
                 <Chip
                   key={tag}
-                  ref={isSelected ? (el: HTMLDivElement | null) => {
-                    el?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-                  } : undefined}
-                  label={isGroupedTag(tag) ? getTagName(tag) : tag}
+                  ref={(el: HTMLDivElement | null) => {
+                    if (isSelected && el) {
+                      el.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'nearest',
+                        inline: 'nearest',
+                      });
+                    }
+                  }}
+                  icon={<TagIcon2 sx={{
+                    fontSize: '0.7rem',
+                    color: 'inherit',
+                  }} />}
+                  label={
+                    grouped ? (
+                      <Box component="span" sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                      }}>
+                        <Box component="span" sx={{
+                          fontSize: '0.7rem',
+                          fontWeight: 800,
+                        }}>
+                          {groupName}
+                        </Box>
+                        <span>{displayName}</span>
+                      </Box>
+                    ) : displayName
+                  }
                   size="small"
                   onMouseDown={(e) => {
                     e.preventDefault();
@@ -720,17 +773,38 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                     cursor: 'pointer',
                     flexShrink: 0,
                     bgcolor: isSelected
-                      ? alpha(tagColor, 0.3)
-                      : alpha(tagColor, 0.12),
-                    color: tagColor,
+                      ? alpha(
+                          theme.palette.primary.main,
+                          0.1
+                        )
+                      : alpha(
+                          theme.palette.text.primary,
+                          0.06
+                        ),
+                    color: isSelected
+                      ? theme.palette.primary.main
+                      : theme.palette.text.secondary,
                     fontWeight: 600,
                     fontSize: '0.73rem',
                     border: isSelected
-                      ? `1.5px solid ${alpha(tagColor, 0.6)}`
-                      : `1px solid ${alpha(tagColor, 0.2)}`,
+                      ? `1.5px solid ${alpha(
+                          theme.palette.primary.main,
+                          0.25
+                        )}`
+                      : `1px solid ${alpha(
+                          theme.palette.text.primary,
+                          0.15
+                        )}`,
                     transition: 'all 0.15s ease',
                     '&:hover': {
-                      bgcolor: alpha(tagColor, 0.25),
+                      bgcolor: alpha(
+                        theme.palette.primary.main,
+                        0.1
+                      ),
+                      color: theme.palette.primary.main,
+                    },
+                    '& .MuiChip-icon': {
+                      color: 'inherit',
                     },
                   }}
                 />
@@ -778,6 +852,19 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                 return (
                   <Chip
                     key={n.id}
+                    ref={(el: HTMLDivElement | null) => {
+                      if (isSelected && el) {
+                        el.scrollIntoView({
+                          behavior: 'smooth',
+                          block: 'nearest',
+                          inline: 'nearest',
+                        });
+                      }
+                    }}
+                    icon={<NoteIcon sx={{
+                      fontSize: '0.85rem',
+                      color: 'inherit',
+                    }} />}
                     label={n.title || 'Untitled'}
                     size="small"
                     onMouseDown={(e) => {
@@ -793,30 +880,36 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                       bgcolor: isSelected
                         ? alpha(
                             theme.palette.primary.main,
-                            0.2
+                            0.1
                           )
                         : alpha(
-                            theme.palette.primary.main,
-                            0.08
+                            theme.palette.text.primary,
+                            0.06
                           ),
-                      color: theme.palette.primary.main,
+                      color: isSelected
+                        ? theme.palette.primary.main
+                        : theme.palette.text.secondary,
                       fontWeight: 600,
                       fontSize: '0.73rem',
                       border: isSelected
                         ? `1.5px solid ${alpha(
                             theme.palette.primary.main,
-                            0.5
+                            0.25
                           )}`
                         : `1px solid ${alpha(
-                            theme.palette.primary.main,
-                            0.2
+                            theme.palette.text.primary,
+                            0.15
                           )}`,
                       transition: 'all 0.15s ease',
                       '&:hover': {
                         bgcolor: alpha(
                           theme.palette.primary.main,
-                          0.18
+                          0.1
                         ),
+                        color: theme.palette.primary.main,
+                      },
+                      '& .MuiChip-icon': {
+                        color: 'inherit',
                       },
                     }}
                   />
@@ -1418,7 +1511,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               ref={editorRef}
               value={content}
               onChange={setContent}
-              placeholder="Document your emotions, game plan, lessons learned, or trading insights... (type @ to insert a trade tag)"
+              placeholder="Document your emotions, game plan, lessons learned, or trading insights... (type /tag to insert a trade tag)"
               minHeight={300}
               maxLength={5000}
               hideCharacterCount={true}

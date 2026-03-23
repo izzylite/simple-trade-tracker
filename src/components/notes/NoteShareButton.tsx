@@ -117,6 +117,10 @@ const NoteShareButton: React.FC<NoteShareButtonProps> = ({
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={() => setAnchorEl(null)}
+        slotProps={{
+          paper: { sx: { zIndex: 1500 } },
+        }}
+        style={{ zIndex: 1500 }}
       >
         <MenuItem onClick={handleCopyLink}>
           <ListItemIcon>
