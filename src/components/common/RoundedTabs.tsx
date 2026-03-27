@@ -63,21 +63,21 @@ const RoundedTabs: React.FC<RoundedTabsProps> = ({
       minHeight: 32,
       fontSize: '0.75rem',
       padding: '4px 12px',
-      borderRadius: '14px',
+      borderRadius: '8px',
       containerPadding: '2px'
     },
     medium: {
       minHeight: 40,
       fontSize: '0.875rem',
       padding: '6px 18px',
-      borderRadius: '16px',
+      borderRadius: '8px',
       containerPadding: '4px'
     },
     large: {
       minHeight: 48,
       fontSize: '1rem',
       padding: '8px 24px',
-      borderRadius: '20px',
+      borderRadius: '8px',
       containerPadding: '6px'
     }
   };
@@ -93,8 +93,8 @@ const RoundedTabs: React.FC<RoundedTabsProps> = ({
         '& .MuiTab-root': {
           '&.Mui-selected': {
             backgroundColor: theme.palette.primary.main,
-            color: theme.palette.mode === 'dark' ? 'white' : 'white',
-            boxShadow: theme.shadows[1]
+            color: '#ffffff',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
           },
           '&:hover:not(.Mui-selected)': {
             backgroundColor: alpha(theme.palette.primary.main, 0.05),
@@ -111,9 +111,9 @@ const RoundedTabs: React.FC<RoundedTabsProps> = ({
         : alpha(theme.palette.background.paper, 0.4),
       '& .MuiTab-root': {
         '&.Mui-selected': {
-          color: theme.palette.mode === 'dark' ? 'white' : 'background.paper',
-          backgroundColor: 'primary.main',
-          boxShadow: theme.shadows[1]
+          backgroundColor: theme.palette.primary.main,
+          color: '#ffffff',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
         },
         '&:hover:not(.Mui-selected)': {
           backgroundColor: alpha(theme.palette.primary.main, 0.05),
@@ -154,9 +154,10 @@ const RoundedTabs: React.FC<RoundedTabsProps> = ({
               my: 0.2,
               textTransform: 'none',
               fontSize: config.fontSize,
-              fontWeight: 500,
+              fontWeight: 600,
               color: 'text.secondary',
-              borderRadius: config.borderRadius,
+              backgroundColor: 'transparent',
+              borderRadius: '8px',
               padding: config.padding,
               minWidth: fullWidth ? 'auto' : 'fit-content',
               gap: 0.5,
