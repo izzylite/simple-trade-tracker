@@ -190,24 +190,22 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
     <Card
       sx={{
         cursor: 'pointer',
-        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: 'all 0.2s ease',
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         height: 'auto',
-        borderRadius: 1,
-        border: '1px solid',
-        borderColor: alpha(theme.palette.divider, 0.1),
-        background: theme.palette.mode === 'dark'
-          ? `linear-gradient(145deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.default, 0.98)} 100%)`
-          : `linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.98) 100%)`,
-        backdropFilter: 'blur(10px)',
-        boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.3 : 0.08)}`,
+        borderRadius: '12px',
+        backgroundColor: 'background.paper',
+        boxShadow: theme.palette.mode === 'dark'
+          ? '0 2px 8px rgba(0,0,0,0.3)'
+          : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
         '&:hover': {
-          transform: 'translateY(-8px) scale(1.02)',
-          boxShadow: `0 20px 40px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.4 : 0.15)}`,
-          borderColor: alpha(theme.palette.primary.main, 0.3),
+          transform: 'translateY(-2px)',
+          boxShadow: theme.palette.mode === 'dark'
+            ? '0 4px 16px rgba(0,0,0,0.4)'
+            : '0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04)',
           '& .hero-image': {
             transform: 'scale(1.05)'
           }
