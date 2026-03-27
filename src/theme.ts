@@ -68,7 +68,7 @@ export function createAppTheme(mode: 'light' | 'dark') {
         main: palette.slate[500],
       },
       background: {
-        default: isDark ? palette.slate[900] : palette.slate[100],
+        default: isDark ? palette.slate[900] : '#e8edf4',
         paper: isDark ? palette.slate[800] : '#ffffff',
       },
       text: {
@@ -77,7 +77,7 @@ export function createAppTheme(mode: 'light' | 'dark') {
       },
       divider: isDark ? palette.slate[700] : palette.slate[200],
       custom: {
-        pageBackground: isDark ? palette.slate[900] : palette.slate[100],
+        pageBackground: isDark ? palette.slate[900] : '#e8edf4',
       },
     },
     shape: {
@@ -146,7 +146,7 @@ export function createAppTheme(mode: 'light' | 'dark') {
             borderRadius: 12,
             boxShadow: s.md,
             transition: 'all 0.15s ease',
-            ...(isDark ? {} : { border: '1px solid #e2e8f0' }),
+            ...(isDark ? {} : { border: '1px solid #cbd5e1' }),
             '&:hover': {
               boxShadow: s.lg,
               transform: 'translateY(-2px)',
