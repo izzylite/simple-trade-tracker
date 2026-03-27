@@ -31,7 +31,7 @@ export const StyledCalendarDay = styled(Box, {
         : $dayStatus === 'breakeven'
           ? 'rgba(100, 116, 139, 0.08)'
           : theme.palette.background.paper,
-  border: 'none',
+  border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
   boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
   position: 'relative',
   overflow: 'hidden',
@@ -58,10 +58,11 @@ export const StyledCalendarDay = styled(Box, {
 
 }));
 
-export const CalendarCell = styled(Box)(() => ({
+export const CalendarCell = styled(Box)(({ theme }) => ({
   borderRadius: '8px',
   overflow: 'hidden',
   backgroundColor: 'transparent',
+  border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
 }));
 
 export const WeekdayHeader = styled(Box)(({ theme }) => ({
@@ -146,6 +147,7 @@ export const CardContainer = styled(Paper)(({ theme }) => ({
   boxShadow: theme.palette.mode === 'dark'
     ? '0 2px 8px rgba(0,0,0,0.3)'
     : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+  border: theme.palette.mode === 'light' ? '1px solid #e2e8f0' : 'none',
   backgroundColor: theme.palette.background.paper,
   transition: 'all 0.2s ease-in-out',
   '&:hover': {
@@ -164,6 +166,7 @@ export const StatsContainer = styled(Box)(({ theme }) => ({
   padding: theme.spacing(2),
   borderRadius: '12px',
   backgroundColor: theme.palette.background.paper,
+  border: theme.palette.mode === 'light' ? '1px solid #e2e8f0' : 'none',
 }));
 
 // Stat item styled component
@@ -177,6 +180,7 @@ export const StatItem = styled(Box)(({ theme }) => ({
   boxShadow: theme.palette.mode === 'dark'
     ? '0 1px 2px rgba(0,0,0,0.2)'
     : '0 1px 2px rgba(0,0,0,0.06)',
+  border: theme.palette.mode === 'light' ? '1px solid #e2e8f0' : 'none',
 }));
 
 // Stat label styled component
@@ -329,6 +333,7 @@ export const AccountBalanceCard = styled(Paper)(({ theme }) => ({
   boxShadow: theme.palette.mode === 'dark'
     ? '0 2px 8px rgba(0,0,0,0.3)'
     : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+  border: theme.palette.mode === 'light' ? '1px solid #e2e8f0' : 'none',
   transition: 'all 0.2s ease-in-out',
   '&:hover': {
     transform: 'translateY(-2px)',
@@ -374,6 +379,7 @@ export const MonthlyStatsCard = styled(Paper)(({ theme }) => ({
   boxShadow: theme.palette.mode === 'dark'
     ? '0 2px 8px rgba(0,0,0,0.3)'
     : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+  border: theme.palette.mode === 'light' ? '1px solid #e2e8f0' : 'none',
 }));
 
 // Monthly stats title styled component
@@ -397,6 +403,7 @@ export const MonthlyStatItem = styled(Box)(({ theme }) => ({
   boxShadow: theme.palette.mode === 'dark'
     ? '0 1px 2px rgba(0,0,0,0.2)'
     : '0 1px 2px rgba(0,0,0,0.06)',
+  border: theme.palette.mode === 'light' ? '1px solid #e2e8f0' : 'none',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',

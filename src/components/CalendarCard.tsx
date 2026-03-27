@@ -201,6 +201,10 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
         boxShadow: theme.palette.mode === 'dark'
           ? '0 2px 8px rgba(0,0,0,0.3)'
           : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+        ...(theme.palette.mode === 'light' && {
+          border: '1px solid',
+          borderColor: 'divider',
+        }),
         '&:hover': {
           transform: 'translateY(-2px)',
           boxShadow: theme.palette.mode === 'dark'
