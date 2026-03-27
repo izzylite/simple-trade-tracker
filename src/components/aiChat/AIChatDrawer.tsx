@@ -251,8 +251,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(4px)',
+          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.3)',
           zIndex: Z_INDEX.AI_DRAWER_BACKDROP,
           opacity: open ? 1 : 0,
           visibility: open ? 'visible' : 'hidden',
@@ -273,18 +272,15 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           maxHeight: '85vh',
           width: '100%',
           maxWidth: { xs: '100%', sm: '420px', md: '460px', lg: '500px' },
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
+          borderTopLeftRadius: 12,
+          borderTopRightRadius: 12,
           borderBottomLeftRadius: 0,
           borderBottomRightRadius: 0,
-          background: theme.palette.mode === 'dark'
-            ? 'linear-gradient(135deg, rgba(18, 18, 18, 0.98) 0%, rgba(30, 30, 30, 0.98) 100%)'
-            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%)',
-          backdropFilter: 'blur(20px)',
+          backgroundColor: 'background.paper',
           boxShadow: theme.palette.mode === 'dark'
-            ? '0 -8px 32px rgba(0, 0, 0, 0.6)'
-            : '0 -8px 32px rgba(0, 0, 0, 0.15)',
-          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            ? '0 -8px 24px rgba(0,0,0,0.5)'
+            : '0 -8px 24px rgba(0,0,0,0.1)',
+          border: `1px solid ${theme.palette.divider}`,
           borderBottom: 'none',
           transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           transform: open ? 'translateY(0)' : 'translateY(100%)',
@@ -303,11 +299,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            p: 2,
-            pb: 1,
-            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-            background: alpha(theme.palette.background.paper, 0.8),
-            backdropFilter: 'blur(10px)'
+            padding: '16px 20px',
+            borderBottom: `1px solid ${theme.palette.divider}`
           }}
           >
             {/* Left side - Logo and Title */}
@@ -315,7 +308,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
               <Avatar sx={{
                 width: 36,
                 height: 36,
-                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
                 border: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`
               }}>
                 <AIIcon sx={{ fontSize: 20, color: 'white' }} />
