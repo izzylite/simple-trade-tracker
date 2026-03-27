@@ -75,14 +75,14 @@ const EconomicCalendarFilters: React.FC<EconomicCalendarFiltersProps> = ({
             sx={{
               p: 2.5,
               borderRadius: 2,
-              background: alpha(theme.palette.background.paper, 0.6),
+              backgroundColor: 'background.paper',
               border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             }}
           >
             <FormControl component="fieldset" fullWidth>
-              <FormLabel component="legend" sx={{ 
-                mb: 1.5, 
-                fontSize: '0.875rem', 
+              <FormLabel component="legend" sx={{
+                mb: 1.5,
+                fontSize: '0.875rem',
                 fontWeight: 600,
                 color: 'text.primary'
               }}>
@@ -118,7 +118,7 @@ const EconomicCalendarFilters: React.FC<EconomicCalendarFiltersProps> = ({
             sx={{
               p: 2.5,
               borderRadius: 2,
-              background: alpha(theme.palette.background.paper, 0.6),
+              backgroundColor: 'background.paper',
               border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             }}
           >
@@ -169,7 +169,7 @@ const EconomicCalendarFilters: React.FC<EconomicCalendarFiltersProps> = ({
             sx={{
               p: 2.5,
               borderRadius: 2,
-              background: alpha(theme.palette.background.paper, 0.6),
+              backgroundColor: 'background.paper',
               border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             }}
           >
@@ -220,7 +220,7 @@ const EconomicCalendarFilters: React.FC<EconomicCalendarFiltersProps> = ({
             sx={{
               p: 2.5,
               borderRadius: 2,
-              background: alpha(theme.palette.background.paper, 0.6),
+              backgroundColor: 'background.paper',
               border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             }}
           >
@@ -275,7 +275,7 @@ const EconomicCalendarFilters: React.FC<EconomicCalendarFiltersProps> = ({
             sx={{
               p: 2.5,
               borderRadius: 2,
-              background: alpha(theme.palette.background.paper, 0.6),
+              backgroundColor: 'background.paper',
               border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             }}
           >
