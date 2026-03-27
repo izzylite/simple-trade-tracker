@@ -4,14 +4,13 @@ export const dialogProps = {
   PaperProps: {
     sx: {
       bgcolor: 'background.paper',
-      borderRadius: 2,
-      boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.15)'
+      borderRadius: '12px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
     }
   },
   sx: {
     '& .MuiBackdrop-root': {
-      backdropFilter: 'blur(4px)',
-      backgroundColor: 'rgba(0, 0, 0, 0.5)'
+      backgroundColor: 'rgba(0,0,0,0.6)'
     }
   }
 } as const;
