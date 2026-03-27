@@ -51,7 +51,6 @@ import EconomicEventShimmer from '../components/economicCalendar/EconomicEventSh
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { dialogProps } from '../styles/dialogStyles';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
-import AnimatedBackground from '../components/common/AnimatedBackground';
 import { DuplicateCalendarDialog } from '../components/dialogs/DuplicateCalendarDialog';
 import { CalendarLinkDialog } from '../components/dialogs/CalendarLinkDialog';
 import CalendarListDialog from '../components/dialogs/CalendarListDialog';
@@ -474,13 +473,9 @@ const Home: React.FC<HomeProps> = ({
     <Box
       sx={{
         minHeight: '100vh',
-        bgcolor: 'custom.pageBackground',
-        position: 'relative',
-        overflow: 'hidden',
+        bgcolor: 'background.default',
       }}
     >
-      <AnimatedBackground />
-
       <Box
         sx={{
           pt: { xs: 2, sm: 3, md: 4 },
@@ -488,8 +483,6 @@ const Home: React.FC<HomeProps> = ({
           px: { xs: 2, sm: 3, md: 4 },
           maxWidth: '1400px',
           mx: 'auto',
-          position: 'relative',
-          zIndex: 1,
         }}
       >
         {/* Header Section */}
@@ -1250,16 +1243,12 @@ const Home: React.FC<HomeProps> = ({
                       borderRadius: 2,
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      bgcolor: theme.palette.mode === 'dark'
-                        ? alpha(theme.palette.common.black, 0.2)
-                        : alpha(theme.palette.common.black, 0.03),
-                      border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                      bgcolor: 'background.default',
+                      border: `1px solid ${theme.palette.divider}`,
                       '&:hover': {
                         boxShadow: 2,
                         transform: 'translateY(-2px)',
-                        bgcolor: theme.palette.mode === 'dark'
-                          ? alpha(theme.palette.common.black, 0.3)
-                          : alpha(theme.palette.common.black, 0.06),
+                        bgcolor: 'action.hover',
                       },
                       '&:last-child': {
                         mb: 0
@@ -1324,9 +1313,6 @@ const Home: React.FC<HomeProps> = ({
                     key={index}
                     sx={{
                       borderRadius: 2,
-                      border: '1px solid',
-                      borderColor: alpha(theme.palette.primary.main, 0.2),
-                      backgroundColor: alpha(theme.palette.primary.main, 0.05)
                     }}
                   >
                     <CardContent sx={{ p: 2, pt: 2, '&:last-child': { pb: 2 } }}>
