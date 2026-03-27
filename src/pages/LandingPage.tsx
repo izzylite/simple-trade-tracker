@@ -31,8 +31,7 @@ const FeatureCard = ({ icon, title, description, delay = 0 }: { icon: React.Reac
         <Card
             sx={{
                 height: '100%',
-                bgcolor: alpha(theme.palette.background.paper, 0.6),
-                backdropFilter: 'blur(10px)',
+                bgcolor: 'background.paper',
                 border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                 transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 animation: `fadeInUp 0.6s ease-out ${delay}s both`,
@@ -41,10 +40,9 @@ const FeatureCard = ({ icon, title, description, delay = 0 }: { icon: React.Reac
                     to: { opacity: 1, transform: 'translateY(0)' }
                 },
                 '&:hover': {
-                    transform: 'translateY(-12px)',
-                    boxShadow: `0 20px 40px ${alpha(theme.palette.primary.main, 0.15)}`,
+                    transform: 'translateY(-2px)',
+                    boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.15)}`,
                     borderColor: alpha(theme.palette.primary.main, 0.4),
-                    bgcolor: alpha(theme.palette.background.paper, 0.8),
                     '& .icon-box': {
                         transform: 'scale(1.1) rotate(5deg)',
                         bgcolor: 'primary.main',
@@ -232,7 +230,7 @@ const LandingPage: React.FC = () => {
                                 fontSize: '1.15rem',
                                 borderRadius: 3,
                                 fontWeight: 800,
-                                boxShadow: `0 12px 30px ${alpha(theme.palette.primary.main, 0.4)}`,
+                                boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`,
                             }}
                         >
                             Dashboard
@@ -269,7 +267,7 @@ const LandingPage: React.FC = () => {
                                 position: 'relative',
                                 borderRadius: 2,
                                 overflow: 'hidden',
-                                boxShadow: `0 50px 100px -20px ${alpha(theme.palette.common.black, 0.3)}`,
+                                boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, 0.2)}`,
                                 border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
                                 bgcolor: 'background.paper',
                                 width: '100%',
@@ -365,7 +363,7 @@ const LandingPage: React.FC = () => {
                                     sx={{
                                         borderRadius: 2,
                                         overflow: 'hidden',
-                                        boxShadow: `0 25px 50px -12px ${alpha(theme.palette.common.black, 0.25)}`,
+                                        boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, 0.15)}`,
                                         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                                     }}
                                 >
@@ -388,7 +386,7 @@ const LandingPage: React.FC = () => {
                                     sx={{
                                         borderRadius: 2,
                                         overflow: 'hidden',
-                                        boxShadow: `0 25px 50px -12px ${alpha(theme.palette.common.black, 0.25)}`,
+                                        boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, 0.15)}`,
                                         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                                     }}
                                 >
@@ -441,7 +439,7 @@ const LandingPage: React.FC = () => {
                                     sx={{
                                         borderRadius: 2,
                                         overflow: 'hidden',
-                                        boxShadow: `0 25px 50px -12px ${alpha(theme.palette.common.black, 0.25)}`,
+                                        boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, 0.15)}`,
                                         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                                     }}
                                 >
@@ -489,7 +487,7 @@ const LandingPage: React.FC = () => {
                         textAlign: 'center',
                         position: 'relative',
                         overflow: 'hidden',
-                        boxShadow: `0 24px 48px ${alpha(theme.palette.primary.main, 0.4)}`
+                        boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`
                     }}
                 >
                     {/* Decorative Circle */}
@@ -526,7 +524,7 @@ const LandingPage: React.FC = () => {
                             fontSize: '1.2rem',
                             '&:hover': {
                                 bgcolor: alpha(theme.palette.common.white, 0.9),
-                                transform: 'scale(1.05)'
+                                transform: 'translateY(-2px)'
                             },
                             transition: 'all 0.2s',
                             position: 'relative'

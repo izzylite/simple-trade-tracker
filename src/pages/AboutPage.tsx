@@ -101,7 +101,7 @@ const AboutPage: React.FC = () => {
       {/* Hero Section */}
       <Box
         sx={{
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.08)} 100%)`,
+          bgcolor: 'background.paper',
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           py: { xs: 5, sm: 8 },
           px: { xs: 2, sm: 3 },
@@ -330,7 +330,7 @@ const AboutPage: React.FC = () => {
           <Card
             sx={{
               borderRadius: 3,
-              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.03)} 0%, ${alpha(theme.palette.secondary.main, 0.03)} 100%)`,
+              bgcolor: 'background.paper',
               border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
               animation: 'fadeInUp 0.6s ease-out 1s both'
             }}
@@ -385,7 +385,7 @@ const AboutPage: React.FC = () => {
           <Card
             sx={{
               borderRadius: 3,
-              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
+              bgcolor: 'background.paper',
               border: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
               animation: 'fadeInUp 0.6s ease-out 1.1s both'
             }}
