@@ -35,9 +35,6 @@ const LoginPrompt: React.FC<LoginPromptProps> = ({
             borderRadius: 3,
             boxShadow: theme.shadows[8],
             overflow: 'hidden',
-            background: theme.palette.mode === 'dark'
-              ? `linear-gradient(145deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.default, 0.98)} 100%)`
-              : `linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.98) 100%)`,
           }}
         >
           <LoginPromptContent

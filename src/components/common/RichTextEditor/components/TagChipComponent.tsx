@@ -38,7 +38,7 @@ const TagChipComponent: React.FC<TagChipProps> = ({
         backgroundColor: alpha(color, 0.12),
         color: color,
         border: `1px solid ${alpha(color, 0.25)}`,
-        borderRadius: 12,
+        borderRadius: 6,
         padding: '1px 8px',
         fontSize: '0.8rem',
         fontWeight: 600,

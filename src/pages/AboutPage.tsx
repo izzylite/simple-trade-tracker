@@ -22,7 +22,6 @@ import {
   Security
 } from '@mui/icons-material';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
-import AnimatedBackground from '../components/common/AnimatedBackground';
 
 interface SectionProps {
   icon: React.ReactNode;
@@ -97,7 +96,6 @@ const AboutPage: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
-      <AnimatedBackground />
       {/* Hero Section */}
       <Box
         sx={{

@@ -105,7 +105,6 @@ import * as calendarService from '../services/calendarService';
 import { Note, DayAbbreviation } from '../types/note';
 
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
-import AnimatedBackground from '../components/common/AnimatedBackground';
 import { Z_INDEX } from '../styles/zIndex';
 
 import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
@@ -1401,7 +1400,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       position: 'relative',
       overflow: 'hidden'
     }}>
-      <AnimatedBackground />
       {/* Floating Month Navigation */}
       <FloatingMonthNavigation
         currentDate={currentDate}

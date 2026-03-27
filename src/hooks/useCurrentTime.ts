@@ -49,6 +49,9 @@ export function useCurrentTime(options: UseCurrentTimeOptions = {}) {
 
     const interval = isImminent ? imminentInterval : normalInterval;
 
+    // Immediately refresh so countdown isn't stale until the first tick
+    setCurrentTime(new Date());
+
     clearCurrentInterval();
     intervalRef.current = setInterval(() => {
       setCurrentTime(new Date());

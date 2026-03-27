@@ -427,7 +427,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         <Box sx={{
           p: 3,
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          bgcolor: 'background.default',
+          bgcolor: 'background.paper',
         }}>
           {/* View Type Selector */}
           <Box sx={{ mb: 2 }}>
@@ -436,7 +436,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                 startIcon={<EventIcon />}
                 onClick={() => handleViewTypeChange('day')}
                 variant={!isMonthPickerActive && viewType === 'day' ? 'contained' : 'outlined'}
-                sx={{ flex: 1 }}
+                sx={{ flex: 1, whiteSpace: 'nowrap' }}
               >
                 Today
               </Button>
@@ -444,7 +444,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                 startIcon={<WeekIcon />}
                 onClick={() => handleViewTypeChange('week')}
                 variant={!isMonthPickerActive && viewType === 'week' ? 'contained' : 'outlined'}
-                sx={{ flex: 1 }}
+                sx={{ flex: 1, whiteSpace: 'nowrap' }}
               >
                 This Week
               </Button>
@@ -452,7 +452,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
                 startIcon={<MonthIcon />}
                 onClick={() => handleViewTypeChange('month')}
                 variant={!isMonthPickerActive && viewType === 'month' ? 'contained' : 'outlined'}
-                sx={{ flex: 1 }}
+                sx={{ flex: 1, whiteSpace: 'nowrap' }}
               >
                 This Month
               </Button>

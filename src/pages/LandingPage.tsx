@@ -44,7 +44,7 @@ const FeatureCard = ({ icon, title, description, delay = 0 }: { icon: React.Reac
                     boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.15)}`,
                     borderColor: alpha(theme.palette.primary.main, 0.4),
                     '& .icon-box': {
-                        transform: 'scale(1.1) rotate(5deg)',
+                        transform: 'scale(1.05)',
                         bgcolor: 'primary.main',
                         color: 'white',
                     }
@@ -192,7 +192,14 @@ const LandingPage: React.FC = () => {
                         }}
                     >
                         Stop Trading Blind. <br />
-                        Start <span style={{ color: theme.palette.primary.main }}>Journaling</span>.
+                        Start{' '}
+                        <Box component="span" sx={{
+                            WebkitBackgroundClip: 'unset',
+                            WebkitTextFillColor: 'unset',
+                            color: 'primary.main',
+                        }}>
+                            Journaling
+                        </Box>.
                     </Typography>
                     <Typography
                         variant="h5"
@@ -223,7 +230,7 @@ const LandingPage: React.FC = () => {
                             variant="contained"
                             size="large"
                             endIcon={<ArrowForward />}
-                            onClick={() => navigate('/dashboard')}
+                            onClick={handleGetStarted}
                             sx={{
                                 height: 64,
                                 px: 5,
@@ -233,7 +240,7 @@ const LandingPage: React.FC = () => {
                                 boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`,
                             }}
                         >
-                            Dashboard
+                            Get Started
                         </Button>
                         <Button
                             variant="outlined"

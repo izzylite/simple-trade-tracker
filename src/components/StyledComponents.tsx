@@ -25,9 +25,9 @@ export const StyledCalendarDay = styled(Box, {
   [theme.breakpoints.down('sm')]: { minHeight: '60px', padding: theme.spacing(0.75) },
   backgroundColor:
     $dayStatus === 'win'
-      ? (theme.palette.mode === 'dark' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(22, 163, 74, 0.08)')
+      ? (theme.palette.mode === 'dark' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(22, 163, 74, 0.15)')
       : $dayStatus === 'loss'
-        ? (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'rgba(220, 38, 38, 0.08)')
+        ? (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'rgba(220, 38, 38, 0.15)')
         : $dayStatus === 'breakeven'
           ? 'rgba(100, 116, 139, 0.08)'
           : theme.palette.background.paper,
@@ -38,9 +38,9 @@ export const StyledCalendarDay = styled(Box, {
   '&:hover': {
     backgroundColor:
       $dayStatus === 'win'
-        ? (theme.palette.mode === 'dark' ? 'rgba(34, 197, 94, 0.18)' : 'rgba(22, 163, 74, 0.13)')
+        ? (theme.palette.mode === 'dark' ? 'rgba(34, 197, 94, 0.18)' : 'rgba(22, 163, 74, 0.22)')
         : $dayStatus === 'loss'
-          ? (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.16)' : 'rgba(220, 38, 38, 0.13)')
+          ? (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.16)' : 'rgba(220, 38, 38, 0.22)')
           : $dayStatus === 'breakeven'
             ? 'rgba(100, 116, 139, 0.13)'
             : alpha(theme.palette.background.paper, 0.85),

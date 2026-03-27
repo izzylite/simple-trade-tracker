@@ -213,10 +213,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             sx: {
               width: 180,
               padding: 1.5,
-              backgroundColor: theme.palette.mode === 'dark'
-                ? alpha(theme.palette.background.paper, 0.95)
-                : alpha(theme.palette.background.paper, 0.98),
-              backdropFilter: 'blur(20px)',
+              backgroundColor: theme.palette.background.paper,
               borderRadius: '12px',
               border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
               boxShadow: theme.palette.mode === 'dark'
@@ -261,10 +258,9 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
                       minWidth: 0,
                       fontSize: '0.65rem',
                       fontWeight: 'bold',
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transition: 'opacity 0.15s ease',
                       '&:hover': {
-                        transform: 'translateY(-1px) scale(1.05)',
-                        boxShadow: `0 4px 12px ${alpha(color.color === 'default' ? theme.palette.text.primary : color.color, 0.3)}`,
+                        opacity: 0.8,
                       }
                     }}
                     aria-label={`Apply ${color.label} text color`}
@@ -286,13 +282,12 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
                       borderRadius: '6px',
                       p: 0,
                       minWidth: 0,
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transition: 'opacity 0.15s ease',
                       ...(color.color === 'default' && {
                         backgroundImage: `linear-gradient(to top right, transparent calc(50% - 0.5px), ${alpha(theme.palette.text.primary, 0.4)} calc(50% - 0.5px), ${alpha(theme.palette.text.primary, 0.4)} calc(50% + 0.5px), transparent calc(50% + 0.5px))`
                       }),
                       '&:hover': {
-                        transform: 'translateY(-1px) scale(1.05)',
-                        boxShadow: `0 4px 12px ${alpha(color.color === 'default' ? theme.palette.text.primary : color.color, 0.4)}`,
+                        opacity: 0.8,
                       }
                     }}
                     aria-label={`Apply ${color.label} background color`}
@@ -424,10 +419,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             onMouseDown: handleToolbarInteraction,
             onTouchStart: handleToolbarInteraction,
             sx: {
-              backgroundColor: theme.palette.mode === 'dark'
-                ? alpha(theme.palette.background.paper, 0.95)
-                : alpha(theme.palette.background.paper, 0.98),
-              backdropFilter: 'blur(20px)',
+              backgroundColor: theme.palette.background.paper,
               borderRadius: '12px',
               border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
               boxShadow: theme.palette.mode === 'dark'
@@ -446,15 +438,13 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             onClick={() => handleApplyHeadingInternal(option.style)}
             selected={currentBlockType === option.style}
             sx={{
-              fontWeight: option.style.includes('header') ? 'bold' : 500,
-              fontSize: option.style === 'header-one' ? '1.4rem' : option.style === 'header-two' ? '1.2rem' : option.style === 'header-three' ? '1rem' : '0.85rem',
-              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
-              borderRadius: '8px',
+              fontWeight: option.style.includes('header') ? 700 : 500,
+              fontSize: option.style === 'header-one' ? '1.3rem' : option.style === 'header-two' ? '1.1rem' : option.style === 'header-three' ? '0.95rem' : '0.85rem',
+              borderRadius: '6px',
               margin: '2px 4px',
-              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              transition: 'background-color 0.15s ease',
               '&:hover': {
                 backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                transform: 'translateX(4px)',
               },
               '&.Mui-selected': {
                 backgroundColor: alpha(theme.palette.primary.main, 0.12),
@@ -476,31 +466,24 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const getToolbarButtonStyles = () => ({
     '& .MuiIconButton-root, & .MuiToggleButton-root': {
       color: theme.palette.text.secondary,
-      borderRadius: '8px',
-      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      position: 'relative',
-      overflow: 'hidden',
+      borderRadius: '6px',
+      transition: 'background-color 0.15s ease, color 0.15s ease',
       '&:hover': {
         backgroundColor: alpha(theme.palette.primary.main, 0.08),
         color: theme.palette.primary.main,
-        transform: 'translateY(-1px)',
-        boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`,
       },
       '&.Mui-selected': {
         backgroundColor: alpha(theme.palette.primary.main, 0.12),
         color: theme.palette.primary.main,
-        boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.25)}`,
         '&:hover': {
           backgroundColor: alpha(theme.palette.primary.main, 0.18),
-          transform: 'translateY(-1px)',
-          boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
         }
       }
     },
     '& .MuiDivider-root': {
-      backgroundColor: alpha(theme.palette.divider, 0.3),
-      margin: theme.spacing(0, 0.75),
-      height: '24px',
+      backgroundColor: theme.palette.divider,
+      margin: theme.spacing(0, 0.5),
+      height: '20px',
       alignSelf: 'center',
     }
   });
@@ -741,26 +724,16 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             sx={{
               borderRadius: '12px',
               overflow: 'hidden',
-              backgroundColor: theme.palette.mode === 'dark'
-                ? alpha(theme.palette.background.paper, 0.95)
-                : alpha(theme.palette.background.paper, 0.98),
-              backdropFilter: 'blur(20px)',
-              border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+              backgroundColor: theme.palette.background.paper,
+              border: `1px solid ${theme.palette.divider}`,
               boxShadow: theme.palette.mode === 'dark'
-                ? `0 8px 32px ${alpha('#000000', 0.4)}, 0 2px 8px ${alpha('#000000', 0.2)}`
-                : `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}, 0 2px 8px ${alpha('#000000', 0.1)}`,
-              transition: 'opacity 0.15s ease-out, transform 0.15s ease-out',
+                ? '0 4px 16px rgba(0,0,0,0.4)'
+                : '0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)',
               animation: 'floatingToolbarFadeIn 0.15s ease-out forwards',
               '@keyframes floatingToolbarFadeIn': {
-                '0%': { opacity: 0, transform: 'translateY(8px)' },
+                '0%': { opacity: 0, transform: 'translateY(6px)' },
                 '100%': { opacity: 1, transform: 'translateY(0)' }
               },
-              '&:hover': {
-                boxShadow: theme.palette.mode === 'dark'
-                  ? `0 12px 40px ${alpha('#000000', 0.5)}, 0 4px 12px ${alpha('#000000', 0.3)}`
-                  : `0 12px 40px ${alpha(theme.palette.primary.main, 0.2)}, 0 4px 12px ${alpha('#000000', 0.15)}`,
-                transform: 'translateY(-1px)',
-              }
             }}
             role="toolbar"
             aria-label="Text Formatting"
@@ -785,16 +758,10 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
           position: 'sticky',
           ...(stickyPosition === 'top' ? { top: 0 } : { bottom: 0 }),
           zIndex: Z_INDEX - 100,
-          backgroundColor: theme.palette.mode === 'dark'
-            ? alpha(theme.palette.background.paper, 0.95)
-            : alpha(theme.palette.background.paper, 0.98),
-          backdropFilter: 'blur(20px)',
+          backgroundColor: theme.palette.background.paper,
           ...(stickyPosition === 'top'
-            ? { borderBottom: `1px solid ${alpha(theme.palette.divider, 0.2)}` }
-            : { borderTop: `1px solid ${alpha(theme.palette.divider, 0.2)}` }),
-          boxShadow: stickyPosition === 'top'
-            ? `0 2px 8px ${alpha('#000000', 0.1)}`
-            : `0 -2px 8px ${alpha('#000000', 0.1)}`,
+            ? { borderBottom: `1px solid ${theme.palette.divider}` }
+            : { borderTop: `1px solid ${theme.palette.divider}` }),
         }}
         role="toolbar"
         aria-label="Text Formatting"

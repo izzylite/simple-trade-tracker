@@ -200,6 +200,7 @@ export function createAppTheme(mode: 'light' | 'dark') {
         styleOverrides: {
           paper: {
             boxShadow: s.xl,
+            backgroundImage: 'none',
           },
         },
       },
