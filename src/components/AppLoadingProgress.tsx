@@ -71,16 +71,16 @@ const AppLoadingProgress: React.FC = () => {
       default: isDarkMode ? '#0a0e27' : '#f0f4f8',
     },
     primary: {
-      main: isDarkMode ? '#90caf9' : '#1976d2',
-      light: isDarkMode ? '#bbdefb' : '#42a5f5',
-      dark: isDarkMode ? '#5c9dd8' : '#1565c0',
+      main: isDarkMode ? '#a78bfa' : '#7c3aed',
+      light: isDarkMode ? '#c4b5fd' : '#a78bfa',
+      dark: isDarkMode ? '#8b5cf6' : '#5b21b6',
     },
     secondary: {
-      main: isDarkMode ? '#ce93d8' : '#9c27b0',
-      light: isDarkMode ? '#e1bee7' : '#ba68c8',
+      main: isDarkMode ? '#a78bfa' : '#7c3aed',
+      light: isDarkMode ? '#c4b5fd' : '#a78bfa',
     },
     accent: {
-      main: isDarkMode ? '#4fc3f7' : '#0288d1',
+      main: isDarkMode ? '#a78bfa' : '#7c3aed',
     },
     text: {
       primary: isDarkMode ? '#ffffff' : '#1a2027',

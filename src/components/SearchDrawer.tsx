@@ -266,14 +266,7 @@ const SearchDrawer: React.FC<SearchDrawerProps> = ({
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: 2,
-                  backgroundColor: alpha(theme.palette.background.paper, 0.8),
-                  backdropFilter: 'blur(8px)',
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.background.paper, 0.9)
-                  },
-                  '&.Mui-focused': {
-                    backgroundColor: alpha(theme.palette.background.paper, 1)
-                  }
+                  backgroundColor: theme.palette.background.paper
                 }
               }}
             />

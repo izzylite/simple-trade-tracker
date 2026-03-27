@@ -75,8 +75,7 @@ const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, buttons, rightContent 
         px: 3,
         py: 1.5,
         bgcolor: alpha(theme.palette.divider, 0.03),
-        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-        backdropFilter: 'blur(8px)'
+        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
@@ -205,8 +204,7 @@ const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, buttons, rightContent 
                 minWidth: 200,
                 maxWidth: 350,
                 maxHeight: 400,
-                bgcolor: alpha(theme.palette.background.paper, 0.95),
-                backdropFilter: 'blur(20px)',
+                bgcolor: theme.palette.background.paper,
                 border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                 boxShadow: theme.shadows[8]
               }

@@ -206,9 +206,8 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
           background: isDark
-            ? 'linear-gradient(135deg, rgba(18, 18, 18, 0.98) 0%, rgba(30, 30, 30, 0.98) 100%)'
-            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%)',
-          backdropFilter: 'blur(20px)',
+            ? 'linear-gradient(135deg, rgba(18, 18, 18, 1) 0%, rgba(30, 30, 30, 1) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(248, 250, 252, 1) 100%)',
           boxShadow: isDark
             ? '0 -8px 32px rgba(0, 0, 0, 0.6)'
             : '0 -8px 32px rgba(0, 0, 0, 0.15)',

@@ -80,8 +80,7 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
         {/* Main Navigation Pill */}
         <Box
           sx={{
-            backgroundColor: alpha(theme.palette.background.paper, 0.95),
-            backdropFilter: 'blur(20px)',
+            backgroundColor: theme.palette.background.paper,
             borderRadius: '24px',
             boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
             border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,

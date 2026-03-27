@@ -107,8 +107,7 @@ const ScoreHistoryComponent: React.FC<ScoreHistoryProps> = ({
             border: `1px solid ${theme.palette.divider}`,
             borderRadius: 2,
             p: 2,
-            boxShadow: theme.shadows[8],
-            backdropFilter: 'blur(10px)'
+            boxShadow: theme.shadows[8]
           }}
         >
           <Typography variant="subtitle2" gutterBottom>
