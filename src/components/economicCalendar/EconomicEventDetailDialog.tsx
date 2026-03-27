@@ -499,7 +499,7 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
             mt: 3,
             p: 2,
             borderRadius: 2,
-            backgroundColor: alpha(theme.palette.background.paper, 0.5),
+            backgroundColor: theme.palette.background.paper,
             border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             position: 'relative' // For Ask AI button positioning if needed
           }}>
@@ -527,7 +527,7 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
               )}
             </Box>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(5, 1fr)' }, gap: 1.25 }}>
-              <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.background.paper, 0.3), border: `1px solid ${alpha(theme.palette.divider, 0.15)}` }}>
+              <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: theme.palette.background.paper, border: `1px solid ${alpha(theme.palette.divider, 0.15)}` }}>
                 <Typography variant="caption" color="text.secondary">Total Trades</Typography>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{stats.total}</Typography>
               </Box>
@@ -637,7 +637,7 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
                       p: 2,
                       borderRadius: 2,
                       border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                      backgroundColor: alpha(theme.palette.background.paper, 0.3),
+                      backgroundColor: theme.palette.background.paper,
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 1
@@ -665,7 +665,7 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
                 sx={{
                   textAlign: 'center',
                   py: 3,
-                  backgroundColor: alpha(theme.palette.background.paper, 0.3),
+                  backgroundColor: theme.palette.background.paper,
                   borderRadius: 1,
                   border: `1px dashed ${alpha(theme.palette.divider, 0.3)}`
                 }}

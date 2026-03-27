@@ -1011,7 +1011,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                 userSelect: 'none',
               }}
             >
-              Type /tag, /note, or /event to embed tags, notes, and events
+              Type /tag, /note, or /event to embed tags, notes, and pinned events
             </Typography>
           )}
         </Box>
@@ -1054,7 +1054,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                 <IconButton
                   onClick={() => setImagePickerOpen(true)}
                   sx={{
-                    bgcolor: alpha(theme.palette.background.paper, 0.9),
+                    bgcolor: theme.palette.background.paper,
                     '&:hover': {
                       bgcolor: theme.palette.background.paper,
                     },
@@ -1065,7 +1065,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                 <IconButton
                   onClick={handleRemoveCover}
                   sx={{
-                    bgcolor: alpha(theme.palette.background.paper, 0.9),
+                    bgcolor: theme.palette.background.paper,
                     '&:hover': {
                       bgcolor: theme.palette.background.paper,
                     },

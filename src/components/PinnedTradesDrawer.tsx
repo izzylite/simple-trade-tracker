@@ -225,7 +225,6 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
         <Box sx={{
           p: 2,
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          backgroundColor: alpha(theme.palette.background.paper, 0.3)
         }}>
           <TextField
             fullWidth
@@ -253,9 +252,9 @@ const PinnedTradesDrawer: React.FC<PinnedTradesDrawerProps> = ({
             }}
             sx={{
               '& .MuiOutlinedInput-root': {
-                backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                backgroundColor: theme.palette.background.paper,
                 '&:hover': {
-                  backgroundColor: alpha(theme.palette.background.paper, 0.8)
+                  backgroundColor: theme.palette.background.paper
                 },
                 '&.Mui-focused': {
                   backgroundColor: theme.palette.background.paper
