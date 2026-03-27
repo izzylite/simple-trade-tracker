@@ -105,7 +105,6 @@ import * as calendarService from '../services/calendarService';
 import { Note, DayAbbreviation } from '../types/note';
 
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
-import AnimatedBackground from '../components/common/AnimatedBackground';
 import { Z_INDEX } from '../styles/zIndex';
 
 import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
@@ -214,24 +213,24 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({
     </Box>
   ) : '';
 
+  const isDark = theme.palette.mode === 'dark';
+  const winBg = isDark ? 'rgba(34,197,94,0.12)' : 'rgba(22,163,74,0.08)';
+  const lossBg = isDark ? 'rgba(239,68,68,0.10)' : 'rgba(220,38,38,0.08)';
+  const cellBg = netAmount > 0 ? winBg : netAmount < 0 ? lossBg : 'background.paper';
+
   const content = (
     <CalendarCell
       onClick={() => onWeekClick?.(trade_date)}
       sx={{
-        bgcolor: 'background.paper',
+        bgcolor: cellBg,
         borderRadius: 1,
         cursor: onWeekClick ? 'pointer' : 'default',
-        border: `2px solid ${netAmount > 0
-          ? alpha(theme.palette.success.main, 0.3)
-          : netAmount < 0
-            ? alpha(theme.palette.error.main, 0.3)
-            : alpha(theme.palette.divider, 0.2)
-          }`,
+        border: `1px solid ${theme.palette.divider}`,
         justifyContent: 'center',
         alignItems: 'center',
         position: 'relative',
         '&:hover': onWeekClick ? {
-          borderColor: alpha(theme.palette.info.main, 0.5),
+          borderColor: theme.palette.info.main,
         } : {},
         ...sx
       }}
@@ -468,7 +467,7 @@ const CalendarDayCell = React.memo(({
               m: 1,
               borderRadius: '50%',
               bgcolor: 'error.main',
-              border: `2px solid ${alpha(theme.palette.background.paper, 0.8)}`,
+              border: `2px solid ${theme.palette.background.paper}`,
               boxShadow: `0 0 0 1px ${alpha(theme.palette.error.main, 0.3)}`
             }}
           />
@@ -1401,7 +1400,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       position: 'relative',
       overflow: 'hidden'
     }}>
-      <AnimatedBackground />
       {/* Floating Month Navigation */}
       <FloatingMonthNavigation
         currentDate={currentDate}

@@ -1,17 +1,11 @@
 import { SxProps, Theme } from '@mui/material';
 
+// MuiDialog theme override already sets borderRadius: 12 and boxShadow: xl.
+// dialogProps only needs the backdrop color — do not add redundant radius/shadow overrides.
 export const dialogProps = {
-  PaperProps: {
-    sx: {
-      bgcolor: 'background.paper',
-      borderRadius: 2,
-      boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.15)'
-    }
-  },
   sx: {
     '& .MuiBackdrop-root': {
-      backdropFilter: 'blur(4px)',
-      backgroundColor: 'rgba(0, 0, 0, 0.5)'
+      backgroundColor: 'rgba(0,0,0,0.6)'
     }
   }
 } as const;

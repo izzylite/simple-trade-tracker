@@ -65,12 +65,11 @@ const TradeLoadingIndicator: React.FC<TradeLoadingIndicatorProps> = ({ isLoading
           left: 0,
           right: 0,
           zIndex: 1100,
-          bgcolor: alpha(theme.palette.background.paper, 0.95), // Slightly transparent background
+          bgcolor: theme.palette.background.paper,
           boxShadow: 3, // Add a shadow for depth
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backdropFilter: 'blur(4px)',
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           '@keyframes pulse': {
             '0%': { opacity: 0.6, transform: 'scale(0.95)' },

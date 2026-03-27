@@ -78,7 +78,7 @@ const NoteListItemShimmer: React.FC = () => {
         py: 1.5,
         px: 2,
         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-        bgcolor: alpha(theme.palette.background.paper, 0.6),
+        bgcolor: 'background.paper',
       }}
     >
       <Stack direction="row" spacing={1.5} alignItems="center">
@@ -318,7 +318,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
           )
         }
         width={{ xs: '100%', sm: 450 }}
-        headerVariant="enhanced"
+        headerVariant="default"
         keepMounted={true}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -332,7 +332,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
                   displayEmpty
                   sx={{
                     borderRadius: 1,
-                    bgcolor: alpha(theme.palette.background.paper, 0.5),
+                    bgcolor: 'background.default',
                   }}
                 >
                   <MenuItem value="all">
@@ -392,8 +392,8 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
                   </InputAdornment>
                 ),
                 sx: {
-                  borderRadius: 2,
-                  bgcolor: alpha(theme.palette.background.paper, 0.5),
+                  borderRadius: '8px',
+                  bgcolor: 'background.default',
                 },
               }}
             />

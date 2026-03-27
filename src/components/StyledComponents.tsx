@@ -17,7 +17,7 @@ export const StyledCalendarDay = styled(Box, {
   flexDirection: 'column',
   alignItems: 'center',
   cursor: 'pointer',
-  borderRadius: theme.shape.borderRadius,
+  borderRadius: '8px',
   transition: 'all 0.1s ease-in-out',
   opacity: $isCurrentMonth ? 1 : 0.4,
   minHeight: '100px',
@@ -25,61 +25,56 @@ export const StyledCalendarDay = styled(Box, {
   [theme.breakpoints.down('sm')]: { minHeight: '60px', padding: theme.spacing(0.75) },
   backgroundColor:
     $dayStatus === 'win'
-      ? alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.2 : 0.4)
+      ? (theme.palette.mode === 'dark' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(22, 163, 74, 0.15)')
       : $dayStatus === 'loss'
-        ? alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.2 : 0.4)
+        ? (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'rgba(220, 38, 38, 0.15)')
         : $dayStatus === 'breakeven'
-          ? alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.2 : 0.4)
+          ? 'rgba(100, 116, 139, 0.08)'
           : theme.palette.background.paper,
-  border: `2px solid ${$dayStatus === 'win'
-    ? alpha(theme.palette.success.main, 0.3)
-    : $dayStatus === 'loss'
-      ? alpha(theme.palette.error.main, 0.3)
-      : $dayStatus === 'breakeven'
-        ? alpha(theme.palette.info.main, 0.3)
-        : alpha(theme.palette.divider, 0.2)
-    }`,
-  boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.3 : 0.05)}`,
+  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
+  boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
   position: 'relative',
   overflow: 'hidden',
   '&:hover': {
-    borderColor:
+    backgroundColor:
       $dayStatus === 'win'
-        ? theme.palette.success.main
+        ? (theme.palette.mode === 'dark' ? 'rgba(34, 197, 94, 0.18)' : 'rgba(22, 163, 74, 0.22)')
         : $dayStatus === 'loss'
-          ? theme.palette.error.main
-          : theme.palette.primary.main,
+          ? (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.16)' : 'rgba(220, 38, 38, 0.22)')
+          : $dayStatus === 'breakeven'
+            ? 'rgba(100, 116, 139, 0.13)'
+            : alpha(theme.palette.background.paper, 0.85),
   },
   ...(!$isCurrentMonth && {
     opacity: 0.4,
-    backgroundColor: alpha(theme.palette.background.default, 0.5),
     '&:hover': {
       opacity: 0.6,
     },
   }),
   ...($isCurrentDay && {
-    borderColor: `${theme.palette.primary.main} !important`,
-    borderWidth: '3px !important',
-    boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}, 0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+    border: '1.5px solid rgba(124, 58, 237, 0.4)',
+    boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
   })
 
 }));
 
 export const CalendarCell = styled(Box)(({ theme }) => ({
-  borderRadius: theme.shape.borderRadius,
+  borderRadius: '8px',
   overflow: 'hidden',
-  backgroundColor: alpha(theme.palette.background.paper, 0.05),
-  // Removed border to prevent double border with StyledCalendarDay
+  backgroundColor: 'transparent',
+  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
 }));
 
 export const WeekdayHeader = styled(Box)(({ theme }) => ({
   padding: theme.spacing(1),
   textAlign: 'center',
   color: theme.palette.text.secondary,
-  fontSize: '0.875rem',
-  fontWeight: 500,
-  backgroundColor: alpha(theme.palette.background.paper, 0.05),
-  borderRadius: theme.shape.borderRadius,
+  fontSize: '0.75rem',
+  fontWeight: 600,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.05em',
+  backgroundColor: 'transparent',
+  borderRadius: '8px',
 }));
 
 // Day number styled component
@@ -148,14 +143,18 @@ export const StatusChip = styled(Chip)(({ theme }) => ({
 // Card container styled component
 export const CardContainer = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
-  borderRadius: theme.shape.borderRadius,
-  boxShadow: theme.shadows[2],
-  backgroundColor: theme.palette.mode === 'dark'
-    ? alpha(theme.palette.background.paper, 0.7)
-    : theme.palette.background.paper,
-  transition: 'all 0.3s ease-in-out',
+  borderRadius: '12px',
+  boxShadow: theme.palette.mode === 'dark'
+    ? '0 2px 8px rgba(0,0,0,0.3)'
+    : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
+  backgroundColor: theme.palette.background.paper,
+  transition: 'all 0.2s ease-in-out',
   '&:hover': {
-    boxShadow: theme.shadows[4],
+    transform: 'translateY(-2px)',
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 4px 16px rgba(0,0,0,0.4)'
+      : '0 4px 12px rgba(0,0,0,0.12)',
   },
 }));
 
@@ -165,13 +164,9 @@ export const StatsContainer = styled(Box)(({ theme }) => ({
   flexDirection: 'column',
   gap: theme.spacing(2),
   padding: theme.spacing(2),
-  borderRadius: theme.shape.borderRadius,
-  backgroundColor: theme.palette.mode === 'dark'
-    ? alpha(theme.palette.background.paper, 0.5)
-    : alpha(theme.palette.background.default, 0.7),
-  border: `1px solid ${theme.palette.mode === 'dark'
-    ? alpha(theme.palette.common.white, 0.1)
-    : alpha(theme.palette.common.black, 0.1)}`,
+  borderRadius: '12px',
+  backgroundColor: theme.palette.background.paper,
+  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
 }));
 
 // Stat item styled component
@@ -180,11 +175,12 @@ export const StatItem = styled(Box)(({ theme }) => ({
   justifyContent: 'space-between',
   alignItems: 'center',
   padding: theme.spacing(1),
-  borderRadius: theme.shape.borderRadius,
-  backgroundColor: theme.palette.mode === 'dark'
-    ? alpha(theme.palette.background.paper, 0.7)
-    : theme.palette.background.paper,
-  boxShadow: theme.shadows[1],
+  borderRadius: '8px',
+  backgroundColor: theme.palette.background.paper,
+  boxShadow: theme.palette.mode === 'dark'
+    ? '0 1px 2px rgba(0,0,0,0.2)'
+    : '0 1px 2px rgba(0,0,0,0.06)',
+  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
 }));
 
 // Stat label styled component
@@ -261,36 +257,24 @@ export const TradeListItem = styled(Box, {
   padding: theme.spacing(1.5),
   borderRadius: theme.shape.borderRadius,
   backgroundColor: $type === 'win'
-    ? alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.1 : 0.05)
+    ? 'rgba(34, 197, 94, 0.08)'
     : $type === 'loss'
-      ? alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.1 : 0.05)
+      ? 'rgba(239, 68, 68, 0.08)'
       : $type === 'breakeven'
-        ? alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.1 : 0.05)
+        ? 'rgba(100, 116, 139, 0.08)'
         : theme.palette.background.paper,
   border: '1px solid',
   borderColor: $type === 'win'
-    ? alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
+    ? 'rgba(34, 197, 94, 0.2)'
     : $type === 'loss'
-      ? alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
+      ? 'rgba(239, 68, 68, 0.2)'
       : $type === 'breakeven'
-        ? alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
+        ? 'rgba(100, 116, 139, 0.2)'
         : theme.palette.divider,
   transition: 'all 0.2s ease-in-out',
   '&:hover': {
     transform: 'translateY(-1px)',
-    boxShadow: `0 2px 8px ${alpha(
-      $type === 'win'
-        ? theme.palette.success.main
-        : $type === 'loss'
-          ? theme.palette.error.main
-          : theme.palette.primary.main,
-      0.15
-    )}`,
-    borderColor: $type === 'win'
-      ? theme.palette.success.main
-      : $type === 'loss'
-        ? theme.palette.error.main
-        : theme.palette.primary.main
+    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
   }
 }));
 
@@ -344,15 +328,18 @@ export const CalendarWeekday = styled(Typography)(({ theme }) => ({
 export const AccountBalanceCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(2),
   marginBottom: theme.spacing(2),
-  backgroundColor: theme.palette.mode === 'dark'
-    ? alpha(theme.palette.background.paper, 0.8)
-    : theme.palette.background.paper,
-  borderRadius: theme.shape.borderRadius,
-  boxShadow: theme.shadows[2],
+  backgroundColor: theme.palette.background.paper,
+  borderRadius: '12px',
+  boxShadow: theme.palette.mode === 'dark'
+    ? '0 2px 8px rgba(0,0,0,0.3)'
+    : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
   transition: 'all 0.2s ease-in-out',
   '&:hover': {
     transform: 'translateY(-2px)',
-    boxShadow: theme.shadows[4],
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 4px 16px rgba(0,0,0,0.4)'
+      : '0 4px 12px rgba(0,0,0,0.12)',
   },
 }));
 
@@ -387,12 +374,12 @@ export const AccountBalanceChange = styled(Typography)(({ theme }) => ({
 // Monthly stats card styled component
 export const MonthlyStatsCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
-  background: theme.palette.mode === 'dark'
-    ? alpha(theme.palette.background.paper, 0.8)
-    : theme.palette.background.paper,
-  backdropFilter: 'blur(10px)',
-  borderRadius: theme.shape.borderRadius * 2,
-  boxShadow: theme.shadows[4],
+  backgroundColor: theme.palette.background.paper,
+  borderRadius: '12px',
+  boxShadow: theme.palette.mode === 'dark'
+    ? '0 2px 8px rgba(0,0,0,0.3)'
+    : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
 }));
 
 // Monthly stats title styled component
@@ -411,18 +398,21 @@ export const MonthlyStatsGrid = styled(Box)(({ theme }) => ({
 // Monthly stat item styled component
 export const MonthlyStatItem = styled(Box)(({ theme }) => ({
   padding: theme.spacing(1.5),
-  backgroundColor: theme.palette.mode === 'dark'
-    ? alpha(theme.palette.background.paper, 0.6)
-    : theme.palette.background.paper,
-  borderRadius: theme.shape.borderRadius,
-  boxShadow: theme.shadows[1],
+  backgroundColor: theme.palette.background.paper,
+  borderRadius: '8px',
+  boxShadow: theme.palette.mode === 'dark'
+    ? '0 1px 2px rgba(0,0,0,0.2)'
+    : '0 1px 2px rgba(0,0,0,0.06)',
+  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   transition: 'all 0.2s ease-in-out',
   '&:hover': {
     transform: 'translateY(-2px)',
-    boxShadow: theme.shadows[3],
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 2px 8px rgba(0,0,0,0.3)'
+      : '0 2px 6px rgba(0,0,0,0.12)',
   },
   [theme.breakpoints.down('sm')]: {
     padding: theme.spacing(1),

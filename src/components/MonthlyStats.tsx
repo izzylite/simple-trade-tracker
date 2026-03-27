@@ -263,16 +263,20 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   return (
     <>
       <Paper
-        elevation={2}
+        elevation={0}
         sx={{
           p: { xs: 1.5, sm: 2 },
-          borderRadius: 2,
+          borderRadius: '12px',
           position: 'relative',
           width: '100%',
           pb: { xs: 4, sm: 2.5 },
           overflow: 'hidden',
           height: '100%',
-          minHeight: { xs: '280px', sm: '320px' }
+          minHeight: { xs: '280px', sm: '320px' },
+          bgcolor: 'background.paper',
+          boxShadow: theme => theme.palette.mode === 'dark'
+            ? '0 2px 8px rgba(0,0,0,0.3)'
+            : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)'
         }}
       >
         <Box sx={{
@@ -427,8 +431,8 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           {/* Monthly P&L Card */}
           <Box sx={{
             p: { xs: 1.25, sm: 2 },
-            borderRadius: 2,
-            bgcolor: theme => alpha(theme.palette.background.default, 0.5),
+            borderRadius: '8px',
+            bgcolor: 'background.default',
             display: 'flex',
             flexDirection: 'column',
             gap: { xs: 0.25, sm: 0.5 }
@@ -516,8 +520,8 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           {/* Win Rate Card */}
           <Box sx={{
             p: { xs: 1.25, sm: 2 },
-            borderRadius: 2,
-            bgcolor: theme => alpha(theme.palette.background.default, 0.5),
+            borderRadius: '8px',
+            bgcolor: 'background.default',
             display: 'flex',
             flexDirection: 'column',
             gap: { xs: 0.25, sm: 0.5 }
@@ -563,8 +567,8 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           {/* Total Trades Card */}
           <Box sx={{
             p: { xs: 1.25, sm: 2 },
-            borderRadius: 2,
-            bgcolor: theme => alpha(theme.palette.background.default, 0.5),
+            borderRadius: '8px',
+            bgcolor: 'background.default',
             display: 'flex',
             flexDirection: 'column',
             gap: { xs: 0.25, sm: 0.5 }
@@ -591,8 +595,8 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           {/* Starting Capital Card */}
           <Box sx={{
             p: { xs: 1, sm: 1.5 },
-            borderRadius: 2,
-            bgcolor: theme => alpha(theme.palette.background.default, 0.5),
+            borderRadius: '8px',
+            bgcolor: 'background.default',
             display: 'flex',
             flexDirection: 'column',
             gap: 0.25
@@ -612,8 +616,8 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           {/* Best Day Card */}
           <Box sx={{
             p: { xs: 1, sm: 1.5 },
-            borderRadius: 2,
-            bgcolor: theme => alpha(theme.palette.background.default, 0.5),
+            borderRadius: '8px',
+            bgcolor: 'background.default',
             display: 'flex',
             flexDirection: 'column',
             gap: 0.25
@@ -633,8 +637,8 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           {/* Profit Factor Card */}
           <Box sx={{
             p: { xs: 1, sm: 1.5 },
-            borderRadius: 2,
-            bgcolor: theme => alpha(theme.palette.background.default, 0.5),
+            borderRadius: '8px',
+            bgcolor: 'background.default',
             display: 'flex',
             flexDirection: 'column',
             gap: 0.25

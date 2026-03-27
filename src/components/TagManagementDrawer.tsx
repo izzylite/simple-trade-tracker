@@ -39,6 +39,7 @@ import {
   ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import UnifiedDrawer from './common/UnifiedDrawer';
+import Shimmer from './Shimmer';
 import TagEditDialog from './TagEditDialog';
 import TagCreateDialog from './TagCreateDialog';
 import {
@@ -87,6 +88,8 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [localRequiredGroups, setLocalRequiredGroups] = useState<string[]>(requiredTagGroups);
   const [tagDefinitions, setTagDefinitions] = useState<Record<string, string>>({});
+  const [definitionsLoading, setDefinitionsLoading] = useState(false);
+  const [definitionsLoaded, setDefinitionsLoaded] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   const toggleGroup = (group: string) => {
@@ -108,11 +111,15 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
     const userId = isReadOnly ? calendarOwnerId : user?.id;
     if (!userId) return;
 
+    setDefinitionsLoading(true);
     try {
       const definitions = await tagService.fetchTagDefinitions(userId);
       setTagDefinitions(definitions);
+      setDefinitionsLoaded(true);
     } catch (err) {
       logger.error('Error fetching tag definitions:', err);
+    } finally {
+      setDefinitionsLoading(false);
     }
   }, [user?.id, isReadOnly, calendarOwnerId]);
 
@@ -454,22 +461,30 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
                                 </Box>
                               }
                               secondary={
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                  sx={{
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: 4,
-                                    WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    mt: 0.5,
-                                    ml: 0.5,
-                                    opacity: tagDefinitions[tag] ? 1 : 0.6
-                                  }}
-                                >
-                                  {tagDefinitions[tag] || (isReadOnly ? 'No definition' : 'No definition — click Edit to add one')}
-                                </Typography>
+                                definitionsLoading && !definitionsLoaded ? (
+                                  <Box sx={{ mt: 0.75, ml: 0.5 }}>
+                                    <Shimmer height={9} borderRadius={4} intensity="low" sx={{ mb: 0.5 }} />
+                                    <Shimmer height={9} borderRadius={4} intensity="low" width="85%" sx={{ mb: 0.5 }} />
+                                    <Shimmer height={9} borderRadius={4} intensity="low" width="55%" />
+                                  </Box>
+                                ) : (
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: 4,
+                                      WebkitBoxOrient: 'vertical',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      mt: 0.5,
+                                      ml: 0.5,
+                                      opacity: tagDefinitions[tag] ? 1 : 0.6
+                                    }}
+                                  >
+                                    {tagDefinitions[tag] || (isReadOnly ? 'No definition' : 'No definition — click Edit to add one')}
+                                  </Typography>
+                                )
                               }
                             />
                           </ListItemButton>

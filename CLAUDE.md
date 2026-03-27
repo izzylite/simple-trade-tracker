@@ -7,25 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 JournoTrades is a React-based trading journal application that allows traders to track their trades, analyze performance, and manage trading calendars. The project uses Supabase, TypeScript, Material-UI, and includes Supabase edge functions for backend operations.
 
 
-
-
-
 ## Core Development Philosophy
 
-### KISS (Keep It Simple, Stupid)
-
-Simplicity should be a key goal in design. Choose straightforward solutions over complex ones whenever possible. Simple solutions are easier to understand, maintain, and debug.
-
-### YAGNI (You Aren't Gonna Need It)
-
-Avoid building functionality on speculation. Implement features only when they are needed, not when you anticipate they might be useful in the future.
-
-### Design Principles
-
-- **Dependency Inversion**: High-level modules should not depend on low-level modules. Both should depend on abstractions.
-- **Open/Closed Principle**: Software entities should be open for extension but closed for modification.
-- **Single Responsibility**: Each function, class, and module should have one clear purpose.
-- **Fail Fast**: Check for potential errors early and raise exceptions immediately when issues occur.
+Follow KISS, YAGNI, and SOLID principles. Fail fast — check for errors early and raise exceptions immediately.
 
 ## 🧱 Code Structure & Modularity
 
@@ -123,10 +107,27 @@ This project uses specialized AI subagents for specific domains. Claude Code sho
 - **Tag Management**: Bulk tag updates across trades
 - **Background Tasks**: Cleanup and maintenance operations
 
+### Source Directory Structure
+- `src/components/` - React UI components
+- `src/config/` - App configuration
+- `src/contexts/` - React Context providers (AuthContext, etc.)
+- `src/hooks/` - Custom React hooks
+- `src/pages/` - Route-level page components
+- `src/services/` - Data and API service layer
+- `src/styles/` - Global styles and theme
+- `src/types/` - TypeScript type definitions
+- `src/utils/` - Utility functions
+- `src/workers/` - Web workers
+
 ### Key Service Files
 - `src/services/calendarService.ts` - Core trade and calendar operations with Supabase
 - `src/services/supabaseStorageService.ts` - File upload/download with Supabase Storage
-- `src/services/ai/supabaseAIChatService.ts` - AI chat service with Supabase edge functions
+- `src/services/supabaseAIChatService.ts` - AI chat service with Supabase edge functions
+- `src/services/performanceCalculationService.ts` - Trade performance metrics
+- `src/services/economicCalendarService.ts` - Economic event data
+- `src/services/tagService.ts` - Tag management
+- `src/services/notesService.ts` - Trade notes
+- `src/services/sharingService.ts` - Calendar/trade sharing
 
 ## Architecture Patterns
 
@@ -199,8 +200,8 @@ This project uses specialized AI subagents for specific domains. Claude Code sho
 
 ## Important Files and Patterns
 
-### Configuration Files 
+### Configuration Files
 - `supabase/config.toml` - Supabase configuration
 - `supabase/migrations/` - Database schema and migrations
-
-
+- `tsconfig.json` - TypeScript configuration (strict mode)
+- `.gitignore` - Ignores `scripts/`, `demos/`, `.claude/`, `.env*`

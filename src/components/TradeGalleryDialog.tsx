@@ -726,7 +726,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 <Box sx={{
                   p: 2,
                   borderRadius: 2,
-                  bgcolor: alpha(theme.palette.background.paper, 0.6),
+                  bgcolor: theme.palette.background.paper,
                   border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
                 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
@@ -740,7 +740,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 <Box sx={{
                   p: 2,
                   borderRadius: 2,
-                  bgcolor: alpha(theme.palette.background.paper, 0.6),
+                  bgcolor: theme.palette.background.paper,
                   border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
                 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
@@ -754,7 +754,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 <Box sx={{
                   p: 2,
                   borderRadius: 2,
-                  bgcolor: alpha(theme.palette.background.paper, 0.6),
+                  bgcolor: theme.palette.background.paper,
                   border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
                 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
@@ -769,7 +769,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 <Box sx={{
                   p: 2,
                   borderRadius: 2,
-                  bgcolor: alpha(theme.palette.background.paper, 0.6),
+                  bgcolor: theme.palette.background.paper,
                   border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
                 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
@@ -911,7 +911,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
               <Box sx={{
                 p: 2,
                 borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                backgroundColor: alpha(theme.palette.background.paper, 0.8)
+                backgroundColor: theme.palette.background.paper
               }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                   Conversation History

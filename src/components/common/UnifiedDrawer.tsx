@@ -32,8 +32,8 @@ export interface UnifiedDrawerProps {
   maxWidth?: string;
   zIndex?: number;
 
-  // Header styling variants
-  headerVariant?: 'default' | 'enhanced'; // enhanced = gradient background with blur
+  // Header styling variants (kept for backward compatibility, no visual difference)
+  headerVariant?: 'default' | 'enhanced';
 
   // Custom styles
   sx?: SxProps<Theme>;
@@ -54,47 +54,27 @@ const UnifiedDrawer: React.FC<UnifiedDrawerProps> = ({
   width = { xs: '100%', sm: 450 },
   maxWidth = '100vw',
   zIndex = 1300,
-  headerVariant = 'enhanced',
+  headerVariant: _headerVariant = 'enhanced', // kept for API compatibility
   sx,
   headerSx,
   contentSx
 }) => {
   const theme = useTheme();
 
-  // Enhanced styling (used by SearchDrawer and EconomicCalendarDrawer)
-  const enhancedDrawerStyles = {
-    background: theme.palette.mode === 'dark'
-      ? 'linear-gradient(135deg, rgba(18, 18, 18, 0.95) 0%, rgba(30, 30, 30, 0.95) 100%)'
-      : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',
-    backdropFilter: 'blur(20px)',
-    borderLeft: anchor === 'right' ? `1px solid ${alpha(theme.palette.divider, 0.1)}` : undefined,
-    borderRight: anchor === 'left' ? `1px solid ${alpha(theme.palette.divider, 0.1)}` : undefined,
-    boxShadow: theme.palette.mode === 'dark'
-      ? '0 8px 32px rgba(0, 0, 0, 0.4)'
-      : '0 8px 32px rgba(0, 0, 0, 0.12)'
+  const drawerPaperStyles = {
+    backgroundColor: 'background.paper',
+    borderLeft: anchor === 'right' ? `1px solid ${theme.palette.divider}` : undefined,
+    borderRight: anchor === 'left' ? `1px solid ${theme.palette.divider}` : undefined,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
   };
 
-  // Enhanced header styling
-  const enhancedHeaderStyles = {
-    p: 3,
-    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 2,
-    background: alpha(theme.palette.background.paper, 0.8),
-    backdropFilter: 'blur(10px)'
-  };
-
-  // Default header styling (used by PinnedTradesDrawer)
-  const defaultHeaderStyles = {
-    p: 2,
+  const headerStyles = {
+    p: '16px 20px',
     borderBottom: `1px solid ${theme.palette.divider}`,
     display: 'flex',
     alignItems: 'center',
     gap: 2
   };
-
-  const headerStyles = headerVariant === 'enhanced' ? enhancedHeaderStyles : defaultHeaderStyles;
 
   return (
     <Drawer
@@ -108,7 +88,7 @@ const UnifiedDrawer: React.FC<UnifiedDrawerProps> = ({
           width,
           maxWidth,
           zIndex,
-          ...(headerVariant === 'enhanced' ? enhancedDrawerStyles : {})
+          ...drawerPaperStyles
         },
         ...sx
       }}
@@ -119,14 +99,9 @@ const UnifiedDrawer: React.FC<UnifiedDrawerProps> = ({
           {/* Icon */}
           {icon && (
             <Box sx={{
-              p: headerVariant === 'enhanced' ? 1.5 : 1,
-              borderRadius: headerVariant === 'enhanced' ? 2 : 1,
-              background: headerVariant === 'enhanced'
-                ? `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`
-                : alpha(theme.palette.primary.main, 0.1),
-              border: headerVariant === 'enhanced' 
-                ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
-                : undefined,
+              p: 1,
+              borderRadius: 1,
+              background: alpha(theme.palette.primary.main, 0.1),
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -135,14 +110,14 @@ const UnifiedDrawer: React.FC<UnifiedDrawerProps> = ({
                 ? React.cloneElement(icon as React.ReactElement<any>, {
                     sx: {
                       color: 'primary.main',
-                      fontSize: headerVariant === 'enhanced' ? 22 : 20
+                      fontSize: 20
                     }
                   })
                 : React.isValidElement(icon)
                 ? React.cloneElement(icon as React.ReactElement<any>, {
                     style: {
                       color: 'var(--mui-palette-primary-main)',
-                      fontSize: headerVariant === 'enhanced' ? 22 : 20
+                      fontSize: 20
                     }
                   })
                 : icon
@@ -152,8 +127,9 @@ const UnifiedDrawer: React.FC<UnifiedDrawerProps> = ({
 
           {/* Title and Subtitle */}
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h6" sx={{ 
-              fontWeight: headerVariant === 'enhanced' ? 700 : 600,
+            <Typography variant="h6" sx={{
+              fontWeight: 700,
+              fontSize: '0.95rem',
               mb: subtitle ? 0.5 : 0
             }}>
               {title}
@@ -181,10 +157,10 @@ const UnifiedDrawer: React.FC<UnifiedDrawerProps> = ({
         </Box>
 
         {/* Content */}
-        <Box sx={{ 
-          flex: 1, 
+        <Box sx={{
+          flex: 1,
           overflow: 'auto',
-          ...contentSx 
+          ...contentSx
         }}>
           {children}
         </Box>

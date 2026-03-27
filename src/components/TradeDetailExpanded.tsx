@@ -1086,7 +1086,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                     <Box sx={{
                                       p: 1,
                                       borderTop: `1px solid ${theme.palette.divider}`,
-                                      backgroundColor: alpha(theme.palette.background.paper, 0.7),
+                                      backgroundColor: theme.palette.background.paper,
                                       maxHeight: 'none', // Ensure no max height constraint
                                       overflow: 'visible' // Prevent scrollbars
                                     }}>
@@ -1123,7 +1123,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                     </Box>
                     <Box sx={{
                       borderRadius: 1,
-                      backgroundColor: alpha(theme.palette.background.paper, 0.7),
+                      backgroundColor: theme.palette.background.paper,
                       overflow: 'visible',
                       p: 1
                     }}>
@@ -1236,7 +1236,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   <Collapse in={showEconomicEvents}>
                     <Box sx={{
                       borderRadius: 1,
-                      backgroundColor: alpha(theme.palette.background.paper, 0.9),
+                      backgroundColor: theme.palette.background.paper,
                       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
                     }}>
                       {loadingEconomicEvents ? (

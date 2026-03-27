@@ -12,7 +12,7 @@ import {
   ThemeProvider,
   CssBaseline,
 } from '@mui/material';
-import { alpha, createTheme } from '@mui/material/styles';
+import { createTheme } from '@mui/material/styles';
 import { createAppTheme } from '../theme';
 import { format } from 'date-fns';
 import AppHeader from '../components/common/AppHeader';
@@ -178,11 +178,8 @@ const SharedNotePage: React.FC = () => {
                       label={tag}
                       size="small"
                       sx={{
-                        bgcolor: alpha(
-                          theme.palette.secondary.main,
-                          0.1
-                        ),
-                        color: 'secondary.main',
+                        bgcolor: 'secondary.main',
+                        color: 'secondary.contrastText',
                         fontWeight: 500,
                         fontSize: '0.75rem',
                         height: 24,

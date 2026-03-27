@@ -6,7 +6,8 @@ import {
   alpha,
   Switch,
   FormControlLabel,
-  Tooltip
+  Tooltip,
+  useTheme
 } from '@mui/material';
 import {
   Security as SecurityIcon,
@@ -46,6 +47,8 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
   max_daily_drawdown
 }) => {
 
+  const theme = useTheme();
+
   // Profit percentage calculation - should be based on original account balance for threshold comparison
   const profitPercentage = trades.length > 0 && balance > 0 ? (totalProfit / balance * 100).toFixed(2) : '0';
 
@@ -69,20 +72,23 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
 
   return (
     <Paper
-      elevation={2}
+      elevation={0}
       sx={{
         display: 'flex',
         flexDirection: 'column',
         gap: 1.5,
         p: 2,
-        borderRadius: 2,
+        borderRadius: '12px',
         bgcolor: 'background.paper',
         border: '1px solid',
         borderColor: 'divider',
         position: 'relative',
         overflow: 'hidden',
         height: '100%',
-        minHeight: '320px'
+        minHeight: '320px',
+        boxShadow: theme.palette.mode === 'dark'
+          ? '0 2px 8px rgba(0,0,0,0.3)'
+          : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)'
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -110,7 +116,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: theme => alpha(theme.palette.background.default, 0.5),
+        backgroundColor: 'background.default',
         p: 1.5,
         borderRadius: 1.5,
         mt: 0.5
@@ -284,7 +290,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: 1,
-        backgroundColor: theme => alpha(theme.palette.background.default, dynamicRiskSettings?.dynamic_risk_enabled ? 0.5 : 0.2),
+        backgroundColor: 'background.default',
         p: 1,
         mt: 1,
         borderRadius: 1.5,

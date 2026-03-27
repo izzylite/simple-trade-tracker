@@ -34,7 +34,7 @@ export const WeekdayHeader = styled(Box)(({ theme }) => ({
   color: theme.palette.text.secondary,
   fontSize: '0.875rem',
   fontWeight: 500,
-  border: `1px solid ${theme.palette.divider}`,
+  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : `1px solid ${theme.palette.divider}`,
   backgroundColor: theme.palette.background.default,
   borderRadius: theme.shape.borderRadius,
 })); 

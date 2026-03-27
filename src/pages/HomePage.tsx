@@ -51,7 +51,6 @@ import EconomicEventShimmer from '../components/economicCalendar/EconomicEventSh
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { dialogProps } from '../styles/dialogStyles';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
-import AnimatedBackground from '../components/common/AnimatedBackground';
 import { DuplicateCalendarDialog } from '../components/dialogs/DuplicateCalendarDialog';
 import { CalendarLinkDialog } from '../components/dialogs/CalendarLinkDialog';
 import CalendarListDialog from '../components/dialogs/CalendarListDialog';
@@ -474,13 +473,9 @@ const Home: React.FC<HomeProps> = ({
     <Box
       sx={{
         minHeight: '100vh',
-        bgcolor: 'custom.pageBackground',
-        position: 'relative',
-        overflow: 'hidden',
+        bgcolor: 'background.default',
       }}
     >
-      <AnimatedBackground />
-
       <Box
         sx={{
           pt: { xs: 2, sm: 3, md: 4 },
@@ -488,8 +483,6 @@ const Home: React.FC<HomeProps> = ({
           px: { xs: 2, sm: 3, md: 4 },
           maxWidth: '1400px',
           mx: 'auto',
-          position: 'relative',
-          zIndex: 1,
         }}
       >
         {/* Header Section */}
@@ -498,18 +491,23 @@ const Home: React.FC<HomeProps> = ({
             variant="h4"
             sx={{
               fontWeight: 700,
-              mb: 1,
+              mb: 0.5,
               fontSize: { xs: '1.75rem', sm: '2rem', md: '2.125rem' }
             }}
           >
-            Dashboard
+            {(() => {
+              const hour = new Date().getHours();
+              const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+              const firstName = user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || null;
+              return firstName ? `${greeting}, ${firstName}` : greeting;
+            })()}
           </Typography>
           <Typography
             variant="body1"
             color="text.secondary"
             sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
           >
-            Welcome back! Here's what's happening.
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </Typography>
         </Box>
 
@@ -528,10 +526,11 @@ const Home: React.FC<HomeProps> = ({
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
                   <Typography
-                    variant="body2"
+                    variant="caption"
                     color="text.secondary"
+                    display="block"
                     gutterBottom
-                    sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                    sx={{ fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}
                   >
                     Total Calendars
                   </Typography>
@@ -575,10 +574,11 @@ const Home: React.FC<HomeProps> = ({
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
                   <Typography
-                    variant="body2"
+                    variant="caption"
                     color="text.secondary"
+                    display="block"
                     gutterBottom
-                    sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                    sx={{ fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}
                   >
                     Total Trades
                   </Typography>
@@ -622,10 +622,11 @@ const Home: React.FC<HomeProps> = ({
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
                   <Typography
-                    variant="body2"
+                    variant="caption"
                     color="text.secondary"
+                    display="block"
                     gutterBottom
-                    sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                    sx={{ fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}
                   >
                     Win Rate
                   </Typography>
@@ -669,10 +670,11 @@ const Home: React.FC<HomeProps> = ({
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
                   <Typography
-                    variant="body2"
+                    variant="caption"
                     color="text.secondary"
+                    display="block"
                     gutterBottom
-                    sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                    sx={{ fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}
                   >
                     Total P&L
                   </Typography>
@@ -681,7 +683,8 @@ const Home: React.FC<HomeProps> = ({
                     sx={{
                       fontWeight: 700,
                       mb: 0.5,
-                      fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+                      fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' },
+                      color: dashboardStats.totalPnL >= 0 ? 'success.main' : 'error.main'
                     }}
                   >
                     {formatCurrency(dashboardStats.totalPnL)}
@@ -744,14 +747,15 @@ const Home: React.FC<HomeProps> = ({
             <Card
               sx={{
                 borderRadius: 2,
-                border: `2px dashed ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.3 : 0.5)}`,
-                bgcolor: theme.palette.mode === 'dark' ? 'transparent' : alpha(theme.palette.primary.main, 0.03),
+                bgcolor: 'background.paper',
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
                 cursor: 'pointer',
-                transition: 'all 0.2s',
+                transition: 'all 0.15s ease',
                 '&:hover': {
-                  borderColor: theme.palette.primary.main,
-                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.05 : 0.08),
-                  transform: 'translateY(-2px)'
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.5)}`,
+                  bgcolor: alpha(theme.palette.primary.main, 0.04),
+                  transform: 'translateY(-2px)',
+                  boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.12)}`
                 }
               }}
               onClick={handleCreateCalendar}
@@ -761,39 +765,20 @@ const Home: React.FC<HomeProps> = ({
                 py: { xs: 2.5, sm: 3, md: 4 },
                 px: { xs: 1.5, sm: 2 }
               }}>
-                <Box
-                  sx={{
-                    width: { xs: 40, sm: 48, md: 56 },
-                    height: { xs: 40, sm: 48, md: 56 },
-                    borderRadius: 2,
-                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.1 : 0.15),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mx: 'auto',
-                    mb: { xs: 1.5, sm: 2 }
-                  }}
-                >
-                  <AddIcon sx={{
-                    fontSize: { xs: 24, sm: 28, md: 32 },
-                    color: theme.palette.primary.main
-                  }} />
+                <Box sx={{
+                  width: { xs: 40, sm: 48, md: 56 },
+                  height: { xs: 40, sm: 48, md: 56 },
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  mx: 'auto', mb: { xs: 1.5, sm: 2 }
+                }}>
+                  <AddIcon sx={{ fontSize: { xs: 24, sm: 28, md: 32 }, color: 'primary.main' }} />
                 </Box>
-                <Typography
-                  variant="subtitle1"
-                  sx={{
-                    fontWeight: 600,
-                    mb: 0.5,
-                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' }
-                  }}
-                >
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                   Create Calendar
                 </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
-                >
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
                   Start a new trading journal
                 </Typography>
               </CardContent>
@@ -803,15 +788,16 @@ const Home: React.FC<HomeProps> = ({
             <Card
               sx={{
                 borderRadius: 2,
-                border: `2px dashed ${alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.3 : 0.5)}`,
-                bgcolor: theme.palette.mode === 'dark' ? 'transparent' : alpha(theme.palette.info.main, 0.03),
+                bgcolor: 'background.paper',
+                border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
                 cursor: calendars.length > 0 ? 'pointer' : 'not-allowed',
-                opacity: calendars.length > 0 ? 1 : 0.6,
-                transition: 'all 0.2s',
+                opacity: calendars.length > 0 ? 1 : 0.5,
+                transition: 'all 0.15s ease',
                 '&:hover': calendars.length > 0 ? {
-                  borderColor: theme.palette.info.main,
-                  bgcolor: alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.05 : 0.08),
-                  transform: 'translateY(-2px)'
+                  border: `1px solid ${alpha(theme.palette.success.main, 0.5)}`,
+                  bgcolor: alpha(theme.palette.success.main, 0.04),
+                  transform: 'translateY(-2px)',
+                  boxShadow: `0 4px 16px ${alpha(theme.palette.success.main, 0.12)}`
                 } : {}
               }}
               onClick={handleCreateTrade}
@@ -821,39 +807,20 @@ const Home: React.FC<HomeProps> = ({
                 py: { xs: 2.5, sm: 3, md: 4 },
                 px: { xs: 1.5, sm: 2 }
               }}>
-                <Box
-                  sx={{
-                    width: { xs: 40, sm: 48, md: 56 },
-                    height: { xs: 40, sm: 48, md: 56 },
-                    borderRadius: 2,
-                    bgcolor: alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.1 : 0.15),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mx: 'auto',
-                    mb: { xs: 1.5, sm: 2 }
-                  }}
-                >
-                  <TrendingUp sx={{
-                    fontSize: { xs: 24, sm: 28, md: 32 },
-                    color: theme.palette.info.main
-                  }} />
+                <Box sx={{
+                  width: { xs: 40, sm: 48, md: 56 },
+                  height: { xs: 40, sm: 48, md: 56 },
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.success.main, 0.1),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  mx: 'auto', mb: { xs: 1.5, sm: 2 }
+                }}>
+                  <TrendingUp sx={{ fontSize: { xs: 24, sm: 28, md: 32 }, color: 'success.main' }} />
                 </Box>
-                <Typography
-                  variant="subtitle1"
-                  sx={{
-                    fontWeight: 600,
-                    mb: 0.5,
-                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' }
-                  }}
-                >
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                   Create Trade
                 </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
-                >
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
                   Log a new trade entry
                 </Typography>
               </CardContent>
@@ -863,14 +830,15 @@ const Home: React.FC<HomeProps> = ({
             <Card
               sx={{
                 borderRadius: 2,
-                border: `2px dashed ${alpha(theme.palette.warning.main, theme.palette.mode === 'dark' ? 0.3 : 0.5)}`,
-                bgcolor: theme.palette.mode === 'dark' ? 'transparent' : alpha(theme.palette.warning.main, 0.03),
+                bgcolor: 'background.paper',
+                border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`,
                 cursor: 'pointer',
-                transition: 'all 0.2s',
+                transition: 'all 0.15s ease',
                 '&:hover': {
-                  borderColor: theme.palette.warning.main,
-                  bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === 'dark' ? 0.05 : 0.08),
-                  transform: 'translateY(-2px)'
+                  border: `1px solid ${alpha(theme.palette.warning.main, 0.5)}`,
+                  bgcolor: alpha(theme.palette.warning.main, 0.04),
+                  transform: 'translateY(-2px)',
+                  boxShadow: `0 4px 16px ${alpha(theme.palette.warning.main, 0.12)}`
                 }
               }}
               onClick={() => {
@@ -883,39 +851,20 @@ const Home: React.FC<HomeProps> = ({
                 py: { xs: 2.5, sm: 3, md: 4 },
                 px: { xs: 1.5, sm: 2 }
               }}>
-                <Box
-                  sx={{
-                    width: { xs: 40, sm: 48, md: 56 },
-                    height: { xs: 40, sm: 48, md: 56 },
-                    borderRadius: 2,
-                    bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === 'dark' ? 0.1 : 0.15),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mx: 'auto',
-                    mb: { xs: 1.5, sm: 2 }
-                  }}
-                >
-                  <EditIcon sx={{
-                    fontSize: { xs: 24, sm: 28, md: 32 },
-                    color: theme.palette.warning.main
-                  }} />
+                <Box sx={{
+                  width: { xs: 40, sm: 48, md: 56 },
+                  height: { xs: 40, sm: 48, md: 56 },
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.warning.main, 0.1),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  mx: 'auto', mb: { xs: 1.5, sm: 2 }
+                }}>
+                  <EditIcon sx={{ fontSize: { xs: 24, sm: 28, md: 32 }, color: 'warning.main' }} />
                 </Box>
-                <Typography
-                  variant="subtitle1"
-                  sx={{
-                    fontWeight: 600,
-                    mb: 0.5,
-                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' }
-                  }}
-                >
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                   Notes
                 </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
-                >
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
                   Create and manage notes
                 </Typography>
               </CardContent>
@@ -925,21 +874,19 @@ const Home: React.FC<HomeProps> = ({
             <Card
               sx={{
                 borderRadius: 2,
-                border: `2px dashed ${alpha(theme.palette.secondary.main, theme.palette.mode === 'dark' ? 0.3 : 0.5)}`,
-                bgcolor: theme.palette.mode === 'dark' ? 'transparent' : alpha(theme.palette.secondary.main, 0.03),
+                bgcolor: 'background.paper',
+                border: `1px solid ${alpha(theme.palette.secondary.main, 0.2)}`,
                 cursor: 'pointer',
-                transition: 'all 0.2s',
+                transition: 'all 0.15s ease',
                 '&:hover': {
-                  borderColor: theme.palette.secondary.main,
-                  bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === 'dark' ? 0.05 : 0.08),
-                  transform: 'translateY(-2px)'
+                  border: `1px solid ${alpha(theme.palette.secondary.main, 0.5)}`,
+                  bgcolor: alpha(theme.palette.secondary.main, 0.04),
+                  transform: 'translateY(-2px)',
+                  boxShadow: `0 4px 16px ${alpha(theme.palette.secondary.main, 0.12)}`
                 }
               }}
               onClick={() => {
-                if (!user) {
-                  setShowLoginDialog(true);
-                  return;
-                }
+                if (!user) { setShowLoginDialog(true); return; }
                 setIsAIChatOpen(true);
               }}
             >
@@ -948,39 +895,20 @@ const Home: React.FC<HomeProps> = ({
                 py: { xs: 2.5, sm: 3, md: 4 },
                 px: { xs: 1.5, sm: 2 }
               }}>
-                <Box
-                  sx={{
-                    width: { xs: 40, sm: 48, md: 56 },
-                    height: { xs: 40, sm: 48, md: 56 },
-                    borderRadius: 2,
-                    bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === 'dark' ? 0.1 : 0.15),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mx: 'auto',
-                    mb: { xs: 1.5, sm: 2 }
-                  }}
-                >
-                  <AIIcon sx={{
-                    fontSize: { xs: 24, sm: 28, md: 32 },
-                    color: theme.palette.secondary.main
-                  }} />
+                <Box sx={{
+                  width: { xs: 40, sm: 48, md: 56 },
+                  height: { xs: 40, sm: 48, md: 56 },
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  mx: 'auto', mb: { xs: 1.5, sm: 2 }
+                }}>
+                  <AIIcon sx={{ fontSize: { xs: 24, sm: 28, md: 32 }, color: 'secondary.main' }} />
                 </Box>
-                <Typography
-                  variant="subtitle1"
-                  sx={{
-                    fontWeight: 600,
-                    mb: 0.5,
-                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' }
-                  }}
-                >
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                   Chat with AI
                 </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
-                >
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
                   Get trading insights
                 </Typography>
               </CardContent>
@@ -1250,16 +1178,12 @@ const Home: React.FC<HomeProps> = ({
                       borderRadius: 2,
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      bgcolor: theme.palette.mode === 'dark'
-                        ? alpha(theme.palette.common.black, 0.2)
-                        : alpha(theme.palette.common.black, 0.03),
-                      border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                      bgcolor: 'background.default',
+                      border: `1px solid ${theme.palette.divider}`,
                       '&:hover': {
                         boxShadow: 2,
                         transform: 'translateY(-2px)',
-                        bgcolor: theme.palette.mode === 'dark'
-                          ? alpha(theme.palette.common.black, 0.3)
-                          : alpha(theme.palette.common.black, 0.06),
+                        bgcolor: 'action.hover',
                       },
                       '&:last-child': {
                         mb: 0
@@ -1324,9 +1248,6 @@ const Home: React.FC<HomeProps> = ({
                     key={index}
                     sx={{
                       borderRadius: 2,
-                      border: '1px solid',
-                      borderColor: alpha(theme.palette.primary.main, 0.2),
-                      backgroundColor: alpha(theme.palette.primary.main, 0.05)
                     }}
                   >
                     <CardContent sx={{ p: 2, pt: 2, '&:last-child': { pb: 2 } }}>

@@ -133,14 +133,9 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
     return (
       <Card
         sx={{
-          backgroundColor: theme.palette.mode === 'dark'
-            ? alpha(theme.palette.background.paper, 0.8)
-            : theme.palette.background.paper,
           borderRadius: 2,
           boxShadow: theme.shadows[2],
-          border: `1px solid ${theme.palette.mode === 'dark'
-            ? alpha(theme.palette.common.white, 0.1)
-            : alpha(theme.palette.common.black, 0.1)}`
+          border: `1px solid ${theme.palette.divider}`
         }}
       >
         <CardContent sx={{ p: 3 }}>
@@ -158,14 +153,9 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
   return (
     <Card
       sx={{
-        backgroundColor: theme.palette.mode === 'dark'
-          ? alpha(theme.palette.background.paper, 0.8)
-          : theme.palette.background.paper,
         borderRadius: 2,
         boxShadow: theme.shadows[2],
-        border: `1px solid ${theme.palette.mode === 'dark'
-          ? alpha(theme.palette.common.white, 0.1)
-          : alpha(theme.palette.common.black, 0.1)}`
+        border: `1px solid ${theme.palette.divider}`
       }}
     >
       <CardContent sx={{ p: 3 }}>
@@ -246,9 +236,7 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
                     sx={{
                       p: 2,
                       borderRadius: 2,
-                      backgroundColor: theme.palette.mode === 'dark'
-                        ? alpha(theme.palette.background.paper, 0.4)
-                        : alpha(theme.palette.background.paper, 0.8),
+                      backgroundColor: 'background.paper',
                       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
                     }}
                   >
