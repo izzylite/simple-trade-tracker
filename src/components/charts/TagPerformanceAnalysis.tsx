@@ -96,10 +96,10 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
 
   // Define colors
   const COLORS = {
-    win: '#4caf50',
-    loss: '#f44336',
-    zero: '#9e9e9e',
-    breakEven: '#ff9800'
+    win: '#22c55e',
+    loss: '#ef4444',
+    zero: '#94a3b8',
+    breakEven: '#64748b'
   };
 
   return (
@@ -211,7 +211,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
             margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
             maxBarSize={50}
           >
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.3} />
             <XAxis
               dataKey="tag"
               axisLine={false}

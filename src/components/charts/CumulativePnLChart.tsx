@@ -29,10 +29,10 @@ const CustomYAxisTick = (props: any) => {
   const { x, y, payload } = props;
   const value = payload.value;
   const formattedValue = formatValue(value);
-  
+
   return (
     <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={5} textAnchor="end" fill="#666" fontSize={12}>
+      <text x={0} y={0} dy={5} textAnchor="end" fill="#94a3b8" fontSize={12}>
         {formattedValue}
       </text>
     </g>
@@ -54,7 +54,7 @@ const CustomTooltip = ({ active, payload, label, type }: any) => {
         <Typography
           variant="body2"
           sx={{
-            color: data.dailyChange > 0 ? '#4caf50' : data.dailyChange < 0 ? '#f44336' : 'text.secondary',
+            color: data.dailyChange > 0 ? '#22c55e' : data.dailyChange < 0 ? '#ef4444' : 'text.secondary',
             fontWeight: 'bold'
           }}
         >
@@ -85,10 +85,10 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
   
   // Define colors
   const COLORS = {
-    win: '#4caf50',
-    loss: '#f44336',
-    zero: '#9e9e9e',
-    breakEven: '#ff9800'
+    win: '#22c55e',
+    loss: '#ef4444',
+    zero: '#94a3b8',
+    breakEven: '#64748b'
   };
 
   return (
@@ -123,7 +123,7 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
               <stop offset="95%" stopColor={COLORS.loss} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.3} />
           <XAxis
             dataKey="date"
             axisLine={false}

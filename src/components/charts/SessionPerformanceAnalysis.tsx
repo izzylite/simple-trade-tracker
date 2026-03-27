@@ -24,10 +24,10 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
 
   // Define colors
   const COLORS = {
-    win: '#4caf50',
-    loss: '#f44336',
-    zero: '#9e9e9e',
-    breakEven: '#ff9800'
+    win: '#22c55e',
+    loss: '#ef4444',
+    zero: '#94a3b8',
+    breakEven: '#64748b'
   };
 
   return (
@@ -200,7 +200,7 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
           <Box
             sx={{
               p: 2,
-              bgcolor: theme.palette.mode === 'dark' ? 'rgba(33, 150, 243, 0.1)' : 'rgba(33, 150, 243, 0.05)',
+              bgcolor: alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.1 : 0.05),
               border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
               borderRadius: 2,
               mt: 1

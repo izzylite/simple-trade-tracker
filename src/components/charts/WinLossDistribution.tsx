@@ -63,10 +63,10 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
 
   // Define colors with enhanced visual appeal
   const COLORS = {
-    win: theme.palette.mode === 'dark' ? '#66bb6a' : '#4caf50', // Slightly lighter green in dark mode
-    loss: theme.palette.mode === 'dark' ? '#ef5350' : '#f44336', // Slightly lighter red in dark mode
-    zero: theme.palette.mode === 'dark' ? '#bdbdbd' : '#9e9e9e', // Lighter gray in dark mode
-    breakEven: theme.palette.mode === 'dark' ? '#ffb74d' : '#ff9800' // Lighter orange in dark mode
+    win: '#22c55e',
+    loss: '#ef4444',
+    zero: '#94a3b8',
+    breakEven: '#64748b'
   };
 
   // Define chart styling
@@ -162,7 +162,7 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
                 outerRadius={chartStyle.outerRadius}
                 strokeWidth={0}
                 innerRadius={chartStyle.innerRadius}
-                fill="#8884d8"
+                fill="#7c3aed"
                 dataKey="value"
                 label={({ name, percent }) => {
                   // Only show labels for segments with significant percentage
