@@ -15,8 +15,6 @@ import {
   Paper,
   IconButton,
   InputAdornment,
-  alpha,
-  useTheme
 } from '@mui/material';
 import { Visibility, VisibilityOff, CheckCircle, Error as ErrorIcon } from '@mui/icons-material';
 import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
@@ -25,7 +23,6 @@ import { supabase } from '../config/supabase';
 
 const PasswordResetPage: React.FC = () => {
   const navigate = useNavigate();
-  const theme = useTheme();
   const [searchParams] = useSearchParams();
   const { updatePassword } = useSupabaseAuth();
 
@@ -162,9 +159,7 @@ const PasswordResetPage: React.FC = () => {
           justifyContent: 'center',
           minHeight: '100vh',
           px: 2,
-          background: theme.palette.mode === 'dark'
-            ? `linear-gradient(145deg, ${alpha(theme.palette.background.default, 0.95)} 0%, ${alpha(theme.palette.background.paper, 0.98)} 100%)`
-            : `linear-gradient(145deg, rgba(248,250,252,0.98) 0%, rgba(255,255,255,0.95) 100%)`
+          backgroundColor: 'background.default'
         }}
       >
         <CircularProgress size={48} sx={{ mb: 2 }} />
@@ -186,9 +181,7 @@ const PasswordResetPage: React.FC = () => {
           justifyContent: 'center',
           minHeight: '100vh',
           px: 2,
-          background: theme.palette.mode === 'dark'
-            ? `linear-gradient(145deg, ${alpha(theme.palette.background.default, 0.95)} 0%, ${alpha(theme.palette.background.paper, 0.98)} 100%)`
-            : `linear-gradient(145deg, rgba(248,250,252,0.98) 0%, rgba(255,255,255,0.95) 100%)`
+          backgroundColor: 'background.default'
         }}
       >
         <Paper
@@ -248,9 +241,7 @@ const PasswordResetPage: React.FC = () => {
           justifyContent: 'center',
           minHeight: '100vh',
           px: 2,
-          background: theme.palette.mode === 'dark'
-            ? `linear-gradient(145deg, ${alpha(theme.palette.background.default, 0.95)} 0%, ${alpha(theme.palette.background.paper, 0.98)} 100%)`
-            : `linear-gradient(145deg, rgba(248,250,252,0.98) 0%, rgba(255,255,255,0.95) 100%)`
+          backgroundColor: 'background.default'
         }}
       >
         <Paper
@@ -286,9 +277,7 @@ const PasswordResetPage: React.FC = () => {
         justifyContent: 'center',
         minHeight: '100vh',
         px: 2,
-        background: theme.palette.mode === 'dark'
-          ? `linear-gradient(145deg, ${alpha(theme.palette.background.default, 0.95)} 0%, ${alpha(theme.palette.background.paper, 0.98)} 100%)`
-          : `linear-gradient(145deg, rgba(248,250,252,0.98) 0%, rgba(255,255,255,0.95) 100%)`
+        backgroundColor: 'background.default'
       }}
     >
       <Paper
