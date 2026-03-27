@@ -102,9 +102,13 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
         position="fixed"
         elevation={0}
         sx={{
-          bgcolor: alpha(theme.palette.background.paper, 0.8),
-          backdropFilter: 'blur(12px)',
-          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+          bgcolor: 'background.paper',
+          borderBottom: 1,
+          borderColor: 'divider',
+          boxShadow: (theme) =>
+            theme.palette.mode === 'dark'
+              ? '0 1px 2px rgba(0,0,0,0.3)'
+              : '0 1px 2px rgba(0,0,0,0.05)',
         }}
       >
         <Toolbar
@@ -147,14 +151,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
                 display: { xs: 'none', sm: 'block' },
                 fontWeight: 700,
                 fontSize: { xs: '1.25rem', sm: '1.375rem' },
-                background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
                 transition: 'opacity 0.2s ease'
               }}
             >
-              JournoTrades
+              <span style={{ color: theme.palette.text.primary }}>Journo</span>
+              <span style={{ color: '#7c3aed' }}>Trades</span>
             </Typography>
           </Box>
 
@@ -178,20 +179,29 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
                     onClick={() => handleNavClick(item.path)}
                     size="small"
                     sx={{
-                      px: { xs: 1.5, sm: 2 },
-                      py: 0.75,
-                      borderRadius: 2,
+                      padding: '6px 12px',
+                      borderRadius: '6px',
                       fontSize: { xs: '0.8125rem', sm: '0.875rem' },
                       fontWeight: active ? 600 : 500,
-                      color: active ? 'primary.main' : 'text.secondary',
-                      bgcolor: active ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+                      color: active ? 'text.primary' : 'text.secondary',
+                      bgcolor: active
+                        ? (theme) =>
+                            alpha(
+                              theme.palette.primary.main,
+                              theme.palette.mode === 'dark' ? 0.12 : 0.08
+                            )
+                        : 'transparent',
                       textTransform: 'none',
                       transition: 'all 0.15s ease',
                       '&:hover': {
                         bgcolor: active
-                          ? alpha(theme.palette.primary.main, 0.12)
+                          ? (theme) =>
+                              alpha(
+                                theme.palette.primary.main,
+                                theme.palette.mode === 'dark' ? 0.18 : 0.12
+                              )
                           : alpha(theme.palette.action.hover, 0.08),
-                        color: active ? 'primary.main' : 'text.primary'
+                        color: 'text.primary'
                       }
                     }}
                   >
@@ -267,7 +277,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
                     width: 32,
                     height: 32,
                     cursor: 'pointer',
-                    bgcolor: theme.palette.primary.main,
+                    bgcolor: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+                    background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
                     fontSize: '0.875rem',
                     fontWeight: 600,
                     transition: 'transform 0.15s ease, box-shadow 0.15s ease',
