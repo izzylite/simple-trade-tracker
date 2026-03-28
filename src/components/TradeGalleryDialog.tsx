@@ -29,7 +29,7 @@ import {
   ArrowBack as BackIcon,
   Schedule as ScheduleIcon,
   Edit as EditIcon,
-  EditDocument
+  Slideshow as SlideshowIcon
 } from '@mui/icons-material';
 import { AIConversation } from '../types/aiChat';
 import { format } from 'date-fns';
@@ -291,6 +291,10 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
 
+  // Immersive mode state
+  const [immersiveMode, setImmersiveMode] = useState(false);
+  const [immersiveImageIndex, setImmersiveImageIndex] = useState(0);
+
   // Track previous trade ID to detect trade changes
   const previousTradeIdRef = useRef<string | null>(null);
 
@@ -455,10 +459,46 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     }
   }, []);
 
+  // Get current trade's images for immersive mode
+  const currentImages = useMemo(() => {
+    if (!currentTrade?.images) return [];
+    return currentTrade.images.filter(img => !img.pending);
+  }, [currentTrade?.images]);
+
+  // Reset immersive image index when trade changes
+  useEffect(() => {
+    setImmersiveImageIndex(0);
+  }, [safeCurrentIndex]);
+
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!open) return;
+
+      if (immersiveMode) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          setImmersiveMode(false);
+          return;
+        }
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          if (immersiveImageIndex > 0) {
+            setImmersiveImageIndex(prev => prev - 1);
+          } else {
+            navigatePrevious();
+          }
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          if (immersiveImageIndex < currentImages.length - 1) {
+            setImmersiveImageIndex(prev => prev + 1);
+          } else {
+            navigateNext();
+          }
+        }
+        return;
+      }
 
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
@@ -482,7 +522,10 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, navigatePrevious, navigateNext, scrollUp, scrollDown, onClose]);
+  }, [
+    open, immersiveMode, immersiveImageIndex, currentImages.length,
+    navigatePrevious, navigateNext, scrollUp, scrollDown, onClose
+  ]);
 
   // Determine if we're in initial loading state (fetch mode, loading, no trades yet)
   const isInitialLoading = isFetchMode && isLoadingTrades && effectiveTrades.length === 0;
@@ -614,8 +657,38 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           </Box>
         </Box>
 
-        {/* Tabs and History Controls */}
+        {/* Tabs, Immersive, and History Controls */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+          {/* Immersive Mode Button */}
+          {!isInitialLoading && currentTrade?.images &&
+            currentTrade.images.length > 0 && (
+            <Tooltip
+              title="Immersive Mode — browse trade images"
+              slotProps={{
+                popper: { sx: { zIndex: Z_INDEX.TOOLTIP } }
+              }}
+            >
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setImmersiveImageIndex(0);
+                  setImmersiveMode(true);
+                }}
+                sx={{
+                  color: 'text.secondary',
+                  '&:hover': {
+                    backgroundColor: alpha(
+                      theme.palette.primary.main, 0.1
+                    ),
+                    color: 'primary.main'
+                  }
+                }}
+              >
+                <SlideshowIcon sx={{ fontSize: 20 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+
           <RoundedTabs
             tabs={[
               { label: 'Trade', icon: <TradeIcon sx={{ fontSize: 18 }} /> },
@@ -1066,6 +1139,232 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           tradeOperations={tradeOperations}
           isReadOnly={isReadOnly}
         />
+      )}
+
+      {/* Immersive Mode Overlay */}
+      {immersiveMode && currentTrade && currentImages.length > 0 && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: Z_INDEX.DIALOG_POPUP + 10,
+            backgroundColor: '#000',
+            display: 'flex',
+            flexDirection: 'column',
+            userSelect: 'none'
+          }}
+        >
+          {/* Top bar: date + counter + exit */}
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            px: 3,
+            py: 1.5,
+            background:
+              'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 2
+          }}>
+            <Box sx={{
+              display: 'flex', alignItems: 'center', gap: 1.5
+            }}>
+              <CalendarIcon sx={{ fontSize: 18, color: '#fff' }} />
+              <Typography sx={{
+                color: '#fff', fontWeight: 600, fontSize: '0.95rem'
+              }}>
+                {format(
+                  new Date(currentTrade.trade_date), 'MMM d, yyyy'
+                )}
+              </Typography>
+              {currentTrade.name && (
+                <Typography sx={{
+                  color: alpha('#fff', 0.6),
+                  fontSize: '0.85rem',
+                  ml: 0.5
+                }}>
+                  — {currentTrade.name}
+                </Typography>
+              )}
+            </Box>
+
+            <Box sx={{
+              display: 'flex', alignItems: 'center', gap: 1.5
+            }}>
+              <Chip
+                size="small"
+                label={`${immersiveImageIndex + 1} / ${currentImages.length}`}
+                sx={{
+                  backgroundColor: alpha('#fff', 0.15),
+                  color: '#fff',
+                  fontWeight: 600,
+                  fontSize: '0.8rem'
+                }}
+              />
+              <Chip
+                size="small"
+                label={isFetchMode
+                  ? `Trade ${safeCurrentIndex + 1} of ${totalTradeCount}`
+                  : `Trade ${safeCurrentIndex + 1} of ${effectiveTrades.length}`
+                }
+                sx={{
+                  backgroundColor: alpha('#fff', 0.15),
+                  color: '#fff',
+                  fontWeight: 600,
+                  fontSize: '0.8rem'
+                }}
+              />
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<CloseIcon sx={{ fontSize: 16 }} />}
+                onClick={() => setImmersiveMode(false)}
+                sx={{
+                  backgroundColor: alpha('#fff', 0.15),
+                  color: '#fff',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  '&:hover': {
+                    backgroundColor: alpha('#fff', 0.25)
+                  }
+                }}
+              >
+                Exit
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Image area */}
+          <Box sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Previous arrow */}
+            <IconButton
+              onClick={() => {
+                if (immersiveImageIndex > 0) {
+                  setImmersiveImageIndex(prev => prev - 1);
+                } else {
+                  navigatePrevious();
+                }
+              }}
+              disabled={immersiveImageIndex === 0 &&
+                (isAtStart && isFetchMode)}
+              sx={{
+                position: 'absolute',
+                left: 16,
+                zIndex: 3,
+                color: '#fff',
+                backgroundColor: alpha('#fff', 0.1),
+                '&:hover': {
+                  backgroundColor: alpha('#fff', 0.2)
+                },
+                '&.Mui-disabled': {
+                  color: alpha('#fff', 0.2)
+                }
+              }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+
+            {/* Current image */}
+            <Box
+              component="img"
+              src={currentImages[immersiveImageIndex]?.url}
+              alt={currentImages[immersiveImageIndex]?.caption
+                || `Trade image ${immersiveImageIndex + 1}`}
+              sx={{
+                maxWidth: '90%',
+                maxHeight: '85vh',
+                objectFit: 'contain',
+                borderRadius: 1,
+                transition: 'opacity 0.2s ease'
+              }}
+            />
+
+            {/* Next arrow */}
+            <IconButton
+              onClick={() => {
+                if (immersiveImageIndex < currentImages.length - 1) {
+                  setImmersiveImageIndex(prev => prev + 1);
+                } else {
+                  navigateNext();
+                }
+              }}
+              disabled={
+                immersiveImageIndex === currentImages.length - 1 &&
+                isAtEnd && !hasMoreTrades && isFetchMode
+              }
+              sx={{
+                position: 'absolute',
+                right: 16,
+                zIndex: 3,
+                color: '#fff',
+                backgroundColor: alpha('#fff', 0.1),
+                '&:hover': {
+                  backgroundColor: alpha('#fff', 0.2)
+                },
+                '&.Mui-disabled': {
+                  color: alpha('#fff', 0.2)
+                }
+              }}
+            >
+              <ArrowForwardIcon />
+            </IconButton>
+          </Box>
+
+          {/* Thumbnail strip */}
+          {currentImages.length > 1 && (
+            <Box sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: 1,
+              pb: 2,
+              px: 3,
+              background:
+                'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              pt: 3
+            }}>
+              {currentImages.map((img, idx) => (
+                <Box
+                  key={img.id}
+                  onClick={() => setImmersiveImageIndex(idx)}
+                  component="img"
+                  src={img.url}
+                  alt={img.caption || `Thumbnail ${idx + 1}`}
+                  sx={{
+                    width: 56,
+                    height: 40,
+                    objectFit: 'cover',
+                    borderRadius: 0.5,
+                    cursor: 'pointer',
+                    border: idx === immersiveImageIndex
+                      ? '2px solid #fff'
+                      : '2px solid transparent',
+                    opacity: idx === immersiveImageIndex ? 1 : 0.5,
+                    transition: 'all 0.2s ease',
+                    '&:hover': { opacity: 0.8 }
+                  }}
+                />
+              ))}
+            </Box>
+          )}
+        </Box>
       )}
 
       {/* Note Editor Dialog */}
