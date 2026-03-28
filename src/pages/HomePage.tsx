@@ -748,11 +748,11 @@ const Home: React.FC<HomeProps> = ({
               sx={{
                 borderRadius: 2,
                 bgcolor: 'background.paper',
-                border: `2px dashed ${alpha(theme.palette.primary.main, 0.3)}`,
+                border: `3px dashed ${alpha(theme.palette.primary.main, 0.5)}`,
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
                 '&:hover': {
-                  border: `2px dashed ${alpha(theme.palette.primary.main, 0.65)}`,
+                  border: `3px dashed ${alpha(theme.palette.primary.main, 0.9)}`,
                   bgcolor: alpha(theme.palette.primary.main, 0.04),
                   transform: 'translateY(-2px)',
                   boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.12)}`
@@ -789,12 +789,12 @@ const Home: React.FC<HomeProps> = ({
               sx={{
                 borderRadius: 2,
                 bgcolor: 'background.paper',
-                border: `2px dashed ${alpha(theme.palette.success.main, 0.3)}`,
+                border: `3px dashed ${alpha(theme.palette.success.main, 0.5)}`,
                 cursor: calendars.length > 0 ? 'pointer' : 'not-allowed',
                 opacity: calendars.length > 0 ? 1 : 0.5,
                 transition: 'all 0.15s ease',
                 '&:hover': calendars.length > 0 ? {
-                  border: `2px dashed ${alpha(theme.palette.success.main, 0.65)}`,
+                  border: `3px dashed ${alpha(theme.palette.success.main, 0.9)}`,
                   bgcolor: alpha(theme.palette.success.main, 0.04),
                   transform: 'translateY(-2px)',
                   boxShadow: `0 4px 16px ${alpha(theme.palette.success.main, 0.12)}`
@@ -831,11 +831,11 @@ const Home: React.FC<HomeProps> = ({
               sx={{
                 borderRadius: 2,
                 bgcolor: 'background.paper',
-                border: `2px dashed ${alpha(theme.palette.warning.main, 0.3)}`,
+                border: `3px dashed ${alpha(theme.palette.warning.main, 0.5)}`,
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
                 '&:hover': {
-                  border: `2px dashed ${alpha(theme.palette.warning.main, 0.65)}`,
+                  border: `3px dashed ${alpha(theme.palette.warning.main, 0.9)}`,
                   bgcolor: alpha(theme.palette.warning.main, 0.04),
                   transform: 'translateY(-2px)',
                   boxShadow: `0 4px 16px ${alpha(theme.palette.warning.main, 0.12)}`
@@ -875,11 +875,11 @@ const Home: React.FC<HomeProps> = ({
               sx={{
                 borderRadius: 2,
                 bgcolor: 'background.paper',
-                border: `2px dashed ${alpha(theme.palette.secondary.main, 0.3)}`,
+                border: `3px dashed ${alpha(theme.palette.secondary.main, 0.5)}`,
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
                 '&:hover': {
-                  border: `2px dashed ${alpha(theme.palette.secondary.main, 0.65)}`,
+                  border: `3px dashed ${alpha(theme.palette.secondary.main, 0.9)}`,
                   bgcolor: alpha(theme.palette.secondary.main, 0.04),
                   transform: 'translateY(-2px)',
                   boxShadow: `0 4px 16px ${alpha(theme.palette.secondary.main, 0.12)}`

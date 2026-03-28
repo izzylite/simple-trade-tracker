@@ -9,3 +9,6 @@ scripts/
 demos/
 .claude/
 .worktrees/
+.playwright-mcp/
+.superpowers/
+docs/superpowers/

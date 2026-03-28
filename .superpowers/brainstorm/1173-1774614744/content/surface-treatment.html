@@ -1,0 +1,168 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<h2>Surface treatment</h2>
+<p class="subtitle">How should cards, panels, and containers feel? Each shown in dark + light mode.</p>
+
+<div class="cards">
+
+  <!-- A: Subtle Borders -->
+  <div class="card" data-choice="borders" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;overflow:hidden;">
+      <!-- Dark -->
+      <div style="background:#0f172a;padding:20px;font-family:'DM Sans',sans-serif;">
+        <div style="color:#64748b;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Dark Mode</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <div style="flex:1;background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:12px;">
+            <div style="color:#64748b;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Win Rate</div>
+            <div style="color:#f1f5f9;font-size:20px;font-weight:700;margin-top:2px;">68.4%</div>
+          </div>
+          <div style="flex:1;background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:12px;">
+            <div style="color:#64748b;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">P&L</div>
+            <div style="color:#7c3aed;font-size:20px;font-weight:700;margin-top:2px;">+$4,820</div>
+          </div>
+        </div>
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="color:#f1f5f9;font-size:12px;font-weight:600;">EUR/USD Long</div>
+            <div style="color:#64748b;font-size:10px;">Mar 27</div>
+          </div>
+          <div style="color:#22c55e;font-size:12px;font-weight:600;">+$340</div>
+        </div>
+      </div>
+      <!-- Light -->
+      <div style="background:#f8fafc;padding:20px;font-family:'DM Sans',sans-serif;border-top:1px solid #e2e8f0;">
+        <div style="color:#94a3b8;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Light Mode</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <div style="flex:1;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;">
+            <div style="color:#94a3b8;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Win Rate</div>
+            <div style="color:#0f172a;font-size:20px;font-weight:700;margin-top:2px;">68.4%</div>
+          </div>
+          <div style="flex:1;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;">
+            <div style="color:#94a3b8;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">P&L</div>
+            <div style="color:#7c3aed;font-size:20px;font-weight:700;margin-top:2px;">+$4,820</div>
+          </div>
+        </div>
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="color:#0f172a;font-size:12px;font-weight:600;">EUR/USD Long</div>
+            <div style="color:#94a3b8;font-size:10px;">Mar 27</div>
+          </div>
+          <div style="color:#16a34a;font-size:12px;font-weight:600;">+$340</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Subtle Borders</h3>
+      <p>Thin 1px borders, no background fill. Content floats on the page. Maximum restraint — the Linear approach. Clean but can feel sparse.</p>
+    </div>
+  </div>
+
+  <!-- B: Soft Elevation -->
+  <div class="card" data-choice="elevation" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;overflow:hidden;">
+      <!-- Dark -->
+      <div style="background:#0f172a;padding:20px;font-family:'DM Sans',sans-serif;">
+        <div style="color:#64748b;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Dark Mode</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <div style="flex:1;background:#1e293b;border-radius:10px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+            <div style="color:#64748b;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Win Rate</div>
+            <div style="color:#f1f5f9;font-size:20px;font-weight:700;margin-top:2px;">68.4%</div>
+          </div>
+          <div style="flex:1;background:#1e293b;border-radius:10px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+            <div style="color:#64748b;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">P&L</div>
+            <div style="color:#7c3aed;font-size:20px;font-weight:700;margin-top:2px;">+$4,820</div>
+          </div>
+        </div>
+        <div style="background:#1e293b;border-radius:10px;padding:10px 12px;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="color:#f1f5f9;font-size:12px;font-weight:600;">EUR/USD Long</div>
+            <div style="color:#64748b;font-size:10px;">Mar 27</div>
+          </div>
+          <div style="color:#22c55e;font-size:12px;font-weight:600;">+$340</div>
+        </div>
+      </div>
+      <!-- Light -->
+      <div style="background:#f8fafc;padding:20px;font-family:'DM Sans',sans-serif;border-top:1px solid #e2e8f0;">
+        <div style="color:#94a3b8;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Light Mode</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <div style="flex:1;background:#ffffff;border-radius:10px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);">
+            <div style="color:#94a3b8;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Win Rate</div>
+            <div style="color:#0f172a;font-size:20px;font-weight:700;margin-top:2px;">68.4%</div>
+          </div>
+          <div style="flex:1;background:#ffffff;border-radius:10px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);">
+            <div style="color:#94a3b8;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">P&L</div>
+            <div style="color:#7c3aed;font-size:20px;font-weight:700;margin-top:2px;">+$4,820</div>
+          </div>
+        </div>
+        <div style="background:#ffffff;border-radius:10px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="color:#0f172a;font-size:12px;font-weight:600;">EUR/USD Long</div>
+            <div style="color:#94a3b8;font-size:10px;">Mar 27</div>
+          </div>
+          <div style="color:#16a34a;font-size:12px;font-weight:600;">+$340</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Soft Elevation</h3>
+      <p>Gentle shadows + filled backgrounds. Cards feel lifted but not heavy. The Notion approach — warm depth, clear hierarchy. Comfortable and familiar.</p>
+    </div>
+  </div>
+
+  <!-- C: Glassmorphism refined -->
+  <div class="card" data-choice="glass" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;overflow:hidden;">
+      <!-- Dark -->
+      <div style="background:linear-gradient(135deg, #0f172a 0%, #1a1033 100%);padding:20px;font-family:'DM Sans',sans-serif;">
+        <div style="color:#64748b;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Dark Mode</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <div style="flex:1;background:rgba(255,255,255,0.05);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;">
+            <div style="color:#64748b;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Win Rate</div>
+            <div style="color:#f1f5f9;font-size:20px;font-weight:700;margin-top:2px;">68.4%</div>
+          </div>
+          <div style="flex:1;background:rgba(255,255,255,0.05);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;">
+            <div style="color:#64748b;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">P&L</div>
+            <div style="color:#a78bfa;font-size:20px;font-weight:700;margin-top:2px;">+$4,820</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="color:#f1f5f9;font-size:12px;font-weight:600;">EUR/USD Long</div>
+            <div style="color:#64748b;font-size:10px;">Mar 27</div>
+          </div>
+          <div style="color:#22c55e;font-size:12px;font-weight:600;">+$340</div>
+        </div>
+      </div>
+      <!-- Light -->
+      <div style="background:linear-gradient(135deg, #f8fafc 0%, #f0eeff 100%);padding:20px;font-family:'DM Sans',sans-serif;border-top:1px solid #e2e8f0;">
+        <div style="color:#94a3b8;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Light Mode</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <div style="flex:1;background:rgba(255,255,255,0.7);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.8);border-radius:10px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="color:#94a3b8;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Win Rate</div>
+            <div style="color:#0f172a;font-size:20px;font-weight:700;margin-top:2px;">68.4%</div>
+          </div>
+          <div style="flex:1;background:rgba(255,255,255,0.7);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.8);border-radius:10px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="color:#94a3b8;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">P&L</div>
+            <div style="color:#7c3aed;font-size:20px;font-weight:700;margin-top:2px;">+$4,820</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.7);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.8);border-radius:10px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="color:#0f172a;font-size:12px;font-weight:600;">EUR/USD Long</div>
+            <div style="color:#94a3b8;font-size:10px;">Mar 27</div>
+          </div>
+          <div style="color:#16a34a;font-size:12px;font-weight:600;">+$340</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Refined Glass</h3>
+      <p>Semi-transparent surfaces with backdrop blur + subtle border highlights. More dramatic, with a violet-tinted gradient underneath. Distinctive but harder to maintain consistently.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:24px;">Each shows dark + light mode stacked. Click to pick the one that feels right for JournoTrades.</p>
