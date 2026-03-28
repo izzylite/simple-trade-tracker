@@ -41,7 +41,7 @@ const SharedCalendarPage: React.FC = () => {
   const [mode, setMode] = useState<'light' | 'dark'>(() => {
     // Get saved theme preference or default to light
     const savedMode = localStorage.getItem('themeMode');
-    return (savedMode as 'light' | 'dark') || 'light';
+    return (savedMode as 'light' | 'dark') || 'dark';
   });
 
   const [calendarData, setCalendarData] = useState<SharedCalendarData | null>(null);

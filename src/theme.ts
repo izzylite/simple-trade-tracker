@@ -68,16 +68,16 @@ export function createAppTheme(mode: 'light' | 'dark') {
         main: palette.slate[500],
       },
       background: {
-        default: isDark ? palette.slate[900] : '#e8edf4',
-        paper: isDark ? palette.slate[800] : '#ffffff',
+        default: isDark ? '#080808' : '#e8edf4',
+        paper: isDark ? '#131313' : '#ffffff',
       },
       text: {
         primary: isDark ? palette.slate[100] : palette.slate[900],
         secondary: isDark ? palette.slate[400] : palette.slate[500],
       },
-      divider: isDark ? palette.slate[700] : palette.slate[200],
+      divider: isDark ? 'rgba(255,255,255,0.08)' : palette.slate[200],
       custom: {
-        pageBackground: isDark ? palette.slate[900] : '#e8edf4',
+        pageBackground: isDark ? '#080808' : '#e8edf4',
       },
     },
     shape: {

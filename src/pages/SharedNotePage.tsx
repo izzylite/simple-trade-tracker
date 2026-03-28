@@ -33,7 +33,7 @@ const SharedNotePage: React.FC = () => {
 
   const [mode, setMode] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('themeMode');
-    return (saved as 'light' | 'dark') || 'light';
+    return (saved as 'light' | 'dark') || 'dark';
   });
 
   useEffect(() => {

@@ -10,76 +10,129 @@ import {
   useMediaQuery,
   Container,
   Divider,
-  alpha
+  alpha,
+  Grid,
 } from '@mui/material';
 import {
   CalendarMonth,
   ShowChart,
   SmartToy,
-  TrendingUp,
   Event,
   BarChart,
-  Security
+  Security,
+  StickyNote2,
 } from '@mui/icons-material';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 
-interface SectionProps {
+interface FeatureSectionProps {
   icon: React.ReactNode;
+  eyebrow: string;
   title: string;
-  subtitle?: string;
+  subtitle: string;
   children: React.ReactNode;
-}
-
-interface SectionPropsExtended extends SectionProps {
+  imageSrc: string;
+  imageAlt: string;
+  reverse?: boolean;
   delay?: number;
 }
 
-const Section: React.FC<SectionPropsExtended> = ({ icon, title, subtitle, children, delay = 0 }) => {
+const FeatureSection: React.FC<FeatureSectionProps> = ({
+  icon, eyebrow, title, subtitle, children, imageSrc, imageAlt, reverse = false, delay = 0,
+}) => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isDark = theme.palette.mode === 'dark';
 
   return (
     <Box
       sx={{
+        py: { xs: 5, md: 7 },
+        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
         animation: `fadeInUp 0.6s ease-out ${delay}s both`,
         '@keyframes fadeInUp': {
-          from: { opacity: 0, transform: 'translateY(30px)' },
-          to: { opacity: 1, transform: 'translateY(0)' }
-        }
+          from: { opacity: 0, transform: 'translateY(24px)' },
+          to: { opacity: 1, transform: 'translateY(0)' },
+        },
       }}
     >
-      <Stack direction="row" spacing={2.5} alignItems="flex-start" sx={{ mb: 2.5 }}>
-        <Box
-          sx={{
-            width: 56,
-            height: 56,
-            borderRadius: 2.5,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-            color: 'primary.contrastText',
-            flexShrink: 0,
-            boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
-            transition: 'transform 0.3s ease',
-            '&:hover': {
-              transform: 'scale(1.1) rotate(5deg)'
-            }
-          }}
-        >
-          {icon}
-        </Box>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+      <Grid
+        container
+        spacing={{ xs: 4, md: 8 }}
+        alignItems="center"
+        direction={isMobile ? 'column' : reverse ? 'row-reverse' : 'row'}
+      >
+        {/* Text side */}
+        <Grid size={{ xs: 12, md: 5 }}>
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 2,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                color: 'primary.contrastText',
+                flexShrink: 0,
+                boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.35)}`,
+              }}
+            >
+              {icon}
+            </Box>
+            <Typography
+              sx={{
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                color: theme.palette.primary.main,
+                textTransform: 'uppercase',
+                letterSpacing: 1.5,
+              }}
+            >
+              {eyebrow}
+            </Typography>
+          </Stack>
+
+          <Typography variant="h5" sx={{ fontWeight: 800, mb: 1, letterSpacing: '-0.02em' }}>
             {title}
           </Typography>
-          {subtitle && (
-            <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>
-              {subtitle}
-            </Typography>
-          )}
-        </Box>
-      </Stack>
-      <Box sx={{ pl: { xs: 0, sm: '72px' } }}>{children}</Box>
+          <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500, mb: 2.5, lineHeight: 1.6 }}>
+            {subtitle}
+          </Typography>
+
+          <Box sx={{ '& .MuiTypography-root': { lineHeight: 1.75, mb: 1.5 } }}>
+            {children}
+          </Box>
+        </Grid>
+
+        {/* Image side */}
+        <Grid size={{ xs: 12, md: 7 }}>
+          <Box
+            sx={{
+              borderRadius: '12px',
+              overflow: 'hidden',
+              border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.15 : 0.3)}`,
+              boxShadow: isDark
+                ? '0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)'
+                : '0 12px 40px rgba(0,0,0,0.12)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: isDark
+                  ? '0 28px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)'
+                  : '0 20px 60px rgba(0,0,0,0.18)',
+              },
+            }}
+          >
+            <Box
+              component="img"
+              src={imageSrc}
+              alt={imageAlt}
+              sx={{ width: '100%', display: 'block', objectFit: 'cover', objectPosition: 'top' }}
+            />
+          </Box>
+        </Grid>
+      </Grid>
     </Box>
   );
 };
@@ -90,66 +143,87 @@ const AboutPage: React.FC = () => {
 
   const paragraphSx = {
     mb: 1.5,
-    lineHeight: 1.7,
-    fontSize: '1rem'
+    lineHeight: 1.75,
+    fontSize: '0.975rem',
+    color: theme.palette.text.secondary,
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', position: 'relative' }}>
       {/* Hero Section */}
       <Box
         sx={{
-          bgcolor: 'background.paper',
-          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          py: { xs: 5, sm: 8 },
-          px: { xs: 2, sm: 3 },
           position: 'relative',
-          zIndex: 1,
+          py: { xs: 8, sm: 12 },
+          px: { xs: 2, sm: 3 },
+          overflow: 'hidden',
+          bgcolor: '#000',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          // Dot grid
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+            maskImage: 'radial-gradient(ellipse 80% 100% at 50% 0%, black 40%, transparent 100%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 80% 100% at 50% 0%, black 40%, transparent 100%)',
+          },
+          // Purple glow
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            top: '-20%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '80%',
+            height: '600px',
+            background: 'radial-gradient(ellipse, rgba(124,58,237,0.18) 0%, transparent 65%)',
+            pointerEvents: 'none',
+          },
           '@keyframes scaleUp': {
             from: { opacity: 0, transform: 'scale(0.8)' },
-            to: { opacity: 1, transform: 'scale(1)' }
+            to: { opacity: 1, transform: 'scale(1)' },
           },
           '@keyframes fadeInUp': {
             from: { opacity: 0, transform: 'translateY(20px)' },
-            to: { opacity: 1, transform: 'translateY(0)' }
-          }
+            to: { opacity: 1, transform: 'translateY(0)' },
+          },
         }}
       >
-        <Container maxWidth="md">
+        <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
           <Stack spacing={2.5} alignItems="center" textAlign="center">
             <Box
+              component="img"
+              src="/android-chrome-192x192.png"
+              alt="JournoTrades"
               sx={{
-                width: { xs: 64, sm: 72 },
-                height: { xs: 64, sm: 72 },
-                borderRadius: 3,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-                color: 'primary.contrastText',
-                boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`,
-                animation: 'scaleUp 0.5s ease-out both'
+                width: { xs: 72, sm: 88 },
+                height: { xs: 72, sm: 88 },
+                borderRadius: '22px',
+                boxShadow: '0 8px 32px rgba(124,58,237,0.45), 0 0 0 1px rgba(255,255,255,0.08)',
+                animation: 'scaleUp 0.5s ease-out both',
               }}
-            >
-              <TrendingUp sx={{ fontSize: { xs: 36, sm: 40 } }} />
-            </Box>
+            />
             <Typography
               variant={isXs ? 'h4' : 'h3'}
               sx={{
                 fontWeight: 800,
-                animation: 'fadeInUp 0.6s ease-out 0.2s both'
+                color: '#fff',
+                animation: 'fadeInUp 0.6s ease-out 0.2s both',
+                letterSpacing: '-0.03em',
               }}
             >
               JournoTrades
             </Typography>
             <Typography
               variant={isXs ? 'h6' : 'h5'}
-              color="text.secondary"
               sx={{
                 maxWidth: 600,
                 fontWeight: 400,
                 lineHeight: 1.7,
-                animation: 'fadeInUp 0.6s ease-out 0.4s both'
+                color: 'rgba(255,255,255,0.5)',
+                animation: 'fadeInUp 0.6s ease-out 0.4s both',
               }}
             >
               Track your trades, organize your strategy, and let AI uncover insights from your data.
@@ -158,169 +232,237 @@ const AboutPage: React.FC = () => {
         </Container>
       </Box>
 
-      {/* Main Content */}
+      {/* Feature Sections */}
       <Container
-        maxWidth="md"
+        maxWidth="lg"
         sx={{
-          pt: { xs: 5, sm: 7 },
+          pt: { xs: 4, sm: 6 },
           pb: { xs: 6, sm: 9 },
           position: 'relative',
           zIndex: 1,
-          ...(scrollbarStyles(theme) as any)
+          ...(scrollbarStyles(theme) as any),
         }}
       >
-        <Stack spacing={5}>
-          {/* Calendars Section */}
-          <Section
-            icon={<CalendarMonth fontSize="large" />}
-            title="Calendars"
-            subtitle="Organize your trading accounts and strategies"
-            delay={0.1}
-          >
-            <Typography variant="body1" sx={paragraphSx}>
-              Calendars are containers for your trades and performance data. Create a calendar for each trading year, prop firm account, or strategy you want to track separately.
-            </Typography>
-            <Typography variant="body1" sx={paragraphSx}>
-              Each calendar tracks your balance, risk settings, profit targets, and performance statistics. Add daily notes to any day on the calendar to record your mindset, market observations, or session reviews.
-            </Typography>
-            <Typography variant="body1" sx={{ ...paragraphSx, mb: 0 }}>
-              Enable dynamic risk adjustment to automatically scale your position sizing based on recent performance, protecting capital during drawdowns and growing during winning streaks.
-            </Typography>
-          </Section>
+        {/* Calendars */}
+        <FeatureSection
+          icon={<CalendarMonth />}
+          eyebrow="Calendars"
+          title="Organize your trading accounts and strategies"
+          subtitle="Calendars are containers for your trades and performance data."
+          imageSrc="/asset/new_calendar.png"
+          imageAlt="Trading Calendar"
+          reverse={false}
+          delay={0.1}
+        >
+          <Typography variant="body2" sx={paragraphSx}>
+            Create a calendar for each trading year, prop firm account, or strategy you want to track separately.
+            Each calendar tracks your balance, risk settings, profit targets, and performance statistics.
+          </Typography>
+          <Typography variant="body2" sx={paragraphSx}>
+            Add daily notes to any day on the calendar to record your mindset, market observations, or session reviews.
+          </Typography>
+          <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
+            Enable dynamic risk adjustment to automatically scale your position sizing based on recent performance,
+            protecting capital during drawdowns and growing during winning streaks.
+          </Typography>
+        </FeatureSection>
 
-          {/* Trades Section */}
-          <Section
-            icon={<ShowChart fontSize="large" />}
-            title="Trades"
-            subtitle="Log and analyze every trade"
-            delay={0.2}
-          >
-            <Typography variant="body1" sx={paragraphSx}>
-              Record your trades with all the details that matter: direction, instrument, size, entry and exit prices, PnL, screenshots, and detailed notes.
-            </Typography>
-            <Typography variant="body1" sx={paragraphSx}>
-              Organize trades with tags like "Setup:Breakout" or "Session:London". Create required tag groups to ensure you log consistent information for every trade.
-            </Typography>
-            <Typography variant="body1" sx={paragraphSx}>
-              Import trades from CSV or Excel files, export your data for backup, and use gallery mode to review all your trade screenshots at once.
-            </Typography>
-            <Typography variant="body1" sx={{ ...paragraphSx, mb: 0 }}>
-              Each trade is scored based on rule adherence and risk management, helping you identify your best setups and recurring mistakes.
-            </Typography>
-          </Section>
+        {/* Trades */}
+        <FeatureSection
+          icon={<ShowChart />}
+          eyebrow="Trades"
+          title="Log and analyze every trade"
+          subtitle="Record your trades with all the details that matter."
+          imageSrc="/asset/new_calendar_trades.png"
+          imageAlt="Trading Calendar Grid"
+          reverse={true}
+          delay={0.15}
+        >
+          <Typography variant="body2" sx={paragraphSx}>
+            Capture direction, instrument, size, entry and exit prices, PnL, screenshots, and detailed notes.
+            Organize trades with tags like "Setup:Breakout" or "Session:London" with required tag groups for consistency.
+          </Typography>
+          <Typography variant="body2" sx={paragraphSx}>
+            Import trades from CSV or Excel files, export your data for backup, and use gallery mode to review
+            all your trade screenshots at once.
+          </Typography>
+          <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
+            Each trade is scored based on rule adherence and risk management, helping you identify your best
+            setups and recurring mistakes.
+          </Typography>
+        </FeatureSection>
 
-          {/* AI Assistant Section */}
-          <Section
-            icon={<SmartToy fontSize="large" />}
-            title="AI Assistant"
-            subtitle="Your personal trading analyst"
-            delay={0.3}
-          >
-            <Typography variant="body1" sx={paragraphSx}>
-              The AI assistant reads your trades, calendar notes, and performance data to provide personalized insights about your trading.
-            </Typography>
-            <Typography variant="body1" sx={paragraphSx}>
-              Ask questions in plain language: "Show me my best performing setups", "Why am I losing on Fridays?", or "Compare my long vs short trades". The AI will search your data, calculate statistics, and explain patterns it finds.
-            </Typography>
-            <Typography variant="body1" sx={paragraphSx}>
-              It can generate charts, analyze correlations, and help you understand what's working and what's not. The more detailed your trade notes and calendar game plan, the better the AI can help you.
-            </Typography>
-            <Typography variant="body1" sx={{ ...paragraphSx, mb: 0, fontStyle: 'italic' }}>
-              Note: AI outputs are analytical insights based on your data, not financial advice.
-            </Typography>
-          </Section>
+        {/* Notes */}
+        <FeatureSection
+          icon={<StickyNote2 />}
+          eyebrow="Trade Notes"
+          title="Capture every detail with rich notes"
+          subtitle="Document your thinking with a full rich text editor."
+          imageSrc="/asset/new_notes.png"
+          imageAlt="Trade Notes"
+          reverse={false}
+          delay={0.2}
+        >
+          <Typography variant="body2" sx={paragraphSx}>
+            Write detailed trade notes using the built-in rich text editor. Capture your pre-trade thesis,
+            execution commentary, and post-trade review in one place.
+          </Typography>
+          <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
+            Good notes are the foundation of improvement. The more detail you capture, the more the AI
+            assistant can help you identify what's working and what isn't.
+          </Typography>
+        </FeatureSection>
 
-          {/* Economic Calendar Section */}
-          <Section
-            icon={<Event fontSize="large" />}
-            title="Economic Calendar"
-            subtitle="Stay ahead of market-moving events"
-            delay={0.4}
-          >
-            <Typography variant="body1" sx={paragraphSx}>
-              Track high-impact economic events directly on your trading calendar. Never be caught off guard by NFP or FOMC again.
-            </Typography>
-            <Typography variant="body1" sx={paragraphSx}>
-              Filter events by currency and importance to focus on what matters to your trading pairs. The calendar automatically highlights events that might impact your open positions.
-            </Typography>
-            <Typography variant="body1" sx={{ ...paragraphSx, mb: 0 }}>
-              See exactly which events were active during your trades to understand how news impacts your performance and execution.
-            </Typography>
-          </Section>
+        {/* AI Assistant */}
+        <FeatureSection
+          icon={<SmartToy />}
+          eyebrow="AI Assistant"
+          title="Your personal trading analyst"
+          subtitle="Ask questions about your trading history in plain language."
+          imageSrc="/asset/new_ai.png"
+          imageAlt="AI Trading Assistant"
+          reverse={true}
+          delay={0.25}
+        >
+          <Typography variant="body2" sx={paragraphSx}>
+            The AI assistant reads your trades, calendar notes, and performance data to provide personalized
+            insights. Ask: "Show me my best performing setups", "Why am I losing on Fridays?", or "Compare
+            my long vs short trades."
+          </Typography>
+          <Typography variant="body2" sx={paragraphSx}>
+            It can generate charts, analyze correlations, and help you understand what's working and what's
+            not. The more detailed your notes, the better the AI can help you.
+          </Typography>
+          <Typography variant="body2" sx={{ ...paragraphSx, mb: 0, fontStyle: 'italic' }}>
+            Note: AI outputs are analytical insights based on your data, not financial advice.
+          </Typography>
+        </FeatureSection>
 
-          {/* Performance Analytics Section */}
-          <Section
-            icon={<BarChart fontSize="large" />}
-            title="Performance Analytics"
-            subtitle="Deep dive into your trading metrics"
-            delay={0.5}
-          >
-            <Typography variant="body1" sx={paragraphSx}>
-              Visualize your progress with interactive charts showing equity curves, daily PnL, and win rates over time.
-            </Typography>
-            <Typography variant="body1" sx={paragraphSx}>
-              Analyze your performance by time of day, day of week, or specific tags to find your sweet spots and eliminate leaks in your game.
-            </Typography>
-            <Typography variant="body1" sx={{ ...paragraphSx, mb: 0 }}>
-              Monitor key metrics like Profit Factor, Average R:R, and Expectancy to ensure your edge is sustainable and scalable.
-            </Typography>
-          </Section>
+        {/* Economic Calendar */}
+        <FeatureSection
+          icon={<Event />}
+          eyebrow="Economic Calendar"
+          title="Stay ahead of market-moving events"
+          subtitle="Track high-impact economic events directly on your calendar."
+          imageSrc="/asset/new_events.png"
+          imageAlt="Economic Calendar"
+          reverse={false}
+          delay={0.3}
+        >
+          <Typography variant="body2" sx={paragraphSx}>
+            Never be caught off guard by NFP or FOMC again. Filter events by currency and importance
+            to focus on what matters to your trading pairs.
+          </Typography>
+          <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
+            See exactly which events were active during your trades to understand how news impacts your
+            performance and execution.
+          </Typography>
+        </FeatureSection>
 
-          {/* Data Privacy Section */}
-          <Section
-            icon={<Security fontSize="large" />}
-            title="Data Privacy & Security"
-            subtitle="Your data belongs to you"
-            delay={0.6}
-          >
-            <Typography variant="body1" sx={paragraphSx}>
-              Your trading data is stored securely. We prioritize your privacy and data ownership.
-            </Typography>
-            <Typography variant="body1" sx={paragraphSx}>
-              We do not have access to your brokerage accounts or funds. This is a journaling tool, not a trading execution platform.
-            </Typography>
-            <Typography variant="body1" sx={{ ...paragraphSx, mb: 0 }}>
-              You can export your data at any time in standard formats or delete your account completely if you choose to leave.
-            </Typography>
-          </Section>
-        </Stack>
+        {/* Performance Analytics */}
+        <FeatureSection
+          icon={<BarChart />}
+          eyebrow="Performance Analytics"
+          title="Deep dive into your trading metrics"
+          subtitle="Visualize your progress with interactive charts and statistics."
+          imageSrc="/asset/new_performance.png"
+          imageAlt="Performance Analytics"
+          reverse={true}
+          delay={0.35}
+        >
+          <Typography variant="body2" sx={paragraphSx}>
+            Interactive charts show equity curves, daily PnL, and win rates over time. Analyze your
+            performance by time of day, day of week, or specific tags to find your sweet spots.
+          </Typography>
+          <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
+            Monitor key metrics like Profit Factor, Average R:R, and Expectancy to ensure your edge
+            is sustainable and scalable.
+          </Typography>
+        </FeatureSection>
 
-        {/* Workflow Section */}
+        {/* Data Privacy — text only */}
         <Box
           sx={{
-            mt: { xs: 6, sm: 8 },
+            py: { xs: 5, md: 6 },
+            animation: 'fadeInUp 0.6s ease-out 0.4s both',
             '@keyframes fadeInUp': {
-              from: { opacity: 0, transform: 'translateY(20px)' },
-              to: { opacity: 1, transform: 'translateY(0)' }
-            }
+              from: { opacity: 0, transform: 'translateY(24px)' },
+              to: { opacity: 1, transform: 'translateY(0)' },
+            },
           }}
         >
-          <Divider sx={{ mb: 4, animation: 'fadeInUp 0.6s ease-out 0.7s both' }}>
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 2,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                color: 'primary.contrastText',
+                flexShrink: 0,
+                boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.35)}`,
+              }}
+            >
+              <Security />
+            </Box>
+            <Typography
+              sx={{
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                color: theme.palette.primary.main,
+                textTransform: 'uppercase',
+                letterSpacing: 1.5,
+              }}
+            >
+              Data Privacy & Security
+            </Typography>
+          </Stack>
+          <Typography variant="h5" sx={{ fontWeight: 800, mb: 1, letterSpacing: '-0.02em' }}>
+            Your data belongs to you
+          </Typography>
+          <Box sx={{ maxWidth: 680 }}>
+            <Typography variant="body2" sx={paragraphSx}>
+              Your trading data is stored securely. We prioritize your privacy and data ownership.
+            </Typography>
+            <Typography variant="body2" sx={paragraphSx}>
+              We do not have access to your brokerage accounts or funds. This is a journaling tool, not a
+              trading execution platform.
+            </Typography>
+            <Typography variant="body2" sx={{ ...paragraphSx, mb: 0 }}>
+              You can export your data at any time in standard formats or delete your account completely
+              if you choose to leave.
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Getting Started */}
+        <Box
+          sx={{
+            mt: { xs: 2, sm: 4 },
+            animation: 'fadeInUp 0.6s ease-out 0.45s both',
+            '@keyframes fadeInUp': {
+              from: { opacity: 0, transform: 'translateY(20px)' },
+              to: { opacity: 1, transform: 'translateY(0)' },
+            },
+          }}
+        >
+          <Divider sx={{ mb: 4 }}>
             <Chip label="Getting Started" size="small" />
           </Divider>
 
           <Typography
             variant={isXs ? 'h5' : 'h4'}
-            sx={{
-              fontWeight: 700,
-              mb: 1,
-              textAlign: 'center',
-              animation: 'fadeInUp 0.6s ease-out 0.8s both'
-            }}
+            sx={{ fontWeight: 700, mb: 1, textAlign: 'center' }}
           >
             How to Get Started
           </Typography>
           <Typography
             variant="body1"
             color="text.secondary"
-            sx={{
-              mb: 4,
-              textAlign: 'center',
-              maxWidth: 600,
-              mx: 'auto',
-              lineHeight: 1.7,
-              animation: 'fadeInUp 0.6s ease-out 0.9s both'
-            }}
+            sx={{ mb: 4, textAlign: 'center', maxWidth: 600, mx: 'auto', lineHeight: 1.7 }}
           >
             Follow these simple steps to start improving your trading.
           </Typography>
@@ -330,7 +472,6 @@ const AboutPage: React.FC = () => {
               borderRadius: 3,
               bgcolor: 'background.paper',
               border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-              animation: 'fadeInUp 0.6s ease-out 1s both'
             }}
           >
             <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
@@ -339,7 +480,7 @@ const AboutPage: React.FC = () => {
                   'Create a calendar and set your starting balance, risk limits, and profit targets.',
                   'Log your trades manually or import them from CSV or Excel files.',
                   'Review your performance statistics and identify patterns in your trading.',
-                  'Ask the AI assistant questions to uncover insights and improve your edge.'
+                  'Ask the AI assistant questions to uncover insights and improve your edge.',
                 ].map((step, index) => (
                   <Stack key={step} direction="row" spacing={2} alignItems="flex-start">
                     <Box
@@ -354,7 +495,7 @@ const AboutPage: React.FC = () => {
                         color: 'primary.contrastText',
                         fontWeight: 700,
                         fontSize: '0.875rem',
-                        flexShrink: 0
+                        flexShrink: 0,
                       }}
                     >
                       {index + 1}
@@ -370,22 +511,12 @@ const AboutPage: React.FC = () => {
         </Box>
 
         {/* Discord CTA */}
-        <Box
-          sx={{
-            mt: { xs: 5, sm: 6 },
-            mb: { xs: 2, sm: 3 },
-            '@keyframes fadeInUp': {
-              from: { opacity: 0, transform: 'translateY(20px)' },
-              to: { opacity: 1, transform: 'translateY(0)' }
-            }
-          }}
-        >
+        <Box sx={{ mt: { xs: 5, sm: 6 }, mb: { xs: 2, sm: 3 } }}>
           <Card
             sx={{
               borderRadius: 3,
               bgcolor: 'background.paper',
               border: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-              animation: 'fadeInUp 0.6s ease-out 1.1s both'
             }}
           >
             <CardContent
@@ -395,7 +526,7 @@ const AboutPage: React.FC = () => {
                 flexDirection: { xs: 'column', sm: 'row' },
                 alignItems: { xs: 'flex-start', sm: 'center' },
                 justifyContent: 'space-between',
-                gap: { xs: 2, sm: 3 }
+                gap: { xs: 2, sm: 3 },
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -407,7 +538,7 @@ const AboutPage: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    mr: 1
+                    mr: 1,
                   }}
                 >
                   <Box
@@ -444,9 +575,9 @@ const AboutPage: React.FC = () => {
                     '&:hover': {
                       bgcolor: '#4752C4',
                       transform: 'scale(1.05)',
-                      boxShadow: theme.shadows[4]
+                      boxShadow: theme.shadows[4],
                     },
-                    transition: 'all 0.2s ease-in-out'
+                    transition: 'all 0.2s ease-in-out',
                   }}
                 />
               </Box>

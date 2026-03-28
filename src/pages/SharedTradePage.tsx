@@ -25,7 +25,7 @@ const SharedTradePage: React.FC = () => {
   const [mode, setMode] = useState<'light' | 'dark'>(() => {
     // Get saved theme preference or default to light
     const savedMode = localStorage.getItem('themeMode');
-    return (savedMode as 'light' | 'dark') || 'light';
+    return (savedMode as 'light' | 'dark') || 'dark';
   });
 
   // Update theme mode in localStorage when it changes

@@ -78,14 +78,16 @@ function AppContent() {
   // Initialize theme from localStorage or system preference
   const [mode, setMode] = useState<'light' | 'dark'>(() => {
     const savedMode = localStorage.getItem('themeMode');
-    return savedMode ? (savedMode as 'light' | 'dark') : (prefersDarkMode ? 'dark' : 'light');
+    return savedMode ? (savedMode as 'light' | 'dark') : 'dark';
   });
 
   const [isLoadingTrades, setIsLoadingTrades] = useState<boolean>(false);
   const [loadingAction, setLoadingAction] = useState<'loading' | 'importing' | 'exporting'>('loading');
 
   const { user } = useAuthState();
-  
+  const location = useLocation();
+  const isLandingPage = !user && location.pathname === '/';
+
 
   // Use SWR to fetch calendars with automatic focus revalidation
   // This solves the Chrome Energy Saver tab freezing issue
@@ -220,21 +222,23 @@ function AppContent() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-        {/* App Header */}
-        <AppHeader
-          onToggleTheme={toggleColorMode}
-          mode={mode}
-        />
+        {/* App Header — hidden on landing page (has its own nav) */}
+        {!isLandingPage && (
+          <AppHeader
+            onToggleTheme={toggleColorMode}
+            mode={mode}
+          />
+        )}
 
         {/* Main Content */}
         <Box
           sx={{
             flexGrow: 1,
             minHeight: '100vh',
-            bgcolor: 'custom.pageBackground',
+            bgcolor: isLandingPage ? '#000' : 'custom.pageBackground',
             position: 'relative',
-            pb: 4,
-            pt: 8, // Add top padding to account for fixed AppBar
+            pb: isLandingPage ? 0 : 4,
+            pt: isLandingPage ? 0 : 8, // Add top padding to account for fixed AppBar
             transition: theme.transitions.create(['margin', 'width'], {
               duration: theme.transitions.duration.shorter,
             })
