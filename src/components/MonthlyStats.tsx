@@ -36,7 +36,9 @@ import {
   MoreVert,
   Delete,
   ViewCarousel as GalleryIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  ChevronLeft,
+  ChevronRight
 } from '@mui/icons-material';
 import { Trade } from '../types/dualWrite';
 import { exportTrades } from '../utils/tradeExportImport';
@@ -104,6 +106,23 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
   const [performanceTimePeriod, setPerformanceTimePeriod] = useState<TimePeriod>('month');
+  const [performanceDate, setPerformanceDate] = useState<Date>(currentDate);
+
+  const navigateYear = (delta: number) => {
+    setPerformanceDate(prev => {
+      const d = new Date(prev);
+      d.setFullYear(d.getFullYear() + delta);
+      return d;
+    });
+  };
+
+  const navigateMonth = (delta: number) => {
+    setPerformanceDate(prev => {
+      const d = new Date(prev);
+      d.setMonth(d.getMonth() + delta);
+      return d;
+    });
+  };
 
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
@@ -309,7 +328,10 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
             {calendarId && (
               <Tooltip title="View detailed performance analytics" arrow>
                 <IconButton
-                  onClick={() => setIsPerformanceDialogOpen(true)}
+                  onClick={() => {
+                    setPerformanceDate(currentDate);
+                    setIsPerformanceDialogOpen(true);
+                  }}
                   size="small"
                   sx={{
                     color: 'primary.main',
@@ -723,14 +745,34 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
         >
           <DialogTitle sx={{ pb: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              <Typography variant="h6">
-                Performance Analytics for {performanceTimePeriod === 'month'
-                  ? format(currentDate, 'MMMM yyyy')
-                  : performanceTimePeriod === 'year'
-                    ? format(currentDate, 'yyyy')
-                    : 'All Time'
-                }
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {performanceTimePeriod !== 'all' && (
+                  <IconButton
+                    size="small"
+                    onClick={() => performanceTimePeriod === 'year'
+                      ? navigateYear(-1) : navigateMonth(-1)}
+                  >
+                    <ChevronLeft fontSize="small" />
+                  </IconButton>
+                )}
+                <Typography variant="h6" sx={{ userSelect: 'none' }}>
+                  {performanceTimePeriod === 'month'
+                    ? format(performanceDate, 'MMMM yyyy')
+                    : performanceTimePeriod === 'year'
+                      ? format(performanceDate, 'yyyy')
+                      : 'All Time'
+                  }
+                </Typography>
+                {performanceTimePeriod !== 'all' && (
+                  <IconButton
+                    size="small"
+                    onClick={() => performanceTimePeriod === 'year'
+                      ? navigateYear(1) : navigateMonth(1)}
+                  >
+                    <ChevronRight fontSize="small" />
+                  </IconButton>
+                )}
+              </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <RoundedTabs
                   tabs={TIME_PERIOD_TABS}
@@ -746,7 +788,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           </DialogTitle>
           <DialogContent sx={{ p: 0 }}>
             <PerformanceCharts
-              selectedDate={currentDate}
+              selectedDate={performanceDate}
               accountBalance={accountBalance}
               maxDailyDrawdown={maxDailyDrawdown || 0}
               monthlyTarget={monthlyTarget}

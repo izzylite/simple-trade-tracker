@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { Box, Paper } from '@mui/material';
 import CumulativePnLChart from './CumulativePnLChart';
 import DailyPnLChart from './DailyPnLChart';
+import PnLHeatmap from './PnLHeatmap';
 import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
+import { Trade } from '../../types/dualWrite';
+import { TimePeriod } from '../../utils/chartDataUtils';
 
 interface PnLChartsWrapperProps {
   chartData: any[];
@@ -10,7 +13,9 @@ interface PnLChartsWrapperProps {
   monthly_target?: number;
   drawdownViolationValue: number;
   setMultipleTradesDialog: (dialogState: any) => void;
-  timePeriod: 'month' | 'year' | 'all';
+  timePeriod: TimePeriod;
+  trades: Trade[];
+  selectedDate: Date;
 }
 
 
@@ -21,7 +26,9 @@ const PnLChartsWrapper: React.FC<PnLChartsWrapperProps> = ({
   monthly_target,
   drawdownViolationValue,
   setMultipleTradesDialog,
-  timePeriod
+  timePeriod,
+  trades,
+  selectedDate
 }) => {
   const [activeTab, setActiveTab] = useState(0);
 
@@ -29,8 +36,8 @@ const PnLChartsWrapper: React.FC<PnLChartsWrapperProps> = ({
     setActiveTab(newValue);
   };
 
-  // Define tabs for P&L charts
   const pnlTabs = [
+    { label: 'Heatmap' },
     { label: 'Cumulative P&L' },
     { label: 'Daily P&L' }
   ];
@@ -48,8 +55,18 @@ const PnLChartsWrapper: React.FC<PnLChartsWrapperProps> = ({
       </Box>
 
       <Box sx={{ px: 3, pb: 3 }}>
-        {/* Cumulative P&L Tab */}
+        {/* Heatmap Tab */}
         <TabPanel value={activeTab} index={0}>
+          <PnLHeatmap
+            trades={trades}
+            timePeriod={timePeriod}
+            selectedDate={selectedDate}
+            setMultipleTradesDialog={setMultipleTradesDialog}
+          />
+        </TabPanel>
+
+        {/* Cumulative P&L Tab */}
+        <TabPanel value={activeTab} index={1}>
           <CumulativePnLChart
             chartData={chartData}
             targetValue={targetValue}
@@ -60,7 +77,7 @@ const PnLChartsWrapper: React.FC<PnLChartsWrapperProps> = ({
         </TabPanel>
 
         {/* Daily P&L Tab */}
-        <TabPanel value={activeTab} index={1}>
+        <TabPanel value={activeTab} index={2}>
           <DailyPnLChart
             chartData={chartData}
             drawdownViolationValue={drawdownViolationValue}

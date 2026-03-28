@@ -651,7 +651,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
                 onTradeClick={handleTradeExpand}
               />
 
-              {/* P&L Charts with Tabs */}
+              {/* P&L Charts with Tabs (Heatmap, Cumulative, Daily) */}
               <PnLChartsWrapper
                 chartData={chartData}
                 targetValue={targetValue}
@@ -659,6 +659,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
                 drawdownViolationValue={drawdownViolationValue}
                 setMultipleTradesDialog={setTradesDialog}
                 timePeriod={timePeriod}
+                trades={filteredTrades}
+                selectedDate={selectedDate}
               />
 
               {/* Win/Loss Distribution and Daily Summary - Stack on mobile */}
