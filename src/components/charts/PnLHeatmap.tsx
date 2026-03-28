@@ -3,7 +3,7 @@ import {
   Box, Typography, useTheme, useMediaQuery, Tooltip, alpha
 } from '@mui/material';
 import {
-  startOfYear, endOfYear, startOfMonth, endOfMonth,
+  startOfYear, endOfYear,
   eachDayOfInterval, getDay, format, isToday,
   startOfWeek, differenceInCalendarWeeks
 } from 'date-fns';
@@ -70,22 +70,10 @@ const PnLHeatmap: React.FC<PnLHeatmapProps> = ({
 
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
 
-  const { days, weeks, monthLabels, maxWin, maxLoss } = useMemo(() => {
-    // Determine date range based on time period
-    let rangeStart: Date;
-    let rangeEnd: Date;
-
-    if (timePeriod === 'month') {
-      rangeStart = startOfMonth(selectedDate);
-      rangeEnd = endOfMonth(selectedDate);
-    } else if (timePeriod === 'year') {
-      rangeStart = startOfYear(selectedDate);
-      rangeEnd = endOfYear(selectedDate);
-    } else {
-      // "all" — use the year of the selected date
-      rangeStart = startOfYear(selectedDate);
-      rangeEnd = endOfYear(selectedDate);
-    }
+  const { weeks, monthLabels, maxWin, maxLoss } = useMemo(() => {
+    // Always show full year grid
+    const rangeStart = startOfYear(selectedDate);
+    const rangeEnd = endOfYear(selectedDate);
 
     // Build trade lookup by date string
     const tradeLookup = new Map<string, { pnl: number; trades: Trade[] }>();
@@ -168,7 +156,6 @@ const PnLHeatmap: React.FC<PnLHeatmapProps> = ({
     });
 
     return {
-      days: dayDataList,
       weeks: weekArray,
       monthLabels: labels,
       maxWin: mxWin,
