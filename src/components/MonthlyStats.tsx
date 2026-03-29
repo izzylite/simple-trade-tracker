@@ -40,7 +40,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from '@mui/icons-material';
-import { Trade } from '../types/dualWrite';
+import { Trade, Calendar } from '../types/dualWrite';
 import { exportTrades } from '../utils/tradeExportImport';
 import { formatCurrency } from '../utils/formatters';
 
@@ -76,6 +76,7 @@ interface MonthlyStatsProps {
   maxDailyDrawdown?: number;
   pnlBeforeMonth?: number;
   isPnlLoading?: boolean;
+  calendar?: Calendar;
 }
 
 
@@ -98,7 +99,8 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   economicFilter,
   maxDailyDrawdown,
   pnlBeforeMonth,
-  isPnlLoading = false
+  isPnlLoading = false,
+  calendar
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -805,6 +807,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
               onOpenGalleryMode={onOpenGalleryMode}
               economicFilter={economicFilter}
               isReadOnly={isReadOnly}
+              calendar={calendar}
             />
           </DialogContent>
         </Dialog>

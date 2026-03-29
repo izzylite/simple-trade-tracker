@@ -1545,6 +1545,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 maxDailyDrawdown={maxDailyDrawdown}
                 pnlBeforeMonth={pnlBeforeMonth}
                 isPnlLoading={isPnlLoading}
+                calendar={calendar}
               />
 
             </Box>

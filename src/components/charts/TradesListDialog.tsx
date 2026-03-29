@@ -67,12 +67,15 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
 
   // State for cumulative P&L
   const [cumulativePnL, setCumulativePnL] = useState<number>(0);
+  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
 
   // Fetch cumulative P&L when dialog opens or trades change
   useEffect(() => {
+    let cancelled = false;
     const fetchCumulativePnL = async () => {
       if (!open || !calendar || !trades || trades.length === 0) return;
+      setIsBalanceLoading(true);
 
       try {
         // Use the most recent trade's date to calculate cumulative P&L
@@ -84,19 +87,22 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
         const targetDate = startOfNextDay(mostRecentTrade.trade_date);
         if (isNaN(targetDate.getTime())) {
           logger.warn('Invalid trade date, skipping cumulative P&L calculation');
-          setCumulativePnL(0);
+          if (!cancelled) setCumulativePnL(0);
           return;
         }
 
         const pnl = await calculateCumulativePnLToDateAsync(targetDate, calendar);
-        setCumulativePnL(pnl);
+        if (!cancelled) setCumulativePnL(pnl);
       } catch (error) {
         logger.error('Error fetching cumulative P&L:', error);
-        setCumulativePnL(0);
+        if (!cancelled) setCumulativePnL(0);
+      } finally {
+        if (!cancelled) setIsBalanceLoading(false);
       }
     };
 
     fetchCumulativePnL();
+    return () => { cancelled = true; };
   }, [open, trades, calendar]);
   // Format data for the chart based on selected metric
   const [chartData, setChartData] = React.useState<any[] | undefined>(undefined);
@@ -218,6 +224,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
           total_pnl={total_pnl}
           onPrevDay={() => { }} // Empty function since we're hiding the buttons
           onNextDay={() => { }} // Empty function since we're hiding the buttons
+          loading={isBalanceLoading}
         />
 
         {chartData &&
