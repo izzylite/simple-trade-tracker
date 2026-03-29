@@ -8,6 +8,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
+  Chip,
   useTheme,
   alpha
 } from '@mui/material';
@@ -22,6 +23,7 @@ import type { EconomicEvent } from '../../types/economicCalendar';
 import type { Note } from '../../types/note';
 import { TradeEconomicEvent } from '../../types/dualWrite';
 import { eventMatchV3 } from '../../utils/eventNameUtils';
+import { getTagChipStyles } from '../../utils/tagColors';
 
 interface HtmlMessageRendererProps {
   html: string;
@@ -277,6 +279,121 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
     return () => clearTimeout(timeoutId);
   }, [sanitizedHtml]);
 
+  // Parse <tag-chip>TagName</tag-chip> from an HTML string into inline sub-segments
+  const parseTagChips = (htmlContent: string): Array<
+    { type: 'html-text'; content: string }
+    | { type: 'tag-chip'; tagName: string }
+  > => {
+    const tagChipPattern = /<tag-chip>([\s\S]*?)<\/tag-chip>/g;
+    const subSegments: Array<
+      { type: 'html-text'; content: string }
+      | { type: 'tag-chip'; tagName: string }
+    > = [];
+    let lastIdx = 0;
+    let tagMatch;
+
+    while ((tagMatch = tagChipPattern.exec(htmlContent)) !== null) {
+      // Add HTML before this tag chip
+      if (tagMatch.index > lastIdx) {
+        subSegments.push({
+          type: 'html-text',
+          content: htmlContent.substring(lastIdx, tagMatch.index)
+        });
+      }
+
+      subSegments.push({
+        type: 'tag-chip',
+        tagName: tagMatch[1].trim()
+      });
+
+      lastIdx = tagMatch.index + tagMatch[0].length;
+    }
+
+    // Add remaining HTML
+    if (lastIdx < htmlContent.length) {
+      subSegments.push({
+        type: 'html-text',
+        content: htmlContent.substring(lastIdx)
+      });
+    }
+
+    return subSegments;
+  };
+
+  // Render an HTML segment that may contain inline <tag-chip> tags
+  const renderHtmlWithTagChips = (
+    htmlContent: string,
+    segmentKey: string
+  ): React.ReactNode => {
+    const subSegments = parseTagChips(htmlContent);
+
+    // No tag chips found — render as before
+    if (
+      subSegments.length === 1
+      && subSegments[0].type === 'html-text'
+    ) {
+      return (
+        <Typography
+          key={segmentKey}
+          component="div"
+          sx={{
+            color: textColor,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            overflowWrap: 'anywhere'
+          }}
+          dangerouslySetInnerHTML={{
+            __html: sanitizeHtml(subSegments[0].content)
+          }}
+        />
+      );
+    }
+
+    // Mixed content — render inline sub-segments
+    return (
+      <Typography
+        key={segmentKey}
+        component="div"
+        sx={{
+          color: textColor,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          overflowWrap: 'anywhere'
+        }}
+      >
+        {subSegments.map((sub, subIdx) => {
+          if (sub.type === 'tag-chip') {
+            return (
+              <Chip
+                key={`${segmentKey}-chip-${subIdx}`}
+                label={sub.tagName}
+                size="small"
+                sx={{
+                  ...getTagChipStyles(sub.tagName, theme),
+                  display: 'inline-flex',
+                  verticalAlign: 'middle',
+                  height: 20,
+                  fontSize: '0.75rem',
+                  mx: 0.25,
+                  cursor: 'default',
+                }}
+              />
+            );
+          }
+
+          return (
+            <span
+              key={`${segmentKey}-text-${subIdx}`}
+              dangerouslySetInnerHTML={{
+                __html: sanitizeHtml(sub.content)
+              }}
+            />
+          );
+        })}
+      </Typography>
+    );
+  };
+
   const renderContentSegments = () => {
     const nodes: React.ReactNode[] = [];
     let currentTradeNodes: React.ReactNode[] = [];
@@ -337,17 +454,7 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
         }
 
         nodes.push(
-          <Typography
-            key={`html-${index}`}
-            component="div"
-            sx={{
-              color: textColor,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              overflowWrap: 'anywhere'
-            }}
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(segment.content) }}
-          />
+          renderHtmlWithTagChips(segment.content, `html-${index}`)
         );
         return;
       }
