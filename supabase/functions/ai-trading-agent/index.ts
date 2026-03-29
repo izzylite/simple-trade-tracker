@@ -51,6 +51,7 @@ const MCP_SESSION_TTL = 10 * 60 * 1000; // 10 minutes
  */
 type SSEEventType =
   | 'text_chunk'      // Streaming text as it's generated
+  | 'thought_chunk'   // Intermediate AI narration during tool use
   | 'tool_call'       // Tool is being called
   | 'tool_result'     // Tool execution completed
   | 'citation'        // Citation discovered
@@ -820,13 +821,11 @@ async function callGeminiStreaming(
               }
             }
 
-            // Stream text chunks - ALWAYS extract text, even if function calls present
-            // Gemini can return text AND function calls in the same response
+            // Extract text — buffer it, don't stream yet
+            // We need to check if function calls are also present
             for (const part of parts) {
               if (part.text) {
                 fullText += part.text;
-                // Send text chunk via SSE
-                await sendSSE(writer, 'text_chunk', { text: part.text });
               }
             }
           } catch (parseError) {
@@ -842,6 +841,17 @@ async function callGeminiStreaming(
 
   // Log final streaming result
   log(`Streaming complete: ${chunkCount} JSON chunks parsed, text=${fullText.length} chars, functionCalls=${functionCalls.length}`, 'info');
+
+  // Stream text now that we know whether function calls are present
+  if (functionCalls.length > 0 || functionCall) {
+    // Text alongside function calls — intermediate narration
+    if (fullText) {
+      await sendSSE(writer, 'thought_chunk', { text: fullText });
+    }
+  } else if (fullText) {
+    // Text only — final answer, stream as text_chunk
+    await sendSSE(writer, 'text_chunk', { text: fullText });
+  }
 
   // Return result - include text alongside function calls when available
   // This allows us to capture any text Gemini sends before/with function calls
@@ -1233,10 +1243,13 @@ function handleStreamingRequest(
           }
         }
 
-        // If no function call, this is the final answer — stream it now
         if (!newFunctionCall && newText) {
+          // No function call — this is the final answer, stream as text_chunk
           await sendSSE(writer, 'text_chunk', { text: newText });
           finalText = newText;
+        } else if (newFunctionCall && newText) {
+          // Text alongside function call — intermediate narration, stream as thought_chunk
+          await sendSSE(writer, 'thought_chunk', { text: newText });
         }
 
         // Include text alongside function call if both present
