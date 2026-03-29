@@ -3,7 +3,7 @@
  * Displays user and AI messages with proper formatting
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -34,6 +34,7 @@ import { Trade } from '../../types/trade';
 import { EconomicEvent } from '../../types/economicCalendar';
 import { format } from 'date-fns';
 import { logger } from '../../utils/logger';
+import { getTagChipStyles } from '../../utils/tagColors';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -45,6 +46,7 @@ interface ChatMessageProps {
   onNoteClick?: (noteId: string) => void;
   onEdit?: (messageId: string) => void;
   trades?: Trade[]; // All trades for calculating event trade counts
+  availableTags?: string[]; // Calendar tags for rendering user message tag chips
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -56,12 +58,80 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   onEventClick,
   onNoteClick,
   onEdit,
-  trades = []
+  trades = [],
+  availableTags = []
 }) => {
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
+
+  // Split user message text into segments with inline tag chips
+  const renderUserContentWithTagChips = useMemo(() => {
+    if (!isUser || availableTags.length === 0) return null;
+
+    const content = message.content;
+    // Sort tags longest-first to match "Sessions:London Session" before "London"
+    const sortedTags = [...availableTags].sort(
+      (a, b) => b.length - a.length
+    );
+
+    // Find all tag occurrences with their positions
+    const matches: Array<{ start: number; end: number; tag: string }> = [];
+    for (const tag of sortedTags) {
+      let searchFrom = 0;
+      while (searchFrom < content.length) {
+        const idx = content.indexOf(tag, searchFrom);
+        if (idx === -1) break;
+        // Check no overlap with existing matches
+        const overlaps = matches.some(
+          m => idx < m.end && idx + tag.length > m.start
+        );
+        if (!overlaps) {
+          matches.push({ start: idx, end: idx + tag.length, tag });
+        }
+        searchFrom = idx + 1;
+      }
+    }
+
+    if (matches.length === 0) return null;
+
+    // Sort by position
+    matches.sort((a, b) => a.start - b.start);
+
+    // Build segments
+    const segments: React.ReactNode[] = [];
+    let lastIdx = 0;
+
+    matches.forEach((m, i) => {
+      if (m.start > lastIdx) {
+        segments.push(content.substring(lastIdx, m.start));
+      }
+      segments.push(
+        <Chip
+          key={`user-tag-${i}`}
+          label={m.tag}
+          size="small"
+          sx={{
+            ...getTagChipStyles(m.tag, theme),
+            display: 'inline-flex',
+            verticalAlign: 'middle',
+            height: 20,
+            fontSize: '0.75rem',
+            mx: 0.25,
+            cursor: 'default',
+          }}
+        />
+      );
+      lastIdx = m.end;
+    });
+
+    if (lastIdx < content.length) {
+      segments.push(content.substring(lastIdx));
+    }
+
+    return segments;
+  }, [isUser, message.content, availableTags, theme]);
 
   const handleCopy = async () => {
     try {
@@ -334,6 +404,19 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 speed={200} // Much faster: 200 characters per second
                 isAnimating={message.status === 'received'}
               />
+            ) : isUser && renderUserContentWithTagChips ? (
+              // User message with inline tag chips
+              <Typography
+                component="div"
+                sx={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'anywhere',
+                  lineHeight: 1.6,
+                }}
+              >
+                {renderUserContentWithTagChips}
+              </Typography>
             ) : (
               // Regular text formatting with streaming-friendly styling
               <Box

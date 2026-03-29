@@ -442,6 +442,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             }}
             onEdit={handleEditMessage}
             trades={trades}
+            availableTags={calendar?.tags || []}
           />
         ))}
 
