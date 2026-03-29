@@ -1113,7 +1113,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   </Box>
                 )}
                 {/* Notes */}
-                {trade.notes && JSON.parse(trade.notes || '').blocks.find((data : any)=> data.text !="") && (
+                {trade.notes && (() => { try { return JSON.parse(trade.notes || '').blocks?.find((data: any) => data.text !== ""); } catch { return false; } })() && (
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                       <NoteIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
