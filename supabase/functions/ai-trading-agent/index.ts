@@ -1165,7 +1165,7 @@ function handleStreamingRequest(
           } : undefined,
           generationConfig: {
             temperature: 0.3,
-            maxOutputTokens: 4000,
+            maxOutputTokens: 8000,
           }
         };
 
@@ -1209,11 +1209,11 @@ function handleStreamingRequest(
                   const content = candidate?.content;
                   const parts = content?.parts || [];
 
-                  // Process text parts first (don't skip text when function call is present)
+                  // Buffer text — don't stream yet, we don't know if this
+                  // is the final answer or narration alongside a tool call
                   for (const part of parts) {
                     if (part.text) {
                       newText += part.text;
-                      await sendSSE(writer, 'text_chunk', { text: part.text });
                     }
                   }
 
@@ -1233,15 +1233,16 @@ function handleStreamingRequest(
           }
         }
 
+        // If no function call, this is the final answer — stream it now
+        if (!newFunctionCall && newText) {
+          await sendSSE(writer, 'text_chunk', { text: newText });
+          finalText = newText;
+        }
+
         // Include text alongside function call if both present
         result = newFunctionCall
           ? { functionCall: newFunctionCall, text: newText || undefined }
           : { text: newText };
-
-        // Capture any text before the loop continues or ends
-        if (newText) {
-          finalText = newText;
-        }
       }
 
       // Final fallback - if we still have no text but result has text
@@ -1327,7 +1328,7 @@ function handleStreamingRequest(
             } : undefined,
             generationConfig: {
               temperature: 0.3,
-              maxOutputTokens: 4000,
+              maxOutputTokens: 8000,
             }
           };
 
@@ -1823,7 +1824,7 @@ Deno.serve(async (req: Request) => {
           } : undefined,
           generationConfig: {
             temperature: 0.3,
-            maxOutputTokens: 4000,
+            maxOutputTokens: 8000,
           }
         };
 
