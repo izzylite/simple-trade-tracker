@@ -309,6 +309,17 @@ Note: COPY the exact UUID string (e.g., "9ee94f92-1b7b-4f95-9fe5-29f56f481010") 
 - Each tag on its own line
 - Blank lines before/after each tag
 - Text content separate from tags
+
+## Inline Tag Chips
+When mentioning trade tags in running text, wrap them in tag-chip tags:
+- <tag-chip>Strategy:Breakout</tag-chip>
+- <tag-chip>Session:London</tag-chip>
+- <tag-chip>Long</tag-chip>
+
+Rules:
+- Use ONLY for inline mentions within sentences
+- Do NOT use when listing all tags on a trade (trade cards already show those)
+- The tag name inside must match the exact tag string from the database
 `;
 
 // =============================================================================
