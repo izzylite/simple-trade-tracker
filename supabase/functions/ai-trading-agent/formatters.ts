@@ -357,10 +357,11 @@ export function convertMarkdownToHtml(
   // Extract and protect inline references BEFORE escaping
   const inlineRefs: Array<{ marker: string; original: string }> = [];
 
-  // Pattern 1: HTML tags (trade-ref, event-ref, and note-ref)
+  // Pattern 1: HTML tags (trade-ref, event-ref, note-ref, tag-chip)
   const tradeTagPattern = /<trade-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/trade-ref>)?/g;
   const eventTagPattern = /<event-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/event-ref>)?/g;
   const noteTagPattern = /<note-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/note-ref>)?/g;
+  const tagChipPattern = /<tag-chip>([^<]*)<\/tag-chip>/g;
 
   let refMatch;
 
@@ -388,7 +389,14 @@ export function convertMarkdownToHtml(
     });
   }
 
-   
+  // Extract tag-chip tags
+  while ((refMatch = tagChipPattern.exec(html)) !== null) {
+    inlineRefs.push({
+      marker: `___INLINE_REF_${inlineRefs.length}___`,
+      original: refMatch[0]
+    });
+  }
+
   // Replace inline refs with placeholders
   inlineRefs.forEach(({ marker, original }) => {
     html = html.replace(original, marker);
