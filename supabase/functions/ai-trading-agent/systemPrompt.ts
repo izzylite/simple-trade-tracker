@@ -303,6 +303,8 @@ Reference trades/events/notes with self-closing XML tags:
 - <event-ref id="uuid"/>
 - <note-ref id="uuid"/>
 Note: COPY the exact UUID string (e.g., "9ee94f92-1b7b-4f95-9fe5-29f56f481010") from the sql query
+⚠️ ONLY use <event-ref> when you have queried the economic_events TABLE and have a real UUID.
+Event names from trade.economic_events JSONB are NOT UUIDs — mention those events as plain text.
  
 
 ### Format Rules
