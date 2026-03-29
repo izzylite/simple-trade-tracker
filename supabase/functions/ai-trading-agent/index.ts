@@ -995,18 +995,15 @@ function handleStreamingRequest(
         { role: 'user', parts: [{ text: message }] }
       ];
 
-      // Function calling loop
-      // Skip if fallback was already provided due to empty bug
-      while (turnCount < maxTurns && !finalText) {
+      // Function calling loop — per Google docs, loop until no function calls remain.
+      // Do NOT use finalText as a loop exit condition: the model may return text
+      // alongside function calls (e.g. "Let me search...") which is not the final answer.
+      while (turnCount < maxTurns) {
         turnCount++;
 
-        // Capture any text that came with the response (even if there are also function calls)
-        if (result.text && !finalText) {
-          finalText = result.text;
-        }
-
-        // If we have text and NO function calls, we're done
+        // If we have text and NO function calls, we're done (final answer)
         if (result.text && !result.functionCall && !result.functionCalls) {
+          finalText = result.text;
           break;
         }
 
@@ -1632,12 +1629,12 @@ Deno.serve(async (req: Request) => {
       { role: 'user', parts: [{ text: message }] }
     ];
 
-    // Function calling loop
+    // Function calling loop — per Google docs, loop until no function calls remain.
     while (turnCount < maxTurns) {
       turnCount++;
 
-      if (result.text) {
-        // Got final answer
+      // Only treat text as final answer when there are NO function calls
+      if (result.text && !result.functionCall) {
         finalText = result.text;
         break;
       }
@@ -1647,7 +1644,7 @@ Deno.serve(async (req: Request) => {
         break;
       }
 
-      const call = result.functionCall;
+      const call = result.functionCall!;
       log(`Executing function: ${call.name}`, 'info');
 
       // Check if we're repeating the same function call (sign of being stuck)
