@@ -24,6 +24,23 @@ import { hasApiKey } from '../services/apiKeyStorage';
 
 const CONVERSATIONS_PAGE_SIZE = 15;
 
+const TOOL_LABELS: Record<string, string> = {
+  execute_sql: 'Querying database',
+  search_web: 'Searching web',
+  scrape_url: 'Reading article',
+  analyze_image: 'Analyzing chart',
+  generate_chart: 'Generating chart',
+  get_crypto_price: 'Checking crypto price',
+  get_forex_price: 'Checking forex price',
+  create_note: 'Creating note',
+  update_note: 'Updating note',
+  delete_note: 'Deleting note',
+  search_notes: 'Searching notes',
+  update_memory: 'Updating memory',
+  get_tag_definition: 'Looking up tag',
+  save_tag_definition: 'Saving tag definition',
+};
+
 export interface UseAIChatOptions {
   userId: string | undefined;
   calendar?: Calendar;
@@ -468,6 +485,7 @@ export function useAIChat({
       abortControllerRef.current = abortController;
 
       let accumulatedText = '';
+      let thoughtText = '';
       let messageHtml = '';
       let citations: any[] | undefined;
       let embeddedTrades: any | undefined;
@@ -516,17 +534,29 @@ export function useAIChat({
             }, 100);
             break;
 
+          case 'thought_chunk':
+            thoughtText += event.data.text;
+            break;
+
           case 'tool_call':
             logger.log(`Tool called: ${event.data.name}`);
             toolCallsInProgress.push(event.data.name);
-            setToolExecutionStatus(toolCallsInProgress.join(', '));
+            setToolExecutionStatus(
+              toolCallsInProgress
+                .map(t => TOOL_LABELS[t] || t)
+                .join(', ')
+            );
             break;
 
           case 'tool_result':
             logger.log(`Tool result: ${event.data.name}`);
             toolCallsInProgress = toolCallsInProgress.filter(t => t !== event.data.name);
             if (toolCallsInProgress.length > 0) {
-              setToolExecutionStatus(toolCallsInProgress.join(', '));
+              setToolExecutionStatus(
+                toolCallsInProgress
+                  .map(t => TOOL_LABELS[t] || t)
+                  .join(', ')
+              );
             } else {
               setToolExecutionStatus('');
             }
@@ -571,6 +601,7 @@ export function useAIChat({
         embeddedTrades,
         embeddedEvents,
         embeddedNotes,
+        thoughtText: thoughtText || undefined,
         timestamp: new Date(),
         status: 'received'
       };
