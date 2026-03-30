@@ -308,9 +308,9 @@ Event names from trade.economic_events JSONB are NOT UUIDs — mention those eve
  
 
 ### Format Rules
-- Each tag on its own line
-- Blank lines before/after each tag
-- Text content separate from tags
+- <trade-ref> renders as a compact inline chip — use them INLINE within sentences, not on separate lines
+- <event-ref> and <note-ref> render as full cards — place each on its own line with blank lines around it
+- Multiple trade refs can appear in the same sentence or list item
 
 ## Inline Tag Chips
 When mentioning trade tags in running text, wrap them in tag-chip tags:
