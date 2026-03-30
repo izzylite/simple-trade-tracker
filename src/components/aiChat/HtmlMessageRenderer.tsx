@@ -14,17 +14,14 @@ import {
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon
+  TrendingDown as TrendingDownIcon,
+  Note as NoteIcon
 } from '@mui/icons-material';
 import DOMPurify from 'dompurify';
 import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
-import EventCard from './EventCard';
-import { NoteListItem } from '../notes/NoteListItem';
 import type { Trade } from '../../types/trade';
 import type { EconomicEvent } from '../../types/economicCalendar';
 import type { Note } from '../../types/note';
-import { TradeEconomicEvent } from '../../types/dualWrite';
-import { eventMatchV3 } from '../../utils/eventNameUtils';
 import { getTagChipStyles } from '../../utils/tagColors';
 
 // Parse <tag-chip>TagName</tag-chip> from an HTML string into inline sub-segments.
@@ -119,29 +116,7 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
     return merged;
   }, [embeddedTrades, liveTradesMap]);
 
-  // Calculate trade count for each embedded event
-  const eventTradeCountMap = useMemo(() => {
-    const countMap = new Map<string, number>();
 
-    if (!embeddedEvents || trades.length === 0) {
-      return countMap;
-    }
-
-    Object.entries(embeddedEvents).forEach(([eventId, event]) => {
-      const tradeCount = trades.filter(trade => {
-        if (!trade.economic_events || trade.economic_events.length === 0) {
-          return false;
-        }
-        return trade.economic_events.some((tradeEvent: TradeEconomicEvent) => {
-          return eventMatchV3(tradeEvent, event);
-        });
-      }).length;
-
-      countMap.set(eventId, tradeCount);
-    });
-
-    return countMap;
-  }, [embeddedEvents, trades]);
 
   // Parse HTML into segments with inline cards
   const contentSegments = useMemo(() => {
@@ -491,36 +466,86 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
       }
 
       if (segment.type === 'event' && segment.id && embeddedEvents?.[segment.id]) {
-        // Events should be rendered as their own block, separate from any trade group
         flushTrades();
 
         const event = embeddedEvents[segment.id];
-        const tradeCount = eventTradeCountMap.get(segment.id) || 0;
+        const impactColor = event.impact === 'High'
+          ? '#f44336'
+          : event.impact === 'Medium'
+            ? '#ff9800'
+            : '#4caf50';
+
         nodes.push(
-          <Box key={`event-${index}`} sx={{ my: 1 }}>
-            <EventCard
-              eventId={segment.id}
-              eventData={event}
-              onClick={onEventClick}
-              compact={false}
-              tradeCount={tradeCount}
-            />
-          </Box>
+          <Chip
+            key={`event-${index}`}
+            icon={event.flag_url ? (
+              <img
+                src={event.flag_url}
+                alt={event.currency}
+                style={{
+                  width: 14,
+                  height: 10,
+                  borderRadius: 1,
+                  objectFit: 'cover',
+                  marginLeft: 6,
+                }}
+              />
+            ) as any : undefined}
+            label={`${event.currency} ${event.event_name}`}
+            size="small"
+            onClick={() => onEventClick?.(event)}
+            sx={{
+              display: 'inline-flex',
+              verticalAlign: 'middle',
+              height: 22,
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              mx: 0.25,
+              my: 0.25,
+              backgroundColor: alpha(impactColor, 0.12),
+              color: impactColor,
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: alpha(impactColor, 0.22),
+              },
+              '& .MuiChip-icon': {
+                marginLeft: '4px',
+              },
+            }}
+          />
         );
       }
 
       if (segment.type === 'note' && segment.id && embeddedNotes?.[segment.id]) {
-        // Notes should be rendered as their own block, separate from any trade group
         flushTrades();
 
         const note = embeddedNotes[segment.id];
         nodes.push(
-          <Box key={`note-${index}`} sx={{ my: 1 }}>
-            <NoteListItem
-              note={note}
-              onClick={() => onNoteClick?.(segment.id!)}
-            />
-          </Box>
+          <Chip
+            key={`note-${index}`}
+            icon={<NoteIcon sx={{ fontSize: '0.85rem !important', color: 'inherit !important' }} />}
+            label={note.title || 'Note'}
+            size="small"
+            onClick={() => onNoteClick?.(segment.id!)}
+            sx={{
+              display: 'inline-flex',
+              verticalAlign: 'middle',
+              height: 22,
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              mx: 0.25,
+              my: 0.25,
+              backgroundColor: alpha(theme.palette.info.main, 0.12),
+              color: theme.palette.info.main,
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: alpha(theme.palette.info.main, 0.22),
+              },
+              '& .MuiChip-icon': {
+                marginLeft: '4px',
+              },
+            }}
+          />
         );
       }
     });
