@@ -20,6 +20,7 @@ import AnimatedText from './AnimatedText';
 import HtmlMessageRenderer from './HtmlMessageRenderer';
 import CitationsSection from './CitationsSection';
 import MarkdownRenderer from './MarkdownRenderer';
+import ThoughtProcess from './ThoughtProcess';
 import {
   Person as PersonIcon,
   SmartToy as AIIcon,
@@ -386,6 +387,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               transition: 'opacity 0.5s ease-in-out'
             }}
           >
+            {/* AI thinking process (session-only, collapsible) */}
+            {isAssistant && message.thoughtText && (
+              <ThoughtProcess text={message.thoughtText} />
+            )}
+
             {/* Use HTML renderer if messageHtml is available (from Supabase AI agent) */}
             {message.messageHtml ? (
               <HtmlMessageRenderer
