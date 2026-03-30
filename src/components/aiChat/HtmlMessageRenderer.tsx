@@ -488,11 +488,16 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
                   <img
                     src={event.flag_url}
                     alt={event.currency}
+                    className="event-chip-flag"
                     style={{
                       width: 14,
                       height: 10,
+                      minHeight: 'unset',
+                      maxHeight: 10,
                       borderRadius: 1,
                       objectFit: 'cover',
+                      display: 'inline-block',
+                      backgroundColor: 'transparent',
                     }}
                   />
                 )}
@@ -624,7 +629,7 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
               opacity: 0.8
             }
           },
-          '& img': {
+          '& img:not(.event-chip-flag)': {
             maxWidth: '100%',
             height: 'auto',
             minHeight: 100,
