@@ -12,12 +12,14 @@ import {
   useTheme,
   alpha
 } from '@mui/material';
+import {
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon
+} from '@mui/icons-material';
 import DOMPurify from 'dompurify';
 import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
-import TradeCard from './TradeCard';
 import EventCard from './EventCard';
 import { NoteListItem } from '../notes/NoteListItem';
-import ExpandableCardList from './ExpandableCardList';
 import type { Trade } from '../../types/trade';
 import type { EconomicEvent } from '../../types/economicCalendar';
 import type { Note } from '../../types/note';
@@ -402,14 +404,8 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
     const flushTrades = () => {
       if (currentTradeNodes.length === 0) return;
 
-      nodes.push(
-        <ExpandableCardList
-          key={`trade-list-${nodes.length}`}
-          items={currentTradeNodes}
-          itemType="trades"
-        />
-      );
-
+      // Render trade chips inline
+      currentTradeNodes.forEach(node => nodes.push(node));
       currentTradeNodes = [];
     };
 
@@ -425,15 +421,49 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
       if (segment.type === 'trade' && segment.id && mergedEmbeddedTrades?.[segment.id]) {
         const trade = mergedEmbeddedTrades[segment.id];
         const contextTrades = Object.values(mergedEmbeddedTrades);
+        const isWin = trade.trade_type === 'win';
+        const isLoss = trade.trade_type === 'loss';
+        const pnlColor = isWin ? '#4caf50' : isLoss ? '#f44336' : theme.palette.text.secondary;
+        const bgColor = isWin
+          ? alpha('#4caf50', 0.15)
+          : isLoss
+            ? alpha('#f44336', 0.15)
+            : alpha(theme.palette.text.primary, 0.08);
 
         currentTradeNodes.push(
-          <Box key={`trade-${index}`} sx={{ my: 1 }}>
-            <TradeCard
-              trade={trade}
-              showTags={true}
-              onClick={() => onTradeClick?.(trade.id, contextTrades)}
-            />
-          </Box>
+          <Chip
+            key={`trade-${index}`}
+            icon={isWin
+              ? <TrendingUpIcon sx={{ fontSize: '0.85rem !important', color: `${pnlColor} !important` }} />
+              : isLoss
+                ? <TrendingDownIcon sx={{ fontSize: '0.85rem !important', color: `${pnlColor} !important` }} />
+                : undefined}
+            label={`${trade.name || 'Trade'} ${isLoss ? '-' : '+'}$${Math.abs(trade.amount).toLocaleString()}`}
+            size="small"
+            onClick={() => onTradeClick?.(trade.id, contextTrades)}
+            sx={{
+              display: 'inline-flex',
+              verticalAlign: 'middle',
+              height: 22,
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              mx: 0.25,
+              my: 0.25,
+              backgroundColor: bgColor,
+              color: pnlColor,
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: isWin
+                  ? alpha('#4caf50', 0.25)
+                  : isLoss
+                    ? alpha('#f44336', 0.25)
+                    : alpha(theme.palette.text.primary, 0.15),
+              },
+              '& .MuiChip-icon': {
+                marginLeft: '4px',
+              },
+            }}
+          />
         );
 
         return;
