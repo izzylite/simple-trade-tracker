@@ -478,20 +478,27 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
         nodes.push(
           <Chip
             key={`event-${index}`}
-            icon={event.flag_url ? (
-              <img
-                src={event.flag_url}
-                alt={event.currency}
-                style={{
-                  width: 14,
-                  height: 10,
-                  borderRadius: 1,
-                  objectFit: 'cover',
-                  marginLeft: 6,
-                }}
-              />
-            ) as any : undefined}
-            label={`${event.currency} ${event.event_name}`}
+            label={
+              <Box component="span" sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.5,
+              }}>
+                {event.flag_url && (
+                  <img
+                    src={event.flag_url}
+                    alt={event.currency}
+                    style={{
+                      width: 14,
+                      height: 10,
+                      borderRadius: 1,
+                      objectFit: 'cover',
+                    }}
+                  />
+                )}
+                <span>{event.event_name}</span>
+              </Box>
+            }
             size="small"
             onClick={() => onEventClick?.(event)}
             sx={{
@@ -507,9 +514,6 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
               cursor: 'pointer',
               '&:hover': {
                 backgroundColor: alpha(impactColor, 0.22),
-              },
-              '& .MuiChip-icon': {
-                marginLeft: '4px',
               },
             }}
           />
