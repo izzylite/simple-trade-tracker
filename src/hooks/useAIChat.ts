@@ -541,6 +541,10 @@ export function useAIChat({
           case 'tool_call':
             logger.log(`Tool called: ${event.data.name}`);
             toolCallsInProgress.push(event.data.name);
+            {
+              const label = TOOL_LABELS[event.data.name] || event.data.name;
+              thoughtText += `${label}...\n`;
+            }
             setToolExecutionStatus(
               toolCallsInProgress
                 .map(t => TOOL_LABELS[t] || t)
