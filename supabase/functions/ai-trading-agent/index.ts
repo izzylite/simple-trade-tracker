@@ -98,6 +98,7 @@ async function sendSSE(writer: WritableStreamDefaultWriter, event: SSEEventType,
   }
 }
 
+
 /**
  * Build multimodal function response parts
  * Detects [IMAGE_ANALYSIS:url] markers and injects images as inline_data

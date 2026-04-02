@@ -32,7 +32,7 @@ export interface GeminiFunctionDeclaration {
 export const searchWebTool: GeminiFunctionDeclaration = {
   name: "search_web",
   description:
-    "Search web for market news, analysis, and trading information. After getting search results, you can use scrape_url to extract more detailed content from specific URLs.",
+    "Search web for market news, analysis, and trading information. After getting search results, you can use scrape_url to extract more detailed content from specific URLs. For market news/sentiment, ALWAYS use type: 'news' with time_range: 'day' or 'week' to get current information.",
   parameters: {
     type: "object",
     properties: {
@@ -42,8 +42,13 @@ export const searchWebTool: GeminiFunctionDeclaration = {
       },
       type: {
         type: "string",
-        description: 'Type: "search" or "news"',
+        description: 'Type: "search" or "news". Use "news" for market sentiment, breaking news, and current events.',
         enum: ["search", "news"],
+      },
+      time_range: {
+        type: "string",
+        description: 'Filter results by recency. Use "day" for breaking news/sentiment, "week" for recent analysis, "month" for broader research. Defaults to no filter.',
+        enum: ["day", "week", "month"],
       },
     },
     required: ["query"],
@@ -511,6 +516,7 @@ Never call this tool without user consent.`,
 export async function executeWebSearch(
   query: string,
   searchType: string = "search",
+  timeRange?: string,
 ): Promise<string> {
   try {
     const serperApiKey = Deno.env.get("SERPER_API_KEY");
@@ -522,13 +528,29 @@ export async function executeWebSearch(
       ? "https://google.serper.dev/news"
       : "https://google.serper.dev/search";
 
+    const timeRangeMap: Record<string, string> = {
+      day: "qdr:d",
+      week: "qdr:w",
+      month: "qdr:m",
+    };
+
+    const body: Record<string, unknown> = {
+      q: query,
+      gl: "us",
+      hl: "en",
+      num: 10,
+    };
+    if (timeRange && timeRangeMap[timeRange]) {
+      body.tbs = timeRangeMap[timeRange];
+    }
+
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         "X-API-KEY": serperApiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ q: query, gl: "us", hl: "en", num: 10 }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -562,7 +584,8 @@ export async function executeWebSearch(
     if (hasNews) {
       results += "News Results:\n";
       for (const result of data.news.slice(0, 5)) {
-        results += `\n- ${result.title}\n  ${
+        const date = result.date ? ` [${result.date}]` : "";
+        results += `\n- ${result.title}${date}\n  ${
           result.snippet || result.description || ""
         }\n  ${result.link}\n`;
       }
@@ -1952,7 +1975,10 @@ export async function executeCustomTool(
       case "search_web": {
         const query = typeof args.query === "string" ? args.query : "";
         const searchType = typeof args.type === "string" ? args.type : "search";
-        return await executeWebSearch(query, searchType);
+        const timeRange = typeof args.time_range === "string"
+          ? args.time_range
+          : undefined;
+        return await executeWebSearch(query, searchType, timeRange);
       }
 
       case "scrape_url": {

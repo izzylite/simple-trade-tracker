@@ -505,8 +505,8 @@ ${calendarContextSection}
 
 ## Tools Available
 1. execute_sql — Query trades/calendars/notes/economic_events (apply security filter)
-2. search_web — Market news and analysis (NOT for economic calendar)
-3. scrape_url — Article content extraction
+2. search_web — Market news and analysis (NOT for economic calendar). Use time_range param for recency filtering.
+3. scrape_url — Article content extraction. Prefer scraping the most recent articles first.
 4. get_crypto_price, get_forex_price — Live prices
 5. generate_chart — Visualize data (auto-displays, omit URL mentions)
 6. create_note, update_note, delete_note, search_notes — Note management (NOT for AGENT_MEMORY)
@@ -522,7 +522,7 @@ ${calendarContextSection}
 | "Trades tagged with X", "scalp trades" | execute_sql → WHERE 'X' = ANY(tags) (ARRAY) |
 | Economic calendar, upcoming events | execute_sql → economic_events table |
 | Trades, performance, statistics | execute_sql → trades/calendars tables |
-| Market news, sentiment, analysis | search_web → THEN scrape_url (see below) |
+| Market news, sentiment, analysis | search_web (type: "news", time_range: "day"/"week") → THEN scrape_url |
 | Current prices | get_crypto_price / get_forex_price |
 | Review trade charts/images | analyze_image (pass trade.images[].url) |
 | Unknown tag meaning | get_tag_definition → user's tag dictionary |
@@ -530,18 +530,30 @@ ${calendarContextSection}
 
 ## Web Research Workflow — CRITICAL
 When user asks about market news, sentiment, or analysis:
-1. FIRST: Call search_web to find relevant articles/news
+1. FIRST: Call search_web with appropriate time_range to find relevant articles/news
 2. THEN: Call scrape_url on 2-3 of the most relevant URLs from search results
-3. FINALLY: Synthesize the detailed content into your response
+3. FINALLY: Synthesize the detailed content, noting publication dates
 
 ⚠️ DO NOT just return search snippets — they are too brief. ALWAYS scrape URLs for full content.
 ⚠️ If search returns URLs, you MUST scrape at least 1-2 of them for detailed information.
 
+## Recency Rules — Prioritize Fresh Sources
+| Query type | time_range | type |
+|-----------|------------|------|
+| Breaking news, "what's happening now", sentiment today | "day" | "news" |
+| Recent analysis, "this week", weekly outlook | "week" | "news" |
+| Broader research, strategy articles, educational | "month" | "search" |
+| Historical context, "what happened in 2024" | omit | "search" |
+
+⚠️ When multiple articles are available, ALWAYS prefer the most recently published.
+⚠️ If an article lacks a publication date, treat it as potentially outdated — cross-reference with dated sources.
+⚠️ When synthesizing, note the timeframe: "Based on reports from [date range]..."
+
 Example workflow for "What's the current market sentiment?":
-1. search_web({query: "current market sentiment", type: "news"})
-2. scrape_url({url: "first_relevant_url_from_results"})
-3. scrape_url({url: "second_relevant_url_from_results"})
-4. Provide synthesized analysis from scraped content
+1. search_web({query: "market sentiment today", type: "news", time_range: "day"})
+2. scrape_url({url: "most_recent_relevant_url"})
+3. scrape_url({url: "second_most_recent_url"})
+4. Synthesize with publication dates and note the recency of sources
 
 ## Tag Definition Workflow
 When you encounter a custom tag you don't understand (e.g., "Confluence:3x Displacement"):

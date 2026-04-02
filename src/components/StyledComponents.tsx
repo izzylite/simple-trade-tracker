@@ -52,7 +52,7 @@ export const StyledCalendarDay = styled(Box, {
     },
   }),
   ...($isCurrentDay && {
-    border: '1.5px solid rgba(124, 58, 237, 0.4)',
+    border: '3px solid rgba(124, 58, 237, 0.4)',
     boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
   })
 
