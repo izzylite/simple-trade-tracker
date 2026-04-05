@@ -485,7 +485,6 @@ export function useAIChat({
       abortControllerRef.current = abortController;
 
       let accumulatedText = '';
-      let thoughtText = '';
       let messageHtml = '';
       let citations: any[] | undefined;
       let embeddedTrades: any | undefined;
@@ -534,8 +533,19 @@ export function useAIChat({
             }, 100);
             break;
 
-          case 'thought_chunk':
-            thoughtText += event.data.text;
+          case 'text_reset':
+            // Narration text was streamed before we knew a function call was coming.
+            // Reset accumulated text and remove the in-progress AI message bubble.
+            accumulatedText = '';
+            pendingTextRef.current = '';
+            if (messageUpdateTimeoutRef.current) {
+              clearTimeout(messageUpdateTimeoutRef.current);
+              messageUpdateTimeoutRef.current = null;
+            }
+            if (aiMessageAdded) {
+              setMessages(prev => prev.filter(msg => msg.id !== aiMessageId));
+              aiMessageAdded = false;
+            }
             break;
 
           case 'tool_call':
@@ -601,7 +611,6 @@ export function useAIChat({
         embeddedTrades,
         embeddedEvents,
         embeddedNotes,
-        thoughtText: thoughtText || undefined,
         timestamp: new Date(),
         status: 'received'
       };

@@ -39,8 +39,6 @@ export interface ChatMessage {
   embeddedTrades?: Record<string, any>; // Trade objects keyed by ID
   embeddedEvents?: Record<string, any>; // Event objects keyed by ID
   embeddedNotes?: Record<string, any>; // Note objects keyed by ID
-  // AI's intermediate narration during tool use (session-only, not persisted)
-  thoughtText?: string;
 }
 
 // Serializable version for database storage (timestamp as ISO string)

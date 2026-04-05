@@ -51,6 +51,7 @@ const MCP_SESSION_TTL = 10 * 60 * 1000; // 10 minutes
  */
 type SSEEventType =
   | 'text_chunk'      // Streaming text as it's generated
+  | 'text_reset'      // Reset accumulated text (narration streamed before tool call detected)
   | 'thought_chunk'   // Intermediate AI narration during tool use
   | 'tool_call'       // Tool is being called
   | 'tool_result'     // Tool execution completed
@@ -1220,11 +1221,13 @@ function handleStreamingRequest(
                   const content = candidate?.content;
                   const parts = content?.parts || [];
 
-                  // Buffer text — don't stream yet, we don't know if this
-                  // is the final answer or narration alongside a tool call
+                  // Stream text immediately for real-time progressive rendering.
+                  // If a function call is found in the same response, text_reset
+                  // will be sent after the loop to correct the already-streamed text.
                   for (const part of parts) {
                     if (part.text) {
                       newText += part.text;
+                      await sendSSE(writer, 'text_chunk', { text: part.text });
                     }
                   }
 
@@ -1245,11 +1248,12 @@ function handleStreamingRequest(
         }
 
         if (!newFunctionCall && newText) {
-          // No function call — this is the final answer, stream as text_chunk
-          await sendSSE(writer, 'text_chunk', { text: newText });
+          // Text was already streamed as text_chunk — this is the final answer
           finalText = newText;
         } else if (newFunctionCall && newText) {
-          // Text alongside function call — intermediate narration, stream as thought_chunk
+          // Text was streamed but was narration alongside a function call.
+          // Reset the frontend's accumulated text and re-send as thought_chunk.
+          await sendSSE(writer, 'text_reset', {});
           await sendSSE(writer, 'thought_chunk', { text: newText });
         }
 

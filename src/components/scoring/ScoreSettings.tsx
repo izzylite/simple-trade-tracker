@@ -1,27 +1,23 @@
 import React, { useState } from 'react';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Slider,
-  Stack,
-  TextField,
-  Button,
-  Alert,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  FormLabel,
-  useTheme
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import Slider from '@mui/material/Slider';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
+import Alert from '@mui/material/Alert';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import FormLabel from '@mui/material/FormLabel';
+import { useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import {
-  ExpandMore,
-  RestoreRounded,
-  SaveRounded,
-  InfoOutlined
-} from '@mui/icons-material';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import RestoreRounded from '@mui/icons-material/RestoreRounded';
+import SaveRounded from '@mui/icons-material/SaveRounded';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import { ScoreSettings } from '../../types/score';
 import { Trade } from '../../types/dualWrite';
 import { DEFAULT_SCORE_SETTINGS } from '../../utils/scoreUtils';

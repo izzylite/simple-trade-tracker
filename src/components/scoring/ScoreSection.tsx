@@ -16,7 +16,7 @@ import {
 import { useMediaQuery } from '@mui/material';
 
 import { alpha } from '@mui/material/styles';
-import { Close } from '@mui/icons-material';
+import { Close, Settings } from '@mui/icons-material';
 import { Trade, Calendar } from '../../types/dualWrite';
 import { ScoreSettings, ScoreAnalysis } from '../../types/score';
 import { DynamicRiskSettings } from '../../utils/dynamicRiskUtils';
@@ -74,6 +74,9 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
 
   // Cache for score history to avoid recalculating when switching tabs
   const scoreHistoryCache = useRef<Map<string, any[]>>(new Map());
+
+  // State for settings dialog
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
 
   // State for breakdown modal
   const [breakdownModalOpen, setBreakdownModalOpen] = useState(false);
@@ -341,8 +344,7 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
   const tabs = [
     { label: 'Overview' },
     { label: 'History' },
-    { label: 'Patterns' },
-    { label: 'Settings' }
+    { label: 'Patterns' }
   ];
 
   const handleHistoryPeriodChange = (newPeriod: 'daily' | 'weekly' | 'monthly' | 'yearly') => {
@@ -468,11 +470,26 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
             📊 Trading Score Analysis
           </Typography>
 
-          <RoundedTabs
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-          />
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <IconButton
+              onClick={() => setSettingsDialogOpen(true)}
+              size="small"
+              sx={{
+                color: theme.palette.text.secondary,
+                '&:hover': {
+                  color: theme.palette.primary.main,
+                  backgroundColor: alpha(theme.palette.primary.main, 0.1)
+                }
+              }}
+            >
+              <Settings fontSize="small" />
+            </IconButton>
+            <RoundedTabs
+              tabs={tabs}
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+            />
+          </Stack>
         </Stack>
       </Box>
 
@@ -648,9 +665,51 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
           />
         </TabPanel>
 
-        {/* Settings Tab */}
-        <TabPanel value={activeTab} index={3}>
-          <Stack spacing={3}>
+        {/* No more Settings Tab - moved to dialog */}
+      </Box>
+
+      {/* Score Settings Dialog */}
+      {settingsDialogOpen && (
+        <Dialog
+          open={settingsDialogOpen}
+          onClose={() => setSettingsDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+          fullScreen={isXs}
+          sx={{
+            '& .MuiDialog-paper': {
+              backgroundColor: theme.palette.mode === 'dark'
+                ? alpha(theme.palette.background.paper, 0.95)
+                : theme.palette.background.paper,
+              borderRadius: 2,
+              maxHeight: '90vh'
+            },
+            '& .MuiDialogContent-root': {
+              ...scrollbarStyles(theme)
+            }
+          }}
+        >
+          <DialogTitle sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            pb: 1,
+            fontWeight: 600
+          }}>
+            Score Settings
+            <IconButton
+              onClick={() => setSettingsDialogOpen(false)}
+              sx={{
+                color: theme.palette.text.secondary,
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.text.secondary, 0.1)
+                }
+              }}
+            >
+              <Close />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ pt: 1 }}>
             <ScoreSettingsComponent
               settings={settings}
               onSettingsChange={handleSettingsChange}
@@ -661,9 +720,9 @@ const ScoreSection: React.FC<ScoreSectionProps> = ({
               onTagsChange={handleTagsChange}
               allTags={allTags}
             />
-          </Stack>
-        </TabPanel>
-      </Box>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Score Breakdown Modal */}
       <Dialog
