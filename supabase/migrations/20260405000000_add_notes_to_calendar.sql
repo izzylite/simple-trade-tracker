@@ -7,7 +7,11 @@ ALTER TABLE calendars ADD COLUMN IF NOT EXISTS notes JSONB DEFAULT '[]'::jsonb;
 
 -- 2. Rebuild function: queries active user notes and overwrites calendar.notes
 CREATE OR REPLACE FUNCTION rebuild_calendar_notes(p_calendar_id UUID)
-RETURNS VOID AS $$
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   UPDATE calendars SET notes = (
     SELECT COALESCE(
@@ -21,11 +25,15 @@ BEGIN
   )
   WHERE id = p_calendar_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 3. Trigger function: fires after any notes row change
 CREATE OR REPLACE FUNCTION trigger_rebuild_calendar_notes()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     IF OLD.calendar_id IS NOT NULL THEN
@@ -46,12 +54,12 @@ BEGIN
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 4. Attach trigger to notes table
 DROP TRIGGER IF EXISTS notes_calendar_sync ON notes;
 CREATE TRIGGER notes_calendar_sync
-  AFTER INSERT OR UPDATE OR DELETE ON notes
+  AFTER INSERT OR UPDATE OF title, is_archived, by_assistant, calendar_id OR DELETE ON notes
   FOR EACH ROW EXECUTE FUNCTION trigger_rebuild_calendar_notes();
 
 -- 5. Backfill existing calendars
