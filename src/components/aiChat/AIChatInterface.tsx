@@ -862,7 +862,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
                               whiteSpace: 'nowrap'
                             }}
                           >
-                            {noteRef.title}
+                            {noteRef.title || 'Untitled'}
                           </Typography>
                         </Box>
                       </ListItemButton>
