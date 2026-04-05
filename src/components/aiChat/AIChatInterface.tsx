@@ -39,7 +39,6 @@ import { Note } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
 import { logger } from '../../utils/logger';
-import * as notesService from '../../services/notesService';
 
 // Image limit for AI agent requests (must match backend MAX_IMAGES_PER_REQUEST)
 const MAX_IMAGES = 4;
@@ -160,8 +159,6 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
 
   // Notes context popup state
   const [notesAnchorEl, setNotesAnchorEl] = useState<HTMLElement | null>(null);
-  const [availableNotes, setAvailableNotes] = useState<Note[]>([]);
-  const [notesLoading, setNotesLoading] = useState(false);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -341,51 +338,19 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   };
 
   // Notes context popup handlers
-  const handleOpenNotesContext = async (event: React.MouseEvent<HTMLElement>) => {
-    if (!userId || isReadOnly) return;
-
-    if (notesAnchorEl) {
-      handleCloseNotesContext();
-      return;
-    }
-
-    setNotesAnchorEl(event.currentTarget);
-
-    if (availableNotes.length > 0 || notesLoading) {
-      return;
-    }
-
-    try {
-      setNotesLoading(true);
-
-      const notes = calendar?.id
-        ? await notesService.getCalendarNotes(calendar.id)
-        : await notesService.getUserNotes(userId);
-
-      const sortedNotes = [...notes].sort((a, b) =>
-        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-      );
-
-      setAvailableNotes(sortedNotes.filter(note => !note.is_archived && !note.by_assistant));
-    } catch (error) {
-      logger.error('Error loading notes for AI context:', error);
-    } finally {
-      setNotesLoading(false);
-    }
+  const handleOpenNotesContext = (event: React.MouseEvent<HTMLElement>) => {
+    if (isReadOnly) return;
+    setNotesAnchorEl(prev => prev ? null : event.currentTarget);
   };
 
   const handleCloseNotesContext = () => {
     setNotesAnchorEl(null);
   };
 
-  const handleInsertNoteContext = (note: Note) => {
-    const title = note.title || 'Untitled';
-
-    // Use the insertNote method to create a note entity chip
+  const handleInsertNoteContext = (noteRef: { id: string; title: string }) => {
     if (inputRef.current?.insertNote) {
-      inputRef.current.insertNote(title);
+      inputRef.current.insertNote(noteRef.title);
     }
-
     handleCloseNotesContext();
   };
 
@@ -865,14 +830,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
                   ...scrollbarStyles(theme)
                 }}
               >
-                {notesLoading ? (
-                  <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <CircularProgress size={16} />
-                    <Typography variant="body2" color="text.secondary">
-                      Loading notes...
-                    </Typography>
-                  </Box>
-                ) : availableNotes.length === 0 ? (
+                {(calendar?.notes ?? []).length === 0 ? (
                   <Box sx={{ p: 2 }}>
                     <Typography variant="body2" color="text.secondary">
                       No notes found yet.
@@ -880,10 +838,10 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
                   </Box>
                 ) : (
                   <List dense sx={{ p: 0 }}>
-                    {availableNotes.map(note => (
+                    {(calendar?.notes ?? []).map(noteRef => (
                       <ListItemButton
-                        key={note.id}
-                        onClick={() => handleInsertNoteContext(note)}
+                        key={noteRef.id}
+                        onClick={() => handleInsertNoteContext(noteRef)}
                         sx={{
                           px: 1.5,
                           py: 1,
@@ -904,7 +862,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
                               whiteSpace: 'nowrap'
                             }}
                           >
-                            {note.title || 'Untitled'}
+                            {noteRef.title}
                           </Typography>
                         </Box>
                       </ListItemButton>
