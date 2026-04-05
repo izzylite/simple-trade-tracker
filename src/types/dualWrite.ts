@@ -187,6 +187,7 @@ export interface Calendar extends BaseEntity {
   // Tag validation and management
   required_tag_groups?: string[];
   tags?: string[];
+  notes?: { id: string; title: string }[];
 
   // Media
   hero_image_url?: string;
