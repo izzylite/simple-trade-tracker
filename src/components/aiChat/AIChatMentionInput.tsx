@@ -587,9 +587,9 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
                               sx={{
                                 height: 20,
                                 fontSize: '0.7rem',
-                                backgroundColor: alpha(theme.palette.info.main, 0.1),
-                                color: theme.palette.info.main,
-                                border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`
+                                backgroundColor: alpha(theme.palette.info.main, 0.25),
+                                color: theme.palette.info.light,
+                                border: `1px solid ${alpha(theme.palette.info.light, 0.5)}`
                               }}
                             />
                           </Box>
