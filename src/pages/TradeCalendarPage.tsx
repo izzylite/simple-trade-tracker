@@ -2024,29 +2024,28 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
       </Box>{/* end left side content */}
 
-      {/* Inline Economic Calendar Panel — lg+ only */}
-      {isLgUp && (
-        <Box sx={{
-          width: isEconomicCalendarOpen ? 'clamp(300px, 25vw, 420px)' : 0,
-          overflow: 'hidden',
-          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          flexShrink: 0,
-          height: '100%',
-          borderLeft: isEconomicCalendarOpen
-            ? `1px solid ${alpha(theme.palette.divider, 0.1)}`
-            : 'none',
-        }}>
-          <EconomicCalendarPanel
-            calendar={calendar!}
-            payload={economicCalendarUpdatedEvent}
-            isReadOnly={isReadOnly}
-            tradeOperations={tradeOperations}
-            onCollapse={() => setIsEconomicCalendarOpen(false)}
-            showHeader={false}
-            enabled={isEconomicCalendarOpen}
-          />
-        </Box>
-      )}
+      {/* Inline Economic Calendar Panel — always mounted, hidden on mobile */}
+      <Box sx={{
+        display: isLgUp ? 'block' : 'none',
+        width: isEconomicCalendarOpen ? 'clamp(300px, 25vw, 420px)' : 0,
+        overflow: 'hidden',
+        transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        flexShrink: 0,
+        height: '100%',
+        borderLeft: isEconomicCalendarOpen
+          ? `1px solid ${alpha(theme.palette.divider, 0.1)}`
+          : 'none',
+      }}>
+        <EconomicCalendarPanel
+          calendar={calendar!}
+          payload={economicCalendarUpdatedEvent}
+          isReadOnly={isReadOnly}
+          tradeOperations={tradeOperations}
+          onCollapse={() => setIsEconomicCalendarOpen(false)}
+          showHeader={false}
+          enabled={isEconomicCalendarOpen}
+        />
+      </Box>
 
       </Box>{/* end page layout flex row */}
 
