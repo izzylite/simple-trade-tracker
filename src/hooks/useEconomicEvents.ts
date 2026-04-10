@@ -96,7 +96,7 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
 
   // State
   const [events, setEvents] = useState<EconomicEvent[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(enabled);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
