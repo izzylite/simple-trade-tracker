@@ -6,7 +6,7 @@ import {
   Typography,
   IconButton,
   Button,
-
+  Divider,
   Stack,
   useTheme,
   useMediaQuery,
@@ -733,20 +733,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     loadUserCalendars();
   }, [calendar?.user_id]);
 
-  const breadcrumbButtons = useMemo<BreadcrumbButton[]>(() => [
-    ...((!isReadOnly) ? [{
-      key: 'edit',
-      icon: <EditIcon fontSize="small" />,
-      onClick: () => setIsCalendarEditOpen(true),
-      tooltip: 'Edit calendar settings'
-    }] : [])
-  ], [isReadOnly]);
-
-  const breadcrumbRightContent = (!isReadOnly && calendar && onUpdateCalendarProperty) ? (
-    <ShareButton type="calendar" item={calendar} onUpdateItemProperty={onUpdateCalendarProperty} size="small" />
-  ) : null;
-
-
   const theme = useTheme();
   const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
@@ -923,7 +909,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   // Economic calendar toggle handler
   const handleToggleEconomicCalendar = useCallback(() => {
-    setIsEconomicCalendarOpen(true);
+    setIsEconomicCalendarOpen(prev => !prev);
   }, []);
 
   // AI Chat toggle handler
@@ -1395,6 +1381,51 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     calendarId,
     calendar
   ]);
+
+  const breadcrumbButtons = useMemo<BreadcrumbButton[]>(() => [], []);
+
+  const breadcrumbRightContent = (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <Tooltip title={isEconomicCalendarOpen ? 'Close Economic Calendar' : 'Economic Calendar'}>
+        <IconButton
+          size="small"
+          onClick={handleToggleEconomicCalendar}
+          sx={{
+            color: isEconomicCalendarOpen ? 'primary.main' : 'text.secondary',
+            bgcolor: isEconomicCalendarOpen ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+            '&:hover': { color: 'text.primary' },
+          }}
+        >
+          <EventIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+
+      {!isReadOnly && (
+        <Divider orientation="vertical" flexItem sx={{ mx: 0.5, alignSelf: 'center', height: 18 }} />
+      )}
+
+      {!isReadOnly && (
+        <Tooltip title="Edit calendar settings">
+          <IconButton
+            size="small"
+            onClick={() => setIsCalendarEditOpen(true)}
+            sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+          >
+            <EditIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+
+      {!isReadOnly && calendar && onUpdateCalendarProperty && (
+        <ShareButton
+          type="calendar"
+          item={calendar}
+          onUpdateItemProperty={onUpdateCalendarProperty}
+          size="small"
+        />
+      )}
+    </Box>
+  );
 
   return (
     <Box sx={{
@@ -2195,8 +2226,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           </Tooltip>
         )}
 
-        {/* Economic Calendar FAB - Hidden in read-only mode */}
-        {!isReadOnly && (
+        {/* Economic Calendar FAB - Mobile only (lg+ uses breadcrumb button) */}
+        {!isReadOnly && !isLgUp && (
           <Tooltip title="Economic Calendar" placement="left">
             <Fab
               color="primary"
