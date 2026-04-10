@@ -90,6 +90,25 @@ const EconomicCalendarFilters: React.FC<EconomicCalendarFiltersProps> = ({
                     '&.Mui-focused fieldset': { borderColor: 'primary.main' },
                   },
                   '& input': { py: 0.75 },
+                  '& .MuiInputAdornment-root .MuiIconButton-root': {
+                    padding: '4px',
+                    '& svg': { fontSize: '1rem' },
+                  },
+                },
+              },
+              desktopPaper: {
+                sx: {
+                  fontSize: '0.75rem',
+                  '& .MuiPickersCalendarHeader-root': { minHeight: 36, pl: 1.5, pr: 0.5 },
+                  '& .MuiPickersCalendarHeader-label': { fontSize: '0.8rem', fontWeight: 600 },
+                  '& .MuiMonthCalendar-root': { width: 220, p: '4px 8px' },
+                  '& .MuiPickersMonth-monthButton': {
+                    fontSize: '0.75rem',
+                    height: 32,
+                    margin: '2px 0',
+                  },
+                  '& .MuiYearCalendar-root': { width: 220 },
+                  '& .MuiPickersYear-yearButton': { fontSize: '0.75rem', height: 28 },
                 },
               },
             }}
