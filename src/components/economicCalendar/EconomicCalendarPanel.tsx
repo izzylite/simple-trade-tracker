@@ -242,27 +242,17 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <Box sx={{
-        p: 3,
+        px: 2, py: 1,
         borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-        display: 'flex', alignItems: 'center', gap: 2,
+        display: 'flex', alignItems: 'center', gap: 1,
         bgcolor: 'background.paper',
       }}>
-        <Box sx={{
-          p: 1.5, borderRadius: 2,
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-          border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <CalendarIcon sx={{ color: 'primary.main', fontSize: 22 }} />
-        </Box>
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>Economic Calendar</Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
-            Economic events and indicators
-          </Typography>
-        </Box>
+        <CalendarIcon sx={{ color: 'primary.main', fontSize: 16, flexShrink: 0 }} />
+        <Typography variant="subtitle2" sx={{ flex: 1, fontWeight: 600, fontSize: '0.8rem' }}>
+          Economic Calendar
+        </Typography>
         <IconButton onClick={onCollapse} size="small">
-          <ChevronRightIcon />
+          <ChevronRightIcon sx={{ fontSize: 18 }} />
         </IconButton>
       </Box>
 
