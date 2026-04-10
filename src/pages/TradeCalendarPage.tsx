@@ -1480,7 +1480,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       {calendarId && !isReadOnly && <StackedNotesWidget calendarId={calendarId} />}
 
       {/* Page layout: main content + inline economic calendar panel (lg+) */}
-      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', overflow: 'hidden' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start' }}>
 
       {/* Main Content Container */}
       <Box sx={{
@@ -1977,6 +1977,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
         </Box>
 
+      </Box>{/* end main content container */}
+
       {/* Inline Economic Calendar Panel — lg+ only */}
       {isLgUp && (
         <Box sx={{
@@ -2276,17 +2278,17 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           submitButtonText="Save"
         />
 
-      </Box>
-
-      {/* Economic Calendar Drawer */}
-      <EconomicCalendarDrawer
-        open={isEconomicCalendarOpen}
-        onClose={() => setIsEconomicCalendarOpen(false)}
-        calendar={calendar!}
-        payload={economicCalendarUpdatedEvent}
-        isReadOnly={isReadOnly}
-        tradeOperations={tradeOperations}
-      />
+      {/* Economic Calendar Drawer — mobile only (lg+ uses inline panel) */}
+      {!isLgUp && (
+        <EconomicCalendarDrawer
+          open={isEconomicCalendarOpen}
+          onClose={() => setIsEconomicCalendarOpen(false)}
+          calendar={calendar!}
+          payload={economicCalendarUpdatedEvent}
+          isReadOnly={isReadOnly}
+          tradeOperations={tradeOperations}
+        />
+      )}
 
       {/* AI Chat Drawer */}
       <AIChatDrawer
