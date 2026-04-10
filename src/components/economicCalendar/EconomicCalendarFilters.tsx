@@ -99,7 +99,9 @@ const EconomicCalendarFilters: React.FC<EconomicCalendarFiltersProps> = ({
               desktopPaper: {
                 sx: {
                   fontSize: '0.75rem',
-                  pb: 0.5,
+                  overflow: 'hidden',
+                  '& .MuiPickersLayout-root': { minWidth: 'unset' },
+                  '& .MuiPickersLayout-contentWrapper': { gridRow: 1, pb: 0 },
                   '& .MuiPickersCalendarHeader-root': { minHeight: 36, pl: 1.5, pr: 0.5 },
                   '& .MuiPickersCalendarHeader-label': { fontSize: '0.8rem', fontWeight: 600 },
                   '& .MuiMonthCalendar-root': {
