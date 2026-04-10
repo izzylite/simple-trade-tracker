@@ -165,6 +165,12 @@ This project uses specialized AI subagents for specific domains. Claude Code sho
 - Store numeric values as numbers, not strings
 - Use Unix timestamps for publishedAt/updatedAt fields
 
+### Reuse Before Creating
+- **Always check `src/utils/` before writing a new utility function.** Search for existing helpers by keyword (e.g. `compressImage`, `validateFile`, `formatDate`) before adding new ones.
+- **Also check `src/services/` and `src/hooks/`** for existing logic that covers the same need.
+- If a similar function exists but has a different return type or signature, prefer extending or wrapping it over duplicating it.
+- New utility functions belong in `src/utils/` in the most relevant existing file (e.g. image helpers → `fileValidation.ts`, formatters → `formatters.ts`).
+
 ### UI/UX Preferences
 - Rounded tab styling and curved cards
 - Tooltips for calculations and complex UI elements

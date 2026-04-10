@@ -25,12 +25,15 @@ interface MarkdownRendererProps {
   content: string;
 }
 
+// remark-gfm v4 is ESM-only; CRA's CJS bundle may wrap it as { default: fn }
+const remarkGfmPlugin = (remarkGfm as any).default ?? remarkGfm;
+
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
   const theme = useTheme();
 
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfmPlugin]}
       components={{
         // Table rendering
         table: ({ children }) => (
@@ -257,6 +260,26 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
         // Emphasis (italic)
         em: ({ children }) => (
           <Box component="em" sx={{ fontStyle: 'italic' }}>
+            {children}
+          </Box>
+        ),
+
+        // Links
+        a: ({ href, children }) => (
+          <Box
+            component="a"
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{
+              color: 'primary.light',
+              textDecoration: 'underline',
+              textDecorationColor: alpha(theme.palette.primary.light, 0.4),
+              '&:hover': {
+                textDecorationColor: 'primary.light'
+              }
+            }}
+          >
             {children}
           </Box>
         )

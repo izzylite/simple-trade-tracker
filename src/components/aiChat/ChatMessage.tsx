@@ -8,7 +8,6 @@ import {
   Box,
   Paper,
   Typography,
-  Avatar,
   IconButton,
   Tooltip,
   Chip,
@@ -21,13 +20,13 @@ import HtmlMessageRenderer from './HtmlMessageRenderer';
 import CitationsSection from './CitationsSection';
 import MarkdownRenderer from './MarkdownRenderer';
 import {
-  Person as PersonIcon,
   SmartToy as AIIcon,
   ContentCopy as CopyIcon,
   CheckCircle as CheckIcon,
   Error as ErrorIcon,
   Schedule as ScheduleIcon,
-  Edit as EditIcon
+  Edit as EditIcon,
+  Check as CopiedIcon
 } from '@mui/icons-material';
 import { ChatMessage as ChatMessageType } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
@@ -45,8 +44,8 @@ interface ChatMessageProps {
   onEventClick?: (event: EconomicEvent) => void;
   onNoteClick?: (noteId: string) => void;
   onEdit?: (messageId: string) => void;
-  trades?: Trade[]; // All trades for calculating event trade counts
-  availableTags?: string[]; // Calendar tags for rendering user message tag chips
+  trades?: Trade[];
+  availableTags?: string[];
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -65,28 +64,22 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
+  const isDark = theme.palette.mode === 'dark';
 
   // Split user message text into segments with inline tag chips
   const renderUserContentWithTagChips = useMemo(() => {
     if (!isUser || availableTags.length === 0) return null;
 
     const content = message.content;
-    // Sort tags longest-first to match "Sessions:London Session" before "London"
-    const sortedTags = [...availableTags].sort(
-      (a, b) => b.length - a.length
-    );
+    const sortedTags = [...availableTags].sort((a, b) => b.length - a.length);
 
-    // Find all tag occurrences with their positions
     const matches: Array<{ start: number; end: number; tag: string }> = [];
     for (const tag of sortedTags) {
       let searchFrom = 0;
       while (searchFrom < content.length) {
         const idx = content.indexOf(tag, searchFrom);
         if (idx === -1) break;
-        // Check no overlap with existing matches
-        const overlaps = matches.some(
-          m => idx < m.end && idx + tag.length > m.start
-        );
+        const overlaps = matches.some(m => idx < m.end && idx + tag.length > m.start);
         if (!overlaps) {
           matches.push({ start: idx, end: idx + tag.length, tag });
         }
@@ -96,10 +89,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
     if (matches.length === 0) return null;
 
-    // Sort by position
     matches.sort((a, b) => a.start - b.start);
 
-    // Build segments
     const segments: React.ReactNode[] = [];
     let lastIdx = 0;
 
@@ -147,193 +138,233 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const getStatusIcon = () => {
     switch (message.status) {
       case 'sending':
-        return <ScheduleIcon sx={{ fontSize: 14, color: 'text.secondary' }} />;
+        return <ScheduleIcon sx={{ fontSize: 12, color: 'text.disabled' }} />;
       case 'sent':
       case 'received':
-        return <CheckIcon sx={{ fontSize: 14, color: 'success.main' }} />;
+        return <CheckIcon sx={{ fontSize: 12, color: 'success.main', opacity: 0.6 }} />;
       case 'error':
-        return <ErrorIcon sx={{ fontSize: 14, color: 'error.main' }} />;
+        return <ErrorIcon sx={{ fontSize: 12, color: 'error.main' }} />;
       default:
         return null;
     }
   };
 
-  const getMessageBackground = () => {
-    if (isUser) {
-      return theme.palette.primary.main;
-    }
-    
-    if (message.status === 'error') {
-      return alpha(theme.palette.error.main, 0.1);
-    }
-    
-    return theme.palette.mode === 'dark' 
-      ? alpha(theme.palette.background.paper, 0.8)
-      : alpha(theme.palette.grey[100], 0.8);
-  };
-
-  const getTextColor = () => {
-    if (isUser) {
-      return theme.palette.primary.contrastText;
-    }
-    
-    return theme.palette.text.primary;
-  };
-
-  // Format message content with basic markdown-like formatting
-  const formatContent = (content: string) => {
-    // Split content by code blocks
-    const parts = content.split(/(```[\s\S]*?```|`[^`]+`)/);
-
-    return parts.map((part, index) => {
-      // Code blocks
-      if (part.startsWith('```') && part.endsWith('```')) {
-        const code = part.slice(3, -3).trim();
-        const lines = code.split('\n');
-        const language = lines[0]?.match(/^[a-zA-Z]+$/) ? lines.shift() : '';
-        const codeContent = lines.join('\n');
-
-        return (
-          <Paper
-            key={index}
-            variant="outlined"
-            sx={{
-              p: 2,
-              my: 1,
-              backgroundColor: theme.palette.mode === 'dark' ? 'grey.900' : 'grey.50',
-              fontFamily: 'monospace',
-              fontSize: '0.875rem',
-              overflow: 'auto'
-            }}
-          >
-            {language && (
-              <Chip
-                label={language}
-                size="small"
-                sx={{ mb: 1, fontSize: '0.75rem' }}
-              />
-            )}
-            <Typography
-              component="pre"
-              sx={{
-                margin: 0,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                fontFamily: 'inherit'
-              }}
-            >
-              {codeContent}
-            </Typography>
-          </Paper>
-        );
-      }
-
-      // Inline code
-      if (part.startsWith('`') && part.endsWith('`')) {
-        return (
-          <Box
-            key={index}
-            component="span"
-            sx={{
-              backgroundColor: alpha(theme.palette.text.primary, 0.1),
-              padding: '2px 4px',
-              borderRadius: 1,
-              fontFamily: 'monospace',
-              fontSize: '0.875em'
-            }}
-          >
-            {part.slice(1, -1)}
-          </Box>
-        );
-      }
-
-      // Regular text with line breaks
-      return (
+  const renderMessageContent = () => (
+    <Box
+      sx={{
+        animation: message.status === 'receiving' && isAssistant ? 'subtlePulse 0.5s ease-in-out' : 'none',
+        '@keyframes subtlePulse': {
+          '0%': { opacity: 0.85 },
+          '50%': { opacity: 1 },
+          '100%': { opacity: 0.95 }
+        },
+        transition: 'opacity 0.5s ease-in-out'
+      }}
+    >
+      {message.messageHtml ? (
+        <HtmlMessageRenderer
+          html={message.messageHtml}
+          embeddedTrades={message.embeddedTrades}
+          embeddedEvents={message.embeddedEvents}
+          embeddedNotes={message.embeddedNotes}
+          onTradeClick={onTradeClick}
+          onEventClick={onEventClick}
+          onNoteClick={onNoteClick}
+          trades={trades}
+        />
+      ) : isAssistant && enableAnimation && isLatestMessage ? (
+        <AnimatedText
+          text={message.content}
+          speed={200}
+          isAnimating={message.status === 'received'}
+        />
+      ) : isUser && renderUserContentWithTagChips ? (
         <Typography
-          key={index}
-          component="span"
+          component="div"
           sx={{
             whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word'
+            wordBreak: 'break-word',
+            overflowWrap: 'anywhere',
+            lineHeight: 1.65,
+            fontSize: '0.9rem'
           }}
         >
-          {part}
+          {renderUserContentWithTagChips}
         </Typography>
-      );
-    });
-  };
+      ) : (
+        <MarkdownRenderer content={message.content} />
+      )}
+    </Box>
+  );
 
+  // ── ASSISTANT MESSAGE ──────────────────────────────────────────────────────
+  if (isAssistant) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 2,
+          mb: 4,
+          alignItems: 'flex-start',
+          px: 1,
+          animation: isLatestMessage ? 'fadeInUp 0.25s ease-out' : 'none',
+          '@keyframes fadeInUp': {
+            '0%': { opacity: 0, transform: 'translateY(8px)' },
+            '100%': { opacity: 1, transform: 'translateY(0)' }
+          }
+        }}
+      >
+        {/* AI indicator dot */}
+        <Box
+          sx={{
+            width: 26,
+            height: 26,
+            borderRadius: '50%',
+            backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.15 : 0.08),
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            mt: 0.25
+          }}
+        >
+          <AIIcon sx={{ fontSize: 14, color: 'primary.main' }} />
+        </Box>
+
+        {/* Content — no bubble, flows on background */}
+        <Box
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            position: 'relative',
+            '&:hover .msg-actions': { opacity: 1 }
+          }}
+        >
+          {/* User-attached images in assistant context (rare but supported) */}
+          {Array.isArray(message.images) && message.images.length > 0 && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
+              {message.images.map((image, index) => (
+                <Box
+                  key={image.id || index}
+                  component="img"
+                  src={image.url}
+                  alt={image.name || `Image ${index + 1}`}
+                  sx={{
+                    maxWidth: '100%',
+                    maxHeight: 200,
+                    borderRadius: 2,
+                    objectFit: 'contain',
+                    cursor: 'pointer',
+                    '&:hover': { opacity: 0.9 }
+                  }}
+                  onClick={() => window.open(image.url, '_blank')}
+                />
+              ))}
+            </Box>
+          )}
+
+          {renderMessageContent()}
+
+          {/* Citations */}
+          {message.citations && message.citations.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <CitationsSection citations={message.citations} />
+            </Box>
+          )}
+
+          {/* Error */}
+          {message.error && (
+            <Alert severity="error" sx={{ mt: 1.5, fontSize: '0.85rem', borderRadius: 2 }}>
+              {message.error}
+            </Alert>
+          )}
+
+          {/* Metadata + floating copy */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              mt: 1.5
+            }}
+          >
+            {showTimestamp && (
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>
+                {format(message.timestamp, 'HH:mm')}
+              </Typography>
+            )}
+            {getStatusIcon()}
+
+            {/* Copy button - inline after timestamp */}
+            <Box
+              className="msg-actions"
+              sx={{ opacity: 0, transition: 'opacity 0.15s', display: 'flex', gap: 0.5 }}
+            >
+              <Tooltip title={copied ? 'Copied!' : 'Copy'}>
+                <IconButton
+                  size="small"
+                  onClick={handleCopy}
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    color: 'text.disabled',
+                    '&:hover': { color: 'text.primary', backgroundColor: alpha(theme.palette.divider, 0.5) }
+                  }}
+                >
+                  {copied
+                    ? <CopiedIcon sx={{ fontSize: 13 }} />
+                    : <CopyIcon sx={{ fontSize: 13 }} />
+                  }
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
+
+  // ── USER MESSAGE ───────────────────────────────────────────────────────────
   return (
     <Box
       sx={{
         display: 'flex',
-        flexDirection: isUser ? 'row-reverse' : 'row',
-        gap: 1.5,
-        mb: 3,
-        alignItems: 'flex-start',
+        justifyContent: 'flex-end',
+        mb: 4,
         px: 1,
-        animation: isLatestMessage && isAssistant ? 'fadeInUp 0.3s ease-out' : 'none',
+        animation: isLatestMessage ? 'fadeInUp 0.2s ease-out' : 'none',
         '@keyframes fadeInUp': {
-          '0%': {
-            opacity: 0,
-            transform: 'translateY(10px)'
-          },
-          '100%': {
-            opacity: 1,
-            transform: 'translateY(0)'
-          }
+          '0%': { opacity: 0, transform: 'translateY(8px)' },
+          '100%': { opacity: 1, transform: 'translateY(0)' }
         }
       }}
     >
-      {/* Avatar */}
-      <Avatar
-        sx={{
-          width: 36,
-          height: 36,
-          backgroundColor: isUser ? 'primary.main' : 'secondary.main',
-          flexShrink: 0,
-          boxShadow: 1
-        }}
-      >
-        {isUser ? <PersonIcon sx={{ fontSize: 20 }} /> : <AIIcon sx={{ fontSize: 20 }} />}
-      </Avatar>
-
-      {/* Message Content */}
-      <Box
-        sx={{
-          maxWidth: isUser ? '80%' : '95%',
-          minWidth: 0,
-          flex: 1
-        }}
-      >
-        {/* Message Bubble */}
+      <Box sx={{ maxWidth: '78%', minWidth: 0 }}>
+        {/* User pill bubble */}
         <Paper
           elevation={0}
           sx={{
-            p: 2.5,
-            backgroundColor: getMessageBackground(),
-            color: getTextColor(),
-            borderRadius: 4,
-            borderTopLeftRadius: isUser ? 4 : 1,
-            borderTopRightRadius: isUser ? 1 : 4,
-            borderBottomLeftRadius: isUser ? 4 : 4,
-            borderBottomRightRadius: isUser ? 4 : 4,
+            px: 2.5,
+            py: 1.5,
+            backgroundColor: isDark
+              ? alpha(theme.palette.primary.main, 0.13)
+              : alpha(theme.palette.primary.main, 0.07),
+            border: '1px solid',
+            borderColor: alpha(theme.palette.primary.main, isDark ? 0.22 : 0.18),
+            borderRadius: '18px 18px 4px 18px',
             position: 'relative',
-            maxWidth: '100%',
             wordBreak: 'break-word',
             overflowWrap: 'anywhere',
-            boxShadow: isUser
-              ? '0 2px 8px rgba(0,0,0,0.1)'
-              : '0 1px 4px rgba(0,0,0,0.05)',
-            border: isUser ? 'none' : '1px solid',
-            borderColor: isUser ? 'transparent' : alpha(theme.palette.divider, 0.3),
-            '&:hover .message-actions': {
-              opacity: 1
-            }
+            '& a': {
+              color: alpha(theme.palette.primary.light, 0.9),
+              textDecorationColor: alpha(theme.palette.primary.light, 0.4)
+            },
+            '&:hover .msg-actions': { opacity: 1 }
           }}
         >
-          {/* Attached Images (for user messages) */}
-          {isUser && Array.isArray(message.images) && message.images.length > 0 && (
+          {/* Attached images */}
+          {Array.isArray(message.images) && message.images.length > 0 && (
             <Box
               sx={{
                 display: 'flex',
@@ -355,9 +386,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                     objectFit: 'contain',
                     backgroundColor: alpha(theme.palette.common.black, 0.1),
                     cursor: 'pointer',
-                    '&:hover': {
-                      opacity: 0.9
-                    }
+                    '&:hover': { opacity: 0.9 }
                   }}
                   onClick={() => window.open(image.url, '_blank')}
                 />
@@ -365,177 +394,58 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             </Box>
           )}
 
-          {/* Message Content */}
-          <Box
-            sx={{
-              mb: message.error ? 1 : 0,
-              // Add subtle fade-in animation for streaming content
-              animation: message.status === 'receiving' && isAssistant ? 'subtlePulse 0.5s ease-in-out' : 'none',
-              '@keyframes subtlePulse': {
-                '0%': {
-                  opacity: 0.85
-                },
-                '50%': {
-                  opacity: 1
-                },
-                '100%': {
-                  opacity: 0.95
-                }
-              },
-              // Smooth transition for content changes
-              transition: 'opacity 0.5s ease-in-out'
-            }}
-          >
-            {/* Use HTML renderer if messageHtml is available (from Supabase AI agent) */}
-            {message.messageHtml ? (
-              <HtmlMessageRenderer
-                html={message.messageHtml}
-                embeddedTrades={message.embeddedTrades}
-                embeddedEvents={message.embeddedEvents}
-                embeddedNotes={message.embeddedNotes}
-                onTradeClick={onTradeClick}
-                onEventClick={onEventClick}
-                onNoteClick={onNoteClick}
-                trades={trades}
-              />
-            ) : isAssistant && enableAnimation && isLatestMessage ? (
-              <AnimatedText
-                text={message.content}
-                speed={200} // Much faster: 200 characters per second
-                isAnimating={message.status === 'received'}
-              />
-            ) : isUser && renderUserContentWithTagChips ? (
-              // User message with inline tag chips
-              <Typography
-                component="div"
-                sx={{
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  overflowWrap: 'anywhere',
-                  lineHeight: 1.6,
-                }}
-              >
-                {renderUserContentWithTagChips}
-              </Typography>
-            ) : (
-              // Regular text formatting with streaming-friendly styling
-              <Box
-                sx={{
-                  // Smooth fade for new content chunks
-                  '& > *': {
-                    animation: message.status === 'receiving' && isAssistant ? 'fadeIn 0.3s ease-in' : 'none',
-                    '@keyframes fadeIn': {
-                      '0%': { opacity: 0 },
-                      '100%': { opacity: 1 }
-                    }
-                  }
-                }}
-              >
-                <MarkdownRenderer content={message.content} />
-              </Box>
-            )}
-          </Box>
+          {renderMessageContent()}
 
-          {/* Citations (from Supabase AI agent) */}
-          {isAssistant && message.citations && message.citations.length > 0 && (
-            <Box sx={{ mt: 2 }}>
-              <CitationsSection citations={message.citations} />
-            </Box>
-          )}
-
-          {/* Error Message */}
-          {message.error && (
-            <Alert severity="error" sx={{ mt: 1, fontSize: '0.875rem' }}>
-              {message.error}
-            </Alert>
-          )}
-
-          {/* Message Actions */}
-          <Box
-            className="message-actions"
-            sx={{
-              position: 'absolute',
-              top: 4,
-              right: 4,
-              opacity: 0,
-              transition: 'opacity 0.2s',
-              display: 'flex',
-              gap: 0.5
-            }}
-          >
-            {/* Edit button for user messages */}
-            {isUser && onEdit && (
-              <Tooltip title="Edit message">
+          {/* Hover edit action */}
+          {onEdit && (
+            <Box
+              className="msg-actions"
+              sx={{
+                position: 'absolute',
+                top: 6,
+                left: -36,
+                opacity: 0,
+                transition: 'opacity 0.15s'
+              }}
+            >
+              <Tooltip title="Edit">
                 <IconButton
                   size="small"
                   onClick={() => onEdit(message.id)}
                   sx={{
-                    backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                    width: 28,
+                    height: 28,
+                    color: 'text.disabled',
                     '&:hover': {
-                      backgroundColor: alpha(theme.palette.background.paper, 0.9)
+                      color: 'text.primary',
+                      backgroundColor: alpha(theme.palette.divider, 0.5)
                     }
                   }}
                 >
-                  <EditIcon sx={{ fontSize: 16 }} />
+                  <EditIcon sx={{ fontSize: 14 }} />
                 </IconButton>
               </Tooltip>
-            )}
-
-            {/* Copy button for assistant/system messages */}
-            {!isUser && (
-              <Tooltip title={copied ? 'Copied!' : 'Copy message'}>
-                <IconButton
-                  size="small"
-                  onClick={handleCopy}
-                  sx={{
-                    backgroundColor: alpha(theme.palette.background.paper, 0.8),
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.background.paper, 0.9)
-                    }
-                  }}
-                >
-                  {copied ? <CheckIcon sx={{ fontSize: 16 }} /> : <CopyIcon sx={{ fontSize: 16 }} />}
-                </IconButton>
-              </Tooltip>
-            )}
-          </Box>
+            </Box>
+          )}
         </Paper>
 
-        {/* Message Metadata */}
+        {/* Metadata */}
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
-            gap: 1,
+            justifyContent: 'flex-end',
+            gap: 0.75,
             mt: 0.5,
-            px: 1,
-            justifyContent: isUser ? 'flex-end' : 'flex-start'
+            px: 0.5
           }}
         >
-          {/* Timestamp */}
           {showTimestamp && (
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>
               {format(message.timestamp, 'HH:mm')}
             </Typography>
           )}
-
-          {/* Status Icon */}
           {getStatusIcon()}
-
-          {/* Provider Badge */}
-          {/* {isAssistant && message.provider && (
-            <Chip
-              label={message.provider.toUpperCase()}
-              size="small"
-              variant="outlined"
-              sx={{ 
-                fontSize: '0.6rem', 
-                height: 16,
-                '& .MuiChip-label': { px: 0.5 }
-              }}
-            />
-          )} */}
-
         </Box>
       </Box>
     </Box>

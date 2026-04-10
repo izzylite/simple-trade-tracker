@@ -21,7 +21,8 @@ import {
   AddComment as NewChatIcon,
   Stop as StopIcon,
   Image as ImageIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  KeyboardArrowDown as ScrollDownIcon
 } from '@mui/icons-material';
 import ChatMessage from './ChatMessage';
 import AIChatMentionInput from './AIChatMentionInput';
@@ -33,6 +34,7 @@ import { Note } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
 import { logger } from '../../utils/logger';
+import { compressImageToDataUrl } from '../../utils/fileValidation';
 
 // Image limit for AI agent requests (must match backend MAX_IMAGES_PER_REQUEST)
 const MAX_IMAGES = 4;
@@ -144,11 +146,13 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
 }, ref) => {
   const theme = useTheme();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<any>(null);
 
   // Local UI state
   const [inputMessage, setInputMessage] = useState('');
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const [showScrollDown, setShowScrollDown] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Expose methods via ref
@@ -171,6 +175,14 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
       scrollToBottom();
     }
   }, [messages, scrollToBottom, autoScroll]);
+
+  // Track scroll position to show/hide the scroll-to-bottom button
+  const handleMessagesScroll = useCallback(() => {
+    const el = messagesAreaRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollDown(distanceFromBottom > 120);
+  }, []);
 
   // Event Handlers
   const handleSendMessage = async () => {
@@ -210,18 +222,12 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
       }
 
       try {
-        // Convert to base64 data URL
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+        const dataUrl = await compressImageToDataUrl(file);
 
         newImages.push({
           id: crypto.randomUUID(),
           url: dataUrl,
-          mimeType: file.type,
+          mimeType: 'image/jpeg',
           name: file.name,
           size: file.size
         });
@@ -341,48 +347,48 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
     }}>
       {/* Messages Area */}
       <Box
+        ref={messagesAreaRef}
+        onScroll={handleMessagesScroll}
         sx={{
           flex: 1,
           overflow: 'auto',
           p: 2,
           pb: 1,
-          backgroundColor: alpha(theme.palette.background.default, 0.3),
-          backgroundImage: `radial-gradient(circle at 20% 80%, ${alpha(theme.palette.primary.main, 0.03)} 0%, transparent 50%),
-                           radial-gradient(circle at 80% 20%, ${alpha(theme.palette.secondary.main, 0.03)} 0%, transparent 50%)`,
+          position: 'relative',
           ...scrollbarStyles(theme)
         }}
       >
         {displayMessages.map((message, index) => (
-          <ChatMessage
-            key={message.id}
-            message={message}
-            showTimestamp={true}
-            isLatestMessage={index === displayMessages.length - 1}
-            enableAnimation={index > 0}
-            onTradeClick={(tradeId, contextTrades) => {
-              if (onTradeClick) {
-                onTradeClick(tradeId, contextTrades);
-              } else {
-                logger.log('Trade clicked but handler not provided:', tradeId);
-              }
-            }}
-            onEventClick={(event) => {
-              logger.log('Economic event clicked:', event);
-              onEventClick?.(event);
-            }}
-            onNoteClick={async (noteId) => {
-              logger.log('Note clicked:', noteId);
-              // Find the note from embedded notes in messages
-              const note = messages
-                .flatMap(m => m.embeddedNotes ? Object.values(m.embeddedNotes) : [])
-                .find(n => n.id === noteId);
-
-              onNoteClick?.(noteId, note || undefined);
-            }}
-            onEdit={handleEditMessage}
-            trades={trades}
-            availableTags={calendar?.tags || []}
-          />
+          <React.Fragment key={message.id}>
+            
+            <ChatMessage
+              message={message}
+              showTimestamp={true}
+              isLatestMessage={index === displayMessages.length - 1}
+              enableAnimation={index > 0}
+              onTradeClick={(tradeId, contextTrades) => {
+                if (onTradeClick) {
+                  onTradeClick(tradeId, contextTrades);
+                } else {
+                  logger.log('Trade clicked but handler not provided:', tradeId);
+                }
+              }}
+              onEventClick={(event) => {
+                logger.log('Economic event clicked:', event);
+                onEventClick?.(event);
+              }}
+              onNoteClick={async (noteId) => {
+                logger.log('Note clicked:', noteId);
+                const note = messages
+                  .flatMap(m => m.embeddedNotes ? Object.values(m.embeddedNotes) : [])
+                  .find(n => n.id === noteId);
+                onNoteClick?.(noteId, note || undefined);
+              }}
+              onEdit={handleEditMessage}
+              trades={trades}
+              availableTags={calendar?.tags || []}
+            />
+          </React.Fragment>
         ))}
 
         {/* Question Templates - Only show when no conversation started */}
@@ -473,41 +479,59 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
 
         {/* Typing Indicator */}
         {isTyping && (
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-            p: 2,
-            mb: 2
-          }}>
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,
-              backgroundColor: alpha(theme.palette.grey[500], 0.1),
-              borderRadius: 2,
-              px: 2,
-              py: 1
-            }}>
-              <CircularProgress
-                size={16}
-                thickness={4}
-                sx={{ color: 'text.secondary' }}
-              />
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ fontStyle: 'italic' }}
-              >
-                {toolExecutionStatus
-                  ? `AI is thinking... ${toolExecutionStatus}`
-                  : 'AI is thinking...'}
-              </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 1, mb: 3 }}>
+            <Box
+              sx={{
+                width: 26,
+                height: 26,
+                borderRadius: '50%',
+                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              <CircularProgress size={12} thickness={4} sx={{ color: 'primary.main' }} />
             </Box>
+            <Typography variant="body2" color="text.disabled" sx={{ fontSize: '0.85rem' }}>
+              {toolExecutionStatus || 'Thinking…'}
+            </Typography>
           </Box>
         )}
 
         <div ref={messagesEndRef} />
+
+        {/* Scroll-to-bottom button */}
+        {showScrollDown && (
+          <IconButton
+            onClick={scrollToBottom}
+            size="small"
+            sx={{
+              position: 'sticky',
+              bottom: 12,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              zIndex: 10,
+              backgroundColor: theme.palette.background.paper,
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: theme.shadows[4],
+              width: 32,
+              height: 32,
+              color: 'text.secondary',
+              '&:hover': {
+                backgroundColor: alpha(theme.palette.background.paper, 1),
+                color: 'primary.main',
+                borderColor: alpha(theme.palette.primary.main, 0.3)
+              }
+            }}
+          >
+            <ScrollDownIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        )}
       </Box>
 
       <Divider sx={{ borderColor: alpha(theme.palette.divider, 0.5) }} />

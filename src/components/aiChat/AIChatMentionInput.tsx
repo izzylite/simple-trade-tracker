@@ -116,6 +116,7 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
   const editorRef = useRef<Editor>(null as any);
   const [editorState, setEditorState] = useState(() => EditorState.createWithContent(ContentState.createFromText(value || ''), createMentionDecorator()));
   const editorStateRef = useRef(editorState);
+  const [editorKey, setEditorKey] = useState(0);
   const [mention, setMention] = useState<{ open: boolean; term: string; start: number; blockKey: string } | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -184,6 +185,15 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
   useEffect(() => {
     editorStateRef.current = editorState;
   }, [editorState]);
+
+  useEffect(() => {
+    if (editorKey > 0) {
+      const raf = requestAnimationFrame(() => {
+        try { (editorRef.current as any)?.focus?.(); } catch (_) {}
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [editorKey]);
 
   const tags = useMemo(() => allTags.sort(), [allTags]);
 
@@ -332,17 +342,18 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
     }) as SelectionState;
     newContent = Modifier.insertText(newContent, afterMention, ' ');
 
-    // Push state and position cursor after trailing space
-    let newState = EditorState.push(state, newContent, 'insert-characters');
+    // Create new state with forceSelection — use createWithContent to force full re-render
+    // (EditorState.push can leave stale DOM when IMMUTABLE entities are adjacent)
     const cursorPosition = SelectionState.createEmpty(blockKey).merge({
       anchorOffset: atIndex + noteTitle.length + 1,
       focusOffset: atIndex + noteTitle.length + 1
     }) as SelectionState;
+    let newState = EditorState.createWithContent(newContent, createMentionDecorator());
     newState = EditorState.forceSelection(newState, cursorPosition);
 
+    setEditorKey(k => k + 1);
     setMention(null);
     handleChange(newState);
-    setTimeout(() => { try { (editorRef.current as any)?.focus?.(); } catch (_) {} }, 0);
   }
 
   function insertTag(tag: string) {
@@ -412,23 +423,18 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
     }) as SelectionState;
     newContent = Modifier.insertText(newContent, afterMention, ' ');
 
-    // Push updated content into editor state and move cursor after the space
-    let newState = EditorState.push(state, newContent, 'insert-characters');
+    // Use createWithContent to force full re-render (EditorState.push leaves stale DOM
+    // when IMMUTABLE entities are adjacent to the inserted text)
     const cursorPosition = SelectionState.createEmpty(blockKey).merge({
       anchorOffset: atIndex + mentionText.length + 1,
       focusOffset: atIndex + mentionText.length + 1
     }) as SelectionState;
+    let newState = EditorState.createWithContent(newContent, createMentionDecorator());
     newState = EditorState.forceSelection(newState, cursorPosition);
 
+    setEditorKey(k => k + 1);
     setMention(null);
     handleChange(newState);
-
-    // Refocus editor
-    setTimeout(() => {
-      try {
-        (editorRef.current as any)?.focus?.();
-      } catch (_) {}
-    }, 0);
   }
 
   function handleRemoveEntity(entityKey: string, includeFollowingSpace = false) {
@@ -447,6 +453,7 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
         const sel = SelectionState.createEmpty(b.getKey()).merge({ anchorOffset: s, focusOffset }) as SelectionState;
         const c2 = Modifier.removeRange(content, sel, 'backward');
         const st = EditorState.push(state, c2, 'remove-range');
+        setEditorKey(k => k + 1);
         handleChange(st);
         return;
       }
@@ -476,11 +483,13 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
         }}
       >
         <Editor
+          key={editorKey}
           ref={editorRef as any}
           editorState={editorState}
           onChange={handleChange}
           readOnly={!!disabled}
           placeholder={placeholder}
+          handleReturn={() => mention?.open ? 'handled' : 'not-handled'}
         />
       </Box>
 
@@ -488,7 +497,6 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
         open={!!mention?.open}
         anchorEl={anchorEl}
         placement="top-start"
-        disablePortal
         sx={{ zIndex: Z_INDEX.DIALOG }}
       >
         <Paper

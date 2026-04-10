@@ -251,7 +251,7 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
   );
 
   return (
-    <Box sx={{ mt: 1.5, display: 'inline-block' }}>
+    <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
       {/* Compact "Sources" pill with favicons */}
       <Box
         onClick={handleClick}
@@ -356,8 +356,8 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
 
       {/* Collapse for non-compact mode */}
       {!compact && (
-        <Collapse in={expanded} timeout="auto">
-          <Box sx={{ mt: 1 }}>
+        <Collapse in={expanded} timeout="auto" sx={{ alignSelf: 'stretch' }}>
+          <Box sx={{ mt: 1, minWidth: 260, maxWidth: 380 }}>
             {renderCitationsList()}
           </Box>
         </Collapse>

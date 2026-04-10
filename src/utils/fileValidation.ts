@@ -76,6 +76,37 @@ export const FILE_SIZE_LIMITS = {
 } as const;
 
 /**
+ * Compress an image file to a base64 JPEG data URL.
+ * Scales down to maxSide on the long edge (default 1600px) at the given JPEG quality (default 0.85).
+ * Images already smaller than maxSide are only re-encoded, not upscaled.
+ */
+export const compressImageToDataUrl = (
+  file: File,
+  maxSide: number = 1600,
+  quality: number = 0.85
+): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('Canvas 2D context unavailable')); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+
+/**
  * Common MIME type groups
  */
 export const MIME_TYPES = {
