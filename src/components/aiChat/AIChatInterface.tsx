@@ -1,7 +1,7 @@
 /**
  * AIChatInterface Component
  * Reusable AI chat interface that can be embedded in different containers
- * Contains: Messages, Templates, Typing Indicator, Input Area, Notes Popup
+ * Contains: Messages, Templates, Typing Indicator, Input Area
  */
 
 import React, { useRef, useEffect, useCallback, useState, forwardRef, useImperativeHandle } from 'react';

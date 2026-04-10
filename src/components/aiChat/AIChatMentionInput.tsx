@@ -129,6 +129,8 @@ const createMentionDecorator = () =>
     }
   ]);
 
+type MentionItem = { type: 'note'; id: string; title: string } | { type: 'tag'; tag: string };
+
 const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
   value, onChange, onKeyDown, placeholder, disabled, allTags, allNotes, maxRows = 4, sx
 }, ref) => {
@@ -172,9 +174,7 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
   useEffect(() => {
     // keep external value in sync if it changes from outside
     const currentText = editorState.getCurrentContent().getPlainText();
-    console.log('useEffect - value prop:', value, 'current text:', currentText);
     if (value !== currentText) {
-      console.log('useEffect - recreating editor state from value:', value);
       const newContent = ContentState.createFromText(value || '');
       let newState = EditorState.createWithContent(newContent, createMentionDecorator());
 
@@ -215,14 +215,12 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
       ? allNotes.filter(n => (n.title || '').toLowerCase().includes(term))
       : allNotes
     ).slice(0, 20);
-  }, [allNotes, mention]);
+  }, [allNotes, mention?.term]);
 
   const filteredTags = useMemo(() => {
     const term = mention?.term?.toLowerCase() ?? '';
     return (term ? tags.filter(t => t.toLowerCase().includes(term)) : tags).slice(0, 30);
-  }, [tags, mention]);
-
-  type MentionItem = { type: 'note'; id: string; title: string } | { type: 'tag'; tag: string };
+  }, [tags, mention?.term]);
 
   const flatItems = useMemo<MentionItem[]>(() => [
     ...filteredNotes.map(n => ({ type: 'note' as const, id: n.id, title: n.title })),
@@ -248,10 +246,8 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
   }
 
   function handleChange(state: EditorState) {
-    const plainText = state.getCurrentContent().getPlainText();
-    console.log('handleChange - plain text:', plainText);
     setEditorState(state);
-    onChange(plainText);
+    onChange(state.getCurrentContent().getPlainText());
     updateMentionState(state);
   }
 
@@ -445,9 +441,6 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
       focusOffset: atIndex + mentionText.length + 1
     }) as SelectionState;
     newState = EditorState.forceSelection(newState, cursorPosition);
-
-    console.log('Final text:', newState.getCurrentContent().getBlockForKey(blockKey).getText());
-    console.log('=== END INSERT TAG DEBUG ===');
 
     setMention(null);
     handleChange(newState);
