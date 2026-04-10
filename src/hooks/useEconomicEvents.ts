@@ -107,7 +107,6 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
   const fetchingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastFetchedParamsRef = useRef<string | null>(null);
-  const hasFetchedRef = useRef(false);
 
   // Memoize date range to prevent unnecessary recalculations
   const dateRange = useMemo(
@@ -136,7 +135,10 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-      abortControllerRef.current = new AbortController();
+      // Capture controller locally so each invocation checks its own abort
+      // status in the finally block, not the (potentially replaced) shared ref.
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
       fetchingRef.current = true;
       const currentOffset = isLoadMore ? offset : 0;
@@ -159,8 +161,7 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
           }
         );
 
-        // Check if request was aborted
-        if (abortControllerRef.current?.signal.aborted) {
+        if (controller.signal.aborted) {
           return;
         }
 
@@ -185,10 +186,7 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
         fetchingRef.current = false;
         setLoading(false);
         setLoadingMore(false);
-        // Only mark completed on a real finish — not on abort.
-        // If aborted, hasCompletedFetch stays false so shimmer keeps showing
-        // until the next (non-aborted) fetch completes.
-        if (!abortControllerRef.current?.signal.aborted) {
+        if (!controller.signal.aborted) {
           setHasCompletedFetch(true);
         }
       }
@@ -234,19 +232,15 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
     // Create a unique key for current params
     const currentParamsKey = `${dateRange.start}|${dateRange.end}|${filterParams.currencies}|${filterParams.impacts}|${filterParams.onlyUpcoming}`;
 
-    // Only fetch if params changed or we haven't fetched yet
-    if (hasFetchedRef.current && lastFetchedParamsRef.current === currentParamsKey) {
-      // Already have data for these exact params, skip fetch
+    // Skip if we already have data for these exact params
+    if (lastFetchedParamsRef.current === currentParamsKey) {
       return;
     }
 
     // Reset so shimmer shows until the upcoming fetch completes.
-    // Safe because aborted fetch finally blocks no longer set hasCompletedFetch=true.
     setHasCompletedFetch(false);
 
-    // Update tracking refs
     lastFetchedParamsRef.current = currentParamsKey;
-    hasFetchedRef.current = true;
 
     setOffset(0);
     fetchEvents(false);
@@ -255,6 +249,13 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      // Reset both guards so that if this effect re-runs (StrictMode
+      // double-invoke or real remount) the re-run effect can call fetchEvents.
+      // Without this, lastFetchedParamsRef blocks the params-cache guard and
+      // fetchingRef blocks the in-flight guard, leaving hasCompletedFetch
+      // permanently false and the shimmer stuck loading forever.
+      lastFetchedParamsRef.current = null;
+      fetchingRef.current = false;
     };
     // Only re-fetch when these specific values change
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -265,22 +266,17 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
     async (payload: any) => {
       logger.log('Real-time economic event update:', payload);
 
-      // For efficiency, only refetch if the event is within our current view
-      // Otherwise, just update the specific event
       if (payload.eventType === 'UPDATE' && payload.new) {
         const updatedEvent = payload.new as EconomicEvent;
         const eventDate = updatedEvent.event_date;
 
-        // Check if event is in our date range
         if (eventDate >= dateRange.start && eventDate <= dateRange.end) {
           updateEvent(updatedEvent.id, updatedEvent);
         }
-      } else {
-        // For INSERT/DELETE, do nothing
-        // refresh();
       }
+      // For INSERT/DELETE, do nothing
     },
-    [dateRange.start, dateRange.end, updateEvent, refresh]
+    [dateRange.start, dateRange.end, updateEvent]
   );
 
   // Set up real-time subscription
@@ -299,10 +295,7 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
     onError: (err) => logger.error('Economic events subscription error:', err),
   });
 
-  // Treat as loading until first fetch completes. Prevents "No events found"
-  // flash when panel/drawer mounts fresh or enabled transitions false→true.
-  // Treat as loading until first fetch completes. Prevents "No events found"
-  // flash when panel/drawer mounts fresh or enabled transitions false→true.
+  // Prevents "No events found" flash on fresh mount or when enabled transitions false→true.
   const awaitingFirstFetch = enabled && !hasCompletedFetch;
 
   return {
