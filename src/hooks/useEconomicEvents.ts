@@ -97,6 +97,7 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
   // State
   const [events, setEvents] = useState<EconomicEvent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasCompletedFetch, setHasCompletedFetch] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -184,6 +185,7 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
         fetchingRef.current = false;
         setLoading(false);
         setLoadingMore(false);
+        setHasCompletedFetch(true);
       }
     },
     [enabled, dateRange, currencies, impacts, onlyUpcoming, pageSize, offset]
@@ -288,14 +290,15 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
     onError: (err) => logger.error('Economic events subscription error:', err),
   });
 
-  // Treat as loading if enabled with no events and no fetch completed yet.
-  // Prevents "No events found" flash when enabled transitions false→true
-  // (the useEffect that triggers the fetch runs AFTER the render).
-  const isInitialLoad = enabled && events.length === 0 && !hasFetchedRef.current;
+  // Treat as loading until first fetch completes. Prevents "No events found"
+  // flash when panel/drawer mounts fresh or enabled transitions false→true.
+  // Treat as loading until first fetch completes. Prevents "No events found"
+  // flash when panel/drawer mounts fresh or enabled transitions false→true.
+  const awaitingFirstFetch = enabled && !hasCompletedFetch;
 
   return {
     events,
-    loading: loading || isInitialLoad,
+    loading: loading || awaitingFirstFetch,
     loadingMore,
     error,
     hasMore,
