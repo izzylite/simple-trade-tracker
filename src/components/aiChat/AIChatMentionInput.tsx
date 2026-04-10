@@ -77,10 +77,6 @@ const createNoteMentionComponent = () => {
   return NoteMentionEntity;
 };
 
-const AtSymbolHidden = ({ children }: any) => (
-  <span style={{ opacity: 0 }}>{children}</span>
-);
-
 const createMentionDecorator = () =>
   new CompositeDecorator([
     {
@@ -108,24 +104,6 @@ const createMentionDecorator = () =>
         );
       },
       component: createNoteMentionComponent()
-    },
-    {
-      // Hide stray '/' characters that are not followed by mention text
-      // (i.e. '/' at the end of a word or followed by whitespace). This
-      // keeps '/' visible while typing (e.g. '/note'), but hides bugs where
-      // an extra '/ ' is left between chips.
-      strategy: (block, callback) => {
-        const text = block.getText();
-        for (let i = 0; i < text.length; i += 1) {
-          if (text[i] === '/') {
-            const next = text[i + 1];
-            if (!next || /\s/.test(next)) {
-              callback(i, i + 1);
-            }
-          }
-        }
-      },
-      component: AtSymbolHidden
     }
   ]);
 
