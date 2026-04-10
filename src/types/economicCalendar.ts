@@ -110,6 +110,7 @@ export interface EconomicCalendarDrawerProps {
   tradeOperations: TradeOperationsProps;
   isReadOnly?: boolean;
   initialDate?: Date;
+  enabled?: boolean;
 }
 
 // Service types

@@ -16,6 +16,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
   tradeOperations,
   isReadOnly,
   initialDate,
+  enabled,
 }) => {
   const theme = useTheme();
   const drawerZIndex = initialDate
@@ -49,7 +50,7 @@ const EconomicCalendarDrawer: React.FC<EconomicCalendarDrawerProps> = ({
         isReadOnly={isReadOnly}
         initialDate={initialDate}
         onCollapse={onClose}
-        enabled={open}
+        enabled={enabled ?? open}
       />
     </Drawer>
   );
