@@ -185,7 +185,12 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
         fetchingRef.current = false;
         setLoading(false);
         setLoadingMore(false);
-        setHasCompletedFetch(true);
+        // Only mark completed on a real finish — not on abort.
+        // If aborted, hasCompletedFetch stays false so shimmer keeps showing
+        // until the next (non-aborted) fetch completes.
+        if (!abortControllerRef.current?.signal.aborted) {
+          setHasCompletedFetch(true);
+        }
       }
     },
     [enabled, dateRange, currencies, impacts, onlyUpcoming, pageSize, offset]
@@ -234,6 +239,10 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
       // Already have data for these exact params, skip fetch
       return;
     }
+
+    // Reset so shimmer shows until the upcoming fetch completes.
+    // Safe because aborted fetch finally blocks no longer set hasCompletedFetch=true.
+    setHasCompletedFetch(false);
 
     // Update tracking refs
     lastFetchedParamsRef.current = currentParamsKey;
