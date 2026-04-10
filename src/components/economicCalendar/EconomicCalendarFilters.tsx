@@ -99,15 +99,19 @@ const EconomicCalendarFilters: React.FC<EconomicCalendarFiltersProps> = ({
               desktopPaper: {
                 sx: {
                   fontSize: '0.75rem',
+                  pb: 0.5,
                   '& .MuiPickersCalendarHeader-root': { minHeight: 36, pl: 1.5, pr: 0.5 },
                   '& .MuiPickersCalendarHeader-label': { fontSize: '0.8rem', fontWeight: 600 },
-                  '& .MuiMonthCalendar-root': { width: 220, p: '4px 8px' },
+                  '& .MuiMonthCalendar-root': {
+                    width: 'auto', pt: '4px', px: '8px', pb: '4px',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                  },
                   '& .MuiPickersMonth-monthButton': {
                     fontSize: '0.75rem',
                     height: 32,
                     margin: '2px 0',
                   },
-                  '& .MuiYearCalendar-root': { width: 220 },
+                  '& .MuiYearCalendar-root': { width: 'auto' },
                   '& .MuiPickersYear-yearButton': { fontSize: '0.75rem', height: 28 },
                 },
               },
