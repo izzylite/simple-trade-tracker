@@ -690,7 +690,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const [isCalendarEditSubmitting, setIsCalendarEditSubmitting] = useState(false);
 
   // Economic calendar drawer state
-  const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(false);
+  const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(true);
 
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
