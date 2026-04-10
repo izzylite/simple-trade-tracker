@@ -96,7 +96,7 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
 
   // State
   const [events, setEvents] = useState<EconomicEvent[]>([]);
-  const [loading, setLoading] = useState(enabled);
+  const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -288,9 +288,14 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
     onError: (err) => logger.error('Economic events subscription error:', err),
   });
 
+  // Treat as loading if enabled with no events and no fetch completed yet.
+  // Prevents "No events found" flash when enabled transitions false→true
+  // (the useEffect that triggers the fetch runs AFTER the render).
+  const isInitialLoad = enabled && events.length === 0 && !hasFetchedRef.current;
+
   return {
     events,
-    loading,
+    loading: loading || isInitialLoad,
     loadingMore,
     error,
     hasMore,
