@@ -1444,6 +1444,12 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         onTodayClick={handleTodayClick}
       />
 
+      {/* Page layout: full page content + inline economic calendar panel (lg+) */}
+      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start' }}>
+
+      {/* Left side: hero, breadcrumbs, and main content */}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+
       {/* Hero Image Banner */}
       {heroImageUrl && (
         <Box
@@ -1509,9 +1515,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
       {/* Stacked Notes Widget - hidden in read-only mode */}
       {calendarId && !isReadOnly && <StackedNotesWidget calendarId={calendarId} />}
-
-      {/* Page layout: main content + inline economic calendar panel (lg+) */}
-      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start' }}>
 
       {/* Main Content Container */}
       <Box sx={{
@@ -2009,6 +2012,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         </Box>
 
       </Box>{/* end main content container */}
+
+      </Box>{/* end left side content */}
 
       {/* Inline Economic Calendar Panel — lg+ only */}
       {isLgUp && (
