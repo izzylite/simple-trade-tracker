@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import OrionIcon from './OrionIcon';
 import {
   Box,
   IconButton,
@@ -305,14 +306,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           >
             {/* Left side - Logo and Title */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Avatar sx={{
-                width: 36,
-                height: 36,
-                background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
-                border: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`
-              }}>
-                <AIIcon sx={{ fontSize: 20, color: 'white' }} />
-              </Avatar>
+              <OrionIcon size={36} />
 
               <Box>
                 <Typography variant="h6" sx={{
@@ -320,7 +314,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                   fontSize: '1.1rem',
                   lineHeight: 1.2
                 }}>
-                  AI Trading Assistant
+                  Orion
                 </Typography>
                 <Typography variant="caption" sx={{
                   color: 'text.secondary',

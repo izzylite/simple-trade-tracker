@@ -96,6 +96,7 @@ import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ShareButton from '../components/sharing/ShareButton';
 
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
+import OrionIcon from '../components/aiChat/OrionIcon';
 import NotesDrawer from '../components/notes/NotesDrawer';
 import NoteEditorDialog from '../components/notes/NoteEditorDialog';
 import { StackedNotesWidget } from '../components/reminderNotes';
@@ -2133,9 +2134,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
         {/* AI Chat FAB - Hidden in read-only mode */}
         {!isReadOnly && (
-          <Tooltip title="AI Trading Assistant" placement="left">
+          <Tooltip title="Orion" placement="left">
             <Fab
-              color="secondary"
               aria-label="open ai chat"
               onClick={handleToggleAIChat}
               size="medium"
@@ -2145,10 +2145,16 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 right: { xs: 16, sm: 24 },
                 zIndex: 1200,
                 width: { xs: 48, sm: 56 },
-                height: { xs: 48, sm: 56 }
+                height: { xs: 48, sm: 56 },
+                backgroundColor: 'transparent',
+                boxShadow: 3,
+                p: 0,
+                overflow: 'hidden',
+                '&:hover': { backgroundColor: 'transparent', transform: 'scale(1.08)' },
+                transition: 'transform 0.2s ease'
               }}
             >
-              <AIIcon sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
+              <OrionIcon size="100%" />
             </Fab>
           </Tooltip>
         )}

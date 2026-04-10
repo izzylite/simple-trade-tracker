@@ -729,7 +729,7 @@ export function useAIChat({
       return {
         id: 'welcome',
         role: 'assistant',
-        content: `${resultEmoji} I'm ready to analyze your ${resultText} trade on **${tradeName}**.
+        content: `${resultEmoji} I'm Orion, your trading analyst. I'm ready to analyze your ${resultText} trade on **${tradeName}**.
 
 I can help you understand what worked${isLoss ? " or didn't work" : ''}, identify patterns, and provide insights to improve your trading.
 
@@ -751,7 +751,7 @@ What would you like to know about this trade?`,
     return {
       id: 'welcome',
       role: 'assistant',
-      content: `👋 Hello! I'm your AI trading analyst. ${calendarInfo}I can help you analyze your trading performance, identify patterns, and provide insights to improve your trading.
+      content: `👋 Hello! I'm Orion, your AI trading analyst. ${calendarInfo}I can help you analyze your trading performance, identify patterns, and provide insights to improve your trading.
 
 💡 I'll analyze your trading data to give you focused and accurate insights!${historyNote}
 

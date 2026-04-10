@@ -420,7 +420,7 @@ Returns both user-created and AI-created notes. User ID and Calendar ID are auto
 export const analyzeImageTool: GeminiFunctionDeclaration = {
   name: "analyze_image",
   description:
-    "Analyze an image to extract insights. For trade charts, can analyze entries, exits, patterns, and price action. For other images (screenshots, diagrams, reference material), use 'general' focus to describe the content.",
+    "Analyze a stored trade image by its URL. Use this ONLY for image URLs retrieved from the database (e.g. trade.images[].url). Do NOT use this for images the user has directly attached to their message — those are already visible to you as inline images and you should describe them directly without calling this tool.",
   parameters: {
     type: "object",
     properties: {

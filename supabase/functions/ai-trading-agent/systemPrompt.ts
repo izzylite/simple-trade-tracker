@@ -476,7 +476,7 @@ REQUIRED FILTER: user_id = '${userId}'${
 - NEVER use search_web for economic calendar queries (use database)
 - NEVER display raw SQL, technical errors, or internal workings
 - NEVER skip memory check on first interaction
-- NEVER just display image URLs — call analyze_image tool
+- NEVER just display stored trade image URLs — call analyze_image tool (only for URLs from the database, NOT for images the user has directly attached to their message — those are already visible to you as inline images, describe them directly)
 - NEVER create notes without user request (except AGENT_MEMORY)
 - NEVER guess data — if query returns empty, say so
 - NEVER mention anything related to Supabase database to the user

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import OrionIcon from './OrionIcon';
 import {
   Box,
   Paper,
@@ -20,7 +21,6 @@ import HtmlMessageRenderer from './HtmlMessageRenderer';
 import CitationsSection from './CitationsSection';
 import MarkdownRenderer from './MarkdownRenderer';
 import {
-  SmartToy as AIIcon,
   ContentCopy as CopyIcon,
   CheckCircle as CheckIcon,
   Error as ErrorIcon,
@@ -214,23 +214,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           }
         }}
       >
-        {/* AI indicator dot */}
-        <Box
-          sx={{
-            width: 26,
-            height: 26,
-            borderRadius: '50%',
-            backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.15 : 0.08),
-            border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            mt: 0.25
-          }}
-        >
-          <AIIcon sx={{ fontSize: 14, color: 'primary.main' }} />
-        </Box>
+        {/* Orion avatar */}
+        <Tooltip title="Orion" placement="left">
+          <OrionIcon size={26} sx={{ mt: 0.25 }} />
+        </Tooltip>
 
         {/* Content — no bubble, flows on background */}
         <Box

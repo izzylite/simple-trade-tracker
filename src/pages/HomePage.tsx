@@ -55,6 +55,7 @@ import { DuplicateCalendarDialog } from '../components/dialogs/DuplicateCalendar
 import { CalendarLinkDialog } from '../components/dialogs/CalendarLinkDialog';
 import CalendarListDialog from '../components/dialogs/CalendarListDialog';
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
+import OrionIcon from '../components/aiChat/OrionIcon';
 import TradeFormDialog from '../components/trades/TradeFormDialog';
 import { NewTradeForm } from '../components/trades';
 import { createNewTradeData } from './TradeCalendarPage';
@@ -870,7 +871,7 @@ const Home: React.FC<HomeProps> = ({
               </CardContent>
             </Card>
 
-            {/* Chat with AI */}
+            {/* Chat with Orion */}
             <Card
               sx={{
                 borderRadius: 2,
@@ -895,18 +896,12 @@ const Home: React.FC<HomeProps> = ({
                 py: { xs: 2.5, sm: 3, md: 4 },
                 px: { xs: 1.5, sm: 2 }
               }}>
-                <Box sx={{
-                  width: { xs: 40, sm: 48, md: 56 },
-                  height: { xs: 40, sm: 48, md: 56 },
-                  borderRadius: 2,
-                  bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  mx: 'auto', mb: { xs: 1.5, sm: 2 }
-                }}>
-                  <AIIcon sx={{ fontSize: { xs: 24, sm: 28, md: 32 }, color: 'secondary.main' }} />
-                </Box>
+                <OrionIcon
+                  size={48}
+                  sx={{ mx: 'auto', mb: { xs: 1.5, sm: 2 } }}
+                />
                 <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-                  Chat with AI
+                  Chat with Orion
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
                   Get trading insights

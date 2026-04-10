@@ -5,6 +5,7 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
+import OrionIcon from './OrionIcon';
 import {
   Box,
   IconButton,
@@ -171,7 +172,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   }, []);
 
   useEffect(() => {
-    if (autoScroll) {
+    if (autoScroll && messages.length > 0) {
       scrollToBottom();
     }
   }, [messages, scrollToBottom, autoScroll]);
@@ -480,23 +481,18 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
         {/* Typing Indicator */}
         {isTyping && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 1, mb: 3 }}>
-            <Box
+            <OrionIcon
+              size={26}
               sx={{
-                width: 26,
-                height: 26,
-                borderRadius: '50%',
-                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
+                animation: 'orionPulse 1.5s ease-in-out infinite',
+                '@keyframes orionPulse': {
+                  '0%, 100%': { opacity: 0.6, transform: 'scale(0.95)' },
+                  '50%': { opacity: 1, transform: 'scale(1.05)' }
+                }
               }}
-            >
-              <CircularProgress size={12} thickness={4} sx={{ color: 'primary.main' }} />
-            </Box>
+            />
             <Typography variant="body2" color="text.disabled" sx={{ fontSize: '0.85rem' }}>
-              {toolExecutionStatus || 'Thinking…'}
+              {toolExecutionStatus || 'Orion is thinking…'}
             </Typography>
           </Box>
         )}
@@ -673,7 +669,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             value={inputMessage}
             onChange={setInputMessage}
             onKeyDown={handleKeyPress}
-            placeholder={calendar ? "(use / to mention tags & notes)" : "Ask me anything about your trading..."}
+            placeholder={calendar ? "Ask Orion… (use / to mention tags & notes)" : "Ask Orion anything about your trading..."}
             disabled={isLoading || isAtMessageLimit}
             allTags={calendar?.tags || []}
             allNotes={calendar?.notes ?? []}

@@ -908,7 +908,8 @@ function handleStreamingRequest(
   projectRef: string,
   supabaseAccessToken: string,
   supabaseUrl: string,
-  userImages?: Array<{ url: string; mimeType: string }>
+  userImages?: Array<{ url: string; mimeType: string }>,
+  calendarTags?: string[]
 ): Response {
   // Create SSE stream
   const { stream, writer } = createSSEStream();
@@ -977,7 +978,8 @@ function handleStreamingRequest(
             clarifiedMessage,
             conversationHistory,
             retryTools,
-            writer
+            writer,
+            userImages // Preserve user images across retries
           );
 
           if (!result.emptyBug && (result.text || result.functionCall || result.functionCalls)) {
@@ -1411,6 +1413,27 @@ function handleStreamingRequest(
         }
       }
 
+      // Wrap calendar tag mentions in <tag-chip> so the frontend renders them as chips.
+      // Single-pass: preserves existing HTML/tag-chip elements, wraps bare tag mentions.
+      if (calendarTags && calendarTags.length > 0) {
+        // Sort longest-first so "Confluence:3x Displacement" matches before "Confluence"
+        const sortedTags = [...calendarTags].sort((a, b) => b.length - a.length);
+        const escapedTags = sortedTags.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        // Group 1: existing <tag-chip>…</tag-chip> blocks or any HTML tag — preserve as-is
+        // Group 2: a bare calendar tag name — wrap it
+        const injectPattern = new RegExp(
+          `(<tag-chip>[\\s\\S]*?<\\/tag-chip>|<[^>]+>)|(${escapedTags.join('|')})`,
+          'g'
+        );
+        cleanedFinalText = cleanedFinalText.replace(
+          injectPattern,
+          (_match, htmlPart, tagName) => htmlPart !== undefined
+            ? _match
+            : `<tag-chip>${tagName}</tag-chip>`
+        );
+        log(`Tag-chip injection complete for ${sortedTags.length} calendar tags`, 'info');
+      }
+
       // Format response with HTML and citations (using cleaned text)
       const { messageHtml, citations } = formatResponseWithHtmlAndCitations(
         cleanedFinalText,
@@ -1623,7 +1646,8 @@ Deno.serve(async (req: Request) => {
         projectRef,
         supabaseAccessToken,
         supabaseUrl,
-        allImages.length > 0 ? allImages : images // Trade + user images
+        allImages.length > 0 ? allImages : images, // Trade + user images
+        calendarContext?.tags
       );
     }
 
