@@ -649,7 +649,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             value={inputMessage}
             onChange={setInputMessage}
             onKeyDown={handleKeyPress}
-            placeholder={calendar ? "(use @ to mention tags & notes)" : "Ask me anything about your trading..."}
+            placeholder={calendar ? "(use / to mention tags & notes)" : "Ask me anything about your trading..."}
             disabled={isLoading || isAtMessageLimit}
             allTags={calendar?.tags || []}
             allNotes={calendar?.notes ?? []}
@@ -738,7 +738,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             opacity: 0.7
           }}
         >
-          {`Enter to send • Shift+Enter newline • @ for tags & notes • Up to ${MAX_IMAGES} images`}
+          {`Enter to send • Shift+Enter newline • / for tags & notes • Up to ${MAX_IMAGES} images`}
         </Typography>
       </Box>
 

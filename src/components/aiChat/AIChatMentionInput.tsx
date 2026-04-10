@@ -110,14 +110,14 @@ const createMentionDecorator = () =>
       component: createNoteMentionComponent()
     },
     {
-      // Hide stray '@' characters that are not followed by mention text
-      // (i.e. '@' at the end of a word or followed by whitespace). This
-      // keeps '@' visible while typing (e.g. '@0.79'), but hides bugs where
-      // an extra '@ ' is left between chips.
+      // Hide stray '/' characters that are not followed by mention text
+      // (i.e. '/' at the end of a word or followed by whitespace). This
+      // keeps '/' visible while typing (e.g. '/note'), but hides bugs where
+      // an extra '/ ' is left between chips.
       strategy: (block, callback) => {
         const text = block.getText();
         for (let i = 0; i < text.length; i += 1) {
-          if (text[i] === '@') {
+          if (text[i] === '/') {
             const next = text[i + 1];
             if (!next || /\s/.test(next)) {
               callback(i, i + 1);
@@ -235,7 +235,7 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
     const block = content.getBlockForKey(blockKey);
     const offset = sel.getStartOffset();
     const text = block.getText().slice(0, offset);
-    const at = text.lastIndexOf('@');
+    const at = text.lastIndexOf('/');
     if (at === -1) return setMention(null);
     if (at > 0 && /[^\s]/.test(text[at - 1])) return setMention(null);
     const term = text.slice(at + 1);
@@ -317,11 +317,11 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
     const text = block.getText();
     const offset = selection.getStartOffset();
 
-    // Find the '@' by scanning backward (same logic as insertTag)
+    // Find the '/' by scanning backward (same logic as insertTag)
     let atIndex = -1;
     for (let i = offset - 1; i >= 0; i -= 1) {
       const ch = text[i];
-      if (ch === '@') {
+      if (ch === '/') {
         if (i === 0 || /\s/.test(text[i - 1])) { atIndex = i; }
         break;
       }
@@ -384,19 +384,19 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
     const text = block.getText();
     const offset = selection.getStartOffset();
 
-    // Find the '@' that starts this mention by scanning backwards from the cursor
+    // Find the '/' that starts this mention by scanning backwards from the cursor
     let atIndex = -1;
     for (let i = offset - 1; i >= 0; i -= 1) {
       const ch = text[i];
-      if (ch === '@') {
-        // Require start-of-line or whitespace before '@' so we don't match emails, etc.
+      if (ch === '/') {
+        // Require start-of-line or whitespace before '/' so we don't match paths, etc.
         if (i === 0 || /\s/.test(text[i - 1])) {
           atIndex = i;
         }
         break;
       }
       if (/\s/.test(ch)) {
-        // Hit whitespace before finding an '@' – no valid mention here
+        // Hit whitespace before finding a '/' – no valid mention here
         break;
       }
     }
