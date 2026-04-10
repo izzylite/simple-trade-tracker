@@ -62,6 +62,7 @@ export interface EconomicCalendarPanelProps {
   initialDate?: Date;
   onCollapse?: () => void;
   enabled?: boolean;
+  showHeader?: boolean;
 }
 
 const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
@@ -72,6 +73,7 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
   initialDate,
   onCollapse,
   enabled = true,
+  showHeader = true,
 }) => {
   const { onUpdateCalendarProperty } = tradeOperations;
   const theme = useTheme();
@@ -240,8 +242,8 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <Box sx={{
+      {/* Header — hidden in inline panel mode, shown in drawer mode */}
+      {showHeader && <Box sx={{
         p: 3,
         borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
         display: 'flex', alignItems: 'center', gap: 2,
@@ -264,7 +266,7 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
         <IconButton onClick={onCollapse} size="small">
           <ChevronRightIcon />
         </IconButton>
-      </Box>
+      </Box>}
 
       {/* View Controls */}
       <Box sx={{

@@ -2042,6 +2042,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
             isReadOnly={isReadOnly}
             tradeOperations={tradeOperations}
             onCollapse={() => setIsEconomicCalendarOpen(false)}
+            showHeader={false}
             enabled={isEconomicCalendarOpen}
           />
         </Box>
