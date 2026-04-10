@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { Editor, EditorState, ContentState, CompositeDecorator, Modifier, SelectionState } from 'draft-js';
 import { Box, Chip, Popper, Paper, List, ListItem, ListItemButton, Typography, useTheme, alpha } from '@mui/material';
-import { Tag as TagIcon } from '@mui/icons-material';
+import { Tag as TagIcon, Notes as NotesIcon } from '@mui/icons-material';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
@@ -13,6 +13,7 @@ export interface AIChatMentionInputProps {
   placeholder?: string;
   disabled?: boolean;
   allTags: string[];
+  allNotes: { id: string; title: string }[];
   maxRows?: number;
   sx?: any;
 }
@@ -129,7 +130,7 @@ const createMentionDecorator = () =>
   ]);
 
 const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
-  value, onChange, onKeyDown, placeholder, disabled, allTags, maxRows = 4, sx
+  value, onChange, onKeyDown, placeholder, disabled, allTags, allNotes, maxRows = 4, sx
 }, ref) => {
   const theme = useTheme();
   const editorRef = useRef<Editor>(null as any);
@@ -166,68 +167,6 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
         (editorRef.current as any)?.focus?.();
       }, 0);
     },
-    insertNote: (noteTitle: string) => {
-      const state = editorStateRef.current;
-      const selection = state.getSelection();
-      const content = state.getCurrentContent();
-      const blockKey = selection.getStartKey();
-
-      // Add a space before if needed
-      let newContent = content;
-      const offset = selection.getStartOffset();
-      const block = content.getBlockForKey(blockKey);
-      const text = block.getText();
-
-      if (offset > 0 && !/\s/.test(text[offset - 1])) {
-        const spaceSelection = SelectionState.createEmpty(blockKey).merge({
-          anchorOffset: offset,
-          focusOffset: offset
-        }) as SelectionState;
-        newContent = Modifier.insertText(newContent, spaceSelection, ' ');
-      }
-
-      // Insert the note token text
-      const noteToken = `note:${noteTitle}`;
-      const insertOffset = offset + (offset > 0 && !/\s/.test(text[offset - 1]) ? 1 : 0);
-      const insertSelection = SelectionState.createEmpty(blockKey).merge({
-        anchorOffset: insertOffset,
-        focusOffset: insertOffset
-      }) as SelectionState;
-      newContent = Modifier.insertText(newContent, insertSelection, noteToken);
-
-      // Create entity and apply it
-      newContent = newContent.createEntity('NOTE_MENTION', 'IMMUTABLE', { noteTitle });
-      const entityKey = newContent.getLastCreatedEntityKey();
-
-      const entityRange = SelectionState.createEmpty(blockKey).merge({
-        anchorOffset: insertOffset,
-        focusOffset: insertOffset + noteToken.length
-      }) as SelectionState;
-      newContent = Modifier.applyEntity(newContent, entityRange, entityKey);
-
-      // Add trailing space
-      const afterNote = SelectionState.createEmpty(blockKey).merge({
-        anchorOffset: insertOffset + noteToken.length,
-        focusOffset: insertOffset + noteToken.length
-      }) as SelectionState;
-      newContent = Modifier.insertText(newContent, afterNote, ' ');
-
-      // Update state and move cursor
-      let newState = EditorState.push(state, newContent, 'insert-characters');
-      const cursorPosition = SelectionState.createEmpty(blockKey).merge({
-        anchorOffset: insertOffset + noteToken.length + 1,
-        focusOffset: insertOffset + noteToken.length + 1
-      }) as SelectionState;
-      newState = EditorState.forceSelection(newState, cursorPosition);
-
-      setEditorState(newState);
-      onChange(newState.getCurrentContent().getPlainText());
-
-      // Focus editor
-      setTimeout(() => {
-        (editorRef.current as any)?.focus?.();
-      }, 0);
-    }
   }));
 
   useEffect(() => {
@@ -269,7 +208,26 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
   }, [editorState]);
 
   const tags = useMemo(() => allTags.sort(), [allTags]);
-  const filtered = useMemo(() => (mention?.term ? tags.filter(t => t.toLowerCase().includes(mention.term.toLowerCase())) : tags).slice(0, 50), [tags, mention]);
+
+  const filteredNotes = useMemo(() => {
+    const term = mention?.term?.toLowerCase() ?? '';
+    return (term
+      ? allNotes.filter(n => (n.title || '').toLowerCase().includes(term))
+      : allNotes
+    ).slice(0, 20);
+  }, [allNotes, mention]);
+
+  const filteredTags = useMemo(() => {
+    const term = mention?.term?.toLowerCase() ?? '';
+    return (term ? tags.filter(t => t.toLowerCase().includes(term)) : tags).slice(0, 30);
+  }, [tags, mention]);
+
+  type MentionItem = { type: 'note'; id: string; title: string } | { type: 'tag'; tag: string };
+
+  const flatItems = useMemo<MentionItem[]>(() => [
+    ...filteredNotes.map(n => ({ type: 'note' as const, id: n.id, title: n.title })),
+    ...filteredTags.map(t => ({ type: 'tag' as const, tag: t }))
+  ], [filteredNotes, filteredTags]);
 
   function updateMentionState(state: EditorState) {
     const sel = state.getSelection();
@@ -299,9 +257,17 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
 
   function handleKeyDownLocal(e: React.KeyboardEvent) {
     if (mention?.open) {
-      if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex((i) => Math.min(i + 1, filtered.length - 1)); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex((i) => Math.min(i + 1, flatItems.length - 1)); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex((i) => Math.max(i - 1, 0)); return; }
-      if (e.key === 'Enter') { e.preventDefault(); if (filtered[selectedIndex]) insertTag(filtered[selectedIndex]); return; }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const item = flatItems[selectedIndex];
+        if (item) {
+          if (item.type === 'tag') insertTag(item.tag);
+          else insertNoteFromMention(item);
+        }
+        return;
+      }
       if (e.key === 'Escape') { e.preventDefault(); setMention(null); return; }
     }
 
@@ -342,6 +308,67 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
       }
     }
     onKeyDown?.(e);
+  }
+
+  function insertNoteFromMention(note: { id: string; title: string }) {
+    const state = editorStateRef.current || editorState;
+    const selection = state.getSelection();
+    if (!selection.isCollapsed()) { setMention(null); return; }
+
+    const content = state.getCurrentContent();
+    const blockKey = selection.getStartKey();
+    const block = content.getBlockForKey(blockKey);
+    const text = block.getText();
+    const offset = selection.getStartOffset();
+
+    // Find the '@' by scanning backward (same logic as insertTag)
+    let atIndex = -1;
+    for (let i = offset - 1; i >= 0; i -= 1) {
+      const ch = text[i];
+      if (ch === '@') {
+        if (i === 0 || /\s/.test(text[i - 1])) { atIndex = i; }
+        break;
+      }
+      if (/\s/.test(ch)) break;
+    }
+    if (atIndex === -1) { setMention(null); return; }
+
+    const noteTitle = note.title || 'Untitled';
+
+    // Replace @term with the note title
+    const replaceSel = SelectionState.createEmpty(blockKey).merge({
+      anchorOffset: atIndex,
+      focusOffset: offset
+    }) as SelectionState;
+    let newContent = Modifier.replaceText(content, replaceSel, noteTitle);
+
+    // Create NOTE_MENTION entity and apply it
+    newContent = newContent.createEntity('NOTE_MENTION', 'IMMUTABLE', { noteTitle, noteId: note.id });
+    const entityKey = newContent.getLastCreatedEntityKey();
+    const entityRange = SelectionState.createEmpty(blockKey).merge({
+      anchorOffset: atIndex,
+      focusOffset: atIndex + noteTitle.length
+    }) as SelectionState;
+    newContent = Modifier.applyEntity(newContent, entityRange, entityKey);
+
+    // Insert trailing space
+    const afterMention = SelectionState.createEmpty(blockKey).merge({
+      anchorOffset: atIndex + noteTitle.length,
+      focusOffset: atIndex + noteTitle.length
+    }) as SelectionState;
+    newContent = Modifier.insertText(newContent, afterMention, ' ');
+
+    // Push state and position cursor after trailing space
+    let newState = EditorState.push(state, newContent, 'insert-characters');
+    const cursorPosition = SelectionState.createEmpty(blockKey).merge({
+      anchorOffset: atIndex + noteTitle.length + 1,
+      focusOffset: atIndex + noteTitle.length + 1
+    }) as SelectionState;
+    newState = EditorState.forceSelection(newState, cursorPosition);
+
+    setMention(null);
+    handleChange(newState);
+    setTimeout(() => { try { (editorRef.current as any)?.focus?.(); } catch (_) {} }, 0);
   }
 
   function insertTag(tag: string) {
@@ -496,9 +523,9 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
         <Paper
           elevation={8}
           sx={{
-            maxHeight: 220,
-            minWidth: 250,
-            maxWidth: 400,
+            maxHeight: 260,
+            minWidth: 260,
+            maxWidth: 420,
             overflow: 'hidden',
             border: '1px solid',
             borderColor: 'divider'
@@ -517,51 +544,115 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
               color="text.secondary"
               sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 500 }}
             >
-              <TagIcon sx={{ fontSize: 14 }} /> Select a tag to mention ({filtered.length} available)
+              <TagIcon sx={{ fontSize: 14 }} /> Select a tag or note ({flatItems.length} available)
             </Typography>
           </Box>
-          <List sx={{ maxHeight: 170, overflow: 'auto', p: 0, ...scrollbarStyles(theme) }}>
-            {filtered.length === 0 ? (
+          <List sx={{ maxHeight: 200, overflow: 'auto', p: 0, ...scrollbarStyles(theme) }}>
+            {flatItems.length === 0 ? (
               <ListItem>
                 <Box sx={{ p: 2, textAlign: 'center', width: '100%' }}>
                   <Typography variant="body2" color="text.secondary">
-                    {allTags.length === 0
-                      ? 'No tags available. Add tags to your calendar to mention them here.'
-                      : `No tags found matching "${mention?.term || ''}"`}
+                    {allTags.length === 0 && allNotes.length === 0
+                      ? 'No tags or notes available.'
+                      : `No matches for "${mention?.term || ''}"`}
                   </Typography>
                 </Box>
               </ListItem>
             ) : (
-              filtered.map((tag, idx) => (
-                <ListItem key={tag} disablePadding>
-                  <ListItemButton
-                    selected={idx === selectedIndex}
-                    onMouseDown={(e) => {
-                      e.preventDefault(); // Prevent editor from losing focus
-                      insertTag(tag);
-                    }}
-                    onClick={(e) => {
-                      // Fallback for environments where onMouseDown does not fire (e.g. some touch devices)
-                      e.preventDefault();
-                      insertTag(tag);
-                    }}
-                    sx={{ py: 1, px: 2 }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                      <Chip
-                        label={formatTagForDisplay(tag, true)}
-                        size="small"
-                        sx={{ ...getTagChipStyles(tag, theme), height: 20, fontSize: '0.7rem' }}
-                      />
-                      {isGroupedTag(tag) && (
-                        <Typography variant="caption" color="text.secondary">
-                          {getTagGroup(tag)}
-                        </Typography>
-                      )}
-                    </Box>
-                  </ListItemButton>
-                </ListItem>
-              ))
+              <>
+                {filteredNotes.length > 0 && (
+                  <>
+                    <ListItem
+                      sx={{
+                        py: 0.5,
+                        px: 2,
+                        backgroundColor: alpha(theme.palette.info.main, 0.04),
+                        borderBottom: '1px solid',
+                        borderColor: 'divider'
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600 }}
+                      >
+                        <NotesIcon sx={{ fontSize: 12 }} /> Notes
+                      </Typography>
+                    </ListItem>
+                    {filteredNotes.map((note, idx) => (
+                      <ListItem key={note.id} disablePadding>
+                        <ListItemButton
+                          selected={idx === selectedIndex}
+                          onMouseDown={(e) => { e.preventDefault(); insertNoteFromMention(note); }}
+                          onClick={(e) => { e.preventDefault(); insertNoteFromMention(note); }}
+                          sx={{ py: 1, px: 2 }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                            <Chip
+                              label={note.title || 'Untitled'}
+                              size="small"
+                              sx={{
+                                height: 20,
+                                fontSize: '0.7rem',
+                                backgroundColor: alpha(theme.palette.info.main, 0.1),
+                                color: theme.palette.info.main,
+                                border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`
+                              }}
+                            />
+                          </Box>
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </>
+                )}
+                {filteredTags.length > 0 && (
+                  <>
+                    <ListItem
+                      sx={{
+                        py: 0.5,
+                        px: 2,
+                        backgroundColor: alpha(theme.palette.primary.main, 0.04),
+                        borderBottom: '1px solid',
+                        borderColor: 'divider'
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600 }}
+                      >
+                        <TagIcon sx={{ fontSize: 12 }} /> Tags
+                      </Typography>
+                    </ListItem>
+                    {filteredTags.map((tag, idx) => {
+                      const flatIdx = filteredNotes.length + idx;
+                      return (
+                        <ListItem key={tag} disablePadding>
+                          <ListItemButton
+                            selected={flatIdx === selectedIndex}
+                            onMouseDown={(e) => { e.preventDefault(); insertTag(tag); }}
+                            onClick={(e) => { e.preventDefault(); insertTag(tag); }}
+                            sx={{ py: 1, px: 2 }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                              <Chip
+                                label={formatTagForDisplay(tag, true)}
+                                size="small"
+                                sx={{ ...getTagChipStyles(tag, theme), height: 20, fontSize: '0.7rem' }}
+                              />
+                              {isGroupedTag(tag) && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {getTagGroup(tag)}
+                                </Typography>
+                              )}
+                            </Box>
+                          </ListItemButton>
+                        </ListItem>
+                      );
+                    })}
+                  </>
+                )}
+              </>
             )}
           </List>
         </Paper>

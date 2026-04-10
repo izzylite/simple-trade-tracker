@@ -14,18 +14,12 @@ import {
   CircularProgress,
   Divider,
   useTheme,
-  alpha,
-  List,
-  ListItemButton,
-  Popper,
-  Paper,
-  ClickAwayListener
+  alpha
 } from '@mui/material';
 import {
   Send as SendIcon,
   AddComment as NewChatIcon,
   Stop as StopIcon,
-  Notes as NotesIcon,
   Image as ImageIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
@@ -156,9 +150,6 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   const [inputMessage, setInputMessage] = useState('');
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Notes context popup state
-  const [notesAnchorEl, setNotesAnchorEl] = useState<HTMLElement | null>(null);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -335,23 +326,6 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
 
   const handleNewChat = async () => {
     await startNewChat();
-  };
-
-  // Notes context popup handlers
-  const handleOpenNotesContext = (event: React.MouseEvent<HTMLElement>) => {
-    if (isReadOnly) return;
-    setNotesAnchorEl(prev => prev ? null : event.currentTarget);
-  };
-
-  const handleCloseNotesContext = () => {
-    setNotesAnchorEl(null);
-  };
-
-  const handleInsertNoteContext = (noteRef: { id: string; title: string }) => {
-    if (inputRef.current?.insertNote) {
-      inputRef.current.insertNote(noteRef.title);
-    }
-    handleCloseNotesContext();
   };
 
   // Determine what to display
@@ -675,9 +649,10 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             value={inputMessage}
             onChange={setInputMessage}
             onKeyDown={handleKeyPress}
-            placeholder={calendar ? "(use @tag to mention tags)" : "Ask me anything about your trading..."}
+            placeholder={calendar ? "(use @ to mention tags & notes)" : "Ask me anything about your trading..."}
             disabled={isLoading || isAtMessageLimit}
             allTags={calendar?.tags || []}
+            allNotes={calendar?.notes ?? []}
             maxRows={4}
             sx={{ flex: 1, minWidth: 0, fontSize: '0.95rem', lineHeight: 1.4 }}
           />
@@ -711,34 +686,6 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             }}
           >
             <ImageIcon sx={{ fontSize: 18 }} />
-          </IconButton>
-          <IconButton
-            aria-label="Insert note context"
-            onClick={handleOpenNotesContext}
-            disabled={isReadOnly || !userId}
-            size="small"
-            sx={{
-              backgroundColor: 'background.default',
-              color: 'text.secondary',
-              width: 32,
-              height: 32,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              transition: 'all 0.2s ease-in-out',
-              '&:hover': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.06),
-                borderColor: 'primary.main',
-                color: 'primary.main'
-              },
-              '&:disabled': {
-                backgroundColor: 'action.disabledBackground',
-                color: 'action.disabled',
-                borderColor: 'action.disabledBackground'
-              }
-            }}
-          >
-            <NotesIcon sx={{ fontSize: 18 }} />
           </IconButton>
           <IconButton
             onClick={isLoading ? handleCancelRequest : handleSendMessage}
@@ -791,89 +738,10 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             opacity: 0.7
           }}
         >
-          {`Enter to send • Shift+Enter newline • @ for tags • Up to ${MAX_IMAGES} images`}
+          {`Enter to send • Shift+Enter newline • @ for tags & notes • Up to ${MAX_IMAGES} images`}
         </Typography>
       </Box>
 
-      {/* Notes Context Popup */}
-      {notesAnchorEl && (
-        <ClickAwayListener onClickAway={() => setNotesAnchorEl(null)}>
-          <Popper
-            open={Boolean(notesAnchorEl)}
-            anchorEl={notesAnchorEl}
-            placement="top-end"
-            disablePortal
-            sx={{ zIndex: Z_INDEX.DIALOG_POPUP }}
-          >
-            <Paper
-              elevation={8}
-              sx={{
-                maxWidth: 360,
-                maxHeight: 320,
-                overflow: 'hidden',
-                borderRadius: 2,
-                boxShadow: theme.shadows[8]
-              }}
-            >
-              <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Add Context
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Select a note to insert into your message.
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  maxHeight: 250,
-                  overflow: 'auto',
-                  ...scrollbarStyles(theme)
-                }}
-              >
-                {(calendar?.notes ?? []).length === 0 ? (
-                  <Box sx={{ p: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No notes found yet.
-                    </Typography>
-                  </Box>
-                ) : (
-                  <List dense sx={{ p: 0 }}>
-                    {(calendar?.notes ?? []).map(noteRef => (
-                      <ListItemButton
-                        key={noteRef.id}
-                        onClick={() => handleInsertNoteContext(noteRef)}
-                        sx={{
-                          px: 1.5,
-                          py: 1,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'flex-start'
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                          <NotesIcon sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontWeight: 600,
-                              maxWidth: 200,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {noteRef.title || 'Untitled'}
-                          </Typography>
-                        </Box>
-                      </ListItemButton>
-                    ))}
-                  </List>
-                )}
-              </Box>
-            </Paper>
-          </Popper>
-        </ClickAwayListener>
-      )}
     </Box>
   );
 });
