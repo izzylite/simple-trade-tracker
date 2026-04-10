@@ -1445,10 +1445,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       />
 
       {/* Page layout: full page content + inline economic calendar panel (lg+) */}
-      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start' }}>
+      <Box sx={{
+        display: 'flex', flexDirection: 'row',
+        height: (theme: Theme) => `calc(100vh - ${theme.spacing(8)})`,
+        overflow: 'hidden',
+      }}>
 
       {/* Left side: hero, breadcrumbs, and main content */}
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={{ flex: 1, minWidth: 0, height: '100%', overflowY: 'auto' }}>
 
       {/* Hero Image Banner */}
       {heroImageUrl && (
@@ -2022,9 +2026,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           overflow: 'hidden',
           transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           flexShrink: 0,
-          position: 'sticky',
-          top: 0,
-          height: '100vh',
+          height: '100%',
           borderLeft: isEconomicCalendarOpen
             ? `1px solid ${alpha(theme.palette.divider, 0.1)}`
             : 'none',
