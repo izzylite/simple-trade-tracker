@@ -580,19 +580,9 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
                           onClick={(e) => { e.preventDefault(); insertNoteFromMention(note); }}
                           sx={{ py: 1, px: 2 }}
                         >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                            <Chip
-                              label={note.title || 'Untitled'}
-                              size="small"
-                              sx={{
-                                height: 20,
-                                fontSize: '0.7rem',
-                                backgroundColor: alpha(theme.palette.info.main, 0.25),
-                                color: theme.palette.info.light,
-                                border: `1px solid ${alpha(theme.palette.info.light, 0.5)}`
-                              }}
-                            />
-                          </Box>
+                          <Typography variant="body2" noWrap>
+                            {note.title || 'Untitled'}
+                          </Typography>
                         </ListItemButton>
                       </ListItem>
                     ))}
