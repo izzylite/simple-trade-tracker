@@ -112,6 +112,7 @@ import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
 import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
 import { calculateSessionStats } from '../utils/chartDataUtils';
 import EconomicCalendarDrawer, { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
+import EconomicCalendarPanel from '../components/economicCalendar/EconomicCalendarPanel';
 import { useEconomicEventWatcher, useEconomicEventsUpdates } from '../hooks/useEconomicEventWatcher';
 import { TradeOperationsProps } from '../types/tradeOperations';
 import EconomicEventNotification from '../components/notifications/EconomicEventNotification';
@@ -748,6 +749,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   const theme = useTheme();
   const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
+  const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
 
   // Breadcrumb items
   const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => {
@@ -1477,8 +1479,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       {/* Stacked Notes Widget - hidden in read-only mode */}
       {calendarId && !isReadOnly && <StackedNotesWidget calendarId={calendarId} />}
 
+      {/* Page layout: main content + inline economic calendar panel (lg+) */}
+      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', overflow: 'hidden' }}>
+
       {/* Main Content Container */}
       <Box sx={{
+        flex: 1,
+        minWidth: 0,
         display: 'flex',
         flexDirection: 'column',
         gap: { xs: 2, sm: 2.5, md: 3 },
@@ -1969,6 +1976,33 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
         </Box>
+
+      {/* Inline Economic Calendar Panel — lg+ only */}
+      {isLgUp && (
+        <Box sx={{
+          width: isEconomicCalendarOpen ? 'clamp(300px, 25vw, 420px)' : 0,
+          overflow: 'hidden',
+          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          flexShrink: 0,
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+          borderLeft: isEconomicCalendarOpen
+            ? `1px solid ${alpha(theme.palette.divider, 0.1)}`
+            : 'none',
+        }}>
+          <EconomicCalendarPanel
+            calendar={calendar!}
+            payload={economicCalendarUpdatedEvent}
+            isReadOnly={isReadOnly}
+            tradeOperations={tradeOperations}
+            onCollapse={() => setIsEconomicCalendarOpen(false)}
+            enabled={isEconomicCalendarOpen}
+          />
+        </Box>
+      )}
+
+      </Box>{/* end page layout flex row */}
 
         <DayDialog
           open={!!selectedDate && !showAddForm?.open}
