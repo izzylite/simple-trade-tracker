@@ -104,8 +104,10 @@ const EconomicCalendarFilters: React.FC<EconomicCalendarFiltersProps> = ({
                   '& .MuiPickersLayout-contentWrapper': { gridRow: 1, pb: 0 },
                   '& .MuiPickersCalendarHeader-root': { minHeight: 36, pl: 1.5, pr: 0.5 },
                   '& .MuiPickersCalendarHeader-label': { fontSize: '0.8rem', fontWeight: 600 },
+                  '& .MuiDateCalendar-root': { height: 'auto', minHeight: 'unset' },
                   '& .MuiMonthCalendar-root': {
                     width: 'auto', pt: '4px', px: '8px', pb: '4px',
+                    height: 'auto',
                     gridTemplateColumns: 'repeat(3, 1fr)',
                   },
                   '& .MuiPickersMonth-monthButton': {
