@@ -191,10 +191,12 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
     }
   }, [viewType]);
 
-  const handleMonthChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setCurrentDate(new Date(event.target.value + '-01'));
-    setIsViewingSpecificDate(false);
-    setIsMonthPickerActive(true);
+  const handleMonthChange = useCallback((date: Date | null) => {
+    if (date) {
+      setCurrentDate(date);
+      setIsViewingSpecificDate(false);
+      setIsMonthPickerActive(true);
+    }
   }, []);
 
   const handleApplyFilters = useCallback(async () => {

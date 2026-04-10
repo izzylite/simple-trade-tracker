@@ -15,12 +15,11 @@ import {
   FormControlLabel,
   Checkbox,
   CircularProgress,
-  TextField,
   Divider,
 } from '@mui/material';
-import { format } from 'date-fns';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { startOfMonth } from 'date-fns';
 import { Currency, ImpactLevel } from '../../types/economicCalendar';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
 
 const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF'];
 const IMPACTS: ImpactLevel[] = ['High', 'Medium', 'Low'];
@@ -36,7 +35,7 @@ interface EconomicCalendarFiltersProps {
   onCurrencyChange: (currency: Currency) => void;
   onImpactChange: (impact: ImpactLevel) => void;
   onUpcomingEventsChange: (checked: boolean) => void;
-  onMonthChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onMonthChange: (date: Date | null) => void;
   onApplyFilters: () => void;
   onResetFilters: () => void;
 }
@@ -61,10 +60,7 @@ const EconomicCalendarFilters: React.FC<EconomicCalendarFiltersProps> = ({
   return (
     <Collapse in={isExpanded}>
       <Box sx={{
-        maxHeight: 300,
-        overflowY: 'auto',
         borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-        ...scrollbarStyles(theme),
       }}>
 
         {/* Month */}
@@ -72,18 +68,29 @@ const EconomicCalendarFilters: React.FC<EconomicCalendarFiltersProps> = ({
           <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.7rem' }}>
             Month
           </Typography>
-          <TextField
-            type="month"
-            value={format(currentDate, 'yyyy-MM')}
+          <DatePicker
+            value={startOfMonth(currentDate)}
             onChange={onMonthChange}
-            size="small"
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-            sx={{
-              mt: 0.75,
-              '& .MuiInputBase-root': { borderRadius: 1.5, fontSize: '0.8rem' },
-              '& .MuiOutlinedInput-root': {
-                '&:hover fieldset': { borderColor: 'primary.main' },
+            views={['year', 'month']}
+            openTo="month"
+            slotProps={{
+              textField: {
+                size: 'small',
+                fullWidth: true,
+                sx: {
+                  mt: 0.75,
+                  '& .MuiInputBase-root': {
+                    borderRadius: 1.5,
+                    fontSize: '0.8rem',
+                    bgcolor: alpha(theme.palette.primary.main, 0.06),
+                  },
+                  '& .MuiOutlinedInput-root': {
+                    '& fieldset': { borderColor: alpha(theme.palette.primary.main, 0.25) },
+                    '&:hover fieldset': { borderColor: alpha(theme.palette.primary.main, 0.5) },
+                    '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+                  },
+                  '& input': { py: 0.75 },
+                },
               },
             }}
           />
