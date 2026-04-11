@@ -227,7 +227,7 @@ const SearchContent: React.FC<SearchContentProps> = ({
   }, [onTradeClick]);
 
   return (
-    <>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Search Input with Filter Button */}
       <Box sx={{
         p: 3,
@@ -699,7 +699,7 @@ const SearchContent: React.FC<SearchContentProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
-    </>
+    </Box>
   );
 };
 

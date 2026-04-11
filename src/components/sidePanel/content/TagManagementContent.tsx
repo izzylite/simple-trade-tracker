@@ -252,7 +252,7 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
   };
 
   return (
-    <Box sx={{ p: 2, ...scrollbarStyles(theme) }}>
+    <Box sx={{ p: 2, flex: 1, overflowY: 'auto', ...scrollbarStyles(theme) }}>
       {/* Add button (replaces drawer headerActions) */}
       {!isReadOnly && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>

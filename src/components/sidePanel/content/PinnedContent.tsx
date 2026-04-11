@@ -177,7 +177,7 @@ const PinnedContent: React.FC<PinnedContentProps> = ({
   };
 
   return (
-    <>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Tabs */}
       <Box sx={{ p: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
         <RoundedTabs
@@ -239,7 +239,7 @@ const PinnedContent: React.FC<PinnedContentProps> = ({
       </Box>
 
       {/* Content */}
-      <Box sx={{ flex: 1 }}>
+      <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
         {activeTab === 0 ? (
           // Pinned Trades Tab
           isLoadingPinned ? (
@@ -441,7 +441,7 @@ const PinnedContent: React.FC<PinnedContentProps> = ({
           tradeOperations={tradeOperations}
         />
       )}
-    </>
+    </Box>
   );
 };
 

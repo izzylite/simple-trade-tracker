@@ -54,10 +54,10 @@ const SidePanel: React.FC<SidePanelProps> = ({ renderView }) => {
           <Box
             sx={{
               flex: 1,
-              overflowY: 'auto',
-              overflowX: 'hidden',
+              overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
+              minHeight: 0,
             }}
           >
             {viewConfig.component}
