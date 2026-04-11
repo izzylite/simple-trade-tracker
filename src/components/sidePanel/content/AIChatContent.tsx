@@ -62,6 +62,8 @@ export interface AIChatContentProps {
   isReadOnly?: boolean;
   tradeOperations: TradeOperationsProps;
   isActive?: boolean;
+  /** When provided, starts a focused AI analysis for this trade */
+  initialTradeId?: string;
 }
 
 const AIChatContent: React.FC<AIChatContentProps> = ({
@@ -69,12 +71,19 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   calendar,
   isReadOnly = false,
   tradeOperations,
-  isActive = false
+  isActive = false,
+  initialTradeId,
 }) => {
   const { onOpenGalleryMode } = tradeOperations;
   const theme = useTheme();
   const { user } = useAuthState();
   const chatInterfaceRef = useRef<AIChatInterfaceRef>(null);
+
+  // Find the focused trade for AI analysis
+  const focusedTrade = useMemo(() => {
+    if (!initialTradeId || !trades) return undefined;
+    return trades.find(t => t.id === initialTradeId);
+  }, [initialTradeId, trades]);
 
   // Use the AI Chat hook for core functionality
   const {
@@ -101,6 +110,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   } = useAIChat({
     userId: user?.uid,
     calendar,
+    trade: focusedTrade,
     messageLimit: 50,
     autoSaveConversation: true
   });

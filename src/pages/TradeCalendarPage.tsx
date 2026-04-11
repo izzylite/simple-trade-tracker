@@ -128,8 +128,10 @@ import {
   SidePanelView,
   DayTradesView,
   EconomicCalendarView,
+  AIAnalysisView,
 } from '../contexts/SidePanelContext';
 import SidePanel from '../components/sidePanel/SidePanel';
+import AIChatContent from '../components/sidePanel/content/AIChatContent';
 import NotesContent from '../components/sidePanel/content/NotesContent';
 import SearchContent from '../components/sidePanel/content/SearchContent';
 import PinnedContent from '../components/sidePanel/content/PinnedContent';
@@ -1539,6 +1541,25 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               />
             ),
           };
+        case 'ai-analysis': {
+          const aiView = view as AIAnalysisView;
+          return {
+            title: aiView.title || 'AI Analysis',
+            component: (
+              <AIChatContent
+                trades={aiView.trades}
+                calendar={calendar!}
+                isReadOnly={isReadOnly}
+                tradeOperations={tradeOperations}
+                isActive={
+                  isPanelOpen
+                  && currentView.id === 'ai-analysis'
+                }
+                initialTradeId={aiView.tradeId}
+              />
+            ),
+          };
+        }
         case 'day-trades': {
           const dayView = view as DayTradesView;
           const dayTrades = getTradesForDate(dayView.date);
@@ -1583,7 +1604,14 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 onOpenAIChatMode={
                   isReadOnly
                     ? undefined
-                    : openGalleryModeAI
+                    : (t, tradeId, title) => {
+                      pushPanel({
+                        id: 'ai-analysis',
+                        tradeId,
+                        trades: t,
+                        title,
+                      });
+                    }
                 }
                 weekTrades={wTrades}
                 isActive={

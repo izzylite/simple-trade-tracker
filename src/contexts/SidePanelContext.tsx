@@ -1,5 +1,6 @@
 // src/contexts/SidePanelContext.tsx
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
+import { Trade } from '../types/dualWrite';
 
 // -- Types --
 
@@ -29,11 +30,11 @@ export interface DayTradesView {
   date: Date;
 }
 
-/** Deferred — will be wired when trade AI analysis is integrated into the panel */
 export interface AIAnalysisView {
   id: 'ai-analysis';
   tradeId: string;
-  tradeIds: string[];
+  trades: Trade[];
+  title?: string;
 }
 
 export interface AIChatView {
