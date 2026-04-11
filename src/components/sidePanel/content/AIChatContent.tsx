@@ -39,7 +39,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import Shimmer from '../../Shimmer';
-import AIChatInterface, { AIChatInterfaceRef } from '../../aiChat/AIChatInterface';
+import AIChatInterface, { AIChatInterfaceRef, QuestionTemplate } from '../../aiChat/AIChatInterface';
 import { AIConversation } from '../../../types/aiChat';
 import { Trade } from '../../../types/trade';
 import { Calendar } from '../../../types/calendar';
@@ -84,6 +84,41 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     if (!initialTradeId || !trades) return undefined;
     return trades.find(t => t.id === initialTradeId);
   }, [initialTradeId, trades]);
+
+  // Trade-specific question templates (when focused on a trade)
+  const tradeQuestionTemplates: QuestionTemplate[] | undefined =
+    useMemo(() => {
+      if (!focusedTrade) return undefined;
+      const name = focusedTrade.name || 'this trade';
+      const isWin = focusedTrade.trade_type === 'win';
+      const isLoss = focusedTrade.trade_type === 'loss';
+      return [
+        {
+          category: 'Trade Analysis',
+          questions: [
+            `Why did ${name} ${isWin ? 'succeed' : isLoss ? 'fail' : 'break even'}?`,
+            "What patterns do you see in this trade's setup?",
+            'Analyze the entry and exit timing for this trade',
+          ],
+        },
+        {
+          category: 'Compare & Learn',
+          questions: [
+            'Show me similar trades from my history',
+            'How does this trade compare to my winning trades?',
+            'What could I have done differently in this trade?',
+          ],
+        },
+        {
+          category: 'Risk & Management',
+          questions: [
+            'Was my position size appropriate for this trade?',
+            'Analyze the risk-reward ratio of this trade',
+            'Did I follow my trading rules on this trade?',
+          ],
+        },
+      ];
+    }, [focusedTrade]);
 
   // Use the AI Chat hook for core functionality
   const {
@@ -344,6 +379,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
               userId={user?.uid}
               calendar={calendar}
               trades={trades}
+              {...(tradeQuestionTemplates && {
+                questionTemplates: tradeQuestionTemplates,
+              })}
               onTradeClick={(tradeId, contextTrades) => {
                 if (onOpenGalleryMode) {
                   const clickedTrade =
