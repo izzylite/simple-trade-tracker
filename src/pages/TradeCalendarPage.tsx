@@ -762,6 +762,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     isOpen: isPanelOpen,
     pushPanel,
     replacePanel,
+    resetPanel,
     setOpen: setPanelOpen,
   } = useSidePanel();
 
@@ -1248,6 +1249,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       const dayTrades = tradesByDay.get(dateKey) || [];
       if (dayTrades.length > 0) {
         if (isLgUp) {
+          resetPanel();
           pushPanel({ id: 'day-trades', date: trade_date });
           setPanelOpen(true);
         } else {
@@ -1276,8 +1278,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       return;
     }
 
-    // On lg+, open day-trades in the side panel
+    // On lg+, open day-trades in the side panel (reset stack first)
     if (isLgUp) {
+      resetPanel();
       pushPanel({ id: 'day-trades', date: trade_date });
       setPanelOpen(true);
       return;
