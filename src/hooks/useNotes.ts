@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Note } from '../types/note';
 import * as notesService from '../services/notesService';
 import { logger } from '../utils/logger';
+import { supabase } from '../config/supabase';
 
 export interface UseNotesOptions {
   /**
@@ -255,6 +256,50 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
   const addNote = useCallback((note: Note) => {
     setNotes((prev) => [note, ...prev]);
   }, []);
+
+  // Real-time updates via postgres_changes
+  const channelIdRef = useRef(
+    `notes-drawer-pg-${Math.random().toString(36).slice(2, 8)}`
+  );
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(channelIdRef.current)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notes' },
+        (payload: any) => {
+          const { eventType } = payload;
+          const newNote = payload.new as Note | undefined;
+          const oldNote = payload.old as Note | undefined;
+
+          if (eventType === 'UPDATE' && newNote) {
+            // Update in-place if the note is already in the list
+            setNotes((prev) => {
+              const idx = prev.findIndex((n) => n.id === newNote.id);
+              if (idx === -1) return prev;
+              const updated = [...prev];
+              updated[idx] = { ...updated[idx], ...newNote };
+              return updated;
+            });
+          } else if (eventType === 'DELETE' && oldNote?.id) {
+            setNotes((prev) => prev.filter((n) => n.id !== oldNote.id));
+          }
+          // INSERT: skip — complex filters make it hard to know
+          // if the new note belongs in the current view.
+          // The user will see it on next open/filter change.
+        }
+      )
+      .subscribe((status: string) => {
+        logger.log(`Notes drawer channel (${channelIdRef.current}): ${status}`);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   return {
     notes,

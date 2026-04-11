@@ -10,7 +10,8 @@ interface UseRealtimeSubscriptionOptions {
   onError?: (error: string) => void;
   maxReconnectAttempts?: number;
   reconnectDelay?: number;
-  onChannelCreated?: (channel: RealtimeChannel) => void; // NEW: Configure channel before subscribing
+  onChannelCreated?: (channel: RealtimeChannel) => void;
+  privateChannel?: boolean; // Set true only for broadcast channels; postgres_changes does not need this
 }
 
 /**
@@ -33,7 +34,8 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
     onError,
     maxReconnectAttempts = 5,
     reconnectDelay = 1000,
-    onChannelCreated, // NEW: Extract callback
+    onChannelCreated,
+    privateChannel = true,
   } = options;
 
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -41,6 +43,8 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const isReconnectingRef = useRef(false);
   const isCleaningUpRef = useRef(false);
+  // Ref to break circular dep: attemptReconnect → createChannel → attemptReconnect
+  const createChannelRef = useRef<() => Promise<RealtimeChannel | null>>(async () => null);
 
 
   /**
@@ -48,14 +52,17 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
    * This prevents subscription loops as recommended by the community
    */
   const cleanupChannel = useCallback(async () => {
-    if (channelRef.current) {
+    const channel = channelRef.current;
+    if (channel) {
       logger.log(`🧹 Cleaning up channel: ${channelName}`);
+      // Clear ref immediately so the next effect run can create a fresh channel
+      // without waiting for the async removal to complete (avoids StrictMode race).
+      channelRef.current = null;
+      isCleaningUpRef.current = true;
       try {
-        isCleaningUpRef.current = true;
-        await supabase.removeChannel(channelRef.current);
+        await supabase.removeChannel(channel);
       } finally {
         isCleaningUpRef.current = false;
-        channelRef.current = null;
       }
     }
   }, [channelName]);
@@ -83,7 +90,9 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
     reconnectTimeoutRef.current = setTimeout(async () => {
       await cleanupChannel();
       isReconnectingRef.current = false;
-      // The channel will be recreated by the effect
+      // Directly recreate the channel — the effect won't re-run since
+      // its deps (channelName, enabled) haven't changed.
+      createChannelRef.current();
     }, delay);
   }, [enabled, maxReconnectAttempts, reconnectDelay, channelName, onError, cleanupChannel]);
 
@@ -106,12 +115,8 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
       logger.log(`🔐 Set realtime auth for ${channelName}`);
     }
 
-    // Create channel with private config for broadcast authorization
-    const channel = supabase.channel(channelName, {
-      config: {
-        private: true, // Required for realtime.broadcast_changes()
-      },
-    });
+    // Private channels are required for broadcast authorization but NOT for postgres_changes
+    const channel = supabase.channel(channelName, { config: { private: privateChannel } });
 
     // Allow caller to configure the channel (add event listeners) BEFORE subscribing
     if (onChannelCreated) {
@@ -154,6 +159,7 @@ export function useRealtimeSubscription(options: UseRealtimeSubscriptionOptions)
     channelRef.current = channel;
     return channel;
   }, [enabled, channelName, onSubscribed, onError, attemptReconnect, onChannelCreated]);
+  createChannelRef.current = createChannel;
 
   /**
    * Handle page visibility changes

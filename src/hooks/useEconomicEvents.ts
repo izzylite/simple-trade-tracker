@@ -9,7 +9,7 @@ import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, end
 import { EconomicEvent, Currency, ImpactLevel } from '../types/economicCalendar';
 import { economicCalendarService } from '../services/economicCalendarService';
 import { logger } from '../utils/logger';
-import { useRealtimeSubscription } from './useRealtimeSubscription';
+import { supabase } from '../config/supabase';
 
 export type ViewType = 'day' | 'week' | 'month';
 
@@ -261,39 +261,46 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, dateRange.start, dateRange.end, filterParams.currencies, filterParams.impacts, filterParams.onlyUpcoming]);
 
-  // Real-time subscription with stable callback
-  const handleRealtimeUpdate = useCallback(
-    async (payload: any) => {
-      logger.log('Real-time economic event update:', payload);
+  // Direct postgres_changes subscription (bypasses useRealtimeSubscription)
+  const dateRangeStartRef = useRef(dateRange.start);
+  const dateRangeEndRef = useRef(dateRange.end);
+  const updateEventRef = useRef(updateEvent);
+  // Unique channel name per hook instance to prevent conflicts between multiple panels
+  const channelIdRef = useRef(`economic-events-pg-${Math.random().toString(36).slice(2, 8)}`);
+  dateRangeStartRef.current = dateRange.start;
+  dateRangeEndRef.current = dateRange.end;
+  updateEventRef.current = updateEvent;
 
-      if (payload.eventType === 'UPDATE' && payload.new) {
-        const updatedEvent = payload.new as EconomicEvent;
-        const eventDate = updatedEvent.event_date;
+  useEffect(() => {
+    if (!enabled) return;
 
-        if (eventDate >= dateRange.start && eventDate <= dateRange.end) {
-          updateEvent(updatedEvent.id, updatedEvent);
+    const channelName = channelIdRef.current;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'economic_events' },
+        (payload: any) => {
+          if (payload.new) {
+            const updatedEvent = payload.new as EconomicEvent;
+            const eventDate = updatedEvent.event_date;
+            const start = dateRangeStartRef.current;
+            const end = dateRangeEndRef.current;
+
+            if (eventDate >= start && eventDate <= end) {
+              updateEventRef.current(updatedEvent.id, updatedEvent);
+            }
+          }
         }
-      }
-      // For INSERT/DELETE, do nothing
-    },
-    [dateRange.start, dateRange.end, updateEvent]
-  );
+      )
+      .subscribe((status: string) => {
+        logger.log(`Economic events channel (${channelName}): ${status}`);
+      });
 
-  // Set up real-time subscription
-  const handleChannelCreated = useCallback(
-    (channel: any) => {
-      channel.on('broadcast', { event: '*' }, handleRealtimeUpdate);
-    },
-    [handleRealtimeUpdate]
-  );
-
-  useRealtimeSubscription({
-    channelName: 'economic-events',
-    enabled: enabled && !!dateRange.start && !!dateRange.end,
-    onChannelCreated: handleChannelCreated,
-    onSubscribed: () => logger.log('Economic events subscription active'),
-    onError: (err) => logger.error('Economic events subscription error:', err),
-  });
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [enabled]);
 
   // Prevents "No events found" flash on fresh mount or when enabled transitions false→true.
   const awaitingFirstFetch = enabled && !hasCompletedFetch;

@@ -1,15 +1,15 @@
 /**
  * useReminderNotes Hook
  * Manages reminder notes data fetching and real-time updates
- * Extracted from CalendarDayReminder component
+ * Uses postgres_changes for reliable subscriptions
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { Note, DayAbbreviation } from '../../types/note';
 import { getReminderNotesForDay } from '../../services/notesService';
 import { logger } from '../../utils/logger';
-import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
+import { supabase } from '../../config/supabase';
 
 interface UseReminderNotesResult {
   notes: Note[];
@@ -25,15 +25,15 @@ export function useReminderNotes(calendarId: string): UseReminderNotesResult {
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Get current day abbreviation
   const currentDayAbbr = format(new Date(), 'EEE') as DayAbbreviation;
   const fullDayName = format(new Date(), 'EEEE');
 
-  // Load reminder notes for current day
   const loadReminderNotes = useCallback(async () => {
     setIsLoading(true);
     try {
-      const fetchedNotes = await getReminderNotesForDay(calendarId, currentDayAbbr);
+      const fetchedNotes = await getReminderNotesForDay(
+        calendarId, currentDayAbbr
+      );
       setNotes(fetchedNotes);
     } catch (error) {
       logger.error('Error loading reminder notes:', error);
@@ -43,100 +43,108 @@ export function useReminderNotes(calendarId: string): UseReminderNotesResult {
     }
   }, [calendarId, currentDayAbbr]);
 
-  // Initial load
   useEffect(() => {
     loadReminderNotes();
   }, [loadReminderNotes]);
 
-  // Helper to check if a note is a reminder for the current day
-  const isReminderForToday = useCallback((note: Note | null): boolean => {
-    if (!note || !note.is_reminder_active || note.is_archived) return false;
-    if (note.reminder_type === 'weekly' && note.reminder_days?.includes(currentDayAbbr)) {
-      return true;
-    }
-    return false;
-  }, [currentDayAbbr]);
+  const isReminderForToday = useCallback(
+    (note: Note | null): boolean => {
+      if (!note || !note.is_reminder_active || note.is_archived) {
+        return false;
+      }
+      return (
+        note.reminder_type === 'weekly' &&
+        !!note.reminder_days?.includes(currentDayAbbr)
+      );
+    },
+    [currentDayAbbr]
+  );
 
-  // Set up real-time subscription for reminder notes changes
-  useRealtimeSubscription({
-    channelName: `calendar-reminders-${calendarId}`,
-    enabled: true,
-    onChannelCreated: (channel) => {
-      logger.log(`🔧 Setting up reminder notes broadcast subscription for calendar-${calendarId}`);
+  // Refs for stable subscription callbacks
+  const isReminderForTodayRef = useRef(isReminderForToday);
+  isReminderForTodayRef.current = isReminderForToday;
+  const calendarIdRef = useRef(calendarId);
+  calendarIdRef.current = calendarId;
 
-      // Listen for INSERT events
-      channel.on(
-        'broadcast',
-        { event: 'INSERT' },
+  // Unique channel per hook instance (postgres_changes doesn't
+  // need to match a specific topic like broadcast does)
+  const channelIdRef = useRef(
+    `notes-pg-${Math.random().toString(36).slice(2, 8)}`
+  );
+
+  // Direct postgres_changes subscription
+  useEffect(() => {
+    if (!calendarId) return;
+
+    const channelName = channelIdRef.current;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notes',
+          // No filter — global notes have calendar_id=null,
+          // so we filter in the handler instead
+        },
         (payload: any) => {
-          if (payload.payload?.record) {
-            const newNote = payload.payload.record as Note;
-            logger.log(`➕ Note added via broadcast: ${newNote.id}`);
+          const { eventType } = payload;
+          const newNote = payload.new as Note | undefined;
+          const oldNote = payload.old as Note | undefined;
 
-            if (isReminderForToday(newNote)) {
+          // Allow global notes (calendar_id is null/undefined) and
+          // notes belonging to this calendar. Skip other calendars.
+          const noteCalendarId = newNote?.calendar_id;
+          if (noteCalendarId && noteCalendarId !== calendarIdRef.current) {
+            return;
+          }
+
+          if (eventType === 'INSERT' && newNote) {
+            if (isReminderForTodayRef.current(newNote)) {
               setNotes((prev) => {
-                const exists = prev.some((n) => n.id === newNote.id);
-                if (exists) return prev;
+                if (prev.some((n) => n.id === newNote.id)) return prev;
                 return [newNote, ...prev];
               });
             }
-          }
-        },
-      );
+          } else if (eventType === 'UPDATE' && newNote) {
+            const isRelevant = isReminderForTodayRef.current(newNote);
+            const wasRelevant = oldNote
+              ? isReminderForTodayRef.current(oldNote)
+              : false;
 
-      // Listen for UPDATE events
-      channel.on(
-        'broadcast',
-        { event: 'UPDATE' },
-        (payload: any) => {
-          if (payload.payload?.record) {
-            const newNote = payload.payload.record as Note;
-            const oldNote = payload.payload.old_record as Note | null;
-            logger.log(`✏️ Note updated via broadcast: ${newNote.id}`);
-
-            const isCurrentlyRelevant = isReminderForToday(newNote);
-            const wasRelevant = oldNote ? isReminderForToday(oldNote) : false;
-
-            if (isCurrentlyRelevant) {
+            if (isRelevant) {
               setNotes((prev) => {
-                const index = prev.findIndex((n) => n.id === newNote.id);
-                if (index >= 0) {
+                const idx = prev.findIndex((n) => n.id === newNote.id);
+                if (idx >= 0) {
                   const updated = [...prev];
-                  updated[index] = newNote;
+                  updated[idx] = newNote;
                   return updated;
-                } else {
-                  return [newNote, ...prev];
                 }
+                return [newNote, ...prev];
               });
-            } else if (wasRelevant && !isCurrentlyRelevant) {
-              setNotes((prev) => prev.filter((n) => n.id !== newNote.id));
+            } else if (wasRelevant && !isRelevant) {
+              setNotes((prev) =>
+                prev.filter((n) => n.id !== newNote.id)
+              );
             }
+          } else if (eventType === 'DELETE' && oldNote) {
+            setNotes((prev) =>
+              prev.filter((n) => n.id !== oldNote.id)
+            );
           }
-        },
-      );
+        }
+      )
+      .subscribe((status: string) => {
+        // eslint-disable-next-line no-console
+        console.log(`[ReminderNotes] channel ${channelName}: ${status}`);
+      });
 
-      // Listen for DELETE events
-      channel.on(
-        'broadcast',
-        { event: 'DELETE' },
-        (payload: any) => {
-          if (payload.payload?.old_record) {
-            const oldNote = payload.payload.old_record as Note;
-            logger.log(`🗑️ Note deleted via broadcast: ${oldNote.id}`);
-            setNotes((prev) => prev.filter((n) => n.id !== oldNote.id));
-          }
-        },
-      );
-    },
-    onSubscribed: () => {
-      logger.log(`✅ Reminder notes broadcast subscription ACTIVE for calendar-${calendarId}`);
-    },
-    onError: (error) => {
-      logger.error(`❌ Reminder notes broadcast subscription ERROR for calendar-${calendarId}:`, error);
-    },
-  });
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [calendarId]);
 
-  // Update a note in the local state (optimistic update)
   const updateNote = useCallback((updatedNote: Note) => {
     setNotes((prev) => {
       const index = prev.findIndex((n) => n.id === updatedNote.id);
@@ -149,7 +157,6 @@ export function useReminderNotes(calendarId: string): UseReminderNotesResult {
     });
   }, []);
 
-  // Remove a note from the local state (optimistic update)
   const removeNote = useCallback((noteId: string) => {
     setNotes((prev) => prev.filter((n) => n.id !== noteId));
   }, []);

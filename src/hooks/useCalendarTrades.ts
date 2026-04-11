@@ -706,6 +706,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
   useRealtimeSubscription({
     channelName: `calendar-${calendarId}`,
     enabled: enableRealtime && !!calendarId,
+    privateChannel: true,
     onChannelCreated: (channel) => {
       logger.log(
         `🔧 Setting up calendar broadcast subscription for calendar-${calendarId}`,
@@ -766,6 +767,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
   useRealtimeSubscription({
     channelName: `trades-${calendarId}`,
     enabled: enableRealtime && !!calendarId,
+    privateChannel: true,
     onChannelCreated: (channel) => {
       // Listen for INSERT events
       channel.on(
