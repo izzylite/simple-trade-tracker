@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -65,10 +65,24 @@ import { CalendarManagementProps } from '../App';
 import NotesDrawer from '../components/notes/NotesDrawer';
 import TrashCalendarItem from '../components/trash/TrashCalendarItem';
 import { Schedule as ScheduleIcon } from '@mui/icons-material';
+import {
+  SidePanelProvider,
+  useSidePanel,
+  SidePanelView,
+} from '../contexts/SidePanelContext';
+import SidePanel from '../components/sidePanel/SidePanel';
+import NotesContent from '../components/sidePanel/content/NotesContent';
+import AIChatContent from '../components/sidePanel/content/AIChatContent';
+import EconomicCalendarPanel
+  from '../components/economicCalendar/EconomicCalendarPanel';
+import {
+  Notes as NotesIcon,
+  SmartToy as SmartToyIcon,
+} from '@mui/icons-material';
 
 interface HomeProps extends CalendarManagementProps {}
 
-const Home: React.FC<HomeProps> = ({
+const HomeInner: React.FC<HomeProps> = ({
   calendars,
   isLoading = false,
   onCreateCalendar,
@@ -140,6 +154,15 @@ const Home: React.FC<HomeProps> = ({
 
   // Check if screen is large (xl breakpoint = 1536px+)
   const isLargeScreen = useMediaQuery(theme.breakpoints.up('xl'));
+  const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
+
+  // Side panel context (provided by SidePanelProvider wrapper)
+  const {
+    currentView,
+    isOpen: isPanelOpen,
+    replacePanel,
+    setOpen: setPanelOpen,
+  } = useSidePanel();
 
   useEffect(()=> {
     setRecentTrades(recentTrades_)
@@ -470,13 +493,88 @@ const Home: React.FC<HomeProps> = ({
     setShowLoginDialog(false);
   };
 
+  // Stub tradeOperations for side-panel components (Home has no single calendar)
+  const stubTradeOperations = useMemo(() => ({
+    onOpenGalleryMode: () => {},
+    onUpdateTradeProperty: () => Promise.resolve(undefined),
+    onEditTrade: () => {},
+    onDeleteTrade: () => Promise.resolve(),
+    onDeleteMultipleTrades: () => {},
+    onZoomImage: setZoomedImage,
+    isTradeUpdating: () => false,
+    onUpdateCalendarProperty: () => Promise.resolve(undefined),
+  }), []);
+
+  // renderView maps a SidePanelView to its title, icon, and component
+  const renderView = useCallback(
+    (view: SidePanelView) => {
+      switch (view.id) {
+        case 'notes':
+          return {
+            title: 'Notes',
+            icon: <NotesIcon fontSize="small" />,
+            component: (
+              <NotesContent
+                showCalendarPicker
+                isActive={isPanelOpen && currentView.id === 'notes'}
+              />
+            ),
+          };
+        case 'economic-calendar':
+          return {
+            title: 'Economic Calendar',
+            icon: <EventIcon fontSize="small" />,
+            component: calendars.length > 0 ? (
+              <EconomicCalendarPanel
+                calendar={calendars[0]}
+                showHeader={false}
+                enabled={isPanelOpen && currentView.id === 'economic-calendar'}
+                tradeOperations={{
+                  ...stubTradeOperations,
+                  calendarId: calendars[0].id,
+                  calendar: calendars[0],
+                }}
+                isReadOnly
+              />
+            ) : (
+              <Box sx={{ p: 3, textAlign: 'center' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Create a calendar to view economic events
+                </Typography>
+              </Box>
+            ),
+          };
+        case 'ai-chat':
+          return {
+            title: 'Chat with Orion',
+            icon: <SmartToyIcon fontSize="small" />,
+            component: (
+              <AIChatContent
+                tradeOperations={stubTradeOperations}
+                isActive={isPanelOpen && currentView.id === 'ai-chat'}
+              />
+            ),
+          };
+        default:
+          return null;
+      }
+    },
+    [
+      isPanelOpen, currentView, calendars, stubTradeOperations,
+    ]
+  );
+
   return (
     <Box
       sx={{
+        display: 'flex',
+        flexDirection: 'row',
         minHeight: '100vh',
         bgcolor: 'background.default',
       }}
     >
+      {/* Left: main content */}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
       <Box
         sx={{
           pt: { xs: 2, sm: 3, md: 4 },
@@ -844,7 +942,12 @@ const Home: React.FC<HomeProps> = ({
               }}
               onClick={() => {
                 if (!user) { setShowLoginDialog(true); return; }
-                setIsNotesDrawerOpen(true);
+                if (isLgUp) {
+                  replacePanel({ id: 'notes' });
+                  setPanelOpen(true);
+                } else {
+                  setIsNotesDrawerOpen(true);
+                }
               }}
             >
               <CardContent sx={{
@@ -888,7 +991,12 @@ const Home: React.FC<HomeProps> = ({
               }}
               onClick={() => {
                 if (!user) { setShowLoginDialog(true); return; }
-                setIsAIChatOpen(true);
+                if (isLgUp) {
+                  replacePanel({ id: 'ai-chat' });
+                  setPanelOpen(true);
+                } else {
+                  setIsAIChatOpen(true);
+                }
               }}
             >
               <CardContent sx={{
@@ -1128,7 +1236,14 @@ const Home: React.FC<HomeProps> = ({
                   fontSize: { xs: '0.8125rem', sm: '0.875rem' },
                   '&:hover': { textDecoration: 'underline' }
                 }}
-                onClick={() => setEconomicCalendarOpen(true)}
+                onClick={() => {
+                  if (isLgUp) {
+                    replacePanel({ id: 'economic-calendar' });
+                    setPanelOpen(true);
+                  } else {
+                    setEconomicCalendarOpen(true);
+                  }
+                }}
               >
                 View all
               </Typography>
@@ -1184,14 +1299,28 @@ const Home: React.FC<HomeProps> = ({
                         mb: 0
                       }
                     }}
-                    onClick={() => setEconomicCalendarOpen(true)}
+                    onClick={() => {
+                      if (isLgUp) {
+                        replacePanel({ id: 'economic-calendar' });
+                        setPanelOpen(true);
+                      } else {
+                        setEconomicCalendarOpen(true);
+                      }
+                    }}
                   >
                     <EconomicEventListItem
                       event={event}
                       px={2.5}
                       py={2}
                       showDivider={false}
-                      onClick={() => setEconomicCalendarOpen(true)}
+                      onClick={() => {
+                        if (isLgUp) {
+                          replacePanel({ id: 'economic-calendar' });
+                          setPanelOpen(true);
+                        } else {
+                          setEconomicCalendarOpen(true);
+                        }
+                      }}
                     />
                   </Card>
                 ))}
@@ -1314,51 +1443,56 @@ const Home: React.FC<HomeProps> = ({
           </Card>
       </Box>
 
-      {/* Economic Calendar Drawer */}
-      {calendars.length > 0 && (
-        <EconomicCalendarDrawer
-          open={economicCalendarOpen}
-          onClose={() => setEconomicCalendarOpen(false)}
-          calendar={calendars[0]}
-          tradeOperations={{
-            onOpenGalleryMode: () => {},
-            onUpdateTradeProperty: () => Promise.resolve(undefined),
-            onEditTrade: () => {},
-            onDeleteTrade: () => Promise.resolve(),
-            onDeleteMultipleTrades: () => {},
-            onZoomImage: setZoomedImage,
-            isTradeUpdating: () => false,
-            calendarId: calendars[0].id,
-            calendar: calendars[0],
-            onUpdateCalendarProperty: () => Promise.resolve(undefined)
-          }}
-          isReadOnly
-        />
+      {/* Drawers — only render on <lg (lg+ uses SidePanel) */}
+      {!isLgUp && (
+        <>
+          {/* Economic Calendar Drawer */}
+          {calendars.length > 0 && (
+            <EconomicCalendarDrawer
+              open={economicCalendarOpen}
+              onClose={() => setEconomicCalendarOpen(false)}
+              calendar={calendars[0]}
+              tradeOperations={{
+                onOpenGalleryMode: () => {},
+                onUpdateTradeProperty: () => Promise.resolve(undefined),
+                onEditTrade: () => {},
+                onDeleteTrade: () => Promise.resolve(),
+                onDeleteMultipleTrades: () => {},
+                onZoomImage: setZoomedImage,
+                isTradeUpdating: () => false,
+                calendarId: calendars[0].id,
+                calendar: calendars[0],
+                onUpdateCalendarProperty: () => Promise.resolve(undefined)
+              }}
+              isReadOnly
+            />
+          )}
+
+          {/* AI Chat Drawer */}
+          <AIChatDrawer
+            open={isAIChatOpen}
+            onClose={() => setIsAIChatOpen(false)}
+            tradeOperations={{
+              onOpenGalleryMode: () => {},
+              onUpdateTradeProperty: () => Promise.resolve(undefined),
+              onEditTrade: () => {},
+              onDeleteTrade: () => Promise.resolve(),
+              onDeleteMultipleTrades: () => {},
+              onZoomImage: setZoomedImage,
+              isTradeUpdating: () => false,
+              onUpdateCalendarProperty: () => Promise.resolve(undefined)
+            }}
+            isReadOnly={false}
+          />
+
+          {/* Notes Drawer */}
+          <NotesDrawer
+            open={isNotesDrawerOpen}
+            onClose={() => setIsNotesDrawerOpen(false)}
+            showCalendarPicker={true}
+          />
+        </>
       )}
-
-      {/* AI Chat Drawer - works without calendar for general queries */}
-      <AIChatDrawer
-        open={isAIChatOpen}
-        onClose={() => setIsAIChatOpen(false)}
-        tradeOperations={{
-          onOpenGalleryMode: () => {},
-          onUpdateTradeProperty: () => Promise.resolve(undefined),
-          onEditTrade: () => {},
-          onDeleteTrade: () => Promise.resolve(),
-          onDeleteMultipleTrades: () => {},
-          onZoomImage: setZoomedImage,
-          isTradeUpdating: () => false,
-          onUpdateCalendarProperty: () => Promise.resolve(undefined)
-        }}
-        isReadOnly={false}
-      />
-
-      {/* Notes Drawer - multi-calendar view with calendar picker */}
-      <NotesDrawer
-        open={isNotesDrawerOpen}
-        onClose={() => setIsNotesDrawerOpen(false)}
-        showCalendarPicker={true}
-      />
 
       {/* Trade Form Dialog - calendar selection mode */}
       {calendars.length > 0 && (
@@ -1493,7 +1627,19 @@ const Home: React.FC<HomeProps> = ({
         title="Welcome Back"
         subtitle="Sign in to continue"
       />
+      </Box>{/* end left flex content */}
+
+      {/* Right: Side Panel (lg+ only) */}
+      {isLgUp && <SidePanel renderView={renderView} />}
     </Box>
+  );
+};
+
+const Home: React.FC<HomeProps> = (props) => {
+  return (
+    <SidePanelProvider defaultView={{ id: 'notes' }}>
+      <HomeInner {...props} />
+    </SidePanelProvider>
   );
 };
 
