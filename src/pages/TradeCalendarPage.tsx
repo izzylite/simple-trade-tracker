@@ -2022,6 +2022,41 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
       </Box>{/* end main content container */}
 
+      {/* Orion FAB — sticky to bottom-right of the left content area.
+          Shifts inward automatically when the economic calendar panel opens
+          because this element is bounded by the flex: 1 left Box. */}
+      {!isReadOnly && (
+        <Box
+          sx={{
+            position: 'sticky',
+            bottom: { xs: 16, sm: 24 },
+            display: 'flex',
+            justifyContent: 'flex-end',
+            pr: { xs: 2, sm: 3 },
+            pointerEvents: 'none',
+            zIndex: 50,
+          }}
+        >
+          <Tooltip title="Orion" placement="left">
+            <Fab
+              aria-label="open ai chat"
+              onClick={handleToggleAIChat}
+              color="secondary"
+              size="medium"
+              sx={{
+                pointerEvents: 'auto',
+                width: { xs: 48, sm: 56 },
+                height: { xs: 48, sm: 56 },
+                '&:hover': { transform: 'scale(1.08)' },
+                transition: 'transform 0.2s ease'
+              }}
+            >
+              <AIIcon />
+            </Fab>
+          </Tooltip>
+        </Box>
+      )}
+
       </Box>{/* end left side content */}
 
       {/* Inline Economic Calendar Panel — always mounted, hidden on mobile */}
@@ -2210,33 +2245,6 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           </Alert>
         </Snackbar>
 
-
-        {/* AI Chat FAB - Hidden in read-only mode */}
-        {!isReadOnly && (
-          <Tooltip title="Orion" placement="left">
-            <Fab
-              aria-label="open ai chat"
-              onClick={handleToggleAIChat}
-              size="medium"
-              sx={{
-                position: 'fixed',
-                bottom: { xs: 80, sm: 96 },
-                right: { xs: 16, sm: 24 },
-                zIndex: 1200,
-                width: { xs: 48, sm: 56 },
-                height: { xs: 48, sm: 56 },
-                backgroundColor: 'transparent',
-                boxShadow: 3,
-                p: 0,
-                overflow: 'hidden',
-                '&:hover': { backgroundColor: 'transparent', transform: 'scale(1.08)' },
-                transition: 'transform 0.2s ease'
-              }}
-            >
-              <OrionIcon size="100%" />
-            </Fab>
-          </Tooltip>
-        )}
 
         {/* Economic Calendar FAB - Mobile only (lg+ uses breadcrumb button) */}
         {!isReadOnly && !isLgUp && (
