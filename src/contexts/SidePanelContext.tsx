@@ -3,43 +3,39 @@ import React, { createContext, useContext, useState, useCallback, useMemo, React
 
 // -- Types --
 
-export interface SidePanelViewBase {
-  id: string;
-  [key: string]: unknown;
-}
-
-export interface EconomicCalendarView extends SidePanelViewBase {
+export interface EconomicCalendarView {
   id: 'economic-calendar';
 }
 
-export interface NotesView extends SidePanelViewBase {
+export interface NotesView {
   id: 'notes';
 }
 
-export interface SearchView extends SidePanelViewBase {
+export interface SearchView {
   id: 'search';
 }
 
-export interface PinnedView extends SidePanelViewBase {
+export interface PinnedView {
   id: 'pinned';
 }
 
-export interface TagsView extends SidePanelViewBase {
+export interface TagsView {
   id: 'tags';
 }
 
-export interface DayTradesView extends SidePanelViewBase {
+export interface DayTradesView {
   id: 'day-trades';
   date: Date;
 }
 
-export interface AIAnalysisView extends SidePanelViewBase {
+/** Deferred — will be wired when trade AI analysis is integrated into the panel */
+export interface AIAnalysisView {
   id: 'ai-analysis';
   tradeId: string;
   tradeIds: string[];
 }
 
-export interface AIChatView extends SidePanelViewBase {
+export interface AIChatView {
   id: 'ai-chat';
 }
 
@@ -107,7 +103,10 @@ export const SidePanelProvider: React.FC<SidePanelProviderProps> = ({
   }, [defaultView]);
 
   const replacePanel = useCallback((view: SidePanelView) => {
-    setStack([view]);
+    setStack(prev => {
+      if (prev.length === 1 && prev[0].id === view.id) return prev;
+      return [view];
+    });
   }, []);
 
   const resetPanel = useCallback(() => {

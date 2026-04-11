@@ -2585,17 +2585,18 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           submitButtonText="Save"
         />
 
-      {/* Economic Calendar Drawer — always mounted so panel retains events
-           across lg+/mobile switches. open controls drawer visibility only. */}
-      <EconomicCalendarDrawer
-        open={!isLgUp && isEconomicCalendarOpen}
-        onClose={() => setIsEconomicCalendarOpen(false)}
-        calendar={calendar!}
-        payload={economicCalendarUpdatedEvent}
-        isReadOnly={isReadOnly}
-        tradeOperations={tradeOperations}
-        enabled={isEconomicCalendarOpen}
-      />
+      {/* Economic Calendar Drawer — only rendered on <lg (panel handles it on lg+) */}
+      {!isLgUp && (
+        <EconomicCalendarDrawer
+          open={isEconomicCalendarOpen}
+          onClose={() => setIsEconomicCalendarOpen(false)}
+          calendar={calendar!}
+          payload={economicCalendarUpdatedEvent}
+          isReadOnly={isReadOnly}
+          tradeOperations={tradeOperations}
+          enabled={isEconomicCalendarOpen}
+        />
+      )}
 
       {/* AI Chat Drawer */}
       <AIChatDrawer
