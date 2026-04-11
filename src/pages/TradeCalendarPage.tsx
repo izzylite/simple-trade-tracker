@@ -122,6 +122,18 @@ import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
 import { useCalendarTrades } from '../hooks/useCalendarTrades';
 import { SessionPerformanceAnalysis, TradesListDialog } from '../components/charts';
+import {
+  SidePanelProvider,
+  useSidePanel,
+  SidePanelView,
+  DayTradesView,
+} from '../contexts/SidePanelContext';
+import SidePanel from '../components/sidePanel/SidePanel';
+import NotesContent from '../components/sidePanel/content/NotesContent';
+import SearchContent from '../components/sidePanel/content/SearchContent';
+import PinnedContent from '../components/sidePanel/content/PinnedContent';
+import TagManagementContent from '../components/sidePanel/content/TagManagementContent';
+import DayTradesContent from '../components/sidePanel/content/DayTradesContent';
 
 interface TradeCalendarProps {
   // Trade CRUD operations now handled internally via useCalendarTrades hook
@@ -521,7 +533,7 @@ const CalendarDayCell = React.memo(({
   );
 });
 
-export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement => {
+const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement => {
   const {
     calendar: selectedCalendar,
     setLoading,
@@ -743,6 +755,15 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
   const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
 
+  // Side panel context (provided by SidePanelProvider wrapper)
+  const {
+    currentView,
+    isOpen: isPanelOpen,
+    pushPanel,
+    replacePanel,
+    setOpen: setPanelOpen,
+  } = useSidePanel();
+
   // Breadcrumb items
   const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => {
     // Create dropdown items from user calendars
@@ -915,8 +936,19 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
   // Economic calendar toggle handler
   const handleToggleEconomicCalendar = useCallback(() => {
-    setIsEconomicCalendarOpen(prev => !prev);
-  }, []);
+    if (isLgUp) {
+      // On lg+, toggle the side panel open/close and ensure
+      // economic-calendar is the active view
+      if (isPanelOpen && currentView.id === 'economic-calendar') {
+        setPanelOpen(false);
+      } else {
+        replacePanel({ id: 'economic-calendar' });
+        setPanelOpen(true);
+      }
+    } else {
+      setIsEconomicCalendarOpen(prev => !prev);
+    }
+  }, [isLgUp, isPanelOpen, currentView, setPanelOpen, replacePanel]);
 
   // AI Chat toggle handler
   const handleToggleAIChat = useCallback(() => {
@@ -1212,9 +1244,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     // In read-only mode, only allow viewing existing trades
     if (isReadOnly) {
       const dateKey = format(trade_date, 'yyyy-MM-dd');
-      const trades = tradesByDay.get(dateKey) || [];
-      if (trades.length > 0) {
-        setSelectedDate(trade_date);
+      const dayTrades = tradesByDay.get(dateKey) || [];
+      if (dayTrades.length > 0) {
+        if (isLgUp) {
+          pushPanel({ id: 'day-trades', date: trade_date });
+          setPanelOpen(true);
+        } else {
+          setSelectedDate(trade_date);
+        }
       }
       return;
     }
@@ -1238,6 +1275,13 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
       return;
     }
 
+    // On lg+, open day-trades in the side panel
+    if (isLgUp) {
+      pushPanel({ id: 'day-trades', date: trade_date });
+      setPanelOpen(true);
+      return;
+    }
+
     const dateKey = format(trade_date, 'yyyy-MM-dd');
     const trades = tradesByDay.get(dateKey) || [];
 
@@ -1250,7 +1294,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     else {
       setSelectedDate(trade_date);
     }
-  }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk, weeklyTarget]);
+  }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk, weeklyTarget, isLgUp, pushPanel, setPanelOpen]);
 
   const handleDayHeaderClick = useCallback((day: DayAbbreviation) => {
     if (isReadOnly || !calendarId) return;
@@ -1388,17 +1432,192 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
     calendar
   ]);
 
+  // Helper: get trades for an arbitrary date (used by day-trades panel view)
+  const getTradesForDate = useCallback((date: Date): Trade[] => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    return tradesByDay.get(dateKey) || [];
+  }, [tradesByDay]);
+
+  // renderView maps a SidePanelView to its title, icon, and component
+  const renderView = useCallback(
+    (view: SidePanelView) => {
+      switch (view.id) {
+        case 'economic-calendar':
+          return {
+            title: 'Economic Calendar',
+            icon: <EventIcon fontSize="small" />,
+            component: (
+              <EconomicCalendarPanel
+                calendar={calendar!}
+                payload={economicCalendarUpdatedEvent}
+                isReadOnly={isReadOnly}
+                tradeOperations={tradeOperations}
+                showHeader={false}
+                enabled={isPanelOpen}
+              />
+            ),
+          };
+        case 'notes':
+          return {
+            title: 'Notes',
+            icon: <NotesIcon fontSize="small" />,
+            component: (
+              <NotesContent
+                calendarId={calendarId}
+                isReadOnly={isReadOnly}
+                isActive={
+                  isPanelOpen && currentView.id === 'notes'
+                }
+                availableTradeTags={allTags}
+                pinnedEvents={calendar?.pinned_events}
+              />
+            ),
+          };
+        case 'search':
+          return {
+            title: 'Search',
+            icon: <SearchIcon fontSize="small" />,
+            component: (
+              <SearchContent
+                calendarId={calendarId!}
+                allTags={allTags}
+                isActive={
+                  isPanelOpen && currentView.id === 'search'
+                }
+                selectedTags={selectedTags}
+                onTagsChange={handleTagsChange}
+                onTradeClick={(trade) => {
+                  openGalleryMode(
+                    trades, trade.id, 'Search Results'
+                  );
+                }}
+              />
+            ),
+          };
+        case 'pinned':
+          return {
+            title: 'Pinned',
+            icon: <PinIcon fontSize="small" />,
+            component: (
+              <PinnedContent
+                calendarId={calendarId}
+                tradeOperations={tradeOperations}
+                isActive={
+                  isPanelOpen && currentView.id === 'pinned'
+                }
+                onTradeClick={(trade, allTrades, title) => {
+                  openGalleryMode(allTrades, trade.id, title);
+                }}
+              />
+            ),
+          };
+        case 'tags':
+          return {
+            title: 'Tags',
+            icon: <TagIcon fontSize="small" />,
+            component: (
+              <TagManagementContent
+                calendarId={calendarId!}
+                allTags={allTags}
+                onTagUpdated={handleTagUpdated}
+                requiredTagGroups={requiredTagGroups}
+                onUpdateCalendarProperty={
+                  onUpdateCalendarProperty
+                }
+                isReadOnly={isReadOnly}
+                calendarOwnerId={calendar?.user_id}
+                isActive={
+                  isPanelOpen && currentView.id === 'tags'
+                }
+              />
+            ),
+          };
+        case 'day-trades': {
+          const dayView = view as DayTradesView;
+          const dayTrades = getTradesForDate(dayView.date);
+          const ws = startOfWeek(
+            dayView.date, { weekStartsOn: 0 }
+          );
+          const wKey = format(ws, 'yyyy-MM-dd');
+          const wTrades =
+            weeklyStatsMap.get(wKey)?.weekTrades;
+          return {
+            title: format(dayView.date, 'MMM d, yyyy'),
+            component: (
+              <DayTradesContent
+                date={dayView.date}
+                trades={dayTrades}
+                account_balance={accountBalance}
+                onDateChange={(d) => {
+                  pushPanel({
+                    id: 'day-trades', date: d,
+                  });
+                }}
+                showAddForm={
+                  isReadOnly ? () => {} : (trade) => {
+                    if (
+                      trade !== null &&
+                      trade !== undefined
+                    ) {
+                      setNewTrade(
+                        () => createEditTradeData(trade)
+                      );
+                    }
+                    setShowAddForm({
+                      open: true,
+                      trade_date: dayView.date,
+                      editTrade: trade,
+                      createTempTrade: trade === null,
+                      showDayDialogWhenDone: false,
+                    });
+                  }
+                }
+                tradeOperations={tradeOperations}
+                onOpenAIChatMode={
+                  isReadOnly
+                    ? undefined
+                    : openGalleryModeAI
+                }
+                weekTrades={wTrades}
+                isActive={
+                  isPanelOpen
+                  && currentView.id === 'day-trades'
+                }
+                onOpenEvents={() => {
+                  replacePanel({
+                    id: 'economic-calendar',
+                  });
+                }}
+              />
+            ),
+          };
+        }
+        default:
+          return null;
+      }
+    },
+    [
+      calendar, economicCalendarUpdatedEvent, isReadOnly,
+      tradeOperations, isPanelOpen, currentView, calendarId,
+      allTags, selectedTags, handleTagsChange, trades,
+      openGalleryMode, openGalleryModeAI, handleTagUpdated,
+      requiredTagGroups, onUpdateCalendarProperty,
+      getTradesForDate, weeklyStatsMap, accountBalance,
+      pushPanel, replacePanel, setNewTrade, setShowAddForm,
+    ]
+  );
+
   const breadcrumbButtons = useMemo<BreadcrumbButton[]>(() => [], []);
 
   const breadcrumbRightContent = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-      <Tooltip title={isEconomicCalendarOpen ? 'Close Economic Calendar' : 'Economic Calendar'}>
+      <Tooltip title={(isLgUp ? isPanelOpen : isEconomicCalendarOpen) ? 'Close Economic Calendar' : 'Economic Calendar'}>
         <IconButton
           size="small"
           onClick={handleToggleEconomicCalendar}
           sx={{
-            color: isEconomicCalendarOpen ? 'primary.main' : 'text.secondary',
-            bgcolor: isEconomicCalendarOpen ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+            color: (isLgUp ? isPanelOpen : isEconomicCalendarOpen) ? 'primary.main' : 'text.secondary',
+            bgcolor: (isLgUp ? isPanelOpen : isEconomicCalendarOpen) ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
             '&:hover': { color: 'text.primary' },
           }}
         >
@@ -1731,7 +1950,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                 <Tooltip title="Notes for this calendar" arrow>
                   <Button
                     startIcon={<NotesIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                    onClick={() => setIsNotesDrawerOpen(true)}
+                    onClick={() => {
+                      if (isLgUp) {
+                        replacePanel({ id: 'notes' });
+                        setPanelOpen(true);
+                      } else {
+                        setIsNotesDrawerOpen(true);
+                      }
+                    }}
                     variant="outlined"
                     size="small"
                     sx={{
@@ -1770,7 +1996,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
               }}>
                 <Button
                   startIcon={<PinIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                  onClick={() => setPinnedTradesDrawerOpen(true)}
+                  onClick={() => {
+                    if (isLgUp) {
+                      replacePanel({ id: 'pinned' });
+                      setPanelOpen(true);
+                    } else {
+                      setPinnedTradesDrawerOpen(true);
+                    }
+                  }}
                   variant={"outlined"}
                   size="small"
                   sx={{
@@ -1802,7 +2035,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                   allTags={allTags}
                   selectedTags={selectedTags}
                   onTagsChange={handleTagsChange}
-                  onOpenDrawer={() => setIsSearchDrawerOpen(true)}
+                  onOpenDrawer={() => {
+                    if (isLgUp) {
+                      replacePanel({ id: 'search' });
+                      setPanelOpen(true);
+                    } else {
+                      setIsSearchDrawerOpen(true);
+                    }
+                  }}
                 />
 
                 <Tooltip title={isReadOnly ? "View tags and definitions" : "Manage tags and required tag groups"} arrow>
@@ -1810,7 +2050,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
                     variant="outlined"
                     size="small"
                     startIcon={<TagIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                    onClick={() => setIsTagManagementDrawerOpen(true)}
+                    onClick={() => {
+                      if (isLgUp) {
+                        replacePanel({ id: 'tags' });
+                        setPanelOpen(true);
+                      } else {
+                        setIsTagManagementDrawerOpen(true);
+                      }
+                    }}
                     sx={{
                       flex: { xs: 1, sm: 'none' },
                       minWidth: { xs: 'auto', sm: '120px' },
@@ -2059,53 +2306,37 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
       </Box>{/* end left side content */}
 
-      {/* Inline Economic Calendar Panel — always mounted, hidden on mobile */}
-      <Box sx={{
-        display: isLgUp ? 'block' : 'none',
-        width: isEconomicCalendarOpen ? 'clamp(300px, 25vw, 420px)' : 0,
-        overflow: 'hidden',
-        transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        flexShrink: 0,
-        height: '100%',
-        borderLeft: isEconomicCalendarOpen
-          ? `1px solid ${alpha(theme.palette.divider, 0.1)}`
-          : 'none',
-      }}>
-        <EconomicCalendarPanel
-          calendar={calendar!}
-          payload={economicCalendarUpdatedEvent}
-          isReadOnly={isReadOnly}
-          tradeOperations={tradeOperations}
-          onCollapse={() => setIsEconomicCalendarOpen(false)}
-          showHeader={false}
-          enabled={isEconomicCalendarOpen}
-        />
-      </Box>
+      {/* Side Panel — lg+ only, replaces inline economic calendar */}
+      {isLgUp && (
+        <SidePanel renderView={renderView} />
+      )}
 
       </Box>{/* end page layout flex row */}
 
-        <DayDialog
-          open={!!selectedDate && !showAddForm?.open}
-          onClose={() => {
-            setSelectedDate(null);
-          }}
-          showAddForm={isReadOnly ? () => { } : (trade) => {
-            if (trade !== null) {
-              setNewTrade(() => (createEditTradeData(trade!!)));
+        {!isLgUp && (
+          <DayDialog
+            open={!!selectedDate && !showAddForm?.open}
+            onClose={() => {
+              setSelectedDate(null);
+            }}
+            showAddForm={isReadOnly ? () => { } : (trade) => {
+              if (trade !== null) {
+                setNewTrade(() => (createEditTradeData(trade!!)));
+              }
+              setShowAddForm({ open: true, trade_date: selectedDate!!, editTrade: trade, createTempTrade: trade === null, showDayDialogWhenDone: true });
+            }}
+            date={selectedDate || new Date()}
+            trades={selectedDate ? tradesForSelectedDay : []}
+            onDateChange={handleDayChange}
+            account_balance={accountBalance}
+            tradeOperations={tradeOperations}
+            onOpenAIChatMode={isReadOnly ? undefined : openGalleryModeAI}
+            weekTrades={selectedDate
+              ? weeklyStatsMap.get(format(startOfWeek(selectedDate, { weekStartsOn: 0 }), 'yyyy-MM-dd'))?.weekTrades
+              : undefined
             }
-            setShowAddForm({ open: true, trade_date: selectedDate!!, editTrade: trade, createTempTrade: trade === null, showDayDialogWhenDone: true });
-          }}
-          date={selectedDate || new Date()}
-          trades={selectedDate ? tradesForSelectedDay : []}
-          onDateChange={handleDayChange}
-          account_balance={accountBalance}
-          tradeOperations={tradeOperations}
-          onOpenAIChatMode={isReadOnly ? undefined : openGalleryModeAI}
-          weekTrades={selectedDate
-            ? weeklyStatsMap.get(format(startOfWeek(selectedDate, { weekStartsOn: 0 }), 'yyyy-MM-dd'))?.weekTrades
-            : undefined
-          }
-        />
+          />
+        )}
 
 
         {!isReadOnly && (
@@ -2171,19 +2402,21 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
 
 
 
-        {/* Drawers */}
+        {/* Drawers — only render on <lg (lg+ uses SidePanel) */}
 
-        <TagManagementDrawer
-          open={isTagManagementDrawerOpen}
-          onClose={() => setIsTagManagementDrawerOpen(false)}
-          allTags={allTags}
-          calendarId={calendarId!!}
-          onTagUpdated={handleTagUpdated}
-          requiredTagGroups={requiredTagGroups}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
-          isReadOnly={isReadOnly}
-          calendarOwnerId={calendar?.user_id}
-        />
+        {!isLgUp && (
+          <TagManagementDrawer
+            open={isTagManagementDrawerOpen}
+            onClose={() => setIsTagManagementDrawerOpen(false)}
+            allTags={allTags}
+            calendarId={calendarId!!}
+            onTagUpdated={handleTagUpdated}
+            requiredTagGroups={requiredTagGroups}
+            onUpdateCalendarProperty={onUpdateCalendarProperty}
+            isReadOnly={isReadOnly}
+            calendarOwnerId={calendar?.user_id}
+          />
+        )}
 
         {/* Snackbar for notifications */}
         <TagManagementDialog
@@ -2269,8 +2502,8 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         )}
 
 
-        {/* Search & Filter Drawer */}
-        {calendar && calendarId && (
+        {/* Search & Filter Drawer — <lg only */}
+        {!isLgUp && calendar && calendarId && (
           <SearchDrawer
             open={isSearchDrawerOpen}
             onClose={() => setIsSearchDrawerOpen(false)}
@@ -2286,18 +2519,20 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
           />
         )}
 
-        {/* Pinned Trades Drawer */}
-        <PinnedTradesDrawer
-          open={pinnedTradesDrawerOpen}
-          onClose={() => setPinnedTradesDrawerOpen(false)}
-          calendarId={calendarId}
-          onTradeClick={(trade, allTrades, title) => {
-            // Close drawer and open the trade in gallery mode
-            setPinnedTradesDrawerOpen(false);
-            openGalleryMode(allTrades, trade.id, title);
-          }}
-          tradeOperations={tradeOperations}
-        />
+        {/* Pinned Trades Drawer — <lg only */}
+        {!isLgUp && (
+          <PinnedTradesDrawer
+            open={pinnedTradesDrawerOpen}
+            onClose={() => setPinnedTradesDrawerOpen(false)}
+            calendarId={calendarId}
+            onTradeClick={(trade, allTrades, title) => {
+              // Close drawer and open the trade in gallery mode
+              setPinnedTradesDrawerOpen(false);
+              openGalleryMode(allTrades, trade.id, title);
+            }}
+            tradeOperations={tradeOperations}
+          />
+        )}
 
         {/* Trade Gallery Dialog */}
         <TradeGalleryDialog
@@ -2351,15 +2586,17 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         tradeOperations={tradeOperations}
       />
 
-      {/* Notes Drawer */}
-      <NotesDrawer
-        open={isNotesDrawerOpen}
-        onClose={() => setIsNotesDrawerOpen(false)}
-        calendarId={calendarId}
-        isReadOnly={isReadOnly}
-        availableTradeTags={allTags}
-        pinnedEvents={calendar.pinned_events}
-      />
+      {/* Notes Drawer — <lg only */}
+      {!isLgUp && (
+        <NotesDrawer
+          open={isNotesDrawerOpen}
+          onClose={() => setIsNotesDrawerOpen(false)}
+          calendarId={calendarId}
+          isReadOnly={isReadOnly}
+          availableTradeTags={allTags}
+          pinnedEvents={calendar.pinned_events}
+        />
+      )}
 
       {/* Week Note Editor */}
       {weekNoteDialog && (
@@ -2467,6 +2704,14 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props): React.ReactElement
         ))}
       </Box>
     </Box>
+  );
+};
+
+export const TradeCalendar: FC<TradeCalendarProps> = (props) => {
+  return (
+    <SidePanelProvider defaultView={{ id: 'economic-calendar' }}>
+      <TradeCalendarInner {...props} />
+    </SidePanelProvider>
   );
 };
 
