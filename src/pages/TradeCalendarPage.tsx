@@ -127,6 +127,7 @@ import {
   useSidePanel,
   SidePanelView,
   DayTradesView,
+  EconomicCalendarView,
 } from '../contexts/SidePanelContext';
 import SidePanel from '../components/sidePanel/SidePanel';
 import NotesContent from '../components/sidePanel/content/NotesContent';
@@ -1442,7 +1443,8 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const renderView = useCallback(
     (view: SidePanelView) => {
       switch (view.id) {
-        case 'economic-calendar':
+        case 'economic-calendar': {
+          const ecView = view as EconomicCalendarView;
           return {
             title: 'Economic Calendar',
             icon: <EventIcon fontSize="small" />,
@@ -1454,9 +1456,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 tradeOperations={tradeOperations}
                 showHeader={false}
                 enabled={isPanelOpen}
+                initialDate={ecView.initialDate}
               />
             ),
           };
+        }
         case 'notes':
           return {
             title: 'Notes',
@@ -1586,6 +1590,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 onOpenEvents={() => {
                   pushPanel({
                     id: 'economic-calendar',
+                    initialDate: dayView.date,
                   });
                 }}
                 compact

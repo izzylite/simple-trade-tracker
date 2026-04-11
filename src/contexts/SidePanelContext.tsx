@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useCallback, useMemo, React
 
 export interface EconomicCalendarView {
   id: 'economic-calendar';
+  initialDate?: Date;
 }
 
 export interface NotesView {
