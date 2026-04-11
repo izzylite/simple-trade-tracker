@@ -1673,6 +1673,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         display: 'flex', flexDirection: 'row',
         height: (theme: Theme) => `calc(100vh - ${theme.spacing(8)})`,
         overflow: 'hidden',
+        position: 'relative',
       }}>
 
       {/* Left side: hero, breadcrumbs, and main content */}
@@ -2309,6 +2310,26 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       {/* Side Panel — lg+ only, replaces inline economic calendar */}
       {isLgUp && (
         <SidePanel renderView={renderView} />
+      )}
+
+      {isLgUp && !isPanelOpen && (
+        <IconButton
+          onClick={() => setPanelOpen(true)}
+          sx={{
+            position: 'absolute',
+            right: 0,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            bgcolor: 'background.paper',
+            border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
+            borderRight: 'none',
+            borderRadius: '8px 0 0 8px',
+            '&:hover': { bgcolor: 'action.hover' },
+          }}
+          aria-label="Expand panel"
+        >
+          <ChevronLeft fontSize="small" />
+        </IconButton>
       )}
 
       </Box>{/* end page layout flex row */}

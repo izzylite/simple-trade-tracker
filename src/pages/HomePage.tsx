@@ -25,7 +25,8 @@ import {
   Edit as EditIcon,
   SmartToy as AIIcon,
   DeleteOutline as TrashIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  ChevronLeft as ChevronLeftIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { Calendar } from '../types/calendar';
@@ -571,6 +572,7 @@ const HomeInner: React.FC<HomeProps> = ({
         flexDirection: 'row',
         minHeight: '100vh',
         bgcolor: 'background.default',
+        position: 'relative',
       }}
     >
       {/* Left: main content */}
@@ -1631,6 +1633,26 @@ const HomeInner: React.FC<HomeProps> = ({
 
       {/* Right: Side Panel (lg+ only) */}
       {isLgUp && <SidePanel renderView={renderView} />}
+
+      {isLgUp && !isPanelOpen && (
+        <IconButton
+          onClick={() => setPanelOpen(true)}
+          sx={{
+            position: 'absolute',
+            right: 0,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            bgcolor: 'background.paper',
+            border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
+            borderRight: 'none',
+            borderRadius: '8px 0 0 8px',
+            '&:hover': { bgcolor: 'action.hover' },
+          }}
+          aria-label="Expand panel"
+        >
+          <ChevronLeftIcon fontSize="small" />
+        </IconButton>
+      )}
     </Box>
   );
 };
