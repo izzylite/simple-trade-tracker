@@ -497,7 +497,7 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
         open={!!mention?.open}
         anchorEl={anchorEl}
         placement="top-start"
-        sx={{ zIndex: Z_INDEX.DIALOG }}
+        sx={{ zIndex: Z_INDEX.RICH_TEXT_MENU }}
       >
         <Paper
           elevation={8}
