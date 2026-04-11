@@ -257,7 +257,12 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   };
 
   return (
-    <>
+    <Box sx={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      overflow: 'hidden',
+    }}>
       {/* Header Action Bar */}
       <Box sx={{
         display: 'flex',
@@ -266,6 +271,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
         gap: 1,
         px: 1,
         py: 0.5,
+        flexShrink: 0,
         borderBottom: `1px solid ${theme.palette.divider}`
       }}>
         {calendar && (
@@ -816,7 +822,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
           }}
         />
       )}
-    </>
+    </Box>
   );
 };
 
