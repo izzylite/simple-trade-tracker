@@ -4,8 +4,18 @@
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Box, Button, Tooltip } from '@mui/material';
-import { Event as EventIcon } from '@mui/icons-material';
+import {
+  Box,
+  Button,
+  Tooltip,
+  alpha,
+  useTheme,
+} from '@mui/material';
+import {
+  Event as EventIcon,
+  ViewCarousel as GalleryIcon,
+  Add as AddIcon,
+} from '@mui/icons-material';
 import { format, isAfter, startOfDay } from 'date-fns';
 import { Trade } from '../../../types/dualWrite';
 import { DayHeader, TradeList, ProgressSection } from '../../trades';
@@ -28,6 +38,10 @@ export interface DayTradesContentProps {
   isActive?: boolean;
   /** Optional: when provided, used for "View Events" button instead of opening internal drawer */
   onOpenEvents?: () => void;
+  /** Compact mode for side panel — smaller text and spacing */
+  compact?: boolean;
+  /** Callback to open gallery mode (for panel footer) */
+  onGalleryClick?: () => void;
 }
 
 const DayTradesContent: React.FC<DayTradesContentProps> = ({
@@ -41,11 +55,15 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
   weekTrades,
   isActive = true,
   onOpenEvents,
+  compact = false,
+  onGalleryClick,
 }) => {
+  const theme = useTheme();
   const {
     calendarId,
     calendar,
     isReadOnly = false,
+    onOpenGalleryMode,
   } = tradeOperations;
 
   // State
@@ -154,33 +172,36 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
     onOpenAIChat: onOpenAIChatMode ? handleOpenAIChat : undefined,
   }), [tradeOperations, isReadOnly, handleEditClick, onOpenAIChatMode, handleOpenAIChat]);
 
+  const handleGalleryClick = useCallback(() => {
+    if (onGalleryClick) {
+      onGalleryClick();
+    } else if (onOpenGalleryMode && trades && trades.length > 0) {
+      const title = `${format(date, 'EEEE, MMMM d, yyyy')} - ${trades.length} Trade${trades.length > 1 ? 's' : ''}`;
+      onOpenGalleryMode(trades, expandedTradeId || trades[0].id, title);
+    }
+  }, [onGalleryClick, onOpenGalleryMode, trades, date, expandedTradeId]);
+
   return (
-    <>
-      <Box sx={{ p: 3 }}>
+    <Box sx={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+    }}>
+      <Box sx={{
+        flex: 1,
+        overflowY: 'auto',
+        p: compact ? 2 : 3,
+      }}>
         <DayHeader
-          title={format(date, 'EEEE, MMMM d, yyyy')}
+          title={format(date, compact ? 'EEE, MMM d, yyyy' : 'EEEE, MMMM d, yyyy')}
           account_balance={account_balance + cumulativePnL}
           formInputVisible={false}
           total_pnl={dayTotalPnL}
           onPrevDay={handlePrevDay}
           onNextDay={handleNextDay}
           loading={isBalanceLoading}
+          compact={compact}
         />
-
-        {calendar && (
-          <Box sx={{ mb: 2 }}>
-            <Tooltip title="View economic events for this day">
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<EventIcon />}
-                onClick={handleOpenEventsDrawer}
-              >
-                Events
-              </Button>
-            </Tooltip>
-          </Box>
-        )}
 
         {calendarId && calendar && (
           <ProgressSection
@@ -202,6 +223,52 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
         />
       </Box>
 
+      {/* Footer — Events, Gallery, Add Trade */}
+      <Box sx={{
+        p: 1.5,
+        borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+        bgcolor: 'background.paper',
+        display: 'flex',
+        justifyContent: 'flex-end',
+        gap: 1,
+        flexShrink: 0,
+      }}>
+        {calendar && (
+          <Tooltip title="View economic events for this day">
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<EventIcon />}
+              onClick={handleOpenEventsDrawer}
+            >
+              Events
+            </Button>
+          </Tooltip>
+        )}
+        {onOpenGalleryMode && tradesLength > 0 && (
+          <Tooltip title="View trades in gallery mode">
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<GalleryIcon />}
+              onClick={handleGalleryClick}
+            >
+              Gallery
+            </Button>
+          </Tooltip>
+        )}
+        {!isReadOnly && (
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={handleAddClick}
+          >
+            Add Trade
+          </Button>
+        )}
+      </Box>
+
       {calendar && !onOpenEvents && (
         <EconomicCalendarDrawer
           open={eventsDrawerOpen}
@@ -212,7 +279,7 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
           initialDate={date}
         />
       )}
-    </>
+    </Box>
   );
 };
 

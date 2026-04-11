@@ -1588,6 +1588,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                     id: 'economic-calendar',
                   });
                 }}
+                compact
               />
             ),
           };

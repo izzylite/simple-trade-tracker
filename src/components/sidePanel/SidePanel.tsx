@@ -56,6 +56,8 @@ const SidePanel: React.FC<SidePanelProps> = ({ renderView }) => {
               flex: 1,
               overflowY: 'auto',
               overflowX: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             {viewConfig.component}

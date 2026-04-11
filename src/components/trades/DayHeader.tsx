@@ -18,6 +18,8 @@ interface DayHeaderProps {
   onPrevDay: () => void;
   onNextDay: () => void;
   loading?: boolean;
+  /** Compact mode for side panel — smaller text */
+  compact?: boolean;
 }
 
 const DayHeader: React.FC<DayHeaderProps> = ({
@@ -27,37 +29,43 @@ const DayHeader: React.FC<DayHeaderProps> = ({
   title,
   onPrevDay,
   onNextDay,
-  loading = false
+  loading = false,
+  compact = false
 }) => {
   const theme = useTheme();
   
    
   
   return (
-    <Box sx={{ mb: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+    <Box sx={{ mb: compact ? 2 : 3 }}>
+      <Box sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        mb: compact ? 1.5 : 2
+      }}>
         {!formInputVisible && <IconButton onClick={onPrevDay} size="small">
-          <ChevronLeft />
+          <ChevronLeft fontSize={compact ? 'small' : 'medium'} />
         </IconButton>}
-        
-        
-        {title && <Typography variant="h6" sx={{ fontWeight: 600 }}>
+
+        {title && <Typography
+          variant={compact ? 'subtitle2' : 'h6'}
+          sx={{ fontWeight: 600 }}
+        >
           {title}
         </Typography>}
-        
+
         {!formInputVisible && <IconButton onClick={onNextDay} size="small">
-          <ChevronRight />
+          <ChevronRight fontSize={compact ? 'small' : 'medium'} />
         </IconButton>
         }
       </Box>
-      
-      <Box sx={{ display: 'flex', gap: 2 }}>
-       
-        
+
+      <Box sx={{ display: 'flex', gap: compact ? 1.5 : 2 }}>
         <Box
           sx={{
             flex: 1,
-            p: 2,
+            p: compact ? 1.5 : 2,
             borderRadius: 1,
             bgcolor: total_pnl >= 0
               ? alpha(theme.palette.success.main, 0.1)
@@ -68,14 +76,19 @@ const DayHeader: React.FC<DayHeaderProps> = ({
               : alpha(theme.palette.error.main, 0.2)
           }}
         >
-          <Typography variant="body2" color="text.secondary">
+          <Typography
+            variant={compact ? 'caption' : 'body2'}
+            color="text.secondary"
+          >
             Day P&L
           </Typography>
           {loading ? (
-            <Skeleton variant="text" width={100} sx={{ fontSize: '1.25rem' }} />
+            <Skeleton variant="text" width={compact ? 80 : 100}
+              sx={{ fontSize: compact ? '0.95rem' : '1.25rem' }}
+            />
           ) : (
             <Typography
-              variant="h6"
+              variant={compact ? 'body1' : 'h6'}
               sx={{
                 fontWeight: 600,
                 color: total_pnl >= 0
@@ -91,20 +104,28 @@ const DayHeader: React.FC<DayHeaderProps> = ({
         <Box
           sx={{
             flex: 1,
-            p: 2,
+            p: compact ? 1.5 : 2,
             borderRadius: 1,
             bgcolor: alpha(theme.palette.primary.main, 0.1),
             border: '1px solid',
             borderColor: alpha(theme.palette.primary.main, 0.2)
           }}
         >
-          <Typography variant="body2" color="text.secondary">
+          <Typography
+            variant={compact ? 'caption' : 'body2'}
+            color="text.secondary"
+          >
             Balance Of The Day
           </Typography>
           {loading ? (
-            <Skeleton variant="text" width={120} sx={{ fontSize: '1.25rem' }} />
+            <Skeleton variant="text" width={compact ? 90 : 120}
+              sx={{ fontSize: compact ? '0.95rem' : '1.25rem' }}
+            />
           ) : (
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            <Typography
+              variant={compact ? 'body1' : 'h6'}
+              sx={{ fontWeight: 600 }}
+            >
               ${account_balance.toLocaleString()}
             </Typography>
           )}
