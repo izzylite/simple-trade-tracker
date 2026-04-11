@@ -1584,7 +1584,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                   && currentView.id === 'day-trades'
                 }
                 onOpenEvents={() => {
-                  replacePanel({
+                  pushPanel({
                     id: 'economic-calendar',
                   });
                 }}
