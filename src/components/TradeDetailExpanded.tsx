@@ -854,7 +854,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <CalendarIcon sx={{ fontSize: 18, color: 'primary.main' }} />
                       <Typography variant="caption" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                        Date
+                        {format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'EEEE')}
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
@@ -864,13 +864,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       }}>
                         {format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'MMMM d, yyyy')}
                       </Typography>
-                      <Typography variant="caption" sx={{
-                        fontWeight: 600,
-                        color: 'primary.main',
-                        fontSize: '0.75rem'
-                      }}>
-                        {format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'EEEE')}
-                      </Typography>
+                      
                     </Box>
                   </Paper>
 
