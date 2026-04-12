@@ -1470,29 +1470,32 @@ const HomeInner: React.FC<HomeProps> = ({
             />
           )}
 
-          {/* AI Chat Drawer */}
-          <AIChatDrawer
-            open={isAIChatOpen}
-            onClose={() => setIsAIChatOpen(false)}
-            tradeOperations={{
-              onOpenGalleryMode: () => {},
-              onUpdateTradeProperty: () => Promise.resolve(undefined),
-              onEditTrade: () => {},
-              onDeleteTrade: () => Promise.resolve(),
-              onDeleteMultipleTrades: () => {},
-              onZoomImage: setZoomedImage,
-              isTradeUpdating: () => false,
-              onUpdateCalendarProperty: () => Promise.resolve(undefined)
-            }}
-            isReadOnly={false}
-          />
+          {/* Drawers — <lg only (panel handles these on lg+) */}
+          {!isLgUp && (
+            <>
+              <AIChatDrawer
+                open={isAIChatOpen}
+                onClose={() => setIsAIChatOpen(false)}
+                tradeOperations={{
+                  onOpenGalleryMode: () => {},
+                  onUpdateTradeProperty: () => Promise.resolve(undefined),
+                  onEditTrade: () => {},
+                  onDeleteTrade: () => Promise.resolve(),
+                  onDeleteMultipleTrades: () => {},
+                  onZoomImage: setZoomedImage,
+                  isTradeUpdating: () => false,
+                  onUpdateCalendarProperty: () => Promise.resolve(undefined)
+                }}
+                isReadOnly={false}
+              />
 
-          {/* Notes Drawer */}
-          <NotesDrawer
-            open={isNotesDrawerOpen}
-            onClose={() => setIsNotesDrawerOpen(false)}
-            showCalendarPicker={true}
-          />
+              <NotesDrawer
+                open={isNotesDrawerOpen}
+                onClose={() => setIsNotesDrawerOpen(false)}
+                showCalendarPicker={true}
+              />
+            </>
+          )}
         </>
       )}
 
