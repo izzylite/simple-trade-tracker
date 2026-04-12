@@ -298,6 +298,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
               value={selectedCalendarId}
               onChange={(e) => onCalendarChange(e.target.value)}
               displayEmpty
+              MenuProps={{ sx: { zIndex: Z_INDEX.DIALOG_POPUP } }}
               sx={{
                 borderRadius: 1,
                 bgcolor: 'background.default',
