@@ -74,17 +74,15 @@ const SidePanelContext = createContext<SidePanelContextValue | null>(null);
 
 interface SidePanelProviderProps {
   defaultView: SidePanelView;
-  initialOpen?: boolean;
   children: ReactNode;
 }
 
 export const SidePanelProvider: React.FC<SidePanelProviderProps> = ({
   defaultView,
-  initialOpen = false,
   children,
 }) => {
   const [stack, setStack] = useState<SidePanelView[]>([defaultView]);
-  const [isOpen, setIsOpen] = useState(initialOpen);
+  const [isOpen, setIsOpen] = useState(true);
 
   const pushPanel = useCallback((view: SidePanelView) => {
     setStack(prev => {

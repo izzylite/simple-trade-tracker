@@ -704,8 +704,8 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const [isCalendarEditOpen, setIsCalendarEditOpen] = useState(false);
   const [isCalendarEditSubmitting, setIsCalendarEditSubmitting] = useState(false);
 
-  // Economic calendar drawer state
-  const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(true);
+  // Economic calendar drawer state (<lg only — panel handles lg+)
+  const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(false);
 
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
