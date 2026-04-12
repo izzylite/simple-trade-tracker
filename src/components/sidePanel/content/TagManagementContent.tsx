@@ -455,9 +455,7 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
                                 definitionsLoading && !definitionsLoaded ? (
                                   <Box sx={{ mt: 0.75, ml: 0.5 }}>
                                     <Shimmer height={9} borderRadius={4} intensity="low" sx={{ mb: 0.5 }} />
-                                    <Shimmer height={9} borderRadius={4} intensity="low" width="85%"
-                                      sx={{ mb: 0.5 }} />
-                                    <Shimmer height={9} borderRadius={4} intensity="low" width="55%" />
+                                   <Shimmer height={9} borderRadius={4} intensity="low" sx={{ mb: 0.5 }} />
                                   </Box>
                                 ) : (
                                   <Typography

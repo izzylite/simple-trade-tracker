@@ -406,7 +406,7 @@ const TagFilter = React.memo<TagFilterProps>(({ allTags, selectedTags, onTagsCha
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
         >
-          {selectedTags.length > 0 ? `${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''}` : 'Search & Filter'}
+          {selectedTags.length > 0 ? `${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''}` : 'Filter'}
         </Button>
       </Tooltip>
 
