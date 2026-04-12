@@ -162,13 +162,17 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
       inputRef.current?.focus();
     },
     scrollToBottom: () => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const el = messagesAreaRef.current;
+      if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     }
   }));
 
   // Auto-scroll to bottom whenever messages change
+  // Uses scrollTo on the messages container instead of scrollIntoView
+  // to prevent ancestor containers from being scrolled
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesAreaRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, []);
 
   useEffect(() => {

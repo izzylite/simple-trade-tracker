@@ -44,6 +44,7 @@ const SidePanel: React.FC<SidePanelProps> = ({ renderView }) => {
             flexDirection: 'column',
             height: '100%',
             minWidth: 'clamp(300px, 25vw, 420px)',
+            overflow: 'hidden',
           }}
         >
           <SidePanelHeader
@@ -58,6 +59,7 @@ const SidePanel: React.FC<SidePanelProps> = ({ renderView }) => {
               display: 'flex',
               flexDirection: 'column',
               minHeight: 0,
+              overscrollBehavior: 'contain',
             }}
           >
             {viewConfig.component}
