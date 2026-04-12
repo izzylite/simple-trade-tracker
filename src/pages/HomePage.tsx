@@ -518,6 +518,7 @@ const HomeInner: React.FC<HomeProps> = ({
               <NotesContent
                 showCalendarPicker
                 isActive={isPanelOpen && currentView.id === 'notes'}
+                showFooter={false}
               />
             ),
           };
