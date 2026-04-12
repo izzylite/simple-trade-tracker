@@ -77,6 +77,36 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
     };
   }, [scrollContainerRef]);
 
+  // Track the right offset so the nav stays within the main content area
+  // (not overlapping the side panel)
+  const [rightOffset, setRightOffset] = useState(24);
+  useEffect(() => {
+    const container = scrollContainerRef?.current;
+    const updateOffset = () => {
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const viewportRight = window.innerWidth - rect.right;
+        setRightOffset(viewportRight + 16);
+      } else {
+        setRightOffset(24);
+      }
+    };
+    updateOffset();
+    window.addEventListener('resize', updateOffset);
+
+    // Observe container resize (panel open/close changes width)
+    let observer: ResizeObserver | null = null;
+    if (container) {
+      observer = new ResizeObserver(updateOffset);
+      observer.observe(container);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateOffset);
+      observer?.disconnect();
+    };
+  }, [scrollContainerRef]);
+
   const finalVisible = isVisible && !hideByTopScroll;
 
   return (
@@ -85,7 +115,7 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
         sx={{
           position: 'fixed',
           top: { xs: 80, sm: 88 },
-          right: { xs: 16, sm: 24 },
+          right: `${rightOffset}px`,
           zIndex: 1300,
           display: 'flex',
           flexDirection: 'column',
