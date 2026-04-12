@@ -570,14 +570,14 @@ const HomeInner: React.FC<HomeProps> = ({
       sx={{
         display: 'flex',
         flexDirection: 'row',
-        height: '100vh',
+        height: `calc(100vh - ${theme.spacing(8)})`,
         overflow: 'hidden',
         bgcolor: 'background.default',
         position: 'relative',
       }}
     >
       {/* Left: main content (independent scroll) */}
-      <Box sx={{ flex: 1, minWidth: 0, height: '100%', overflowY: 'auto' }}>
+      <Box sx={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
       <Box
         sx={{
           pt: { xs: 2, sm: 3, md: 4 },
