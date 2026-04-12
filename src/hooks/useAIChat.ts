@@ -783,9 +783,7 @@ What would you like to know about this trade?`,
       ? `You're working with the "${calendar.name}" calendar. `
       : 'You can ask me about your trading performance across all your calendars. ';
 
-    const historyNote = !calendar
-      ? '\n\n📝 Note: Conversation history is only available when working with a specific calendar.'
-      : '';
+    const historyNote = '';
 
     return {
       id: 'welcome',

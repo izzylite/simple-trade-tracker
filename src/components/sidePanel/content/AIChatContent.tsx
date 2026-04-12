@@ -280,7 +280,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
         flexShrink: 0,
         borderBottom: `1px solid ${theme.palette.divider}`
       }}>
-        {calendar && (
+        {user && (
           <>
             <Tooltip title="New Chat">
               <IconButton
