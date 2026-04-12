@@ -96,11 +96,22 @@ const HomeInner: React.FC<HomeProps> = ({
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // AI chat calendar context — user can switch calendar for AI analysis
+  const [aiChatCalendarId, setAiChatCalendarId] = useState<string>('');
+  const aiChatCalendar = useMemo(
+    () => calendars.find(c => c.id === aiChatCalendarId),
+    [calendars, aiChatCalendarId]
+  );
+
   // Shared AI chat state — persists across panel/drawer switches
+  // calendar context changes when user picks a calendar from the dropdown
+  // but conversations always save to userId (no calendar_id) for Home page
   const sharedChatState = useAIChat({
     userId: user?.uid,
+    calendar: aiChatCalendar,
     messageLimit: 50,
     autoSaveConversation: true,
+    saveAsUserLevel: true,
   });
 
   // Use custom hooks for data fetching with SWR caching
@@ -596,6 +607,9 @@ const HomeInner: React.FC<HomeProps> = ({
                 tradeOperations={stubTradeOperations}
                 isActive={isPanelOpen && currentView.id === 'ai-chat'}
                 sharedChatState={sharedChatState}
+                availableCalendars={calendars}
+                selectedCalendarId={aiChatCalendarId}
+                onCalendarChange={setAiChatCalendarId}
               />
             ),
           };
@@ -1524,6 +1538,9 @@ const HomeInner: React.FC<HomeProps> = ({
                 tradeOperations={stubTradeOperations}
                 isReadOnly={false}
                 sharedChatState={sharedChatState}
+                availableCalendars={calendars}
+                selectedCalendarId={aiChatCalendarId}
+                onCalendarChange={setAiChatCalendarId}
               />
 
               <NotesDrawer

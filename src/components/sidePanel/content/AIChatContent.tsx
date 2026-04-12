@@ -26,7 +26,10 @@ import {
   DialogActions,
   TextField,
   InputAdornment,
-  CircularProgress
+  CircularProgress,
+  Select,
+  MenuItem,
+  FormControl
 } from '@mui/material';
 import {
   AddComment as NewChatIcon,
@@ -66,6 +69,12 @@ export interface AIChatContentProps {
   initialTradeId?: string;
   /** When provided, uses this shared chat state instead of creating its own useAIChat instance */
   sharedChatState?: UseAIChatReturn;
+  /** Available calendars for the context picker dropdown */
+  availableCalendars?: Calendar[];
+  /** Currently selected calendar ID for AI context */
+  selectedCalendarId?: string;
+  /** Callback when user changes the calendar context */
+  onCalendarChange?: (calendarId: string) => void;
 }
 
 const AIChatContent: React.FC<AIChatContentProps> = ({
@@ -76,6 +85,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   isActive = false,
   initialTradeId,
   sharedChatState,
+  availableCalendars,
+  selectedCalendarId = '',
+  onCalendarChange,
 }) => {
   const { onOpenGalleryMode } = tradeOperations;
   const theme = useTheme();
@@ -348,6 +360,34 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
           </IconButton>
         </Tooltip>
       </Box>
+
+      {/* Calendar context picker — Home page only */}
+      {availableCalendars && availableCalendars.length > 0 && onCalendarChange && (
+        <Box sx={{ px: 2, py: 1, flexShrink: 0 }}>
+          <FormControl fullWidth size="small">
+            <Select
+              value={selectedCalendarId}
+              onChange={(e) => onCalendarChange(e.target.value)}
+              displayEmpty
+              sx={{
+                borderRadius: 1,
+                bgcolor: 'background.default',
+              }}
+            >
+              <MenuItem value="">
+                <Typography variant="body2" color="text.secondary">
+                  All Calendars
+                </Typography>
+              </MenuItem>
+              {availableCalendars.map((cal) => (
+                <MenuItem key={cal.id} value={cal.id}>
+                  <Typography variant="body2">{cal.name}</Typography>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+      )}
 
       {/* Content - Sliding Pager */}
       <Box sx={{

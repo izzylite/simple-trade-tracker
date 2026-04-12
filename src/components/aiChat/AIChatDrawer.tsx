@@ -32,6 +32,10 @@ interface AIChatDrawerProps {
   tradeOperations: TradeOperationsProps;
   /** When provided, shares chat state with the panel version */
   sharedChatState?: UseAIChatReturn;
+  /** Calendar picker props (Home page) */
+  availableCalendars?: Calendar[];
+  selectedCalendarId?: string;
+  onCalendarChange?: (calendarId: string) => void;
 }
 
 // Bottom sheet heights
@@ -47,6 +51,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   isReadOnly = false,
   tradeOperations,
   sharedChatState,
+  availableCalendars,
+  selectedCalendarId,
+  onCalendarChange,
 }) => {
   const theme = useTheme();
 
@@ -192,6 +199,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             tradeOperations={tradeOperations}
             isActive={open}
             sharedChatState={sharedChatState}
+            availableCalendars={availableCalendars}
+            selectedCalendarId={selectedCalendarId}
+            onCalendarChange={onCalendarChange}
           />
         </Box>
       </Box>

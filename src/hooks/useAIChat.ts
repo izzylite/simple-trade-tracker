@@ -47,6 +47,13 @@ export interface UseAIChatOptions {
   trade?: Trade;
   messageLimit?: number;
   autoSaveConversation?: boolean;
+  /**
+   * When true, conversations save to userId only (calendar_id = null)
+   * even when a calendar is provided for AI context.
+   * Used by Home page where calendar selection changes AI context
+   * but conversations should persist independently of any calendar.
+   */
+  saveAsUserLevel?: boolean;
 }
 
 export interface UseAIChatReturn {
@@ -93,7 +100,8 @@ export function useAIChat({
   calendar,
   trade,
   messageLimit = MESSAGE_LIMIT_DEFAULT,
-  autoSaveConversation = true
+  autoSaveConversation = true,
+  saveAsUserLevel = false,
 }: UseAIChatOptions): UseAIChatReturn {
   // State
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
@@ -237,7 +245,8 @@ export function useAIChat({
     }
 
     // Calendar-level: load conversations without trade_id
-    if (calendar?.id) {
+    // (skip if saveAsUserLevel — always use user-level storage)
+    if (calendar?.id && !saveAsUserLevel) {
       setLoadingConversations(true);
       try {
         const result = await conversationRepo.findByCalendarId(calendar.id, {
@@ -255,7 +264,7 @@ export function useAIChat({
       return;
     }
 
-    // User-level: no calendar, load by userId
+    // User-level: load by userId (no calendar filter)
     if (!userId) return;
 
     setLoadingConversations(true);
@@ -301,8 +310,8 @@ export function useAIChat({
       return;
     }
 
-    // Calendar-level
-    if (calendar?.id) {
+    // Calendar-level (skip if saveAsUserLevel)
+    if (calendar?.id && !saveAsUserLevel) {
       setLoadingMoreConversations(true);
       try {
         const result = await conversationRepo.findByCalendarId(calendar.id, {
@@ -354,9 +363,10 @@ export function useAIChat({
     if (!userId || updatedMessages.length === 0 || !autoSaveConversation) return;
 
     try {
+      const storageCalendarId = saveAsUserLevel ? null : (calendar?.id || null);
       const result = await conversationRepo.saveConversation(
         currentConversationId,
-        calendar?.id || null,
+        storageCalendarId,
         userId,
         updatedMessages,
         undefined, // title - auto-generated
