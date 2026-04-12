@@ -285,13 +285,39 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
       <Box sx={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'flex-end',
         gap: 1,
         px: 1,
         py: 0.5,
         flexShrink: 0,
         borderBottom: `1px solid ${theme.palette.divider}`
       }}>
+        {/* Calendar context picker — inline in header */}
+        {availableCalendars && availableCalendars.length > 0 && onCalendarChange && (
+          <FormControl size="small" sx={{ flex: 1, minWidth: 0 }}>
+            <Select
+              value={selectedCalendarId}
+              onChange={(e) => onCalendarChange(e.target.value)}
+              displayEmpty
+              sx={{
+                borderRadius: 1,
+                bgcolor: 'background.default',
+                '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' },
+              }}
+            >
+              <MenuItem value="">
+                <Typography variant="body2" color="text.secondary">
+                  All Calendars
+                </Typography>
+              </MenuItem>
+              {availableCalendars.map((cal) => (
+                <MenuItem key={cal.id} value={cal.id}>
+                  <Typography variant="body2">{cal.name}</Typography>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+
         {user && (
           <>
             <Tooltip title="New Chat">
@@ -360,34 +386,6 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
           </IconButton>
         </Tooltip>
       </Box>
-
-      {/* Calendar context picker — Home page only */}
-      {availableCalendars && availableCalendars.length > 0 && onCalendarChange && (
-        <Box sx={{ px: 2, py: 1, flexShrink: 0 }}>
-          <FormControl fullWidth size="small">
-            <Select
-              value={selectedCalendarId}
-              onChange={(e) => onCalendarChange(e.target.value)}
-              displayEmpty
-              sx={{
-                borderRadius: 1,
-                bgcolor: 'background.default',
-              }}
-            >
-              <MenuItem value="">
-                <Typography variant="body2" color="text.secondary">
-                  All Calendars
-                </Typography>
-              </MenuItem>
-              {availableCalendars.map((cal) => (
-                <MenuItem key={cal.id} value={cal.id}>
-                  <Typography variant="body2">{cal.name}</Typography>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
-      )}
 
       {/* Content - Sliding Pager */}
       <Box sx={{
