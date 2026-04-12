@@ -260,7 +260,8 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',
-      height: '100%',
+      flex: 1,
+      minHeight: 0,
       overflow: 'hidden',
     }}>
       {/* Header Action Bar */}

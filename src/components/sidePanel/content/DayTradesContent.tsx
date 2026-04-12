@@ -185,7 +185,8 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',
-      height: '100%',
+      flex: 1,
+      minHeight: 0,
     }}>
       <Box sx={{
         flex: 1,
