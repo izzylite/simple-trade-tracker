@@ -1381,6 +1381,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           note={selectedNote}
           calendarId={calendarId}
           availableTradeTags={calendar?.tags || []}
+          calendarNotes={calendar?.notes}
           onSave={(updatedNote) => {
             // Update the note in embedded notes across all messages
             aiChat.setMessages(prevMessages =>

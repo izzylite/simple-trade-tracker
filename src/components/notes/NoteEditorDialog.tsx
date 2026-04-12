@@ -131,6 +131,7 @@ interface NoteEditorDialogProps {
   weekKey?: string; // If set, this is a week note
   gamePlanDay?: DayAbbreviation; // If set, pre-fill as game plan template
   availableTradeTags?: string[]; // Trade tags from calendar for inline insertion
+  calendarNotes?: Array<{ id: string; title: string }>; // Notes from calendar for /note linking
   pinnedEvents?: Array<{
     event_id: string;
     event: string;
@@ -165,6 +166,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   weekKey,
   gamePlanDay,
   availableTradeTags = [],
+  calendarNotes,
   pinnedEvents,
 }) => {
   const theme = useTheme();
@@ -222,15 +224,10 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   // Share snackbar state
   const [shareSnackbar, setShareSnackbar] = useState<string | null>(null);
 
-  // Available notes for /note link picker
-  const [availableNotes, setAvailableNotes] = useState<
-    Array<{
-      id: string;
-      title: string;
-      color?: string;
-      calendar_name?: string;
-    }>
-  >([]);
+  // Available notes for /note link picker (from calendar, exclude current note)
+  const availableNotes = (calendarNotes ?? [])
+    .filter((n) => n.id !== initialNote?.id)
+    .map((n) => ({ id: n.id, title: n.title }));
 
 
   // Default tags list
@@ -423,29 +420,6 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   }, [title, content, coverImage, tags, isGlobal, open, note]);
 
   // Load available notes for /note link picker
-  useEffect(() => {
-    if (!open || !user?.uid) return;
-
-    const loadNotes = async () => {
-      try {
-        const result = await notesService.getUserNotes(user.uid);
-        setAvailableNotes(
-          result
-            .filter((n) => !n.is_archived && n.id !== note?.id)
-            .map((n) => ({
-              id: n.id,
-              title: n.title,
-              color: n.color ?? undefined,
-            }))
-        );
-      } catch {
-        setAvailableNotes([]);
-      }
-    };
-
-    loadNotes();
-  }, [open, user?.uid, note?.id]);
-
   // Load note when navigating forward or back
   useEffect(() => {
     // Skip initial render (navVersion 0 = no navigation yet)
@@ -1011,7 +985,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                 userSelect: 'none',
               }}
             >
-              Type /tag, /note, or /event to embed tags, notes, and pinned events
+              Type /tag + space, /note + space, or /event + space to embed tags, notes, and pinned events
             </Typography>
           )}
         </Box>

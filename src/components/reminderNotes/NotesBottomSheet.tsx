@@ -389,6 +389,7 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
           onSave={handleNoteSaved}
           onDelete={handleNoteDeleted}
           availableTradeTags={availableTradeTags}
+          calendarNotes={notes.map((n) => ({ id: n.id, title: n.title }))}
         />
       )}
     </>

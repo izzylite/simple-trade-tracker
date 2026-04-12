@@ -450,6 +450,7 @@ const NotesContent: React.FC<NotesContentProps> = ({
           }
           onDelete={(noteId: string) => removeNote(noteId)}
           availableTradeTags={availableTradeTags}
+          calendarNotes={notes.map((n) => ({ id: n.id, title: n.title }))}
           pinnedEvents={pinnedEvents}
         />
       )}

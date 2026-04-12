@@ -1223,15 +1223,23 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     return calculateSessionStats(filteredTrades, currentDate, 'month', accountBalance);
   }, [filteredTrades, currentDate, accountBalance]);
 
+  const clearDaySelection = () => {
+    setSelectedDate(null);
+    if (currentView.id === 'day-trades') resetPanel();
+  };
+
   const handlePrevMonth = () => {
+    clearDaySelection();
     setCurrentDate(prev => subMonths(prev, 1));
   };
 
   const handleNextMonth = () => {
+    clearDaySelection();
     setCurrentDate(prev => addMonths(prev, 1));
   };
 
   const handleTodayClick = () => {
+    clearDaySelection();
     setCurrentDate(new Date());
   };
 
@@ -1378,6 +1386,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const handleMonthSelect = (trade_date: Date) => {
     // Setting currentDate will trigger useEffect to load visible calendar range
     // This includes overflow days from adjacent months
+    clearDaySelection();
     setCurrentDate(trade_date);
     // Note: Dialog closes itself after this completes
   };
@@ -2727,6 +2736,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           calendarId={calendarId!}
           weekKey={weekNoteDialog.weekKey}
           availableTradeTags={allTags}
+          calendarNotes={calendar.notes}
           pinnedEvents={calendar.pinned_events}
           onSave={(savedNote, isCreated) => {
             if (isCreated && savedNote.week_key) {
@@ -2786,6 +2796,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           calendarId={calendarId!}
           gamePlanDay={gamePlanDialog.day}
           availableTradeTags={allTags}
+          calendarNotes={calendar.notes}
           pinnedEvents={calendar.pinned_events}
           onSave={() => {
             setGamePlanDialog(null);

@@ -827,6 +827,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
           note={selectedNote}
           calendarId={calendar.id}
           availableTradeTags={calendar.tags || []}
+          calendarNotes={calendar.notes}
           onSave={(updatedNote) => {
             setMessages(prevMessages =>
               prevMessages.map(msg => {
