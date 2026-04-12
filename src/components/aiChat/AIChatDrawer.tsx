@@ -21,6 +21,7 @@ import { Calendar } from '../../types/calendar';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
 import AIChatContent from '../sidePanel/content/AIChatContent';
+import { UseAIChatReturn } from '../../hooks/useAIChat';
 
 interface AIChatDrawerProps {
   open: boolean;
@@ -29,6 +30,8 @@ interface AIChatDrawerProps {
   calendar?: Calendar;
   isReadOnly?: boolean;
   tradeOperations: TradeOperationsProps;
+  /** When provided, shares chat state with the panel version */
+  sharedChatState?: UseAIChatReturn;
 }
 
 // Bottom sheet heights
@@ -42,7 +45,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   trades,
   calendar,
   isReadOnly = false,
-  tradeOperations
+  tradeOperations,
+  sharedChatState,
 }) => {
   const theme = useTheme();
 
@@ -187,6 +191,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             isReadOnly={isReadOnly}
             tradeOperations={tradeOperations}
             isActive={open}
+            sharedChatState={sharedChatState}
           />
         </Box>
       </Box>

@@ -47,7 +47,7 @@ import { EconomicEvent } from '../../../types/economicCalendar';
 import { scrollbarStyles } from '../../../styles/scrollbarStyles';
 import { logger } from '../../../utils/logger';
 import { useAuthState } from '../../../contexts/AuthStateContext';
-import { useAIChat } from '../../../hooks/useAIChat';
+import { useAIChat, UseAIChatReturn } from '../../../hooks/useAIChat';
 import EconomicEventDetailDialog
   from '../../economicCalendar/EconomicEventDetailDialog';
 import ApiKeySettingsDialog from '../../aiChat/ApiKeySettingsDialog';
@@ -64,6 +64,8 @@ export interface AIChatContentProps {
   isActive?: boolean;
   /** When provided, starts a focused AI analysis for this trade */
   initialTradeId?: string;
+  /** When provided, uses this shared chat state instead of creating its own useAIChat instance */
+  sharedChatState?: UseAIChatReturn;
 }
 
 const AIChatContent: React.FC<AIChatContentProps> = ({
@@ -73,6 +75,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   tradeOperations,
   isActive = false,
   initialTradeId,
+  sharedChatState,
 }) => {
   const { onOpenGalleryMode } = tradeOperations;
   const theme = useTheme();
@@ -120,7 +123,15 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
       ];
     }, [focusedTrade]);
 
-  // Use the AI Chat hook for core functionality
+  // Use shared chat state if provided, otherwise create own instance
+  const ownChatState = useAIChat({
+    userId: user?.uid,
+    calendar,
+    trade: focusedTrade,
+    messageLimit: 50,
+    autoSaveConversation: true
+  });
+
   const {
     messages,
     isLoading,
@@ -142,13 +153,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     startNewChat,
     setMessages,
     getWelcomeMessage
-  } = useAIChat({
-    userId: user?.uid,
-    calendar,
-    trade: focusedTrade,
-    messageLimit: 50,
-    autoSaveConversation: true
-  });
+  } = sharedChatState || ownChatState;
 
   // Local UI state
   const [showHistoryView, setShowHistoryView] = useState(false);

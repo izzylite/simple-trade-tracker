@@ -74,6 +74,7 @@ import {
 import SidePanel from '../components/sidePanel/SidePanel';
 import NotesContent from '../components/sidePanel/content/NotesContent';
 import AIChatContent from '../components/sidePanel/content/AIChatContent';
+import { useAIChat } from '../hooks/useAIChat';
 import EconomicCalendarPanel
   from '../components/economicCalendar/EconomicCalendarPanel';
 import {
@@ -94,6 +95,13 @@ const HomeInner: React.FC<HomeProps> = ({
   const theme = useTheme();
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // Shared AI chat state — persists across panel/drawer switches
+  const sharedChatState = useAIChat({
+    userId: user?.uid,
+    messageLimit: 50,
+    autoSaveConversation: true,
+  });
 
   // Use custom hooks for data fetching with SWR caching
   const { economicEvents, isLoading: loadingEvents } = useUpcomingEconomicEvents({
@@ -183,8 +191,9 @@ const HomeInner: React.FC<HomeProps> = ({
         case 'notes':
           setIsNotesDrawerOpen(true);
           break;
-        // ai-chat intentionally omitted — chat state can't transfer
-        // between panel and drawer instances without data loss
+        case 'ai-chat':
+          setIsAIChatOpen(true);
+          break;
         case 'economic-calendar':
           setEconomicCalendarOpen(true);
           break;
@@ -586,6 +595,7 @@ const HomeInner: React.FC<HomeProps> = ({
               <AIChatContent
                 tradeOperations={stubTradeOperations}
                 isActive={isPanelOpen && currentView.id === 'ai-chat'}
+                sharedChatState={sharedChatState}
               />
             ),
           };
@@ -594,7 +604,7 @@ const HomeInner: React.FC<HomeProps> = ({
       }
     },
     [
-      isPanelOpen, currentView, calendars, stubTradeOperations,
+      isPanelOpen, currentView, calendars, stubTradeOperations, sharedChatState,
     ]
   );
 
@@ -1511,17 +1521,9 @@ const HomeInner: React.FC<HomeProps> = ({
               <AIChatDrawer
                 open={isAIChatOpen}
                 onClose={() => setIsAIChatOpen(false)}
-                tradeOperations={{
-                  onOpenGalleryMode: () => {},
-                  onUpdateTradeProperty: () => Promise.resolve(undefined),
-                  onEditTrade: () => {},
-                  onDeleteTrade: () => Promise.resolve(),
-                  onDeleteMultipleTrades: () => {},
-                  onZoomImage: setZoomedImage,
-                  isTradeUpdating: () => false,
-                  onUpdateCalendarProperty: () => Promise.resolve(undefined)
-                }}
+                tradeOperations={stubTradeOperations}
                 isReadOnly={false}
+                sharedChatState={sharedChatState}
               />
 
               <NotesDrawer
