@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { Tag as TagIcon, Add as AddIcon } from '@mui/icons-material';
-import { IconButton, Tooltip, alpha, useTheme } from '@mui/material';
+import React from 'react';
+import { Tag as TagIcon } from '@mui/icons-material';
 import UnifiedDrawer from './common/UnifiedDrawer';
 import TagManagementContent, { TagManagementContentProps } from './sidePanel/content/TagManagementContent';
 
@@ -14,9 +13,6 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
   onClose,
   ...contentProps
 }) => {
-  const theme = useTheme();
-  const [createFn, setCreateFn] = useState<(() => void) | null>(null);
-
   return (
     <UnifiedDrawer
       open={open}
@@ -24,31 +20,12 @@ const TagManagementDrawer: React.FC<TagManagementDrawerProps> = ({
       title="Tag Management"
       icon={<TagIcon />}
       width={{ xs: '100%', sm: 500 }}
-      headerVariant="enhanced"
-      headerActions={
-        !contentProps.isReadOnly ? (
-          <Tooltip title="Create new tag">
-            <IconButton
-              color="primary"
-              onClick={() => createFn?.()}
-              sx={{
-                bgcolor: alpha(theme.palette.primary.main, 0.1),
-                '&:hover': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.2),
-                },
-              }}
-            >
-              <AddIcon />
-            </IconButton>
-          </Tooltip>
-        ) : undefined
-      }
+      contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
     >
       <TagManagementContent
         {...contentProps}
         isActive={open}
-        showFooter={false}
-        onCreateReady={(fn) => setCreateFn(() => fn)}
+        showFooter
       />
     </UnifiedDrawer>
   );
