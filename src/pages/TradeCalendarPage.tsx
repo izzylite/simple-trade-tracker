@@ -768,6 +768,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setOpen: setPanelOpen,
   } = useSidePanel();
 
+  // Ref for main content scroll container (used by floating nav scroll detection)
+  const mainContentRef = useRef<HTMLDivElement>(null);
+
   // Responsive handoff: panel ↔ drawers on breakpoint change
   const prevIsLgUp = useRef(isLgUp);
   useEffect(() => {
@@ -1007,17 +1010,20 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   }, []);
 
   // Scroll detection for floating month navigation with throttling
+  // Listens on the main content container (not window) since content
+  // scrolls inside a flex layout, not the page body.
   useEffect(() => {
+    const container = mainContentRef.current;
+    if (!container) return;
+
     let ticking = false;
 
     const handleScroll = () => {
       if (!ticking) {
         requestAnimationFrame(() => {
-          // Find the score section element
           const section = document.querySelector('[data-testid="month-nav-section"]');
           if (section) {
             const rect = section.getBoundingClientRect();
-            // Show floating nav when section is NOT visible
             setShowFloatingMonthNav(!(rect.top <= window.innerHeight && rect.bottom >= 0));
           }
           ticking = false;
@@ -1026,10 +1032,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       }
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); // Check initial state
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
 
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
 
@@ -1784,7 +1790,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       }}>
 
       {/* Left side: hero, breadcrumbs, and main content */}
-      <Box sx={{ flex: 1, minWidth: 0, height: '100%', overflowY: 'auto' }}>
+      <Box ref={mainContentRef} sx={{ flex: 1, minWidth: 0, height: '100%', overflowY: 'auto' }}>
 
       {/* Hero Image Banner */}
       {heroImageUrl && (
