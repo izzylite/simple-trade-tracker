@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { FC } from 'react';
 import {
@@ -767,6 +767,36 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     resetPanel,
     setOpen: setPanelOpen,
   } = useSidePanel();
+
+  // When screen resizes from lg+ to <lg, open the matching drawer
+  const prevIsLgUp = useRef(isLgUp);
+  useEffect(() => {
+    if (prevIsLgUp.current && !isLgUp && isPanelOpen) {
+      switch (currentView.id) {
+        case 'notes':
+          setIsNotesDrawerOpen(true);
+          break;
+        case 'search':
+          setIsSearchDrawerOpen(true);
+          break;
+        case 'pinned':
+          setPinnedTradesDrawerOpen(true);
+          break;
+        case 'tags':
+          setIsTagManagementDrawerOpen(true);
+          break;
+        case 'economic-calendar':
+          setIsEconomicCalendarOpen(true);
+          break;
+        case 'day-trades': {
+          const dayView = currentView as DayTradesView;
+          setSelectedDate(dayView.date);
+          break;
+        }
+      }
+    }
+    prevIsLgUp.current = isLgUp;
+  }, [isLgUp]);
 
   // Breadcrumb items
   const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => {
