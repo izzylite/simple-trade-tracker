@@ -900,7 +900,10 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
               isExpanded={true}
               animate={false}
               trades={trades}
-              tradeOperations={tradeOperations}
+              tradeOperations={{
+                ...tradeOperations,
+                onOpenGalleryMode: undefined
+              }}
               showAIButton={false}
             />
           ) : null}

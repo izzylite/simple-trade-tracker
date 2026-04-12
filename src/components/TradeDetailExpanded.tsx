@@ -43,7 +43,8 @@ import {
   ListAlt as ListAltIcon,
   SmartToy as AIIcon,
   Edit as EditIcon,
-  StickyNote2 as GamePlanIcon
+  StickyNote2 as GamePlanIcon,
+  OpenInFull as ExpandIcon
 } from '@mui/icons-material';
 import { AnimatedDropdown } from './Animations';
 import { TagsDisplay } from './common';
@@ -68,7 +69,7 @@ import {
   getReminderNotesForDay,
   getReminderNotesForDate
 } from '../services/notesService';
-import { NotesBottomSheet } from './reminderNotes';
+import NoteViewerDialog from './notes/NoteViewerDialog';
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -177,7 +178,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   // Game plan (reminder notes) state
   const [gamePlanNotes, setGamePlanNotes] = useState<Note[]>([]);
   const [loadingGamePlan, setLoadingGamePlan] = useState(false);
-  const [gamePlanOpen, setGamePlanOpen] = useState(false);
+  const [gamePlanViewNote, setGamePlanViewNote] = useState<Note | null>(null);
 
   const filterSetting: EconomicCalendarFilterSettings = economicFilter ? economicFilter(calendarId!) : DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
 
@@ -324,8 +325,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   };
 
   // Function to fetch game plan notes for the trade's date
-  const fetchGamePlanNotes = async () => {
-    if (!trade.trade_date || !calendarId) return;
+  const fetchGamePlanNotes = async (): Promise<Note[]> => {
+    if (!trade.trade_date || !calendarId) return [];
 
     try {
       setLoadingGamePlan(true);
@@ -351,20 +352,25 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
         (note, idx, arr) => arr.findIndex(n => n.id === note.id) === idx
       );
       setGamePlanNotes(uniqueNotes);
+      return uniqueNotes;
     } catch (error) {
       logger.error('Error fetching game plan notes:', error);
       setGamePlanNotes([]);
+      return [];
     } finally {
       setLoadingGamePlan(false);
     }
   };
 
-  // Open game plan bottom sheet
+  // Open game plan note viewer dialog
   const handleOpenGamePlan = async () => {
-    if (gamePlanNotes.length === 0 && !loadingGamePlan) {
-      await fetchGamePlanNotes();
+    let notes = gamePlanNotes;
+    if (notes.length === 0 && !loadingGamePlan) {
+      notes = await fetchGamePlanNotes();
     }
-    setGamePlanOpen(true);
+    if (notes.length > 0) {
+      setGamePlanViewNote(notes[0]);
+    }
   };
 
   // Re-fetch economic events when trade changes (for gallery mode)
@@ -389,7 +395,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   // Clear game plan when trade changes
   useEffect(() => {
     setGamePlanNotes([]);
-    setGamePlanOpen(false);
+    setGamePlanViewNote(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trade.id, tradeDateString]);
 
@@ -533,51 +539,30 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 width: { xs: '100%', sm: 'auto' },
                 justifyContent: { xs: 'flex-end', sm: 'flex-start' }
               }}>
-                {/* Game Plan Button */}
-                {calendarId && (
+                {/* Expand / Gallery Mode Button */}
+                {onOpenGalleryMode && trades && (
                   <Tooltip
-                    title={`Game Plan (${format(
-                      typeof trade.trade_date === 'string'
-                        ? parseISO(trade.trade_date)
-                        : trade.trade_date,
-                      'EEE, MMM d'
-                    )})`}
-                    slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+                    title="Expand"
+                    slotProps={{
+                      popper: { sx: { zIndex: Z_INDEX.TOOLTIP } }
+                    }}
                   >
                     <IconButton
-                      onClick={handleOpenGamePlan}
-                      disabled={loadingGamePlan}
+                      onClick={() => onOpenGalleryMode(
+                        trades as Trade[],
+                        trade.id
+                      )}
                       sx={{
                         color: 'text.secondary',
                         '&:hover': {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                          backgroundColor: alpha(
+                            theme.palette.primary.main, 0.1
+                          ),
                           color: 'primary.main'
                         }
                       }}
                     >
-                      {loadingGamePlan
-                        ? <CircularProgress size={20} color="inherit" />
-                        : <GamePlanIcon sx={{ fontSize: 20 }} />}
-                    </IconButton>
-                  </Tooltip>
-                )}
-                {/* AI Analysis Button */}
-                {showAIButton && onOpenAIChat && (
-                  <Tooltip
-                    title="AI Analysis"
-                    slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
-                  >
-                    <IconButton
-                      onClick={() => onOpenAIChat(trade)}
-                      sx={{
-                        color: 'text.secondary',
-                        '&:hover': {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                          color: 'primary.main'
-                        }
-                      }}
-                    >
-                      <AIIcon sx={{ fontSize: 20 }} />
+                      <ExpandIcon sx={{ fontSize: 20 }} />
                     </IconButton>
                   </Tooltip>
                 )}
@@ -645,16 +630,72 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
             {/* Properties Section */}
             <Box sx={{ width: '100%' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                mb: 1.5,
+                width: '100%'
+              }}>
                 <ListAltIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                 <Typography variant="subtitle2" color="text.primary" sx={{
                   fontWeight: 700,
                   fontSize: '0.9rem',
                   wordBreak: 'break-word',
-                  overflowWrap: 'break-word'
+                  overflowWrap: 'break-word',
+                  flex: 1
                 }}>
                   Properties
                 </Typography>
+                {calendarId && (
+                  <Button
+                    size="small"
+                    startIcon={loadingGamePlan
+                      ? <CircularProgress size={14} color="inherit" />
+                      : <GamePlanIcon sx={{ fontSize: 16 }} />}
+                    onClick={handleOpenGamePlan}
+                    disabled={loadingGamePlan}
+                    sx={{
+                      color: 'text.secondary',
+                      textTransform: 'none',
+                      fontSize: '0.8rem',
+                      minWidth: 'auto',
+                      px: 1,
+                      py: 0.25,
+                      '&:hover': {
+                        backgroundColor: alpha(
+                          theme.palette.primary.main, 0.1
+                        ),
+                        color: 'primary.main'
+                      }
+                    }}
+                  >
+                    Game Plan
+                  </Button>
+                )}
+                {showAIButton && onOpenAIChat && (
+                  <Button
+                    size="small"
+                    startIcon={<AIIcon sx={{ fontSize: 16 }} />}
+                    onClick={() => onOpenAIChat(trade)}
+                    sx={{
+                      color: 'text.secondary',
+                      textTransform: 'none',
+                      fontSize: '0.8rem',
+                      minWidth: 'auto',
+                      px: 1,
+                      py: 0.25,
+                      '&:hover': {
+                        backgroundColor: alpha(
+                          theme.palette.primary.main, 0.1
+                        ),
+                        color: 'primary.main'
+                      }
+                    }}
+                  >
+                    Ask Orion
+                  </Button>
+                )}
               </Box>
 
               <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ width: '100%' }}>
@@ -1446,20 +1487,11 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   return (
     <>
       {content}
-      {calendarId && (
-        <NotesBottomSheet
-          open={gamePlanOpen}
-          onClose={() => setGamePlanOpen(false)}
-          notes={gamePlanNotes}
-          calendarId={calendarId}
-          fullDayName={format(
-            typeof trade.trade_date === 'string'
-              ? parseISO(trade.trade_date)
-              : trade.trade_date,
-            'EEEE'
-          )}
-        />
-      )}
+      <NoteViewerDialog
+        open={!!gamePlanViewNote}
+        onClose={() => setGamePlanViewNote(null)}
+        note={gamePlanViewNote}
+      />
     </>
   );
 };

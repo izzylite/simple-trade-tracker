@@ -25,6 +25,7 @@ import {
 
 import { Note } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import { Z_INDEX } from '../../styles/zIndex';
 import { getTagDisplayLabel } from './NoteEditorDialog';
 import RichTextViewer from '../common/RichTextEditor/RichTextViewer';
 import { format } from 'date-fns';
@@ -58,6 +59,7 @@ const NoteViewerDialog: React.FC<NoteViewerDialogProps> = ({
       fullScreen={fullScreen}
       maxWidth="md"
       fullWidth
+      sx={{ zIndex: Z_INDEX.DIALOG_POPUP + 1 }}
       PaperProps={{
         sx: {
           height: fullScreen ? '100%' : '85vh',
