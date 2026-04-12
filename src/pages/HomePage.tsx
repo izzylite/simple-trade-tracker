@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -164,6 +164,39 @@ const HomeInner: React.FC<HomeProps> = ({
     replacePanel,
     setOpen: setPanelOpen,
   } = useSidePanel();
+
+  // Responsive handoff: panel ↔ drawers on breakpoint change
+  const prevIsLgUp = useRef(isLgUp);
+  useEffect(() => {
+    if (prevIsLgUp.current === isLgUp) return;
+
+    const closeAllDrawers = () => {
+      setIsNotesDrawerOpen(false);
+      setIsAIChatOpen(false);
+      setEconomicCalendarOpen(false);
+    };
+
+    if (prevIsLgUp.current && !isLgUp && isPanelOpen) {
+      // lg+ → <lg: close all drawers, open matching one
+      closeAllDrawers();
+      switch (currentView.id) {
+        case 'notes':
+          setIsNotesDrawerOpen(true);
+          break;
+        case 'ai-chat':
+          setIsAIChatOpen(true);
+          break;
+        case 'economic-calendar':
+          setEconomicCalendarOpen(true);
+          break;
+      }
+    } else if (!prevIsLgUp.current && isLgUp) {
+      // <lg → lg+: close all drawers, panel takes over
+      closeAllDrawers();
+    }
+
+    prevIsLgUp.current = isLgUp;
+  }, [isLgUp]);
 
   useEffect(()=> {
     setRecentTrades(recentTrades_)
