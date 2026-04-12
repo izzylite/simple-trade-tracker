@@ -1496,6 +1496,7 @@ const HomeInner: React.FC<HomeProps> = ({
                 open={isNotesDrawerOpen}
                 onClose={() => setIsNotesDrawerOpen(false)}
                 showCalendarPicker={true}
+                showFooter={false}
               />
             </>
           )}

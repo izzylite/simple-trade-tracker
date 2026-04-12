@@ -20,6 +20,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
   onClose,
   isReadOnly = false,
   showCalendarPicker = false,
+  showFooter = true,
   ...contentProps
 }) => {
   return (
@@ -37,7 +38,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
         isActive={open}
         isReadOnly={isReadOnly}
         showCalendarPicker={showCalendarPicker}
-        showFooter
+        showFooter={showFooter}
       />
     </UnifiedDrawer>
   );
