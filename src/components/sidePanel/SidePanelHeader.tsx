@@ -3,7 +3,7 @@ import React from 'react';
 import { Box, IconButton, Typography, alpha, useTheme } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
-  ChevronRight as CollapseIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useSidePanel } from '../../contexts/SidePanelContext';
 
@@ -65,7 +65,7 @@ const SidePanelHeader: React.FC<SidePanelHeaderProps> = ({ title, icon }) => {
       <IconButton
         onClick={() => setOpen(false)}
         size="small"
-        aria-label="Collapse panel"
+        aria-label="Close panel"
         sx={{
           color: 'text.secondary',
           '&:hover': {
@@ -73,7 +73,7 @@ const SidePanelHeader: React.FC<SidePanelHeaderProps> = ({ title, icon }) => {
           },
         }}
       >
-        <CollapseIcon fontSize="small" />
+        <CloseIcon fontSize="small" />
       </IconButton>
     </Box>
   );
