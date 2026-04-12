@@ -574,6 +574,7 @@ const HomeInner: React.FC<HomeProps> = ({
         overflow: 'hidden',
         bgcolor: 'background.default',
         position: 'relative',
+        mb: -4,
       }}
     >
       {/* Left: main content (independent scroll) */}
