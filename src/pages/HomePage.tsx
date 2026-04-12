@@ -183,9 +183,8 @@ const HomeInner: React.FC<HomeProps> = ({
         case 'notes':
           setIsNotesDrawerOpen(true);
           break;
-        case 'ai-chat':
-          setIsAIChatOpen(true);
-          break;
+        // ai-chat intentionally omitted — chat state can't transfer
+        // between panel and drawer instances without data loss
         case 'economic-calendar':
           setEconomicCalendarOpen(true);
           break;
