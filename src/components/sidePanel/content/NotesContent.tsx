@@ -31,7 +31,7 @@ import {
 
 import RoundedTabs from '../../common/RoundedTabs';
 import NoteListItem from '../../notes/NoteListItem';
-import Shimmer from '../../Shimmer';
+import EconomicEventShimmer from '../../economicCalendar/EconomicEventShimmer';
 import NoteEditorDialog from '../../notes/NoteEditorDialog';
 import NoteViewerDialog from '../../notes/NoteViewerDialog';
 import { Note } from '../../../types/note';
@@ -69,59 +69,6 @@ export interface NotesContentProps {
 
 type TabValue = 'all' | 'pinned' | 'archived';
 
-/**
- * Shimmer loading component for note list items
- */
-const NoteListItemShimmer: React.FC = () => {
-  const theme = useTheme();
-
-  return (
-    <Box
-      sx={{
-        borderRadius: 2,
-        mb: 0.5,
-        py: 1.5,
-        px: 2,
-        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-        bgcolor: 'background.paper',
-      }}
-    >
-      <Stack direction="row" spacing={1.5} alignItems="center">
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          {/* Title */}
-          <Box sx={{ mb: 0.5 }}>
-            <Shimmer height={20} width="60%" borderRadius={4} variant="wave" intensity="medium" />
-          </Box>
-
-          {/* Content preview */}
-          <Box sx={{ mb: 0.5 }}>
-            <Shimmer
-              height={16}
-              width="100%"
-              borderRadius={4}
-              variant="wave"
-              intensity="medium"
-              sx={{ mb: 0.3 }}
-            />
-            <Shimmer height={16} width="80%" borderRadius={4} variant="wave" intensity="medium" />
-          </Box>
-
-          {/* Date */}
-          <Shimmer height={14} width="30%" borderRadius={4} variant="wave" intensity="medium" />
-        </Box>
-
-        <Shimmer
-          height={60}
-          width={60}
-          borderRadius={1}
-          variant="wave"
-          intensity="medium"
-          sx={{ flexShrink: 0 }}
-        />
-      </Stack>
-    </Box>
-  );
-};
 
 const NotesContent: React.FC<NotesContentProps> = ({
   isActive = true,
@@ -393,11 +340,7 @@ const NotesContent: React.FC<NotesContentProps> = ({
           }}
         >
           {loading ? (
-            <Box>
-              {Array.from({ length: 10 }).map((_, index) => (
-                <NoteListItemShimmer key={index} />
-              ))}
-            </Box>
+            <EconomicEventShimmer count={8} />
           ) : notes.length === 0 ? (
             <Stack spacing={2} alignItems="center" sx={{ py: 8, textAlign: 'center' }}>
               <NotesIcon sx={{ fontSize: 64, color: 'text.disabled' }} />
