@@ -23,6 +23,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
       title={format(date, 'EEEE, MMMM d, yyyy')}
       icon={<EventIcon />}
       width={{ xs: '100%', sm: 450 }}
+      contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
     >
       <DayTradesContent
         {...contentProps}
