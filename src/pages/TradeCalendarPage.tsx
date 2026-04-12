@@ -768,10 +768,23 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setOpen: setPanelOpen,
   } = useSidePanel();
 
-  // When screen resizes from lg+ to <lg, open the matching drawer
+  // Responsive handoff: panel ↔ drawers on breakpoint change
   const prevIsLgUp = useRef(isLgUp);
   useEffect(() => {
+    if (prevIsLgUp.current === isLgUp) return;
+
+    const closeAllDrawers = () => {
+      setIsNotesDrawerOpen(false);
+      setIsSearchDrawerOpen(false);
+      setPinnedTradesDrawerOpen(false);
+      setIsTagManagementDrawerOpen(false);
+      setIsEconomicCalendarOpen(false);
+      setSelectedDate(null);
+    };
+
     if (prevIsLgUp.current && !isLgUp && isPanelOpen) {
+      // lg+ → <lg: close all drawers first, then open matching one
+      closeAllDrawers();
       switch (currentView.id) {
         case 'notes':
           setIsNotesDrawerOpen(true);
@@ -794,7 +807,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           break;
         }
       }
+    } else if (!prevIsLgUp.current && isLgUp) {
+      // <lg → lg+: close all drawers, panel takes over
+      closeAllDrawers();
     }
+
     prevIsLgUp.current = isLgUp;
   }, [isLgUp]);
 
