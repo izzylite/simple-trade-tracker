@@ -65,6 +65,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({
         isReadOnly={isReadOnly}
         showCalendarPicker={showCalendarPicker}
         onNewNoteReady={handleNewNoteReady}
+        showFooter={false}
       />
     </UnifiedDrawer>
   );

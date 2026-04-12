@@ -60,7 +60,7 @@ const DayDialog: React.FC<DayDialogProps> = ({
         ) : undefined
       }
     >
-      <DayTradesContent {...contentProps} isActive={open} />
+      <DayTradesContent {...contentProps} isActive={open} showFooter={false} />
     </BaseDialog>
   );
 };

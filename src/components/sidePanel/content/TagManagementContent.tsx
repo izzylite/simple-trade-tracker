@@ -64,6 +64,10 @@ export interface TagManagementContentProps {
   // Calendar owner's user ID (for fetching tag definitions in read-only mode)
   calendarOwnerId?: string;
   isActive?: boolean;
+  /** Show footer with Add Tag button (panel mode). Hidden in drawer mode. */
+  showFooter?: boolean;
+  /** Called once with a function to trigger the create dialog from outside */
+  onCreateReady?: (triggerCreate: () => void) => void;
 }
 
 const TagManagementContent: React.FC<TagManagementContentProps> = ({
@@ -74,7 +78,9 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
   onUpdateCalendarProperty,
   isReadOnly = false,
   calendarOwnerId,
-  isActive
+  isActive,
+  showFooter = true,
+  onCreateReady,
 }) => {
   const theme = useTheme();
   const { user } = useAuthState();
@@ -88,6 +94,13 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
   const [definitionsLoading, setDefinitionsLoading] = useState(false);
   const [definitionsLoaded, setDefinitionsLoaded] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  // Expose create trigger to parent (for drawer headerActions)
+  useEffect(() => {
+    if (onCreateReady) {
+      onCreateReady(() => setIsCreateDialogOpen(true));
+    }
+  }, [onCreateReady]);
 
   const toggleGroup = (group: string) => {
     setCollapsedGroups(prev => ({
@@ -487,8 +500,8 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
       </Box>
       </Box>{/* end scrollable content */}
 
-      {/* Footer */}
-      {!isReadOnly && (
+      {/* Footer — panel mode only */}
+      {showFooter && !isReadOnly && (
         <Box sx={{
           p: 1.5,
           borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,

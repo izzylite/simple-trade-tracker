@@ -42,6 +42,8 @@ export interface DayTradesContentProps {
   compact?: boolean;
   /** Callback to open gallery mode (for panel footer) */
   onGalleryClick?: () => void;
+  /** Show footer with action buttons (panel mode). Hidden in dialog mode. */
+  showFooter?: boolean;
 }
 
 const DayTradesContent: React.FC<DayTradesContentProps> = ({
@@ -57,6 +59,7 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
   onOpenEvents,
   compact = false,
   onGalleryClick,
+  showFooter = true,
 }) => {
   const theme = useTheme();
   const {
@@ -224,8 +227,8 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
         />
       </Box>
 
-      {/* Footer — Events, Gallery, Add Trade */}
-      <Box sx={{
+      {/* Footer — Events, Gallery, Add Trade (panel mode only) */}
+      {showFooter && <Box sx={{
         p: 1.5,
         borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
         bgcolor: 'background.paper',
@@ -268,7 +271,7 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
             Add Trade
           </Button>
         )}
-      </Box>
+      </Box>}
 
       {calendar && !onOpenEvents && (
         <EconomicCalendarDrawer

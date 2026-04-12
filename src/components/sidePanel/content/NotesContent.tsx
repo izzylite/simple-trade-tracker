@@ -63,6 +63,8 @@ export interface NotesContentProps {
    * Allows parent containers (e.g. drawer header buttons) to trigger new-note creation.
    */
   onNewNoteReady?: (triggerNewNote: () => void) => void;
+  /** Show footer with Add Note button (panel mode). Hidden in drawer mode. */
+  showFooter?: boolean;
 }
 
 type TabValue = 'all' | 'pinned' | 'archived';
@@ -130,6 +132,7 @@ const NotesContent: React.FC<NotesContentProps> = ({
   availableTradeTags = [],
   pinnedEvents,
   onNewNoteReady,
+  showFooter = true,
 }) => {
   const theme = useTheme();
   const { user } = useAuthState();
@@ -470,8 +473,8 @@ const NotesContent: React.FC<NotesContentProps> = ({
           )}
         </Box>
 
-        {/* Footer */}
-        {!isReadOnly && (
+        {/* Footer — panel mode only */}
+        {showFooter && !isReadOnly && (
           <Box sx={{
             p: 1.5,
             borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
