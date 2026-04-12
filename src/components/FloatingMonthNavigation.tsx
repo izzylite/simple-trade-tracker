@@ -7,7 +7,6 @@ import {
   alpha,
   Chip,
   Fade,
-  Slide,
   Tooltip
 } from '@mui/material';
 import {
@@ -110,7 +109,7 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
   const finalVisible = isVisible && !hideByTopScroll;
 
   return (
-    <Slide direction="left" in={finalVisible} mountOnEnter unmountOnExit>
+    <Fade in={finalVisible} timeout={300} mountOnEnter unmountOnExit>
       <Box
         sx={{
           position: 'fixed',
@@ -237,7 +236,7 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
 
 
       </Box>
-    </Slide>
+    </Fade>
   );
 };
 
