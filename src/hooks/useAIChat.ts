@@ -237,11 +237,30 @@ export function useAIChat({
     }
 
     // Calendar-level: load conversations without trade_id
-    if (!calendar?.id) return;
+    if (calendar?.id) {
+      setLoadingConversations(true);
+      try {
+        const result = await conversationRepo.findByCalendarId(calendar.id, {
+          limit: CONVERSATIONS_PAGE_SIZE,
+          offset: 0
+        });
+        setConversations(result.conversations);
+        setHasMoreConversations(result.hasMore);
+        setTotalConversationsCount(result.totalCount);
+      } catch (error) {
+        logger.error('Error loading conversations:', error);
+      } finally {
+        setLoadingConversations(false);
+      }
+      return;
+    }
+
+    // User-level: no calendar, load by userId
+    if (!userId) return;
 
     setLoadingConversations(true);
     try {
-      const result = await conversationRepo.findByCalendarId(calendar.id, {
+      const result = await conversationRepo.findUserLevel(userId, {
         limit: CONVERSATIONS_PAGE_SIZE,
         offset: 0
       });
@@ -249,11 +268,11 @@ export function useAIChat({
       setHasMoreConversations(result.hasMore);
       setTotalConversationsCount(result.totalCount);
     } catch (error) {
-      logger.error('Error loading conversations:', error);
+      logger.error('Error loading user-level conversations:', error);
     } finally {
       setLoadingConversations(false);
     }
-  }, [calendar?.id, trade?.id, conversationRepo]);
+  }, [userId, calendar?.id, trade?.id, conversationRepo]);
 
   /**
    * Load more conversations (pagination)
@@ -283,22 +302,41 @@ export function useAIChat({
     }
 
     // Calendar-level
-    if (!calendar?.id) return;
+    if (calendar?.id) {
+      setLoadingMoreConversations(true);
+      try {
+        const result = await conversationRepo.findByCalendarId(calendar.id, {
+          limit: CONVERSATIONS_PAGE_SIZE,
+          offset: currentOffset
+        });
+        setConversations(prev => [...prev, ...result.conversations]);
+        setHasMoreConversations(result.hasMore);
+      } catch (error) {
+        logger.error('Error loading more conversations:', error);
+      } finally {
+        setLoadingMoreConversations(false);
+      }
+      return;
+    }
+
+    // User-level
+    if (!userId) return;
 
     setLoadingMoreConversations(true);
     try {
-      const result = await conversationRepo.findByCalendarId(calendar.id, {
+      const result = await conversationRepo.findUserLevel(userId, {
         limit: CONVERSATIONS_PAGE_SIZE,
         offset: currentOffset
       });
       setConversations(prev => [...prev, ...result.conversations]);
       setHasMoreConversations(result.hasMore);
     } catch (error) {
-      logger.error('Error loading more conversations:', error);
+      logger.error('Error loading more user-level conversations:', error);
     } finally {
       setLoadingMoreConversations(false);
     }
   }, [
+    userId,
     calendar?.id,
     trade?.id,
     conversations.length,
@@ -313,21 +351,22 @@ export function useAIChat({
    * Otherwise saves as calendar-level conversation
    */
   const saveCurrentConversation = useCallback(async (updatedMessages: ChatMessageType[]) => {
-    if (!userId || !calendar?.id || updatedMessages.length === 0 || !autoSaveConversation) return;
+    if (!userId || updatedMessages.length === 0 || !autoSaveConversation) return;
 
     try {
       const result = await conversationRepo.saveConversation(
         currentConversationId,
-        calendar.id,
+        calendar?.id || null,
         userId,
         updatedMessages,
         undefined, // title - auto-generated
-        trade?.id || null // tradeId - null for calendar-level, set for trade-specific
+        trade?.id || null // tradeId - null for calendar/user-level
       );
 
       if (result.success && result.data) {
         setCurrentConversationId(result.data.id);
-        logger.log('Conversation saved successfully:', result.data.id, trade?.id ? '(trade-specific)' : '(calendar-level)');
+        logger.log('Conversation saved:', result.data.id,
+          trade?.id ? '(trade)' : calendar?.id ? '(calendar)' : '(user-level)');
         await loadConversations();
       }
     } catch (error) {

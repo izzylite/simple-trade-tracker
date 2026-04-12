@@ -243,6 +243,62 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
   }
 
   /**
+   * Find user-level conversations (no calendar) with pagination.
+   * Used by Home page AI chat where there's no specific calendar context.
+   */
+  async findUserLevel(
+    userId: string,
+    options?: ConversationPaginationOptions
+  ): Promise<PaginatedConversations> {
+    const DEFAULT_LIMIT = 15;
+    const limit = options?.limit ?? DEFAULT_LIMIT;
+    const offset = options?.offset ?? 0;
+
+    try {
+      const { count, error: countError } = await supabase
+        .from('ai_conversations')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .is('calendar_id', null)
+        .is('trade_id', null);
+
+      if (countError) {
+        logger.error('Error counting user-level conversations:', countError);
+        return { conversations: [], totalCount: 0, hasMore: false };
+      }
+
+      const totalCount = count ?? 0;
+
+      const { data, error } = await supabase
+        .from('ai_conversations')
+        .select('*')
+        .eq('user_id', userId)
+        .is('calendar_id', null)
+        .is('trade_id', null)
+        .order('updated_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) {
+        logger.error('Error loading user-level conversations:', error);
+        return { conversations: [], totalCount, hasMore: false };
+      }
+
+      const conversations = data
+        ? data.map(item => transformSupabaseConversation(item))
+        : [];
+
+      return {
+        conversations,
+        totalCount,
+        hasMore: offset + conversations.length < totalCount
+      };
+    } catch (error) {
+      logger.error('Error loading user-level conversations:', error);
+      return { conversations: [], totalCount: 0, hasMore: false };
+    }
+  }
+
+  /**
    * Find all conversations (admin use only - respects RLS)
    */
   async findAll(): Promise<AIConversation[]> {
@@ -374,7 +430,7 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
    */
   async saveConversation(
     conversationId: string | null,
-    calendarId: string,
+    calendarId: string | null,
     userId: string,
     messages: ChatMessage[],
     title?: string,
