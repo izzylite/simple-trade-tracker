@@ -1790,6 +1790,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         onNextMonth={handleNextMonth}
         onMonthClick={handleMonthClick}
         onTodayClick={handleTodayClick}
+        scrollContainerRef={mainContentRef}
       />
 
       {/* Hero Image Banner */}

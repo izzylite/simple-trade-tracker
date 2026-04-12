@@ -26,6 +26,8 @@ interface FloatingMonthNavigationProps {
   onNextMonth: () => void;
   onMonthClick: () => void;
   onTodayClick?: () => void;
+  /** Scroll container ref — used for scroll progress detection when content scrolls inside a container instead of the window */
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
@@ -34,32 +36,46 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
   onPrevMonth,
   onNextMonth,
   onMonthClick,
+  scrollContainerRef,
 }) => {
   const theme = useTheme();
   const isCurrentMonth = isToday(currentDate);
 
-  // Hide nav when the page is within the top 20% scroll
+  // Hide nav when within the top 20% of scroll
   const [hideByTopScroll, setHideByTopScroll] = useState(false);
   useEffect(() => {
+    const container = scrollContainerRef?.current;
+
     const update = () => {
-      const doc = document.documentElement;
-      const scrollable = Math.max(0, doc.scrollHeight - window.innerHeight);
-      if (scrollable <= 0) {
-        // No scrollable area: treat as top to keep nav hidden per requirement
-        setHideByTopScroll(true);
-        return;
+      if (container) {
+        const scrollable = Math.max(0, container.scrollHeight - container.clientHeight);
+        if (scrollable <= 0) {
+          setHideByTopScroll(true);
+          return;
+        }
+        const progress = Math.max(0, Math.min(1, container.scrollTop / scrollable));
+        setHideByTopScroll(progress <= 0.2);
+      } else {
+        const doc = document.documentElement;
+        const scrollable = Math.max(0, doc.scrollHeight - window.innerHeight);
+        if (scrollable <= 0) {
+          setHideByTopScroll(true);
+          return;
+        }
+        const progress = Math.max(0, Math.min(1, window.scrollY / scrollable));
+        setHideByTopScroll(progress <= 0.2);
       }
-      const progress = Math.max(0, Math.min(1, window.scrollY / scrollable));
-      setHideByTopScroll(progress <= 0.2);
     };
+
+    const target = container || window;
     update();
-    window.addEventListener('scroll', update, { passive: true } as any);
+    target.addEventListener('scroll', update, { passive: true });
     window.addEventListener('resize', update);
     return () => {
-      window.removeEventListener('scroll', update as any);
+      target.removeEventListener('scroll', update as any);
       window.removeEventListener('resize', update);
     };
-  }, []);
+  }, [scrollContainerRef]);
 
   const finalVisible = isVisible && !hideByTopScroll;
 
