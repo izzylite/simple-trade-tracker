@@ -1648,7 +1648,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   const breadcrumbRightContent = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-      <Tooltip title={(isLgUp ? isPanelOpen : isEconomicCalendarOpen) ? 'Close Economic Calendar' : 'Economic Calendar'}>
+      <Tooltip title={(isLgUp ? isPanelOpen : isEconomicCalendarOpen) ? 'Close Panel' : 'Economic Calendar'}>
         <IconButton
           size="small"
           onClick={handleToggleEconomicCalendar}

@@ -252,28 +252,9 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
   };
 
   return (
-    <Box sx={{ p: 2, flex: 1, overflowY: 'auto', ...scrollbarStyles(theme) }}>
-      {/* Add button (replaces drawer headerActions) */}
-      {!isReadOnly && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-          <Tooltip title="Create new tag" arrow>
-            <IconButton
-              color="primary"
-              onClick={() => setIsCreateDialogOpen(true)}
-              sx={{
-                bgcolor: alpha(theme.palette.primary.main, 0.1),
-                '&:hover': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.2)
-                }
-              }}
-            >
-              <AddIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      )}
-
-      {/* Content */}
+    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      {/* Scrollable content */}
+      <Box sx={{ p: 2, flex: 1, overflowY: 'auto', minHeight: 0, ...scrollbarStyles(theme) }}>
       <Box>
         <Box sx={{ mb: 3 }}>
           <Typography variant="body1" gutterBottom>
@@ -504,6 +485,28 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
           </Box>
         </Box>
       </Box>
+      </Box>{/* end scrollable content */}
+
+      {/* Footer */}
+      {!isReadOnly && (
+        <Box sx={{
+          p: 1.5,
+          borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          bgcolor: 'background.paper',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          flexShrink: 0,
+        }}>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
+            Add Tag
+          </Button>
+        </Box>
+      )}
 
       {tagToEdit && (
         <TagEditDialog

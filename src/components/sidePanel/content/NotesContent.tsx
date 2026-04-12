@@ -278,7 +278,7 @@ const NotesContent: React.FC<NotesContentProps> = ({
 
   return (
     <>
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {/* Calendar Dropdown - only show in multi-calendar view */}
         {showCalendarPicker && !calendarId && (
           <Box sx={{ p: 2, pb: 1 }}>
@@ -469,6 +469,27 @@ const NotesContent: React.FC<NotesContentProps> = ({
             </>
           )}
         </Box>
+
+        {/* Footer */}
+        {!isReadOnly && (
+          <Box sx={{
+            p: 1.5,
+            borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            bgcolor: 'background.paper',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            flexShrink: 0,
+          }}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={handleNewNote}
+            >
+              Add Note
+            </Button>
+          </Box>
+        )}
       </Box>
 
       {/* Note Editor Dialog */}
