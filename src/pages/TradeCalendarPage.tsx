@@ -1771,16 +1771,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Floating Month Navigation */}
-      <FloatingMonthNavigation
-        currentDate={currentDate}
-        isVisible={showFloatingMonthNav}
-        onPrevMonth={handlePrevMonth}
-        onNextMonth={handleNextMonth}
-        onMonthClick={handleMonthClick}
-        onTodayClick={handleTodayClick}
-      />
-
       {/* Page layout: full page content + inline economic calendar panel (lg+) */}
       <Box sx={{
         display: 'flex', flexDirection: 'row',
@@ -1790,7 +1780,17 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       }}>
 
       {/* Left side: hero, breadcrumbs, and main content */}
-      <Box ref={mainContentRef} sx={{ flex: 1, minWidth: 0, height: '100%', overflowY: 'auto' }}>
+      <Box ref={mainContentRef} sx={{ flex: 1, minWidth: 0, height: '100%', overflowY: 'auto', position: 'relative' }}>
+
+      {/* Floating Month Navigation — inside scroll container */}
+      <FloatingMonthNavigation
+        currentDate={currentDate}
+        isVisible={showFloatingMonthNav}
+        onPrevMonth={handlePrevMonth}
+        onNextMonth={handleNextMonth}
+        onMonthClick={handleMonthClick}
+        onTodayClick={handleTodayClick}
+      />
 
       {/* Hero Image Banner */}
       {heroImageUrl && (
