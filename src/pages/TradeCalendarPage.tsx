@@ -360,9 +360,10 @@ interface TagFilterProps {
   selectedTags: string[];
   onTagsChange: (tags: string[]) => void;
   onOpenDrawer: () => void;
+  isActive?: boolean;
 }
 
-const TagFilter = React.memo<TagFilterProps>(({ allTags, selectedTags, onTagsChange, onOpenDrawer }) => {
+const TagFilter = React.memo<TagFilterProps>(({ allTags, selectedTags, onTagsChange, onOpenDrawer, isActive = false }) => {
   const theme = useTheme();
 
   const handleClearTags = () => {
@@ -395,8 +396,9 @@ const TagFilter = React.memo<TagFilterProps>(({ allTags, selectedTags, onTagsCha
                 boxShadow: `0 6px 16px ${alpha(theme.palette.info.main, 0.4)}`
               }
             } : {
-              borderColor: alpha(theme.palette.text.secondary, 0.3),
-              color: 'text.secondary',
+              borderColor: isActive ? 'info.main' : alpha(theme.palette.text.secondary, 0.3),
+              color: isActive ? 'info.main' : 'text.secondary',
+              bgcolor: isActive ? alpha(theme.palette.info.main, 0.1) : 'transparent',
               '&:hover': {
                 borderColor: 'info.main',
                 bgcolor: alpha(theme.palette.info.main, 0.1),
@@ -988,21 +990,27 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     }
   };
 
-  // Economic calendar toggle handler
-  const handleToggleEconomicCalendar = useCallback(() => {
+  // Generic panel/drawer toggle — reused by Notes, Events, Pinned, Filter, Tags
+  const togglePanel = useCallback((
+    panelId: SidePanelView['id'],
+    toggleDrawer: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
     if (isLgUp) {
-      // On lg+, toggle the side panel open/close and ensure
-      // economic-calendar is the active view
-      if (isPanelOpen && currentView.id === 'economic-calendar') {
+      if (isPanelOpen && currentView.id === panelId) {
         setPanelOpen(false);
       } else {
-        replacePanel({ id: 'economic-calendar' });
+        replacePanel({ id: panelId } as SidePanelView);
         setPanelOpen(true);
       }
     } else {
-      setIsEconomicCalendarOpen(prev => !prev);
+      toggleDrawer(prev => !prev);
     }
   }, [isLgUp, isPanelOpen, currentView, setPanelOpen, replacePanel]);
+
+  const handleToggleEconomicCalendar = useCallback(
+    () => togglePanel('economic-calendar', setIsEconomicCalendarOpen),
+    [togglePanel]
+  );
 
   // AI Chat toggle handler
   const handleToggleAIChat = useCallback(() => {
@@ -1710,37 +1718,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   const breadcrumbRightContent = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-      <Tooltip title={
-        isLgUp
-          ? (isPanelOpen && currentView.id === 'economic-calendar'
-            ? 'Close Economic Calendar'
-            : 'Economic Calendar')
-          : (isEconomicCalendarOpen
-            ? 'Close Economic Calendar'
-            : 'Economic Calendar')
-      }>
-        <IconButton
-          size="small"
-          onClick={handleToggleEconomicCalendar}
-          sx={{
-            color: (isLgUp
-              ? isPanelOpen && currentView.id === 'economic-calendar'
-              : isEconomicCalendarOpen
-            ) ? 'primary.main' : 'text.secondary',
-            bgcolor: (isLgUp
-              ? isPanelOpen && currentView.id === 'economic-calendar'
-              : isEconomicCalendarOpen
-            ) ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
-            '&:hover': { color: 'text.primary' },
-          }}
-        >
-          <EventIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-
-      {!isReadOnly && (
-        <Divider orientation="vertical" flexItem sx={{ mx: 0.5, alignSelf: 'center', height: 18 }} />
-      )}
 
       {!isReadOnly && (
         <Tooltip title="Edit calendar settings">
@@ -2023,6 +2000,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               flexDirection: { xs: 'column', sm: 'row' },
               gap: { xs: 1, sm: 1.5, md: 2 },
               flexWrap: 'wrap',
+              justifyContent: 'center',
               order: { xs: 0, lg: 1 },
               width: { xs: '100%', lg: 'auto' }
             }}>
@@ -2031,6 +2009,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 display: 'flex',
                 gap: { xs: 0.75, sm: 1 },
                 flexWrap: 'wrap',
+                justifyContent: 'center',
                 width: { xs: '100%', sm: 'auto' }
               }}>
                 {/* Only show Today button when not viewing current month */}
@@ -2061,18 +2040,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                   </Button>
                 )}
 
-                {/* Notes Button - Moved from FAB */}
+                {/* Notes Button */}
                 <Tooltip title="Notes for this calendar" arrow>
                   <Button
                     startIcon={<NotesIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                    onClick={() => {
-                      if (isLgUp) {
-                        replacePanel({ id: 'notes' });
-                        setPanelOpen(true);
-                      } else {
-                        setIsNotesDrawerOpen(true);
-                      }
-                    }}
+                    onClick={() => togglePanel('notes', setIsNotesDrawerOpen)}
                     variant="outlined"
                     size="small"
                     sx={{
@@ -2084,8 +2056,18 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                       fontSize: { xs: '0.8125rem', sm: '0.875rem' },
                       py: { xs: 0.75, sm: 1 },
                       px: { xs: 1.5, sm: 2 },
-                      borderColor: alpha(theme.palette.text.secondary, 0.3),
-                      color: 'text.secondary',
+                      borderColor: (isLgUp
+                        ? isPanelOpen && currentView.id === 'notes'
+                        : isNotesDrawerOpen
+                      ) ? 'info.main' : alpha(theme.palette.text.secondary, 0.3),
+                      color: (isLgUp
+                        ? isPanelOpen && currentView.id === 'notes'
+                        : isNotesDrawerOpen
+                      ) ? 'info.main' : 'text.secondary',
+                      bgcolor: (isLgUp
+                        ? isPanelOpen && currentView.id === 'notes'
+                        : isNotesDrawerOpen
+                      ) ? alpha(theme.palette.info.main, 0.1) : 'transparent',
                       '&:hover': {
                         borderColor: 'info.main',
                         bgcolor: alpha(theme.palette.info.main, 0.1),
@@ -2099,6 +2081,46 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                   </Button>
                 </Tooltip>
 
+                {/* Events Button */}
+                <Tooltip title="Economic Calendar" arrow>
+                  <Button
+                    startIcon={<EventIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
+                    onClick={handleToggleEconomicCalendar}
+                    variant="outlined"
+                    size="small"
+                    sx={{
+                      flex: { xs: 1, sm: 'none' },
+                      minWidth: { xs: 'auto', sm: '100px' },
+                      borderRadius: 2,
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                      py: { xs: 0.75, sm: 1 },
+                      px: { xs: 1.5, sm: 2 },
+                      borderColor: (isLgUp
+                        ? isPanelOpen && currentView.id === 'economic-calendar'
+                        : isEconomicCalendarOpen
+                      ) ? 'info.main' : alpha(theme.palette.text.secondary, 0.3),
+                      color: (isLgUp
+                        ? isPanelOpen && currentView.id === 'economic-calendar'
+                        : isEconomicCalendarOpen
+                      ) ? 'info.main' : 'text.secondary',
+                      bgcolor: (isLgUp
+                        ? isPanelOpen && currentView.id === 'economic-calendar'
+                        : isEconomicCalendarOpen
+                      ) ? alpha(theme.palette.info.main, 0.1) : 'transparent',
+                      '&:hover': {
+                        borderColor: 'info.main',
+                        bgcolor: alpha(theme.palette.info.main, 0.1),
+                        color: 'info.main',
+                        transform: 'translateY(-1px)'
+                      },
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                  >
+                    Events
+                  </Button>
+                </Tooltip>
 
               </Box>
 
@@ -2107,19 +2129,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 display: 'flex',
                 gap: { xs: 0.75, sm: 1 },
                 flexWrap: 'wrap',
+                justifyContent: 'center',
                 width: { xs: '100%', sm: 'auto' }
               }}>
                 <Button
                   startIcon={<PinIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                  onClick={() => {
-                    if (isLgUp) {
-                      replacePanel({ id: 'pinned' });
-                      setPanelOpen(true);
-                    } else {
-                      setPinnedTradesDrawerOpen(true);
-                    }
-                  }}
-                  variant={"outlined"}
+                  onClick={() => togglePanel('pinned', setPinnedTradesDrawerOpen)}
+                  variant="outlined"
                   size="small"
                   sx={{
                     flex: { xs: 1, sm: 'none' },
@@ -2130,16 +2146,24 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                     fontSize: { xs: '0.8125rem', sm: '0.875rem' },
                     py: { xs: 0.75, sm: 1 },
                     px: { xs: 1.5, sm: 2 },
-                    ...({
-                      borderColor: alpha(theme.palette.text.secondary, 0.3),
-                      color: 'text.secondary',
-                      '&:hover': {
-                        borderColor: 'info.main',
-                        bgcolor: alpha(theme.palette.info.main, 0.1),
-                        color: 'info.main',
-                        transform: 'translateY(-1px)'
-                      }
-                    }),
+                    borderColor: (isLgUp
+                      ? isPanelOpen && currentView.id === 'pinned'
+                      : pinnedTradesDrawerOpen
+                    ) ? 'info.main' : alpha(theme.palette.text.secondary, 0.3),
+                    color: (isLgUp
+                      ? isPanelOpen && currentView.id === 'pinned'
+                      : pinnedTradesDrawerOpen
+                    ) ? 'info.main' : 'text.secondary',
+                    bgcolor: (isLgUp
+                      ? isPanelOpen && currentView.id === 'pinned'
+                      : pinnedTradesDrawerOpen
+                    ) ? alpha(theme.palette.info.main, 0.1) : 'transparent',
+                    '&:hover': {
+                      borderColor: 'info.main',
+                      bgcolor: alpha(theme.palette.info.main, 0.1),
+                      color: 'info.main',
+                      transform: 'translateY(-1px)'
+                    },
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                   }}
                 >
@@ -2150,14 +2174,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                   allTags={allTags}
                   selectedTags={selectedTags}
                   onTagsChange={handleTagsChange}
-                  onOpenDrawer={() => {
-                    if (isLgUp) {
-                      replacePanel({ id: 'search' });
-                      setPanelOpen(true);
-                    } else {
-                      setIsSearchDrawerOpen(true);
-                    }
-                  }}
+                  onOpenDrawer={() => togglePanel('search', setIsSearchDrawerOpen)}
+                  isActive={isLgUp
+                    ? isPanelOpen && currentView.id === 'search'
+                    : isSearchDrawerOpen
+                  }
                 />
 
                 <Tooltip title={isReadOnly ? "View tags and definitions" : "Manage tags and required tag groups"} arrow>
@@ -2165,14 +2186,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                     variant="outlined"
                     size="small"
                     startIcon={<TagIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                    onClick={() => {
-                      if (isLgUp) {
-                        replacePanel({ id: 'tags' });
-                        setPanelOpen(true);
-                      } else {
-                        setIsTagManagementDrawerOpen(true);
-                      }
-                    }}
+                    onClick={() => togglePanel('tags', setIsTagManagementDrawerOpen)}
                     sx={{
                       flex: { xs: 1, sm: 'none' },
                       minWidth: { xs: 'auto', sm: '120px' },
@@ -2182,8 +2196,18 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                       fontSize: { xs: '0.8125rem', sm: '0.875rem' },
                       py: { xs: 0.75, sm: 1 },
                       px: { xs: 1.5, sm: 2 },
-                      borderColor: alpha(theme.palette.text.secondary, 0.3),
-                      color: 'text.secondary',
+                      borderColor: (isLgUp
+                        ? isPanelOpen && currentView.id === 'tags'
+                        : isTagManagementDrawerOpen
+                      ) ? 'info.main' : alpha(theme.palette.text.secondary, 0.3),
+                      color: (isLgUp
+                        ? isPanelOpen && currentView.id === 'tags'
+                        : isTagManagementDrawerOpen
+                      ) ? 'info.main' : 'text.secondary',
+                      bgcolor: (isLgUp
+                        ? isPanelOpen && currentView.id === 'tags'
+                        : isTagManagementDrawerOpen
+                      ) ? alpha(theme.palette.info.main, 0.1) : 'transparent',
                       '&:hover': {
                         borderColor: 'info.main',
                         bgcolor: alpha(theme.palette.info.main, 0.1),
@@ -2614,27 +2638,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         </Snackbar>
 
 
-        {/* Economic Calendar FAB - Mobile only (lg+ uses breadcrumb button) */}
-        {!isReadOnly && !isLgUp && (
-          <Tooltip title="Economic Calendar" placement="left">
-            <Fab
-              color="primary"
-              aria-label="open economic calendar"
-              onClick={handleToggleEconomicCalendar}
-              size="medium"
-              sx={{
-                position: 'fixed',
-                bottom: { xs: 16, sm: 24 },
-                right: { xs: 16, sm: 24 },
-                zIndex: 1200,
-                width: { xs: 48, sm: 56 },
-                height: { xs: 48, sm: 56 }
-              }}
-            >
-              <EventIcon sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
-            </Fab>
-          </Tooltip>
-        )}
 
 
         {/* Search & Filter Drawer — <lg only */}

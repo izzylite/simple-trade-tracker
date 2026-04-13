@@ -82,6 +82,7 @@ export interface UpdateNoteInput {
   calendar_id?: string | null; // null = global note (visible in all calendars)
   is_archived?: boolean;
   is_pinned?: boolean;
+  by_assistant?: boolean;
 
   // Reminder fields
   reminder_type?: ReminderType;

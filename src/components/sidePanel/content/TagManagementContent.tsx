@@ -282,7 +282,7 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
                 this group.
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
-                Adding definitions to your tags helps the AI assistant and traders understand your
+                Adding definitions to your tags helps Orion and traders understand your
                 trading terminology and provide more accurate analysis.
               </Typography>
             </>

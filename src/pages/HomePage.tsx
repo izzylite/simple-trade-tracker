@@ -55,6 +55,7 @@ import CalendarFormDialog, { CalendarFormData } from '../components/CalendarForm
 import { DuplicateCalendarDialog } from '../components/dialogs/DuplicateCalendarDialog';
 import { CalendarLinkDialog } from '../components/dialogs/CalendarLinkDialog';
 import CalendarListDialog from '../components/dialogs/CalendarListDialog';
+import CalendarsListDrawer from '../components/calendars/CalendarsListDrawer';
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import OrionIcon from '../components/aiChat/OrionIcon';
 import TradeFormDialog from '../components/trades/TradeFormDialog';
@@ -77,6 +78,8 @@ import AIChatContent from '../components/sidePanel/content/AIChatContent';
 import { useAIChat } from '../hooks/useAIChat';
 import EconomicCalendarPanel
   from '../components/economicCalendar/EconomicCalendarPanel';
+import CalendarsListContent
+  from '../components/sidePanel/content/CalendarsListContent';
 import {
   Notes as NotesIcon,
   SmartToy as SmartToyIcon,
@@ -155,6 +158,7 @@ const HomeInner: React.FC<HomeProps> = ({
 
   // Calendar list dialog state
   const [isCalendarListDialogOpen, setIsCalendarListDialogOpen] = useState(false);
+  const [isCalendarsDrawerOpen, setIsCalendarsDrawerOpen] = useState(false);
 
   // Image zoom state
   const [zoomedImage, setZoomedImage] = useState<string>('');
@@ -193,6 +197,7 @@ const HomeInner: React.FC<HomeProps> = ({
       setIsNotesDrawerOpen(false);
       setIsAIChatOpen(false);
       setEconomicCalendarOpen(false);
+      setIsCalendarsDrawerOpen(false);
     };
 
     if (prevIsLgUp.current && !isLgUp && isPanelOpen) {
@@ -207,6 +212,9 @@ const HomeInner: React.FC<HomeProps> = ({
           break;
         case 'economic-calendar':
           setEconomicCalendarOpen(true);
+          break;
+        case 'calendars-list':
+          setIsCalendarsDrawerOpen(true);
           break;
       }
     } else if (!prevIsLgUp.current && isLgUp) {
@@ -610,6 +618,31 @@ const HomeInner: React.FC<HomeProps> = ({
                 availableCalendars={calendars}
                 selectedCalendarId={aiChatCalendarId}
                 onCalendarChange={setAiChatCalendarId}
+              />
+            ),
+          };
+        case 'calendars-list':
+          return {
+            title: view.isTrash ? 'Trash' : 'All Calendars',
+            icon: view.isTrash
+              ? <TrashIcon fontSize="small" />
+              : <CalendarToday fontSize="small" />,
+            component: (
+              <CalendarsListContent
+                isActive={
+                  isPanelOpen && currentView.id === 'calendars-list'
+                }
+                initialTab={view.isTrash ? 1 : 0}
+                onCalendarClick={handleCalendarClick}
+                onEditCalendar={handleEditCalendar}
+                onDuplicateCalendar={handleDuplicateCalendar}
+                onLinkCalendar={handleLinkCalendar}
+                onDeleteCalendar={handleDeleteCalendar}
+                onUpdateCalendarProperty={handleUpdateCalendarProperty}
+                onRestoreCalendar={handleRestoreCalendar}
+                onPermanentDeleteCalendar={
+                  handlePermanentDeleteCalendar
+                }
               />
             ),
           };
@@ -1130,7 +1163,17 @@ const HomeInner: React.FC<HomeProps> = ({
                   fontSize: { xs: '0.8125rem', sm: '0.875rem' },
                   '&:hover': { textDecoration: 'underline' }
                 }}
-                onClick={() => setIsCalendarListDialogOpen(true)}
+                onClick={() => {
+                  if (isLgUp) {
+                    replacePanel({
+                      id: 'calendars-list',
+                      isTrash: calendarTabIndex === 1,
+                    });
+                    setPanelOpen(true);
+                  } else {
+                    setIsCalendarsDrawerOpen(true);
+                  }
+                }}
               >
                 View all
               </Typography>
@@ -1548,6 +1591,22 @@ const HomeInner: React.FC<HomeProps> = ({
                 onClose={() => setIsNotesDrawerOpen(false)}
                 showCalendarPicker={true}
                 showFooter={false}
+              />
+              <CalendarsListDrawer
+                open={isCalendarsDrawerOpen}
+                onClose={() => setIsCalendarsDrawerOpen(false)}
+                initialTab={calendarTabIndex}
+                onCalendarClick={(id) => {
+                  setIsCalendarsDrawerOpen(false);
+                  handleCalendarClick(id);
+                }}
+                onEditCalendar={handleEditCalendar}
+                onDuplicateCalendar={handleDuplicateCalendar}
+                onLinkCalendar={handleLinkCalendar}
+                onDeleteCalendar={handleDeleteCalendar}
+                onUpdateCalendarProperty={handleUpdateCalendarProperty}
+                onRestoreCalendar={handleRestoreCalendar}
+                onPermanentDeleteCalendar={handlePermanentDeleteCalendar}
               />
             </>
           )}

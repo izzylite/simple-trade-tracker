@@ -150,12 +150,12 @@ const TagCreateDialog: React.FC<TagCreateDialogProps> = ({
                     multiline
                     rows={3}
                     disabled={isSubmitting}
-                    placeholder="What does this tag mean? Helps the AI analyze your trades."
+                    placeholder="What does this tag mean? Helps Orion analyze your trades."
                     inputProps={{ maxLength: 2024 }}
                     helperText={
                         <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <AIIcon sx={{ fontSize: 14 }} />
-                            Help the AI understand your trading context
+                            Help Orion understand your trading context
                         </Box>
                     }
                     sx={{

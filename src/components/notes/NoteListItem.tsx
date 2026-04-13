@@ -6,7 +6,6 @@
 import React, { useState } from 'react';
 import {
   ListItemButton,
-  ListItemText,
   Typography,
   Box,
   useTheme,
@@ -14,6 +13,7 @@ import {
   IconButton,
   Chip,
   Stack,
+  Tooltip,
 } from '@mui/material';
 import {
   PushPin as PinIcon,
@@ -23,11 +23,13 @@ import {
   NotificationsActive as ReminderIcon,
   SmartToy as AIIcon,
   LocalOffer as TagIcon,
+  Person as ConvertToUserIcon,
 } from '@mui/icons-material';
 import { convertFromRaw } from 'draft-js';
 import { Note } from '../../types/note';
 import { Calendar } from '../../types/calendar';
 import { getTagDisplayLabel } from './NoteEditorDialog';
+import ConfirmationDialog from '../common/ConfirmationDialog';
 
 interface NoteListItemProps {
   note: Note;
@@ -35,6 +37,7 @@ interface NoteListItemProps {
   onPin?: (note: Note) => void;
   onArchive?: (note: Note) => void;
   onUnarchive?: (note: Note) => void;
+  onConvertToUserNote?: (note: Note) => void;
   calendar?: Calendar; // For showing calendar name in multi-calendar view
   showCalendarBadge?: boolean;
 }
@@ -61,11 +64,13 @@ export const NoteListItem: React.FC<NoteListItemProps> = ({
   onPin,
   onArchive,
   onUnarchive,
+  onConvertToUserNote,
   calendar,
   showCalendarBadge = false,
 }) => {
   const theme = useTheme();
   const [isHovered, setIsHovered] = useState(false);
+  const [confirmConvertOpen, setConfirmConvertOpen] = useState(false);
 
   // Extract plain text from rich text content
   const plainText = extractPlainText(note.content);
@@ -90,14 +95,25 @@ export const NoteListItem: React.FC<NoteListItemProps> = ({
     }
   };
 
+  const handleConvertClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmConvertOpen(true);
+  };
+
+  const handleConfirmConvert = () => {
+    setConfirmConvertOpen(false);
+    if (onConvertToUserNote) onConvertToUserNote(note);
+  };
+
   return (
+    <>
     <ListItemButton
       onClick={() => onClick(note)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       sx={{
         borderRadius: 1,
-        mb: 0.5, 
+        mb: 0.5,
         p: 1.5,
         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
         bgcolor: note.is_pinned
@@ -210,11 +226,11 @@ export const NoteListItem: React.FC<NoteListItemProps> = ({
                 +{note.tags.length - 3}
               </Typography>
             )}
-            
+
           </Stack>
         )}
 
-       
+
 
         {/* Last updated */}
         <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
@@ -235,6 +251,25 @@ export const NoteListItem: React.FC<NoteListItemProps> = ({
           transition: 'opacity 0.15s ease',
         }}
       >
+        {note.by_assistant && onConvertToUserNote && (
+          <Tooltip title="Convert to my note" arrow>
+            <IconButton
+              size="small"
+              onClick={handleConvertClick}
+              sx={{
+                p: 0.5,
+                color: 'text.secondary',
+                '&:hover': {
+                  bgcolor: alpha(theme.palette.info.main, 0.1),
+                  color: 'info.main',
+                },
+              }}
+            >
+              <ConvertToUserIcon sx={{ fontSize: '1.1rem' }} />
+            </IconButton>
+          </Tooltip>
+        )}
+
         {onPin && (
           <IconButton
             size="small"
@@ -295,6 +330,17 @@ export const NoteListItem: React.FC<NoteListItemProps> = ({
         />
       )}
     </ListItemButton>
+
+    {/* Convert to user note confirmation dialog */}
+    <ConfirmationDialog
+      open={confirmConvertOpen}
+      title="Convert to My Note"
+      message="This will convert the Orion note to your own note. It will no longer be marked as Orion-generated."
+      confirmText="Convert"
+      onConfirm={handleConfirmConvert}
+      onCancel={() => setConfirmConvertOpen(false)}
+    />
+    </>
   );
 };
 

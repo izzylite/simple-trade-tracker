@@ -170,6 +170,7 @@ This project uses specialized AI subagents for specific domains. Claude Code sho
 - **Also check `src/services/` and `src/hooks/`** for existing logic that covers the same need.
 - If a similar function exists but has a different return type or signature, prefer extending or wrapping it over duplicating it.
 - New utility functions belong in `src/utils/` in the most relevant existing file (e.g. image helpers → `fileValidation.ts`, formatters → `formatters.ts`).
+- **Extract shared logic within components too.** When 2+ event handlers, style objects, or render patterns repeat the same structure with different parameters, extract a reusable helper function or constant immediately — don't duplicate then refactor later. Example: a `togglePanel(viewId, drawerSetter)` instead of repeating the same panel open/close logic for every button.
 
 ### UI/UX Preferences
 - Rounded tab styling and curved cards

@@ -692,7 +692,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           <RoundedTabs
             tabs={[
               { label: 'Trade', icon: <TradeIcon sx={{ fontSize: 18 }} /> },
-              { label: 'Assistant', icon: <AssistantIcon sx={{ fontSize: 18 }} /> }
+              { label: 'Ask Orion', icon: <AssistantIcon sx={{ fontSize: 18 }} /> }
             ]}
             activeTab={activeTab}
             onTabChange={handleTabChange}

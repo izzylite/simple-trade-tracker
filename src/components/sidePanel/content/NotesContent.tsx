@@ -222,6 +222,16 @@ const NotesContent: React.FC<NotesContentProps> = ({
     }
   };
 
+  const handleConvertToUserNote = async (note: Note) => {
+    try {
+      updateNote(note.id, { by_assistant: false });
+      await notesService.updateNote(note.id, { by_assistant: false });
+    } catch (error) {
+      logger.error('Error converting note:', error);
+      updateNote(note.id, { by_assistant: true });
+    }
+  };
+
   const getCalendarForNote = (note: Note): Calendar | undefined => {
     return calendars.find(c => c.id === note.calendar_id);
   };
@@ -322,7 +332,7 @@ const NotesContent: React.FC<NotesContentProps> = ({
               <MenuItem value="assistant">
                 <Stack direction="row" spacing={1} alignItems="center">
                   <AIIcon sx={{ fontSize: '1rem', color: 'primary.main' }} />
-                  <Typography variant="body2">AI Assistant</Typography>
+                  <Typography variant="body2">Orion</Typography>
                 </Stack>
               </MenuItem>
             </Select>
@@ -360,16 +370,6 @@ const NotesContent: React.FC<NotesContentProps> = ({
                     ? 'Create your first note to get started'
                     : ''}
               </Typography>
-              {!searchQuery && activeTab === 'all' && !isReadOnly && (
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={handleNewNote}
-                  sx={{ mt: 2 }}
-                >
-                  Create Note
-                </Button>
-              )}
             </Stack>
           ) : (
             <>
@@ -382,6 +382,9 @@ const NotesContent: React.FC<NotesContentProps> = ({
                     onPin={isReadOnly ? undefined : handlePin}
                     onArchive={isReadOnly ? undefined : handleArchive}
                     onUnarchive={isReadOnly ? undefined : handleArchive}
+                    onConvertToUserNote={
+                      isReadOnly ? undefined : handleConvertToUserNote
+                    }
                     calendar={getCalendarForNote(note)}
                     showCalendarBadge={showCalendarPicker && !calendarId}
                   />

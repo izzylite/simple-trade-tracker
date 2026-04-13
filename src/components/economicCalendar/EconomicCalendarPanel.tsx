@@ -98,8 +98,8 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
     applyFilters, resetFilters,
   } = useEconomicCalendarFilters({ calendar, onUpdateCalendarProperty });
 
-  const effectiveCurrentDate = (enabled && initialDate) ? initialDate : currentDate;
-  const effectiveIsViewingSpecificDate = !!(enabled && initialDate) || isViewingSpecificDate;
+  const effectiveIsViewingSpecificDate = isViewingSpecificDate;
+  const effectiveCurrentDate = (effectiveIsViewingSpecificDate && initialDate) ? initialDate : currentDate;
 
   const {
     events, loading, loadingMore, error, hasMore, loadMore, refresh,
@@ -281,19 +281,19 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
             <Button
               startIcon={<EventIcon />}
               onClick={() => handleViewTypeChange('day')}
-              variant={!isMonthPickerActive && viewType === 'day' ? 'contained' : 'outlined'}
+              variant={!isMonthPickerActive && !effectiveIsViewingSpecificDate && viewType === 'day' ? 'contained' : 'outlined'}
               sx={{ flex: 1, whiteSpace: 'nowrap' }}
             >Today</Button>
             <Button
               startIcon={<WeekIcon />}
               onClick={() => handleViewTypeChange('week')}
-              variant={!isMonthPickerActive && viewType === 'week' ? 'contained' : 'outlined'}
+              variant={!isMonthPickerActive && !effectiveIsViewingSpecificDate && viewType === 'week' ? 'contained' : 'outlined'}
               sx={{ flex: 1, whiteSpace: 'nowrap' }}
             >This Week</Button>
             <Button
               startIcon={<MonthIcon />}
               onClick={() => handleViewTypeChange('month')}
-              variant={!isMonthPickerActive && viewType === 'month' ? 'contained' : 'outlined'}
+              variant={!isMonthPickerActive && !effectiveIsViewingSpecificDate && viewType === 'month' ? 'contained' : 'outlined'}
               sx={{ flex: 1, whiteSpace: 'nowrap' }}
             >This Month</Button>
           </ButtonGroup>

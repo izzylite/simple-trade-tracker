@@ -41,6 +41,11 @@ export interface AIChatView {
   id: 'ai-chat';
 }
 
+export interface CalendarsListView {
+  id: 'calendars-list';
+  isTrash?: boolean;
+}
+
 export type SidePanelView =
   | EconomicCalendarView
   | NotesView
@@ -49,7 +54,8 @@ export type SidePanelView =
   | TagsView
   | DayTradesView
   | AIAnalysisView
-  | AIChatView;
+  | AIChatView
+  | CalendarsListView;
 
 const MAX_STACK_DEPTH = 3;
 
