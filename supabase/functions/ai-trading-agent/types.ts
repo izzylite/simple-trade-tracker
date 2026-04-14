@@ -217,7 +217,6 @@ export interface AgentRequest {
   focusedTradeId?: string; // When analyzing a specific trade
   conversationHistory?: ConversationMessage[];
   calendarContext?: Partial<Calendar>;
-  userApiKey?: string; // User's own Gemini API key (optional)
   images?: UserAttachedImage[]; // User-attached images for analysis
 }
 

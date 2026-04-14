@@ -37,7 +37,6 @@ import {
   ArrowBack as ArrowBackIcon,
   Delete as DeleteIcon,
   Schedule as ScheduleIcon,
-  Settings as SettingsIcon,
   Search as SearchIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
@@ -53,7 +52,6 @@ import { useAuthState } from '../../../contexts/AuthStateContext';
 import { useAIChat, UseAIChatReturn } from '../../../hooks/useAIChat';
 import EconomicEventDetailDialog
   from '../../economicCalendar/EconomicEventDetailDialog';
-import ApiKeySettingsDialog from '../../aiChat/ApiKeySettingsDialog';
 import NoteEditorDialog from '../../notes/NoteEditorDialog';
 import { Note } from '../../../types/note';
 import { TradeOperationsProps } from '../../../types/tradeOperations';
@@ -184,9 +182,6 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
 
-  // API Key settings dialog state
-  const [apiKeySettingsOpen, setApiKeySettingsOpen] = useState(false);
-
   // Filter conversations based on search query
   const filteredConversations = useMemo(() => {
     if (!historySearchQuery.trim()) {
@@ -292,7 +287,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
         borderBottom: `1px solid ${theme.palette.divider}`
       }}>
         {/* Calendar context picker — inline in header */}
-        {availableCalendars && availableCalendars.length > 0 && onCalendarChange && (
+        {availableCalendars && availableCalendars.length > 0 && onCalendarChange ? (
           <FormControl size="small" sx={{ flex: 1, minWidth: 0 }}>
             <Select
               value={selectedCalendarId}
@@ -317,10 +312,26 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
               ))}
             </Select>
           </FormControl>
-        )}
+        ) : calendar ? (
+          <FormControl size="small" sx={{ flex: 1, minWidth: 0 }}>
+            <Select
+              value={calendar.id}
+              disabled
+              sx={{
+                borderRadius: 1,
+                bgcolor: 'background.default',
+                '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' },
+              }}
+            >
+              <MenuItem value={calendar.id}>
+                <Typography variant="body2">{calendar.name}</Typography>
+              </MenuItem>
+            </Select>
+          </FormControl>
+        ) : null}
 
         {user && (
-          <>
+          <Box sx={{ display: 'flex', gap: 0.5, ml: 'auto' }}>
             <Tooltip title="New Chat">
               <IconButton
                 size="small"
@@ -367,25 +378,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                 }
               </IconButton>
             </Tooltip>
-          </>
+          </Box>
         )}
 
-        <Tooltip title="API Key Settings">
-          <IconButton
-            size="small"
-            onClick={() => setApiKeySettingsOpen(true)}
-            sx={{
-              color: 'text.secondary',
-              '&:hover': {
-                backgroundColor: alpha(
-                  theme.palette.action.hover, 0.5
-                )
-              }
-            }}
-          >
-            <SettingsIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
       </Box>
 
       {/* Content - Sliding Pager */}
@@ -809,12 +804,6 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* API Key Settings Dialog */}
-      <ApiKeySettingsDialog
-        open={apiKeySettingsOpen}
-        onClose={() => setApiKeySettingsOpen(false)}
-      />
 
       {/* Note Editor Dialog */}
       {noteEditorOpen && selectedNote && calendar && (

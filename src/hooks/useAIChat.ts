@@ -20,7 +20,6 @@ import {
   ConversationPaginationOptions
 } from '../services/repository/repositories/ConversationRepository';
 import { logger } from '../utils/logger';
-import { hasApiKey } from '../services/apiKeyStorage';
 
 const CONVERSATIONS_PAGE_SIZE = 15;
 
@@ -169,49 +168,20 @@ export function useAIChat({
                        errorMessage.match(/retryDelay["\s:]+(\d+)s/i);
     const retryDelay = retryMatch ? retryMatch[1] : undefined;
 
-    const userHasApiKey = hasApiKey();
-
     let userMessage = '';
 
     if (isApiKeyError) {
       userMessage = '⚠️ **API Key Error**\n\n';
-
-      if (userHasApiKey) {
-        userMessage += 'Your Gemini API key has expired or is invalid.\n\n';
-        userMessage += '**What you can do:**\n';
-        userMessage += '• Go to [Google AI Studio](https://aistudio.google.com/app/apikey)\n';
-        userMessage += '• Generate a new API key\n';
-        userMessage += '• Click the ⚙️ Settings button above to update your key\n';
-      } else {
-        userMessage += 'The shared API key has expired.\n\n';
-        userMessage += '**Solution: Use Your Own API Key**\n';
-        userMessage += '• Click the ⚙️ Settings button above\n';
-        userMessage += '• Add your free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)\n';
-        userMessage += '• Get unlimited usage with your own quota\n';
-      }
+      userMessage += 'The AI service encountered an authentication error. ';
+      userMessage += 'Please try again later or contact support.\n';
     } else {
       userMessage = '⚠️ **API Quota Exceeded**\n\n';
-
-      if (userHasApiKey) {
-        userMessage += 'Your Gemini API key has reached its quota limit.\n\n';
-        userMessage += '**What you can do:**\n';
-        userMessage += '• Wait for your quota to reset (usually 24 hours)\n';
-        userMessage += '• Check your usage at [Google AI Studio](https://aistudio.google.com/app/apikey)\n';
-        userMessage += '• Upgrade to a paid plan for higher limits\n';
-        if (retryDelay) {
-          const seconds = Math.ceil(parseFloat(retryDelay));
-          userMessage += `\n*You can retry in ${seconds} seconds*`;
-        }
-      } else {
-        userMessage += 'The shared API key has reached its quota limit.\n\n';
-        userMessage += '**Solution: Use Your Own API Key**\n';
-        userMessage += '• Click the ⚙️ Settings button above\n';
-        userMessage += '• Add your free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)\n';
-        userMessage += '• Get unlimited usage with your own quota\n';
-        if (retryDelay) {
-          const seconds = Math.ceil(parseFloat(retryDelay));
-          userMessage += `\n*Or wait ${seconds} seconds to retry with the shared key*`;
-        }
+      userMessage += 'The AI service has reached its usage limit.\n\n';
+      userMessage += '**What you can do:**\n';
+      userMessage += '• Wait for the quota to reset (usually within a few minutes)\n';
+      if (retryDelay) {
+        const seconds = Math.ceil(parseFloat(retryDelay));
+        userMessage += `\n*You can retry in ${seconds} seconds*`;
       }
     }
 

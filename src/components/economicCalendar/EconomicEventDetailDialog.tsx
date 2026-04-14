@@ -38,8 +38,6 @@ import { Z_INDEX } from '../../styles/zIndex';
 import Shimmer from '../Shimmer';
 import { supabaseAIChatService } from '../../services/supabaseAIChatService';
 import { supabase } from '../../config/supabase';
-import { hasApiKey } from '../../services/apiKeyStorage';
-import ApiKeySettingsDialog from '../aiChat/ApiKeySettingsDialog';
 
 interface EconomicEventDetailDialogProps {
   open: boolean;
@@ -73,7 +71,6 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
   const [aiAnalysisExpanded, setAiAnalysisExpanded] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [apiKeySettingsOpen, setApiKeySettingsOpen] = useState(false);
 
   // State for event trades
   const [eventTrades, setEventTrades] = useState<Trade[]>([]);
@@ -300,12 +297,6 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
 
   // Handle Ask AI
   const handleAskAI = async () => {
-    // Check if API key exists
-    if (!hasApiKey()) {
-      setApiKeySettingsOpen(true);
-      return;
-    }
-
     setIsAnalyzing(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -361,13 +352,7 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
       }
     } catch (error) {
       console.error('Error asking AI:', error);
-
-      // If error is about API key (e.g. from backend), prompt for it
-      if (error instanceof Error && error.message.includes('API key')) {
-        setApiKeySettingsOpen(true);
-      }
-
-      setAiAnalysis('An error occurred while analyzing the event. Please check your API key settings.');
+      setAiAnalysis('An error occurred while analyzing the event. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -687,11 +672,6 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
         </Box>
       </BaseDialog>
 
-      {/* API Key Settings Dialog */}
-      <ApiKeySettingsDialog
-        open={apiKeySettingsOpen}
-        onClose={() => setApiKeySettingsOpen(false)}
-      />
     </>
   );
 };

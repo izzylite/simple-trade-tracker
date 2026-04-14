@@ -1532,7 +1532,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: AgentRequest = await req.json();
-    const { message, userId, calendarId, focusedTradeId, conversationHistory = [], calendarContext, userApiKey, images } = body;
+    const { message, userId, calendarId, focusedTradeId, conversationHistory = [], calendarContext, images } = body;
 
     // Allow image-only messages (no text required if images present)
     const hasContent = message || (images && images.length > 0);
@@ -1555,15 +1555,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Use user's API key if provided, otherwise fall back to server key
-    const googleApiKey = userApiKey || Deno.env.get('GOOGLE_API_KEY');
+    const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
     if (!googleApiKey) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'No API key available. Please configure your Gemini API key in settings.'
+          error: 'AI service is not configured. Please contact support.'
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -1572,7 +1571,7 @@ Deno.serve(async (req: Request) => {
       ? `Please analyze ${images.length === 1 ? 'this image' : `these ${images.length} images`}.`
       : '');
 
-    log(`Processing request for user ${userId} (using ${userApiKey ? 'user' : 'server'} API key)`, 'info');
+    log(`Processing request for user ${userId}`, 'info');
     log(`Input message (first 200 chars): "${effectiveMessage.substring(0, 200)}"`, 'info');
     log(`Message length: ${effectiveMessage.length}, History length: ${conversationHistory.length}, Images: ${images?.length || 0}`, 'info');
 

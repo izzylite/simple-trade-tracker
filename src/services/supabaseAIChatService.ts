@@ -9,7 +9,7 @@ import { logger } from '../utils/logger';
 import type { Trade } from '../types/trade';
 import type { Calendar } from '../types/calendar';
 import type { ChatMessage as ChatMessageType, AttachedImage } from '../types/aiChat';
-import { getApiKey } from './apiKeyStorage';
+
 
 export interface AgentResponse {
   success: boolean;
@@ -148,17 +148,14 @@ class SupabaseAIChatService {
         content: msg.content
       }));
 
-      // Get user's API key from localStorage (if available)
-      const userApiKey = getApiKey();
-
       // Call edge function with streaming
-      const url = this.getFunctionUrl() + '?stream=true'; // Use query param for streaming
+      const url = this.getFunctionUrl() + '?stream=true';
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
-          'Accept': 'text/event-stream' // Also set Accept header for proper response type
+          'Accept': 'text/event-stream',
         },
         body: JSON.stringify({
           message: finalMessage,
@@ -166,12 +163,15 @@ class SupabaseAIChatService {
           calendarId: calendar?.id,
           focusedTradeId: focusedTradeId || undefined,
           conversationHistory: formattedHistory,
-          calendarContext: calendar ? this.buildCalendarContext(calendar) : undefined,
-          userApiKey: userApiKey || undefined, // Send user's API key if available
-          images: images && images.length > 0 ? images.map(img => ({
-            url: img.url,
-            mimeType: img.mimeType
-          })) : undefined, // Send attached images
+          calendarContext: calendar
+            ? this.buildCalendarContext(calendar)
+            : undefined,
+          images: images && images.length > 0
+            ? images.map(img => ({
+                url: img.url,
+                mimeType: img.mimeType,
+              }))
+            : undefined,
         }),
         signal
       });
@@ -359,13 +359,9 @@ class SupabaseAIChatService {
         content: msg.content
       }));
 
-      // Get user's API key from localStorage (if available)
-      const userApiKey = getApiKey();
-
       // Get valid auth token with auto-refresh
       const session = await this.getValidSession();
 
-      // Call edge function using fetch (not supabase.functions.invoke) to get detailed error messages
       const response = await fetch(
         `${supabaseUrl}/functions/v1/${this.FUNCTION_NAME}`,
         {
@@ -380,8 +376,9 @@ class SupabaseAIChatService {
             calendarId: calendar?.id,
             focusedTradeId: focusedTradeId || undefined,
             conversationHistory: formattedHistory,
-            calendarContext: calendar ? this.buildCalendarContext(calendar) : undefined,
-            userApiKey: userApiKey || undefined,
+            calendarContext: calendar
+              ? this.buildCalendarContext(calendar)
+              : undefined,
           }),
         }
       );
