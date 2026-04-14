@@ -109,7 +109,7 @@ export const DEFAULT_NOTE_TAGS_MAP: Record<string, TagInfo> = {
   'GENERAL': { label: 'General', subtitle: 'General notes and thoughts' },
   'RISK_MANAGEMENT': { label: 'Risk Management', subtitle: 'Position sizing and stop-loss rules' },
   'PSYCHOLOGY': { label: 'Psychology', subtitle: 'Mental state and emotional control' },
-  'GUIDELINE': { label: 'Guideline', subtitle: 'Instructions for the AI Assistant (Max 1)' },
+  'GUIDELINE': { label: 'Guideline', subtitle: 'Instructions for the Orion (Max 1)' },
 };
 
 // Helper to get display label for a tag (returns original if not a default tag)
@@ -204,7 +204,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   const [reminderDate, setReminderDate] = useState<Date | null>(null);
   const [reminderDays, setReminderDays] = useState<DayAbbreviation[]>([]);
   const [isReminderActive, setIsReminderActive] = useState(false);
-  const [isReminderExpanded, setIsReminderExpanded] = useState(false);
+  const [isReminderExpanded, setIsReminderExpanded] = useState(!initialNote);
   // Color state
   const [noteColor, setNoteColor] = useState(initialNote?.color);
   const [colorMenuAnchor, setColorMenuAnchor] = useState<null | HTMLElement>(null);
@@ -304,7 +304,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           setReminderDate(null);
           setReminderDays([]);
           setIsReminderActive(false);
-          setIsReminderExpanded(false);
+          setIsReminderExpanded(true);
           setNoteColor(undefined);
           setTags([]);
           setIsTagsExpanded(false);
@@ -319,6 +319,9 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
 
   const saveNote = async () => {
     if (!user?.uid) return;
+
+    // In game plan mode, require both title and content
+    if (gamePlanDay && (!title.trim() || !content.trim())) return;
 
     try {
       setSaving(true);

@@ -1,14 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     TextField,
     Typography,
     Box,
     alpha,
     useTheme,
-    CircularProgress
+    CircularProgress,
+    Autocomplete
 } from '@mui/material';
 import { AutoAwesome as AIIcon } from '@mui/icons-material';
-import { formatTagWithCapitalizedGroup } from '../utils/tagColors';
+import {
+    formatTagWithCapitalizedGroup,
+    getTagGroup,
+    isGroupedTag,
+} from '../utils/tagColors';
 import { BaseDialog } from './common';
 import { logger } from '../utils/logger';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
@@ -37,6 +42,16 @@ const TagCreateDialog: React.FC<TagCreateDialogProps> = ({
     const [definition, setDefinition] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const existingGroups = useMemo(() => {
+        const groups = new Set<string>();
+        allTags.forEach(tag => {
+            if (isGroupedTag(tag)) {
+                groups.add(getTagGroup(tag));
+            }
+        });
+        return Array.from(groups).sort();
+    }, [allTags]);
 
     // Reset state when dialog opens
     useEffect(() => {
@@ -112,18 +127,7 @@ const TagCreateDialog: React.FC<TagCreateDialogProps> = ({
                 </Typography>
 
                 <Box sx={{ display: 'flex', gap: 2 }}>
-                    <TextField
-                        label="Group (optional)"
-                        value={tagGroup}
-                        onChange={(e) => {
-                            const value = e.target.value;
-                            if (value.includes(':')) return;
-                            setTagGroup(value);
-                        }}
-                        fullWidth
-                        placeholder="e.g. Strategy"
-                        disabled={isSubmitting}
-                    />
+                   
                     <TextField
                         label="Tag Name"
                         value={tagName}
@@ -139,6 +143,27 @@ const TagCreateDialog: React.FC<TagCreateDialogProps> = ({
                         helperText={error}
                         placeholder="e.g. Breakout"
                         disabled={isSubmitting}
+                    />
+
+                     <Autocomplete
+                        freeSolo
+                        options={existingGroups}
+                        value={tagGroup}
+                        onInputChange={(_e, value) => {
+                            if (!value.includes(':')) setTagGroup(value);
+                        }}
+                        disabled={isSubmitting}
+                        fullWidth
+                        slotProps={{
+                            popper: { sx: { zIndex: 1600 } },
+                        }}
+                        renderInput={(params) => (
+                            <TextField
+                                {...params}
+                                label="Group (optional)"
+                                placeholder="e.g. Strategy"
+                            />
+                        )}
                     />
                 </Box>
 
