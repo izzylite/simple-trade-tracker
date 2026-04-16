@@ -115,23 +115,26 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
           gap: 2,
           gridAutoRows: 'minmax(min-content, max-content)'
         }}>
-          {sessionStats.map(session => (
-            <Paper
-              key={session.session}
-              sx={{
-                p: 2,
-                border: `1px solid ${alpha(
-                  SESSION_COLORS[session.session as keyof typeof SESSION_COLORS],
-                  0.3
-                )}`,
-                borderRadius: 2,
-                bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)',
+          {sessionStats.map(session => {
+            const sessionColor = SESSION_COLORS[session.session as keyof typeof SESSION_COLORS] || theme.palette.primary.main;
+            const cardBgAlpha = theme.palette.mode === 'dark' ? 0.18 : 0.1;
+            const cardHoverAlpha = theme.palette.mode === 'dark' ? 0.4 : 0.2;
+            return (
+              <Paper
+                key={session.session}
+                sx={{
+                  p: 2,
+                  border: `1px solid ${alpha(sessionColor, 0.3)}`,
+                  borderRadius: 2,
+                  bgcolor: alpha(sessionColor, cardBgAlpha),
                 opacity: session.total_trades === 0 ? 0.5 : 1,
                 cursor: session.total_trades > 0 ? 'pointer' : 'default',
                 transition: 'all 0.2s',
                 '&:hover': {
                   boxShadow: session.total_trades > 0 ? theme.shadows[2] : 'none',
-                  bgcolor: session.total_trades > 0 ? alpha(theme.palette.primary.main, 0.05) : theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)'
+                  bgcolor: session.total_trades > 0
+                    ? alpha(sessionColor, cardHoverAlpha)
+                    : alpha(sessionColor, cardBgAlpha)
                 }
               }}
               onClick={() => {
@@ -256,7 +259,8 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                 />
               </Stack>
             </Paper>
-          ))}
+          );
+          })}
         </Box>
 
         {/* Pro Tip Section */}
