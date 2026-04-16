@@ -133,6 +133,48 @@ async function releaseLock(eventName: string, country: string): Promise<void> {
   }
 }
 
+const WAIT_FOR_SYNC_TIMEOUT_MS = 15_000;
+const WAIT_POLL_INTERVAL_MS = 500;
+
+/**
+ * Poll the cache until the winning caller writes a fresh row for this event,
+ * or until WAIT_FOR_SYNC_TIMEOUT_MS elapses.
+ *
+ * Returns:
+ *   - the fresh cached row if the winner wrote before timeout
+ *   - null on timeout (caller falls back to stale or errors out)
+ */
+async function waitForFreshCache(
+  eventName: string,
+  country: string,
+  beforeLastUpdated: string | null,
+): Promise<CachedEventData | null> {
+  const started = Date.now();
+  const deadline = started + WAIT_FOR_SYNC_TIMEOUT_MS;
+  const beforeMs = beforeLastUpdated ? new Date(beforeLastUpdated).getTime() : 0;
+
+  log(`Waiting for in-flight sync of ${eventName} (${country})`);
+
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, WAIT_POLL_INTERVAL_MS));
+
+    const { data: current } = await getCachedEventData(eventName, country);
+    if (!current) continue;
+
+    const currentMs = new Date(current.last_updated).getTime();
+    const advanced = currentMs > beforeMs;
+    const fresh = Date.now() - currentMs < CACHE_FRESHNESS_MS;
+
+    if (advanced && fresh) {
+      log(`Wait-loop: fresh data observed for ${eventName} after ${Date.now() - started}ms`);
+      return current;
+    }
+  }
+
+  log(`Wait-loop timed out for ${eventName} (${country}) after ${WAIT_FOR_SYNC_TIMEOUT_MS}ms`);
+  return null;
+}
+
 interface CachedEventData {
   id: string;
   external_id: string;
