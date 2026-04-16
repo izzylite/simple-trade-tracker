@@ -53,7 +53,11 @@ const SharedTradePage: React.FC = () => {
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Box sx={{ minHeight: '100vh', backgroundColor: 'custom.pageBackground' }}>
+        <Box sx={{
+          minHeight: '100vh',
+          backgroundColor: 'custom.pageBackground',
+          overflowY: 'auto'
+        }}>
           <AppHeader
             onToggleTheme={handleToggleTheme}
             mode={mode}
@@ -80,7 +84,11 @@ const SharedTradePage: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ minHeight: '100vh', backgroundColor: 'custom.pageBackground' }}>
+      <Box sx={{
+        minHeight: '100vh',
+        backgroundColor: 'custom.pageBackground',
+        overflowY: 'auto'
+      }}>
         <AppHeader
           onToggleTheme={handleToggleTheme}
           mode={mode}
@@ -90,9 +98,9 @@ const SharedTradePage: React.FC = () => {
         <Container
           maxWidth="md"
           sx={{
-            pt: { xs: 2, sm: 4 }, // Less top padding on mobile
-            pb: { xs: 2, sm: 4 }, // Less bottom padding on mobile
-            px: { xs: 1, sm: 3 }  // Less horizontal padding on mobile
+            pt: { xs: 2, sm: 4 },
+            pb: { xs: 2, sm: 4 },
+            px: { xs: 1, sm: 3 }
           }}
         >
           <SharedTradeView shareId={shareId} />

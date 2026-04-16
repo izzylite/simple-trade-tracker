@@ -25,7 +25,8 @@ export const createDecorator = (
     eventName: string,
     currency: Currency,
     impact: ImpactLevel
-  ) => void
+  ) => void,
+  onSharedTradeClick?: (shareId: string, tradeId: string) => void
 ) => {
   return new CompositeDecorator([
     {
@@ -35,7 +36,8 @@ export const createDecorator = (
           ...props,
           calendarId,
           trades,
-          onOpenGalleryMode
+          onOpenGalleryMode,
+          onSharedTradeClick
         })
       ),
     },

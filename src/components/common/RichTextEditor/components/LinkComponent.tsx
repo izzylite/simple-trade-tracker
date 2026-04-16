@@ -12,15 +12,17 @@ interface LinkProps {
   calendarId?: string;
   trades?: Array<{ id: string; [key: string]: any }>;
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
+  onSharedTradeClick?: (shareId: string, tradeId: string) => void;
 }
 
-export const LinkComponent = ({ 
-  contentState, 
-  entityKey, 
-  children, 
-  calendarId, 
-  trades, 
-  onOpenGalleryMode 
+export const LinkComponent = ({
+  contentState,
+  entityKey,
+  children,
+  calendarId,
+  trades,
+  onOpenGalleryMode,
+  onSharedTradeClick
 }: LinkProps) => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -48,9 +50,11 @@ export const LinkComponent = ({
       if (tradeInCurrentCalendar && onOpenGalleryMode && trades) {
         // Trade found in current calendar - open gallery mode directly
         onOpenGalleryMode(trades, linkInfo.tradeId, 'Shared Trade');
+      } else if (onSharedTradeClick && linkInfo.id) {
+        // Open trade in inline preview dialog
+        onSharedTradeClick(linkInfo.id, linkInfo.tradeId);
       } else {
-        // Trade not in current calendar or no gallery mode available - navigate to shared page
-        // Add referrer info to help with back navigation
+        // Navigate to shared page as last resort
         const currentPath = window.location.pathname;
         navigate(`/shared/${linkInfo.id}`, {
           state: {
@@ -60,13 +64,17 @@ export const LinkComponent = ({
         });
       }
     } else if (linkInfo.type === 'shared' && linkInfo.id) {
-      // Fallback for shared links without extractable tradeId
-      navigate(`/shared/${linkInfo.id}`, {
-        state: {
-          referrer: window.location.pathname,
-          referrerCalendarId: calendarId
-        }
-      });
+      if (onSharedTradeClick) {
+        // Extract tradeId if possible, otherwise pass empty string
+        onSharedTradeClick(linkInfo.id, '');
+      } else {
+        navigate(`/shared/${linkInfo.id}`, {
+          state: {
+            referrer: window.location.pathname,
+            referrerCalendarId: calendarId
+          }
+        });
+      }
     } else {
       // For external links, open in new tab
       window.open(url, '_blank', 'noopener,noreferrer');

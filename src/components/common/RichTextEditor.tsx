@@ -115,6 +115,8 @@ export interface RichTextEditorProps {
     currency: Currency,
     impact: ImpactLevel
   ) => void;
+  // Callback for shared trade link clicks (inline preview)
+  onSharedTradeClick?: (shareId: string, tradeId: string) => void;
 }
 
 // Ref handle for external toolbar control
@@ -194,6 +196,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   availableEvents,
   onEventLinkStateChange,
   onEventLinkClick,
+  onSharedTradeClick,
 }, ref) => {
   const theme = useTheme();
   const Z_INDEX = 2000;
@@ -209,10 +212,10 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   const decorator = useMemo(
     () => createDecorator(
       calendarId, trades, onOpenGalleryMode,
-      onNoteLinkClick, onEventLinkClick
+      onNoteLinkClick, onEventLinkClick, onSharedTradeClick
     ),
     [calendarId, trades, onOpenGalleryMode,
-      onNoteLinkClick, onEventLinkClick]
+      onNoteLinkClick, onEventLinkClick, onSharedTradeClick]
   );
 
   const [editorState, setEditorState] = useState(() => {
@@ -1013,7 +1016,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                textDecoration: 'underline !important',
                cursor: 'pointer !important',
                backgroundColor: `${alpha(theme.palette.primary.main, 0.08)} !important`,
-               padding: '2px 4px !important',
+               padding: '0px 4px !important',
                borderRadius: '4px !important',
                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)} !important`,
                display: 'inline-block !important',
@@ -1024,8 +1027,6 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                  color: `${theme.palette.primary.dark} !important`,
                  backgroundColor: `${alpha(theme.palette.primary.main, 0.15)} !important`,
                  borderColor: `${alpha(theme.palette.primary.main, 0.4)} !important`,
-                 transform: 'translateY(-1px) !important',
-                 boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.25)} !important`,
                },
                '&:active': {
                  transform: 'translateY(0px) !important',

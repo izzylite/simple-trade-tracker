@@ -67,6 +67,8 @@ interface TradeGalleryDialogProps {
   isReadOnly?: boolean;
   // Fetch mode: if set, dialog will fetch trades for this year when trades array is empty
   fetchYear?: number;
+  // External loading state (e.g. parent is fetching a trade to display)
+  loading?: boolean;
 
   // Trade operations - required
   tradeOperations: TradeOperationsProps;
@@ -87,6 +89,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   aiOnlyMode = false,
   isReadOnly = false,
   fetchYear,
+  loading: externalLoading = false,
   tradeOperations
 }) => {
   // Destructure from tradeOperations directly
@@ -528,7 +531,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   ]);
 
   // Determine if we're in initial loading state (fetch mode, loading, no trades yet)
-  const isInitialLoading = isFetchMode && isLoadingTrades && effectiveTrades.length === 0;
+  const isInitialLoading =
+    externalLoading || (isFetchMode && isLoadingTrades && effectiveTrades.length === 0);
 
   // Only return null if not in fetch mode and no trade
   if (!currentTrade && !isInitialLoading) {

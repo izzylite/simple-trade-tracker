@@ -42,6 +42,11 @@ import { Z_INDEX } from '../../styles/zIndex';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import RichTextEditor from '../common/RichTextEditor';
 import NoteEditorDialog from '../notes/NoteEditorDialog';
+import { getSharedTrade } from '../../services/sharingService';
+import { Trade } from '../../types/dualWrite';
+import TradeGalleryDialog from '../TradeGalleryDialog';
+import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
+import { logger } from '../../utils/logger';
 
 interface NotesBottomSheetProps {
   open: boolean;
@@ -104,6 +109,12 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
   const [editorOpen, setEditorOpen] = useState(false);
   const [noteToEdit, setNoteToEdit] = useState<Note | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Trade preview state
+  const [previewTrade, setPreviewTrade] = useState<Trade | null>(null);
+  const [tradePreviewOpen, setTradePreviewOpen] = useState(false);
+  const [tradePreviewLoading, setTradePreviewLoading] = useState(false);
+  const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
 
   // Reset index when notes change or sheet opens
   useEffect(() => {
@@ -168,6 +179,24 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
       onClose();
     }
   }, [onNoteDeleted, notes.length, onClose]);
+
+  const handleSharedTradeClick = useCallback(
+    async (shareId: string, _tradeId: string) => {
+      setTradePreviewOpen(true);
+      setTradePreviewLoading(true);
+      try {
+        const data = await getSharedTrade(shareId);
+        if (data?.trade) {
+          setPreviewTrade(data.trade);
+        }
+      } catch (err) {
+        logger.error('Error loading shared trade:', err);
+      } finally {
+        setTradePreviewLoading(false);
+      }
+    },
+    []
+  );
 
   // Safe access to current note
   const currentNote = notes[currentIndex];
@@ -377,6 +406,8 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
                       disabled
                       hideCharacterCount
                       minHeight={200}
+                      calendarId={calendarId}
+                      onSharedTradeClick={handleSharedTradeClick}
                     />
                   </Box>
                 </Box>
@@ -398,6 +429,60 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
           availableTradeTags={availableTradeTags}
           calendarNotes={notes.map((n) => ({ id: n.id, title: n.title }))}
           pinnedEvents={pinnedEvents}
+        />
+      )}
+
+      {/* Trade Preview via TradeGalleryDialog */}
+      {tradePreviewOpen && (
+        <TradeGalleryDialog
+          open={tradePreviewOpen}
+          onClose={() => {
+            setTradePreviewOpen(false);
+            setPreviewTrade(null);
+          }}
+          trades={previewTrade ? [previewTrade] : []}
+          initialTradeId={previewTrade?.id}
+          loading={tradePreviewLoading}
+          setZoomedImage={(
+            url: string,
+            allImages?: string[],
+            initialIndex?: number
+          ) => {
+            setZoomedImages({
+              selectetdImageIndex: initialIndex || 0,
+              allImages: allImages || [url],
+            });
+          }}
+          title={previewTrade?.name || 'Trade Preview'}
+          isReadOnly={true}
+          tradeOperations={{
+            onZoomImage: (
+              url: string,
+              allImages?: string[],
+              initialIndex?: number
+            ) => {
+              setZoomedImages({
+                selectetdImageIndex: initialIndex || 0,
+                allImages: allImages || [url],
+              });
+            },
+            onUpdateTradeProperty: undefined,
+            calendarId: undefined,
+            onOpenGalleryMode: undefined,
+            economicFilter: undefined,
+            onOpenAIChat: undefined,
+            isTradeUpdating: undefined,
+            isReadOnly: true,
+          }}
+        />
+      )}
+
+      {/* Image Zoom for Trade Preview */}
+      {zoomedImages && (
+        <ImageZoomDialog
+          open={!!zoomedImages}
+          onClose={() => setZoomedImages(null)}
+          imageProp={zoomedImages}
         />
       )}
     </>

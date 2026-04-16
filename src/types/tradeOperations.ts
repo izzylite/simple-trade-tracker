@@ -52,6 +52,9 @@ export interface TradeOperationsProps {
   /** Open AI chat for a specific trade */
   onOpenAIChat?: (trade: Trade) => void;
 
+  /** Handle shared trade link click (inline preview) */
+  onSharedTradeClick?: (shareId: string, tradeId: string) => void;
+
   // ===== Calendar Operations =====
 
   /** Update calendar properties */
@@ -103,6 +106,7 @@ export function extractTradeOperations(props: TradeOperationsProps): TradeOperat
     onZoomImage: props.onZoomImage,
     onOpenGalleryMode: props.onOpenGalleryMode,
     onOpenAIChat: props.onOpenAIChat,
+    onSharedTradeClick: props.onSharedTradeClick,
     onUpdateCalendarProperty: props.onUpdateCalendarProperty,
     isTradeUpdating: props.isTradeUpdating,
     deletingTradeIds: props.deletingTradeIds,

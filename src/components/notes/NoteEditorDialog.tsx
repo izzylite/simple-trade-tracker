@@ -88,6 +88,10 @@ import { getTagColor, isGroupedTag, getTagName, getTagGroup } from '../../utils/
 import NoteShareButton from './NoteShareButton';
 import { useNoteNavigation } from '../../hooks/useNoteNavigation';
 import { getContentAsJson } from '../common/RichTextEditor/utils/draftUtils';
+import { getSharedTrade } from '../../services/sharingService';
+import { Trade } from '../../types/dualWrite';
+import TradeGalleryDialog from '../TradeGalleryDialog';
+import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 import {
   IMPACT_COLORS, CURRENCY_FLAGS
 } from '../../types/economicCalendar';
@@ -223,6 +227,12 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
 
   // Share snackbar state
   const [shareSnackbar, setShareSnackbar] = useState<string | null>(null);
+
+  // Trade preview dialog state (uses TradeGalleryDialog)
+  const [previewTrade, setPreviewTrade] = useState<Trade | null>(null);
+  const [tradePreviewOpen, setTradePreviewOpen] = useState(false);
+  const [tradePreviewLoading, setTradePreviewLoading] = useState(false);
+  const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
 
   // Available notes for /note link picker (from calendar, exclude current note)
   const availableNotes = (calendarNotes ?? [])
@@ -499,6 +509,24 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
     noteNav.reset();
     onClose();
   };
+
+  const handleSharedTradeClick = useCallback(
+    async (shareId: string, _tradeId: string) => {
+      setTradePreviewOpen(true);
+      setTradePreviewLoading(true);
+      try {
+        const data = await getSharedTrade(shareId);
+        if (data?.trade) {
+          setPreviewTrade(data.trade);
+        }
+      } catch (err) {
+        logger.error('Error loading shared trade:', err);
+      } finally {
+        setTradePreviewLoading(false);
+      }
+    },
+    []
+  );
 
   const handleImageSelect = (imageUrl: string) => {
     setCoverImage(imageUrl);
@@ -1602,6 +1630,8 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
               onEventLinkStateChange={() => {
                 setMentionVersion((v) => v + 1);
               }}
+              calendarId={calendarId}
+              onSharedTradeClick={handleSharedTradeClick}
             />
           </Box>
         </DialogContent>
@@ -1634,6 +1664,60 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
         isSubmitting={deleting}
         sx={{ zIndex: Z_INDEX.LOADING_PROGRESS }}
       />
+
+      {/* Trade Preview via TradeGalleryDialog */}
+      {tradePreviewOpen && (
+        <TradeGalleryDialog
+          open={tradePreviewOpen}
+          onClose={() => {
+            setTradePreviewOpen(false);
+            setPreviewTrade(null);
+          }}
+          trades={previewTrade ? [previewTrade] : []}
+          initialTradeId={previewTrade?.id}
+          loading={tradePreviewLoading}
+          setZoomedImage={(
+            url: string,
+            allImages?: string[],
+            initialIndex?: number
+          ) => {
+            setZoomedImages({
+              selectetdImageIndex: initialIndex || 0,
+              allImages: allImages || [url],
+            });
+          }}
+          title={previewTrade?.name || 'Trade Preview'}
+          isReadOnly={true}
+          tradeOperations={{
+            onZoomImage: (
+              url: string,
+              allImages?: string[],
+              initialIndex?: number
+            ) => {
+              setZoomedImages({
+                selectetdImageIndex: initialIndex || 0,
+                allImages: allImages || [url],
+              });
+            },
+            onUpdateTradeProperty: undefined,
+            calendarId: undefined,
+            onOpenGalleryMode: undefined,
+            economicFilter: undefined,
+            onOpenAIChat: undefined,
+            isTradeUpdating: undefined,
+            isReadOnly: true,
+          }}
+        />
+      )}
+
+      {/* Image Zoom for Trade Preview */}
+      {zoomedImages && (
+        <ImageZoomDialog
+          open={!!zoomedImages}
+          onClose={() => setZoomedImages(null)}
+          imageProp={zoomedImages}
+        />
+      )}
     </>
   );
 };
