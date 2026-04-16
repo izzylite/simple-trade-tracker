@@ -936,7 +936,7 @@ function buildCachedResult(
   eventName: string,
   country: string,
   cached: CachedEventData,
-  flags: { stale: boolean; sync_timeout?: boolean },
+  flags: { stale?: boolean; sync_timeout?: boolean },
 ): EventResult {
   const cachedResponse: MQL5EventData = {
     event_name: cached.event_name,
@@ -1030,7 +1030,7 @@ async function processEvent(eventName: string, country: string): Promise<EventRe
 
     if (cachedData && isFresh) {
       log(`Returning fresh cached data for ${eventName}`);
-      return buildCachedResult(eventName, country, cachedData, { stale: false });
+      return buildCachedResult(eventName, country, cachedData, {});
     }
 
     // Step 2: Try to acquire the per-event lock.
@@ -1041,7 +1041,7 @@ async function processEvent(eventName: string, country: string): Promise<EventRe
       // Another caller is scraping MQL5. Wait for their result.
       const fresh = await waitForFreshCache(eventName, country, beforeLastUpdated);
       if (fresh) {
-        return buildCachedResult(eventName, country, fresh, { stale: false });
+        return buildCachedResult(eventName, country, fresh, {});
       }
       // Timed out. Fall back to stale cache, or signal sync_in_progress.
       if (cachedData) {
@@ -1085,11 +1085,13 @@ async function processEvent(eventName: string, country: string): Promise<EventRe
  * 2. Batch events: { events: [{ event_name: string, country: string }, ...] }
  *
  * Flow for each event:
- * 1. Check Supabase for cached event data
- * 2. If data exists and is fresh (< 5 min), return cached data
- * 3. If stale or missing, fetch from MQL5
- * 4. Update Supabase with fresh MQL5 data
- * 5. Return the data
+ * 1. Fast path: return cached data if it is < 5 minutes old.
+ * 2. Otherwise try to acquire a per-event advisory lock (mql5_sync_locks).
+ *    - Acquired: fetch from MQL5, update Supabase, release lock, return fresh.
+ *    - Lost:     another caller is syncing; poll the cache for up to 15s,
+ *                return the winner's fresh write, or fall back to stale with
+ *                sync_timeout, or return sync_in_progress if no cache exists.
+ *    - RPC error: proceed without the lock (strictly no worse than pre-lock behavior).
  */
 Deno.serve(async (req: Request) => {
   const corsResponse = handleCors(req);
