@@ -18,7 +18,7 @@ import { startOfNextDay } from '../trades/TradeFormDialog';
 import { calculateCumulativePnLToDateAsync } from '../../utils/dynamicRiskUtils';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip } from 'recharts';
 import { logger } from '../../utils/logger';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatCount } from '../../utils/formatters';
 import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 
@@ -156,7 +156,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   const handleGalleryModeClick = () => {
     if (onOpenGalleryMode && trades && trades.length > 0) {
       onOpenGalleryMode(trades, expandedTradeId || trades[0].id,
-        `${title} - ${trades.length} Trade${trades.length > 1 ? 's' : ''}`);
+        `${title} - ${formatCount(trades.length)} Trade${trades.length > 1 ? 's' : ''}`);
       onClose(); // Close the dialog when opening gallery mode
     }
   };
@@ -179,7 +179,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   const dialogTitle = (
     <>
       <Typography variant="h6">
-        {tradesLength} {tradesLength === 1 ? 'Trade' : 'Trades'}{title ? ` for ${title.toLowerCase()}` : ''}
+        {formatCount(tradesLength)} {tradesLength === 1 ? 'Trade' : 'Trades'}{title ? ` for ${title.toLowerCase()}` : ''}
       </Typography>
 
     </>
@@ -291,17 +291,17 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
                           {data.fullDay}
                         </Typography>
                         <Typography variant="body2">
-                          Total Trades: {data.total_trades}
+                          Total Trades: {formatCount(data.total_trades)}
                         </Typography>
                         {tradeStats.containWins &&
                           <Typography variant="body2" sx={{ color: theme.palette.success.main }}>
-                            Wins: {data.winTrades}
+                            Wins: {formatCount(data.winTrades)}
                           </Typography>
                         }
 
                         {tradeStats.containLosses &&
                           <Typography variant="body2" sx={{ color: theme.palette.error.main }}>
-                            Losses: {data.lossTrades}
+                            Losses: {formatCount(data.lossTrades)}
                           </Typography>
                         }
 

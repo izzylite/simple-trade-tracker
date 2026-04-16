@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { formatCount } from '../utils/formatters';
 import {
   Box,
   Typography,
@@ -333,7 +334,7 @@ const TagManagementDialog: React.FC<TagManagementDialogProps> = ({
                       )}
                     </Box>
                     <Typography variant="caption" color="text.secondary">
-                      {tags.length} tag{tags.length !== 1 ? 's' : ''}
+                      {formatCount(tags.length)} tag{tags.length !== 1 ? 's' : ''}
                     </Typography>
                   </Box>
                   <Divider />

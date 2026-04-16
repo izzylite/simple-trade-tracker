@@ -1,4 +1,17 @@
 /**
+ * Format a numeric count with locale-aware separators
+ * (e.g. 1000 → "1,000")
+ */
+export const formatCount = (
+  value: number | undefined | null
+): string => {
+  if (value === undefined || value === null || isNaN(value)) {
+    return '0';
+  }
+  return value.toLocaleString();
+};
+
+/**
  * Format a numeric value as currency
  * @param amount The amount to format
  * @returns Formatted currency string

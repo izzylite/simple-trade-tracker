@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { formatCount } from '../../utils/formatters';
 import {
   Box,
   Typography,
@@ -147,7 +148,7 @@ const TradeTagsDisplay: React.FC<{ tags: string[] }> = React.memo(({ tags }) => 
           title={
             <Box sx={{ p: 0.5 }}>
               <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                {remainingCount} more tag{remainingCount > 1 ? 's' : ''}
+                {formatCount(remainingCount)} more tag{remainingCount > 1 ? 's' : ''}
               </Typography>
               {groupEntries.slice(visibleGroups.length).map(([group, groupTags]) => (
                 <Box key={group} sx={{ mb: 0.5 }}>
@@ -171,7 +172,7 @@ const TradeTagsDisplay: React.FC<{ tags: string[] }> = React.memo(({ tags }) => 
           arrow
         >
           <Chip
-            label={`+${remainingCount}`}
+            label={`+${formatCount(remainingCount)}`}
             size="small"
             sx={{
               height: '20px',
@@ -324,12 +325,12 @@ const TradeList: React.FC<TradeListProps> = ({
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Typography variant="subtitle1" sx={{ mr: 1 }}>
-           {displayedCount < tradesLength ? `${displayedCount} of ${tradesLength}` : tradesLength} Trades
+           {displayedCount < tradesLength ? `${formatCount(displayedCount)} of ${formatCount(tradesLength)}` : formatCount(tradesLength)} Trades
           </Typography>
         
           {enableBulkSelection && selectedTradeIds.length > 0 && (
             <Chip
-              label={`${selectedTradeIds.length} selected`}
+              label={`${formatCount(selectedTradeIds.length)} selected`}
               size="small"
               color="secondary"
               sx={{
@@ -359,7 +360,7 @@ const TradeList: React.FC<TradeListProps> = ({
                 onClick={handleBulkDelete}
                 sx={{ minWidth: 'auto', fontSize: '0.75rem' }}
               >
-                Delete ({selectedTradeIds.length})
+                Delete ({formatCount(selectedTradeIds.length)})
               </Button>
             )}
           </Box>
@@ -461,7 +462,7 @@ const TradeList: React.FC<TradeListProps> = ({
                       </Box>
                       <Box sx={{ display: 'flex', flexDirection: 'row', gap: { xs: 0.75, sm: 1, md: 1.5 }, alignItems: 'center', mt: { xs: 0.25, sm: 0.5 }, flexWrap: 'wrap' }}>
                         {Array.isArray(trade.images) && trade.images.length > 0 && (
-                          <Tooltip title={`${trade.images.length} image${trade.images.length > 1 ? 's' : ''}`}>
+                          <Tooltip title={`${formatCount(trade.images.length)} image${trade.images.length > 1 ? 's' : ''}`}>
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                               <ImageIcon
                                 fontSize="small"
@@ -649,7 +650,7 @@ const TradeList: React.FC<TradeListProps> = ({
                   }
                 }}
               >
-                Load More ({tradesLength - displayedCount} remaining)
+                Load More ({formatCount(tradesLength - displayedCount)} remaining)
               </Button>
             </Box>
           )}

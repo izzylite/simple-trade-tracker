@@ -286,7 +286,7 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
                         <strong>W/L:</strong> {combo.wins}/{combo.losses}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        <strong>Avg P&L:</strong> {combo.avgPnL > 0 ? '+' : ''}{combo.avgPnL.toFixed(2)}
+                        <strong>Avg P&L:</strong> {combo.avgPnL > 0 ? '+' : ''}{combo.avgPnL.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </Typography>
                       {combo.trend !== 'stable' && (
                         <Typography

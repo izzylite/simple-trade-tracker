@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Paper, Typography, Tooltip, useTheme, Stack, alpha } from '@mui/material';
 import { InfoOutlined } from '@mui/icons-material';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatCount } from '../../utils/formatters';
 import { Trade } from '../../types/dualWrite';
 
 interface WinLossStatsProps {
@@ -77,7 +77,7 @@ const WinLossStats: React.FC<WinLossStatsProps> = ({ winLossStats, trades, onTra
                     <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
                   </Tooltip>
                 </Box>
-                <Typography variant="body2">{winLossStats.winners.total}</Typography>
+                <Typography variant="body2">{formatCount(winLossStats.winners.total)}</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -112,7 +112,7 @@ const WinLossStats: React.FC<WinLossStatsProps> = ({ winLossStats, trades, onTra
                     <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
                   </Tooltip>
                 </Box>
-                <Typography variant="body2">{winLossStats.winners.maxConsecutive}</Typography>
+                <Typography variant="body2">{formatCount(winLossStats.winners.maxConsecutive)}</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -148,7 +148,7 @@ const WinLossStats: React.FC<WinLossStatsProps> = ({ winLossStats, trades, onTra
                     <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
                   </Tooltip>
                 </Box>
-                <Typography variant="body2">{winLossStats.losers.total}</Typography>
+                <Typography variant="body2">{formatCount(winLossStats.losers.total)}</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -183,7 +183,7 @@ const WinLossStats: React.FC<WinLossStatsProps> = ({ winLossStats, trades, onTra
                     <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
                   </Tooltip>
                 </Box>
-                <Typography variant="body2">{winLossStats.losers.maxConsecutive}</Typography>
+                <Typography variant="body2">{formatCount(winLossStats.losers.maxConsecutive)}</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

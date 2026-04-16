@@ -107,7 +107,7 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
               fontSize: '0.875rem'
             }}
           >
-            Target: {monthly_target}% (${targetValue?.toFixed(2)})
+            Target: {monthly_target}% (${targetValue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
           </Box>
         )}
       </Box>

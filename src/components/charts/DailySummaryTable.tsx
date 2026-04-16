@@ -17,7 +17,7 @@ import { alpha } from '@mui/material/styles';
 import { InfoOutlined, TrendingUp, TrendingDown, TrendingFlat } from '@mui/icons-material';
 import { format, isValid } from 'date-fns';
 import { Trade } from '../../types/dualWrite';
-import { formatValue } from '../../utils/formatters';
+import { formatValue, formatCount } from '../../utils/formatters';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 
 interface DailySummaryTableProps {
@@ -235,7 +235,7 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
                     color: 'text.primary'
                   }}
                 >
-                  {row.trades}
+                  {formatCount(row.trades)}
                 </TableCell>
                 <TableCell align="center">
                   {row.session ? (

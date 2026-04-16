@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { formatCount } from '../utils/formatters';
 import {
   Box,
   Button,
@@ -161,7 +162,7 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
 
       <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
         {selectedTags.length > 0
-          ? `Selected ${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''}`
+          ? `Selected ${formatCount(selectedTags.length)} tag${selectedTags.length > 1 ? 's' : ''}`
           : 'Select tags to filter. When no tags are selected, all items will be shown.'}
       </Typography>
     </BaseDialog>

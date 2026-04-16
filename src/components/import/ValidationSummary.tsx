@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatCount } from '../../utils/formatters';
 import {
   Box,
   Card,
@@ -56,7 +57,7 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ summary })
               Valid Rows
             </Typography>
             <Typography variant="body2" fontWeight={600}>
-              {validRows} / {totalRows} ({validPercentage.toFixed(0)}%)
+              {formatCount(validRows)} / {formatCount(totalRows)} ({validPercentage.toFixed(0)}%)
             </Typography>
           </Box>
           <LinearProgress
@@ -84,7 +85,7 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ summary })
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="body2">Valid rows</Typography>
                   <Chip
-                    label={validRows}
+                    label={formatCount(validRows)}
                     size="small"
                     sx={{
                       bgcolor: alpha('#4caf50', 0.1),
@@ -107,7 +108,7 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ summary })
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="body2">Rows with warnings</Typography>
                     <Chip
-                      label={rowsWithWarnings}
+                      label={formatCount(rowsWithWarnings)}
                       size="small"
                       sx={{
                         bgcolor: alpha('#ff9800', 0.1),
@@ -131,7 +132,7 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ summary })
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="body2">Rows with errors</Typography>
                     <Chip
-                      label={rowsWithErrors}
+                      label={formatCount(rowsWithErrors)}
                       size="small"
                       sx={{
                         bgcolor: alpha('#f44336', 0.1),
@@ -155,7 +156,7 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ summary })
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="body2">Type conversions</Typography>
                     <Chip
-                      label={conversions.length}
+                      label={formatCount(conversions.length)}
                       size="small"
                       sx={{
                         bgcolor: alpha('#2196f3', 0.1),
@@ -190,7 +191,7 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ summary })
               >
                 <Info sx={{ fontSize: 16, color: 'info.main' }} />
                 <Typography variant="caption" color="text.secondary">
-                  {conversion.affectedRows} {conversion.field} values: {conversion.fromType} → {conversion.toType}
+                  {formatCount(conversion.affectedRows)} {conversion.field} values: {conversion.fromType} → {conversion.toType}
                 </Typography>
               </Box>
             ))}
@@ -212,7 +213,7 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ summary })
             Will import:
           </Typography>
           <Chip
-            label={`${willImport} trades`}
+            label={`${formatCount(willImport)} trades`}
             size="small"
             color="primary"
             sx={{ fontWeight: 600 }}

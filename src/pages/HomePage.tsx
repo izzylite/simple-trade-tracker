@@ -31,7 +31,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { Calendar } from '../types/calendar';
 import { Trade } from '../types/dualWrite';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatCount } from '../utils/formatters';
 import { TradeWithCalendarName, useRecentTrades } from '../hooks/useRecentTrades';
 import { useUpcomingEconomicEvents } from '../hooks/useUpcomingEconomicEvents';
 import { useCalendars, useTrashCalendars } from '../hooks/useCalendars';
@@ -735,14 +735,14 @@ const HomeInner: React.FC<HomeProps> = ({
                       fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
                     }}
                   >
-                    {dashboardStats.totalCalendars}
+                    {formatCount(dashboardStats.totalCalendars)}
                   </Typography>
                   <Typography
                     variant="caption"
                     color="text.secondary"
                     sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}
                   >
-                    {dashboardStats.activeCalendars} active
+                    {formatCount(dashboardStats.activeCalendars)} active
                   </Typography>
                 </Box>
                 <Box
@@ -783,7 +783,7 @@ const HomeInner: React.FC<HomeProps> = ({
                       fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
                     }}
                   >
-                    {dashboardStats.totalTrades}
+                    {formatCount(dashboardStats.totalTrades)}
                   </Typography>
                   <Typography
                     variant="caption"

@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Button, useTheme, alpha } from '@mui/material';
+import { formatCount } from '../../utils/formatters';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 
 interface ExpandableCardListProps {
@@ -81,7 +82,7 @@ const ExpandableCardList: React.FC<ExpandableCardListProps> = ({
           >
             {isExpanded
               ? `Collapse ${itemType}`
-              : `Load ${totalCount - visibleCount} more ${itemType}`}
+              : `Load ${formatCount(totalCount - visibleCount)} more ${itemType}`}
           </Button>
         </Box>
       )}

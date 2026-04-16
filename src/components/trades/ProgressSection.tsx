@@ -225,25 +225,25 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
     <Paper
       elevation={0}
       sx={{
-        p: 2,
+        p: 1.5,
         mb: 2,
         backgroundColor: 'rgba(255, 255, 255, 0.05)',
         borderRadius: 1
       }}
     >
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+      <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 600 }}>
         Progress
       </Typography>
 
       {/* Traded Days Progress */}
-      <Box sx={{ mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+      <Box sx={{ mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
           {tradedDaysReached ? (
-            <CheckIcon sx={{ color: 'success.main', fontSize: 20 }} />
+            <CheckIcon sx={{ color: 'success.main', fontSize: 16 }} />
           ) : (
-            <CalendarMonthOutlined  />
+            <CalendarMonthOutlined sx={{ fontSize: 16 }} />
           )}
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             Traded days
           </Typography>
         </Box>
@@ -251,7 +251,7 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
           variant="determinate"
           value={tradedDaysProgress}
           sx={{
-            height: 8,
+            height: 6,
             borderRadius: 1,
             backgroundColor: 'rgba(255, 255, 255, 0.1)',
             '& .MuiLinearProgress-bar': {
@@ -260,20 +260,20 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
             }
           }}
         />
-        <Typography variant="body1" sx={{ mt: 0.5, fontWeight: 600 }}>
+        <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600 }}>
           {displayedTradedDays} / {tradedDaysTarget}
         </Typography>
       </Box>
 
       {/* Profit Target Progress */}
       <Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
           {profitTargetReached ? (
-            <CheckIcon sx={{ color: 'success.main', fontSize: 20 }} />
+            <CheckIcon sx={{ color: 'success.main', fontSize: 16 }} />
           ) : (
-             <Timelapse  />
+             <Timelapse sx={{ fontSize: 16 }} />
           )}
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             Reach your profit target of ${profitTarget.toLocaleString()}
           </Typography>
         </Box>
@@ -281,7 +281,7 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
           variant="determinate"
           value={profitProgress}
           sx={{
-            height: 8,
+            height: 6,
             borderRadius: 1,
             backgroundColor: 'rgba(255, 255, 255, 0.1)',
             '& .MuiLinearProgress-bar': {
@@ -291,7 +291,7 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
           }}
         />
         <Typography
-          variant="body1"
+          variant="body2"
           sx={{
             mt: 0.5,
             fontWeight: 600,
@@ -306,19 +306,19 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
       {motivationalTip && (
         <Box
           sx={{
-            mt: 3,
-            p: 2,
+            mt: 2,
+            p: 1.5,
             borderRadius: 1,
             backgroundColor: (theme) => alpha(theme.palette.warning.main, 0.15),
             border: '1px solid',
             borderColor: (theme) => alpha(theme.palette.warning.main, 0.3)
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
             <TipsAndUpdates
               sx={{
                 color: 'warning.main',
-                fontSize: 22,
+                fontSize: 18,
                 mt: 0.25
               }}
             />
@@ -328,11 +328,12 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
                 <>
                   {/* Main message: "You need at least X trades" */}
                   <Typography
-                    variant="body2"
+                    variant="caption"
                     sx={{
                       fontWeight: 600,
                       color: 'text.primary',
-                      mb: 1
+                      mb: 0.75,
+                      display: 'block'
                     }}
                   >
                     {motivationalTip.message}
@@ -383,11 +384,12 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
                 </>
               ) : (
                 <Typography
-                  variant="body2"
+                  variant="caption"
                   sx={{
                     fontWeight: 600,
                     color: 'text.primary',
-                    mb: 0.5
+                    mb: 0.5,
+                    display: 'block'
                   }}
                 >
                   {motivationalTip.message}

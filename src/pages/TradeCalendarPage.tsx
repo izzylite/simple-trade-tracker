@@ -57,7 +57,7 @@ import {
   isSameWeek,
   isToday
 } from 'date-fns';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatCount } from '../utils/formatters';
 import { Trade } from '../types/trade';
 import DayDialog from '../components/trades/DayDialog';
 import SelectDateDialog from '../components/SelectDateDialog';
@@ -316,7 +316,7 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({
             fontWeight: 500
           }}
         >
-          {weekTrades.length} trade{weekTrades.length !== 1 ? 's' : ''}
+          {formatCount(weekTrades.length)} trade{weekTrades.length !== 1 ? 's' : ''}
         </Typography>
       </Stack>
     </CalendarCell>
@@ -412,7 +412,7 @@ const TagFilter = React.memo<TagFilterProps>(({ allTags, selectedTags, onTagsCha
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
         >
-          {selectedTags.length > 0 ? `${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''}` : 'Filter'}
+          {selectedTags.length > 0 ? `${formatCount(selectedTags.length)} tag${selectedTags.length > 1 ? 's' : ''}` : 'Filter'}
         </Button>
       </Tooltip>
 
@@ -509,7 +509,7 @@ const CalendarDayCell = React.memo(({
               </TradeAmount>
             )}
             <TradeCount>
-              {dayTrades.length} trade{dayTrades.length !== 1 ? 's' : ''}
+              {formatCount(dayTrades.length)} trade{dayTrades.length !== 1 ? 's' : ''}
             </TradeCount>
             <Typography
               variant="caption"
@@ -1354,7 +1354,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       // Show success message
       const successMessage = tradesToDelete.length === 1
         ? 'Trade deleted successfully.'
-        : `Successfully deleted ${tradesToDelete.length} trades.`;
+        : `Successfully deleted ${formatCount(tradesToDelete.length)} trades.`;
 
       showSnackbar(successMessage, 'success');
     } catch (error) {
@@ -2693,11 +2693,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         {/* Confirmation Delete Dialog */}
         <ConfirmationDialog
           open={isDeleteDialogOpen}
-          title={tradesToDelete.length === 1 ? "Delete Trade" : `Delete ${tradesToDelete.length} Trades`}
+          title={tradesToDelete.length === 1 ? "Delete Trade" : `Delete ${formatCount(tradesToDelete.length)} Trades`}
           message={
             tradesToDelete.length === 1
               ? "Are you sure you want to delete this trade? This action cannot be undone."
-              : `Are you sure you want to delete ${tradesToDelete.length} trades? This action cannot be undone.`
+              : `Are you sure you want to delete ${formatCount(tradesToDelete.length)} trades? This action cannot be undone.`
           }
           confirmText="Delete"
           cancelText="Cancel"

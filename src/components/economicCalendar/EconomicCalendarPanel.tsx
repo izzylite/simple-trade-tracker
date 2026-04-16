@@ -37,6 +37,7 @@ import { useEconomicEvents, ViewType } from '../../hooks/useEconomicEvents';
 import { useEventPinning } from '../../hooks/useEventPinning';
 import { useEconomicCalendarFilters } from '../../hooks/useEconomicCalendarFilters';
 import { useEventCountdownTime } from '../../hooks/useCurrentTime';
+import { formatCount } from '../../utils/formatters';
 import EconomicCalendarFilters from './EconomicCalendarFilters';
 import EconomicEventDetailDialog from './EconomicEventDetailDialog';
 import EconomicCalendarEventList from './EconomicCalendarEventList';
@@ -273,8 +274,7 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
       {/* View Controls */}
       <Box sx={{
         p: 3,
-        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-        bgcolor: 'background.paper',
+        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`, 
       }}>
         <Box sx={{ mb: 2 }}>
           <ButtonGroup variant="outlined" size="small" fullWidth>
@@ -423,7 +423,7 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
         <Box sx={{ p: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`, bgcolor: 'background.paper' }}>
           {mergedEvents.length > 0 && (
             <Typography variant="caption" color="text.secondary" align="center" display="block" sx={{ mb: 0.5 }}>
-              Showing {mergedEvents.length} events{hasMore ? ' (more available)' : ''}
+              Showing {formatCount(mergedEvents.length)} events{hasMore ? ' (more available)' : ''}
             </Typography>
           )}
         </Box>

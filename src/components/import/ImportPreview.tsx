@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatCount } from '../../utils/formatters';
 import {
   Box,
   Table,
@@ -104,7 +105,7 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
           Data Preview
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          Showing {displayRows.length} of {previewRows.length} rows
+          Showing {formatCount(displayRows.length)} of {formatCount(previewRows.length)} rows
         </Typography>
       </Box>
 
@@ -172,9 +173,9 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
                       <Tooltip
                         title={
                           row.errors.length > 0
-                            ? `${row.errors.length} error(s)`
+                            ? `${formatCount(row.errors.length)} error(s)`
                             : row.warnings.length > 0
-                            ? `${row.warnings.length} warning(s)`
+                            ? `${formatCount(row.warnings.length)} warning(s)`
                             : 'Valid'
                         }
                       >
@@ -331,7 +332,7 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
             size="small"
             onClick={() => setShowAll(true)}
           >
-            Show All {previewRows.length} Rows
+            Show All {formatCount(previewRows.length)} Rows
           </Button>
         </Box>
       )}

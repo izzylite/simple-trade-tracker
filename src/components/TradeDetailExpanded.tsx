@@ -55,6 +55,7 @@ import { economicCalendarService } from '../services/economicCalendarService';
 import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
 import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS, EconomicCalendarFilterSettings } from './economicCalendar/EconomicCalendarDrawer';
 import { logger } from '../utils/logger';
+import { formatCount } from '../utils/formatters';
 import { tradeEconomicEventService } from '../services/tradeEconomicEventService';
 import { useEventPinning } from '../hooks/useEventPinning';
 import ShareButton from './sharing/ShareButton';
@@ -136,7 +137,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     calendar,
     onUpdateCalendarProperty,
     onEditTrade,
-    isReadOnly = false
+    isReadOnly = false,
+    onSharedTradeClick
   } = tradeOperations;
 
   // Use global context for trade updating state
@@ -834,7 +836,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                         color: trade.amount > 0 ? 'success.main' : trade.amount < 0 ? 'error.main' : 'text.primary',
                         fontSize: '1.1rem'
                       }}>
-                        {trade.amount > 0 ? '+' : ''}{trade.amount.toFixed(2)}
+                        {trade.amount > 0 ? '+' : ''}{trade.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </Typography>
 
 
@@ -897,7 +899,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                           }}>
                             Amount Risked: ${(() => {
                               const amountRisked = Math.abs(trade.amount) / trade.risk_to_reward;
-                              return amountRisked.toFixed(2);
+                              return amountRisked.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                             })()}
                           </Typography>
                         )}
@@ -1171,6 +1173,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                         calendarId={calendarId}
                         trades={trades}
                         onOpenGalleryMode={onOpenGalleryMode}
+                        onSharedTradeClick={onSharedTradeClick}
                       />
                     </Box>
                   </Box>
@@ -1399,7 +1402,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                 display: 'block',
                                 fontSize: { xs: '0.7rem', sm: '0.75rem' } // Smaller on mobile
                               }}>
-                                Showing {economicEvents.length} of {allEconomicEvents.length} events
+                                Showing {formatCount(economicEvents.length)} of {formatCount(allEconomicEvents.length)} events
                               </Typography>
                             </Box>
                           )}
