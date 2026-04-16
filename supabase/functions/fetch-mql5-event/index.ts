@@ -915,7 +915,12 @@ interface EventResult {
   event_name: string;
   country: string;
   success: boolean;
-  data?: MQL5EventData & { cached?: boolean; stale?: boolean; cache_age_seconds?: number };
+  data?: MQL5EventData & {
+    cached?: boolean;
+    stale?: boolean;
+    sync_timeout?: boolean;
+    cache_age_seconds?: number;
+  };
   error?: string;
   // Date mismatch fields - when MQL5 returns data for a different date than the event
   date_mismatch?: boolean;
@@ -924,116 +929,142 @@ interface EventResult {
 }
 
 /**
- * Process a single event - check cache, fetch from MQL5 if needed, update DB
+ * Build an EventResult from a cached row. Used by fast path, wait-loop,
+ * and timeout fallback.
  */
+function buildCachedResult(
+  eventName: string,
+  country: string,
+  cached: CachedEventData,
+  flags: { stale: boolean; sync_timeout?: boolean },
+): EventResult {
+  const cachedResponse: MQL5EventData = {
+    event_name: cached.event_name,
+    country: cached.country,
+    mql5_url: buildMql5Url(eventName, country) || "",
+    last_release_date: cached.event_date,
+    actual_value: cached.actual_value,
+    forecast_value: cached.forecast_value,
+    previous_value: cached.previous_value,
+    impact: cached.impact,
+    actual_result_type: null,
+    next_release_date: null,
+    next_forecast: null,
+    days_until_next: null,
+    source: cached.data_source,
+    sector: null,
+    fetched_at: cached.last_updated,
+  };
+  return {
+    event_name: eventName,
+    country,
+    success: true,
+    data: {
+      ...cachedResponse,
+      cached: true,
+      ...(flags.stale ? { stale: true } : {}),
+      ...(flags.sync_timeout ? { sync_timeout: true } : {}),
+      cache_age_seconds: Math.round(
+        (Date.now() - new Date(cached.last_updated).getTime()) / 1000,
+      ),
+    },
+  };
+}
+
+/**
+ * Fetch fresh data from MQL5 and update the DB.
+ * Caller is responsible for holding the per-event lock.
+ */
+async function fetchAndUpdate(
+  eventName: string,
+  country: string,
+  cachedData: CachedEventData | null,
+): Promise<EventResult> {
+  log(`Cache miss or stale for ${eventName}, fetching from MQL5...`);
+  const eventData = await fetchMql5Event(eventName, country);
+
+  if (!eventData) {
+    if (cachedData) {
+      log(`MQL5 fetch failed, returning stale cached data for ${eventName}`);
+      return buildCachedResult(eventName, country, cachedData, { stale: true });
+    }
+    return {
+      event_name: eventName,
+      country,
+      success: false,
+      error: `Could not fetch event data for "${eventName}" in "${country}"`,
+    };
+  }
+
+  const updateResult = await updateEventInDatabase(cachedData, eventData);
+
+  if (updateResult.skipped && updateResult.reason?.includes("Date mismatch")) {
+    log(`Date mismatch prevented update for ${eventName}`, "error");
+    return {
+      event_name: eventName,
+      country,
+      success: false,
+      error: updateResult.reason,
+      date_mismatch: true,
+      mql5_date: eventData.last_release_date,
+      event_date: cachedData?.event_date ?? null,
+    };
+  }
+
+  log(`Successfully fetched MQL5 data for ${eventName} (updated: ${updateResult.updated})`);
+  return {
+    event_name: eventName,
+    country,
+    success: true,
+    data: {
+      ...eventData,
+      cached: false,
+    },
+  };
+}
+
 async function processEvent(eventName: string, country: string): Promise<EventResult> {
   try {
-    // Step 1: Check for cached data in Supabase
+    // Step 1: Fast path — fresh cache short-circuits before any lock work.
     const { data: cachedData, isFresh } = await getCachedEventData(eventName, country);
 
     if (cachedData && isFresh) {
       log(`Returning fresh cached data for ${eventName}`);
-      const cachedResponse: MQL5EventData = {
-        event_name: cachedData.event_name,
-        country: cachedData.country,
-        mql5_url: buildMql5Url(eventName, country) || "",
-        last_release_date: cachedData.event_date,
-        actual_value: cachedData.actual_value,
-        forecast_value: cachedData.forecast_value,
-        previous_value: cachedData.previous_value,
-        impact: cachedData.impact,
-        actual_result_type: null, // Not available from cache
-        next_release_date: null,
-        next_forecast: null,
-        days_until_next: null,
-        source: cachedData.data_source,
-        sector: null,
-        fetched_at: cachedData.last_updated,
-      };
-      return {
-        event_name: eventName,
-        country,
-        success: true,
-        data: {
-          ...cachedResponse,
-          cached: true,
-          cache_age_seconds: Math.round((Date.now() - new Date(cachedData.last_updated).getTime()) / 1000),
-        },
-      };
+      return buildCachedResult(eventName, country, cachedData, { stale: false });
     }
 
-    // Step 2: Fetch from MQL5 (data is stale or missing)
-    log(`Cache miss or stale for ${eventName}, fetching from MQL5...`);
-    const eventData = await fetchMql5Event(eventName, country);
+    // Step 2: Try to acquire the per-event lock.
+    const beforeLastUpdated = cachedData?.last_updated ?? null;
+    const lock = await tryAcquireLock(eventName, country);
 
-    if (!eventData) {
-      // If MQL5 fetch fails but we have stale cached data, return it
+    if (lock === "lost") {
+      // Another caller is scraping MQL5. Wait for their result.
+      const fresh = await waitForFreshCache(eventName, country, beforeLastUpdated);
+      if (fresh) {
+        return buildCachedResult(eventName, country, fresh, { stale: false });
+      }
+      // Timed out. Fall back to stale cache, or signal sync_in_progress.
       if (cachedData) {
-        log(`MQL5 fetch failed, returning stale cached data for ${eventName}`);
-        const staleCachedResponse: MQL5EventData = {
-          event_name: cachedData.event_name,
-          country: cachedData.country,
-          mql5_url: buildMql5Url(eventName, country) || "",
-          last_release_date: cachedData.event_date,
-          actual_value: cachedData.actual_value,
-          forecast_value: cachedData.forecast_value,
-          previous_value: cachedData.previous_value,
-          impact: cachedData.impact,
-          actual_result_type: null, // Not available from cache
-          next_release_date: null,
-          next_forecast: null,
-          days_until_next: null,
-          source: cachedData.data_source,
-          sector: null,
-          fetched_at: cachedData.last_updated,
-        };
-        return {
-          event_name: eventName,
-          country,
-          success: true,
-          data: {
-            ...staleCachedResponse,
-            cached: true,
-            stale: true,
-            cache_age_seconds: Math.round((Date.now() - new Date(cachedData.last_updated).getTime()) / 1000),
-          },
-        };
+        log(`Wait-loop timeout for ${eventName} — returning stale cache`);
+        return buildCachedResult(eventName, country, cachedData, { stale: true, sync_timeout: true });
       }
       return {
         event_name: eventName,
         country,
         success: false,
-        error: `Could not fetch event data for "${eventName}" in "${country}"`,
+        error: "sync_in_progress",
       };
     }
 
-    // Step 3: Update Supabase with fresh MQL5 data (with date validation)
-    const updateResult = await updateEventInDatabase(cachedData, eventData);
-
-    // If date mismatch occurred, return error with explanation
-    if (updateResult.skipped && updateResult.reason?.includes('Date mismatch')) {
-      log(`Date mismatch prevented update for ${eventName}`, "error");
-      return {
-        event_name: eventName,
-        country,
-        success: false,
-        error: updateResult.reason,
-        date_mismatch: true,
-        mql5_date: eventData.last_release_date,
-        event_date: cachedData?.event_date,
-      };
+    // 'acquired' or 'error' (degraded): do the actual fetch.
+    const acquired = lock === "acquired";
+    try {
+      return await fetchAndUpdate(eventName, country, cachedData);
+    } finally {
+      if (acquired) {
+        await releaseLock(eventName, country);
+      }
     }
-
-    log(`Successfully fetched event data from MQL5 for ${eventName} (updated: ${updateResult.updated})`);
-    return {
-      event_name: eventName,
-      country,
-      success: true,
-      data: {
-        ...eventData,
-        cached: false,
-      },
-    };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log(`Error processing event ${eventName}`, "error", { message: errorMessage });
