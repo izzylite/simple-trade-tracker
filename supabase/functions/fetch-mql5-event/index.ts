@@ -4,6 +4,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  * Fetch MQL5 Event Details Edge Function
  * Fetches real-time event data (actual, forecast, previous) from MQL5 individual event pages
  *
+ * SIZE NOTE: this file is ~1170 lines and exceeds the project's 500-line guideline.
+ * Natural split candidates if/when refactoring: lock helpers (top), MQL5 URL/slug
+ * mapping (~330-560), MQL5 HTML parsing (~640-810), DB cache helpers (~180-340).
+ *
  * CACHING STRATEGY:
  * 1. First checks Supabase economic_events table for existing data
  * 2. If data exists and is fresh (< 5 minutes old), returns cached data
@@ -27,6 +31,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // Cache freshness threshold (5 minutes)
 const CACHE_FRESHNESS_MS = 5 * 60 * 1000;
+
+// Error string returned when a concurrent caller holds the sync lock and the
+// wait-loop times out without seeing a fresh write. Frontends grep on this.
+const SYNC_IN_PROGRESS_ERROR = "sync_in_progress";
 
 // CORS headers
 const corsHeaders = {
@@ -1052,7 +1060,7 @@ async function processEvent(eventName: string, country: string): Promise<EventRe
         event_name: eventName,
         country,
         success: false,
-        error: "sync_in_progress",
+        error: SYNC_IN_PROGRESS_ERROR,
       };
     }
 
