@@ -83,6 +83,56 @@ function getSupabaseClient() {
   return createClient(supabaseUrl, supabaseKey);
 }
 
+type LockAcquireResult = "acquired" | "lost" | "error";
+
+/**
+ * Try to acquire a per-event advisory lock via RPC.
+ * Returns 'acquired' if we took the lock, 'lost' if another caller holds it,
+ * 'error' if the RPC itself failed (caller should proceed without the lock).
+ */
+async function tryAcquireLock(
+  eventName: string,
+  country: string,
+  leaseSeconds = 30,
+): Promise<LockAcquireResult> {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    log("Cannot acquire lock: no Supabase client", "error");
+    return "error";
+  }
+
+  const { data, error } = await supabase.rpc("try_acquire_mql5_sync_lock", {
+    p_event_name: eventName,
+    p_country: country,
+    p_lease_seconds: leaseSeconds,
+  });
+
+  if (error) {
+    log(`Lock acquire RPC failed for ${eventName}/${country}`, "error", error);
+    return "error";
+  }
+
+  return data === true ? "acquired" : "lost";
+}
+
+/**
+ * Release the per-event advisory lock. Idempotent — safe to call on error paths.
+ */
+async function releaseLock(eventName: string, country: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase.rpc("release_mql5_sync_lock", {
+    p_event_name: eventName,
+    p_country: country,
+  });
+
+  if (error) {
+    log(`Lock release RPC failed for ${eventName}/${country}`, "error", error);
+    // Not fatal — lease will expire.
+  }
+}
+
 interface CachedEventData {
   id: string;
   external_id: string;
