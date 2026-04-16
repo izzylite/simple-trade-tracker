@@ -173,7 +173,7 @@ const TagCreateDialog: React.FC<TagCreateDialogProps> = ({
                     onChange={(e) => setDefinition(e.target.value)}
                     fullWidth
                     multiline
-                    rows={3}
+                    rows={5}
                     disabled={isSubmitting}
                     placeholder="What does this tag mean? Helps Orion analyze your trades."
                     inputProps={{ maxLength: 2024 }}

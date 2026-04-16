@@ -8,6 +8,8 @@ interface ViewConfig {
   title: string;
   icon?: React.ReactNode;
   component: React.ReactNode;
+  /** Content rendered between header and main content (e.g. sticky reminders) */
+  stickyContent?: React.ReactNode;
 }
 
 interface SidePanelProps {
@@ -45,12 +47,17 @@ const SidePanel: React.FC<SidePanelProps> = ({ renderView }) => {
             height: '100%',
             minWidth: 'clamp(300px, 25vw, 420px)',
             overflow: 'hidden',
+            bgcolor: theme.palette.mode === 'dark'
+              ? alpha(theme.palette.background.paper, 0.4)
+              : alpha(theme.palette.background.paper, 0.7),
           }}
         >
           <SidePanelHeader
             title={viewConfig.title}
             icon={viewConfig.icon}
           />
+
+          {viewConfig.stickyContent}
 
           <Box
             sx={{

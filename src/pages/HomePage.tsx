@@ -1388,17 +1388,13 @@ const HomeInner: React.FC<HomeProps> = ({
                   <Card
                     key={event.id}
                     sx={{
-                      mb: 2,
-                      borderRadius: 2,
+                      mb: 0.5,
+                      borderRadius: 1,
                       cursor: 'pointer',
                       transition: 'all 0.2s',
                       bgcolor: 'background.default',
                       border: `1px solid ${theme.palette.divider}`,
-                      '&:hover': {
-                        boxShadow: 2,
-                        transform: 'translateY(-2px)',
-                        bgcolor: 'action.hover',
-                      },
+                       
                       '&:last-child': {
                         mb: 0
                       }

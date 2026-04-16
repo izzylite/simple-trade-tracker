@@ -8,3 +8,4 @@ export { default as NoteCard } from './NoteCard';
 export { default as PlaceholderNoteCard } from './PlaceholderNoteCard';
 export { default as NotesBottomSheet } from './NotesBottomSheet';
 export { useReminderNotes } from './useReminderNotes';
+export { default as StickyReminderCards } from './StickyReminderCards';

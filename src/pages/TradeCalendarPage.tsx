@@ -19,7 +19,7 @@ import {
   Alert,
   Fab,
   Fade,
-  LinearProgress
+  LinearProgress,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -99,7 +99,11 @@ import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import OrionIcon from '../components/aiChat/OrionIcon';
 import NotesDrawer from '../components/notes/NotesDrawer';
 import NoteEditorDialog from '../components/notes/NoteEditorDialog';
-import { StackedNotesWidget } from '../components/reminderNotes';
+import {
+  StackedNotesWidget,
+  StickyReminderCards,
+  useReminderNotes,
+} from '../components/reminderNotes';
 import NotesBottomSheet from '../components/reminderNotes/NotesBottomSheet';
 import * as notesService from '../services/notesService';
 import * as calendarService from '../services/calendarService';
@@ -704,10 +708,26 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   // Calendar edit dialog state
   const [isCalendarEditOpen, setIsCalendarEditOpen] = useState(false);
+
   const [isCalendarEditSubmitting, setIsCalendarEditSubmitting] = useState(false);
+
+  // Trigger to open performance dialog (hosted in MonthlyStats)
+  const [openPerfDialog, setOpenPerfDialog] = useState(false);
 
   // Economic calendar drawer state (<lg only — panel handles lg+)
   const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(false);
+
+  // Sticky reminder dismissed IDs (session-only — resets on reload)
+  const [dismissedReminderIds, setDismissedReminderIds] = useState<Set<string>>(new Set());
+  const {
+    notes: reminderNotes,
+    fullDayName: reminderDayName,
+    updateNote: updateReminderNote,
+    removeNote: removeReminderNote,
+  } = useReminderNotes(calendarId || '');
+  const handleDismissReminder = useCallback((noteId: string) => {
+    setDismissedReminderIds(prev => new Set(prev).add(noteId));
+  }, []);
 
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
@@ -1237,6 +1257,52 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     return calculateSessionStats(filteredTrades, currentDate, 'month', accountBalance);
   }, [filteredTrades, currentDate, accountBalance]);
 
+  // Compute cumulative PnL chart data for the current month
+  const monthlyCumulativeChartData = useMemo(() => {
+    const monthTrades = filteredTrades
+      .filter(t => isSameMonth(new Date(t.trade_date), currentDate))
+      .sort((a, b) =>
+        new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime()
+      );
+    if (monthTrades.length === 0) return [];
+
+    const byDate = new Map<string, { pnl: number; trades: Trade[]; fullDate: Date }>();
+    monthTrades.forEach(t => {
+      const d = new Date(t.trade_date);
+      const key = format(d, 'MM/dd');
+      const existing = byDate.get(key);
+      if (existing) {
+        existing.pnl += t.amount;
+        existing.trades.push(t);
+      } else {
+        byDate.set(key, { pnl: t.amount, trades: [t], fullDate: d });
+      }
+    });
+
+    let cumulative = 0;
+    return Array.from(byDate.entries()).map(([date, { pnl, trades: dayTrades, fullDate }]) => {
+      const prev = cumulative;
+      cumulative += pnl;
+      return {
+        date,
+        pnl,
+        cumulativePnL: cumulative,
+        dailyChange: cumulative - prev,
+        trades: dayTrades,
+        fullDate,
+        isWin: pnl > 0,
+        isLoss: pnl < 0,
+        isIncreasing: cumulative > prev,
+        isDecreasing: cumulative < prev,
+      };
+    });
+  }, [filteredTrades, currentDate]);
+
+  const monthlyTargetValue = useMemo(() => {
+    if (!monthly_target || accountBalance <= 0) return null;
+    return (monthly_target / 100) * accountBalance;
+  }, [monthly_target, accountBalance]);
+
   const clearDaySelection = () => {
     setSelectedDate(null);
     if (currentView.id === 'day-trades') resetPanel();
@@ -1714,6 +1780,30 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     ]
   );
 
+  // Wrap renderView to inject sticky reminder cards into every panel view
+  const renderViewWithReminders = useCallback(
+    (view: SidePanelView) => {
+      const config = renderView(view);
+      if (!config || isReadOnly) return config;
+      return {
+        ...config,
+        stickyContent: reminderNotes.length > 0 ? (
+          <StickyReminderCards
+            notes={reminderNotes}
+            dismissedIds={dismissedReminderIds}
+            onDismiss={handleDismissReminder}
+            calendar={calendar!}
+            fullDayName={reminderDayName}
+            onNoteSaved={updateReminderNote}
+            onNoteDeleted={removeReminderNote}
+          />
+        ) : undefined,
+      };
+    },
+    [renderView, reminderNotes, dismissedReminderIds,
+     handleDismissReminder, isReadOnly]
+  );
+
   const breadcrumbButtons = useMemo<BreadcrumbButton[]>(() => [], []);
 
   const breadcrumbRightContent = (
@@ -1834,7 +1924,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
 
       {/* Stacked Notes Widget - hidden in read-only mode */}
-      {calendarId && !isReadOnly && <StackedNotesWidget calendarId={calendarId} />}
+      {calendarId && !isReadOnly && (
+        <StackedNotesWidget
+          calendarId={calendarId}
+          filterIds={dismissedReminderIds}
+          calendar={calendar}
+        />
+      )}
 
       {/* Main Content Container */}
       <Box sx={{
@@ -1908,6 +2004,8 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 pnlBeforeMonth={pnlBeforeMonth}
                 isPnlLoading={isPnlLoading}
                 calendar={calendar}
+                openPerformanceDialog={openPerfDialog}
+                onPerformanceDialogClose={() => setOpenPerfDialog(false)}
               />
 
             </Box>
@@ -2381,6 +2479,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               selectedDate={currentDate}
               timePeriod="month"
               setMultipleTradesDialog={setSessionTradesDialog}
+              chartData={monthlyCumulativeChartData}
+              targetValue={monthlyTargetValue}
+              monthly_target={monthly_target}
+              onOpenPerformanceDetail={() => setOpenPerfDialog(true)}
             />
           )}
 
@@ -2447,7 +2549,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
       {/* Side Panel — lg+ only, replaces inline economic calendar */}
       {isLgUp && (
-        <SidePanel renderView={renderView} />
+        <SidePanel renderView={renderViewWithReminders} />
       )}
 
       {isLgUp && !isPanelOpen && (

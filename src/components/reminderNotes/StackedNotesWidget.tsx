@@ -12,15 +12,24 @@ import PlaceholderNoteCard from './PlaceholderNoteCard';
 import NotesBottomSheet from './NotesBottomSheet';
 import { Z_INDEX } from '../../styles/zIndex';
 import { Note } from '../../types/note';
+import { Calendar } from '../../types/calendar';
 
 interface StackedNotesWidgetProps {
   calendarId: string;
+  /** When provided, only show notes whose IDs are in this set */
+  filterIds?: Set<string>;
+  calendar?: Calendar;
 }
 
 const MAX_VISIBLE_CARDS = 3;
 
-const StackedNotesWidget: React.FC<StackedNotesWidgetProps> = ({ calendarId }) => {
-  const { notes, isLoading, fullDayName, updateNote, removeNote } = useReminderNotes(calendarId);
+const StackedNotesWidget: React.FC<StackedNotesWidgetProps> = ({
+  calendarId, filterIds, calendar,
+}) => {
+  const { notes: allNotes, isLoading, fullDayName, updateNote, removeNote } = useReminderNotes(calendarId);
+  const notes = filterIds
+    ? allNotes.filter(n => filterIds.has(n.id))
+    : allNotes;
   const [isHovered, setIsHovered] = useState(false);
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
   const [initialNoteIndex, setInitialNoteIndex] = useState(0);
@@ -115,12 +124,14 @@ const StackedNotesWidget: React.FC<StackedNotesWidgetProps> = ({ calendarId }) =
       <NotesBottomSheet
         open={bottomSheetOpen}
         onClose={handleBottomSheetClose}
-        notes={notes}
+        notes={allNotes}
         initialIndex={initialNoteIndex}
         calendarId={calendarId}
         fullDayName={fullDayName}
         onNoteSaved={handleNoteSaved}
         onNoteDeleted={handleNoteDeleted}
+        availableTradeTags={calendar?.tags}
+        pinnedEvents={calendar?.pinned_events}
       />
     </>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import {
   Box,
@@ -77,6 +77,9 @@ interface MonthlyStatsProps {
   pnlBeforeMonth?: number;
   isPnlLoading?: boolean;
   calendar?: Calendar;
+  /** When true, opens the performance dialog from outside */
+  openPerformanceDialog?: boolean;
+  onPerformanceDialogClose?: () => void;
 }
 
 
@@ -100,13 +103,29 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   maxDailyDrawdown,
   pnlBeforeMonth,
   isPnlLoading = false,
-  calendar
+  calendar,
+  openPerformanceDialog = false,
+  onPerformanceDialogClose,
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const menuOpen = Boolean(menuAnchorEl);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
+
+  // Allow external trigger to open the performance dialog
+  useEffect(() => {
+    if (openPerformanceDialog) {
+      setPerformanceDate(currentDate);
+      setIsPerformanceDialogOpen(true);
+    }
+  }, [openPerformanceDialog]);
+
+  // Notify parent when dialog closes (so it can reset its trigger)
+  const handlePerformanceDialogClose = () => {
+    setIsPerformanceDialogOpen(false);
+    onPerformanceDialogClose?.();
+  };
   const [performanceTimePeriod, setPerformanceTimePeriod] = useState<TimePeriod>('month');
   const [performanceDate, setPerformanceDate] = useState<Date>(currentDate);
 
@@ -728,7 +747,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
       {calendarId && (
         <Dialog
           open={isPerformanceDialogOpen}
-          onClose={() => setIsPerformanceDialogOpen(false)}
+          onClose={handlePerformanceDialogClose}
           maxWidth="lg"
           fullWidth
           fullScreen={isXs}
@@ -782,7 +801,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
                   onTabChange={(_, index) => setPerformanceTimePeriod(TIME_PERIOD_TABS[index].value)}
                   size="small"
                 />
-                <IconButton onClick={() => setIsPerformanceDialogOpen(false)} size="small">
+                <IconButton onClick={handlePerformanceDialogClose} size="small">
                   <CloseIcon />
                 </IconButton>
               </Box>

@@ -53,6 +53,12 @@ interface NotesBottomSheetProps {
   onNoteSaved?: (note: Note, isCreated?: boolean) => void;
   onNoteDeleted?: (noteId: string) => void;
   availableTradeTags?: string[];
+  pinnedEvents?: Array<{
+    event_id: string;
+    event: string;
+    currency?: any;
+    impact?: any;
+  }>;
 }
 
 // Color mapping
@@ -88,6 +94,7 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
   onNoteSaved,
   onNoteDeleted,
   availableTradeTags = [],
+  pinnedEvents,
 }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -390,6 +397,7 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
           onDelete={handleNoteDeleted}
           availableTradeTags={availableTradeTags}
           calendarNotes={notes.map((n) => ({ id: n.id, title: n.title }))}
+          pinnedEvents={pinnedEvents}
         />
       )}
     </>

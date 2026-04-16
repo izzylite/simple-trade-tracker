@@ -785,6 +785,9 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             selectedDate={selectedDate}
             timePeriod={timePeriod}
             setMultipleTradesDialog={setTradesDialog}
+            chartData={chartData}
+            targetValue={targetValue}
+            monthly_target={monthlyTarget}
           />
 
             {/* Economic Event Correlation Analysis */}

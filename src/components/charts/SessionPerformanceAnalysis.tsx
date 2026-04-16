@@ -1,9 +1,15 @@
-import React from 'react';
-import { Box, Paper, Typography, useTheme, Stack, alpha } from '@mui/material';
+import React, { useState } from 'react';
+import {
+  Box, Paper, Typography, useTheme, Stack, alpha,
+  Button, Tooltip,
+} from '@mui/material';
+import { Assessment as PerformanceIcon } from '@mui/icons-material';
 import { isSameMonth } from 'date-fns';
 import { Trade } from '../../types/dualWrite';
 import { formatValue } from '../../utils/formatters';
 import { SESSION_COLORS } from '../../utils/sessionTimeUtils';
+import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
+import CumulativePnLChart from './CumulativePnLChart';
 
 interface SessionPerformanceAnalysisProps {
   sessionStats: any[];
@@ -11,16 +17,30 @@ interface SessionPerformanceAnalysisProps {
   selectedDate: Date;
   timePeriod: 'month' | 'year' | 'all';
   setMultipleTradesDialog: (dialogState: any) => void;
+  chartData?: any[];
+  targetValue?: number | null;
+  monthly_target?: number;
+  onOpenPerformanceDetail?: () => void;
 }
+
+const TABS = [
+  { label: 'Session' },
+  { label: 'Cumulative P&L' },
+];
 
 const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
   sessionStats,
   trades,
   selectedDate,
   timePeriod,
-  setMultipleTradesDialog
+  setMultipleTradesDialog,
+  chartData,
+  targetValue,
+  monthly_target,
+  onOpenPerformanceDetail,
 }) => {
   const theme = useTheme();
+  const [activeTab, setActiveTab] = useState(0);
 
   // Define colors
   const COLORS = {
@@ -41,9 +61,53 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
         flexDirection: 'column',
         bgcolor: theme.palette.background.paper,
       }}>
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        Session Performance
-      </Typography>
+      {/* Header: tabs + Performance Detail button */}
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        mb: 2,
+      }}>
+        <RoundedTabs
+          tabs={TABS}
+          activeTab={activeTab}
+          onTabChange={(_, idx) => setActiveTab(idx)}
+          size="small"
+        />
+        {onOpenPerformanceDetail && (
+          <Tooltip title="Full performance analytics" arrow>
+            <Button
+              size="small"
+              startIcon={
+                <PerformanceIcon sx={{ fontSize: 18 }} />
+              }
+              onClick={onOpenPerformanceDetail}
+              variant="outlined"
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '0.8rem',
+                color: 'text.secondary',
+                borderColor: alpha(
+                  theme.palette.text.secondary, 0.3
+                ),
+                '&:hover': {
+                  color: 'primary.main',
+                  borderColor: 'primary.main',
+                  bgcolor: alpha(
+                    theme.palette.primary.main, 0.08
+                  ),
+                },
+              }}
+            >
+              Performance Analytics
+            </Button>
+          </Tooltip>
+        )}
+      </Box>
+
+      {/* Session Tab */}
+      <TabPanel value={activeTab} index={0}>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
         <Box sx={{
           display: 'grid',
@@ -259,6 +323,30 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
         )}
 
       </Box>
+      </TabPanel>
+
+      {/* Cumulative P&L Tab */}
+      <TabPanel value={activeTab} index={1}>
+        {chartData && chartData.length > 0 ? (
+          <CumulativePnLChart
+            chartData={chartData}
+            targetValue={targetValue ?? null}
+            monthly_target={monthly_target}
+            setMultipleTradesDialog={setMultipleTradesDialog}
+            timePeriod={timePeriod}
+          />
+        ) : (
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: 300,
+            color: 'text.secondary',
+          }}>
+            <Typography>No chart data available</Typography>
+          </Box>
+        )}
+      </TabPanel>
     </Paper>
   );
 };
