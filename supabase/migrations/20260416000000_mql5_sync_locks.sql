@@ -13,6 +13,9 @@ alter table public.mql5_sync_locks enable row level security;
 comment on table public.mql5_sync_locks is
   'Lease-based locks serializing fetch-mql5-event invocations per event. Rows self-expire via expires_at; no GC needed.';
 
+-- Runs as `security invoker` (default). Only `service_role` is granted
+-- execute below; if that ever changes, the RLS-with-no-policies design
+-- will block the function — revisit then.
 -- Acquire: returns true iff this caller took the lock.
 create or replace function public.try_acquire_mql5_sync_lock(
   p_event_name    text,
@@ -20,6 +23,7 @@ create or replace function public.try_acquire_mql5_sync_lock(
   p_lease_seconds int default 30
 ) returns boolean
 language plpgsql
+set search_path = public
 as $$
 declare
   v_key    text;
@@ -48,6 +52,7 @@ create or replace function public.release_mql5_sync_lock(
   p_country    text
 ) returns void
 language plpgsql
+set search_path = public
 as $$
 begin
   delete from public.mql5_sync_locks
