@@ -34,6 +34,42 @@ function buildGeminiUrl(apiKey: string, streaming: boolean): string {
 }
 
 /**
+ * Parsed function call from Gemini response. `thoughtSignature` is required
+ * by Gemini 3.x — the API emits it as a sibling field of `functionCall` on the
+ * Part, and the next turn's model part must echo it back verbatim or the API
+ * returns 400 ("Function call is missing a thought_signature in functionCall
+ * parts"). See https://ai.google.dev/gemini-api/docs/thought-signatures
+ */
+type ParsedFunctionCall = {
+  name: string;
+  args: Record<string, unknown>;
+  thoughtSignature?: string;
+};
+
+/**
+ * Extract a ParsedFunctionCall from a response Part, preserving the
+ * thoughtSignature from its documented sibling location (with a defensive
+ * fallback to the nested location in case the shape shifts).
+ */
+function extractFunctionCall(part: Record<string, unknown>): ParsedFunctionCall | undefined {
+  const fc = part.functionCall as { name?: string; args?: Record<string, unknown>; thoughtSignature?: string } | undefined;
+  if (!fc?.name) return undefined;
+  const thoughtSignature = (part as { thoughtSignature?: string }).thoughtSignature ?? fc.thoughtSignature;
+  return { name: fc.name, args: fc.args || {}, thoughtSignature };
+}
+
+/**
+ * Build a model Part that echoes a function call back to Gemini, including
+ * the thoughtSignature when present (Gemini 3.x requirement).
+ */
+function buildFunctionCallPart(call: ParsedFunctionCall): Record<string, unknown> {
+  return {
+    functionCall: { name: call.name, args: call.args },
+    ...(call.thoughtSignature ? { thoughtSignature: call.thoughtSignature } : {})
+  };
+}
+
+/**
  * Shared Gemini call for sites that already have `contents` in Gemini parts
  * format (continuation + correction passes inside the function-calling loop).
  * Streams text to the writer as it arrives when `streaming: true`.
@@ -53,7 +89,7 @@ async function callGeminiWithContents(
     maxOutputTokens?: number;
     mode?: 'AUTO' | 'ANY' | 'NONE';
   }
-): Promise<{ text: string; functionCall?: { name: string; args: Record<string, unknown> } }> {
+): Promise<{ text: string; functionCall?: ParsedFunctionCall }> {
   const body = {
     contents,
     tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
@@ -78,7 +114,7 @@ async function callGeminiWithContents(
   }
 
   let text = '';
-  let functionCall: { name: string; args: Record<string, unknown> } | undefined;
+  let functionCall: ParsedFunctionCall | undefined;
 
   if (opts.streaming) {
     if (!response.body) return { text, functionCall };
@@ -106,9 +142,9 @@ async function callGeminiWithContents(
               }
             }
             const fcPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
-            if (fcPart?.functionCall) {
-              const fc = fcPart.functionCall as { name: string; args: Record<string, unknown> };
-              functionCall = { name: fc.name, args: fc.args || {} };
+            if (fcPart) {
+              const extracted = extractFunctionCall(fcPart);
+              if (extracted) functionCall = extracted;
             }
           } catch (parseError) {
             log(`Failed to parse streaming chunk: ${parseError}`, 'warn');
@@ -122,9 +158,9 @@ async function callGeminiWithContents(
     const data = await response.json();
     const parts = data.candidates?.[0]?.content?.parts || [];
     const fcPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
-    if (fcPart?.functionCall) {
-      const fc = fcPart.functionCall as { name: string; args: Record<string, unknown> };
-      functionCall = { name: fc.name, args: fc.args || {} };
+    if (fcPart) {
+      const extracted = extractFunctionCall(fcPart);
+      if (extracted) functionCall = extracted;
     }
     text = parts.map((p: { text?: string }) => p.text || '').join('');
   }
@@ -682,7 +718,7 @@ async function callGemini(
   message: string,
   conversationHistory: Array<{ role: string; content: string }>,
   tools: GeminiFunctionDeclaration[]
-): Promise<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> } }> {
+): Promise<{ text?: string; functionCall?: ParsedFunctionCall }> {
   const apiUrl = buildGeminiUrl(apiKey, false);
 
   // Build contents array
@@ -729,9 +765,9 @@ async function callGemini(
 
   // Check for function call
   const functionCallPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
-  if (functionCallPart?.functionCall) {
-    const fc = functionCallPart.functionCall as { name: string; args: Record<string, unknown> };
-    return { functionCall: { name: fc.name, args: fc.args || {} } };
+  if (functionCallPart) {
+    const extracted = extractFunctionCall(functionCallPart);
+    if (extracted) return { functionCall: extracted };
   }
 
   // Get text response
@@ -751,7 +787,7 @@ async function callGeminiStreaming(
   tools: GeminiFunctionDeclaration[],
   writer: WritableStreamDefaultWriter,
   userImages?: Array<{ url: string; mimeType: string }>
-): Promise<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> }; functionCalls?: Array<{ name: string; args: Record<string, unknown> }>; emptyBug?: boolean }> {
+): Promise<{ text?: string; functionCall?: ParsedFunctionCall; functionCalls?: ParsedFunctionCall[]; emptyBug?: boolean }> {
   const apiUrl = buildGeminiUrl(apiKey, true);
 
   // Build user message parts (text + optional images)
@@ -841,8 +877,8 @@ async function callGeminiStreaming(
 
   // Process streaming response
   let fullText = '';
-  let functionCall: { name: string; args: Record<string, unknown> } | undefined;
-  const functionCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+  let functionCall: ParsedFunctionCall | undefined;
+  const functionCalls: ParsedFunctionCall[] = [];
   let chunkCount = 0;
 
   if (!response.body) {
@@ -924,18 +960,18 @@ async function callGeminiStreaming(
               // Continue processing - the empty response will be detected at the end
             }
 
-            // Extract ALL function calls (not just the first one)
+            // Extract ALL function calls (not just the first one).
+            // Gemini 3.x attaches a thoughtSignature on the same Part as each
+            // functionCall — extractFunctionCall preserves it so we can echo
+            // it back on the next turn (required, else the API 400s).
             const functionCallParts = parts.filter((p: { functionCall?: unknown }) => p.functionCall);
             for (const functionCallPart of functionCallParts) {
-              if (functionCallPart.functionCall) {
-                const fc = functionCallPart.functionCall as { name: string; args: Record<string, unknown> };
-                const call = { name: fc.name, args: fc.args || {} };
-                functionCalls.push(call);
-
-                // Keep backward compatibility - set first call
-                if (!functionCall) {
-                  functionCall = call;
-                }
+              const call = extractFunctionCall(functionCallPart);
+              if (!call) continue;
+              functionCalls.push(call);
+              // Keep backward compatibility - set first call
+              if (!functionCall) {
+                functionCall = call;
               }
             }
 
@@ -1183,13 +1219,8 @@ function handleStreamingRequest(
             // Add to function calls history
             functionCalls.push({ name: call.name, args: call.args, result: funcResult });
 
-            // Build conversation parts
-            modelParts.push({
-              functionCall: {
-                name: call.name,
-                args: call.args
-              }
-            });
+            // Build conversation parts (preserves thoughtSignature for Gemini 3.x)
+            modelParts.push(buildFunctionCallPart(call));
 
             // Build multimodal response parts (handles image injection)
             const responseParts = await buildFunctionResponseParts(call.name, funcResult);
@@ -1255,15 +1286,10 @@ function handleStreamingRequest(
             result: functionResult
           });
 
-          // Append to conversation history
+          // Append to conversation history (preserves thoughtSignature for Gemini 3.x)
           conversationContents.push({
             role: 'model',
-            parts: [{
-              functionCall: {
-                name: call.name,
-                args: call.args
-              }
-            }]
+            parts: [buildFunctionCallPart(call)]
           });
 
           // Build multimodal response parts (handles image injection)
@@ -1712,14 +1738,10 @@ Deno.serve(async (req: Request) => {
       }
 
       // Append model's function call to conversation history
+      // (preserves thoughtSignature for Gemini 3.x)
       conversationContents.push({
         role: 'model',
-        parts: [{
-          functionCall: {
-            name: call.name,
-            args: call.args
-          }
-        }]
+        parts: [buildFunctionCallPart(call)]
       });
 
       // Append function response to conversation history (handles image injection)
