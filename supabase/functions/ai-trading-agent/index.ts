@@ -18,6 +18,122 @@ import { encodeBase64 } from "https://deno.land/std@0.208.0/encoding/base64.ts";
 
 /**
  * ============================================================================
+ * MODEL CONFIG
+ * ============================================================================
+ * Model ID is read from the GEMINI_MODEL env var so we can flip per-environment
+ * (e.g. canary a new model in staging while prod stays on the stable one).
+ * The default stays conservative — bump it once the target has been validated.
+ */
+const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash';
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+function buildGeminiUrl(apiKey: string, streaming: boolean): string {
+  return streaming
+    ? `${GEMINI_API_BASE}/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`
+    : `${GEMINI_API_BASE}/${MODEL}:generateContent?key=${apiKey}`;
+}
+
+/**
+ * Shared Gemini call for sites that already have `contents` in Gemini parts
+ * format (continuation + correction passes inside the function-calling loop).
+ * Streams text to the writer as it arrives when `streaming: true`.
+ * Throws on non-2xx — callers that want soft-failure should wrap in try/catch.
+ *
+ * The initial request uses callGemini / callGeminiStreaming below, which build
+ * `contents` from systemPrompt + message + history. Once we're past turn 1
+ * we already have `contents`, so those helpers don't fit.
+ */
+async function callGeminiWithContents(
+  apiKey: string,
+  contents: Array<{ role: string; parts: Array<Record<string, unknown>> }>,
+  tools: GeminiFunctionDeclaration[],
+  opts: {
+    streaming: boolean;
+    writer?: WritableStreamDefaultWriter;
+    maxOutputTokens?: number;
+    mode?: 'AUTO' | 'ANY' | 'NONE';
+  }
+): Promise<{ text: string; functionCall?: { name: string; args: Record<string, unknown> } }> {
+  const body = {
+    contents,
+    tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
+    tool_config: tools.length > 0 ? {
+      function_calling_config: { mode: opts.mode ?? 'AUTO' }
+    } : undefined,
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: opts.maxOutputTokens ?? 4000,
+    }
+  };
+
+  const response = await fetch(buildGeminiUrl(apiKey, opts.streaming), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+  }
+
+  let text = '';
+  let functionCall: { name: string; args: Record<string, unknown> } | undefined;
+
+  if (opts.streaming) {
+    if (!response.body) return { text, functionCall };
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.trim() || line.startsWith('data: [DONE]')) continue;
+          const jsonLine = line.startsWith('data: ') ? line.slice(6) : line;
+          if (!jsonLine.trim()) continue;
+          try {
+            const chunk = JSON.parse(jsonLine);
+            const parts = chunk.candidates?.[0]?.content?.parts || [];
+            for (const part of parts) {
+              if (part.text) {
+                text += part.text;
+                if (opts.writer) await sendSSE(opts.writer, 'text_chunk', { text: part.text });
+              }
+            }
+            const fcPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
+            if (fcPart?.functionCall) {
+              const fc = fcPart.functionCall as { name: string; args: Record<string, unknown> };
+              functionCall = { name: fc.name, args: fc.args || {} };
+            }
+          } catch (parseError) {
+            log(`Failed to parse streaming chunk: ${parseError}`, 'warn');
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  } else {
+    const data = await response.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const fcPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
+    if (fcPart?.functionCall) {
+      const fc = fcPart.functionCall as { name: string; args: Record<string, unknown> };
+      functionCall = { name: fc.name, args: fc.args || {} };
+    }
+    text = parts.map((p: { text?: string }) => p.text || '').join('');
+  }
+
+  return { text, functionCall };
+}
+
+/**
+ * ============================================================================
  * TOOL CACHING
  * ============================================================================
  * Cache MCP tools for 5 minutes to avoid repeated fetches on every request.
@@ -567,7 +683,7 @@ async function callGemini(
   conversationHistory: Array<{ role: string; content: string }>,
   tools: GeminiFunctionDeclaration[]
 ): Promise<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> } }> {
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const apiUrl = buildGeminiUrl(apiKey, false);
 
   // Build contents array
   const contents = [
@@ -636,7 +752,7 @@ async function callGeminiStreaming(
   writer: WritableStreamDefaultWriter,
   userImages?: Array<{ url: string; mimeType: string }>
 ): Promise<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> }; functionCalls?: Array<{ name: string; args: Record<string, unknown> }>; emptyBug?: boolean }> {
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
+  const apiUrl = buildGeminiUrl(apiKey, true);
 
   // Build user message parts (text + optional images)
   const userMessageParts: Array<Record<string, unknown>> = [];
@@ -1164,90 +1280,15 @@ function handleStreamingRequest(
           break;
         }
 
-        // Call Gemini again with updated conversation - need to use direct API call
-        // since we have conversationContents in Gemini format already
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${googleApiKey}`;
-
-        const requestBody = {
-          contents: conversationContents,
-          tools: allTools.length > 0 ? [{ function_declarations: allTools }] : undefined,
-          // AUTO mode for continuation: allow text responses after function results
-          tool_config: allTools.length > 0 ? {
-            function_calling_config: {
-              mode: "AUTO"
-            }
-          } : undefined,
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 8000,
-          }
-        };
-
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
-        }
-
-        // Process streaming response
-        let newText = '';
-        let newFunctionCall: { name: string; args: Record<string, unknown> } | undefined;
-
-        if (response.body) {
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
-
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-
-              buffer += decoder.decode(value, { stream: true });
-              const lines = buffer.split('\n');
-              buffer = lines.pop() || '';
-
-              for (const line of lines) {
-                if (!line.trim() || line.startsWith('data: [DONE]')) continue;
-                const jsonLine = line.startsWith('data: ') ? line.slice(6) : line;
-                if (!jsonLine.trim()) continue;
-
-                try {
-                  const chunk = JSON.parse(jsonLine);
-                  const candidate = chunk.candidates?.[0];
-                  const content = candidate?.content;
-                  const parts = content?.parts || [];
-
-                  // Stream text immediately for real-time progressive rendering.
-                  // If a function call is found in the same response, text_reset
-                  // will be sent after the loop to correct the already-streamed text.
-                  for (const part of parts) {
-                    if (part.text) {
-                      newText += part.text;
-                      await sendSSE(writer, 'text_chunk', { text: part.text });
-                    }
-                  }
-
-                  // Check for function call
-                  const functionCallPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
-                  if (functionCallPart?.functionCall) {
-                    const fc = functionCallPart.functionCall as { name: string; args: Record<string, unknown> };
-                    newFunctionCall = { name: fc.name, args: fc.args || {} };
-                  }
-                } catch (parseError) {
-                  log(`Failed to parse streaming chunk: ${parseError}`, 'warn');
-                }
-              }
-            }
-          } finally {
-            reader.releaseLock();
-          }
-        }
+        // Continuation call — conversationContents is already in Gemini format.
+        // If the model returns both text and a function call in the same turn,
+        // the text was narration (streamed already); text_reset corrects the UI.
+        const { text: newText, functionCall: newFunctionCall } = await callGeminiWithContents(
+          googleApiKey,
+          conversationContents,
+          allTools,
+          { streaming: true, writer, maxOutputTokens: 8000 }
+        );
 
         if (!newFunctionCall && newText) {
           // Text was already streamed as text_chunk — this is the final answer
@@ -1338,75 +1379,23 @@ function handleStreamingRequest(
           // Stream the correction prompt to client
           await sendSSE(writer, 'text_chunk', { text: '\n\n[Correcting response...]\n\n' });
 
-          // Call Gemini again with correction feedback
-          const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${googleApiKey}`;
-          const requestBody = {
-            contents: conversationContents,
-            tools: allTools.length > 0 ? [{ function_declarations: allTools }] : undefined,
-            tool_config: allTools.length > 0 ? {
-              function_calling_config: { mode: "AUTO" }
-            } : undefined,
-            generationConfig: {
-              temperature: 0.3,
-              maxOutputTokens: 8000,
-            }
-          };
-
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody),
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            log(`Gemini correction call failed: ${response.status} - ${errorText}`, 'error');
+          // Correction pass — soft-fail (break validation loop) on any API error
+          // rather than killing the whole request, since we already have a
+          // usable (if imperfect) response from the prior turn.
+          let correctedText = '';
+          try {
+            const result = await callGeminiWithContents(
+              googleApiKey,
+              conversationContents,
+              allTools,
+              { streaming: true, writer, maxOutputTokens: 8000 }
+            );
+            correctedText = result.text;
+          } catch (error) {
+            log(`Gemini correction call failed: ${error}`, 'error');
             break;
           }
 
-          // Process streaming response for correction
-          let correctedText = '';
-          if (response.body) {
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-
-            try {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                  if (!line.trim() || line.startsWith('data: [DONE]')) continue;
-                  const jsonLine = line.startsWith('data: ') ? line.slice(6) : line;
-                  if (!jsonLine.trim()) continue;
-
-                  try {
-                    const chunk = JSON.parse(jsonLine);
-                    const candidate = chunk.candidates?.[0];
-                    const parts = candidate?.content?.parts || [];
-
-                    for (const part of parts) {
-                      if (part.text) {
-                        correctedText += part.text;
-                        await sendSSE(writer, 'text_chunk', { text: part.text });
-                      }
-                    }
-                  } catch (parseError) {
-                    // Skip invalid JSON
-                  }
-                }
-              }
-            } finally {
-              reader.releaseLock();
-            }
-          }
-
-          // Update final text with corrected version for next validation pass
           cleanedFinalText = correctedText;
           finalText = correctedText;
           log(`Received corrected response (${correctedText.length} chars)`, 'info');
@@ -1474,7 +1463,7 @@ function handleStreamingRequest(
         messageHtml,
         metadata: {
           functionCalls,
-          model: 'gemini-2.5-flash',
+          model: MODEL,
           timestamp: new Date().toISOString(),
           turnCount
         }
@@ -1740,50 +1729,14 @@ Deno.serve(async (req: Request) => {
         parts: responseParts
       });
 
-      // Call Gemini again with updated conversation history
-      // CONSERVATIVE: const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleApiKey}`
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleApiKey}`;
-      const requestBody = {
-        contents: conversationContents,
-        tools: allTools.length > 0 ? [{ function_declarations: allTools }] : undefined,
-        // AUTO mode for continuation: allow text responses after function results
-        tool_config: allTools.length > 0 ? {
-          function_calling_config: {
-            mode: "AUTO"
-          }
-        } : undefined,
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 4000,
-        }
-      };
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      const candidate = data.candidates?.[0];
-      const content = candidate?.content;
-      const parts = content?.parts || [];
-
-      // Check for function call
-      const functionCallPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
-      if (functionCallPart?.functionCall) {
-        const fc = functionCallPart.functionCall as { name: string; args: Record<string, unknown> };
-        result = { functionCall: { name: fc.name, args: fc.args || {} } };
-      } else {
-        // Get text response
-        const text = parts.map((p: { text?: string }) => p.text || '').join('');
-        result = { text };
-      }
+      // Non-streaming continuation with updated conversation history.
+      const { text: newText, functionCall: newFunctionCall } = await callGeminiWithContents(
+        googleApiKey,
+        conversationContents,
+        allTools,
+        { streaming: false, maxOutputTokens: 4000 }
+      );
+      result = newFunctionCall ? { functionCall: newFunctionCall } : { text: newText };
     }
 
     log(`Completed in ${turnCount} turns with ${functionCalls.length} function calls`, 'info');
@@ -1855,38 +1808,21 @@ Deno.serve(async (req: Request) => {
           parts: [{ text: idValidationResult.correctionPrompt }]
         });
 
-        // Call Gemini again with correction feedback
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleApiKey}`;
-        const requestBody = {
-          contents: conversationContents,
-          tools: allTools.length > 0 ? [{ function_declarations: allTools }] : undefined,
-          tool_config: allTools.length > 0 ? {
-            function_calling_config: { mode: "AUTO" }
-          } : undefined,
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 8000,
-          }
-        };
-
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          log(`Gemini correction call failed: ${response.status} - ${errorText}`, 'error');
+        // Non-streaming correction — soft-fail (break validation loop) on API error.
+        let correctedText = '';
+        try {
+          const result = await callGeminiWithContents(
+            googleApiKey,
+            conversationContents,
+            allTools,
+            { streaming: false, maxOutputTokens: 8000 }
+          );
+          correctedText = result.text;
+        } catch (error) {
+          log(`Gemini correction call failed: ${error}`, 'error');
           break;
         }
 
-        const data = await response.json();
-        const candidate = data.candidates?.[0];
-        const parts = candidate?.content?.parts || [];
-        const correctedText = parts.map((p: { text?: string }) => p.text || '').join('');
-
-        // Update final text with corrected version for next validation pass
         cleanedFinalText = correctedText;
         finalText = correctedText;
         log(`Received corrected response (${correctedText.length} chars)`, 'info');
@@ -1926,7 +1862,7 @@ Deno.serve(async (req: Request) => {
       embeddedNotes: Object.keys(embeddedNotes).length > 0 ? embeddedNotes : undefined,
       metadata: {
         functionCalls,
-        model: 'gemini-2.5-flash',
+        model: MODEL,
         timestamp: new Date().toISOString(),
       }
     };
@@ -1941,7 +1877,7 @@ Deno.serve(async (req: Request) => {
           message: 'Security validation failed',
           metadata: {
             functionCalls: [],
-            model: 'gemini-2.5-flash',
+            model: MODEL,
             timestamp: new Date().toISOString()
           },
           error: 'Data leak detected',
@@ -1961,7 +1897,7 @@ Deno.serve(async (req: Request) => {
 
     const errorResponse = formatErrorResponse(
       error instanceof Error ? error : new Error('Unknown error'),
-      'gemini-2.5-flash'
+      MODEL
     );
 
     return new Response(JSON.stringify(errorResponse), {
