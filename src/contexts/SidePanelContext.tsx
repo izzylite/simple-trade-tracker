@@ -46,6 +46,10 @@ export interface CalendarsListView {
   isTrash?: boolean;
 }
 
+export interface FAQView {
+  id: 'faq';
+}
+
 export type SidePanelView =
   | EconomicCalendarView
   | NotesView
@@ -55,7 +59,8 @@ export type SidePanelView =
   | DayTradesView
   | AIAnalysisView
   | AIChatView
-  | CalendarsListView;
+  | CalendarsListView
+  | FAQView;
 
 const MAX_STACK_DEPTH = 3;
 

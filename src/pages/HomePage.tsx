@@ -27,6 +27,7 @@ import {
   DeleteOutline as TrashIcon,
   Close as CloseIcon,
   ChevronLeft as ChevronLeftIcon,
+  HelpOutline as HelpOutlineIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { Calendar } from '../types/calendar';
@@ -65,6 +66,8 @@ import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import * as calendarService from '../services/calendarService';
 import { CalendarManagementProps } from '../App';
 import NotesDrawer from '../components/notes/NotesDrawer';
+import FAQDrawer from '../components/faq/FAQDrawer';
+import FAQContent from '../components/faq/FAQContent';
 import TrashCalendarItem from '../components/trash/TrashCalendarItem';
 import { Schedule as ScheduleIcon } from '@mui/icons-material';
 import {
@@ -153,6 +156,9 @@ const HomeInner: React.FC<HomeProps> = ({
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
 
+  // FAQ drawer state
+  const [isFAQDrawerOpen, setIsFAQDrawerOpen] = useState(false);
+
   // Calendar tabs state (0 = Recent, 1 = Trash)
   const [calendarTabIndex, setCalendarTabIndex] = useState(0);
 
@@ -198,6 +204,7 @@ const HomeInner: React.FC<HomeProps> = ({
       setIsAIChatOpen(false);
       setEconomicCalendarOpen(false);
       setIsCalendarsDrawerOpen(false);
+      setIsFAQDrawerOpen(false);
     };
 
     if (prevIsLgUp.current && !isLgUp && isPanelOpen) {
@@ -216,9 +223,16 @@ const HomeInner: React.FC<HomeProps> = ({
         case 'calendars-list':
           setIsCalendarsDrawerOpen(true);
           break;
+        case 'faq':
+          setIsFAQDrawerOpen(true);
+          break;
       }
     } else if (!prevIsLgUp.current && isLgUp) {
-      // <lg → lg+: close all drawers, panel takes over
+      // <lg → lg+: if FAQ drawer was open, hand off to panel; then close all drawers
+      if (isFAQDrawerOpen) {
+        replacePanel({ id: 'faq' });
+        setPanelOpen(true);
+      }
       closeAllDrawers();
     }
 
@@ -646,6 +660,12 @@ const HomeInner: React.FC<HomeProps> = ({
               />
             ),
           };
+        case 'faq':
+          return {
+            title: 'FAQs',
+            icon: <HelpOutlineIcon fontSize="small" />,
+            component: <FAQContent />,
+          };
         default:
           return null;
       }
@@ -679,29 +699,70 @@ const HomeInner: React.FC<HomeProps> = ({
         }}
       >
         {/* Header Section */}
-        <Box sx={{ mb: { xs: 3, sm: 4 } }}>
-          <Typography
-            variant="h4"
+        <Box
+          sx={{
+            mb: { xs: 3, sm: 4 },
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 2,
+          }}
+        >
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                mb: 0.5,
+                fontSize: { xs: '1.75rem', sm: '2rem', md: '2.125rem' }
+              }}
+            >
+              {(() => {
+                const hour = new Date().getHours();
+                const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+                const firstName = user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || null;
+                return firstName ? `${greeting}, ${firstName}` : greeting;
+              })()}
+            </Typography>
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
+            >
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </Typography>
+          </Box>
+
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<HelpOutlineIcon />}
+            onClick={() => {
+              if (isLgUp) {
+                replacePanel({ id: 'faq' });
+                setPanelOpen(true);
+              } else {
+                setIsFAQDrawerOpen(true);
+              }
+            }}
             sx={{
-              fontWeight: 700,
-              mb: 0.5,
-              fontSize: { xs: '1.75rem', sm: '2rem', md: '2.125rem' }
+              flexShrink: 0,
+              borderRadius: 999,
+              textTransform: 'none',
+              fontWeight: 600,
+              px: { xs: 1.5, sm: 2 },
+              py: 0.5,
+              borderColor: (t) => alpha(t.palette.primary.main, 0.4),
+              color: 'primary.main',
+              bgcolor: (t) => alpha(t.palette.primary.main, 0.08),
+              '&:hover': {
+                borderColor: 'primary.main',
+                bgcolor: (t) => alpha(t.palette.primary.main, 0.16),
+              },
             }}
           >
-            {(() => {
-              const hour = new Date().getHours();
-              const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-              const firstName = user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || null;
-              return firstName ? `${greeting}, ${firstName}` : greeting;
-            })()}
-          </Typography>
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
-          >
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </Typography>
+            FAQs
+          </Button>
         </Box>
 
         {/* Statistics Cards */}
@@ -1124,7 +1185,7 @@ const HomeInner: React.FC<HomeProps> = ({
         >
           {/* Recent Calendars Card */}
           <Card
-            sx={{
+            sx={(theme) => ({
               flex: 1,
               borderRadius: 1,
               height: { xs: 'auto', md: '620px' },
@@ -1133,8 +1194,14 @@ const HomeInner: React.FC<HomeProps> = ({
               maxWidth: recentCalendars.length <= 1 ? { xs: 'none', md: '400px' } : 'none',
               p: { xs: 0.5, sm: 1 },
               display: 'flex',
-              flexDirection: 'column'
-            }}
+              flexDirection: 'column',
+              '&:hover': {
+                transform: 'none',
+                boxShadow: theme.palette.mode === 'dark'
+                  ? '0 2px 8px rgba(0,0,0,0.3)'
+                  : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+              },
+            })}
           >
             <Stack
               direction="row"
@@ -1303,15 +1370,21 @@ const HomeInner: React.FC<HomeProps> = ({
 
   {/* Economic Events Section */}
           <Card
-            sx={{
+            sx={(theme) => ({
               flex: 1,
               borderRadius: 1,
               height: { xs: 'auto', md: '620px' },
               minHeight: { xs: '400px', md: '620px' },
               p: { xs: 0.5, sm: 1 },
               display: 'flex',
-              flexDirection: 'column'
-            }}
+              flexDirection: 'column',
+              '&:hover': {
+                transform: 'none',
+                boxShadow: theme.palette.mode === 'dark'
+                  ? '0 2px 8px rgba(0,0,0,0.3)'
+                  : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+              },
+            })}
           >
             <Stack
               direction="row"
@@ -1432,11 +1505,17 @@ const HomeInner: React.FC<HomeProps> = ({
 
         {/* Recent Trades Card */}
           <Card
-            sx={{
+            sx={(theme) => ({
               flex: 1,
               borderRadius: 1,
               p: { xs: 2, sm: 2.5, md: 3 },
-            }}
+              '&:hover': {
+                transform: 'none',
+                boxShadow: theme.palette.mode === 'dark'
+                  ? '0 2px 8px rgba(0,0,0,0.3)'
+                  : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+              },
+            })}
           >
             <Stack
               direction="row"
@@ -1608,6 +1687,12 @@ const HomeInner: React.FC<HomeProps> = ({
           )}
         </>
       )}
+
+      {/* FAQ Drawer — available on all breakpoints */}
+      <FAQDrawer
+        open={isFAQDrawerOpen}
+        onClose={() => setIsFAQDrawerOpen(false)}
+      />
 
       {/* Trade Form Dialog - calendar selection mode */}
       {calendars.length > 0 && (

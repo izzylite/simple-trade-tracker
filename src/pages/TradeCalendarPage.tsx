@@ -41,6 +41,7 @@ import {
   Edit as EditIcon,
   Flag as TargetIcon,
   EventNote as GamePlanIcon,
+  HelpOutline as HelpOutlineIcon,
 } from '@mui/icons-material';
 import {
   format,
@@ -98,6 +99,8 @@ import ShareButton from '../components/sharing/ShareButton';
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import OrionIcon from '../components/aiChat/OrionIcon';
 import NotesDrawer from '../components/notes/NotesDrawer';
+import FAQDrawer from '../components/faq/FAQDrawer';
+import FAQContent from '../components/faq/FAQContent';
 import NoteEditorDialog from '../components/notes/NoteEditorDialog';
 import {
   StackedNotesWidget,
@@ -735,6 +738,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
 
+  // FAQ drawer state
+  const [isFAQDrawerOpen, setIsFAQDrawerOpen] = useState(false);
+
   // Week note state
   const [weekNoteKeys, setWeekNoteKeys] = useState<Set<string>>(new Set());
   const [weekNoteDialog, setWeekNoteDialog] = useState<{
@@ -804,6 +810,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       setPinnedTradesDrawerOpen(false);
       setIsTagManagementDrawerOpen(false);
       setIsEconomicCalendarOpen(false);
+      setIsFAQDrawerOpen(false);
       setSelectedDate(null);
     };
 
@@ -826,6 +833,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         case 'economic-calendar':
           setIsEconomicCalendarOpen(true);
           break;
+        case 'faq':
+          setIsFAQDrawerOpen(true);
+          break;
         case 'day-trades': {
           const dayView = currentView as DayTradesView;
           setSelectedDate(dayView.date);
@@ -833,7 +843,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         }
       }
     } else if (!prevIsLgUp.current && isLgUp) {
-      // <lg → lg+: close all drawers, panel takes over
+      // <lg → lg+: if FAQ drawer was open, hand off to panel; then close all drawers
+      if (isFAQDrawerOpen) {
+        replacePanel({ id: 'faq' });
+        setPanelOpen(true);
+      }
       closeAllDrawers();
     }
 
@@ -842,14 +856,20 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   // Breadcrumb items
   const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => {
-    // Create dropdown items from user calendars
-    const dropdownItems: DropdownItem[] = userCalendars.map(cal => ({
-      label: cal.name,
-      path: `/calendar/${cal.id}`,
-      active: cal.id === calendarId,
-      totalTrades: cal.total_trades,
-      pnl: cal.total_pnl
-    }));
+    // Create dropdown items from user calendars, overlaying live data for the
+    // active calendar so name/totals reflect in-session updates (renames, new
+    // trades) instead of the snapshot taken when the list was first loaded.
+    const dropdownItems: DropdownItem[] = userCalendars.map(cal => {
+      const isActive = cal.id === calendarId;
+      const source = isActive ? calendar : cal;
+      return {
+        label: source.name,
+        path: `/calendar/${cal.id}`,
+        active: isActive,
+        totalTrades: source.total_trades,
+        pnl: source.total_pnl
+      };
+    });
 
     return [
       { label: 'Home', path: '/', icon: <HomeIcon sx={{ fontSize: 18 }} /> },
@@ -860,7 +880,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         dropdown: dropdownItems.length > 0 ? dropdownItems : undefined
       }
     ];
-  }, [calendarName, calendarId, userCalendars]);
+  }, [calendarName, calendarId, userCalendars, calendar]);
 
   // Use optimized hook for high-impact economic events
   const { highImpactEventDates: monthlyHighImpactEvents } = useHighImpactEvents({
@@ -1677,6 +1697,12 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               />
             ),
           };
+        case 'faq':
+          return {
+            title: 'FAQs',
+            icon: <HelpOutlineIcon fontSize="small" />,
+            component: <FAQContent />,
+          };
         case 'ai-analysis': {
           const aiView = view as AIAnalysisView;
           return {
@@ -1806,6 +1832,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   const breadcrumbButtons = useMemo<BreadcrumbButton[]>(() => [], []);
 
+  const isFAQActive = isLgUp
+    ? isPanelOpen && currentView.id === 'faq'
+    : isFAQDrawerOpen;
+
   const breadcrumbRightContent = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
 
@@ -1829,6 +1859,19 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           size="small"
         />
       )}
+
+      <Tooltip title="FAQs">
+        <IconButton
+          size="small"
+          onClick={() => togglePanel('faq', setIsFAQDrawerOpen)}
+          sx={{
+            color: isFAQActive ? 'primary.main' : 'text.secondary',
+            '&:hover': { color: isFAQActive ? 'primary.main' : 'text.primary' },
+          }}
+        >
+          <HelpOutlineIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
     </Box>
   );
 
@@ -2836,6 +2879,14 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           isReadOnly={isReadOnly}
           availableTradeTags={allTags}
           pinnedEvents={calendar.pinned_events}
+        />
+      )}
+
+      {/* FAQ Drawer — <lg only (lg+ uses SidePanel) */}
+      {!isLgUp && (
+        <FAQDrawer
+          open={isFAQDrawerOpen}
+          onClose={() => setIsFAQDrawerOpen(false)}
         />
       )}
 
