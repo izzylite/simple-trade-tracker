@@ -47,9 +47,10 @@ type ParsedFunctionCall = {
 };
 
 /**
- * Extract a ParsedFunctionCall from a response Part, preserving the
- * thoughtSignature from its documented sibling location (with a defensive
- * fallback to the nested location in case the shape shifts).
+ * Extract a ParsedFunctionCall from a response Part. `thoughtSignature`
+ * may live on the Part itself, nested in the functionCall object, or on a
+ * preceding standalone Part — all three are captured elsewhere via rawParts
+ * preservation. Here we just pull name/args for tool execution.
  */
 function extractFunctionCall(part: Record<string, unknown>): ParsedFunctionCall | undefined {
   const fc = part.functionCall as { name?: string; args?: Record<string, unknown>; thoughtSignature?: string } | undefined;
@@ -59,8 +60,10 @@ function extractFunctionCall(part: Record<string, unknown>): ParsedFunctionCall 
 }
 
 /**
- * Build a model Part that echoes a function call back to Gemini, including
- * the thoughtSignature when present (Gemini 3.x requirement).
+ * Fallback Part builder used only when a caller has no rawParts available
+ * (e.g. a synthesised turn). Prefer echoing `result.rawParts` verbatim
+ * whenever possible — Gemini 3.x emits thoughtSignature as its own Part
+ * preceding the functionCall, and reconstructing loses that context.
  */
 function buildFunctionCallPart(call: ParsedFunctionCall): Record<string, unknown> {
   return {
@@ -89,7 +92,7 @@ async function callGeminiWithContents(
     maxOutputTokens?: number;
     mode?: 'AUTO' | 'ANY' | 'NONE';
   }
-): Promise<{ text: string; functionCall?: ParsedFunctionCall }> {
+): Promise<{ text: string; functionCall?: ParsedFunctionCall; rawParts: Array<Record<string, unknown>> }> {
   const body = {
     contents,
     tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
@@ -115,9 +118,10 @@ async function callGeminiWithContents(
 
   let text = '';
   let functionCall: ParsedFunctionCall | undefined;
+  const rawParts: Array<Record<string, unknown>> = [];
 
   if (opts.streaming) {
-    if (!response.body) return { text, functionCall };
+    if (!response.body) return { text, functionCall, rawParts };
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -135,6 +139,10 @@ async function callGeminiWithContents(
           try {
             const chunk = JSON.parse(jsonLine);
             const parts = chunk.candidates?.[0]?.content?.parts || [];
+            // Preserve ALL raw parts across chunks — thoughtSignature may arrive
+            // as its own standalone Part preceding the functionCall Part, and
+            // reconstructing would drop it.
+            rawParts.push(...parts);
             for (const part of parts) {
               if (part.text) {
                 text += part.text;
@@ -157,6 +165,7 @@ async function callGeminiWithContents(
   } else {
     const data = await response.json();
     const parts = data.candidates?.[0]?.content?.parts || [];
+    rawParts.push(...parts);
     const fcPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
     if (fcPart) {
       const extracted = extractFunctionCall(fcPart);
@@ -165,7 +174,7 @@ async function callGeminiWithContents(
     text = parts.map((p: { text?: string }) => p.text || '').join('');
   }
 
-  return { text, functionCall };
+  return { text, functionCall, rawParts };
 }
 
 /**
@@ -718,7 +727,7 @@ async function callGemini(
   message: string,
   conversationHistory: Array<{ role: string; content: string }>,
   tools: GeminiFunctionDeclaration[]
-): Promise<{ text?: string; functionCall?: ParsedFunctionCall }> {
+): Promise<{ text?: string; functionCall?: ParsedFunctionCall; rawParts: Array<Record<string, unknown>> }> {
   const apiUrl = buildGeminiUrl(apiKey, false);
 
   // Build contents array
@@ -761,18 +770,18 @@ async function callGemini(
   const data = await response.json();
   const candidate = data.candidates?.[0];
   const content = candidate?.content;
-  const parts = content?.parts || [];
+  const parts: Array<Record<string, unknown>> = content?.parts || [];
 
   // Check for function call
   const functionCallPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
   if (functionCallPart) {
     const extracted = extractFunctionCall(functionCallPart);
-    if (extracted) return { functionCall: extracted };
+    if (extracted) return { functionCall: extracted, rawParts: parts };
   }
 
   // Get text response
   const text = parts.map((p: { text?: string }) => p.text || '').join('');
-  return { text };
+  return { text, rawParts: parts };
 }
 
 /**
@@ -787,7 +796,7 @@ async function callGeminiStreaming(
   tools: GeminiFunctionDeclaration[],
   writer: WritableStreamDefaultWriter,
   userImages?: Array<{ url: string; mimeType: string }>
-): Promise<{ text?: string; functionCall?: ParsedFunctionCall; functionCalls?: ParsedFunctionCall[]; emptyBug?: boolean }> {
+): Promise<{ text?: string; functionCall?: ParsedFunctionCall; functionCalls?: ParsedFunctionCall[]; emptyBug?: boolean; rawParts?: Array<Record<string, unknown>> }> {
   const apiUrl = buildGeminiUrl(apiKey, true);
 
   // Build user message parts (text + optional images)
@@ -879,11 +888,15 @@ async function callGeminiStreaming(
   let fullText = '';
   let functionCall: ParsedFunctionCall | undefined;
   const functionCalls: ParsedFunctionCall[] = [];
+  // Preserve ALL raw parts across chunks — Gemini 3.x may emit thoughtSignature
+  // as its own standalone Part preceding a functionCall Part. Dropping any
+  // Part here means the next turn's echo is missing context and the API 400s.
+  const rawParts: Array<Record<string, unknown>> = [];
   let chunkCount = 0;
 
   if (!response.body) {
     log('Warning: Response body is null - no stream to process', 'warn');
-    return { text: '' };
+    return { text: '', rawParts: [] };
   }
 
   if (response.body) {
@@ -960,10 +973,11 @@ async function callGeminiStreaming(
               // Continue processing - the empty response will be detected at the end
             }
 
+            // Preserve every raw Part so we can echo the model turn verbatim
+            // on the next API call (required for Gemini 3.x thoughtSignature).
+            rawParts.push(...parts);
+
             // Extract ALL function calls (not just the first one).
-            // Gemini 3.x attaches a thoughtSignature on the same Part as each
-            // functionCall — extractFunctionCall preserves it so we can echo
-            // it back on the next turn (required, else the API 400s).
             const functionCallParts = parts.filter((p: { functionCall?: unknown }) => p.functionCall);
             for (const functionCallPart of functionCallParts) {
               const call = extractFunctionCall(functionCallPart);
@@ -1010,19 +1024,19 @@ async function callGeminiStreaming(
   // Return result - include text alongside function calls when available
   // This allows us to capture any text Gemini sends before/with function calls
   if (functionCalls.length > 1) {
-    return { functionCalls, text: fullText || undefined };
+    return { functionCalls, text: fullText || undefined, rawParts };
   } else if (functionCall) {
-    return { functionCall, text: fullText || undefined };
+    return { functionCall, text: fullText || undefined, rawParts };
   }
 
   // No function calls - return text (may be empty if model returned nothing)
   if (!fullText) {
     log('Warning: Gemini returned empty response (no text, no function calls) - known API bug', 'warn');
     // Signal that this is the known empty bug so caller can retry
-    return { text: '', emptyBug: true };
+    return { text: '', emptyBug: true, rawParts };
   }
 
-  return { text: fullText };
+  return { text: fullText, rawParts };
 }
 
 /**
@@ -1205,8 +1219,7 @@ function handleStreamingRequest(
 
           const results = await Promise.all(executionPromises);
 
-          // Send all tool_result events and build conversation parts
-          const modelParts: Array<Record<string, unknown>> = [];
+          // Send all tool_result events and collect function response parts
           const userParts: Array<Record<string, unknown>> = [];
 
           for (const { call, result: funcResult } of results) {
@@ -1219,15 +1232,19 @@ function handleStreamingRequest(
             // Add to function calls history
             functionCalls.push({ name: call.name, args: call.args, result: funcResult });
 
-            // Build conversation parts (preserves thoughtSignature for Gemini 3.x)
-            modelParts.push(buildFunctionCallPart(call));
-
             // Build multimodal response parts (handles image injection)
             const responseParts = await buildFunctionResponseParts(call.name, funcResult);
             userParts.push(...responseParts);
           }
 
-          // Append to conversation history
+          // Echo the model turn VERBATIM — Gemini 3.x emits thoughtSignature
+          // on its own Part preceding the functionCall, and reconstructing
+          // from just {name,args} drops it, causing 400 INVALID_ARGUMENT on
+          // the next call. Fall back to per-call synthesis only if rawParts
+          // is missing (shouldn't happen for a well-formed response).
+          const modelParts = result.rawParts && result.rawParts.length > 0
+            ? result.rawParts
+            : result.functionCalls!.map(buildFunctionCallPart);
           conversationContents.push({
             role: 'model',
             parts: modelParts
@@ -1286,10 +1303,13 @@ function handleStreamingRequest(
             result: functionResult
           });
 
-          // Append to conversation history (preserves thoughtSignature for Gemini 3.x)
+          // Echo the model turn verbatim (preserves thoughtSignature Parts)
+          const singleCallModelParts = result.rawParts && result.rawParts.length > 0
+            ? result.rawParts
+            : [buildFunctionCallPart(call)];
           conversationContents.push({
             role: 'model',
-            parts: [buildFunctionCallPart(call)]
+            parts: singleCallModelParts
           });
 
           // Build multimodal response parts (handles image injection)
@@ -1309,7 +1329,7 @@ function handleStreamingRequest(
         // Continuation call — conversationContents is already in Gemini format.
         // If the model returns both text and a function call in the same turn,
         // the text was narration (streamed already); text_reset corrects the UI.
-        const { text: newText, functionCall: newFunctionCall } = await callGeminiWithContents(
+        const { text: newText, functionCall: newFunctionCall, rawParts: newRawParts } = await callGeminiWithContents(
           googleApiKey,
           conversationContents,
           allTools,
@@ -1328,8 +1348,8 @@ function handleStreamingRequest(
 
         // Include text alongside function call if both present
         result = newFunctionCall
-          ? { functionCall: newFunctionCall, text: newText || undefined }
-          : { text: newText };
+          ? { functionCall: newFunctionCall, text: newText || undefined, rawParts: newRawParts }
+          : { text: newText, rawParts: newRawParts };
       }
 
       // Final fallback - if we still have no text but result has text
@@ -1737,11 +1757,13 @@ Deno.serve(async (req: Request) => {
         functionCalls.push({ name: call.name, args: call.args, result: functionResult });
       }
 
-      // Append model's function call to conversation history
-      // (preserves thoughtSignature for Gemini 3.x)
+      // Echo the model turn verbatim (preserves thoughtSignature Parts)
+      const modelTurnParts = result.rawParts && result.rawParts.length > 0
+        ? result.rawParts
+        : [buildFunctionCallPart(call)];
       conversationContents.push({
         role: 'model',
-        parts: [buildFunctionCallPart(call)]
+        parts: modelTurnParts
       });
 
       // Append function response to conversation history (handles image injection)
@@ -1752,13 +1774,15 @@ Deno.serve(async (req: Request) => {
       });
 
       // Non-streaming continuation with updated conversation history.
-      const { text: newText, functionCall: newFunctionCall } = await callGeminiWithContents(
+      const { text: newText, functionCall: newFunctionCall, rawParts: newRawParts } = await callGeminiWithContents(
         googleApiKey,
         conversationContents,
         allTools,
         { streaming: false, maxOutputTokens: 4000 }
       );
-      result = newFunctionCall ? { functionCall: newFunctionCall } : { text: newText };
+      result = newFunctionCall
+        ? { functionCall: newFunctionCall, rawParts: newRawParts }
+        : { text: newText, rawParts: newRawParts };
     }
 
     log(`Completed in ${turnCount} turns with ${functionCalls.length} function calls`, 'info');
