@@ -10,10 +10,10 @@ import type {
 import type { NewsResult } from './serper.ts';
 
 const SESSION_SEARCH_TERMS: Record<string, string> = {
-  asia: 'Asian session Nikkei Shanghai Hang Seng ASX',
-  london: 'London session FTSE DAX Euro Stoxx European markets',
-  ny_am: 'New York morning session S&P 500 Nasdaq Wall Street',
-  ny_pm: 'New York afternoon session US market closing',
+  asia: 'Asian markets Nikkei Shanghai Hang Seng ASX China Japan economic news',
+  london: 'European markets FTSE DAX CAC Euro Stoxx UK inflation economic news',
+  ny_am: 'US stocks S&P 500 Nasdaq Dow premarket earnings Wall Street',
+  ny_pm: 'US market close bond yields Treasury dollar index DXY',
 };
 
 const SESSION_CURRENCIES: Record<string, string[]> = {
@@ -22,6 +22,20 @@ const SESSION_CURRENCIES: Record<string, string[]> = {
   ny_am: ['USD', 'CAD'],
   ny_pm: ['USD', 'CAD'],
 };
+
+// Baseline macro/political/geopolitical queries that run on every briefing —
+// these catch market-moving events that transcend specific session indices
+// (central bank speakers, executive-branch statements, war/sanctions, commodity shocks).
+const BASELINE_MACRO_QUERIES = [
+  'Federal Reserve OR FOMC speech statement policy today',
+  'ECB OR Bank of England OR Bank of Japan policy commentary today',
+  'White House OR US President statement market impact today',
+  'geopolitical tension war sanctions markets today',
+  'oil price WTI Brent crude today',
+  'gold silver commodity prices today',
+  'US Treasury yields bond market today',
+  'China US trade policy tariffs today',
+];
 
 export async function handleMarketResearch(
   task: OrionTask,
@@ -57,33 +71,55 @@ export async function handleMarketResearch(
   return parseBriefingResponse(briefingJson);
 }
 
-function buildSearchQueries(config: MarketResearchConfig): string[] {
-  const queries: string[] = [];
+interface CategorizedQueries {
+  macro: string[];
+  session: string[];
+  market: string[];
+  custom: string[];
+}
 
-  for (const session of config.sessions) {
-    const terms = SESSION_SEARCH_TERMS[session];
-    if (terms) {
-      queries.push(`${terms} today`);
-    }
+function buildSearchQueries(config: MarketResearchConfig): CategorizedQueries {
+  const session: string[] = [];
+  for (const s of config.sessions) {
+    const terms = SESSION_SEARCH_TERMS[s];
+    if (terms) session.push(`${terms} today`);
   }
 
-  for (const market of config.markets) {
-    queries.push(`${market} market outlook today`);
-  }
+  const market: string[] = config.markets.map(
+    (m) => `${m} market outlook today`
+  );
 
-  for (const topic of config.custom_topics) {
-    queries.push(topic);
-  }
-
-  return queries;
+  return {
+    macro: [...BASELINE_MACRO_QUERIES],
+    session,
+    market,
+    custom: [...config.custom_topics],
+  };
 }
 
 async function gatherMarketNews(
   config: MarketResearchConfig
 ): Promise<NewsResult[]> {
   const queries = buildSearchQueries(config);
-  if (queries.length === 0) return [];
-  return searchNewsMultiple(queries, 5);
+
+  // Fewer results per macro query (many queries; avoid flooding the prompt).
+  // More per session/market (focused, higher signal).
+  const [macroNews, sessionNews, marketNews, customNews] = await Promise.all([
+    queries.macro.length > 0
+      ? searchNewsMultiple(queries.macro, 3)
+      : Promise.resolve([]),
+    queries.session.length > 0
+      ? searchNewsMultiple(queries.session, 5)
+      : Promise.resolve([]),
+    queries.market.length > 0
+      ? searchNewsMultiple(queries.market, 4)
+      : Promise.resolve([]),
+    queries.custom.length > 0
+      ? searchNewsMultiple(queries.custom, 4)
+      : Promise.resolve([]),
+  ]);
+
+  return [...macroNews, ...sessionNews, ...marketNews, ...customNews];
 }
 
 async function fetchUpcomingEvents(
@@ -163,7 +199,7 @@ async function callGeminiForBriefing(
   events: EconomicEvent[],
   instruments: string[]
 ): Promise<string> {
-  const systemPrompt = `You are Orion, an AI trading assistant. Generate a concise market research briefing.
+  const systemPrompt = `You are Orion, an AI trading assistant. Generate a concise market research briefing focused on what could move markets today.
 
 Respond ONLY with a JSON object in this exact format:
 {
@@ -173,24 +209,35 @@ Respond ONLY with a JSON object in this exact format:
   "briefing_plain": "Plain text version of the briefing"
 }
 
+Prioritize these catalyst categories when scanning the news (from highest impact to lowest):
+1. Central bank decisions and speeches (Fed, ECB, BoE, BoJ, PBoC)
+2. Political statements from heads of state, executive orders, trade policy moves, presidential posts/tweets
+3. Geopolitical shocks — wars, sanctions, coups, major diplomatic events
+4. Scheduled economic data releases (CPI, NFP, GDP, PMI) and surprise data
+5. Commodity shocks (oil supply, OPEC, gold safe-haven flows)
+6. Bond market signals (yield curve, Treasury auctions, credit spreads)
+7. Major corporate catalysts (mega-cap earnings, M&A, regulatory action)
+8. Session-specific index moves
+
 Significance guide:
-- "high": Major market-moving events (central bank decisions, unexpected data, geopolitical shocks)
-- "medium": Notable events that could affect trading (scheduled data releases, earnings, moderate moves)
-- "low": Routine market conditions, no major catalysts
+- "high": Central bank surprise, major political/geopolitical shock, large unexpected data miss, commodity supply disruption
+- "medium": Scheduled high-impact data, central bank speakers on-script, notable earnings, moderate market moves
+- "low": Routine session with no major catalysts
 
 HTML formatting rules:
 - Use <h4> for section headers
 - Use <p> for paragraphs
 - Use <ul>/<li> for lists
-- Use <strong> for emphasis on key data points
+- Use <strong> for emphasis on names, data, and numbers
 - Keep total length under 800 words
-- Include sections: Key Headlines, Economic Calendar, Market Outlook
-- If instruments are provided, include an Instrument Focus section`;
+- Required sections in order: Key Catalysts (political/central bank/geopolitical top-of-mind), Economic Calendar (today and tomorrow), Market Outlook (sessions and sentiment)
+- Add an Instrument Focus section only if instruments are provided
+- If a headline mentions a specific politician, central banker, or country, name them explicitly in the briefing`;
 
   const newsSection =
     news.length > 0
       ? news
-          .slice(0, 15)
+          .slice(0, 30)
           .map(
             (n) =>
               `- [${n.source || 'Web'}] ${n.title}: ${n.snippet}` +

@@ -54,17 +54,20 @@ interface TaskTypeInfo {
 
 const TASK_TYPE_INFO: Record<TaskType, TaskTypeInfo> = {
   market_research: {
-    summary: 'Live market news and economic events briefing for your sessions',
+    summary: 'Market-moving catalysts: central banks, politics, geopolitics, data',
     description:
-      'Orion searches live news feeds, pulls upcoming economic events from the calendar, ' +
-      'and (optionally) focuses on your recently traded instruments. ' +
-      'Runs at configured session checkpoints (start / mid / end) so you stay informed before the market moves.',
-    exampleTitle: 'London Session Start — Medium Significance',
+      'Orion scans live news for the catalysts that actually move markets — central bank decisions and speeches ' +
+      '(Fed, ECB, BoE), political statements and executive orders, geopolitical shocks, commodity shifts (oil, gold), ' +
+      'bond-market signals, and scheduled economic data. Runs at your configured session checkpoints ' +
+      '(start / mid / end) and optionally tailors the focus to your recently traded instruments.',
+    exampleTitle: 'London Session Start — High Significance',
     exampleOutput:
-      '• ECB commentary expected 14:00 UTC — euro volatility likely\n' +
-      '• GBP/USD approaching key 1.2750 resistance, watch for rejection\n' +
-      '• FTSE opened +0.4% on M&A news; DAX flat\n' +
-      '• Instrument focus: EUR/USD consolidating below yesterday\'s high',
+      'Key Catalysts:\n' +
+      '• Fed Chair Powell delivers keynote at 14:00 UTC — dot-plot revision expected\n' +
+      '• White House announces fresh China tariffs overnight; futures −0.6%\n' +
+      '• Brent crude +2.1% on OPEC+ production cut speculation\n' +
+      '• UK CPI 3.4% vs 3.2% forecast — GBP jumped 40 pips on print\n' +
+      '• Instrument focus: EUR/USD pressured by dollar strength into NY open',
     Icon: MarketResearchIcon,
     iconColor: '#3b82f6',
   },
