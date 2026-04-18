@@ -60,16 +60,16 @@ const TASK_TYPE_INFO: Record<TaskType, TaskTypeInfo> = {
       'central bank surprises, political statements, geopolitical shocks, unexpected data, and commodity disruptions. ' +
       'You only get a notification when something real happens and clears your significance threshold. ' +
       'Quiet markets = silent. Surprise hits = red dot on Orion within minutes, with full impact breakdown and affected assets.',
-    exampleTitle: 'Trump posts ceasefire, EUR/USD ripping',
+    exampleTitle: 'Surprise ceasefire announcement, EUR/USD ripping',
     exampleOutput:
-      'Heads up: President Trump posted ~30 min ago announcing a 10-day\n' +
-      'Israel-Lebanon ceasefire. Risk-on unwind in progress.\n\n' +
+      'Heads up: the US President posted ~30 min ago announcing a 10-day\n' +
+      'Middle East ceasefire. Risk-on unwind in progress.\n\n' +
       'Market impact so far:\n' +
       '• USD safe-haven bid evaporating → EUR/USD +95 pips since the post\n' +
       '• Oil −3.2% (lower risk premium)\n' +
       '• Gold −1.1%, defense stocks (LMT, RTX) −2%\n' +
       '• Eurozone Trade Balance beat (€4.944B vs €3.83B forecast) adding fuel\n\n' +
-      'Watch: Fed\'s Barkin at 16:15 UTC could cap dollar downside if hawkish.\n' +
+      'Watch: Fed speaker at 16:15 UTC could cap dollar downside if hawkish.\n' +
       'If you are short EUR/USD or long USD, size risk accordingly.',
     Icon: MarketResearchIcon,
     iconColor: '#3b82f6',

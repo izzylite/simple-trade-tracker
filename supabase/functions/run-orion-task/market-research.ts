@@ -45,10 +45,15 @@ const BASELINE_MACRO_QUERIES = [
 // These catch political posts, flash headlines, and surprise announcements that
 // haven't been indexed by Google News yet — targeted at the categories most
 // likely to move markets minute-to-minute.
+// Breaking-content queries. Deliberately no politician, central banker, or
+// head-of-state names hardcoded — those change with elections/appointments
+// and would need code updates. "US President" / "Fed Chair" / "ECB" etc. are
+// role-based and stable across administrations.
 const BREAKING_MACRO_QUERIES = [
-  'Trump OR President statement announcement',
-  'Federal Reserve OR Powell',
-  'ECB OR Lagarde OR Bank of England',
+  'US President statement announcement',
+  'White House policy announcement',
+  'Federal Reserve Chair statement',
+  'ECB OR Bank of England policy',
   'ceasefire OR war OR attack markets',
   'breaking news markets',
   'flash crash surge',
@@ -332,19 +337,19 @@ DEDUPLICATION (critical to avoid spam — default to suppressing):
 You will be shown a "Previously Reported" section listing briefings this same task has already sent the trader in the past 90 minutes. The trader has ALREADY READ those. Your job now is to ask: "What has happened that the trader does not yet know?"
 
 Two briefings report the SAME EVENT if they share the same central catalyst, regardless of framing, headline, or which angle you emphasize. Rephrasing, re-headlining, or shifting emphasis from one consequence of the same event to another is NOT a new event. Examples of what counts as duplication:
-- Previous: "Hormuz closure triggers oil spike"
-  Current: "Trump threatens China as Hormuz blockade escalates"
-  → SAME EVENT (both center on the Hormuz closure and its ripple effects). Return "low".
-- Previous: "Fed Powell hints at dovish pivot"
-  Current: "Powell speech calms markets, Nasdaq rallies"
+- Previous: "Shipping lane closure triggers oil spike"
+  Current: "President threatens trading partner as shipping lane blockade escalates"
+  → SAME EVENT (both center on the same underlying closure and its ripple effects). Return "low".
+- Previous: "Fed Chair hints at dovish pivot"
+  Current: "Fed Chair's speech calms markets, Nasdaq rallies"
   → SAME EVENT. Return "low".
 
 Examples of GENUINELY NEW:
-- Previous: "Israel-Lebanon ceasefire announced"
-  Current: "Israel launches retaliation strike 2 hours after ceasefire"
+- Previous: "Country-A / Country-B ceasefire announced"
+  Current: "Country-A launches retaliation strike 2 hours after ceasefire"
   → NEW (an actual new event, not a rephrase). Return "high".
-- Previous: "ECB rate decision pending at 12:00 UTC"
-  Current: "ECB surprise 50 bps cut, EUR −200 pips"
+- Previous: "Central bank rate decision pending at 12:00 UTC"
+  Current: "Central bank surprise 50 bps cut, currency −200 pips"
   → NEW (the decision itself is a distinct event from the anticipation). Return "high".
 
 DEFAULT RULE: If you are uncertain whether the current news cycle contains genuinely new events the trader doesn't already know, return significance="low". Being silent when there's doubt is the correct choice — the trader prefers a quiet system that only speaks when something real happens.

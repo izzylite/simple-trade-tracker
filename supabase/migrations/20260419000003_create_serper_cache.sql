@@ -3,7 +3,7 @@
 -- ============================================================
 --
 -- The market_research handler runs a set of baseline macro queries (Fed,
--- ECB, Trump, geopolitics, oil, gold, Treasury, tariffs) + breaking-content
+-- ECB, White House, geopolitics, oil, gold, Treasury, tariffs) + breaking-content
 -- queries on every sweep. These queries are IDENTICAL across all users —
 -- every user hitting "Fed speech today" gets the same Google News result
 -- set for the same minute.
