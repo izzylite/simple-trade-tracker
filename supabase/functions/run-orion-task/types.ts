@@ -30,3 +30,19 @@ export interface MarketResearchConfig {
   custom_topics: string[];
   instrument_aware: boolean;
 }
+
+export interface DailyAnalysisConfig {
+  run_time_utc: string;
+  tone: 'tough_love' | 'blunt_analyst' | 'supportive_mentor';
+}
+
+export interface WeeklyReviewConfig {
+  run_day: number;
+  run_time_utc: string;
+  comparison_weeks: number;
+}
+
+export interface MonthlyRollupConfig {
+  run_time_utc: string;
+  comparison_months: number;
+}
