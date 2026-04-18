@@ -5,7 +5,7 @@
  * Delegates all chat content to AIChatContent.
  */
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import OrionIcon from './OrionIcon';
 import {
   Box,
@@ -22,6 +22,9 @@ import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
 import AIChatContent from '../sidePanel/content/AIChatContent';
 import { UseAIChatReturn } from '../../hooks/useAIChat';
+import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
+import OrionTasksContent from '../orionTasks/OrionTasksContent';
+import type { OrionTask, OrionTaskResult, TaskType, TaskConfig } from '../../types/orionTask';
 
 interface AIChatDrawerProps {
   open: boolean;
@@ -36,6 +39,14 @@ interface AIChatDrawerProps {
   availableCalendars?: Calendar[];
   selectedCalendarId?: string;
   onCalendarChange?: (calendarId: string) => void;
+  /** Orion Tasks props */
+  tasks?: OrionTask[];
+  taskResults?: OrionTaskResult[];
+  taskUnreadCount?: number;
+  tasksLoading?: boolean;
+  onCreateTask?: (taskType: TaskType, config: TaskConfig) => Promise<OrionTask | undefined>;
+  onDeleteTask?: (taskId: string) => Promise<void>;
+  onMarkTaskResultRead?: (resultId: string) => Promise<void>;
 }
 
 // Bottom sheet heights
@@ -54,8 +65,16 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   availableCalendars,
   selectedCalendarId,
   onCalendarChange,
+  tasks,
+  taskResults,
+  taskUnreadCount,
+  tasksLoading,
+  onCreateTask,
+  onDeleteTask,
+  onMarkTaskResultRead,
 }) => {
   const theme = useTheme();
+  const [activeTab, setActiveTab] = useState(0);
 
   // Prevent body scroll when drawer is open
   useEffect(() => {
@@ -191,18 +210,50 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             </Box>
           </Box>
 
-          {/* Delegated chat content */}
-          <AIChatContent
-            trades={trades}
-            calendar={calendar}
-            isReadOnly={isReadOnly}
-            tradeOperations={tradeOperations}
-            isActive={open}
-            sharedChatState={sharedChatState}
-            availableCalendars={availableCalendars}
-            selectedCalendarId={selectedCalendarId}
-            onCalendarChange={onCalendarChange}
-          />
+          {/* Tabs */}
+          <Box sx={{ px: 2, pt: 1 }}>
+            <RoundedTabs
+              tabs={[
+                { label: 'Chat' },
+                { label: 'Tasks' },
+              ]}
+              activeTab={activeTab}
+              onTabChange={(_e, v) => setActiveTab(v)}
+              size="small"
+              fullWidth
+            />
+          </Box>
+
+          {/* Tab content */}
+          <TabPanel value={activeTab} index={0}>
+            <Box sx={{ height: 'calc(100% - 110px)', overflow: 'hidden' }}>
+              <AIChatContent
+                trades={trades}
+                calendar={calendar}
+                isReadOnly={isReadOnly}
+                tradeOperations={tradeOperations}
+                isActive={open && activeTab === 0}
+                sharedChatState={sharedChatState}
+                availableCalendars={availableCalendars}
+                selectedCalendarId={selectedCalendarId}
+                onCalendarChange={onCalendarChange}
+              />
+            </Box>
+          </TabPanel>
+
+          <TabPanel value={activeTab} index={1}>
+            <Box sx={{ height: 'calc(100% - 110px)', overflow: 'hidden' }}>
+              <OrionTasksContent
+                tasks={tasks ?? []}
+                results={taskResults ?? []}
+                unreadCount={taskUnreadCount ?? 0}
+                loading={tasksLoading ?? false}
+                onCreateTask={onCreateTask ?? (async () => undefined)}
+                onDeleteTask={onDeleteTask ?? (async () => {})}
+                onMarkRead={onMarkTaskResultRead ?? (async () => {})}
+              />
+            </Box>
+          </TabPanel>
         </Box>
       </Box>
     </>
