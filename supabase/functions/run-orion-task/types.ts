@@ -20,8 +20,9 @@ export interface TaskResult {
 
 export type TaskHandler = (
   task: OrionTask,
-  supabase: SupabaseClient
-) => Promise<TaskResult>;
+  supabase: SupabaseClient,
+  mode?: RunMode
+) => Promise<TaskResult | null>;
 
 export interface MarketResearchConfig {
   sessions: string[];
@@ -29,7 +30,12 @@ export interface MarketResearchConfig {
   markets: string[];
   custom_topics: string[];
   instrument_aware: boolean;
+  breaking_alerts_enabled?: boolean;
+  breaking_alert_frequency_minutes?: 15 | 30 | 60;
+  breaking_alert_min_significance?: 'medium' | 'high';
 }
+
+export type RunMode = 'scheduled' | 'alert';
 
 export interface DailyAnalysisConfig {
   run_time_utc: string;

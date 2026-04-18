@@ -6,6 +6,7 @@ import type {
   TaskResult,
   MarketResearchConfig,
   SupabaseClient,
+  RunMode,
 } from './types.ts';
 import type { NewsResult } from './serper.ts';
 
@@ -50,10 +51,17 @@ const BREAKING_MACRO_QUERIES = [
   'flash crash surge',
 ];
 
+const SIGNIFICANCE_RANK: Record<string, number> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+};
+
 export async function handleMarketResearch(
   task: OrionTask,
-  supabase: SupabaseClient
-): Promise<TaskResult> {
+  supabase: SupabaseClient,
+  mode: RunMode = 'scheduled'
+): Promise<TaskResult | null> {
   const config = task.config as unknown as MarketResearchConfig;
 
   const [newsBundle, economicEvents, instruments] = await Promise.all([
@@ -80,10 +88,34 @@ export async function handleMarketResearch(
     allNews,
     breakingNews,
     economicEvents,
-    instruments
+    instruments,
+    mode
   );
 
-  return parseBriefingResponse(briefingJson);
+  const result = parseBriefingResponse(briefingJson);
+
+  // Alert mode: suppress results below the configured threshold so the user
+  // only gets notified on real surprises. Quiet 30-min sweep with no major
+  // catalyst = silent, no red dot, no card.
+  if (mode === 'alert') {
+    const threshold = config.breaking_alert_min_significance ?? 'high';
+    const thresholdRank = SIGNIFICANCE_RANK[threshold] ?? 2;
+    const resultRank =
+      result.significance !== null
+        ? SIGNIFICANCE_RANK[result.significance] ?? 0
+        : 0;
+    if (resultRank < thresholdRank) {
+      log('Market research alert suppressed', 'info', {
+        threshold,
+        actual: result.significance,
+      });
+      return null;
+    }
+    // Tag alert-mode results so the UI can render them differently if desired.
+    result.metadata = { ...result.metadata, alert: true };
+  }
+
+  return result;
 }
 
 interface CategorizedQueries {
@@ -219,9 +251,20 @@ async function callGeminiForBriefing(
   news: NewsResult[],
   breaking: NewsResult[],
   events: EconomicEvent[],
-  instruments: string[]
+  instruments: string[],
+  mode: RunMode
 ): Promise<string> {
+  const modeInstruction =
+    mode === 'alert'
+      ? `You are running in ALERT MODE — a 15–30 minute sweep for surprises between scheduled briefings. ` +
+        `If nothing market-moving has happened, return significance="low" and keep the briefing short (the UI will suppress it). ` +
+        `If a surprise HAS happened (breaking content present with real catalyst), rate "high" and lead with the trade-impact of the event. ` +
+        `Alert-mode briefings MUST open with one sentence telling the trader exactly what changed and which assets are affected.`
+      : `You are running in SCHEDULED MODE — this is a session-checkpoint briefing. Cover the full situation.`;
+
   const systemPrompt = `You are Orion, an AI trading assistant. Generate a concise market research briefing focused on what could move markets today.
+
+${modeInstruction}
 
 Respond ONLY with a JSON object in this exact format:
 {

@@ -55,20 +55,24 @@ interface TaskTypeInfo {
 
 const TASK_TYPE_INFO: Record<TaskType, TaskTypeInfo> = {
   market_research: {
-    summary: 'Market-moving catalysts: central banks, politics, geopolitics, data',
+    summary: 'Market-moving catalysts + breaking surprise alerts',
     description:
       'Orion scans live news for the catalysts that actually move markets — central bank decisions and speeches ' +
       '(Fed, ECB, BoE), political statements and executive orders, geopolitical shocks, commodity shifts (oil, gold), ' +
-      'bond-market signals, and scheduled economic data. Runs at your configured session checkpoints ' +
-      '(start / mid / end) and optionally tailors the focus to your recently traded instruments.',
-    exampleTitle: 'London Session Start — High Significance',
+      'bond-market signals, and scheduled economic data. Delivers scheduled briefings at your chosen session ' +
+      'checkpoints (start / mid / end), and with Breaking Alerts enabled, also fires interrupt-driven notifications ' +
+      'within 15-60 min of a surprise so you don\'t get caught off-guard mid-trade.',
+    exampleTitle: 'BREAKING ALERT — Trump posts ceasefire, EUR/USD ripping',
     exampleOutput:
-      'Key Catalysts:\n' +
-      '• Fed Chair Powell delivers keynote at 14:00 UTC — dot-plot revision expected\n' +
-      '• White House announces fresh China tariffs overnight; futures −0.6%\n' +
-      '• Brent crude +2.1% on OPEC+ production cut speculation\n' +
-      '• UK CPI 3.4% vs 3.2% forecast — GBP jumped 40 pips on print\n' +
-      '• Instrument focus: EUR/USD pressured by dollar strength into NY open',
+      'Heads up: President Trump posted ~30 min ago announcing a 10-day\n' +
+      'Israel-Lebanon ceasefire. Risk-on unwind in progress.\n\n' +
+      'Market impact so far:\n' +
+      '• USD safe-haven bid evaporating → EUR/USD +95 pips since the post\n' +
+      '• Oil −3.2% (lower risk premium)\n' +
+      '• Gold −1.1%, defense stocks (LMT, RTX) −2%\n' +
+      '• Eurozone Trade Balance beat (€4.944B vs €3.83B forecast) adding fuel\n\n' +
+      'Watch: Fed\'s Barkin at 16:15 UTC could cap dollar downside if hawkish.\n' +
+      'If you are short EUR/USD or long USD, size risk accordingly.',
     Icon: MarketResearchIcon,
     iconColor: '#3b82f6',
   },
@@ -546,6 +550,92 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                   }
                   label="Instrument-aware (tailor to my traded pairs)"
                 />
+
+                {/* Breaking alerts — interrupt-driven surprise detection */}
+                <Box
+                  sx={{
+                    p: 1.5,
+                    mt: 1,
+                    borderRadius: '10px',
+                    border: `1px dashed ${alpha(
+                      theme.palette.warning.main,
+                      0.4
+                    )}`,
+                    backgroundColor: alpha(theme.palette.warning.main, 0.04),
+                  }}
+                >
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={(config as any).breaking_alerts_enabled}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            breaking_alerts_enabled: e.target.checked,
+                          })
+                        }
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                          Breaking Alerts
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.72rem' }}>
+                          Catch surprises between scheduled checkpoints (e.g. unexpected Fed speech, geopolitical shock, political announcement)
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ alignItems: 'flex-start', m: 0 }}
+                  />
+
+                  {(config as any).breaking_alerts_enabled && (
+                    <Box sx={{ display: 'flex', gap: 1.5, mt: 1.5 }}>
+                      <FormControl size="small" sx={{ flex: 1 }}>
+                        <InputLabel>Check every</InputLabel>
+                        <Select
+                          value={
+                            (config as any).breaking_alert_frequency_minutes
+                          }
+                          label="Check every"
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              breaking_alert_frequency_minutes:
+                                e.target.value as 15 | 30 | 60,
+                            })
+                          }
+                          MenuProps={{ sx: { zIndex: 1600 } }}
+                        >
+                          <MenuItem value={15}>15 min</MenuItem>
+                          <MenuItem value={30}>30 min</MenuItem>
+                          <MenuItem value={60}>1 hour</MenuItem>
+                        </Select>
+                      </FormControl>
+
+                      <FormControl size="small" sx={{ flex: 1 }}>
+                        <InputLabel>Only alert on</InputLabel>
+                        <Select
+                          value={
+                            (config as any).breaking_alert_min_significance
+                          }
+                          label="Only alert on"
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              breaking_alert_min_significance:
+                                e.target.value as 'medium' | 'high',
+                            })
+                          }
+                          MenuProps={{ sx: { zIndex: 1600 } }}
+                        >
+                          <MenuItem value="medium">Medium &amp; high</MenuItem>
+                          <MenuItem value="high">High only</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Box>
+                  )}
+                </Box>
               </Box>
             )}
 

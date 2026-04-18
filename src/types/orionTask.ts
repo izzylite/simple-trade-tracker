@@ -14,12 +14,22 @@ export type SessionCheckpoint = 'start' | 'mid' | 'end';
 
 export type CoachingTone = 'tough_love' | 'blunt_analyst' | 'supportive_mentor';
 
+export type AlertFrequency = 15 | 30 | 60;
+export type AlertMinSignificance = 'medium' | 'high';
+
 export interface MarketResearchConfig {
   sessions: TradingSession[];
   checkpoints: SessionCheckpoint[];
   markets: string[];
   custom_topics: string[];
   instrument_aware: boolean;
+  // Breaking-alert mode: runs every N minutes and only posts when a
+  // high-impact surprise (central-bank, political, geopolitical shock) hits.
+  // Complements scheduled session checkpoints by catching surprises that
+  // happen between them.
+  breaking_alerts_enabled: boolean;
+  breaking_alert_frequency_minutes: AlertFrequency;
+  breaking_alert_min_significance: AlertMinSignificance;
 }
 
 export interface DailyAnalysisConfig {
@@ -83,6 +93,9 @@ export const DEFAULT_CONFIGS: Record<TaskType, TaskConfig> = {
     markets: ['forex'],
     custom_topics: [],
     instrument_aware: true,
+    breaking_alerts_enabled: true,
+    breaking_alert_frequency_minutes: 30,
+    breaking_alert_min_significance: 'high',
   },
   daily_analysis: {
     run_time_utc: '21:00',
