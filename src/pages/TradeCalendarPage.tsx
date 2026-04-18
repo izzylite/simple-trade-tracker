@@ -20,6 +20,7 @@ import {
   Fab,
   Fade,
   LinearProgress,
+  Badge,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -128,6 +129,7 @@ import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
 import { useCalendarTrades } from '../hooks/useCalendarTrades';
+import { useOrionTasks } from '../hooks/useOrionTasks';
 import { SessionPerformanceAnalysis, TradesListDialog } from '../components/charts';
 import {
   SidePanelProvider,
@@ -734,6 +736,16 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+
+  const {
+    tasks: orionTasks,
+    results: orionResults,
+    unreadCount: taskUnreadCount,
+    loading: tasksLoading,
+    createTask,
+    deleteTask,
+    markRead,
+  } = useOrionTasks(calendar?.user_id, calendar?.id);
 
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
@@ -2582,7 +2594,22 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 transition: 'transform 0.2s ease'
               }}
             >
-              <AIIcon />
+              <Badge
+                variant="dot"
+                color="error"
+                invisible={taskUnreadCount === 0}
+                sx={{
+                  '& .MuiBadge-badge': {
+                    top: 4,
+                    right: 4,
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                  },
+                }}
+              >
+                <AIIcon />
+              </Badge>
             </Fab>
           </Tooltip>
         </Box>
@@ -2868,6 +2895,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         calendar={calendar!}
         isReadOnly={isReadOnly}
         tradeOperations={tradeOperations}
+        tasks={orionTasks}
+        taskResults={orionResults}
+        taskUnreadCount={taskUnreadCount}
+        tasksLoading={tasksLoading}
+        onCreateTask={createTask}
+        onDeleteTask={deleteTask}
+        onMarkTaskResultRead={markRead}
       />
 
       {/* Notes Drawer — <lg only */}
