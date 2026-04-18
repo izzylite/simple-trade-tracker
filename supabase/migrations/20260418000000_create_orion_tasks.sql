@@ -98,8 +98,6 @@ CREATE INDEX idx_orion_task_results_group_date ON public.orion_task_results(grou
 CREATE INDEX idx_orion_task_results_unread
   ON public.orion_task_results(user_id, is_read) WHERE is_read = false;
 CREATE INDEX idx_orion_task_results_created_at ON public.orion_task_results(created_at DESC);
-CREATE INDEX idx_orion_task_results_cleanup
-  ON public.orion_task_results(created_at) WHERE created_at < NOW() - INTERVAL '30 days';
 
 -- RLS
 ALTER TABLE public.orion_task_results ENABLE ROW LEVEL SECURITY;
