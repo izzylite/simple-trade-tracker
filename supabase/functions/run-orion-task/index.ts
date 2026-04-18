@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const result = await handler(orionTask);
+    const result = await handler(orionTask, serviceClient);
 
     const { error: insertError } = await serviceClient
       .from('orion_task_results')
