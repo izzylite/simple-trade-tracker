@@ -1,4 +1,5 @@
 import { log } from '../_shared/supabase.ts';
+import type { SupabaseClient } from './types.ts';
 
 export interface NewsResult {
   title: string;
@@ -135,6 +136,125 @@ export async function searchBreakingMultiple(
 ): Promise<NewsResult[]> {
   const results = await Promise.all(
     queries.map((q) => searchBreaking(q, timeRange, numPerQuery))
+  );
+  return results.flat();
+}
+
+// ============================================================
+// Cached variants — shared across all users via serper_cache table
+// ============================================================
+//
+// Only use for queries that are TRULY shared (macro/session/market/breaking
+// baselines). Custom topics and instrument-specific queries must skip the
+// cache because their keys would rarely hit.
+// ============================================================
+
+function makeCacheKey(
+  endpoint: 'news' | 'search',
+  query: string,
+  num: number,
+  timeRange?: string
+): string {
+  return `${endpoint}::${query}::${num}::${timeRange ?? ''}`;
+}
+
+async function readCache(
+  supabase: SupabaseClient,
+  cacheKey: string,
+  ttlSeconds: number
+): Promise<NewsResult[] | null> {
+  const cutoff = new Date(Date.now() - ttlSeconds * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('serper_cache')
+    .select('results')
+    .eq('cache_key', cacheKey)
+    .gte('fetched_at', cutoff)
+    .maybeSingle();
+  if (error) {
+    log('Serper cache read error', 'warn', error);
+    return null;
+  }
+  if (!data) return null;
+  return data.results as NewsResult[];
+}
+
+async function writeCache(
+  supabase: SupabaseClient,
+  cacheKey: string,
+  endpoint: 'news' | 'search',
+  query: string,
+  results: NewsResult[]
+): Promise<void> {
+  const { error } = await supabase.from('serper_cache').upsert({
+    cache_key: cacheKey,
+    query,
+    endpoint,
+    results,
+    fetched_at: new Date().toISOString(),
+  });
+  if (error) {
+    log('Serper cache write error', 'warn', error);
+  }
+}
+
+export async function searchNewsCached(
+  supabase: SupabaseClient,
+  query: string,
+  num: number,
+  ttlSeconds: number
+): Promise<NewsResult[]> {
+  const cacheKey = makeCacheKey('news', query, num);
+  const cached = await readCache(supabase, cacheKey, ttlSeconds);
+  if (cached) return cached;
+
+  const fresh = await searchNews(query, num);
+  if (fresh.length > 0) {
+    await writeCache(supabase, cacheKey, 'news', query, fresh);
+  }
+  return fresh;
+}
+
+export async function searchNewsMultipleCached(
+  supabase: SupabaseClient,
+  queries: string[],
+  numPerQuery: number,
+  ttlSeconds: number
+): Promise<NewsResult[]> {
+  const results = await Promise.all(
+    queries.map((q) => searchNewsCached(supabase, q, numPerQuery, ttlSeconds))
+  );
+  return results.flat();
+}
+
+export async function searchBreakingCached(
+  supabase: SupabaseClient,
+  query: string,
+  timeRange: 'qdr:h' | 'qdr:d' | 'qdr:w',
+  num: number,
+  ttlSeconds: number
+): Promise<NewsResult[]> {
+  const cacheKey = makeCacheKey('search', query, num, timeRange);
+  const cached = await readCache(supabase, cacheKey, ttlSeconds);
+  if (cached) return cached;
+
+  const fresh = await searchBreaking(query, timeRange, num);
+  if (fresh.length > 0) {
+    await writeCache(supabase, cacheKey, 'search', query, fresh);
+  }
+  return fresh;
+}
+
+export async function searchBreakingMultipleCached(
+  supabase: SupabaseClient,
+  queries: string[],
+  timeRange: 'qdr:h' | 'qdr:d' | 'qdr:w',
+  numPerQuery: number,
+  ttlSeconds: number
+): Promise<NewsResult[]> {
+  const results = await Promise.all(
+    queries.map((q) =>
+      searchBreakingCached(supabase, q, timeRange, numPerQuery, ttlSeconds)
+    )
   );
   return results.flat();
 }

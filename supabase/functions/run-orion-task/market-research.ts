@@ -1,5 +1,9 @@
 import { log } from '../_shared/supabase.ts';
-import { searchNewsMultiple, searchBreakingMultiple } from './serper.ts';
+import {
+  searchNewsMultiple,
+  searchNewsMultipleCached,
+  searchBreakingMultipleCached,
+} from './serper.ts';
 import { generateContent } from './gemini.ts';
 import type {
   OrionTask,
@@ -62,13 +66,15 @@ export async function handleMarketResearch(
 ): Promise<TaskResult | null> {
   const config = task.config as unknown as MarketResearchConfig;
 
-  const [newsBundle, economicEvents, instruments] = await Promise.all([
-    gatherMarketNews(config),
-    fetchUpcomingEvents(supabase, config.sessions),
-    config.instrument_aware
-      ? fetchRecentInstruments(supabase, task.user_id, task.calendar_id)
-      : Promise.resolve([]),
-  ]);
+  const [newsBundle, economicEvents, instruments, recentBriefings] =
+    await Promise.all([
+      gatherMarketNews(supabase, config),
+      fetchUpcomingEvents(supabase, config.sessions),
+      config.instrument_aware
+        ? fetchRecentInstruments(supabase, task.user_id, task.calendar_id)
+        : Promise.resolve([]),
+      fetchRecentBriefings(supabase, task.id, 3),
+    ]);
 
   let instrumentNews: NewsResult[] = [];
   if (instruments.length > 0) {
@@ -86,7 +92,8 @@ export async function handleMarketResearch(
     allNews,
     breakingNews,
     economicEvents,
-    instruments
+    instruments,
+    recentBriefings
   );
 
   const result = parseBriefingResponse(briefingJson);
@@ -137,29 +144,60 @@ function buildSearchQueries(config: MarketResearchConfig): CategorizedQueries {
   };
 }
 
+// Cache TTLs:
+//   NEWS_TTL: 5 min — news articles don't change meaningfully within a window
+//     that short, and with 14 shared queries × N users we collapse to 14 total
+//     Serper calls per 5-min window across the whole user base.
+//   BREAKING_TTL: 2 min — breaking content needs to be fresher, but same
+//     sharing logic applies.
+//   Custom topics and instrument queries skip the cache (rarely shared).
+const NEWS_CACHE_TTL_SECONDS = 300;
+const BREAKING_CACHE_TTL_SECONDS = 120;
+
 async function gatherMarketNews(
+  supabase: SupabaseClient,
   config: MarketResearchConfig
 ): Promise<{ news: NewsResult[]; breaking: NewsResult[] }> {
   const queries = buildSearchQueries(config);
 
-  // Fewer results per macro query (many queries; avoid flooding the prompt).
-  // More per session/market (focused, higher signal).
+  // Shared queries (macro/session/market/breaking) hit the cache.
+  // Per-user queries (custom topics) bypass it.
   const [macroNews, sessionNews, marketNews, customNews, breakingNews] =
     await Promise.all([
       queries.macro.length > 0
-        ? searchNewsMultiple(queries.macro, 3)
+        ? searchNewsMultipleCached(
+            supabase,
+            queries.macro,
+            3,
+            NEWS_CACHE_TTL_SECONDS
+          )
         : Promise.resolve([]),
       queries.session.length > 0
-        ? searchNewsMultiple(queries.session, 5)
+        ? searchNewsMultipleCached(
+            supabase,
+            queries.session,
+            5,
+            NEWS_CACHE_TTL_SECONDS
+          )
         : Promise.resolve([]),
       queries.market.length > 0
-        ? searchNewsMultiple(queries.market, 4)
+        ? searchNewsMultipleCached(
+            supabase,
+            queries.market,
+            4,
+            NEWS_CACHE_TTL_SECONDS
+          )
         : Promise.resolve([]),
       queries.custom.length > 0
         ? searchNewsMultiple(queries.custom, 4)
         : Promise.resolve([]),
-      // Breaking: organic search with past-hour filter for flash content
-      searchBreakingMultiple(BREAKING_MACRO_QUERIES, 'qdr:h', 3),
+      searchBreakingMultipleCached(
+        supabase,
+        BREAKING_MACRO_QUERIES,
+        'qdr:h',
+        3,
+        BREAKING_CACHE_TTL_SECONDS
+      ),
     ]);
 
   return {
@@ -197,6 +235,42 @@ async function fetchUpcomingEvents(
     return [];
   }
   return data ?? [];
+}
+
+interface RecentBriefing {
+  title: string;
+  content_plain: string;
+  created_at: string;
+}
+
+// Pull the last N briefings this task already produced. We feed them into the
+// Gemini prompt so the LLM can detect "same event, already reported" and rate
+// the current sweep as `low` (which the threshold filter will suppress). Without
+// this, a news event that stays in the cycle for hours would re-fire an alert
+// on every sweep.
+async function fetchRecentBriefings(
+  supabase: SupabaseClient,
+  taskId: string,
+  limit: number
+): Promise<RecentBriefing[]> {
+  const { data, error } = await supabase
+    .from('orion_task_results')
+    .select('metadata, content_plain, created_at')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    log('Failed to fetch recent briefings', 'error', error);
+    return [];
+  }
+
+  return (data ?? []).map((r) => ({
+    title:
+      (r.metadata as { title?: string } | null)?.title ?? 'Previous briefing',
+    content_plain: r.content_plain ?? '',
+    created_at: r.created_at,
+  }));
 }
 
 async function fetchRecentInstruments(
@@ -244,7 +318,8 @@ async function callGeminiForBriefing(
   news: NewsResult[],
   breaking: NewsResult[],
   events: EconomicEvent[],
-  instruments: string[]
+  instruments: string[],
+  recentBriefings: RecentBriefing[]
 ): Promise<string> {
   const systemPrompt = `You are Orion, an AI trading surprise detector. Every ${config.frequency_minutes ?? 30} minutes you sweep the market for catalysts. You only alert the trader when something actually happened — scheduled briefings don't exist in this system, so if nothing market-moving is present, rate significance="low" and keep the briefing brief (the UI will suppress it).
 
@@ -252,6 +327,27 @@ When a surprise IS present (breaking content with a real catalyst, unexpected ce
 1. What exactly happened
 2. Which assets are moving and by how much
 3. What the expected follow-through is (if any)
+
+DEDUPLICATION (critical to avoid spam — default to suppressing):
+You will be shown a "Previously Reported" section listing briefings this same task has already sent the trader in the past 90 minutes. The trader has ALREADY READ those. Your job now is to ask: "What has happened that the trader does not yet know?"
+
+Two briefings report the SAME EVENT if they share the same central catalyst, regardless of framing, headline, or which angle you emphasize. Rephrasing, re-headlining, or shifting emphasis from one consequence of the same event to another is NOT a new event. Examples of what counts as duplication:
+- Previous: "Hormuz closure triggers oil spike"
+  Current: "Trump threatens China as Hormuz blockade escalates"
+  → SAME EVENT (both center on the Hormuz closure and its ripple effects). Return "low".
+- Previous: "Fed Powell hints at dovish pivot"
+  Current: "Powell speech calms markets, Nasdaq rallies"
+  → SAME EVENT. Return "low".
+
+Examples of GENUINELY NEW:
+- Previous: "Israel-Lebanon ceasefire announced"
+  Current: "Israel launches retaliation strike 2 hours after ceasefire"
+  → NEW (an actual new event, not a rephrase). Return "high".
+- Previous: "ECB rate decision pending at 12:00 UTC"
+  Current: "ECB surprise 50 bps cut, EUR −200 pips"
+  → NEW (the decision itself is a distinct event from the anticipation). Return "high".
+
+DEFAULT RULE: If you are uncertain whether the current news cycle contains genuinely new events the trader doesn't already know, return significance="low". Being silent when there's doubt is the correct choice — the trader prefers a quiet system that only speaks when something real happens.
 
 Respond ONLY with a JSON object in this exact format:
 {
@@ -330,11 +426,28 @@ HTML formatting rules:
       ? `Instruments the trader actively trades: ${instruments.join(', ')}`
       : '';
 
+  const previouslyReportedSection =
+    recentBriefings.length > 0
+      ? recentBriefings
+          .map(
+            (b, i) =>
+              `[${i + 1}] Sent at ${b.created_at}\n` +
+              `    Title: ${b.title}\n` +
+              `    Body: ${b.content_plain.substring(0, 500)}${b.content_plain.length > 500 ? '...' : ''}`
+          )
+          .join('\n\n')
+      : '(No previous briefings — this is the first for this task.)';
+
   const userPrompt = `Generate a market research briefing for the following sessions: ${config.sessions.join(', ')}.
 Markets of interest: ${config.markets.join(', ')}.
 
+## Previously Reported (DEDUPLICATE AGAINST THESE)
+These are briefings already sent to the trader for this same task. Do NOT re-surface these events unless there is a genuinely new development. If the current news cycle is dominated by these already-reported stories, return significance="low" and keep the briefing brief — the system will suppress the output.
+
+${previouslyReportedSection}
+
 ## Breaking Content (past hour — TREAT AS HIGHEST PRIORITY)
-These items were published in the last 60 minutes. A political post, ceasefire announcement, central-bank speaker line, or surprise headline here is almost certainly the day's top catalyst. If any item describes a head-of-state statement, military/diplomatic action, central-bank surprise, or major data miss, raise significance to "high" and lead the briefing with it.
+These items were published in the last 60 minutes. A political post, ceasefire announcement, central-bank speaker line, or surprise headline here is almost certainly the day's top catalyst. If any item describes a head-of-state statement, military/diplomatic action, central-bank surprise, or major data miss — AND is not already in the Previously Reported section — raise significance to "high" and lead the briefing with it.
 
 ${breakingSection}
 
