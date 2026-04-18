@@ -9,9 +9,20 @@ export interface NewsResult {
   source?: string;
 }
 
+// Time-range filter for Google News queries.
+//   'qdr:h' = past hour
+//   'qdr:d' = past day (default for routine news queries — today's cycle only)
+//   'qdr:w' = past week
+// Without this, Google News's default corpus search can return articles from
+// days or weeks ago that happen to match the keywords (e.g. an article titled
+// "Today's Fed decision" published last week would still match a query about
+// today's Fed news).
+export type NewsTimeRange = 'qdr:h' | 'qdr:d' | 'qdr:w';
+
 export async function searchNews(
   query: string,
-  num = 8
+  num = 8,
+  timeRange: NewsTimeRange = 'qdr:d'
 ): Promise<NewsResult[]> {
   const apiKey = Deno.env.get('SERPER_API_KEY');
   if (!apiKey) {
@@ -26,7 +37,7 @@ export async function searchNews(
         'X-API-KEY': apiKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ q: query, gl: 'us', hl: 'en', num }),
+      body: JSON.stringify({ q: query, gl: 'us', hl: 'en', num, tbs: timeRange }),
     });
 
     if (!response.ok) {
@@ -58,10 +69,11 @@ export async function searchNews(
 
 export async function searchNewsMultiple(
   queries: string[],
-  numPerQuery = 5
+  numPerQuery = 5,
+  timeRange: NewsTimeRange = 'qdr:d'
 ): Promise<NewsResult[]> {
   const results = await Promise.all(
-    queries.map((q) => searchNews(q, numPerQuery))
+    queries.map((q) => searchNews(q, numPerQuery, timeRange))
   );
   return results.flat();
 }
@@ -201,13 +213,14 @@ export async function searchNewsCached(
   supabase: SupabaseClient,
   query: string,
   num: number,
-  ttlSeconds: number
+  ttlSeconds: number,
+  timeRange: NewsTimeRange = 'qdr:d'
 ): Promise<NewsResult[]> {
-  const cacheKey = makeCacheKey('news', query, num);
+  const cacheKey = makeCacheKey('news', query, num, timeRange);
   const cached = await readCache(supabase, cacheKey, ttlSeconds);
   if (cached) return cached;
 
-  const fresh = await searchNews(query, num);
+  const fresh = await searchNews(query, num, timeRange);
   if (fresh.length > 0) {
     await writeCache(supabase, cacheKey, 'news', query, fresh);
   }
@@ -218,10 +231,13 @@ export async function searchNewsMultipleCached(
   supabase: SupabaseClient,
   queries: string[],
   numPerQuery: number,
-  ttlSeconds: number
+  ttlSeconds: number,
+  timeRange: NewsTimeRange = 'qdr:d'
 ): Promise<NewsResult[]> {
   const results = await Promise.all(
-    queries.map((q) => searchNewsCached(supabase, q, numPerQuery, ttlSeconds))
+    queries.map((q) =>
+      searchNewsCached(supabase, q, numPerQuery, ttlSeconds, timeRange)
+    )
   );
   return results.flat();
 }
