@@ -14,9 +14,36 @@ interface DueTask {
   task_type: string;
 }
 
+// Timing-safe string comparison to prevent leak of secret via response latency.
+function constantTimeEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  // Shared-secret auth: the orion-dispatcher cron sends a secret in the
+  // X-Orion-Dispatcher-Secret header. Anyone without it gets 401.
+  // Required because verify_jwt is disabled (pg_cron can't send a JWT,
+  // and the new sb_secret_* keys aren't JWT-format anyway).
+  const expectedSecret = Deno.env.get('ORION_DISPATCHER_SECRET');
+  if (!expectedSecret) {
+    log('ORION_DISPATCHER_SECRET not set — refusing to dispatch', 'error');
+    return errorResponse('Dispatcher not configured', 500);
+  }
+  const providedSecret = req.headers.get('x-orion-dispatcher-secret') ?? '';
+  if (!constantTimeEquals(providedSecret, expectedSecret)) {
+    log('Dispatcher auth failed', 'warn', {
+      hasHeader: providedSecret.length > 0,
+    });
+    return errorResponse('Unauthorized', 401);
+  }
 
   const startedAt = Date.now();
   const serviceClient = createServiceClient();

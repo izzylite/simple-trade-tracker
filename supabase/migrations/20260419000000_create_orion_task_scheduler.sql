@@ -38,7 +38,13 @@ DECLARE
 BEGIN
   IF p_task_type = 'market_research' THEN
     v_freq_minutes := COALESCE((p_config->>'frequency_minutes')::INT, 30);
-    RETURN p_from + make_interval(mins => v_freq_minutes);
+    -- Jitter: ±30 seconds of random offset to prevent thundering herd.
+    -- All users on the same frequency would otherwise align on the same
+    -- clock boundary and hit the dispatcher in the same 5-min tick.
+    -- Only applied to market_research — daily/weekly/monthly fire at
+    -- user-configured exact times and should not be randomized.
+    RETURN p_from + make_interval(mins => v_freq_minutes)
+                  + (random() * 60 - 30) * INTERVAL '1 second';
 
   ELSIF p_task_type = 'daily_analysis' THEN
     v_run_time := COALESCE(p_config->>'run_time_utc', '21:00');
