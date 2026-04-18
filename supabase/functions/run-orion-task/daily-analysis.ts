@@ -133,17 +133,27 @@ Respond ONLY with a JSON object in this exact format:
   "briefing_plain": "Plain text version"
 }
 
+Your analysis must examine four dimensions:
+1. Rule compliance — check risk-per-trade adherence, required tag groups, daily-drawdown limits
+2. Emotional patterns — look for revenge trades (loss followed by larger size or tighter entry),
+   FOMO entries (chasing after a move is underway), over-trading (unusually high trade count),
+   cutting winners early, letting losers run, size escalation after wins
+3. Tag correlations — if tags are present, identify which tag combinations performed well or
+   poorly today; compare session/setup/strategy tags against outcome
+4. Setup quality — did entries match pre-defined plans; were R:R ratios honored
+
 Significance guide:
-- "high": Major rule violations, unusual losses, significant drawdown, or exceptional performance
-- "medium": Mixed results, some rule breaks, or notable patterns
+- "high": Major rule violations, revenge trading detected, unusual losses, significant drawdown, or exceptional performance
+- "medium": Mixed results, isolated rule breaks, minor emotional patterns
 - "low": Routine day, rules followed, expected outcomes
 
 HTML formatting rules:
 - Use <h4> for section headers
 - Use <p> for paragraphs, <ul>/<li> for lists
-- Use <strong> for key numbers
-- Keep under 600 words
-- Include sections: Day Summary, Trade Breakdown, Rule Compliance, Key Takeaway`;
+- Use <strong> for key numbers and trade references (e.g. "Trade #3")
+- Keep under 700 words
+- Required sections in order: Day Summary, Trade Breakdown, Rule Compliance,
+  Emotional Patterns, Tag Performance (only if tags are present), Key Takeaway`;
 
   const tradesText = trades
     .map((t, i) => {
@@ -161,6 +171,20 @@ HTML formatting rules:
     })
     .join('\n');
 
+  const tagStats = aggregateTagStats(trades);
+  const tagStatsText =
+    tagStats.length > 0
+      ? tagStats
+          .map(
+            (s) =>
+              `- "${s.tag}": ${s.total} trade${s.total === 1 ? '' : 's'} | ` +
+              `${s.wins}W / ${s.losses}L | Net $${s.pnl.toFixed(2)}`
+          )
+          .join('\n')
+      : 'No tags on today\'s trades.';
+
+  const sequenceText = buildSequenceSignal(trades);
+
   const calendarContext = calendar
     ? `Account balance: $${calendar.account_balance}
 Current balance: $${calendar.current_balance || calendar.account_balance}
@@ -176,8 +200,14 @@ Required tag groups: ${calendar.required_tag_groups?.join(', ') || 'None'}`
 Total trades: ${trades.length} | Wins: ${wins.length} | Losses: ${losses.length}
 Net P&L: $${totalPnl.toFixed(2)}
 
-## Trades
+## Trades (in order)
 ${tradesText}
+
+## Tag Performance Today
+${tagStatsText}
+
+## Sequence Signals
+${sequenceText}
 
 ## Account Context
 ${calendarContext}
@@ -185,6 +215,63 @@ ${calendarContext}
 Generate the JSON analysis now.`;
 
   return generateContent(systemPrompt, userPrompt);
+}
+
+interface TagStat {
+  tag: string;
+  total: number;
+  wins: number;
+  losses: number;
+  pnl: number;
+}
+
+function aggregateTagStats(trades: TradeRow[]): TagStat[] {
+  const byTag: Record<string, TagStat> = {};
+  for (const t of trades) {
+    if (!t.tags || t.tags.length === 0) continue;
+    for (const tag of t.tags) {
+      if (!byTag[tag]) {
+        byTag[tag] = { tag, total: 0, wins: 0, losses: 0, pnl: 0 };
+      }
+      byTag[tag].total += 1;
+      byTag[tag].pnl += Number(t.amount);
+      if (t.trade_type === 'win') byTag[tag].wins += 1;
+      if (t.trade_type === 'loss') byTag[tag].losses += 1;
+    }
+  }
+  return Object.values(byTag).sort((a, b) => b.total - a.total);
+}
+
+// Build compact "what happened after each trade" string so the LLM can detect
+// revenge trading, size escalation, and over-trading without re-parsing timestamps.
+function buildSequenceSignal(trades: TradeRow[]): string {
+  if (trades.length < 2) return 'Only one trade today — no sequence to analyze.';
+
+  const lines: string[] = [];
+  for (let i = 1; i < trades.length; i++) {
+    const prev = trades[i - 1];
+    const curr = trades[i];
+    const prevAmt = Math.abs(Number(prev.amount));
+    const currAmt = Math.abs(Number(curr.amount));
+    const ratio = prevAmt > 0 ? currAmt / prevAmt : 1;
+
+    const gapMs =
+      new Date(curr.trade_date).getTime() - new Date(prev.trade_date).getTime();
+    const gapMin = Math.round(gapMs / 60000);
+
+    const tags: string[] = [];
+    if (prev.trade_type === 'loss' && ratio > 1.5) tags.push('size-up-after-loss');
+    if (prev.trade_type === 'loss' && gapMin < 10) tags.push('fast-re-entry-after-loss');
+    if (prev.trade_type === 'win' && ratio > 1.5) tags.push('size-up-after-win');
+
+    lines.push(
+      `After trade ${i} (${prev.trade_type}, $${Number(prev.amount).toFixed(2)}): ` +
+      `trade ${i + 1} was ${curr.trade_type} $${Number(curr.amount).toFixed(2)} ` +
+      `(gap: ${gapMin}min, size ratio: ${ratio.toFixed(2)}x)` +
+      (tags.length > 0 ? ` — flags: ${tags.join(', ')}` : '')
+    );
+  }
+  return lines.join('\n');
 }
 
 function parseAnalysisResponse(rawJson: string): TaskResult {

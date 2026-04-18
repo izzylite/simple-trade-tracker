@@ -26,6 +26,7 @@ import {
   Assessment as WeeklyReviewIcon,
   CalendarMonth as MonthlyRollupIcon,
   CheckCircleOutline as CheckIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import type {
   TaskType,
@@ -74,15 +75,22 @@ const TASK_TYPE_INFO: Record<TaskType, TaskTypeInfo> = {
   daily_analysis: {
     summary: 'End-of-day coaching review of your closed trades',
     description:
-      'Orion analyzes every trade you closed today, checks rule compliance against your required ' +
-      'tag groups and risk settings, flags emotional patterns, and delivers coaching in your chosen tone. ' +
+      'Orion analyzes every trade you closed today, checks rule compliance against your required tag groups ' +
+      'and risk-per-trade settings, detects emotional patterns (revenge trading, size escalation, FOMO entries, ' +
+      'over-trading), and correlates tag performance against outcomes. Delivers coaching in your chosen tone. ' +
       'Automatically skipped on zero-trade days.',
     exampleTitle: 'Daily Recap — 3 trades, +$245 — High Significance',
     exampleOutput:
-      '✓ Good discipline on your first two trades — entries aligned with plan.\n' +
-      '✗ Trade 3 broke your max-risk rule (2.5% vs 1% target).\n' +
-      'Pattern: losses cluster in NY PM session — third week in a row.\n' +
-      'Takeaway: close the laptop after 18:00 UTC or cut NY PM size by half.',
+      'Rule Compliance:\n' +
+      '✓ Trades 1 & 2 inside 1% risk-per-trade rule\n' +
+      '✗ Trade 3 broke max-risk rule (2.5% vs 1% target)\n\n' +
+      'Emotional Patterns:\n' +
+      '⚠ Size-up after loss detected: after a losing trade 2, trade 3 size ran 2.3x larger\n' +
+      '⚠ Fast re-entry (7 min after loss) — possible revenge trade\n\n' +
+      'Tag Performance:\n' +
+      '• "breakout-london": 2 trades, 2W 0L, +$310\n' +
+      '• "reversal-ny_pm": 1 trade, 0W 1L, −$65\n\n' +
+      'Takeaway: pause 30 minutes after any loss before re-entering.',
     Icon: DailyAnalysisIcon,
     iconColor: '#a855f7',
   },
@@ -139,6 +147,15 @@ const TONE_LABELS: Record<CoachingTone, string> = {
   supportive_mentor: 'Supportive Mentor',
 };
 
+const MARKET_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'forex', label: 'Forex' },
+  { value: 'stocks', label: 'Stocks' },
+  { value: 'crypto', label: 'Crypto' },
+  { value: 'commodities', label: 'Commodities' },
+  { value: 'indices', label: 'Indices' },
+  { value: 'bonds', label: 'Bonds' },
+];
+
 const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   open,
   onClose,
@@ -149,6 +166,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   const [taskType, setTaskType] = useState<TaskType | ''>('');
   const [config, setConfig] = useState<TaskConfig | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [customTopicInput, setCustomTopicInput] = useState('');
 
   const availableTypes = (
     Object.keys(TASK_TYPE_LABELS) as TaskType[]
@@ -162,12 +180,14 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   const handleBack = () => {
     setTaskType('');
     setConfig(null);
+    setCustomTopicInput('');
   };
 
   const handleClose = () => {
     onClose();
     setTaskType('');
     setConfig(null);
+    setCustomTopicInput('');
   };
 
   const handleCreate = async () => {
@@ -391,6 +411,126 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                       />
                     ))}
                   </Box>
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                    Markets
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    {MARKET_OPTIONS.map((m) => (
+                      <Chip
+                        key={m.value}
+                        label={m.label}
+                        size="small"
+                        onClick={() =>
+                          setConfig({
+                            ...config,
+                            markets: toggleArrayItem(
+                              (config as any).markets,
+                              m.value
+                            ),
+                          })
+                        }
+                        color={
+                          (config as any).markets.includes(m.value)
+                            ? 'primary'
+                            : 'default'
+                        }
+                        variant={
+                          (config as any).markets.includes(m.value)
+                            ? 'filled'
+                            : 'outlined'
+                        }
+                      />
+                    ))}
+                  </Box>
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                    Custom Topics
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: 'block',
+                      color: 'text.secondary',
+                      mb: 1,
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    Add specific search topics (e.g. "ECB rate decision", "Fed minutes", "China PMI")
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                    <TextField
+                      size="small"
+                      placeholder="Add a topic…"
+                      value={customTopicInput}
+                      onChange={(e) => setCustomTopicInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const trimmed = customTopicInput.trim();
+                          if (
+                            trimmed &&
+                            !(config as any).custom_topics.includes(trimmed)
+                          ) {
+                            setConfig({
+                              ...config,
+                              custom_topics: [
+                                ...(config as any).custom_topics,
+                                trimmed,
+                              ],
+                            });
+                            setCustomTopicInput('');
+                          }
+                        }
+                      }}
+                      fullWidth
+                    />
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<AddIcon />}
+                      disabled={!customTopicInput.trim()}
+                      onClick={() => {
+                        const trimmed = customTopicInput.trim();
+                        if (
+                          trimmed &&
+                          !(config as any).custom_topics.includes(trimmed)
+                        ) {
+                          setConfig({
+                            ...config,
+                            custom_topics: [
+                              ...(config as any).custom_topics,
+                              trimmed,
+                            ],
+                          });
+                          setCustomTopicInput('');
+                        }
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </Box>
+                  {(config as any).custom_topics.length > 0 && (
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                      {(config as any).custom_topics.map((topic: string) => (
+                        <Chip
+                          key={topic}
+                          label={topic}
+                          size="small"
+                          onDelete={() =>
+                            setConfig({
+                              ...config,
+                              custom_topics: (config as any).custom_topics.filter(
+                                (t: string) => t !== topic
+                              ),
+                            })
+                          }
+                        />
+                      ))}
+                    </Box>
+                  )}
                 </Box>
                 <FormControlLabel
                   control={
