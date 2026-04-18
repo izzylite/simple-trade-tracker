@@ -64,3 +64,77 @@ export async function searchNewsMultiple(
   );
   return results.flat();
 }
+
+/**
+ * Search organic Google results with a recency filter.
+ *
+ * Use this to catch breaking content that Google News hasn't indexed yet —
+ * e.g. a politician's post, an unexpected central-bank statement, or early
+ * reporting from outlets that haven't been picked up by Google News.
+ *
+ * `timeRange`:
+ *   'qdr:h' = past hour
+ *   'qdr:d' = past day
+ *   'qdr:w' = past week
+ */
+export async function searchBreaking(
+  query: string,
+  timeRange: 'qdr:h' | 'qdr:d' | 'qdr:w' = 'qdr:h',
+  num = 5
+): Promise<NewsResult[]> {
+  const apiKey = Deno.env.get('SERPER_API_KEY');
+  if (!apiKey) return [];
+
+  try {
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        q: query,
+        gl: 'us',
+        hl: 'en',
+        num,
+        tbs: timeRange,
+      }),
+    });
+
+    if (!response.ok) {
+      log(`Serper breaking search failed: ${response.status}`, 'error');
+      return [];
+    }
+
+    const data = await response.json();
+    const results: NewsResult[] = [];
+
+    if (data.organic) {
+      for (const item of data.organic.slice(0, num)) {
+        results.push({
+          title: item.title,
+          link: item.link,
+          snippet: item.snippet || '',
+          date: item.date,
+          source: new URL(item.link).hostname.replace(/^www\./, ''),
+        });
+      }
+    }
+
+    return results;
+  } catch (err) {
+    log('Serper breaking search error', 'error', err);
+    return [];
+  }
+}
+
+export async function searchBreakingMultiple(
+  queries: string[],
+  timeRange: 'qdr:h' | 'qdr:d' | 'qdr:w' = 'qdr:h',
+  numPerQuery = 3
+): Promise<NewsResult[]> {
+  const results = await Promise.all(
+    queries.map((q) => searchBreaking(q, timeRange, numPerQuery))
+  );
+  return results.flat();
+}

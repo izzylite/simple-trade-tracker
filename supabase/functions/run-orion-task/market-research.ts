@@ -1,5 +1,5 @@
 import { log } from '../_shared/supabase.ts';
-import { searchNewsMultiple } from './serper.ts';
+import { searchNewsMultiple, searchBreakingMultiple } from './serper.ts';
 import { generateContent } from './gemini.ts';
 import type {
   OrionTask,
@@ -37,13 +37,26 @@ const BASELINE_MACRO_QUERIES = [
   'China US trade policy tariffs today',
 ];
 
+// Queries for breaking content (organic Google search with past-hour filter).
+// These catch political posts, flash headlines, and surprise announcements that
+// haven't been indexed by Google News yet — targeted at the categories most
+// likely to move markets minute-to-minute.
+const BREAKING_MACRO_QUERIES = [
+  'Trump OR President statement announcement',
+  'Federal Reserve OR Powell',
+  'ECB OR Lagarde OR Bank of England',
+  'ceasefire OR war OR attack markets',
+  'breaking news markets',
+  'flash crash surge',
+];
+
 export async function handleMarketResearch(
   task: OrionTask,
   supabase: SupabaseClient
 ): Promise<TaskResult> {
   const config = task.config as unknown as MarketResearchConfig;
 
-  const [newsResults, economicEvents, instruments] = await Promise.all([
+  const [newsBundle, economicEvents, instruments] = await Promise.all([
     gatherMarketNews(config),
     fetchUpcomingEvents(supabase, config.sessions),
     config.instrument_aware
@@ -59,11 +72,13 @@ export async function handleMarketResearch(
     );
   }
 
-  const allNews = deduplicateNews([...newsResults, ...instrumentNews]);
+  const allNews = deduplicateNews([...newsBundle.news, ...instrumentNews]);
+  const breakingNews = deduplicateNews(newsBundle.breaking);
 
   const briefingJson = await callGeminiForBriefing(
     config,
     allNews,
+    breakingNews,
     economicEvents,
     instruments
   );
@@ -99,27 +114,33 @@ function buildSearchQueries(config: MarketResearchConfig): CategorizedQueries {
 
 async function gatherMarketNews(
   config: MarketResearchConfig
-): Promise<NewsResult[]> {
+): Promise<{ news: NewsResult[]; breaking: NewsResult[] }> {
   const queries = buildSearchQueries(config);
 
   // Fewer results per macro query (many queries; avoid flooding the prompt).
   // More per session/market (focused, higher signal).
-  const [macroNews, sessionNews, marketNews, customNews] = await Promise.all([
-    queries.macro.length > 0
-      ? searchNewsMultiple(queries.macro, 3)
-      : Promise.resolve([]),
-    queries.session.length > 0
-      ? searchNewsMultiple(queries.session, 5)
-      : Promise.resolve([]),
-    queries.market.length > 0
-      ? searchNewsMultiple(queries.market, 4)
-      : Promise.resolve([]),
-    queries.custom.length > 0
-      ? searchNewsMultiple(queries.custom, 4)
-      : Promise.resolve([]),
-  ]);
+  const [macroNews, sessionNews, marketNews, customNews, breakingNews] =
+    await Promise.all([
+      queries.macro.length > 0
+        ? searchNewsMultiple(queries.macro, 3)
+        : Promise.resolve([]),
+      queries.session.length > 0
+        ? searchNewsMultiple(queries.session, 5)
+        : Promise.resolve([]),
+      queries.market.length > 0
+        ? searchNewsMultiple(queries.market, 4)
+        : Promise.resolve([]),
+      queries.custom.length > 0
+        ? searchNewsMultiple(queries.custom, 4)
+        : Promise.resolve([]),
+      // Breaking: organic search with past-hour filter for flash content
+      searchBreakingMultiple(BREAKING_MACRO_QUERIES, 'qdr:h', 3),
+    ]);
 
-  return [...macroNews, ...sessionNews, ...marketNews, ...customNews];
+  return {
+    news: [...macroNews, ...sessionNews, ...marketNews, ...customNews],
+    breaking: breakingNews,
+  };
 }
 
 async function fetchUpcomingEvents(
@@ -196,6 +217,7 @@ function deduplicateNews(results: NewsResult[]): NewsResult[] {
 async function callGeminiForBriefing(
   config: MarketResearchConfig,
   news: NewsResult[],
+  breaking: NewsResult[],
   events: EconomicEvent[],
   instruments: string[]
 ): Promise<string> {
@@ -209,7 +231,9 @@ Respond ONLY with a JSON object in this exact format:
   "briefing_plain": "Plain text version of the briefing"
 }
 
-Prioritize these catalyst categories when scanning the news (from highest impact to lowest):
+Breaking content (past-hour items in the user prompt) outranks everything else. If there IS a breaking item — a political post, a ceasefire announcement, a central-bank surprise, a flash headline — that is the lede. Open the briefing with it.
+
+Absent breaking content, prioritize these catalyst categories when scanning the news (from highest impact to lowest):
 1. Central bank decisions and speeches (Fed, ECB, BoE, BoJ, PBoC)
 2. Political statements from heads of state, executive orders, trade policy moves, presidential posts/tweets
 3. Geopolitical shocks — wars, sanctions, coups, major diplomatic events
@@ -246,6 +270,18 @@ HTML formatting rules:
           .join('\n')
       : 'No recent news found.';
 
+  const breakingSection =
+    breaking.length > 0
+      ? breaking
+          .slice(0, 15)
+          .map(
+            (n) =>
+              `- [${n.source || 'Web'}] ${n.title}: ${n.snippet}` +
+              `${n.date ? ` (${n.date})` : ''}`
+          )
+          .join('\n')
+      : 'No breaking content in the past hour.';
+
   const eventsSection =
     events.length > 0
       ? events
@@ -267,7 +303,12 @@ HTML formatting rules:
   const userPrompt = `Generate a market research briefing for the following sessions: ${config.sessions.join(', ')}.
 Markets of interest: ${config.markets.join(', ')}.
 
-## Recent Market News
+## Breaking Content (past hour — TREAT AS HIGHEST PRIORITY)
+These items were published in the last 60 minutes. A political post, ceasefire announcement, central-bank speaker line, or surprise headline here is almost certainly the day's top catalyst. If any item describes a head-of-state statement, military/diplomatic action, central-bank surprise, or major data miss, raise significance to "high" and lead the briefing with it.
+
+${breakingSection}
+
+## Recent Market News (past day)
 ${newsSection}
 
 ## Upcoming Economic Events (today and tomorrow)
