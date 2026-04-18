@@ -28,7 +28,7 @@ import { TASK_TYPE_LABELS, DEFAULT_CONFIGS } from '../../types/orionTask';
 interface CreateTaskDialogProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (taskType: TaskType, config: TaskConfig) => Promise<void>;
+  onCreate: (taskType: TaskType, config: TaskConfig) => Promise<unknown>;
   existingTaskTypes: TaskType[];
 }
 
