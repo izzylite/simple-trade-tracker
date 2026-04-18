@@ -18,24 +18,22 @@ export interface TaskResult {
   metadata: Record<string, unknown>;
 }
 
+// Handlers may return `null` to suppress storage — used by market_research
+// when a sweep finishes below the configured significance threshold so the
+// user isn't spammed on quiet intervals.
 export type TaskHandler = (
   task: OrionTask,
-  supabase: SupabaseClient,
-  mode?: RunMode
+  supabase: SupabaseClient
 ) => Promise<TaskResult | null>;
 
 export interface MarketResearchConfig {
   sessions: string[];
-  checkpoints: string[];
   markets: string[];
   custom_topics: string[];
   instrument_aware: boolean;
-  breaking_alerts_enabled?: boolean;
-  breaking_alert_frequency_minutes?: 15 | 30 | 60;
-  breaking_alert_min_significance?: 'medium' | 'high';
+  frequency_minutes: 15 | 30 | 60;
+  min_significance: 'medium' | 'high';
 }
-
-export type RunMode = 'scheduled' | 'alert';
 
 export interface DailyAnalysisConfig {
   run_time_utc: string;

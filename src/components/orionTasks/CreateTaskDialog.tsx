@@ -32,7 +32,6 @@ import type {
   TaskType,
   TaskConfig,
   TradingSession,
-  SessionCheckpoint,
   CoachingTone,
 } from '../../types/orionTask';
 import { TASK_TYPE_LABELS, DEFAULT_CONFIGS } from '../../types/orionTask';
@@ -55,14 +54,13 @@ interface TaskTypeInfo {
 
 const TASK_TYPE_INFO: Record<TaskType, TaskTypeInfo> = {
   market_research: {
-    summary: 'Market-moving catalysts + breaking surprise alerts',
+    summary: 'Surprise monitor: alerts you the moment something market-moving happens',
     description:
-      'Orion scans live news for the catalysts that actually move markets — central bank decisions and speeches ' +
-      '(Fed, ECB, BoE), political statements and executive orders, geopolitical shocks, commodity shifts (oil, gold), ' +
-      'bond-market signals, and scheduled economic data. Delivers scheduled briefings at your chosen session ' +
-      'checkpoints (start / mid / end), and with Breaking Alerts enabled, also fires interrupt-driven notifications ' +
-      'within 15-60 min of a surprise so you don\'t get caught off-guard mid-trade.',
-    exampleTitle: 'BREAKING ALERT — Trump posts ceasefire, EUR/USD ripping',
+      'Orion sweeps live news every 15-60 minutes looking for catalysts that actually move markets — ' +
+      'central bank surprises, political statements, geopolitical shocks, unexpected data, and commodity disruptions. ' +
+      'You only get a notification when something real happens and clears your significance threshold. ' +
+      'Quiet markets = silent. Surprise hits = red dot on Orion within minutes, with full impact breakdown and affected assets.',
+    exampleTitle: 'Trump posts ceasefire, EUR/USD ripping',
     exampleOutput:
       'Heads up: President Trump posted ~30 min ago announcing a 10-day\n' +
       'Israel-Lebanon ceasefire. Risk-on unwind in progress.\n\n' +
@@ -137,12 +135,6 @@ const SESSION_LABELS: Record<TradingSession, string> = {
   london: 'London',
   ny_am: 'NY AM',
   ny_pm: 'NY PM',
-};
-
-const CHECKPOINT_LABELS: Record<SessionCheckpoint, string> = {
-  start: 'Start',
-  mid: 'Mid',
-  end: 'End',
 };
 
 const TONE_LABELS: Record<CoachingTone, string> = {
@@ -372,9 +364,60 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
 
             {taskType === 'market_research' && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {/* Core monitor config — frequency + threshold drive the whole task */}
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <FormControl size="small" sx={{ flex: 1 }}>
+                    <InputLabel>Check every</InputLabel>
+                    <Select
+                      value={(config as any).frequency_minutes}
+                      label="Check every"
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          frequency_minutes: e.target.value as 15 | 30 | 60,
+                        })
+                      }
+                      MenuProps={{ sx: { zIndex: 1600 } }}
+                    >
+                      <MenuItem value={15}>15 min</MenuItem>
+                      <MenuItem value={30}>30 min</MenuItem>
+                      <MenuItem value={60}>1 hour</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  <FormControl size="small" sx={{ flex: 1 }}>
+                    <InputLabel>Alert on</InputLabel>
+                    <Select
+                      value={(config as any).min_significance}
+                      label="Alert on"
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          min_significance: e.target.value as 'medium' | 'high',
+                        })
+                      }
+                      MenuProps={{ sx: { zIndex: 1600 } }}
+                    >
+                      <MenuItem value="medium">Medium &amp; high</MenuItem>
+                      <MenuItem value="high">High only</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+
                 <Box>
                   <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
                     Sessions
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: 'block',
+                      color: 'text.secondary',
+                      mb: 1,
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    Focus the news search and economic-calendar filter on these hours. Doesn't affect when the task runs.
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                     {(Object.keys(SESSION_LABELS) as TradingSession[]).map((s) => (
@@ -390,28 +433,6 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                         }
                         color={(config as any).sessions.includes(s) ? 'primary' : 'default'}
                         variant={(config as any).sessions.includes(s) ? 'filled' : 'outlined'}
-                      />
-                    ))}
-                  </Box>
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                    Checkpoints
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
-                    {(Object.keys(CHECKPOINT_LABELS) as SessionCheckpoint[]).map((c) => (
-                      <Chip
-                        key={c}
-                        label={CHECKPOINT_LABELS[c]}
-                        size="small"
-                        onClick={() =>
-                          setConfig({
-                            ...config,
-                            checkpoints: toggleArrayItem((config as any).checkpoints, c),
-                          })
-                        }
-                        color={(config as any).checkpoints.includes(c) ? 'primary' : 'default'}
-                        variant={(config as any).checkpoints.includes(c) ? 'filled' : 'outlined'}
                       />
                     ))}
                   </Box>
@@ -550,92 +571,6 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                   }
                   label="Instrument-aware (tailor to my traded pairs)"
                 />
-
-                {/* Breaking alerts — interrupt-driven surprise detection */}
-                <Box
-                  sx={{
-                    p: 1.5,
-                    mt: 1,
-                    borderRadius: '10px',
-                    border: `1px dashed ${alpha(
-                      theme.palette.warning.main,
-                      0.4
-                    )}`,
-                    backgroundColor: alpha(theme.palette.warning.main, 0.04),
-                  }}
-                >
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={(config as any).breaking_alerts_enabled}
-                        onChange={(e) =>
-                          setConfig({
-                            ...config,
-                            breaking_alerts_enabled: e.target.checked,
-                          })
-                        }
-                      />
-                    }
-                    label={
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
-                          Breaking Alerts
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.72rem' }}>
-                          Catch surprises between scheduled checkpoints (e.g. unexpected Fed speech, geopolitical shock, political announcement)
-                        </Typography>
-                      </Box>
-                    }
-                    sx={{ alignItems: 'flex-start', m: 0 }}
-                  />
-
-                  {(config as any).breaking_alerts_enabled && (
-                    <Box sx={{ display: 'flex', gap: 1.5, mt: 1.5 }}>
-                      <FormControl size="small" sx={{ flex: 1 }}>
-                        <InputLabel>Check every</InputLabel>
-                        <Select
-                          value={
-                            (config as any).breaking_alert_frequency_minutes
-                          }
-                          label="Check every"
-                          onChange={(e) =>
-                            setConfig({
-                              ...config,
-                              breaking_alert_frequency_minutes:
-                                e.target.value as 15 | 30 | 60,
-                            })
-                          }
-                          MenuProps={{ sx: { zIndex: 1600 } }}
-                        >
-                          <MenuItem value={15}>15 min</MenuItem>
-                          <MenuItem value={30}>30 min</MenuItem>
-                          <MenuItem value={60}>1 hour</MenuItem>
-                        </Select>
-                      </FormControl>
-
-                      <FormControl size="small" sx={{ flex: 1 }}>
-                        <InputLabel>Only alert on</InputLabel>
-                        <Select
-                          value={
-                            (config as any).breaking_alert_min_significance
-                          }
-                          label="Only alert on"
-                          onChange={(e) =>
-                            setConfig({
-                              ...config,
-                              breaking_alert_min_significance:
-                                e.target.value as 'medium' | 'high',
-                            })
-                          }
-                          MenuProps={{ sx: { zIndex: 1600 } }}
-                        >
-                          <MenuItem value="medium">Medium &amp; high</MenuItem>
-                          <MenuItem value="high">High only</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Box>
-                  )}
-                </Box>
               </Box>
             )}
 

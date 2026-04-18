@@ -6,7 +6,6 @@ import type {
   TaskResult,
   MarketResearchConfig,
   SupabaseClient,
-  RunMode,
 } from './types.ts';
 import type { NewsResult } from './serper.ts';
 
@@ -59,8 +58,7 @@ const SIGNIFICANCE_RANK: Record<string, number> = {
 
 export async function handleMarketResearch(
   task: OrionTask,
-  supabase: SupabaseClient,
-  mode: RunMode = 'scheduled'
+  supabase: SupabaseClient
 ): Promise<TaskResult | null> {
   const config = task.config as unknown as MarketResearchConfig;
 
@@ -88,31 +86,26 @@ export async function handleMarketResearch(
     allNews,
     breakingNews,
     economicEvents,
-    instruments,
-    mode
+    instruments
   );
 
   const result = parseBriefingResponse(briefingJson);
 
-  // Alert mode: suppress results below the configured threshold so the user
-  // only gets notified on real surprises. Quiet 30-min sweep with no major
-  // catalyst = silent, no red dot, no card.
-  if (mode === 'alert') {
-    const threshold = config.breaking_alert_min_significance ?? 'high';
-    const thresholdRank = SIGNIFICANCE_RANK[threshold] ?? 2;
-    const resultRank =
-      result.significance !== null
-        ? SIGNIFICANCE_RANK[result.significance] ?? 0
-        : 0;
-    if (resultRank < thresholdRank) {
-      log('Market research alert suppressed', 'info', {
-        threshold,
-        actual: result.significance,
-      });
-      return null;
-    }
-    // Tag alert-mode results so the UI can render them differently if desired.
-    result.metadata = { ...result.metadata, alert: true };
+  // Market Research is always a surprise monitor — suppress anything below
+  // the configured significance threshold so the user isn't spammed on quiet
+  // sweeps. No red dot, no card; the run still counts as executed.
+  const threshold = config.min_significance ?? 'high';
+  const thresholdRank = SIGNIFICANCE_RANK[threshold] ?? 2;
+  const resultRank =
+    result.significance !== null
+      ? SIGNIFICANCE_RANK[result.significance] ?? 0
+      : 0;
+  if (resultRank < thresholdRank) {
+    log('Market research sweep suppressed', 'info', {
+      threshold,
+      actual: result.significance,
+    });
+    return null;
   }
 
   return result;
@@ -251,20 +244,14 @@ async function callGeminiForBriefing(
   news: NewsResult[],
   breaking: NewsResult[],
   events: EconomicEvent[],
-  instruments: string[],
-  mode: RunMode
+  instruments: string[]
 ): Promise<string> {
-  const modeInstruction =
-    mode === 'alert'
-      ? `You are running in ALERT MODE — a 15–30 minute sweep for surprises between scheduled briefings. ` +
-        `If nothing market-moving has happened, return significance="low" and keep the briefing short (the UI will suppress it). ` +
-        `If a surprise HAS happened (breaking content present with real catalyst), rate "high" and lead with the trade-impact of the event. ` +
-        `Alert-mode briefings MUST open with one sentence telling the trader exactly what changed and which assets are affected.`
-      : `You are running in SCHEDULED MODE — this is a session-checkpoint briefing. Cover the full situation.`;
+  const systemPrompt = `You are Orion, an AI trading surprise detector. Every ${config.frequency_minutes ?? 30} minutes you sweep the market for catalysts. You only alert the trader when something actually happened — scheduled briefings don't exist in this system, so if nothing market-moving is present, rate significance="low" and keep the briefing brief (the UI will suppress it).
 
-  const systemPrompt = `You are Orion, an AI trading assistant. Generate a concise market research briefing focused on what could move markets today.
-
-${modeInstruction}
+When a surprise IS present (breaking content with a real catalyst, unexpected central-bank speech, political statement, geopolitical shock, major data miss), rate it at the appropriate level ("medium" or "high") and OPEN the briefing with one sentence telling the trader:
+1. What exactly happened
+2. Which assets are moving and by how much
+3. What the expected follow-through is (if any)
 
 Respond ONLY with a JSON object in this exact format:
 {

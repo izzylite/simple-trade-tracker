@@ -5,7 +5,7 @@ import {
   createServiceClient,
 } from '../_shared/supabase.ts';
 import { getHandler } from './handlers.ts';
-import type { OrionTask, TaskResult, RunMode } from './types.ts';
+import type { OrionTask, TaskResult } from './types.ts';
 
 async function storeResult(
   serviceClient: ReturnType<typeof createServiceClient>,
@@ -37,9 +37,7 @@ Deno.serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const body = await req.json();
-    const { taskId } = body;
-    const mode: RunMode = body.mode === 'alert' ? 'alert' : 'scheduled';
+    const { taskId } = await req.json();
 
     if (!taskId) {
       return new Response(
@@ -83,7 +81,7 @@ Deno.serve(async (req) => {
 
     let result: TaskResult | null;
     try {
-      result = await handler(orionTask, serviceClient, mode);
+      result = await handler(orionTask, serviceClient);
     } catch (handlerErr) {
       const message = handlerErr instanceof Error ? handlerErr.message : 'Handler error';
       log('Task handler failed', 'error', {
@@ -106,13 +104,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Handler returning null means "suppress this result" — e.g. alert-mode
-    // ran but nothing significant was found, so we don't spam the user.
+    // Handler returning null means "suppress this result" — e.g. a market
+    // research sweep below the configured significance threshold. No red dot,
+    // no card; the run still counts as "executed" for scheduling purposes.
     if (result === null) {
       log('Task suppressed (below significance threshold)', 'info', {
         taskId: orionTask.id,
         taskType: orionTask.task_type,
-        mode,
       });
       return new Response(
         JSON.stringify({ success: true, suppressed: true }),
@@ -131,7 +129,6 @@ Deno.serve(async (req) => {
     log('Task executed successfully', 'info', {
       taskId: orionTask.id,
       taskType: orionTask.task_type,
-      mode,
     });
 
     return new Response(

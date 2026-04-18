@@ -10,26 +10,28 @@ export type Significance = 'low' | 'medium' | 'high';
 
 export type TradingSession = 'asia' | 'london' | 'ny_am' | 'ny_pm';
 
-export type SessionCheckpoint = 'start' | 'mid' | 'end';
-
 export type CoachingTone = 'tough_love' | 'blunt_analyst' | 'supportive_mentor';
 
 export type AlertFrequency = 15 | 30 | 60;
 export type AlertMinSignificance = 'medium' | 'high';
 
+/**
+ * Market Research is a continuous surprise monitor, not a scheduled digest.
+ * It runs every `frequency_minutes` and only posts a result when a catalyst
+ * clears `min_significance` — central-bank surprise, political statement,
+ * geopolitical shock, unexpected data, commodity disruption, etc.
+ *
+ * `sessions` is a context filter: it narrows which regional news and which
+ * currencies from the economic calendar are prioritised in the search. It
+ * does NOT control when the task fires.
+ */
 export interface MarketResearchConfig {
   sessions: TradingSession[];
-  checkpoints: SessionCheckpoint[];
   markets: string[];
   custom_topics: string[];
   instrument_aware: boolean;
-  // Breaking-alert mode: runs every N minutes and only posts when a
-  // high-impact surprise (central-bank, political, geopolitical shock) hits.
-  // Complements scheduled session checkpoints by catching surprises that
-  // happen between them.
-  breaking_alerts_enabled: boolean;
-  breaking_alert_frequency_minutes: AlertFrequency;
-  breaking_alert_min_significance: AlertMinSignificance;
+  frequency_minutes: AlertFrequency;
+  min_significance: AlertMinSignificance;
 }
 
 export interface DailyAnalysisConfig {
@@ -89,13 +91,11 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
 export const DEFAULT_CONFIGS: Record<TaskType, TaskConfig> = {
   market_research: {
     sessions: ['london', 'ny_am'],
-    checkpoints: ['start', 'end'],
     markets: ['forex'],
     custom_topics: [],
     instrument_aware: true,
-    breaking_alerts_enabled: true,
-    breaking_alert_frequency_minutes: 30,
-    breaking_alert_min_significance: 'high',
+    frequency_minutes: 30,
+    min_significance: 'high',
   },
   daily_analysis: {
     run_time_utc: '21:00',
