@@ -82,7 +82,7 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string) {
     );
 
     const channel = supabase
-      .channel('orion-task-results')
+      .channel(`orion-task-results-${userId}`)
       .on(
         'postgres_changes',
         {

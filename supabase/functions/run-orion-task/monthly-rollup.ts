@@ -143,14 +143,15 @@ async function fetchInstrumentRankings(
   calendarId: string,
   date: Date
 ): Promise<InstrumentStat[]> {
-  const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+  const monthStart = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)
+  );
 
   const { data, error } = await supabase
     .from('trades')
     .select('name, amount, trade_type')
     .eq('user_id', userId)
     .eq('calendar_id', calendarId)
-    .eq('is_deleted', false)
     .gte('trade_date', monthStart.toISOString())
     .not('name', 'is', null);
 

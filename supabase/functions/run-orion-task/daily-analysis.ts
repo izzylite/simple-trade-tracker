@@ -62,7 +62,12 @@ async function fetchTodaysTrades(
   userId: string,
   calendarId: string
 ): Promise<TradeRow[]> {
-  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const todayStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1);
 
   const { data, error } = await supabase
     .from('trades')
@@ -73,9 +78,8 @@ async function fetchTodaysTrades(
     )
     .eq('user_id', userId)
     .eq('calendar_id', calendarId)
-    .eq('is_deleted', false)
-    .gte('trade_date', `${today}T00:00:00`)
-    .lte('trade_date', `${today}T23:59:59`)
+    .gte('trade_date', todayStart.toISOString())
+    .lt('trade_date', tomorrowStart.toISOString())
     .order('trade_date', { ascending: true });
 
   if (error) {

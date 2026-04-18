@@ -3,6 +3,20 @@ import { log } from '../_shared/supabase.ts';
 const GEMINI_API_BASE =
   'https://generativelanguage.googleapis.com/v1beta/models';
 
+const BRIEFING_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    significance: {
+      type: 'string',
+      enum: ['low', 'medium', 'high'],
+    },
+    title: { type: 'string' },
+    briefing_html: { type: 'string' },
+    briefing_plain: { type: 'string' },
+  },
+  required: ['significance', 'title', 'briefing_html', 'briefing_plain'],
+};
+
 export async function generateContent(
   systemPrompt: string,
   userPrompt: string
@@ -20,18 +34,17 @@ export async function generateContent(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      systemInstruction: {
+        parts: [{ text: systemPrompt }],
+      },
       contents: [
-        { role: 'user', parts: [{ text: systemPrompt }] },
-        {
-          role: 'model',
-          parts: [{ text: 'Understood. I will generate the briefing now.' }],
-        },
         { role: 'user', parts: [{ text: userPrompt }] },
       ],
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 4000,
+        maxOutputTokens: 8192,
         responseMimeType: 'application/json',
+        responseSchema: BRIEFING_RESPONSE_SCHEMA,
       },
     }),
   });

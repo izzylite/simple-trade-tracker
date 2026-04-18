@@ -14,6 +14,7 @@ import {
 import { format } from 'date-fns';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import Shimmer from '../Shimmer';
+import ConfirmationDialog from '../common/ConfirmationDialog';
 import TaskResultCard from './TaskResultCard';
 import CreateTaskDialog from './CreateTaskDialog';
 import type {
@@ -48,10 +49,36 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
 }) => {
   const theme = useTheme();
   const [createOpen, setCreateOpen] = useState(false);
+  const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const pendingDeleteTask = useMemo(
+    () => tasks.find((t) => t.id === pendingDeleteTaskId) || null,
+    [tasks, pendingDeleteTaskId]
+  );
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteTaskId) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteTask(pendingDeleteTaskId);
+      setPendingDeleteTaskId(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const existingTaskTypes = useMemo(
     () => tasks.map((t) => t.task_type),
     [tasks]
+  );
+
+  const allTaskTypesUsed = useMemo(
+    () =>
+      (Object.keys(TASK_TYPE_LABELS) as TaskType[]).every((t) =>
+        existingTaskTypes.includes(t)
+      ),
+    [existingTaskTypes]
   );
 
   const groupedResults = useMemo(() => {
@@ -105,7 +132,7 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
             size="small"
             startIcon={<AddIcon />}
             onClick={() => setCreateOpen(true)}
-            disabled={existingTaskTypes.length >= 4}
+            disabled={allTaskTypesUsed}
             sx={{ textTransform: 'none', fontSize: '0.8rem' }}
           >
             New Task
@@ -138,7 +165,7 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                 variant={
                   task.status === 'active' ? 'filled' : 'outlined'
                 }
-                onDelete={() => onDeleteTask(task.id)}
+                onDelete={() => setPendingDeleteTaskId(task.id)}
                 deleteIcon={
                   <DeleteIcon sx={{ fontSize: '14px !important' }} />
                 }
@@ -208,6 +235,21 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
         onClose={() => setCreateOpen(false)}
         onCreate={onCreateTask}
         existingTaskTypes={existingTaskTypes}
+      />
+
+      <ConfirmationDialog
+        open={!!pendingDeleteTaskId}
+        title="Delete Task?"
+        message={
+          pendingDeleteTask
+            ? `Are you sure you want to delete the "${TASK_TYPE_LABELS[pendingDeleteTask.task_type]}" task? Orion will stop running it.`
+            : ''
+        }
+        confirmText="Delete"
+        confirmColor="error"
+        isSubmitting={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDeleteTaskId(null)}
       />
     </Box>
   );

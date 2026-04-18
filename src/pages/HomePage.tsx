@@ -162,7 +162,7 @@ const HomeInner: React.FC<HomeProps> = ({
     createTask,
     deleteTask,
     markRead,
-  } = useOrionTasks(user?.id);
+  } = useOrionTasks(user?.id, aiChatCalendarId || undefined);
 
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);

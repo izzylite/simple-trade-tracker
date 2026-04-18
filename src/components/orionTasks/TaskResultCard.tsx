@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import {
   Box,
   Card,
@@ -17,6 +18,11 @@ import { format } from 'date-fns';
 import type { OrionTaskResult, Significance } from '../../types/orionTask';
 import { TASK_TYPE_LABELS } from '../../types/orionTask';
 
+const SANITIZE_CONFIG = {
+  ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'h3', 'h4', 'h5', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span'],
+  ALLOWED_ATTR: ['class'],
+};
+
 interface TaskResultCardProps {
   result: OrionTaskResult;
   onMarkRead: (resultId: string) => void;
@@ -33,6 +39,11 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
   onMarkRead,
 }) => {
   const theme = useTheme();
+
+  const sanitizedHtml = useMemo(
+    () => DOMPurify.sanitize(result.content_html, SANITIZE_CONFIG),
+    [result.content_html]
+  );
 
   return (
     <Card
@@ -120,7 +131,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
             lineHeight: 1.5,
             whiteSpace: 'pre-wrap',
           }}
-          dangerouslySetInnerHTML={{ __html: result.content_html }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       </CardContent>
     </Card>
