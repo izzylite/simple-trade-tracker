@@ -33,6 +33,7 @@ import type {
   TaskConfig,
   TradingSession,
   CoachingTone,
+  OrionTask,
 } from '../../types/orionTask';
 import { TASK_TYPE_LABELS, DEFAULT_CONFIGS } from '../../types/orionTask';
 
@@ -41,6 +42,10 @@ interface CreateTaskDialogProps {
   onClose: () => void;
   onCreate: (taskType: TaskType, config: TaskConfig) => Promise<unknown>;
   existingTaskTypes: TaskType[];
+  /** If set, dialog runs in edit mode: task type is locked, config is pre-populated */
+  editingTask?: OrionTask | null;
+  /** Called on Save in edit mode. Only required when editingTask is set. */
+  onSave?: (taskId: string, config: TaskConfig) => Promise<unknown>;
 }
 
 interface TaskTypeInfo {
@@ -157,12 +162,24 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   onClose,
   onCreate,
   existingTaskTypes,
+  editingTask,
+  onSave,
 }) => {
   const theme = useTheme();
+  const isEditMode = !!editingTask;
   const [taskType, setTaskType] = useState<TaskType | ''>('');
   const [config, setConfig] = useState<TaskConfig | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [customTopicInput, setCustomTopicInput] = useState('');
+
+  // When opening in edit mode, hydrate from the editing task
+  React.useEffect(() => {
+    if (editingTask) {
+      setTaskType(editingTask.task_type);
+      setConfig({ ...editingTask.config } as TaskConfig);
+      setCustomTopicInput('');
+    }
+  }, [editingTask]);
 
   const availableTypes = (
     Object.keys(TASK_TYPE_LABELS) as TaskType[]
@@ -174,6 +191,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   };
 
   const handleBack = () => {
+    if (isEditMode) return; // in edit mode, back is disabled — only cancel/save
     setTaskType('');
     setConfig(null);
     setCustomTopicInput('');
@@ -186,11 +204,15 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     setCustomTopicInput('');
   };
 
-  const handleCreate = async () => {
+  const handleSubmit = async () => {
     if (!taskType || !config) return;
     setSubmitting(true);
     try {
-      await onCreate(taskType, config);
+      if (isEditMode && onSave && editingTask) {
+        await onSave(editingTask.id, config);
+      } else {
+        await onCreate(taskType, config);
+      }
       handleClose();
     } finally {
       setSubmitting(false);
@@ -212,12 +234,16 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
       PaperProps={{ sx: { borderRadius: '12px' } }}
     >
       <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-        {taskType && (
+        {taskType && !isEditMode && (
           <IconButton size="small" onClick={handleBack} sx={{ mr: 0.5 }}>
             <ArrowBackIcon fontSize="small" />
           </IconButton>
         )}
-        {taskType && selectedInfo ? TASK_TYPE_LABELS[taskType] : 'Create Task'}
+        {isEditMode && taskType && selectedInfo
+          ? `Edit ${TASK_TYPE_LABELS[taskType]}`
+          : taskType && selectedInfo
+            ? TASK_TYPE_LABELS[taskType]
+            : 'Create Task'}
       </DialogTitle>
 
       <DialogContent>
@@ -689,10 +715,12 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
         {taskType && (
           <Button
             variant="contained"
-            onClick={handleCreate}
+            onClick={handleSubmit}
             disabled={!config || submitting}
           >
-            {submitting ? 'Creating...' : 'Create Task'}
+            {submitting
+              ? (isEditMode ? 'Saving...' : 'Creating...')
+              : (isEditMode ? 'Save Changes' : 'Create Task')}
           </Button>
         )}
       </DialogActions>

@@ -73,6 +73,22 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string) {
     setUnreadCount((prev) => Math.max(0, prev - 1));
   }, []);
 
+  const markAllRead = useCallback(async () => {
+    if (!userId) return;
+    await orionTaskService.markAllResultsRead(userId);
+    setResults((prev) => prev.map((r) => ({ ...r, is_read: true })));
+    setUnreadCount(0);
+  }, [userId]);
+
+  const updateTask = useCallback(
+    async (taskId: string, updates: { status?: OrionTask['status']; config?: TaskConfig }) => {
+      const updated = await orionTaskService.updateTask(taskId, updates);
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+      return updated;
+    },
+    []
+  );
+
   useEffect(() => {
     if (!userId) return;
 
@@ -110,8 +126,10 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string) {
     unreadCount,
     loading,
     createTask,
+    updateTask,
     deleteTask,
     markRead,
+    markAllRead,
     refetchTasks: fetchTasks,
     refetchResults: fetchResults,
   };

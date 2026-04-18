@@ -119,6 +119,7 @@ export interface AIChatInterfaceProps {
 export interface AIChatInterfaceRef {
   focus: () => void;
   scrollToBottom: () => void;
+  setInput: (value: string) => void;
 }
 
 const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
@@ -164,6 +165,17 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
     scrollToBottom: () => {
       const el = messagesAreaRef.current;
       if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    },
+    setInput: (value: string) => {
+      setInputMessage(value);
+      // Focus and move cursor to the end so the user can type their question
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+        if (inputRef.current) {
+          const len = value.length;
+          inputRef.current.setSelectionRange(len, len);
+        }
+      });
     }
   }));
 

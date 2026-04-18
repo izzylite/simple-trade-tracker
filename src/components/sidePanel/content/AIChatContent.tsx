@@ -73,6 +73,12 @@ export interface AIChatContentProps {
   selectedCalendarId?: string;
   /** Callback when user changes the calendar context */
   onCalendarChange?: (calendarId: string) => void;
+  /** When set (non-empty), populates the chat input with this text. Used by the
+   *  "Follow up with Orion" button on Orion Task briefings. */
+  seedMessage?: string;
+  /** Called after seedMessage has been injected into the input so the parent
+   *  can clear it (otherwise it would re-inject on every re-render). */
+  onSeedMessageConsumed?: () => void;
 }
 
 const AIChatContent: React.FC<AIChatContentProps> = ({
@@ -86,6 +92,8 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   availableCalendars,
   selectedCalendarId = '',
   onCalendarChange,
+  seedMessage = '',
+  onSeedMessageConsumed,
 }) => {
   const { onOpenGalleryMode } = tradeOperations;
   const theme = useTheme();
@@ -212,6 +220,17 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
       setTimeout(() => chatInterfaceRef.current?.focus(), 100);
     }
   }, [isActive, isLoading]);
+
+  // Inject seed message (from "Follow up with Orion" on a task briefing).
+  // Defer slightly so the AIChatInterface has mounted its ref.
+  useEffect(() => {
+    if (!seedMessage) return;
+    const timer = setTimeout(() => {
+      chatInterfaceRef.current?.setInput(seedMessage);
+      onSeedMessageConsumed?.();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [seedMessage, onSeedMessageConsumed]);
 
   // Load conversations when content becomes active
   useEffect(() => {

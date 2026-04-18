@@ -743,8 +743,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     unreadCount: taskUnreadCount,
     loading: tasksLoading,
     createTask,
+    updateTask,
     deleteTask,
     markRead,
+    markAllRead,
   } = useOrionTasks(calendar?.user_id, calendar?.id);
 
   // Notes drawer state
@@ -2900,8 +2902,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         taskUnreadCount={taskUnreadCount}
         tasksLoading={tasksLoading}
         onCreateTask={createTask}
+        onUpdateTask={updateTask}
         onDeleteTask={deleteTask}
         onMarkTaskResultRead={markRead}
+        onMarkAllTaskResultsRead={markAllRead}
       />
 
       {/* Notes Drawer — <lg only */}

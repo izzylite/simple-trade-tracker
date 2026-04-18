@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import DOMPurify from 'dompurify';
 import {
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
@@ -13,6 +14,7 @@ import {
 } from '@mui/material';
 import {
   Circle as UnreadIcon,
+  ChatBubbleOutline as ChatIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import type { OrionTaskResult, Significance } from '../../types/orionTask';
@@ -26,6 +28,9 @@ const SANITIZE_CONFIG = {
 interface TaskResultCardProps {
   result: OrionTaskResult;
   onMarkRead: (resultId: string) => void;
+  /** Optional: clicking the Follow-up button calls this with the result so the
+   *  parent can switch to the Chat tab and seed the input with briefing context. */
+  onFollowup?: (result: OrionTaskResult) => void;
 }
 
 const SIGNIFICANCE_COLORS: Record<Significance, string> = {
@@ -37,6 +42,7 @@ const SIGNIFICANCE_COLORS: Record<Significance, string> = {
 const TaskResultCard: React.FC<TaskResultCardProps> = ({
   result,
   onMarkRead,
+  onFollowup,
 }) => {
   const theme = useTheme();
 
@@ -133,6 +139,28 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
           }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
+
+        {onFollowup && (
+          <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              size="small"
+              startIcon={<ChatIcon sx={{ fontSize: 14 }} />}
+              onClick={() => onFollowup(result)}
+              sx={{
+                textTransform: 'none',
+                fontSize: '0.75rem',
+                py: 0.25,
+                px: 1,
+                color: theme.palette.primary.main,
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                },
+              }}
+            >
+              Follow up with Orion
+            </Button>
+          </Box>
+        )}
       </CardContent>
     </Card>
   );

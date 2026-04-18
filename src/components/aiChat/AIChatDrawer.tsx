@@ -45,8 +45,10 @@ interface AIChatDrawerProps {
   taskUnreadCount?: number;
   tasksLoading?: boolean;
   onCreateTask?: (taskType: TaskType, config: TaskConfig) => Promise<OrionTask | undefined>;
+  onUpdateTask?: (taskId: string, updates: { config?: TaskConfig }) => Promise<OrionTask | undefined>;
   onDeleteTask?: (taskId: string) => Promise<void>;
   onMarkTaskResultRead?: (resultId: string) => Promise<void>;
+  onMarkAllTaskResultsRead?: () => Promise<void>;
 }
 
 // Bottom sheet heights
@@ -70,11 +72,21 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   taskUnreadCount,
   tasksLoading,
   onCreateTask,
+  onUpdateTask,
   onDeleteTask,
   onMarkTaskResultRead,
+  onMarkAllTaskResultsRead,
 }) => {
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState(0);
+  const [chatSeedMessage, setChatSeedMessage] = useState<string>('');
+
+  const handleFollowupAboutResult = (result: OrionTaskResult) => {
+    const title = (result.metadata as { title?: string } | null)?.title ?? 'this briefing';
+    const seed = `I'd like to follow up on "${title}":\n\n${result.content_plain}\n\nMy question: `;
+    setChatSeedMessage(seed);
+    setActiveTab(0);
+  };
 
   // Prevent body scroll when drawer is open
   useEffect(() => {
@@ -153,7 +165,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '16px 20px',
-            borderBottom: `1px solid ${theme.palette.divider}`
+            borderBottom: `1px solid ${theme.palette.divider}`,
+            flexShrink: 0,
           }}>
             {/* Left side - Logo and Title */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -211,7 +224,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           </Box>
 
           {/* Tabs */}
-          <Box sx={{ px: 2, pt: 1 }}>
+          <Box sx={{ px: 2, pt: 1, flexShrink: 0 }}>
             <RoundedTabs
               tabs={[
                 { label: 'Chat' },
@@ -225,8 +238,26 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           </Box>
 
           {/* Tab content */}
-          <TabPanel value={activeTab} index={0}>
-            <Box sx={{ height: 'calc(100% - 110px)', overflow: 'hidden' }}>
+          <Box sx={{
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            '& [role="tabpanel"]:not([hidden])': {
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+            '& [role="tabpanel"]:not([hidden]) > .MuiBox-root': {
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          }}>
+            <TabPanel value={activeTab} index={0}>
               <AIChatContent
                 trades={trades}
                 calendar={calendar}
@@ -237,23 +268,26 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 availableCalendars={availableCalendars}
                 selectedCalendarId={selectedCalendarId}
                 onCalendarChange={onCalendarChange}
+                seedMessage={chatSeedMessage}
+                onSeedMessageConsumed={() => setChatSeedMessage('')}
               />
-            </Box>
-          </TabPanel>
+            </TabPanel>
 
-          <TabPanel value={activeTab} index={1}>
-            <Box sx={{ height: 'calc(100% - 110px)', overflow: 'hidden' }}>
+            <TabPanel value={activeTab} index={1}>
               <OrionTasksContent
                 tasks={tasks ?? []}
                 results={taskResults ?? []}
                 unreadCount={taskUnreadCount ?? 0}
                 loading={tasksLoading ?? false}
                 onCreateTask={onCreateTask ?? (async () => undefined)}
+                onUpdateTask={onUpdateTask}
                 onDeleteTask={onDeleteTask ?? (async () => {})}
                 onMarkRead={onMarkTaskResultRead ?? (async () => {})}
+                onMarkAllRead={onMarkAllTaskResultsRead}
+                onFollowup={handleFollowupAboutResult}
               />
-            </Box>
-          </TabPanel>
+            </TabPanel>
+          </Box>
         </Box>
       </Box>
     </>

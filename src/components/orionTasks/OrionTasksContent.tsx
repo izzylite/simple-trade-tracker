@@ -10,7 +10,10 @@ import {
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
+  DoneAll as DoneAllIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material';
+import { IconButton, Tooltip } from '@mui/material';
 import { format } from 'date-fns';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import Shimmer from '../Shimmer';
@@ -34,8 +37,14 @@ interface OrionTasksContentProps {
     taskType: TaskType,
     config: TaskConfig
   ) => Promise<OrionTask | undefined>;
+  onUpdateTask?: (
+    taskId: string,
+    updates: { config?: TaskConfig }
+  ) => Promise<OrionTask | undefined>;
   onDeleteTask: (taskId: string) => Promise<void>;
   onMarkRead: (resultId: string) => Promise<void>;
+  onMarkAllRead?: () => Promise<void>;
+  onFollowup?: (result: OrionTaskResult) => void;
 }
 
 const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
@@ -44,11 +53,15 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
   unreadCount,
   loading,
   onCreateTask,
+  onUpdateTask,
   onDeleteTask,
   onMarkRead,
+  onMarkAllRead,
+  onFollowup,
 }) => {
   const theme = useTheme();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<OrionTask | null>(null);
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -128,15 +141,28 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
           >
             Active Tasks ({tasks.filter((t) => t.status === 'active').length})
           </Typography>
-          <Button
-            size="small"
-            startIcon={<AddIcon />}
-            onClick={() => setCreateOpen(true)}
-            disabled={allTaskTypesUsed}
-            sx={{ textTransform: 'none', fontSize: '0.8rem' }}
-          >
-            New Task
-          </Button>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            {onMarkAllRead && unreadCount > 0 && (
+              <Tooltip title="Mark all results as read">
+                <IconButton
+                  size="small"
+                  onClick={() => onMarkAllRead()}
+                  sx={{ p: 0.5 }}
+                >
+                  <DoneAllIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Button
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => setCreateOpen(true)}
+              disabled={allTaskTypesUsed}
+              sx={{ textTransform: 'none', fontSize: '0.8rem' }}
+            >
+              New Task
+            </Button>
+          </Box>
         </Box>
 
         {tasks.length === 0 ? (
@@ -159,17 +185,19 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
             {tasks.map((task) => (
               <Chip
                 key={task.id}
+                icon={onUpdateTask ? <EditIcon sx={{ fontSize: '14px !important' }} /> : undefined}
                 label={TASK_TYPE_LABELS[task.task_type]}
                 size="small"
                 color={task.status === 'active' ? 'primary' : 'default'}
                 variant={
                   task.status === 'active' ? 'filled' : 'outlined'
                 }
+                onClick={onUpdateTask ? () => setEditingTask(task) : undefined}
                 onDelete={() => setPendingDeleteTaskId(task.id)}
                 deleteIcon={
                   <DeleteIcon sx={{ fontSize: '14px !important' }} />
                 }
-                sx={{ fontSize: '0.75rem', height: 26 }}
+                sx={{ fontSize: '0.75rem', height: 26, cursor: onUpdateTask ? 'pointer' : 'default' }}
               />
             ))}
           </Box>
@@ -223,6 +251,7 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                   key={result.id}
                   result={result}
                   onMarkRead={onMarkRead}
+                  onFollowup={onFollowup}
                 />
               ))}
             </Box>
@@ -235,6 +264,21 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
         onClose={() => setCreateOpen(false)}
         onCreate={onCreateTask}
         existingTaskTypes={existingTaskTypes}
+      />
+
+      <CreateTaskDialog
+        open={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        onCreate={async () => undefined}
+        existingTaskTypes={[]}
+        editingTask={editingTask}
+        onSave={
+          onUpdateTask
+            ? async (taskId, config) => {
+                await onUpdateTask(taskId, { config });
+              }
+            : undefined
+        }
       />
 
       <ConfirmationDialog
