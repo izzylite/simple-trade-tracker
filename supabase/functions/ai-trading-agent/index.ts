@@ -1083,6 +1083,11 @@ function handleStreamingRequest(
   // Process request in background (don't await - return stream immediately)
   (async () => {
     try {
+      // Prime the stream: send a comment line immediately so the proxy commits to
+      // streaming mode and flushes subsequent writes instead of buffering them all.
+      // SSE comments (lines starting with :) are ignored by parsers.
+      await writer.write(`: stream-open\n\n`);
+
       const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
       let finalText = '';
       let turnCount = 0;
