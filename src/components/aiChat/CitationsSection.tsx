@@ -175,7 +175,7 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
             py: 1,
             borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
             backgroundColor: 'background.paper',
-            borderRadius: '2px 2px 0 0',
+            borderRadius: '8px 8px 0 0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -379,7 +379,7 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
           PaperProps={{
             sx: {
               mt: 1,
-              borderRadius: 2,
+              borderRadius: 1,
               boxShadow: theme.shadows[8]
             }
           }}

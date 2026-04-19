@@ -100,7 +100,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       user_id: user.uid,
       calendar_id: calendar?.id ?? null,
       title: `Orion Briefing: ${taskLabel} — ${formattedDate}`,
-      content: result.content_plain, 
+      content: result.content_plain,
       by_assistant: true,
       tags: ['orion', 'briefing'],
     });

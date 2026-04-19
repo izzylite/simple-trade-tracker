@@ -113,7 +113,7 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
   }, [results]);
 
   if (loading) {
-    return <EconomicEventShimmer count={5} />;
+    return <EconomicEventShimmer count={10} />;
   }
 
   return (
