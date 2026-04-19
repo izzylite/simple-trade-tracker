@@ -168,13 +168,11 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
     },
     setInput: (value: string) => {
       setInputMessage(value);
-      // Focus and move cursor to the end so the user can type their question
+      // Focus and move the Draft.js caret to the end of the injected text
+      // so the user can type their question immediately.
       requestAnimationFrame(() => {
-        inputRef.current?.focus();
-        if (inputRef.current) {
-          const len = value.length;
-          inputRef.current.setSelectionRange(len, len);
-        }
+        inputRef.current?.focus?.();
+        inputRef.current?.moveCursorToEnd?.();
       });
     }
   }));
