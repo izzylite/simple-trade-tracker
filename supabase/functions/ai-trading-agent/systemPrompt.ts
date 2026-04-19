@@ -483,6 +483,7 @@ REQUIRED FILTER: user_id = '${userId}'${
 - NEVER fabricate/invent UUIDs for <trade-ref/>, <event-ref/>, <note-ref/> tags — use ONLY exact IDs from your SQL query results (server validates and removes fake IDs)
 - NEVER state specific dates, trade counts, or P&L figures unless they came directly from a query result in THIS conversation turn
 - NEVER keep calling tools once you have enough data to answer — synthesize what you have and respond
+- NEVER use search_web when the user references one of YOUR briefings/alerts (phrases: "your briefing", "your alert", "new briefing", "recent briefing", "check your briefing", "latest briefing", "this briefing"). Call get_recent_orion_briefings FIRST — search_web does not have access to what you sent. You may call search_web AFTER to corroborate details, but never as a substitute.
 
 ## ACTION-ORIENTED BEHAVIOR — Critical
 - DO NOT describe what you will do — JUST DO IT by calling the appropriate tool
