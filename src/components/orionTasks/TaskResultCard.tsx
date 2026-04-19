@@ -19,7 +19,9 @@ import {
   ErrorOutline as ErrorIcon,
   Close as CloseIcon,
   NoteAddOutlined as NoteAddIcon,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
+import Collapse from '@mui/material/Collapse';
 import { format } from 'date-fns';
 import type { OrionTaskResult, Significance } from '../../types/orionTask';
 import { TASK_TYPE_LABELS } from '../../types/orionTask';
@@ -60,6 +62,8 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
 }) => {
   const theme = useTheme();
   const [isSaving, setIsSaving] = useState(false);
+  // Read cards start collapsed; unread start expanded
+  const [expanded, setExpanded] = useState(!result.is_read);
   const isError = result.metadata?.error === true;
 
   const handleSaveNote = async () => {
@@ -169,12 +173,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
                   onClick={() => onMarkRead(result.id)}
                   sx={{ p: 0.25 }}
                 >
-                  <UnreadIcon
-                    sx={{
-                      fontSize: 10,
-                      color: accentColor,
-                    }}
-                  />
+                  <UnreadIcon sx={{ fontSize: 10, color: accentColor }} />
                 </IconButton>
               </Tooltip>
             )}
@@ -185,34 +184,43 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
                   onClick={() => onHide(result.id)}
                   sx={{ p: 0.25 }}
                 >
-                  <CloseIcon
-                    sx={{
-                      fontSize: 14,
-                      color: 'text.secondary',
-                    }}
-                  />
+                  <CloseIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                 </IconButton>
               </Tooltip>
             )}
+            <Tooltip title={expanded ? 'Collapse' : 'Expand'}>
+              <IconButton
+                size="small"
+                onClick={() => setExpanded((v) => !v)}
+                sx={{ p: 0.25 }}
+              >
+                <ExpandMoreIcon
+                  sx={{
+                    fontSize: 16,
+                    color: 'text.secondary',
+                    transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s',
+                  }}
+                />
+              </IconButton>
+            </Tooltip>
           </Box>
         </Box>
 
-        <Typography
-          variant="body2"
-          sx={{
-            fontSize: '0.82rem',
-            lineHeight: 1.5,
-            whiteSpace: 'pre-wrap',
-          }}
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-        />
-
-        {Array.isArray(result.metadata?.citations) && (result.metadata.citations as Citation[]).length > 0 && (
-          <CitationsSection
-            citations={result.metadata.citations as Citation[]}
-            compact
+        <Collapse in={expanded} timeout="auto">
+          <Typography
+            variant="body2"
+            sx={{ fontSize: '0.82rem', lineHeight: 1.5, whiteSpace: 'pre-wrap', mt: 0.5 }}
+            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
           />
-        )}
+
+          {Array.isArray(result.metadata?.citations) && (result.metadata.citations as Citation[]).length > 0 && (
+            <CitationsSection
+              citations={result.metadata.citations as Citation[]}
+              compact
+            />
+          )}
+        </Collapse>
 
         {(onFollowup || onSaveNote) && (
           <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
