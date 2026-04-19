@@ -15,7 +15,7 @@ const FAQDrawer: React.FC<FAQDrawerProps> = ({ open, onClose }) => {
       open={open}
       onClose={onClose}
       title="FAQs"
-      subtitle="Answers to common questions about the app"
+      subtitle="Answers to common questions about JournoTrades"
       icon={<HelpOutlineIcon />}
       width={{ xs: '100%', sm: 520 }}
       keepMounted={false}

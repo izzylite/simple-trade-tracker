@@ -20,6 +20,7 @@ import {
   Fab,
   Fade,
   LinearProgress,
+  Badge,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -128,6 +129,7 @@ import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
 import { useCalendarTrades } from '../hooks/useCalendarTrades';
+import { useOrionTasks } from '../hooks/useOrionTasks';
 import { SessionPerformanceAnalysis, TradesListDialog } from '../components/charts';
 import {
   SidePanelProvider,
@@ -734,6 +736,19 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+
+  const {
+    tasks: orionTasks,
+    results: orionResults,
+    unreadCount: taskUnreadCount,
+    loading: tasksLoading,
+    createTask,
+    updateTask,
+    deleteTask,
+    markRead,
+    markAllRead,
+    hideResult,
+  } = useOrionTasks(calendar?.user_id, calendar?.id);
 
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
@@ -2579,10 +2594,42 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 width: { xs: 48, sm: 56 },
                 height: { xs: 48, sm: 56 },
                 '&:hover': { transform: 'scale(1.08)' },
-                transition: 'transform 0.2s ease'
+                transition: 'transform 0.2s ease',
+                // When there's an unread briefing, pulse a soft ring around
+                // the fab. Uses box-shadow so it doesn't affect layout and
+                // doesn't fight the hover scale transform on the fab itself.
+                ...((taskUnreadCount ?? 0) > 0 && {
+                  animation: 'orionFabPulse 1.8s ease-out infinite',
+                  '@keyframes orionFabPulse': {
+                    '0%': {
+                      boxShadow: `0 0 0 0 ${alpha(theme.palette.secondary.main, 0.55)}`,
+                    },
+                    '70%': {
+                      boxShadow: `0 0 0 14px ${alpha(theme.palette.secondary.main, 0)}`,
+                    },
+                    '100%': {
+                      boxShadow: `0 0 0 0 ${alpha(theme.palette.secondary.main, 0)}`,
+                    },
+                  },
+                }),
               }}
             >
-              <AIIcon />
+              <Badge
+                variant="dot"
+                color="error"
+                invisible={taskUnreadCount === 0}
+                sx={{
+                  '& .MuiBadge-badge': {
+                    top: 4,
+                    right: 4,
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                  },
+                }}
+              >
+                <AIIcon />
+              </Badge>
             </Fab>
           </Tooltip>
         </Box>
@@ -2868,6 +2915,16 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         calendar={calendar!}
         isReadOnly={isReadOnly}
         tradeOperations={tradeOperations}
+        tasks={orionTasks}
+        taskResults={orionResults}
+        taskUnreadCount={taskUnreadCount}
+        tasksLoading={tasksLoading}
+        onCreateTask={createTask}
+        onUpdateTask={updateTask}
+        onDeleteTask={deleteTask}
+        onMarkTaskResultRead={markRead}
+        onMarkAllTaskResultsRead={markAllRead}
+        onHideTaskResult={hideResult}
       />
 
       {/* Notes Drawer — <lg only */}

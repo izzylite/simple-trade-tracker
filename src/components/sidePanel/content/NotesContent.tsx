@@ -419,8 +419,8 @@ const NotesContent: React.FC<NotesContentProps> = ({
           )}
         </Box>
 
-        {/* Footer — panel mode only */}
-        {showFooter && !isReadOnly && (
+        {/* Footer — panel mode only. Hidden when using the calendar picker with "All" selected. */}
+        {showFooter && !isReadOnly && !(showCalendarPicker && !calendarId && selectedCalendarFilter === 'all') && (
           <Box sx={{
             p: 1.5,
             borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,

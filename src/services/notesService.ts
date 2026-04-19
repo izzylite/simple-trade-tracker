@@ -131,8 +131,9 @@ export const getNote = async (noteId: string): Promise<Note | null> => {
  */
 export const createNote = async (noteInput: CreateNoteInput): Promise<Note> => {
   try {
+    const { id, ...rest } = noteInput;
     const noteData = {
-      ...noteInput,
+      ...rest,
       title: noteInput.title || "Untitled",
       content: noteInput.content || "",
       cover_image: noteInput.cover_image ?? null,
@@ -141,7 +142,11 @@ export const createNote = async (noteInput: CreateNoteInput): Promise<Note> => {
       archived_at: null,
       by_assistant: noteInput.by_assistant ?? false,
     };
-    const result = await noteRepository.create(noteData);
+
+    const result = id
+      ? await noteRepository.insertOrFetchById(id, noteData)
+      : await noteRepository.create(noteData);
+
     if (!result.success || !result.data) {
       throw new Error(result.error?.message || "Failed to create note");
     }

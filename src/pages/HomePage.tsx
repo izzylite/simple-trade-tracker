@@ -58,6 +58,7 @@ import { CalendarLinkDialog } from '../components/dialogs/CalendarLinkDialog';
 import CalendarListDialog from '../components/dialogs/CalendarListDialog';
 import CalendarsListDrawer from '../components/calendars/CalendarsListDrawer';
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
+import { useOrionTasks } from '../hooks/useOrionTasks';
 import OrionIcon from '../components/aiChat/OrionIcon';
 import TradeFormDialog from '../components/trades/TradeFormDialog';
 import { NewTradeForm } from '../components/trades';
@@ -152,6 +153,19 @@ const HomeInner: React.FC<HomeProps> = ({
   const [recentTrades, setRecentTrades] = useState< TradeWithCalendarName[] | undefined>([]);
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+
+  const {
+    tasks: orionTasks,
+    results: orionResults,
+    unreadCount: taskUnreadCount,
+    loading: tasksLoading,
+    createTask,
+    updateTask,
+    deleteTask,
+    markRead,
+    markAllRead,
+    hideResult,
+  } = useOrionTasks(user?.id, aiChatCalendarId || undefined);
 
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
@@ -592,7 +606,6 @@ const HomeInner: React.FC<HomeProps> = ({
               <NotesContent
                 showCalendarPicker
                 isActive={isPanelOpen && currentView.id === 'notes'}
-                showFooter={false}
               />
             ),
           };
@@ -703,7 +716,7 @@ const HomeInner: React.FC<HomeProps> = ({
           sx={{
             mb: { xs: 3, sm: 4 },
             display: 'flex',
-            alignItems: 'flex-start',
+            alignItems: 'flex-end',
             justifyContent: 'space-between',
             gap: 2,
           }}
@@ -1659,13 +1672,22 @@ const HomeInner: React.FC<HomeProps> = ({
                 availableCalendars={calendars}
                 selectedCalendarId={aiChatCalendarId}
                 onCalendarChange={setAiChatCalendarId}
+                tasks={orionTasks}
+                taskResults={orionResults}
+                taskUnreadCount={taskUnreadCount}
+                tasksLoading={tasksLoading}
+                onCreateTask={createTask}
+                onUpdateTask={updateTask}
+                onDeleteTask={deleteTask}
+                onMarkTaskResultRead={markRead}
+                onMarkAllTaskResultsRead={markAllRead}
+                onHideTaskResult={hideResult}
               />
 
               <NotesDrawer
                 open={isNotesDrawerOpen}
                 onClose={() => setIsNotesDrawerOpen(false)}
                 showCalendarPicker={true}
-                showFooter={false}
               />
               <CalendarsListDrawer
                 open={isCalendarsDrawerOpen}

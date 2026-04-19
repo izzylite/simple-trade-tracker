@@ -415,6 +415,97 @@ Returns both user-created and AI-created notes. User ID and Calendar ID are auto
 };
 
 /**
+ * Get recent Orion task briefings tool definition
+ */
+export const getRecentOrionBriefingsTool: GeminiFunctionDeclaration = {
+  name: "get_recent_orion_briefings",
+  description: `Retrieve recent Orion task briefings (Market Research, Daily Analysis, Weekly Review, Monthly Rollup) that Orion has already sent this user.
+
+Use this when the user references something you previously told them — e.g.:
+- "What did you say about the Fed earlier?"
+- "Was there a Trump post alert today?"
+- "Summarize everything you've alerted me about this week"
+- "Did you mention EUR/USD in your last briefing?"
+
+Do NOT use this for general market questions; use search_web for those. This is specifically for "what have YOU, Orion, already told me" questions.
+
+Results include: title, significance (low/medium/high), task type, plain-text body, and timestamp. User ID is automatically provided from context.`,
+  parameters: {
+    type: "object",
+    properties: {
+      task_type: {
+        type: "string",
+        description:
+          'Optional filter by task type. Use when the user asks about a specific type, e.g. "what did you tell me in the weekly review".',
+        enum: ["market_research", "daily_analysis", "weekly_review", "monthly_rollup"],
+      },
+      since_hours: {
+        type: "number",
+        description:
+          "Optional: only return briefings from the last N hours. E.g. 24 for today, 168 for the past week. Default is 72 (past 3 days).",
+      },
+      limit: {
+        type: "number",
+        description: "Max briefings to return. Default 10, max 30.",
+      },
+    },
+    required: [],
+  },
+};
+
+/**
+ * Search past conversations tool definition (Tier 1)
+ */
+export const searchConversationsTool: GeminiFunctionDeclaration = {
+  name: "search_conversations",
+  description: `Search the user's past chat conversations with you by keyword. Returns lightweight metadata (title + snippet + timestamp), NOT full message bodies. Use get_conversation(id) afterwards if a result looks relevant.
+
+ONLY USE WHEN the user explicitly references a past chat — phrases like "last time", "yesterday we discussed", "you told me before", "our previous conversation", "remember when I asked about...". Do NOT use on every turn to pad context; AGENT_MEMORY (via search_notes with tags:["AGENT_MEMORY"]) is the primary long-term memory.
+
+Returns: [{ id, title, message_count, created_at, updated_at, snippet }]. The snippet is the first ~200 chars of the most recent message in each conversation.`,
+  parameters: {
+    type: "object",
+    properties: {
+      query: {
+        type: "string",
+        description:
+          "Search term to match against conversation titles and message content. Use the subject the user referenced (e.g. 'Powell', 'risk management', 'EURUSD strategy').",
+      },
+      since_days: {
+        type: "number",
+        description:
+          "Optional: only return conversations updated in the last N days. Default 30.",
+      },
+      limit: {
+        type: "number",
+        description: "Max conversations to return. Default 5, max 10.",
+      },
+    },
+    required: ["query"],
+  },
+};
+
+/**
+ * Fetch a specific conversation's full transcript tool definition (Tier 2)
+ */
+export const getConversationTool: GeminiFunctionDeclaration = {
+  name: "get_conversation",
+  description: `Fetch the full message transcript of a specific past conversation by id. Call this ONLY after search_conversations has identified a relevant conversation — do not guess conversation ids.
+
+Each conversation is capped at 50 messages so the transcript is bounded (roughly 5-12k tokens). The returned transcript is formatted as "user: ..." / "orion: ..." turns with timestamps.`,
+  parameters: {
+    type: "object",
+    properties: {
+      conversation_id: {
+        type: "string",
+        description: "The id of the conversation to fetch (from search_conversations results).",
+      },
+    },
+    required: ["conversation_id"],
+  },
+};
+
+/**
  * Analyze trade image tool definition
  */
 export const analyzeImageTool: GeminiFunctionDeclaration = {
@@ -1764,6 +1855,204 @@ export async function searchNotes(
 }
 
 /**
+ * Get recent Orion task briefings for a user.
+ * Scoped by userId — agents see only their own user's briefings. The
+ * service-role supabase client bypasses RLS, so the userId filter is the
+ * security boundary.
+ */
+export async function getRecentOrionBriefings(
+  supabase: SupabaseClient,
+  userId: string,
+  taskType?: string,
+  sinceHours: number = 72,
+  limit: number = 10,
+): Promise<string> {
+  try {
+    const boundedLimit = Math.max(1, Math.min(30, Math.floor(limit)));
+    const sinceIso = new Date(Date.now() - sinceHours * 3600 * 1000).toISOString();
+
+    let query = supabase
+      .from("orion_task_results")
+      .select("id, task_type, significance, metadata, content_plain, created_at")
+      .eq("user_id", userId)
+      .gte("created_at", sinceIso)
+      .order("created_at", { ascending: false })
+      .limit(boundedLimit);
+
+    if (taskType) {
+      query = query.eq("task_type", taskType);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      log(`Error fetching Orion briefings: ${error.message}`, "error");
+      return `Failed to fetch briefings: ${error.message}`;
+    }
+
+    const rows = data ?? [];
+    if (rows.length === 0) {
+      return `No Orion briefings found in the last ${sinceHours} hours${
+        taskType ? ` for task type "${taskType}"` : ""
+      }.`;
+    }
+
+    const lines = rows.map((r, i) => {
+      const title =
+        (r.metadata as { title?: string } | null)?.title ?? "Briefing";
+      const sig = r.significance ? r.significance.toUpperCase() : "—";
+      const body = (r.content_plain ?? "").substring(0, 800);
+      return (
+        `[${i + 1}] ${r.created_at} | ${r.task_type} | ${sig}\n` +
+        `    Title: ${title}\n` +
+        `    ${body}${(r.content_plain?.length ?? 0) > 800 ? "..." : ""}`
+      );
+    });
+
+    return `Found ${rows.length} Orion briefing${
+      rows.length === 1 ? "" : "s"
+    } in the last ${sinceHours}h:\n\n${lines.join("\n\n")}`;
+  } catch (error) {
+    return `Failed to fetch briefings: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
+  }
+}
+
+/**
+ * Tier 1 — search past AI conversations by keyword.
+ * Returns lightweight metadata so the agent can decide which transcript (if any)
+ * is worth fetching via get_conversation. Keeps token cost bounded.
+ */
+interface ConversationMessage {
+  role?: string;
+  content?: string;
+  timestamp?: string;
+}
+
+export async function searchConversations(
+  supabase: SupabaseClient,
+  userId: string,
+  query: string,
+  sinceDays: number = 30,
+  limit: number = 5,
+): Promise<string> {
+  try {
+    const boundedLimit = Math.max(1, Math.min(10, Math.floor(limit)));
+    const sinceIso = new Date(Date.now() - sinceDays * 86400 * 1000).toISOString();
+    const q = (query || "").trim();
+    if (!q) {
+      return "Query is required for search_conversations.";
+    }
+
+    // Pull a candidate window (up to 50 rows) and filter in-memory.
+    // ai_conversations.messages is JSONB — PostgREST can't easily do a full
+    // text search on it from the client library, so we fetch-then-filter.
+    // The user's per-window conversation count is small so this is cheap.
+    const { data, error } = await supabase
+      .from("ai_conversations")
+      .select("id, title, message_count, created_at, updated_at, messages")
+      .eq("user_id", userId)
+      .gte("updated_at", sinceIso)
+      .order("updated_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      log(`Error searching conversations: ${error.message}`, "error");
+      return `Failed to search conversations: ${error.message}`;
+    }
+
+    const needle = q.toLowerCase();
+    const rows = (data ?? []).filter((r) => {
+      const titleMatch = (r.title ?? "").toLowerCase().includes(needle);
+      if (titleMatch) return true;
+      const messages = (r.messages as ConversationMessage[] | null) ?? [];
+      return messages.some((m) =>
+        (m?.content ?? "").toLowerCase().includes(needle),
+      );
+    }).slice(0, boundedLimit);
+
+    if (rows.length === 0) {
+      return `No past conversations matched "${q}" in the last ${sinceDays} days.`;
+    }
+
+    const lines = rows.map((r, i) => {
+      const messages = (r.messages as ConversationMessage[] | null) ?? [];
+      const last = messages[messages.length - 1];
+      const snippet = (last?.content ?? "").substring(0, 200).replace(/\s+/g, " ");
+      return (
+        `[${i + 1}] id=${r.id}\n` +
+        `    Title: ${r.title ?? "(untitled)"}\n` +
+        `    ${r.message_count} messages | updated ${r.updated_at}\n` +
+        `    Last message: ${snippet}${snippet.length >= 200 ? "..." : ""}`
+      );
+    });
+
+    return `Found ${rows.length} conversation${
+      rows.length === 1 ? "" : "s"
+    } matching "${q}":\n\n${lines.join("\n\n")}\n\nUse get_conversation(id) to read the full transcript of any relevant result.`;
+  } catch (error) {
+    return `Failed to search conversations: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
+  }
+}
+
+/**
+ * Tier 2 — fetch a specific conversation's full transcript.
+ * Bounded by the 50-message per-conversation cap in useAIChat.
+ */
+export async function getConversation(
+  supabase: SupabaseClient,
+  userId: string,
+  conversationId: string,
+): Promise<string> {
+  try {
+    if (!conversationId) {
+      return "conversation_id is required.";
+    }
+
+    const { data, error } = await supabase
+      .from("ai_conversations")
+      .select("id, title, message_count, created_at, updated_at, messages")
+      .eq("id", conversationId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) {
+      log(`Error fetching conversation: ${error.message}`, "error");
+      return `Failed to fetch conversation: ${error.message}`;
+    }
+    if (!data) {
+      return `Conversation ${conversationId} not found (or not owned by this user).`;
+    }
+
+    const messages = (data.messages as ConversationMessage[] | null) ?? [];
+    if (messages.length === 0) {
+      return `Conversation "${data.title ?? "(untitled)"}" has no messages.`;
+    }
+
+    const transcript = messages
+      .map((m) => {
+        const role = m?.role === "assistant" ? "orion" : m?.role ?? "user";
+        const ts = m?.timestamp ?? "";
+        const content = (m?.content ?? "").trim();
+        return `[${ts}] ${role}: ${content}`;
+      })
+      .join("\n\n");
+
+    return (
+      `Conversation "${data.title ?? "(untitled)"}" — ${messages.length} messages, ` +
+      `created ${data.created_at}, last updated ${data.updated_at}:\n\n${transcript}`
+    );
+  } catch (error) {
+    return `Failed to fetch conversation: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
+  }
+}
+
+/**
  * Get tag definition from database
  * Supports partial matching: "3x Displacement" will match "Confluence:3x Displacement"
  */
@@ -2114,6 +2403,66 @@ export async function executeCustomTool(
         );
       }
 
+      case "get_recent_orion_briefings": {
+        if (!supabase) {
+          return "Supabase client not available for Orion briefings lookup";
+        }
+        const userId = context.userId || "";
+        if (!userId) {
+          return "User ID not available in context";
+        }
+        const taskType = typeof args.task_type === "string"
+          ? args.task_type
+          : undefined;
+        const sinceHours = typeof args.since_hours === "number"
+          ? args.since_hours
+          : 72;
+        const limit = typeof args.limit === "number" ? args.limit : 10;
+        return await getRecentOrionBriefings(
+          supabase,
+          userId,
+          taskType,
+          sinceHours,
+          limit,
+        );
+      }
+
+      case "search_conversations": {
+        if (!supabase) {
+          return "Supabase client not available for conversation search";
+        }
+        const userId = context.userId || "";
+        if (!userId) {
+          return "User ID not available in context";
+        }
+        const query = typeof args.query === "string" ? args.query : "";
+        const sinceDays = typeof args.since_days === "number"
+          ? args.since_days
+          : 30;
+        const limit = typeof args.limit === "number" ? args.limit : 5;
+        return await searchConversations(
+          supabase,
+          userId,
+          query,
+          sinceDays,
+          limit,
+        );
+      }
+
+      case "get_conversation": {
+        if (!supabase) {
+          return "Supabase client not available for conversation fetch";
+        }
+        const userId = context.userId || "";
+        if (!userId) {
+          return "User ID not available in context";
+        }
+        const conversationId = typeof args.conversation_id === "string"
+          ? args.conversation_id
+          : "";
+        return await getConversation(supabase, userId, conversationId);
+      }
+
       case "analyze_image": {
         const imageUrl = typeof args.image_url === "string"
           ? args.image_url
@@ -2203,6 +2552,9 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     updateNoteTool,
     deleteNoteTool,
     searchNotesTool,
+    getRecentOrionBriefingsTool,
+    searchConversationsTool,
+    getConversationTool,
     analyzeImageTool,
     getTagDefinitionTool,
     saveTagDefinitionTool,

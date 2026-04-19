@@ -119,6 +119,7 @@ export interface AIChatInterfaceProps {
 export interface AIChatInterfaceRef {
   focus: () => void;
   scrollToBottom: () => void;
+  setInput: (value: string) => void;
 }
 
 const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
@@ -164,6 +165,15 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
     scrollToBottom: () => {
       const el = messagesAreaRef.current;
       if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    },
+    setInput: (value: string) => {
+      setInputMessage(value);
+      // Focus and move the Draft.js caret to the end of the injected text
+      // so the user can type their question immediately.
+      requestAnimationFrame(() => {
+        inputRef.current?.focus?.();
+        inputRef.current?.moveCursorToEnd?.();
+      });
     }
   }));
 

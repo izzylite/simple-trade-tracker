@@ -5,7 +5,7 @@
  * Delegates all chat content to AIChatContent.
  */
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import OrionIcon from './OrionIcon';
 import {
   Box,
@@ -16,12 +16,22 @@ import {
   alpha
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
+import { format } from 'date-fns';
+import { v5 as uuidv5 } from 'uuid';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
 import AIChatContent from '../sidePanel/content/AIChatContent';
 import { UseAIChatReturn } from '../../hooks/useAIChat';
+import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
+import OrionTasksContent from '../orionTasks/OrionTasksContent';
+import type { OrionTask, OrionTaskResult, TaskType, TaskConfig } from '../../types/orionTask';
+import { TASK_TYPE_LABELS } from '../../types/orionTask';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { createNote } from '../../services/notesService';
+
+const ORION_NOTE_NS = 'a7f3d5e2-1b4c-5890-9e12-f3c4d5b6a7e8';
 
 interface AIChatDrawerProps {
   open: boolean;
@@ -36,6 +46,17 @@ interface AIChatDrawerProps {
   availableCalendars?: Calendar[];
   selectedCalendarId?: string;
   onCalendarChange?: (calendarId: string) => void;
+  /** Orion Tasks props */
+  tasks?: OrionTask[];
+  taskResults?: OrionTaskResult[];
+  taskUnreadCount?: number;
+  tasksLoading?: boolean;
+  onCreateTask?: (taskType: TaskType, config: TaskConfig) => Promise<OrionTask | undefined>;
+  onUpdateTask?: (taskId: string, updates: { config?: TaskConfig }) => Promise<OrionTask | undefined>;
+  onDeleteTask?: (taskId: string) => Promise<void>;
+  onMarkTaskResultRead?: (resultId: string) => Promise<void>;
+  onMarkAllTaskResultsRead?: () => Promise<void>;
+  onHideTaskResult?: (resultId: string) => Promise<void>;
 }
 
 // Bottom sheet heights
@@ -54,8 +75,43 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   availableCalendars,
   selectedCalendarId,
   onCalendarChange,
+  tasks,
+  taskResults,
+  taskUnreadCount,
+  tasksLoading,
+  onCreateTask,
+  onUpdateTask,
+  onDeleteTask,
+  onMarkTaskResultRead,
+  onMarkAllTaskResultsRead,
+  onHideTaskResult,
 }) => {
   const theme = useTheme();
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState(0);
+  const [chatSeedMessage, setChatSeedMessage] = useState<string>('');
+
+  const handleSaveNote = async (result: OrionTaskResult) => {
+    if (!user?.uid) return;
+    const taskLabel = TASK_TYPE_LABELS[result.task_type];
+    const formattedDate = format(new Date(result.created_at), 'MMM d, yyyy');
+    await createNote({
+      id: uuidv5(result.id, ORION_NOTE_NS),
+      user_id: user.uid,
+      calendar_id: calendar?.id ?? null,
+      title: `Orion Briefing: ${taskLabel} — ${formattedDate}`,
+      content: result.content_plain, 
+      by_assistant: true,
+      tags: ['orion', 'briefing'],
+    });
+  };
+
+  const handleFollowupAboutResult = (result: OrionTaskResult) => {
+    const title = (result.metadata as { title?: string } | null)?.title ?? 'this briefing';
+    const seed = `I'd like to follow up on "${title}":\n\n${result.content_plain}\n\nMy question: `;
+    setChatSeedMessage(seed);
+    setActiveTab(0);
+  };
 
   // Prevent body scroll when drawer is open
   useEffect(() => {
@@ -134,7 +190,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '16px 20px',
-            borderBottom: `1px solid ${theme.palette.divider}`
+            borderBottom: `1px solid ${theme.palette.divider}`,
+            flexShrink: 0,
           }}>
             {/* Left side - Logo and Title */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -191,18 +248,73 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             </Box>
           </Box>
 
-          {/* Delegated chat content */}
-          <AIChatContent
-            trades={trades}
-            calendar={calendar}
-            isReadOnly={isReadOnly}
-            tradeOperations={tradeOperations}
-            isActive={open}
-            sharedChatState={sharedChatState}
-            availableCalendars={availableCalendars}
-            selectedCalendarId={selectedCalendarId}
-            onCalendarChange={onCalendarChange}
-          />
+          {/* Tabs */}
+          <Box sx={{ px: 2, pt: 1, flexShrink: 0 }}>
+            <RoundedTabs
+              tabs={[
+                { label: 'Chat' },
+                { label: 'Tasks' },
+              ]}
+              activeTab={activeTab}
+              onTabChange={(_e, v) => setActiveTab(v)}
+              size="small"
+              fullWidth
+            />
+          </Box>
+
+          {/* Tab content */}
+          <Box sx={{
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            '& [role="tabpanel"]:not([hidden])': {
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+            '& [role="tabpanel"]:not([hidden]) > .MuiBox-root': {
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          }}>
+            <TabPanel value={activeTab} index={0}>
+              <AIChatContent
+                trades={trades}
+                calendar={calendar}
+                isReadOnly={isReadOnly}
+                tradeOperations={tradeOperations}
+                isActive={open && activeTab === 0}
+                sharedChatState={sharedChatState}
+                availableCalendars={availableCalendars}
+                selectedCalendarId={selectedCalendarId}
+                onCalendarChange={onCalendarChange}
+                seedMessage={chatSeedMessage}
+                onSeedMessageConsumed={() => setChatSeedMessage('')}
+              />
+            </TabPanel>
+
+            <TabPanel value={activeTab} index={1}>
+              <OrionTasksContent
+                tasks={tasks ?? []}
+                results={taskResults ?? []}
+                unreadCount={taskUnreadCount ?? 0}
+                loading={tasksLoading ?? false}
+                onCreateTask={onCreateTask ?? (async () => undefined)}
+                onUpdateTask={onUpdateTask}
+                onDeleteTask={onDeleteTask ?? (async () => {})}
+                onMarkRead={onMarkTaskResultRead ?? (async () => {})}
+                onMarkAllRead={onMarkAllTaskResultsRead}
+                onHideResult={onHideTaskResult}
+                onFollowup={handleFollowupAboutResult}
+                onSaveNote={handleSaveNote}
+              />
+            </TabPanel>
+          </Box>
         </Box>
       </Box>
     </>
