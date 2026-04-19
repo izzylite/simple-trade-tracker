@@ -164,13 +164,45 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 0.5,
-        p: compact ? 1.5 : 0,
         maxWidth: compact ? 350 : 'none',
-        maxHeight: compact ? 300 : 'none',
-        overflow: 'auto'
       }}
     >
+      {/* Sticky header — citations scroll beneath it */}
+      {compact && (
+        <Box
+          sx={{
+            px: 1.5,
+            py: 1,
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            backgroundColor: 'background.paper',
+            borderRadius: '2px 2px 0 0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            position: 'sticky',
+            top: 0,
+            zIndex: 1,
+          }}
+        >
+          <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.72rem', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Sources
+          </Typography>
+          <Typography variant="caption" sx={{ fontSize: '0.68rem', color: 'text.secondary' }}>
+            {citations.length} {citations.length === 1 ? 'source' : 'sources'}
+          </Typography>
+        </Box>
+      )}
+
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.5,
+          p: compact ? 1.5 : 0,
+          maxHeight: compact ? 260 : 'none',
+          overflow: 'auto',
+        }}
+      >
       {citations.map((citation) => (
         <Paper
           key={citation.id}
@@ -247,6 +279,7 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
           <OpenInNewIcon sx={{ fontSize: 14, color: 'text.secondary', flexShrink: 0 }} />
         </Paper>
       ))}
+      </Box>
     </Box>
   );
 
