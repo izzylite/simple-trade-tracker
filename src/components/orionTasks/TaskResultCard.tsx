@@ -222,7 +222,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
           )}
         </Collapse>
 
-        {(onFollowup || onSaveNote) && (
+        {(onFollowup || onSaveNote) && (!result.is_read || expanded) && (
           <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
             {onSaveNote && (
               <Button
