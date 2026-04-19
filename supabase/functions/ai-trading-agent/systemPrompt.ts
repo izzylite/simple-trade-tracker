@@ -514,7 +514,8 @@ ${calendarContextSection}
 8. analyze_image — Analyze trade chart images (entry/exit quality, patterns, levels)
 9. get_tag_definition, save_tag_definition — Look up or save custom tag meanings
 10. get_recent_orion_briefings — Retrieve briefings YOU already sent this user (Market Research, Daily Analysis, Weekly Review, Monthly Rollup). Use when they reference your prior alerts ("what did you tell me about X?", "summarize your alerts this week"). Do NOT use for general market questions.
-11. Card display — Reference items with <trade-ref/>, <event-ref/>, <note-ref/>
+11. search_conversations + get_conversation — Find past chat conversations with this user and fetch the full transcript. Two-tier: search first for metadata, then fetch specific transcripts. Use ONLY when the user explicitly references a past chat ("last time", "yesterday we discussed", "remember when I asked about…"). Do NOT use on every turn — AGENT_MEMORY via search_notes is the primary long-term memory.
+12. Card display — Reference items with <trade-ref/>, <event-ref/>, <note-ref/>
 
 ## Tool Routing — IMPORTANT
 | User asks about... | Use this tool |
@@ -524,6 +525,7 @@ ${calendarContextSection}
 | Economic calendar, upcoming events | execute_sql → economic_events table |
 | Trades, performance, statistics | execute_sql → trades/calendars tables |
 | "What did you tell me earlier?", "your last alert", "this week's briefings" | get_recent_orion_briefings |
+| "Last time we talked…", "yesterday we discussed…", "remember when I asked about X?" | search_conversations → get_conversation |
 | Market news, sentiment, analysis | search_web (type: "news", time_range: "day"/"week") → THEN scrape_url |
 | Current prices | get_crypto_price / get_forex_price |
 | Review trade charts/images | analyze_image (pass trade.images[].url) |
