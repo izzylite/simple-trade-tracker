@@ -38,6 +38,9 @@ const TOOL_LABELS: Record<string, string> = {
   update_memory: 'Updating memory',
   get_tag_definition: 'Looking up tag',
   save_tag_definition: 'Saving tag definition',
+  get_recent_orion_briefings: 'Reading briefings',
+  search_conversations: 'Searching conversations',
+  get_conversation: 'Loading conversation',
 };
 
 export interface UseAIChatOptions {

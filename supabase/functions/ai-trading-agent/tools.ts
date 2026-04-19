@@ -421,13 +421,14 @@ export const getRecentOrionBriefingsTool: GeminiFunctionDeclaration = {
   name: "get_recent_orion_briefings",
   description: `Retrieve recent Orion task briefings (Market Research, Daily Analysis, Weekly Review, Monthly Rollup) that Orion has already sent this user.
 
-Use this when the user references something you previously told them — e.g.:
-- "What did you say about the Fed earlier?"
-- "Was there a Trump post alert today?"
-- "Summarize everything you've alerted me about this week"
-- "Did you mention EUR/USD in your last briefing?"
+Use this whenever the user references a briefing or alert you sent — whether past or just-delivered. Trigger signals:
+- Backward refs: "what did you say about…", "your last alert", "summarize your briefings this week"
+- Forward refs: "new briefing is out", "the latest briefing", "this briefing", "the alert you just sent"
+- Implicit refs: user cites an event/claim as being "in the briefing" or "from your alert" without quoting it in full
 
-Do NOT use this for general market questions; use search_web for those. This is specifically for "what have YOU, Orion, already told me" questions.
+When the user references a briefing AND asks a market/trading question, call this FIRST (before search_web) so you know what the briefing actually said — do not assume its contents from the user's paraphrase.
+
+Do NOT use this for general market questions with no briefing reference; use search_web for those.
 
 Results include: title, significance (low/medium/high), task type, plain-text body, and timestamp. User ID is automatically provided from context.`,
   parameters: {

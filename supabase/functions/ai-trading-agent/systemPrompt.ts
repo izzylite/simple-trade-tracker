@@ -541,6 +541,10 @@ Correct sequencing examples:
 "Compare my briefings with my trades this week" (explicit multi-source):
   get_recent_orion_briefings → execute_sql → respond
 
+"New briefing is out, does this change things?" (user references a briefing + asks market question):
+  get_recent_orion_briefings → (optionally search_web for corroboration) → respond
+  NOT: search_web (you'd be guessing what the briefing said from the user's paraphrase)
+
 ## Tool Routing — IMPORTANT
 | User asks about... | Use this tool |
 |-------------------|---------------|
@@ -548,7 +552,7 @@ Correct sequencing examples:
 | "Trades tagged with X", "scalp trades" | execute_sql → WHERE 'X' = ANY(tags) (ARRAY) |
 | Economic calendar, upcoming events | execute_sql → economic_events table |
 | Trades, performance, statistics | execute_sql → trades/calendars tables |
-| "What did you tell me earlier?", "your last alert", "this week's briefings" | get_recent_orion_briefings |
+| User references a briefing/alert — past ("what did you tell me earlier", "your last alert") OR just-delivered ("new briefing is out", "the latest briefing says", "this briefing") OR implicit ("does this change the outlook?" when citing briefing content) | get_recent_orion_briefings |
 | "Last time we talked…", "yesterday we discussed…", "remember when I asked about X?", "previously discussed", "what have we talked about", "what did we conclude" | search_conversations → get_conversation |
 | Market news, sentiment, analysis | search_web (type: "news", time_range: "day"/"week") → THEN scrape_url |
 | Current prices | get_crypto_price / get_forex_price |
