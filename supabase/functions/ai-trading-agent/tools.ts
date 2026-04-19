@@ -415,6 +415,45 @@ Returns both user-created and AI-created notes. User ID and Calendar ID are auto
 };
 
 /**
+ * Get recent Orion task briefings tool definition
+ */
+export const getRecentOrionBriefingsTool: GeminiFunctionDeclaration = {
+  name: "get_recent_orion_briefings",
+  description: `Retrieve recent Orion task briefings (Market Research, Daily Analysis, Weekly Review, Monthly Rollup) that Orion has already sent this user.
+
+Use this when the user references something you previously told them — e.g.:
+- "What did you say about the Fed earlier?"
+- "Was there a Trump post alert today?"
+- "Summarize everything you've alerted me about this week"
+- "Did you mention EUR/USD in your last briefing?"
+
+Do NOT use this for general market questions; use search_web for those. This is specifically for "what have YOU, Orion, already told me" questions.
+
+Results include: title, significance (low/medium/high), task type, plain-text body, and timestamp. User ID is automatically provided from context.`,
+  parameters: {
+    type: "object",
+    properties: {
+      task_type: {
+        type: "string",
+        description:
+          'Optional filter by task type. Use when the user asks about a specific type, e.g. "what did you tell me in the weekly review".',
+        enum: ["market_research", "daily_analysis", "weekly_review", "monthly_rollup"],
+      },
+      since_hours: {
+        type: "number",
+        description:
+          "Optional: only return briefings from the last N hours. E.g. 24 for today, 168 for the past week. Default is 72 (past 3 days).",
+      },
+      limit: {
+        type: "number",
+        description: "Max briefings to return. Default 10, max 30.",
+      },
+    },
+    required: [],
+  },
+};
+
+/**
  * Analyze trade image tool definition
  */
 export const analyzeImageTool: GeminiFunctionDeclaration = {
@@ -1764,6 +1803,71 @@ export async function searchNotes(
 }
 
 /**
+ * Get recent Orion task briefings for a user.
+ * Scoped by userId — agents see only their own user's briefings. The
+ * service-role supabase client bypasses RLS, so the userId filter is the
+ * security boundary.
+ */
+export async function getRecentOrionBriefings(
+  supabase: SupabaseClient,
+  userId: string,
+  taskType?: string,
+  sinceHours: number = 72,
+  limit: number = 10,
+): Promise<string> {
+  try {
+    const boundedLimit = Math.max(1, Math.min(30, Math.floor(limit)));
+    const sinceIso = new Date(Date.now() - sinceHours * 3600 * 1000).toISOString();
+
+    let query = supabase
+      .from("orion_task_results")
+      .select("id, task_type, significance, metadata, content_plain, created_at")
+      .eq("user_id", userId)
+      .gte("created_at", sinceIso)
+      .order("created_at", { ascending: false })
+      .limit(boundedLimit);
+
+    if (taskType) {
+      query = query.eq("task_type", taskType);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      log(`Error fetching Orion briefings: ${error.message}`, "error");
+      return `Failed to fetch briefings: ${error.message}`;
+    }
+
+    const rows = data ?? [];
+    if (rows.length === 0) {
+      return `No Orion briefings found in the last ${sinceHours} hours${
+        taskType ? ` for task type "${taskType}"` : ""
+      }.`;
+    }
+
+    const lines = rows.map((r, i) => {
+      const title =
+        (r.metadata as { title?: string } | null)?.title ?? "Briefing";
+      const sig = r.significance ? r.significance.toUpperCase() : "—";
+      const body = (r.content_plain ?? "").substring(0, 800);
+      return (
+        `[${i + 1}] ${r.created_at} | ${r.task_type} | ${sig}\n` +
+        `    Title: ${title}\n` +
+        `    ${body}${(r.content_plain?.length ?? 0) > 800 ? "..." : ""}`
+      );
+    });
+
+    return `Found ${rows.length} Orion briefing${
+      rows.length === 1 ? "" : "s"
+    } in the last ${sinceHours}h:\n\n${lines.join("\n\n")}`;
+  } catch (error) {
+    return `Failed to fetch briefings: ${
+      error instanceof Error ? error.message : "Unknown"
+    }`;
+  }
+}
+
+/**
  * Get tag definition from database
  * Supports partial matching: "3x Displacement" will match "Confluence:3x Displacement"
  */
@@ -2114,6 +2218,30 @@ export async function executeCustomTool(
         );
       }
 
+      case "get_recent_orion_briefings": {
+        if (!supabase) {
+          return "Supabase client not available for Orion briefings lookup";
+        }
+        const userId = context.userId || "";
+        if (!userId) {
+          return "User ID not available in context";
+        }
+        const taskType = typeof args.task_type === "string"
+          ? args.task_type
+          : undefined;
+        const sinceHours = typeof args.since_hours === "number"
+          ? args.since_hours
+          : 72;
+        const limit = typeof args.limit === "number" ? args.limit : 10;
+        return await getRecentOrionBriefings(
+          supabase,
+          userId,
+          taskType,
+          sinceHours,
+          limit,
+        );
+      }
+
       case "analyze_image": {
         const imageUrl = typeof args.image_url === "string"
           ? args.image_url
@@ -2203,6 +2331,7 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     updateNoteTool,
     deleteNoteTool,
     searchNotesTool,
+    getRecentOrionBriefingsTool,
     analyzeImageTool,
     getTagDefinitionTool,
     saveTagDefinitionTool,

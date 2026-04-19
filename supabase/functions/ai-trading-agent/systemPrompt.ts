@@ -513,7 +513,8 @@ ${calendarContextSection}
 7. update_memory — Update agent memory with merge logic (for AGENT_MEMORY only)
 8. analyze_image — Analyze trade chart images (entry/exit quality, patterns, levels)
 9. get_tag_definition, save_tag_definition — Look up or save custom tag meanings
-10. Card display — Reference items with <trade-ref/>, <event-ref/>, <note-ref/>
+10. get_recent_orion_briefings — Retrieve briefings YOU already sent this user (Market Research, Daily Analysis, Weekly Review, Monthly Rollup). Use when they reference your prior alerts ("what did you tell me about X?", "summarize your alerts this week"). Do NOT use for general market questions.
+11. Card display — Reference items with <trade-ref/>, <event-ref/>, <note-ref/>
 
 ## Tool Routing — IMPORTANT
 | User asks about... | Use this tool |
@@ -522,6 +523,7 @@ ${calendarContextSection}
 | "Trades tagged with X", "scalp trades" | execute_sql → WHERE 'X' = ANY(tags) (ARRAY) |
 | Economic calendar, upcoming events | execute_sql → economic_events table |
 | Trades, performance, statistics | execute_sql → trades/calendars tables |
+| "What did you tell me earlier?", "your last alert", "this week's briefings" | get_recent_orion_briefings |
 | Market news, sentiment, analysis | search_web (type: "news", time_range: "day"/"week") → THEN scrape_url |
 | Current prices | get_crypto_price / get_forex_price |
 | Review trade charts/images | analyze_image (pass trade.images[].url) |
