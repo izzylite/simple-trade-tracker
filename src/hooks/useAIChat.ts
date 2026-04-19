@@ -126,6 +126,8 @@ export function useAIChat({
   const activeRequestRef = useRef<{ userId: string; aiId: string } | null>(null);
   const messageUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingTextRef = useRef<string>('');
+  const toolStatusClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const toolStatusSetAtRef = useRef<number>(0);
 
   // Check message limit whenever messages change
   useEffect(() => {
@@ -573,6 +575,11 @@ export function useAIChat({
           case 'tool_call':
             logger.log(`Tool called: ${event.data.name}`);
             toolCallsInProgress.push(event.data.name);
+            if (toolStatusClearTimeoutRef.current) {
+              clearTimeout(toolStatusClearTimeoutRef.current);
+              toolStatusClearTimeoutRef.current = null;
+            }
+            toolStatusSetAtRef.current = Date.now();
             setToolExecutionStatus(
               toolCallsInProgress
                 .map(t => TOOL_LABELS[t] || t)
@@ -580,7 +587,7 @@ export function useAIChat({
             );
             break;
 
-          case 'tool_result':
+          case 'tool_result': {
             logger.log(`Tool result: ${event.data.name}`);
             toolCallsInProgress = toolCallsInProgress.filter(t => t !== event.data.name);
             if (toolCallsInProgress.length > 0) {
@@ -590,9 +597,19 @@ export function useAIChat({
                   .join(', ')
               );
             } else {
-              setToolExecutionStatus('');
+              const elapsed = Date.now() - toolStatusSetAtRef.current;
+              const MIN_DISPLAY_MS = 600;
+              const remaining = Math.max(0, MIN_DISPLAY_MS - elapsed);
+              if (toolStatusClearTimeoutRef.current) {
+                clearTimeout(toolStatusClearTimeoutRef.current);
+              }
+              toolStatusClearTimeoutRef.current = setTimeout(() => {
+                setToolExecutionStatus('');
+                toolStatusClearTimeoutRef.current = null;
+              }, remaining);
             }
             break;
+          }
 
           case 'citation':
             citations = event.data.citations;
@@ -695,6 +712,10 @@ export function useAIChat({
       if (messageUpdateTimeoutRef.current) {
         clearTimeout(messageUpdateTimeoutRef.current);
         messageUpdateTimeoutRef.current = null;
+      }
+      if (toolStatusClearTimeoutRef.current) {
+        clearTimeout(toolStatusClearTimeoutRef.current);
+        toolStatusClearTimeoutRef.current = null;
       }
       abortControllerRef.current = null;
       activeRequestRef.current = null;
