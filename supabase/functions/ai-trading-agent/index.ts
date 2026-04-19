@@ -232,21 +232,44 @@ function createSSEEvent(event: SSEEventType, data: any): string {
  * Create readable stream for SSE
  */
 function createSSEStream(): { stream: ReadableStream; writer: WritableStreamDefaultWriter } {
-  const { readable, writable } = new TransformStream();
-  const writer = writable.getWriter();
   const encoder = new TextEncoder();
+  let controller!: ReadableStreamDefaultController<Uint8Array>;
+  let closed = false;
 
-  // Wrap writer to encode strings
+  // Native ReadableStream with controller gives us direct enqueue semantics —
+  // TransformStream's internal queue was being held by the Supabase/Cloudflare
+  // proxy until the whole response finished. Enqueuing on the underlying source
+  // forces each chunk to flush.
+  const stream = new ReadableStream<Uint8Array>({
+    start(c) {
+      controller = c;
+    },
+    cancel() {
+      closed = true;
+    },
+  });
+
   const wrappedWriter = {
     write: async (chunk: string) => {
-      await writer.write(encoder.encode(chunk));
+      if (closed) return;
+      try {
+        controller.enqueue(encoder.encode(chunk));
+      } catch (_err) {
+        closed = true;
+      }
     },
     close: async () => {
-      await writer.close();
-    }
+      if (closed) return;
+      closed = true;
+      try {
+        controller.close();
+      } catch (_err) {
+        // already closed
+      }
+    },
   };
 
-  return { stream: readable, writer: wrappedWriter as any };
+  return { stream, writer: wrappedWriter as any };
 }
 
 /**
@@ -1083,10 +1106,11 @@ function handleStreamingRequest(
   // Process request in background (don't await - return stream immediately)
   (async () => {
     try {
-      // Prime the stream: send a comment line immediately so the proxy commits to
-      // streaming mode and flushes subsequent writes instead of buffering them all.
+      // Prime the stream with ~4KB of padding so the response crosses any proxy
+      // buffer threshold (Cloudflare typically buffers 1-4KB before first flush).
       // SSE comments (lines starting with :) are ignored by parsers.
-      await writer.write(`: stream-open\n\n`);
+      const padding = ' '.repeat(4096);
+      await writer.write(`:${padding}\n\n`);
 
       const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
       let finalText = '';
