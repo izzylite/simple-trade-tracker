@@ -342,6 +342,7 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
             vertical: 'top',
             horizontal: 'left'
           }}
+          sx={{ zIndex: 1500 }}
           PaperProps={{
             sx: {
               mt: 1,
