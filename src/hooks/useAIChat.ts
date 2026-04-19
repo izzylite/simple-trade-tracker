@@ -515,6 +515,7 @@ export function useAIChat({
       let embeddedEvents: any | undefined;
       let embeddedNotes: any | undefined;
       let toolCallsInProgress: string[] = [];
+      const toolCallHistory: Array<{ name: string; label: string }> = [];
 
       for await (const event of supabaseAIChatService.sendMessageStreaming(
         trimmedMessage,
@@ -572,9 +573,11 @@ export function useAIChat({
             }
             break;
 
-          case 'tool_call':
-            logger.log(`Tool called: ${event.data.name}`);
-            toolCallsInProgress.push(event.data.name);
+          case 'tool_call': {
+            const name = event.data.name as string;
+            logger.log(`Tool called: ${name}`);
+            toolCallsInProgress.push(name);
+            toolCallHistory.push({ name, label: TOOL_LABELS[name] || name });
             if (toolStatusClearTimeoutRef.current) {
               clearTimeout(toolStatusClearTimeoutRef.current);
               toolStatusClearTimeoutRef.current = null;
@@ -586,6 +589,7 @@ export function useAIChat({
                 .join(', ')
             );
             break;
+          }
 
           case 'tool_result': {
             logger.log(`Tool result: ${event.data.name}`);
@@ -650,6 +654,7 @@ export function useAIChat({
         embeddedTrades,
         embeddedEvents,
         embeddedNotes,
+        toolCalls: toolCallHistory.length > 0 ? toolCallHistory : undefined,
         timestamp: new Date(),
         status: 'received'
       };

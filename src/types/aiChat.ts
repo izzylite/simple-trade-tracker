@@ -39,6 +39,15 @@ export interface ChatMessage {
   embeddedTrades?: Record<string, any>; // Trade objects keyed by ID
   embeddedEvents?: Record<string, any>; // Event objects keyed by ID
   embeddedNotes?: Record<string, any>; // Note objects keyed by ID
+  // Tool calls used to produce this response (captured from SSE stream — even
+  // when the stream is proxy-buffered, these arrive at the end of the request
+  // and are rendered in an expandable panel for transparency).
+  toolCalls?: ToolCallRecord[];
+}
+
+export interface ToolCallRecord {
+  name: string;
+  label: string; // Human-friendly label
 }
 
 // Serializable version for database storage (timestamp as ISO string)
