@@ -3,7 +3,7 @@
  * Handles Supabase operations for simple notes
  */
 
-import { AbstractBaseRepository, RepositoryConfig } from "./BaseRepository";
+import { AbstractBaseRepository, RepositoryConfig, RepositoryResult } from "./BaseRepository";
 import { Note } from "../../../types/note";
 import { logger } from "../../../utils/logger";
 import { supabase } from "../../../config/supabase";
@@ -589,6 +589,44 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
     }
 
     return transformSupabaseNote(data);
+  }
+
+  async insertOrFetchById(
+    id: string,
+    entity: Omit<Note, "id" | "created_at" | "updated_at">,
+  ): Promise<RepositoryResult<Note>> {
+    return await this.withRetryAndErrorHandling<RepositoryResult<Note>>(async () => {
+      const now = new Date();
+      const noteData = {
+        ...entity,
+        id,
+        title: entity.title || "Untitled",
+        content: entity.content || "",
+        is_archived: false,
+        is_pinned: false,
+        archived_at: null,
+        created_at: now,
+        updated_at: now,
+      };
+
+      const { data, error } = await supabase
+        .from("notes")
+        .insert(noteData)
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === "23505") {
+          const existing = await this.findById(id);
+          if (existing) {
+            return { success: true, data: existing, timestamp: new Date(), operation: "create" };
+          }
+        }
+        throw error;
+      }
+
+      return { success: true, data: transformSupabaseNote(data), timestamp: new Date(), operation: "create" };
+    }, "create", "Saving Orion briefing note");
   }
 
   protected async updateInSupabase(

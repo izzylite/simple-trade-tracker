@@ -91,6 +91,7 @@ export const orionTaskService = {
       .from('orion_task_results')
       .select('*')
       .eq('user_id', userId)
+      .is('hidden_at', null)
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -123,10 +124,28 @@ export const orionTaskService = {
       .from('orion_task_results')
       .update({ is_read: true })
       .eq('user_id', userId)
-      .eq('is_read', false);
+      .eq('is_read', false)
+      .is('hidden_at', null);
 
     if (error) {
       logger.error('Failed to mark all results read', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Soft-delete: hides the result from the user feed but leaves the row in
+   * place so Orion's dedup context (fetchRecentBriefings) can still see it
+   * and avoid re-reporting the same catalyst the user just dismissed.
+   */
+  async hideResult(resultId: string): Promise<void> {
+    const { error } = await supabase
+      .from('orion_task_results')
+      .update({ hidden_at: new Date().toISOString() })
+      .eq('id', resultId);
+
+    if (error) {
+      logger.error('Failed to hide result', error);
       throw error;
     }
   },
@@ -136,7 +155,8 @@ export const orionTaskService = {
       .from('orion_task_results')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('is_read', false);
+      .eq('is_read', false)
+      .is('hidden_at', null);
 
     if (error) {
       logger.error('Failed to fetch unread count', error);

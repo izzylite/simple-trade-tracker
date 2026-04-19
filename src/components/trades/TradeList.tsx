@@ -31,7 +31,8 @@ import {
   SelectAll as SelectAllIcon,
   DeleteSweep as DeleteMultipleIcon,
   KeyboardArrowDown as LoadMoreIcon,
-  MoreVert as MoreVertIcon
+  MoreVert as MoreVertIcon,
+  EventBusyOutlined as EmptyDayIcon
 } from '@mui/icons-material';
 import { Trade } from '../../types/dualWrite';
 import { TradeListItem, TradeInfo, TradeActions } from '../StyledComponents';
@@ -368,9 +369,24 @@ const TradeList: React.FC<TradeListProps> = ({
       </Box>
 
       {tradesLength === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-          No trades for this day
-        </Typography>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            flex: 1, 
+            py: 4,
+            gap: 1.5,
+            color: 'text.secondary',
+          }}
+        >
+          <EmptyDayIcon sx={{ fontSize: 56, opacity: 0.4 }} />
+          <Typography variant="body2" >
+            No trades for this day
+          </Typography>
+        </Box>
       ) : (
         <Stack spacing={1}>
           {displayedTrades.map((trade) => (

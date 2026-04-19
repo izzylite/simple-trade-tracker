@@ -164,6 +164,7 @@ const HomeInner: React.FC<HomeProps> = ({
     deleteTask,
     markRead,
     markAllRead,
+    hideResult,
   } = useOrionTasks(user?.id, aiChatCalendarId || undefined);
 
   // Notes drawer state
@@ -1680,6 +1681,7 @@ const HomeInner: React.FC<HomeProps> = ({
                 onDeleteTask={deleteTask}
                 onMarkTaskResultRead={markRead}
                 onMarkAllTaskResultsRead={markAllRead}
+                onHideTaskResult={hideResult}
               />
 
               <NotesDrawer

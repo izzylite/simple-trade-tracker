@@ -6,17 +6,19 @@ import {
   Chip,
   Divider,
   useTheme,
+  alpha,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
   DoneAll as DoneAllIcon,
   Edit as EditIcon,
+  WarningAmber as WarningIcon,
 } from '@mui/icons-material';
 import { IconButton, Tooltip } from '@mui/material';
 import { format } from 'date-fns';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import Shimmer from '../Shimmer';
+import EconomicEventShimmer from '../economicCalendar/EconomicEventShimmer';
 import ConfirmationDialog from '../common/ConfirmationDialog';
 import TaskResultCard from './TaskResultCard';
 import CreateTaskDialog from './CreateTaskDialog';
@@ -44,7 +46,9 @@ interface OrionTasksContentProps {
   onDeleteTask: (taskId: string) => Promise<void>;
   onMarkRead: (resultId: string) => Promise<void>;
   onMarkAllRead?: () => Promise<void>;
+  onHideResult?: (resultId: string) => Promise<void>;
   onFollowup?: (result: OrionTaskResult) => void;
+  onSaveNote?: (result: OrionTaskResult) => Promise<void>;
 }
 
 const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
@@ -57,7 +61,9 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
   onDeleteTask,
   onMarkRead,
   onMarkAllRead,
+  onHideResult,
   onFollowup,
+  onSaveNote,
 }) => {
   const theme = useTheme();
   const [createOpen, setCreateOpen] = useState(false);
@@ -107,13 +113,7 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
   }, [results]);
 
   if (loading) {
-    return (
-      <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-        <Shimmer width="100%" height={60} />
-        <Shimmer width="100%" height={80} />
-        <Shimmer width="100%" height={80} />
-      </Box>
-    );
+    return <EconomicEventShimmer count={5} />;
   }
 
   return (
@@ -125,14 +125,13 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
         overflow: 'hidden',
       }}
     >
-      {/* Active tasks summary */}
-      <Box sx={{ p: 2, pb: 1 }}>
+      {/* Sticky header: title + action buttons only. Task chips scroll with the feed. */}
+      <Box sx={{ px: 2, pt: 2, pb: 1,  borderBottom: `1px solid ${theme.palette.divider}`, backgroundColor: 'background.paper', zIndex: 1 }}>
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            mb: 1.5,
           }}
         >
           <Typography
@@ -164,7 +163,18 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
             </Button>
           </Box>
         </Box>
+      </Box>
 
+      {/* Scroll region: task chips + results feed scroll together below the sticky header. */}
+      <Box
+        sx={{
+          flex: 1,
+          pt: 2,
+          overflow: 'auto',
+          ...scrollbarStyles(theme),
+        }}
+      >
+        <Box sx={{ px: 2, pb: 1 }}>
         {tasks.length === 0 ? (
           <Box
             sx={{
@@ -182,40 +192,84 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
           </Box>
         ) : (
           <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 1 }}>
-            {tasks.map((task) => (
-              <Chip
-                key={task.id}
-                icon={onUpdateTask ? <EditIcon sx={{ fontSize: '14px !important' }} /> : undefined}
-                label={TASK_TYPE_LABELS[task.task_type]}
-                size="small"
-                color={task.status === 'active' ? 'primary' : 'default'}
-                variant={
-                  task.status === 'active' ? 'filled' : 'outlined'
-                }
-                onClick={onUpdateTask ? () => setEditingTask(task) : undefined}
-                onDelete={() => setPendingDeleteTaskId(task.id)}
-                deleteIcon={
-                  <DeleteIcon sx={{ fontSize: '14px !important' }} />
-                }
-                sx={{ fontSize: '0.75rem', height: 26, cursor: onUpdateTask ? 'pointer' : 'default' }}
-              />
-            ))}
+            {tasks.map((task) => {
+              const hasFailures = (task.consecutive_failures ?? 0) > 0;
+              const chipIcon = hasFailures ? (
+                <WarningIcon sx={{ fontSize: '14px !important' }} />
+              )  : undefined;
+              const tooltip = hasFailures
+                ? `${task.consecutive_failures} consecutive failed run${
+                    task.consecutive_failures === 1 ? '' : 's'
+                  }${task.last_error ? ` — ${task.last_error}` : ''}`
+                : '';
+              return (
+                <Chip
+                  key={task.id}
+                  icon={chipIcon}
+                  label={TASK_TYPE_LABELS[task.task_type]}
+                  size="small"
+                  title={tooltip}
+                  color={
+                    hasFailures
+                      ? 'warning'
+                      : task.status === 'active'
+                        ? 'primary'
+                        : 'default'
+                  }
+                  variant={task.status === 'active' ? 'filled' : 'outlined'}
+                  onClick={onUpdateTask ? () => setEditingTask(task) : undefined}
+                  onDelete={() => setPendingDeleteTaskId(task.id)}
+                  deleteIcon={
+                    <DeleteIcon sx={{ fontSize: '14px !important' }} />
+                  }
+                  sx={{
+                    fontSize: '0.75rem',
+                    height: 26,
+                    cursor: onUpdateTask ? 'pointer' : 'default',
+                    // Preserve background on hover — MUI's default darken
+                    // for clickable chips fights the "filled accent color"
+                    // we want the chip to hold in both states.
+                    backgroundColor: hasFailures
+                      ? alpha(theme.palette.warning.main, 0.15)
+                      : task.status === 'active'
+                        ? theme.palette.primary.main
+                        : 'transparent',
+                    color: hasFailures
+                      ? theme.palette.warning.dark
+                      : task.status === 'active'
+                        ? theme.palette.primary.contrastText
+                        : 'text.primary',
+                    borderColor: hasFailures
+                      ? theme.palette.warning.main
+                      : undefined,
+                    '&:hover, &.MuiChip-clickable:hover, &.MuiChip-clickable:focus': {
+                      backgroundColor: hasFailures
+                        ? alpha(theme.palette.warning.main, 0.15)
+                        : task.status === 'active'
+                          ? theme.palette.primary.main
+                          : 'transparent',
+                    },
+                    // Match the leading + trailing icons to the chip's label
+                    // color so they don't wash out against the fill.
+                    '& .MuiChip-icon, & .MuiChip-deleteIcon': {
+                      color: 'inherit',
+                    },
+                    '& .MuiChip-deleteIcon:hover': {
+                      color: 'inherit',
+                      opacity: 0.7,
+                    },
+                  }}
+                />
+              );
+            })}
           </Box>
         )}
-      </Box>
+        </Box>
 
-      <Divider />
+        <Divider />
 
-      {/* Results feed */}
-      <Box
-        sx={{
-          flex: 1,
-          overflow: 'auto',
-          p: 2,
-          pt: 1,
-          ...scrollbarStyles(theme),
-        }}
-      >
+        {/* Results feed */}
+        <Box sx={{ p: 2, pt: 1 }}>
         {results.length === 0 ? (
           <Box
             sx={{
@@ -251,12 +305,15 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                   key={result.id}
                   result={result}
                   onMarkRead={onMarkRead}
+                  onHide={onHideResult}
                   onFollowup={onFollowup}
+                  onSaveNote={onSaveNote}
                 />
               ))}
             </Box>
           ))
         )}
+        </Box>
       </Box>
 
       <CreateTaskDialog

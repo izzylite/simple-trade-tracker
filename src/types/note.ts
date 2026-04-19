@@ -52,6 +52,7 @@ export interface Note {
 }
 
 export interface CreateNoteInput {
+  id?: string; // When provided, insert-or-fetch by this deterministic ID (idempotent save)
   user_id: string;
   calendar_id: string | null; // null = global note (visible in all calendars)
   title?: string;

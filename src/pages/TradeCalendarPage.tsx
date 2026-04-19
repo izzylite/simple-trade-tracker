@@ -747,6 +747,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     deleteTask,
     markRead,
     markAllRead,
+    hideResult,
   } = useOrionTasks(calendar?.user_id, calendar?.id);
 
   // Notes drawer state
@@ -2593,7 +2594,24 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 width: { xs: 48, sm: 56 },
                 height: { xs: 48, sm: 56 },
                 '&:hover': { transform: 'scale(1.08)' },
-                transition: 'transform 0.2s ease'
+                transition: 'transform 0.2s ease',
+                // When there's an unread briefing, pulse a soft ring around
+                // the fab. Uses box-shadow so it doesn't affect layout and
+                // doesn't fight the hover scale transform on the fab itself.
+                ...((taskUnreadCount ?? 0) > 0 && {
+                  animation: 'orionFabPulse 1.8s ease-out infinite',
+                  '@keyframes orionFabPulse': {
+                    '0%': {
+                      boxShadow: `0 0 0 0 ${alpha(theme.palette.secondary.main, 0.55)}`,
+                    },
+                    '70%': {
+                      boxShadow: `0 0 0 14px ${alpha(theme.palette.secondary.main, 0)}`,
+                    },
+                    '100%': {
+                      boxShadow: `0 0 0 0 ${alpha(theme.palette.secondary.main, 0)}`,
+                    },
+                  },
+                }),
               }}
             >
               <Badge
@@ -2906,6 +2924,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         onDeleteTask={deleteTask}
         onMarkTaskResultRead={markRead}
         onMarkAllTaskResultsRead={markAllRead}
+        onHideTaskResult={hideResult}
       />
 
       {/* Notes Drawer — <lg only */}

@@ -1359,7 +1359,34 @@ function handleStreamingRequest(
 
       // Log completion with warning if no text was generated
       if (!finalText) {
-        log(`Warning: Completed in ${turnCount} turns with ${functionCalls.length} function calls but NO TEXT generated`, 'warn');
+        // Known Gemini behavior: after many tool calls the model stops generating text.
+        // Official mitigation: make one final call with tool_config=NONE to force synthesis
+        // from the accumulated tool results already in conversationContents.
+        // See: https://discuss.ai.google.dev/t/gemini-2-5-flash-stuck-in-a-tool-call-loop
+        log(`Warning: Completed in ${turnCount} turns with ${functionCalls.length} function calls but NO TEXT — forcing synthesis with tool_config=NONE`, 'warn');
+        try {
+          const synthesisResult = await callGeminiWithContents(
+            googleApiKey,
+            [
+              ...conversationContents,
+              { role: 'user', parts: [{ text: 'Please now summarise everything you found and give your final answer. Do not call any more tools.' }] }
+            ],
+            allTools,
+            { streaming: false, maxOutputTokens: 4000, mode: 'NONE' }
+          );
+          if (synthesisResult.text) {
+            finalText = synthesisResult.text;
+            await sendSSE(writer, 'text_chunk', { text: finalText });
+            log(`Forced synthesis succeeded (${finalText.length} chars)`, 'info');
+          }
+        } catch (synthErr) {
+          log(`Forced synthesis failed: ${synthErr}`, 'error');
+        }
+        // Last-resort fallback if synthesis also fails
+        if (!finalText) {
+          finalText = "I gathered some data but ran into a temporary issue composing my response. Please try again.";
+          await sendSSE(writer, 'text_chunk', { text: finalText });
+        }
       } else {
         log(`Completed in ${turnCount} turns with ${functionCalls.length} function calls`, 'info');
       }
@@ -1787,9 +1814,30 @@ Deno.serve(async (req: Request) => {
 
     log(`Completed in ${turnCount} turns with ${functionCalls.length} function calls`, 'info');
 
-    // If no final text, just log it - let frontend handle empty responses
+    // Known Gemini behavior: after many tool calls the model stops generating text.
+    // Same fix as the streaming path: force a final synthesis call with tool_config=NONE.
     if (!finalText) {
-      log('No final text generated', 'warn');
+      log('No final text generated — forcing synthesis with tool_config=NONE', 'warn');
+      try {
+        const synthesisResult = await callGeminiWithContents(
+          googleApiKey,
+          [
+            ...conversationContents,
+            { role: 'user', parts: [{ text: 'Please now summarise everything you found and give your final answer. Do not call any more tools.' }] }
+          ],
+          allTools,
+          { streaming: false, maxOutputTokens: 4000, mode: 'NONE' }
+        );
+        if (synthesisResult.text) {
+          finalText = synthesisResult.text;
+          log(`Forced synthesis succeeded (${finalText.length} chars)`, 'info');
+        }
+      } catch (synthErr) {
+        log(`Forced synthesis failed: ${synthErr}`, 'error');
+      }
+      if (!finalText) {
+        finalText = "I gathered some data but ran into a temporary issue composing my response. Please try again.";
+      }
     }
 
     // ID Validation Feedback Loop (Non-streaming)

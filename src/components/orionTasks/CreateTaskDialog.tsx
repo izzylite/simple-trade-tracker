@@ -35,7 +35,39 @@ import type {
   CoachingTone,
   OrionTask,
 } from '../../types/orionTask';
-import { TASK_TYPE_LABELS, DEFAULT_CONFIGS } from '../../types/orionTask';
+import {
+  TASK_TYPE_LABELS,
+  buildDefaultConfigs,
+  detectBrowserTimezone,
+} from '../../types/orionTask';
+
+// IANA timezones we surface in the dropdown. The browser-detected tz is
+// always prepended so the user's actual zone appears even if it's not in
+// this curated list. Covers the major trading hubs + UTC baseline.
+const TIMEZONE_PRESETS: Array<{ value: string; label: string }> = [
+  { value: 'UTC', label: 'UTC' },
+  { value: 'America/New_York', label: 'New York (ET)' },
+  { value: 'America/Chicago', label: 'Chicago (CT)' },
+  { value: 'America/Los_Angeles', label: 'Los Angeles (PT)' },
+  { value: 'Europe/London', label: 'London (GMT/BST)' },
+  { value: 'Europe/Frankfurt', label: 'Frankfurt (CET/CEST)' },
+  { value: 'Europe/Zurich', label: 'Zurich (CET/CEST)' },
+  { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+  { value: 'Asia/Hong_Kong', label: 'Hong Kong (HKT)' },
+  { value: 'Asia/Singapore', label: 'Singapore (SGT)' },
+  { value: 'Asia/Dubai', label: 'Dubai (GST)' },
+  { value: 'Australia/Sydney', label: 'Sydney (AET)' },
+];
+
+function buildTimezoneOptions(
+  detected: string
+): Array<{ value: string; label: string }> {
+  const presetValues = new Set(TIMEZONE_PRESETS.map((t) => t.value));
+  if (detected && !presetValues.has(detected)) {
+    return [{ value: detected, label: `${detected} (browser)` }, ...TIMEZONE_PRESETS];
+  }
+  return TIMEZONE_PRESETS;
+}
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -172,6 +204,17 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [customTopicInput, setCustomTopicInput] = useState('');
 
+  // Detect once per mount — changing TZ mid-dialog is unexpected.
+  const browserTimezone = React.useMemo(() => detectBrowserTimezone(), []);
+  const timezoneOptions = React.useMemo(
+    () => buildTimezoneOptions(browserTimezone),
+    [browserTimezone]
+  );
+  const defaultConfigs = React.useMemo(
+    () => buildDefaultConfigs(browserTimezone),
+    [browserTimezone]
+  );
+
   // When opening in edit mode, hydrate from the editing task
   React.useEffect(() => {
     if (editingTask) {
@@ -187,7 +230,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
 
   const handleTypeChange = (type: TaskType) => {
     setTaskType(type);
-    setConfig({ ...DEFAULT_CONFIGS[type] });
+    setConfig({ ...defaultConfigs[type] });
   };
 
   const handleBack = () => {
@@ -602,15 +645,34 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
 
             {taskType === 'daily_analysis' && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <TextField
-                  label="Run Time (UTC)"
-                  type="time"
-                  value={(config as any).run_time_utc}
-                  onChange={(e) =>
-                    setConfig({ ...config, run_time_utc: e.target.value })
-                  }
-                  fullWidth
-                />
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <TextField
+                    label="Run Time"
+                    type="time"
+                    value={(config as any).run_time_utc}
+                    onChange={(e) =>
+                      setConfig({ ...config, run_time_utc: e.target.value })
+                    }
+                    sx={{ flex: 1 }}
+                  />
+                  <FormControl size="small" sx={{ flex: 1.3 }}>
+                    <InputLabel>Timezone</InputLabel>
+                    <Select
+                      value={(config as any).timezone || 'UTC'}
+                      label="Timezone"
+                      onChange={(e) =>
+                        setConfig({ ...config, timezone: e.target.value as string })
+                      }
+                      MenuProps={{ sx: { zIndex: 1600 } }}
+                    >
+                      {timezoneOptions.map((tz) => (
+                        <MenuItem key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Box>
                 <FormControl fullWidth>
                   <InputLabel>Coaching Tone</InputLabel>
                   <Select
@@ -656,15 +718,34 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                     ))}
                   </Select>
                 </FormControl>
-                <TextField
-                  label="Run Time (UTC)"
-                  type="time"
-                  value={(config as any).run_time_utc}
-                  onChange={(e) =>
-                    setConfig({ ...config, run_time_utc: e.target.value })
-                  }
-                  fullWidth
-                />
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <TextField
+                    label="Run Time"
+                    type="time"
+                    value={(config as any).run_time_utc}
+                    onChange={(e) =>
+                      setConfig({ ...config, run_time_utc: e.target.value })
+                    }
+                    sx={{ flex: 1 }}
+                  />
+                  <FormControl size="small" sx={{ flex: 1.3 }}>
+                    <InputLabel>Timezone</InputLabel>
+                    <Select
+                      value={(config as any).timezone || 'UTC'}
+                      label="Timezone"
+                      onChange={(e) =>
+                        setConfig({ ...config, timezone: e.target.value as string })
+                      }
+                      MenuProps={{ sx: { zIndex: 1600 } }}
+                    >
+                      {timezoneOptions.map((tz) => (
+                        <MenuItem key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Box>
                 <TextField
                   label="Comparison Weeks"
                   type="number"
@@ -683,15 +764,34 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
 
             {taskType === 'monthly_rollup' && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <TextField
-                  label="Run Time (UTC)"
-                  type="time"
-                  value={(config as any).run_time_utc}
-                  onChange={(e) =>
-                    setConfig({ ...config, run_time_utc: e.target.value })
-                  }
-                  fullWidth
-                />
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <TextField
+                    label="Run Time"
+                    type="time"
+                    value={(config as any).run_time_utc}
+                    onChange={(e) =>
+                      setConfig({ ...config, run_time_utc: e.target.value })
+                    }
+                    sx={{ flex: 1 }}
+                  />
+                  <FormControl size="small" sx={{ flex: 1.3 }}>
+                    <InputLabel>Timezone</InputLabel>
+                    <Select
+                      value={(config as any).timezone || 'UTC'}
+                      label="Timezone"
+                      onChange={(e) =>
+                        setConfig({ ...config, timezone: e.target.value as string })
+                      }
+                      MenuProps={{ sx: { zIndex: 1600 } }}
+                    >
+                      {timezoneOptions.map((tz) => (
+                        <MenuItem key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Box>
                 <TextField
                   label="Comparison Months"
                   type="number"

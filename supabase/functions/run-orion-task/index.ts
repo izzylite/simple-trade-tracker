@@ -32,6 +32,53 @@ async function storeResult(
   return true;
 }
 
+// Reset failure counters after a successful (or suppressed) run.
+async function markTaskSuccess(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  taskId: string
+) {
+  const { error } = await serviceClient
+    .from('orion_tasks')
+    .update({
+      last_error: null,
+      last_error_at: null,
+      consecutive_failures: 0,
+    })
+    .eq('id', taskId)
+    .gt('consecutive_failures', 0); // only touch row if there's state to clear
+  if (error) log('Failed to clear failure state', 'warn', error);
+}
+
+// Bump failure counters. We do NOT zero this elsewhere — the dispatcher's
+// advance_orion_tasks_next_run_at only moves the schedule, not the counters.
+async function markTaskFailure(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  taskId: string,
+  message: string
+) {
+  // Truncate to keep the row small — full stack goes to edge function logs.
+  const truncated = message.length > 500 ? message.slice(0, 497) + '...' : message;
+  const { data, error: selectErr } = await serviceClient
+    .from('orion_tasks')
+    .select('consecutive_failures')
+    .eq('id', taskId)
+    .single();
+  if (selectErr) {
+    log('Failed to read failure counter', 'warn', selectErr);
+    return;
+  }
+  const next = (data?.consecutive_failures ?? 0) + 1;
+  const { error: updateErr } = await serviceClient
+    .from('orion_tasks')
+    .update({
+      last_error: truncated,
+      last_error_at: new Date().toISOString(),
+      consecutive_failures: next,
+    })
+    .eq('id', taskId);
+  if (updateErr) log('Failed to persist failure state', 'warn', updateErr);
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -97,6 +144,7 @@ Deno.serve(async (req) => {
         metadata: { error: true, message },
       };
       await storeResult(serviceClient, orionTask, failureResult);
+      await markTaskFailure(serviceClient, orionTask.id, message);
 
       return new Response(
         JSON.stringify({ success: false, error: message }),
@@ -112,6 +160,7 @@ Deno.serve(async (req) => {
         taskId: orionTask.id,
         taskType: orionTask.task_type,
       });
+      await markTaskSuccess(serviceClient, orionTask.id);
       return new Response(
         JSON.stringify({ success: true, suppressed: true }),
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
@@ -125,6 +174,7 @@ Deno.serve(async (req) => {
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
+    await markTaskSuccess(serviceClient, orionTask.id);
 
     log('Task executed successfully', 'info', {
       taskId: orionTask.id,

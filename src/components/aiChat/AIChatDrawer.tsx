@@ -16,6 +16,8 @@ import {
   alpha
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
+import { format } from 'date-fns';
+import { v5 as uuidv5 } from 'uuid';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
 import { TradeOperationsProps } from '../../types/tradeOperations';
@@ -25,6 +27,11 @@ import { UseAIChatReturn } from '../../hooks/useAIChat';
 import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
 import OrionTasksContent from '../orionTasks/OrionTasksContent';
 import type { OrionTask, OrionTaskResult, TaskType, TaskConfig } from '../../types/orionTask';
+import { TASK_TYPE_LABELS } from '../../types/orionTask';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { createNote } from '../../services/notesService';
+
+const ORION_NOTE_NS = 'a7f3d5e2-1b4c-5890-9e12-f3c4d5b6a7e8';
 
 interface AIChatDrawerProps {
   open: boolean;
@@ -49,6 +56,7 @@ interface AIChatDrawerProps {
   onDeleteTask?: (taskId: string) => Promise<void>;
   onMarkTaskResultRead?: (resultId: string) => Promise<void>;
   onMarkAllTaskResultsRead?: () => Promise<void>;
+  onHideTaskResult?: (resultId: string) => Promise<void>;
 }
 
 // Bottom sheet heights
@@ -76,10 +84,27 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   onDeleteTask,
   onMarkTaskResultRead,
   onMarkAllTaskResultsRead,
+  onHideTaskResult,
 }) => {
   const theme = useTheme();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
   const [chatSeedMessage, setChatSeedMessage] = useState<string>('');
+
+  const handleSaveNote = async (result: OrionTaskResult) => {
+    if (!user?.uid) return;
+    const taskLabel = TASK_TYPE_LABELS[result.task_type];
+    const formattedDate = format(new Date(result.created_at), 'MMM d, yyyy');
+    await createNote({
+      id: uuidv5(result.id, ORION_NOTE_NS),
+      user_id: user.uid,
+      calendar_id: calendar?.id ?? null,
+      title: `Orion Briefing: ${taskLabel} — ${formattedDate}`,
+      content: result.content_plain, 
+      by_assistant: true,
+      tags: ['orion', 'briefing'],
+    });
+  };
 
   const handleFollowupAboutResult = (result: OrionTaskResult) => {
     const title = (result.metadata as { title?: string } | null)?.title ?? 'this briefing';
@@ -284,7 +309,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 onDeleteTask={onDeleteTask ?? (async () => {})}
                 onMarkRead={onMarkTaskResultRead ?? (async () => {})}
                 onMarkAllRead={onMarkAllTaskResultsRead}
+                onHideResult={onHideTaskResult}
                 onFollowup={handleFollowupAboutResult}
+                onSaveNote={handleSaveNote}
               />
             </TabPanel>
           </Box>

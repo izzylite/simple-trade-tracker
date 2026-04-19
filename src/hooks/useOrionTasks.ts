@@ -73,6 +73,16 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string) {
     setUnreadCount((prev) => Math.max(0, prev - 1));
   }, []);
 
+  const hideResult = useCallback(async (resultId: string) => {
+    // Look up the row before we drop it so we can decrement unread correctly.
+    const target = results.find((r) => r.id === resultId);
+    await orionTaskService.hideResult(resultId);
+    setResults((prev) => prev.filter((r) => r.id !== resultId));
+    if (target && !target.is_read) {
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    }
+  }, [results]);
+
   const markAllRead = useCallback(async () => {
     if (!userId) return;
     await orionTaskService.markAllResultsRead(userId);
@@ -98,7 +108,7 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string) {
     );
 
     const channel = supabase
-      .channel(`orion-task-results-${userId}`)
+      .channel(`orion-${userId}`)
       .on(
         'postgres_changes',
         {
@@ -111,6 +121,49 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string) {
           const newResult = payload.new as OrionTaskResult;
           setResults((prev) => [newResult, ...prev]);
           setUnreadCount((prev) => prev + 1);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orion_task_results',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          // Cross-device sync: a hide/read on one tab should propagate.
+          const updated = payload.new as OrionTaskResult;
+          if (updated.hidden_at) {
+            setResults((prev) => {
+              const target = prev.find((r) => r.id === updated.id);
+              if (target && !target.is_read) {
+                setUnreadCount((c) => Math.max(0, c - 1));
+              }
+              return prev.filter((r) => r.id !== updated.id);
+            });
+          } else {
+            setResults((prev) =>
+              prev.map((r) => (r.id === updated.id ? updated : r))
+            );
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orion_tasks',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          // Keep failure counters / next_run_at fresh so the UI warning
+          // badge reflects the current state without a manual refresh.
+          const updated = payload.new as OrionTask;
+          setTasks((prev) =>
+            prev.map((t) => (t.id === updated.id ? updated : t))
+          );
         }
       )
       .subscribe();
@@ -130,6 +183,7 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string) {
     deleteTask,
     markRead,
     markAllRead,
+    hideResult,
     refetchTasks: fetchTasks,
     refetchResults: fetchResults,
   };

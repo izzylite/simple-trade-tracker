@@ -35,18 +35,24 @@ export interface MarketResearchConfig {
 }
 
 export interface DailyAnalysisConfig {
+  /** Wall-clock run time (HH:MM) interpreted in `timezone`. Field kept as
+   *  `run_time_utc` for backward compatibility with existing rows. */
   run_time_utc: string;
+  /** IANA timezone name (e.g. "Europe/London"). Defaults to "UTC" on legacy rows. */
+  timezone: string;
   tone: CoachingTone;
 }
 
 export interface WeeklyReviewConfig {
   run_day: number;
   run_time_utc: string;
+  timezone: string;
   comparison_weeks: number;
 }
 
 export interface MonthlyRollupConfig {
   run_time_utc: string;
+  timezone: string;
   comparison_months: number;
 }
 
@@ -65,6 +71,20 @@ export interface OrionTask {
   config: TaskConfig;
   created_at: string;
   updated_at: string;
+  /** Most recent handler error message (truncated to 500 chars). null when healthy. */
+  last_error: string | null;
+  last_error_at: string | null;
+  /** Count of consecutive failed runs; resets to 0 after a successful run. */
+  consecutive_failures: number;
+}
+
+/** Returns the IANA timezone the browser reports, falling back to UTC. */
+export function detectBrowserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
 }
 
 export interface OrionTaskResult {
@@ -78,6 +98,9 @@ export interface OrionTaskResult {
   metadata: Record<string, unknown>;
   group_date: string;
   is_read: boolean;
+  /** Soft-delete timestamp. When set, result is hidden from feed but still
+   *  feeds Orion's dedup context so the same catalyst isn't re-reported. */
+  hidden_at: string | null;
   created_at: string;
 }
 
@@ -88,26 +111,35 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   monthly_rollup: 'Monthly Rollup',
 };
 
-export const DEFAULT_CONFIGS: Record<TaskType, TaskConfig> = {
-  market_research: {
-    sessions: ['london', 'ny_am'],
-    markets: ['forex'],
-    custom_topics: [],
-    instrument_aware: true,
-    frequency_minutes: 30,
-    min_significance: 'high',
-  },
-  daily_analysis: {
-    run_time_utc: '21:00',
-    tone: 'tough_love',
-  },
-  weekly_review: {
-    run_day: 6,
-    run_time_utc: '09:00',
-    comparison_weeks: 4,
-  },
-  monthly_rollup: {
-    run_time_utc: '21:00',
-    comparison_months: 3,
-  },
-};
+export function buildDefaultConfigs(timezone: string): Record<TaskType, TaskConfig> {
+  return {
+    market_research: {
+      sessions: ['london', 'ny_am'],
+      markets: ['forex'],
+      custom_topics: [],
+      instrument_aware: true,
+      frequency_minutes: 30,
+      min_significance: 'high',
+    },
+    daily_analysis: {
+      run_time_utc: '21:00',
+      timezone,
+      tone: 'tough_love',
+    },
+    weekly_review: {
+      run_day: 6,
+      run_time_utc: '09:00',
+      timezone,
+      comparison_weeks: 4,
+    },
+    monthly_rollup: {
+      run_time_utc: '21:00',
+      timezone,
+      comparison_months: 3,
+    },
+  };
+}
+
+/** @deprecated Use `buildDefaultConfigs(detectBrowserTimezone())` so time-based
+ *  tasks pick up the user's local TZ instead of silently defaulting to UTC. */
+export const DEFAULT_CONFIGS: Record<TaskType, TaskConfig> = buildDefaultConfigs('UTC');
