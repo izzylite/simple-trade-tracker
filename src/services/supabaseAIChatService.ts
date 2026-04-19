@@ -227,6 +227,14 @@ class SupabaseAIChatService {
               continue;
             }
 
+            // Diagnostic: log when SSE comments (heartbeats) arrive so we can
+            // see if the stream actually delivers bytes incrementally.
+            if (trimmedLine.startsWith(':')) {
+              const snippet = trimmedLine.slice(0, 40);
+              logger.log(`SSE comment received: ${snippet}`);
+              continue;
+            }
+
             // Parse SSE format: "event: type\ndata: {...}\n\n"
             if (trimmedLine.startsWith('event: ')) {
               currentEventType = trimmedLine.substring(7).trim() as SSEEventType;

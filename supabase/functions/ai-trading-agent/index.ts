@@ -1104,6 +1104,7 @@ function handleStreamingRequest(
   const { stream, writer } = createSSEStream();
 
   // Process request in background (don't await - return stream immediately)
+  let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
   (async () => {
     try {
       // Prime the stream with ~4KB of padding so the response crosses any proxy
@@ -1111,6 +1112,16 @@ function handleStreamingRequest(
       // SSE comments (lines starting with :) are ignored by parsers.
       const padding = ' '.repeat(4096);
       await writer.write(`:${padding}\n\n`);
+
+      // Heartbeat: send an SSE comment every 500ms to keep the stream "alive"
+      // and force proxies to continuously flush rather than accumulating bytes.
+      // If heartbeats arrive staggered on the client, streaming works; if they
+      // all arrive at the end, the buffering is fully terminal.
+      heartbeatInterval = setInterval(() => {
+        writer.write(`: heartbeat ${Date.now()}\n\n`).catch(() => {
+          if (heartbeatInterval) clearInterval(heartbeatInterval);
+        });
+      }, 500);
 
       const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
       let finalText = '';
@@ -1577,6 +1588,7 @@ function handleStreamingRequest(
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     } finally {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
       await writer.close();
     }
   })();
