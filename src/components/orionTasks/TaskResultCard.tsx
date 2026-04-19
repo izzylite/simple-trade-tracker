@@ -23,6 +23,8 @@ import {
 import { format } from 'date-fns';
 import type { OrionTaskResult, Significance } from '../../types/orionTask';
 import { TASK_TYPE_LABELS } from '../../types/orionTask';
+import CitationsSection from '../aiChat/CitationsSection';
+import type { Citation } from '../../types/aiChat';
 
 const SANITIZE_CONFIG = {
   ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'h3', 'h4', 'h5', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span'],
@@ -204,6 +206,13 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
           }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
+
+        {Array.isArray(result.metadata?.citations) && (result.metadata.citations as Citation[]).length > 0 && (
+          <CitationsSection
+            citations={result.metadata.citations as Citation[]}
+            compact
+          />
+        )}
 
         {(onFollowup || onSaveNote) && (
           <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>

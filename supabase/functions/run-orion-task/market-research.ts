@@ -120,7 +120,44 @@ export async function handleMarketResearch(
     return null;
   }
 
+  // Attach citations so the UI can render a "Sources" pill on the card.
+  // Take up to 6 unique-domain URLs from the news pool fed to Gemini.
+  const citations = buildCitations([...allNews, ...breakingNews]);
+  if (citations.length > 0) {
+    result.metadata = { ...result.metadata, citations };
+  }
+
   return result;
+}
+
+interface CitationEntry {
+  id: string;
+  url: string;
+  title?: string;
+  source?: string;
+  toolName: string;
+}
+
+function buildCitations(news: NewsResult[]): CitationEntry[] {
+  const seen = new Set<string>();
+  const out: CitationEntry[] = [];
+  for (const item of news) {
+    if (!item.link) continue;
+    let domain: string;
+    try { domain = new URL(item.link).hostname.replace(/^www\./, ''); }
+    catch { continue; }
+    if (seen.has(domain)) continue;
+    seen.add(domain);
+    out.push({
+      id: `${domain}-${out.length}`,
+      url: item.link,
+      title: item.title,
+      source: item.source || domain,
+      toolName: 'search_web',
+    });
+    if (out.length >= 6) break;
+  }
+  return out;
 }
 
 interface CategorizedQueries {
