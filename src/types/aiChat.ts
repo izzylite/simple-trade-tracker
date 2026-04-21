@@ -43,6 +43,9 @@ export interface ChatMessage {
   // when the stream is proxy-buffered, these arrive at the end of the request
   // and are rendered in an expandable panel for transparency).
   toolCalls?: ToolCallRecord[];
+  // Gemini chain-of-thought summary (thinkingConfig.includeThoughts). Streamed
+  // in as reasoning_chunk SSE events and rendered in an expandable panel.
+  reasoning?: string;
 }
 
 export interface ToolCallRecord {

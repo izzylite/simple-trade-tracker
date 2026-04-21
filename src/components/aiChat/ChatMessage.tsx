@@ -66,6 +66,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
   const [toolsExpanded, setToolsExpanded] = useState(false);
+  const [reasoningExpanded, setReasoningExpanded] = useState(false);
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const isDark = theme.palette.mode === 'dark';
@@ -252,6 +253,35 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   onClick={() => window.open(image.url, '_blank')}
                 />
               ))}
+            </Box>
+          )}
+
+          {/* Reasoning (Gemini chain-of-thought) — collapsed by default, above answer */}
+          {isAssistant && message.reasoning && (
+            <Box sx={{ mb: 1.5 }}>
+              <Box
+                onClick={() => setReasoningExpanded(v => !v)}
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  cursor: 'pointer',
+                  color: 'text.secondary',
+                  '&:hover': { color: 'text.primary' },
+                }}
+              >
+                <Typography variant="caption" sx={{ fontSize: '0.82rem', lineHeight: 1 }}>
+                  {message.status === 'receiving' ? 'Thinking' : 'Reasoning'}
+                </Typography>
+                {reasoningExpanded
+                  ? <ExpandLessIcon sx={{ fontSize: 16 }} />
+                  : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
+              </Box>
+              {reasoningExpanded && (
+                <Box sx={{ mt: 0.75, color: 'text.secondary', fontSize: '0.82rem' }}>
+                  <MarkdownRenderer content={message.reasoning} />
+                </Box>
+              )}
             </Box>
           )}
 

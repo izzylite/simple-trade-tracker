@@ -23,7 +23,7 @@ import { Calendar } from '../../types/calendar';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
 import AIChatContent from '../sidePanel/content/AIChatContent';
-import { UseAIChatReturn } from '../../hooks/useAIChat';
+import { UseAIChatReturn, useAIChat } from '../../hooks/useAIChat';
 import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
 import OrionTasksContent from '../orionTasks/OrionTasksContent';
 import type { OrionTask, OrionTaskResult, TaskType, TaskConfig } from '../../types/orionTask';
@@ -61,7 +61,7 @@ interface AIChatDrawerProps {
 
 // Bottom sheet heights
 const BOTTOM_SHEET_HEIGHTS = {
-  default: 780
+  default: 880
 } as const;
 
 const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
@@ -90,6 +90,18 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
   const [chatSeedMessage, setChatSeedMessage] = useState<string>('');
+
+  // Fallback chat state lives at the drawer level so it survives tab switches
+  // (AIChatContent unmounts when activeTab changes). Callers that already manage
+  // their own shared state (e.g. HomePage) pass it via the prop and this hook's
+  // return is unused — the hook itself still runs to satisfy React's rules.
+  const internalChatState = useAIChat({
+    userId: user?.uid,
+    calendar,
+    messageLimit: 50,
+    autoSaveConversation: true,
+  });
+  const effectiveChatState = sharedChatState ?? internalChatState;
 
   const handleSaveNote = async (result: OrionTaskResult) => {
     if (!user?.uid) return;
@@ -156,10 +168,10 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           left: { xs: 0, sm: 'auto' },
           zIndex: Z_INDEX.AI_DRAWER,
           height: open ? BOTTOM_SHEET_HEIGHTS.default : 0,
-          maxHeight: '85vh',
+          maxHeight: '92vh',
           width: '100%',
           maxWidth: {
-            xs: '100%', sm: '420px', md: '460px', lg: '500px'
+            xs: '100%', sm: '480px', md: '540px', lg: '600px'
           },
           borderTopLeftRadius: 12,
           borderTopRightRadius: 12,
@@ -289,7 +301,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 isReadOnly={isReadOnly}
                 tradeOperations={tradeOperations}
                 isActive={open && activeTab === 0}
-                sharedChatState={sharedChatState}
+                sharedChatState={effectiveChatState}
                 availableCalendars={availableCalendars}
                 selectedCalendarId={selectedCalendarId}
                 onCalendarChange={onCalendarChange}

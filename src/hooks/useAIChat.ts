@@ -507,6 +507,7 @@ export function useAIChat({
       abortControllerRef.current = abortController;
 
       let accumulatedText = '';
+      let accumulatedReasoning = '';
       let messageHtml = '';
       let citations: any[] | undefined;
       let embeddedTrades: any | undefined;
@@ -556,9 +557,32 @@ export function useAIChat({
             }, 100);
             break;
 
+          case 'reasoning_chunk': {
+            accumulatedReasoning += event.data.text;
+            const reasoningSnapshot = accumulatedReasoning;
+            if (aiMessageAdded) {
+              setMessages(prev => prev.map(msg =>
+                msg.id === aiMessageId ? { ...msg, reasoning: reasoningSnapshot } : msg
+              ));
+            } else {
+              const newMessage: ChatMessageType = {
+                id: aiMessageId,
+                role: 'assistant',
+                content: '',
+                reasoning: reasoningSnapshot,
+                timestamp: new Date(),
+                status: 'receiving'
+              };
+              setMessages(prev => [...prev, newMessage]);
+              aiMessageAdded = true;
+            }
+            break;
+          }
+
           case 'text_reset':
             // Narration text was streamed before we knew a function call was coming.
-            // Reset accumulated text and remove the in-progress AI message bubble.
+            // Reset accumulated text but keep reasoning (it's still valid context for
+            // the upcoming tool call + final answer).
             accumulatedText = '';
             pendingTextRef.current = '';
             if (messageUpdateTimeoutRef.current) {
@@ -566,8 +590,16 @@ export function useAIChat({
               messageUpdateTimeoutRef.current = null;
             }
             if (aiMessageAdded) {
-              setMessages(prev => prev.filter(msg => msg.id !== aiMessageId));
-              aiMessageAdded = false;
+              if (accumulatedReasoning) {
+                setMessages(prev => prev.map(msg =>
+                  msg.id === aiMessageId
+                    ? { ...msg, content: '', reasoning: accumulatedReasoning }
+                    : msg
+                ));
+              } else {
+                setMessages(prev => prev.filter(msg => msg.id !== aiMessageId));
+                aiMessageAdded = false;
+              }
             }
             break;
 
@@ -633,6 +665,7 @@ export function useAIChat({
         embeddedEvents,
         embeddedNotes,
         toolCalls: toolCallHistory.length > 0 ? toolCallHistory : undefined,
+        reasoning: accumulatedReasoning || undefined,
         timestamp: new Date(),
         status: 'received'
       };

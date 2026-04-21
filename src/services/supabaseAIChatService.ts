@@ -40,6 +40,7 @@ export interface AgentResponse {
 export type SSEEventType =
   | 'text_chunk'
   | 'text_reset'
+  | 'reasoning_chunk'
   | 'tool_call'
   | 'tool_result'
   | 'citation'

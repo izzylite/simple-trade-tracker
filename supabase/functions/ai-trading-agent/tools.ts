@@ -2562,3 +2562,11 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     updateMemoryTool,
   ];
 }
+
+/**
+ * Name lookup set derived from getAllCustomTools() so the dispatcher in
+ * index.ts can't drift out of sync with the registered tool list.
+ */
+export const CUSTOM_TOOL_NAMES: ReadonlySet<string> = new Set(
+  getAllCustomTools().map((t) => t.name),
+);

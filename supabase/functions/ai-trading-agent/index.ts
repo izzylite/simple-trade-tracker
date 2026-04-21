@@ -9,7 +9,8 @@ import type { AgentRequest, ToolCall } from './types.ts';
 import {
   type GeminiFunctionDeclaration,
   getAllCustomTools,
-  executeCustomTool
+  executeCustomTool,
+  CUSTOM_TOOL_NAMES
 } from './tools.ts';
 import { fetchEmbeddedData, type EmbeddedData } from './embedDataFetcher.ts';
 import { validateReferenceIds, hasReferenceTags, type ValidationResult } from './idValidator.ts';
@@ -25,6 +26,10 @@ import { encodeBase64 } from "https://deno.land/std@0.208.0/encoding/base64.ts";
  * The default stays conservative — bump it once the target has been validated.
  */
 const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash';
+// Gemini 3 thinking level: "minimal" | "low" | "medium" | "high".
+// Default "medium" — enough reasoning for multi-step analysis without burning
+// the token budget on shallow tool-routing queries. Flip via env to A/B.
+const THINKING_LEVEL = Deno.env.get('GEMINI_THINKING_LEVEL') ?? 'medium';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 function buildGeminiUrl(apiKey: string, streaming: boolean): string {
@@ -102,6 +107,7 @@ async function callGeminiWithContents(
     generationConfig: {
       temperature: 0.3,
       maxOutputTokens: opts.maxOutputTokens ?? 4000,
+      thinkingConfig: { includeThoughts: true, thinkingLevel: THINKING_LEVEL }
     }
   };
 
@@ -144,10 +150,13 @@ async function callGeminiWithContents(
             // reconstructing would drop it.
             rawParts.push(...parts);
             for (const part of parts) {
-              if (part.text) {
-                text += part.text;
-                if (opts.writer) await sendSSE(opts.writer, 'text_chunk', { text: part.text });
+              if (!part.text) continue;
+              if (part.thought) {
+                if (opts.writer) await sendSSE(opts.writer, 'reasoning_chunk', { text: part.text });
+                continue;
               }
+              text += part.text;
+              if (opts.writer) await sendSSE(opts.writer, 'text_chunk', { text: part.text });
             }
             const fcPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
             if (fcPart) {
@@ -171,7 +180,10 @@ async function callGeminiWithContents(
       const extracted = extractFunctionCall(fcPart);
       if (extracted) functionCall = extracted;
     }
-    text = parts.map((p: { text?: string }) => p.text || '').join('');
+    text = parts
+      .filter((p: { text?: string; thought?: boolean }) => !p.thought)
+      .map((p: { text?: string }) => p.text || '')
+      .join('');
   }
 
   return { text, functionCall, rawParts };
@@ -214,6 +226,7 @@ type SSEEventType =
   | 'text_chunk'      // Streaming text as it's generated
   | 'text_reset'      // Reset accumulated text (narration streamed before tool call detected)
   | 'thought_chunk'   // Intermediate AI narration during tool use
+  | 'reasoning_chunk' // Gemini thought summary (chain-of-thought) — from thinkingConfig.includeThoughts
   | 'tool_call'       // Tool is being called
   | 'tool_result'     // Tool execution completed
   | 'citation'        // Citation discovered
@@ -776,6 +789,7 @@ async function callGemini(
     generationConfig: {
       temperature: 0.3,
       maxOutputTokens: 4000,
+      thinkingConfig: { includeThoughts: true, thinkingLevel: THINKING_LEVEL }
     }
   };
 
@@ -802,8 +816,11 @@ async function callGemini(
     if (extracted) return { functionCall: extracted, rawParts: parts };
   }
 
-  // Get text response
-  const text = parts.map((p: { text?: string }) => p.text || '').join('');
+  // Get text response (exclude thought-summary parts so chain-of-thought doesn't leak into answer)
+  const text = parts
+    .filter((p: { text?: string; thought?: boolean }) => !p.thought)
+    .map((p: { text?: string }) => p.text || '')
+    .join('');
   return { text, rawParts: parts };
 }
 
@@ -878,6 +895,7 @@ async function callGeminiStreaming(
     generationConfig: {
       temperature: 0.3,
       maxOutputTokens: 4000,
+      thinkingConfig: { includeThoughts: true, thinkingLevel: THINKING_LEVEL }
     }
   };
 
@@ -1012,12 +1030,16 @@ async function callGeminiStreaming(
               }
             }
 
-            // Extract text — buffer it, don't stream yet
-            // We need to check if function calls are also present
+            // Extract text — buffer answer text (we need to check for function calls
+            // first before deciding how to emit it). Thought-summary parts stream
+            // immediately as reasoning_chunk and are kept separate from fullText.
             for (const part of parts) {
-              if (part.text) {
-                fullText += part.text;
+              if (!part.text) continue;
+              if (part.thought) {
+                await sendSSE(writer, 'reasoning_chunk', { text: part.text });
+                continue;
               }
+              fullText += part.text;
             }
           } catch (parseError) {
             // Skip invalid JSON lines
@@ -1224,11 +1246,10 @@ function handleStreamingRequest(
           }
 
           // Execute all tools in parallel
-          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes', 'analyze_image', 'get_tag_definition', 'save_tag_definition', 'update_memory'];
           const supabaseClient = createServiceClient();
           const executionPromises = result.functionCalls.map(async (call) => {
             try {
-              const result = customToolNames.includes(call.name)
+              const result = CUSTOM_TOOL_NAMES.has(call.name)
                 ? await executeCustomTool(call.name, call.args, {
                   userId,
                   calendarId: _calendarId
@@ -1308,9 +1329,8 @@ function handleStreamingRequest(
           let functionResult: string;
 
           // Execute tool (custom or MCP)
-          const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes', 'analyze_image', 'get_tag_definition', 'save_tag_definition', 'update_memory'];
           const supabaseClient = createServiceClient();
-          if (customToolNames.includes(call.name)) {
+          if (CUSTOM_TOOL_NAMES.has(call.name)) {
             functionResult = await executeCustomTool(call.name, call.args, {
                   userId,
                   calendarId: _calendarId
@@ -1794,9 +1814,8 @@ Deno.serve(async (req: Request) => {
       let functionResult: string;
 
       // Check if it's a custom tool (from tools.ts)
-      const customToolNames = ['search_web', 'scrape_url', 'get_crypto_price', 'get_forex_price', 'generate_chart', 'create_note', 'update_note', 'delete_note', 'search_notes', 'analyze_image', 'get_tag_definition', 'save_tag_definition', 'update_memory'];
       const supabaseClient = createServiceClient();
-      if (customToolNames.includes(call.name)) {
+      if (CUSTOM_TOOL_NAMES.has(call.name)) {
         // Execute custom tool
         functionResult = await executeCustomTool(call.name, call.args, {
                   userId,
