@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkjournotrades=self.webpackChunkjournotrades||[]).push([[782],{70782:(e,t,a)=>{a.d(t,{moveCalendarToTrash:()=>d});var r=a(78018);const o=new(a(4239).t),d=async(e,t)=>{try{const a=new Date,d=new Date(a.getTime()+2592e6);await o.update(e,{deleted_at:a,deleted_by:t,auto_delete_at:d,updated_at:a}),r.logger.log("Calendar ".concat(e," moved to trash"))}catch(a){throw r.logger.error("Error moving calendar to trash:",a),a}}}}]);
+//# sourceMappingURL=782.0a3da53b.chunk.js.map
