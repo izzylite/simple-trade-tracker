@@ -27,12 +27,17 @@ export type TaskHandler = (
 ) => Promise<TaskResult | null>;
 
 export interface MarketResearchConfig {
-  sessions: string[];
   markets: string[];
-  custom_topics: string[];
-  instrument_aware: boolean;
   frequency_minutes: 15 | 30 | 60;
   min_significance: 'medium' | 'high';
+  // Template snapshot fields. Optional so legacy rows (pre-template) still
+  // typecheck — the handler falls back to hardcoded defaults when absent.
+  template_id?: string;
+  macro_queries?: string[];
+  /** Yahoo symbols for price grounding, news queries, and economic-event
+   *  currency filtering. UI requires non-empty at save time; handler caps
+   *  at MAX_WATCHLIST_SIZE after merging with `markets` defaults. */
+  watchlist_symbols?: string[];
 }
 
 export interface DailyAnalysisConfig {

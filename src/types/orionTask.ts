@@ -1,3 +1,5 @@
+import { FOREX_MACRO_TEMPLATE } from '../config/researchTemplates';
+
 export type TaskType =
   | 'market_research'
   | 'daily_analysis'
@@ -21,17 +23,22 @@ export type AlertMinSignificance = 'medium' | 'high';
  * clears `min_significance` — central-bank surprise, political statement,
  * geopolitical shock, unexpected data, commodity disruption, etc.
  *
- * `sessions` is a context filter: it narrows which regional news and which
- * currencies from the economic calendar are prioritised in the search. It
- * does NOT control when the task fires.
+ * `watchlist_symbols` is the single source of user intent: Yahoo symbols drive
+ * price grounding, per-instrument news queries (via a symbol→readable-name
+ * mapping), and economic-event currency filtering (via a symbol→currencies
+ * mapping). Required non-empty at save time.
+ *
+ * Template fields (`template_id`, `macro_queries`) snapshot from a preset at
+ * creation time. The user can edit any of them after picking; edits to the
+ * original preset definition do not propagate back into existing tasks.
  */
 export interface MarketResearchConfig {
-  sessions: TradingSession[];
   markets: string[];
-  custom_topics: string[];
-  instrument_aware: boolean;
   frequency_minutes: AlertFrequency;
   min_significance: AlertMinSignificance;
+  template_id: string;
+  macro_queries: string[];
+  watchlist_symbols: string[];
 }
 
 export interface DailyAnalysisConfig {
@@ -111,15 +118,24 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   monthly_rollup: 'Monthly Rollup',
 };
 
+// Per-task accent color used for chips, card headers, and any task-scoped
+// visual. Picked from Material's 400-level palette so it reads on both themes.
+export const TASK_TYPE_COLORS: Record<TaskType, string> = {
+  market_research: '#7C4DFF', // purple
+  daily_analysis: '#29B6F6',  // cyan
+  weekly_review: '#66BB6A',   // green
+  monthly_rollup: '#EC407A',  // pink
+};
+
 export function buildDefaultConfigs(timezone: string): Record<TaskType, TaskConfig> {
   return {
     market_research: {
-      sessions: ['london', 'ny_am'],
       markets: ['forex'],
-      custom_topics: [],
-      instrument_aware: true,
       frequency_minutes: 30,
       min_significance: 'high',
+      template_id: FOREX_MACRO_TEMPLATE.id,
+      macro_queries: [...FOREX_MACRO_TEMPLATE.macro_queries],
+      watchlist_symbols: [],
     },
     daily_analysis: {
       run_time_utc: '21:00',

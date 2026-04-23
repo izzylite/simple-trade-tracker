@@ -3,8 +3,23 @@ import {
   searchNewsMultiple,
   searchNewsMultipleCached,
   searchBreakingMultipleCached,
+  type SerperBatchResult,
 } from './serper.ts';
-import { generateContent } from './gemini.ts';
+import {
+  generateBriefingWithScrape,
+  type BriefingWithScrapeResult,
+} from './gemini.ts';
+import {
+  getMarketPrices,
+  formatPriceLine,
+  type PriceSnapshot,
+} from './prices.ts';
+import { scrapeArticle } from '../_shared/serperScrape.ts';
+import { buildMarketResearchSystemPrompt } from './market-research-prompt.ts';
+import {
+  symbolsToCurrencies,
+  symbolsToReadableNames,
+} from './symbols.ts';
 import type {
   OrionTask,
   TaskResult,
@@ -13,24 +28,13 @@ import type {
 } from './types.ts';
 import type { NewsResult } from './serper.ts';
 
-const SESSION_SEARCH_TERMS: Record<string, string> = {
-  asia: 'Asian markets Nikkei Shanghai Hang Seng ASX China Japan economic news',
-  london: 'European markets FTSE DAX CAC Euro Stoxx UK inflation economic news',
-  ny_am: 'US stocks S&P 500 Nasdaq Dow premarket earnings Wall Street',
-  ny_pm: 'US market close bond yields Treasury dollar index DXY',
-};
+// Defensive cap on macro queries per task. Each query fires a Serper call every
+// sweep, so an unbounded list burns API quota linearly. UI enforces the same
+// cap at save time; the edge function trims here in case a stale row or direct
+// DB edit bypassed validation.
+const MAX_MACRO_QUERIES = 10;
 
-const SESSION_CURRENCIES: Record<string, string[]> = {
-  asia: ['JPY', 'AUD', 'NZD', 'CNY'],
-  london: ['GBP', 'EUR', 'CHF'],
-  ny_am: ['USD', 'CAD'],
-  ny_pm: ['USD', 'CAD'],
-};
-
-// Baseline macro/political/geopolitical queries that run on every briefing —
-// these catch market-moving events that transcend specific session indices
-// (central bank speakers, executive-branch statements, war/sanctions, commodity shocks).
-const BASELINE_MACRO_QUERIES = [
+const DEFAULT_MACRO_QUERIES = [
   'Federal Reserve OR FOMC speech statement policy today',
   'ECB OR Bank of England OR Bank of Japan policy commentary today',
   'White House OR US President statement market impact today',
@@ -65,43 +69,139 @@ const SIGNIFICANCE_RANK: Record<string, number> = {
   high: 2,
 };
 
+// `^VIX` is always included as a risk-on/off tell — regardless of what the
+// trader watches, a 20% VIX spike is a "something real is happening" signal
+// worth showing. Same logic for `DX-Y.NYB` (ICE dollar index) which cross-
+// asset traders need whether they trade FX or not. (`DX=F` does not resolve.)
+const ALWAYS_ON_SYMBOLS = ['^VIX', 'DX-Y.NYB'];
+const MAX_WATCHLIST_SIZE = 12;
+
+// Watchlist = always-on risk tells + user picks, capped. The UI requires
+// `watchlist_symbols` to be non-empty at save time, so the user's list is
+// always the dominant input here.
+function buildWatchlist(customSymbols: string[]): string[] {
+  const set = new Set<string>(ALWAYS_ON_SYMBOLS);
+  for (const sym of customSymbols) {
+    const trimmed = sym.trim();
+    if (!trimmed) continue;
+    set.add(trimmed);
+    if (set.size >= MAX_WATCHLIST_SIZE) break;
+  }
+  return Array.from(set);
+}
+
 export async function handleMarketResearch(
   task: OrionTask,
   supabase: SupabaseClient
 ): Promise<TaskResult | null> {
   const config = task.config as unknown as MarketResearchConfig;
 
-  const [newsBundle, economicEvents, instruments, recentBriefings] =
+  // Staleness guard: cache TTL must stay shorter than task frequency, or
+  // consecutive runs see identical cached news and briefings go stale.
+  const frequencySeconds = (config.frequency_minutes ?? 30) * 60;
+  const effectiveMinFreq = Math.min(frequencySeconds, MIN_TASK_FREQUENCY_SECONDS);
+  if (
+    NEWS_CACHE_TTL_SECONDS >= effectiveMinFreq ||
+    BREAKING_CACHE_TTL_SECONDS >= effectiveMinFreq
+  ) {
+    log('Market research: cache TTL >= task frequency (will serve stale news)', 'warn', {
+      frequency_seconds: frequencySeconds,
+      news_ttl: NEWS_CACHE_TTL_SECONDS,
+      breaking_ttl: BREAKING_CACHE_TTL_SECONDS,
+    });
+  }
+
+  // User-picked symbols drive news queries and currency filtering. Watchlist
+  // adds ALWAYS_ON risk tells (VIX, DXY) on top, but those are excluded from
+  // instrument news queries so we don't drown the briefing in DXY/VIX
+  // headlines every sweep — those are already covered by macro queries.
+  const userSymbols = (config.watchlist_symbols ?? []).filter(
+    (s) => s.trim().length > 0
+  );
+  const watchlist = buildWatchlist(userSymbols);
+  const instrumentNames = symbolsToReadableNames(userSymbols).slice(0, 5);
+
+  const [newsBundle, economicEvents, recentBriefings, priceMap] =
     await Promise.all([
       gatherMarketNews(supabase, config),
-      fetchUpcomingEvents(supabase, config.sessions),
-      config.instrument_aware
-        ? fetchRecentInstruments(supabase, task.user_id, task.calendar_id)
-        : Promise.resolve([]),
-      fetchRecentBriefings(supabase, task.id, 3),
+      fetchUpcomingEvents(supabase, userSymbols),
+      fetchRecentBriefings(supabase, task.id, 5),
+      getMarketPrices(supabase, watchlist, 60),
     ]);
 
+  const prices: PriceSnapshot[] = Object.values(priceMap).filter(
+    (p): p is PriceSnapshot => p !== null
+  );
+
   let instrumentNews: NewsResult[] = [];
-  if (instruments.length > 0) {
-    instrumentNews = await searchNewsMultiple(
-      instruments.slice(0, 5).map((i) => `${i} trading analysis today`),
+  let instrumentErrorCount = 0;
+  let instrumentTotalQueries = 0;
+  if (instrumentNames.length > 0) {
+    const batch = await searchNewsMultiple(
+      instrumentNames.map((n) => `${n} trading analysis today`),
       3
     );
+    instrumentNews = batch.results;
+    instrumentErrorCount = batch.errorCount;
+    instrumentTotalQueries = batch.totalQueries;
   }
 
   const allNews = deduplicateNews([...newsBundle.news, ...instrumentNews]);
   const breakingNews = deduplicateNews(newsBundle.breaking);
 
-  const briefingJson = await callGeminiForBriefing(
+  // Outage detection: if every Serper call errored, the data source is down
+  // and any briefing we generate would be meaningless. Surface a medium-
+  // significance "data source unavailable" card so the user knows the
+  // monitor ran but couldn't work — distinct from "market is quiet," which
+  // is also silent. Threshold filter would normally suppress this; bypass
+  // it because an outage notification IS the signal the user needs.
+  const totalErrors = newsBundle.errorCount + instrumentErrorCount;
+  const totalQueries = newsBundle.totalQueries + instrumentTotalQueries;
+  if (totalQueries > 0 && totalErrors === totalQueries) {
+    log('Market research: Serper outage detected — all queries failed', 'error', {
+      totalErrors,
+      totalQueries,
+    });
+    return {
+      content_html:
+        '<h4>Data Source Unavailable</h4>' +
+        '<p>Orion could not reach its news data source on this sweep. ' +
+        'This is a temporary upstream issue — the next scheduled run will retry. ' +
+        'No market catalysts can be assessed until the feed is back.</p>',
+      content_plain:
+        'Data Source Unavailable — Orion could not reach its news data source ' +
+        'on this sweep. The next scheduled run will retry.',
+      significance: 'medium',
+      metadata: {
+        title: 'Data source unavailable',
+        generated_at: new Date().toISOString(),
+        serper_outage: true,
+        failed_queries: totalErrors,
+      },
+    };
+  }
+
+  const briefing = await callGeminiForBriefing(
+    supabase,
     config,
     allNews,
     breakingNews,
     economicEvents,
-    instruments,
-    recentBriefings
+    instrumentNames,
+    recentBriefings,
+    prices
   );
 
-  const result = parseBriefingResponse(briefingJson);
+  const result = parseBriefingResponse(briefing.json);
+  if (briefing.scrapedUrls.length > 0) {
+    result.metadata = { ...result.metadata, scraped_urls: briefing.scrapedUrls };
+  }
+  if (briefing.scrapedUrlsFailed.length > 0) {
+    result.metadata = {
+      ...result.metadata,
+      scraped_urls_failed: briefing.scrapedUrlsFailed,
+    };
+  }
 
   // Market Research is always a surprise monitor — suppress anything below
   // the configured significance threshold so the user isn't spammed on quiet
@@ -162,77 +262,72 @@ function buildCitations(news: NewsResult[]): CitationEntry[] {
 
 interface CategorizedQueries {
   macro: string[];
-  session: string[];
   market: string[];
-  custom: string[];
 }
 
 function buildSearchQueries(config: MarketResearchConfig): CategorizedQueries {
-  const session: string[] = [];
-  for (const s of config.sessions) {
-    const terms = SESSION_SEARCH_TERMS[s];
-    if (terms) session.push(`${terms} today`);
-  }
+  const macroQueries = (config.macro_queries ?? DEFAULT_MACRO_QUERIES)
+    .slice(0, MAX_MACRO_QUERIES);
 
   const market: string[] = config.markets.map(
     (m) => `${m} market outlook today`
   );
 
   return {
-    macro: [...BASELINE_MACRO_QUERIES],
-    session,
+    macro: macroQueries,
     market,
-    custom: [...config.custom_topics],
   };
 }
 
 // Cache TTLs:
 //   NEWS_TTL: 5 min — news articles don't change meaningfully within a window
-//     that short, and with 14 shared queries × N users we collapse to 14 total
+//     that short, and with N shared queries × M users we collapse to N total
 //     Serper calls per 5-min window across the whole user base.
 //   BREAKING_TTL: 2 min — breaking content needs to be fresher, but same
 //     sharing logic applies.
-//   Custom topics and instrument queries skip the cache (rarely shared).
+//   Instrument queries skip the cache (user-specific by watchlist choice).
+//
+// INVARIANT: both TTLs MUST be shorter than the minimum task frequency
+// (currently 15 min). If cache TTL >= frequency, consecutive runs would see
+// the same cached news and the briefing would go stale. Enforced at runtime
+// in handleMarketResearch (warns on violation) so a future config change
+// that lowers frequency below 5 min can't silently break the system.
 const NEWS_CACHE_TTL_SECONDS = 300;
 const BREAKING_CACHE_TTL_SECONDS = 120;
+const MIN_TASK_FREQUENCY_SECONDS = 15 * 60;
+
+interface MarketNewsBundle {
+  news: NewsResult[];
+  breaking: NewsResult[];
+  /** How many Serper queries errored across all batches (HTTP-layer failures). */
+  errorCount: number;
+  /** Total Serper queries attempted. Used with errorCount to detect outage. */
+  totalQueries: number;
+}
+
+const EMPTY_BATCH: SerperBatchResult = {
+  results: [],
+  errorCount: 0,
+  totalQueries: 0,
+};
 
 async function gatherMarketNews(
   supabase: SupabaseClient,
   config: MarketResearchConfig
-): Promise<{ news: NewsResult[]; breaking: NewsResult[] }> {
+): Promise<MarketNewsBundle> {
   const queries = buildSearchQueries(config);
 
-  // Shared queries (macro/session/market/breaking) hit the cache.
-  // Per-user queries (custom topics) bypass it.
-  const [macroNews, sessionNews, marketNews, customNews, breakingNews] =
+  // All template queries (macro/market/breaking) hit the shared cache.
+  // Users on the same template with unedited queries share cache entries;
+  // edited queries produce new cache keys automatically via the query string.
+  const [macroBatch, marketBatch, breakingBatch] =
     await Promise.all([
       queries.macro.length > 0
-        ? searchNewsMultipleCached(
-            supabase,
-            queries.macro,
-            3,
-            NEWS_CACHE_TTL_SECONDS
-          )
-        : Promise.resolve([]),
-      queries.session.length > 0
-        ? searchNewsMultipleCached(
-            supabase,
-            queries.session,
-            5,
-            NEWS_CACHE_TTL_SECONDS
-          )
-        : Promise.resolve([]),
+        ? searchNewsMultipleCached(supabase, queries.macro, 3, NEWS_CACHE_TTL_SECONDS)
+        : Promise.resolve(EMPTY_BATCH),
       queries.market.length > 0
-        ? searchNewsMultipleCached(
-            supabase,
-            queries.market,
-            4,
-            NEWS_CACHE_TTL_SECONDS
-          )
-        : Promise.resolve([]),
-      queries.custom.length > 0
-        ? searchNewsMultiple(queries.custom, 4)
-        : Promise.resolve([]),
+        ? searchNewsMultipleCached(supabase, queries.market, 4, NEWS_CACHE_TTL_SECONDS)
+        : Promise.resolve(EMPTY_BATCH),
       searchBreakingMultipleCached(
         supabase,
         BREAKING_MACRO_QUERIES,
@@ -243,20 +338,33 @@ async function gatherMarketNews(
     ]);
 
   return {
-    news: [...macroNews, ...sessionNews, ...marketNews, ...customNews],
-    breaking: breakingNews,
+    news: [...macroBatch.results, ...marketBatch.results],
+    breaking: breakingBatch.results,
+    errorCount:
+      macroBatch.errorCount +
+      marketBatch.errorCount +
+      breakingBatch.errorCount,
+    totalQueries:
+      macroBatch.totalQueries +
+      marketBatch.totalQueries +
+      breakingBatch.totalQueries,
   };
 }
 
 async function fetchUpcomingEvents(
   supabase: SupabaseClient,
-  sessions: string[]
+  watchlistSymbols: string[]
 ): Promise<EconomicEvent[]> {
   const today = new Date().toISOString().split('T')[0];
 
-  const relevantCurrencies = sessions
-    .flatMap((s) => SESSION_CURRENCIES[s] || [])
-    .filter((v, i, a) => a.indexOf(v) === i);
+  // Derive the currency filter from the user's watchlist. EURUSD=X contributes
+  // EUR+USD; ^N225 contributes JPY; GC=F contributes USD; etc. If the watchlist
+  // is empty (shouldn't happen — UI requires non-empty at save time), fall
+  // back to USD so we still get the most market-moving events.
+  const relevantCurrencies =
+    watchlistSymbols.length > 0
+      ? symbolsToCurrencies(watchlistSymbols)
+      : ['USD'];
 
   const { data, error } = await supabase
     .from('economic_events')
@@ -295,10 +403,15 @@ async function fetchRecentBriefings(
   taskId: string,
   limit: number
 ): Promise<RecentBriefing[]> {
+  // Outage briefings describe system state, not market events. Feeding them
+  // into Gemini's "Previously Reported" dedup section would bias it toward
+  // suppressing genuine news that happens to follow an outage. Use JSONB
+  // containment via PostgREST's `not.cs` so the filter runs at the DB.
   const { data, error } = await supabase
     .from('orion_task_results')
     .select('metadata, content_plain, created_at')
     .eq('task_id', taskId)
+    .not('metadata', 'cs', '{"serper_outage":true}')
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -307,42 +420,16 @@ async function fetchRecentBriefings(
     return [];
   }
 
-  return (data ?? []).map((r) => ({
-    title:
-      (r.metadata as { title?: string } | null)?.title ?? 'Previous briefing',
+  interface BriefingRow {
+    metadata: Record<string, unknown> | null;
+    content_plain: string | null;
+    created_at: string;
+  }
+  return ((data ?? []) as BriefingRow[]).map((r) => ({
+    title: (r.metadata?.title as string | undefined) ?? 'Previous briefing',
     content_plain: r.content_plain ?? '',
     created_at: r.created_at,
   }));
-}
-
-async function fetchRecentInstruments(
-  supabase: SupabaseClient,
-  userId: string,
-  calendarId: string
-): Promise<string[]> {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  const { data, error } = await supabase
-    .from('trades')
-    .select('name')
-    .eq('user_id', userId)
-    .eq('calendar_id', calendarId)
-    .gte('trade_date', thirtyDaysAgo.toISOString())
-    .not('name', 'is', null)
-    .order('trade_date', { ascending: false })
-    .limit(100);
-
-  if (error) {
-    log('Failed to fetch recent instruments', 'error', error);
-    return [];
-  }
-
-  const names = (data ?? [])
-    .map((t: { name: string | null }) => t.name)
-    .filter((n): n is string => !!n && n.trim().length > 0);
-
-  return [...new Set(names)].slice(0, 10);
 }
 
 function deduplicateNews(results: NewsResult[]): NewsResult[] {
@@ -356,75 +443,18 @@ function deduplicateNews(results: NewsResult[]): NewsResult[] {
 }
 
 async function callGeminiForBriefing(
+  supabase: SupabaseClient,
   config: MarketResearchConfig,
   news: NewsResult[],
   breaking: NewsResult[],
   events: EconomicEvent[],
   instruments: string[],
-  recentBriefings: RecentBriefing[]
-): Promise<string> {
-  const systemPrompt = `You are Orion, an AI trading surprise detector. Every ${config.frequency_minutes ?? 30} minutes you sweep the market for catalysts. You only alert the trader when something actually happened — scheduled briefings don't exist in this system, so if nothing market-moving is present, rate significance="low" and keep the briefing brief (the UI will suppress it).
-
-When a surprise IS present (breaking content with a real catalyst, unexpected central-bank speech, political statement, geopolitical shock, major data miss), rate it at the appropriate level ("medium" or "high") and OPEN the briefing with one sentence telling the trader:
-1. What exactly happened
-2. Which assets are moving and by how much
-3. What the expected follow-through is (if any)
-
-DEDUPLICATION (critical to avoid spam — default to suppressing):
-You will be shown a "Previously Reported" section listing briefings this same task has already sent the trader in the past 90 minutes. The trader has ALREADY READ those. Your job now is to ask: "What has happened that the trader does not yet know?"
-
-Two briefings report the SAME EVENT if they share the same central catalyst, regardless of framing, headline, or which angle you emphasize. Rephrasing, re-headlining, or shifting emphasis from one consequence of the same event to another is NOT a new event. Examples of what counts as duplication:
-- Previous: "Shipping lane closure triggers oil spike"
-  Current: "President threatens trading partner as shipping lane blockade escalates"
-  → SAME EVENT (both center on the same underlying closure and its ripple effects). Return "low".
-- Previous: "Fed Chair hints at dovish pivot"
-  Current: "Fed Chair's speech calms markets, Nasdaq rallies"
-  → SAME EVENT. Return "low".
-
-Examples of GENUINELY NEW:
-- Previous: "Country-A / Country-B ceasefire announced"
-  Current: "Country-A launches retaliation strike 2 hours after ceasefire"
-  → NEW (an actual new event, not a rephrase). Return "high".
-- Previous: "Central bank rate decision pending at 12:00 UTC"
-  Current: "Central bank surprise 50 bps cut, currency −200 pips"
-  → NEW (the decision itself is a distinct event from the anticipation). Return "high".
-
-DEFAULT RULE: If you are uncertain whether the current news cycle contains genuinely new events the trader doesn't already know, return significance="low". Being silent when there's doubt is the correct choice — the trader prefers a quiet system that only speaks when something real happens.
-
-Respond ONLY with a JSON object in this exact format:
-{
-  "significance": "low" | "medium" | "high",
-  "title": "Short briefing title (max 60 chars)",
-  "briefing_html": "HTML formatted briefing",
-  "briefing_plain": "Plain text version of the briefing"
-}
-
-Breaking content (past-hour items in the user prompt) outranks everything else. If there IS a breaking item — a political post, a ceasefire announcement, a central-bank surprise, a flash headline — that is the lede. Open the briefing with it.
-
-Absent breaking content, prioritize these catalyst categories when scanning the news (from highest impact to lowest):
-1. Central bank decisions and speeches (Fed, ECB, BoE, BoJ, PBoC)
-2. Political statements from heads of state, executive orders, trade policy moves, presidential posts/tweets
-3. Geopolitical shocks — wars, sanctions, coups, major diplomatic events
-4. Scheduled economic data releases (CPI, NFP, GDP, PMI) and surprise data
-5. Commodity shocks (oil supply, OPEC, gold safe-haven flows)
-6. Bond market signals (yield curve, Treasury auctions, credit spreads)
-7. Major corporate catalysts (mega-cap earnings, M&A, regulatory action)
-8. Session-specific index moves
-
-Significance guide:
-- "high": Central bank surprise, major political/geopolitical shock, large unexpected data miss, commodity supply disruption
-- "medium": Scheduled high-impact data, central bank speakers on-script, notable earnings, moderate market moves
-- "low": Routine session with no major catalysts
-
-HTML formatting rules:
-- Use <h4> for section headers
-- Use <p> for paragraphs
-- Use <ul>/<li> for lists
-- Use <strong> for emphasis on names, data, and numbers
-- Keep total length under 800 words
-- Required sections in order: Key Catalysts (political/central bank/geopolitical top-of-mind), Economic Calendar (today and tomorrow), Market Outlook (sessions and sentiment)
-- Add an Instrument Focus section only if instruments are provided
-- If a headline mentions a specific politician, central banker, or country, name them explicitly in the briefing`;
+  recentBriefings: RecentBriefing[],
+  prices: PriceSnapshot[]
+): Promise<BriefingWithScrapeResult> {
+  const systemPrompt = buildMarketResearchSystemPrompt(
+    config.frequency_minutes ?? 30
+  );
 
   const newsSection =
     news.length > 0
@@ -433,7 +463,8 @@ HTML formatting rules:
           .map(
             (n) =>
               `- [${n.source || 'Web'}] ${n.title}: ${n.snippet}` +
-              `${n.date ? ` (${n.date})` : ''}`
+              `${n.date ? ` (${n.date})` : ''}` +
+              `${n.link ? ` | URL: ${n.link}` : ''}`
           )
           .join('\n')
       : 'No recent news found.';
@@ -445,7 +476,8 @@ HTML formatting rules:
           .map(
             (n) =>
               `- [${n.source || 'Web'}] ${n.title}: ${n.snippet}` +
-              `${n.date ? ` (${n.date})` : ''}`
+              `${n.date ? ` (${n.date})` : ''}` +
+              `${n.link ? ` | URL: ${n.link}` : ''}`
           )
           .join('\n')
       : 'No breaking content in the past hour.';
@@ -465,7 +497,7 @@ HTML formatting rules:
 
   const instrumentSection =
     instruments.length > 0
-      ? `Instruments the trader actively trades: ${instruments.join(', ')}`
+      ? `Instruments the trader is watching: ${instruments.join(', ')}`
       : '';
 
   const previouslyReportedSection =
@@ -480,7 +512,12 @@ HTML formatting rules:
           .join('\n\n')
       : '(No previous briefings — this is the first for this task.)';
 
-  const userPrompt = `Generate a market research briefing for the following sessions: ${config.sessions.join(', ')}.
+  const priceSection =
+    prices.length > 0
+      ? prices.map((p) => `- ${formatPriceLine(p)}`).join('\n')
+      : '(No price data available this sweep — describe moves qualitatively.)';
+
+  const userPrompt = `Generate a market research briefing.
 Markets of interest: ${config.markets.join(', ')}.
 
 ## Previously Reported (DEDUPLICATE AGAINST THESE)
@@ -493,6 +530,11 @@ These items were published in the last 60 minutes. A political post, ceasefire a
 
 ${breakingSection}
 
+## Price Snapshot (use ONLY these numbers when citing moves)
+Live intraday quotes. Every pip count, percentage move, or "X is +Y%" claim in your briefing MUST be supported by a line in this section. If the relevant instrument isn't listed here, describe the move qualitatively ("bid firmly", "under pressure") instead of inventing a number. Cross-check catalyst news against these moves: a big-sounding headline with a <0.15% move on the relevant pair is probably already priced in or not real.
+
+${priceSection}
+
 ## Recent Market News (past day)
 ${newsSection}
 
@@ -503,7 +545,11 @@ ${instrumentSection}
 
 Generate the JSON briefing now.`;
 
-  return generateContent(systemPrompt, userPrompt);
+  return generateBriefingWithScrape(
+    systemPrompt,
+    userPrompt,
+    (url) => scrapeArticle(supabase, url, 3600)
+  );
 }
 
 function parseBriefingResponse(rawJson: string): TaskResult {

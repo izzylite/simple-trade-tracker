@@ -13,9 +13,8 @@ import {
   Box,
   Chip,
   TextField,
-  Switch,
-  FormControlLabel,
   IconButton,
+  Autocomplete,
   useTheme,
   alpha,
 } from '@mui/material';
@@ -31,7 +30,7 @@ import {
 import type {
   TaskType,
   TaskConfig,
-  TradingSession,
+  MarketResearchConfig,
   CoachingTone,
   OrionTask,
 } from '../../types/orionTask';
@@ -40,6 +39,36 @@ import {
   buildDefaultConfigs,
   detectBrowserTimezone,
 } from '../../types/orionTask';
+import {
+  RESEARCH_TEMPLATES,
+  getTemplate,
+  FOREX_MACRO_TEMPLATE,
+} from '../../config/researchTemplates';
+
+// Backfill template fields on legacy task configs saved before templates
+// existed. Returns a fully-populated MarketResearchConfig so the form never
+// sees undefined arrays. Preserves prior `custom_topics` by merging them into
+// `macro_queries` so a user's ad-hoc topics don't silently vanish.
+function hydrateMarketResearchConfig(
+  raw: Record<string, unknown>
+): MarketResearchConfig {
+  const legacyTopics = Array.isArray(raw.custom_topics)
+    ? (raw.custom_topics as string[])
+    : [];
+  const macroQueries = Array.isArray(raw.macro_queries)
+    ? (raw.macro_queries as string[])
+    : [...FOREX_MACRO_TEMPLATE.macro_queries, ...legacyTopics];
+  return {
+    markets: (raw.markets as string[]) ?? ['forex'],
+    frequency_minutes: (raw.frequency_minutes as 15 | 30 | 60) ?? 30,
+    min_significance: (raw.min_significance as 'medium' | 'high') ?? 'high',
+    template_id: (raw.template_id as string) ?? FOREX_MACRO_TEMPLATE.id,
+    macro_queries: macroQueries.slice(0, MAX_MACRO_QUERIES),
+    watchlist_symbols: Array.isArray(raw.watchlist_symbols)
+      ? (raw.watchlist_symbols as string[])
+      : [],
+  };
+}
 
 // IANA timezones we surface in the dropdown. The browser-detected tz is
 // always prepended so the user's actual zone appears even if it's not in
@@ -167,13 +196,6 @@ const TASK_TYPE_INFO: Record<TaskType, TaskTypeInfo> = {
   },
 };
 
-const SESSION_LABELS: Record<TradingSession, string> = {
-  asia: 'Asia',
-  london: 'London',
-  ny_am: 'NY AM',
-  ny_pm: 'NY PM',
-};
-
 const TONE_LABELS: Record<CoachingTone, string> = {
   tough_love: 'Tough Love Coach',
   blunt_analyst: 'Blunt Analyst',
@@ -189,6 +211,419 @@ const MARKET_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'bonds', label: 'Bonds' },
 ];
 
+// Curated catalog of Yahoo Finance symbols, grouped by asset class for the
+// Autocomplete picker. Not exhaustive (Yahoo has tens of thousands of
+// tickers) — just the instruments traders actually watch. Keyboard shortcuts
+// / display labels are the primary UX, so we keep the label concise and put
+// the verbose name in `description` for the option row.
+interface YahooSymbolOption {
+  symbol: string;
+  label: string;
+  group: string;
+}
+
+const YAHOO_SYMBOL_CATALOG: YahooSymbolOption[] = [
+  // Forex — majors
+  { symbol: 'EURUSD=X', label: 'EUR/USD', group: 'Forex majors' },
+  { symbol: 'GBPUSD=X', label: 'GBP/USD', group: 'Forex majors' },
+  { symbol: 'USDJPY=X', label: 'USD/JPY', group: 'Forex majors' },
+  { symbol: 'USDCHF=X', label: 'USD/CHF', group: 'Forex majors' },
+  { symbol: 'USDCAD=X', label: 'USD/CAD', group: 'Forex majors' },
+  { symbol: 'AUDUSD=X', label: 'AUD/USD', group: 'Forex majors' },
+  { symbol: 'NZDUSD=X', label: 'NZD/USD', group: 'Forex majors' },
+  // Forex — crosses
+  { symbol: 'EURGBP=X', label: 'EUR/GBP', group: 'Forex crosses' },
+  { symbol: 'EURJPY=X', label: 'EUR/JPY', group: 'Forex crosses' },
+  { symbol: 'EURCHF=X', label: 'EUR/CHF', group: 'Forex crosses' },
+  { symbol: 'EURAUD=X', label: 'EUR/AUD', group: 'Forex crosses' },
+  { symbol: 'EURCAD=X', label: 'EUR/CAD', group: 'Forex crosses' },
+  { symbol: 'GBPJPY=X', label: 'GBP/JPY', group: 'Forex crosses' },
+  { symbol: 'GBPAUD=X', label: 'GBP/AUD', group: 'Forex crosses' },
+  { symbol: 'GBPCAD=X', label: 'GBP/CAD', group: 'Forex crosses' },
+  { symbol: 'AUDJPY=X', label: 'AUD/JPY', group: 'Forex crosses' },
+  { symbol: 'AUDNZD=X', label: 'AUD/NZD', group: 'Forex crosses' },
+  { symbol: 'NZDJPY=X', label: 'NZD/JPY', group: 'Forex crosses' },
+  { symbol: 'CADJPY=X', label: 'CAD/JPY', group: 'Forex crosses' },
+  { symbol: 'CHFJPY=X', label: 'CHF/JPY', group: 'Forex crosses' },
+  // Dollar / exotic FX
+  { symbol: 'DX-Y.NYB', label: 'DXY — US Dollar Index', group: 'Forex crosses' },
+  { symbol: 'USDMXN=X', label: 'USD/MXN', group: 'Forex crosses' },
+  { symbol: 'USDZAR=X', label: 'USD/ZAR', group: 'Forex crosses' },
+  { symbol: 'USDTRY=X', label: 'USD/TRY', group: 'Forex crosses' },
+  { symbol: 'USDCNH=X', label: 'USD/CNH (offshore yuan)', group: 'Forex crosses' },
+  // Equity indices — US
+  { symbol: '^GSPC', label: 'S&P 500', group: 'Equity indices' },
+  { symbol: '^IXIC', label: 'Nasdaq Composite', group: 'Equity indices' },
+  { symbol: '^DJI', label: 'Dow Jones', group: 'Equity indices' },
+  { symbol: '^RUT', label: 'Russell 2000', group: 'Equity indices' },
+  { symbol: '^VIX', label: 'VIX', group: 'Equity indices' },
+  // Equity indices — international
+  { symbol: '^FTSE', label: 'FTSE 100', group: 'Equity indices' },
+  { symbol: '^GDAXI', label: 'DAX', group: 'Equity indices' },
+  { symbol: '^FCHI', label: 'CAC 40', group: 'Equity indices' },
+  { symbol: '^STOXX50E', label: 'Euro Stoxx 50', group: 'Equity indices' },
+  { symbol: '^N225', label: 'Nikkei 225', group: 'Equity indices' },
+  { symbol: '^HSI', label: 'Hang Seng', group: 'Equity indices' },
+  { symbol: '^AXJO', label: 'ASX 200', group: 'Equity indices' },
+  // Index ETFs
+  { symbol: 'SPY', label: 'SPY', group: 'Index ETFs' },
+  { symbol: 'QQQ', label: 'QQQ', group: 'Index ETFs' },
+  { symbol: 'IWM', label: 'IWM', group: 'Index ETFs' },
+  { symbol: 'DIA', label: 'DIA', group: 'Index ETFs' },
+  // Commodities — metals
+  { symbol: 'GC=F', label: 'Gold', group: 'Commodities' },
+  { symbol: 'SI=F', label: 'Silver', group: 'Commodities' },
+  { symbol: 'HG=F', label: 'Copper', group: 'Commodities' },
+  { symbol: 'PL=F', label: 'Platinum', group: 'Commodities' },
+  { symbol: 'PA=F', label: 'Palladium', group: 'Commodities' },
+  // Commodities — energy
+  { symbol: 'CL=F', label: 'WTI Crude', group: 'Commodities' },
+  { symbol: 'BZ=F', label: 'Brent Crude', group: 'Commodities' },
+  { symbol: 'NG=F', label: 'Natural Gas', group: 'Commodities' },
+  { symbol: 'HO=F', label: 'Heating Oil', group: 'Commodities' },
+  { symbol: 'RB=F', label: 'Gasoline (RBOB)', group: 'Commodities' },
+  // Commodities — agricultural
+  { symbol: 'ZC=F', label: 'Corn', group: 'Commodities' },
+  { symbol: 'ZS=F', label: 'Soybeans', group: 'Commodities' },
+  { symbol: 'ZW=F', label: 'Wheat', group: 'Commodities' },
+  { symbol: 'KC=F', label: 'Coffee', group: 'Commodities' },
+  { symbol: 'SB=F', label: 'Sugar', group: 'Commodities' },
+  { symbol: 'CT=F', label: 'Cotton', group: 'Commodities' },
+  // Bonds / yields
+  { symbol: '^TNX', label: 'US 10Y Yield', group: 'Bonds & yields' },
+  { symbol: '^FVX', label: 'US 5Y Yield', group: 'Bonds & yields' },
+  { symbol: '^TYX', label: 'US 30Y Yield', group: 'Bonds & yields' },
+  { symbol: '^IRX', label: 'US 13W Yield', group: 'Bonds & yields' },
+  { symbol: 'ZB=F', label: '30Y T-Bond Future', group: 'Bonds & yields' },
+  { symbol: 'ZN=F', label: '10Y T-Note Future', group: 'Bonds & yields' },
+  { symbol: 'ZF=F', label: '5Y T-Note Future', group: 'Bonds & yields' },
+  { symbol: 'TLT', label: 'TLT (20Y+ Treasury ETF)', group: 'Bonds & yields' },
+  // Crypto
+  { symbol: 'BTC-USD', label: 'Bitcoin', group: 'Crypto' },
+  { symbol: 'ETH-USD', label: 'Ethereum', group: 'Crypto' },
+  { symbol: 'SOL-USD', label: 'Solana', group: 'Crypto' },
+  { symbol: 'BNB-USD', label: 'BNB', group: 'Crypto' },
+  { symbol: 'XRP-USD', label: 'XRP', group: 'Crypto' },
+  { symbol: 'ADA-USD', label: 'Cardano', group: 'Crypto' },
+  { symbol: 'DOGE-USD', label: 'Dogecoin', group: 'Crypto' },
+  { symbol: 'AVAX-USD', label: 'Avalanche', group: 'Crypto' },
+  { symbol: 'LINK-USD', label: 'Chainlink', group: 'Crypto' },
+  { symbol: 'LTC-USD', label: 'Litecoin', group: 'Crypto' },
+  // Mega-cap stocks
+  { symbol: 'AAPL', label: 'Apple', group: 'Mega-cap stocks' },
+  { symbol: 'MSFT', label: 'Microsoft', group: 'Mega-cap stocks' },
+  { symbol: 'NVDA', label: 'NVIDIA', group: 'Mega-cap stocks' },
+  { symbol: 'GOOGL', label: 'Alphabet Class A', group: 'Mega-cap stocks' },
+  { symbol: 'META', label: 'Meta', group: 'Mega-cap stocks' },
+  { symbol: 'AMZN', label: 'Amazon', group: 'Mega-cap stocks' },
+  { symbol: 'TSLA', label: 'Tesla', group: 'Mega-cap stocks' },
+  { symbol: 'JPM', label: 'JPMorgan', group: 'Mega-cap stocks' },
+  { symbol: 'XOM', label: 'Exxon', group: 'Mega-cap stocks' },
+  { symbol: 'BRK-B', label: 'Berkshire Hathaway B', group: 'Mega-cap stocks' },
+];
+
+const CUSTOM_TEMPLATE_ID = 'custom';
+
+// Each macro query fires a Serper call every sweep. Capped to keep quota usage
+// bounded; edge function trims defensively to the same limit.
+const MAX_MACRO_QUERIES = 10;
+
+interface MarketResearchFormProps {
+  config: MarketResearchConfig;
+  setConfig: (c: MarketResearchConfig) => void;
+  macroQueryInput: string;
+  setMacroQueryInput: (v: string) => void;
+}
+
+const MarketResearchForm: React.FC<MarketResearchFormProps> = ({
+  config,
+  setConfig,
+  macroQueryInput,
+  setMacroQueryInput,
+}) => {
+  const toggleArrayItem = <T extends string>(arr: T[], item: T): T[] =>
+    arr.includes(item) ? arr.filter((v) => v !== item) : [...arr, item];
+
+  const handleTemplateChange = (templateId: string) => {
+    const template = getTemplate(templateId);
+    if (!template) return;
+    // Overwrite the macro-query snapshot with the chosen template. Preserve
+    // markets/frequency/threshold/watchlist — those are orthogonal to the
+    // preset queries.
+    setConfig({
+      ...config,
+      template_id: template.id,
+      macro_queries: template.macro_queries.slice(0, MAX_MACRO_QUERIES),
+    });
+  };
+
+  const addMacroQuery = () => {
+    const trimmed = macroQueryInput.trim();
+    if (!trimmed || config.macro_queries.includes(trimmed)) return;
+    if (config.macro_queries.length >= MAX_MACRO_QUERIES) return;
+    setConfig({
+      ...config,
+      macro_queries: [...config.macro_queries, trimmed],
+      template_id: CUSTOM_TEMPLATE_ID,
+    });
+    setMacroQueryInput('');
+  };
+
+  const removeMacroQuery = (q: string) => {
+    setConfig({
+      ...config,
+      macro_queries: config.macro_queries.filter((x) => x !== q),
+      template_id: CUSTOM_TEMPLATE_ID,
+    });
+  };
+
+  const updateWatchlistSymbols = (symbols: string[]) => {
+    setConfig({
+      ...config,
+      watchlist_symbols: symbols,
+    });
+  };
+
+  // If the stored template_id is something we don't recognize (custom or
+  // legacy), show it as "Custom" in the picker rather than leaving the
+  // Select empty.
+  const templateValue = RESEARCH_TEMPLATES.some((t) => t.id === config.template_id)
+    ? config.template_id
+    : CUSTOM_TEMPLATE_ID;
+
+  const watchlistEmpty = (config.watchlist_symbols ?? []).length === 0;
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <FormControl size="small" fullWidth>
+        <InputLabel>Template</InputLabel>
+        <Select
+          value={templateValue}
+          label="Template"
+          onChange={(e) => handleTemplateChange(e.target.value as string)}
+          MenuProps={{ sx: { zIndex: 1600 } }}
+          renderValue={(val) => {
+            const label =
+              val === CUSTOM_TEMPLATE_ID
+                ? 'Custom (edited)'
+                : getTemplate(val as string)?.name ?? (val as string);
+            return (
+              <Typography
+                variant="body2"
+                sx={{ fontWeight: 600, color: 'text.primary' }}
+              >
+                {label}
+              </Typography>
+            );
+          }}
+        >
+          {RESEARCH_TEMPLATES.map((t) => (
+            <MenuItem key={t.id} value={t.id}>
+              <Box>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 600, color: 'text.primary' }}
+                >
+                  {t.name}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  {t.description}
+                </Typography>
+              </Box>
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <Box sx={{ display: 'flex', gap: 1.5 }}>
+        <FormControl size="small" sx={{ flex: 1 }}>
+          <InputLabel>Check every</InputLabel>
+          <Select
+            value={config.frequency_minutes}
+            label="Check every"
+            onChange={(e) =>
+              setConfig({
+                ...config,
+                frequency_minutes: e.target.value as 15 | 30 | 60,
+              })
+            }
+            MenuProps={{ sx: { zIndex: 1600 } }}
+          >
+            <MenuItem value={15}>15 min</MenuItem>
+            <MenuItem value={30}>30 min</MenuItem>
+            <MenuItem value={60}>1 hour</MenuItem>
+          </Select>
+        </FormControl>
+
+        <FormControl size="small" sx={{ flex: 1 }}>
+          <InputLabel>Alert on</InputLabel>
+          <Select
+            value={config.min_significance}
+            label="Alert on"
+            onChange={(e) =>
+              setConfig({
+                ...config,
+                min_significance: e.target.value as 'medium' | 'high',
+              })
+            }
+            MenuProps={{ sx: { zIndex: 1600 } }}
+          >
+            <MenuItem value="medium">Medium &amp; high</MenuItem>
+            <MenuItem value="high">High only</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+          Markets
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+          {MARKET_OPTIONS.map((m) => (
+            <Chip
+              key={m.value}
+              label={m.label}
+              size="small"
+              onClick={() =>
+                setConfig({
+                  ...config,
+                  markets: toggleArrayItem(config.markets, m.value),
+                })
+              }
+              color={config.markets.includes(m.value) ? 'primary' : 'default'}
+              variant={config.markets.includes(m.value) ? 'filled' : 'outlined'}
+            />
+          ))}
+        </Box>
+      </Box>
+
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+          Watchlist symbols <Box component="span" sx={{ color: 'error.main' }}>*</Box>
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{
+            display: 'block',
+            color: 'text.secondary',
+            mb: 1,
+            fontSize: '0.72rem',
+          }}
+        >
+          Pick the instruments you're watching. Drives live price grounding, per‑instrument news queries, and economic‑event currency filtering. Capped at ~12 total.
+        </Typography>
+        <Autocomplete<YahooSymbolOption, true>
+          multiple
+          size="small"
+          options={YAHOO_SYMBOL_CATALOG}
+          groupBy={(opt) => opt.group}
+          getOptionLabel={(opt) => `${opt.label} (${opt.symbol})`}
+          isOptionEqualToValue={(a, b) => a.symbol === b.symbol}
+          value={YAHOO_SYMBOL_CATALOG.filter((opt) =>
+            (config.watchlist_symbols ?? []).includes(opt.symbol)
+          )}
+          onChange={(_, newValue) =>
+            updateWatchlistSymbols(newValue.map((v) => v.symbol))
+          }
+          // The enclosing Dialog sets z-index 1500; default Popper lands behind it.
+          slotProps={{ popper: { sx: { zIndex: 1600 } } }}
+          renderOption={(props, opt) => (
+            <li {...props} key={opt.symbol}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                <span>{opt.label}</span>
+                <Typography
+                  component="span"
+                  variant="caption"
+                  sx={{ color: 'text.secondary', fontFamily: 'monospace' }}
+                >
+                  {opt.symbol}
+                </Typography>
+              </Box>
+            </li>
+          )}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              placeholder="Search instruments…"
+              error={watchlistEmpty}
+              helperText={watchlistEmpty ? 'Pick at least one instrument.' : undefined}
+            />
+          )}
+        />
+      </Box>
+
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+          Macro Queries{' '}
+          <Typography
+            component="span"
+            variant="caption"
+            sx={{ color: 'text.secondary', fontWeight: 400 }}
+          >
+            ({config.macro_queries.length}/{MAX_MACRO_QUERIES})
+          </Typography>
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{
+            display: 'block',
+            color: 'text.secondary',
+            mb: 1,
+            fontSize: '0.72rem',
+          }}
+        >
+          Baseline queries Orion runs every sweep. Edit to tailor to your market — e.g. add "$TSLA earnings" or "BTC ETF flows". Up to {MAX_MACRO_QUERIES} queries.
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+          <TextField
+            size="small"
+            placeholder={
+              config.macro_queries.length >= MAX_MACRO_QUERIES
+                ? `Limit reached (${MAX_MACRO_QUERIES})`
+                : 'Add a query…'
+            }
+            value={macroQueryInput}
+            onChange={(e) => setMacroQueryInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addMacroQuery();
+              }
+            }}
+            disabled={config.macro_queries.length >= MAX_MACRO_QUERIES}
+            fullWidth
+          />
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<AddIcon />}
+            disabled={
+              !macroQueryInput.trim() ||
+              config.macro_queries.length >= MAX_MACRO_QUERIES
+            }
+            onClick={addMacroQuery}
+          >
+            Add
+          </Button>
+        </Box>
+        {config.macro_queries.length > 0 && (
+          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+            {config.macro_queries.map((q) => (
+              <Chip
+                key={q}
+                label={q}
+                size="small"
+                onDelete={() => removeMacroQuery(q)}
+              />
+            ))}
+          </Box>
+        )}
+      </Box>
+
+    </Box>
+  );
+};
+
 const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   open,
   onClose,
@@ -202,7 +637,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   const [taskType, setTaskType] = useState<TaskType | ''>('');
   const [config, setConfig] = useState<TaskConfig | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [customTopicInput, setCustomTopicInput] = useState('');
+  const [macroQueryInput, setMacroQueryInput] = useState('');
 
   // Detect once per mount — changing TZ mid-dialog is unexpected.
   const browserTimezone = React.useMemo(() => detectBrowserTimezone(), []);
@@ -215,12 +650,19 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     [browserTimezone]
   );
 
-  // When opening in edit mode, hydrate from the editing task
+  // When opening in edit mode, hydrate from the editing task. Market research
+  // configs may predate the template fields — run them through the hydrator so
+  // the form always sees a fully-populated config.
   React.useEffect(() => {
     if (editingTask) {
       setTaskType(editingTask.task_type);
-      setConfig({ ...editingTask.config } as TaskConfig);
-      setCustomTopicInput('');
+      const raw = editingTask.config as unknown as Record<string, unknown>;
+      const hydrated =
+        editingTask.task_type === 'market_research'
+          ? (hydrateMarketResearchConfig(raw) as unknown as TaskConfig)
+          : ({ ...editingTask.config } as TaskConfig);
+      setConfig(hydrated);
+      setMacroQueryInput('');
     }
   }, [editingTask]);
 
@@ -237,14 +679,14 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     if (isEditMode) return; // in edit mode, back is disabled — only cancel/save
     setTaskType('');
     setConfig(null);
-    setCustomTopicInput('');
+    setMacroQueryInput('');
   };
 
   const handleClose = () => {
     onClose();
     setTaskType('');
     setConfig(null);
-    setCustomTopicInput('');
+    setMacroQueryInput('');
   };
 
   const handleSubmit = async () => {
@@ -262,10 +704,16 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     }
   };
 
-  const toggleArrayItem = <T extends string>(arr: T[], item: T): T[] =>
-    arr.includes(item) ? arr.filter((v) => v !== item) : [...arr, item];
-
   const selectedInfo = taskType ? TASK_TYPE_INFO[taskType] : null;
+
+  // Market research requires at least one watchlist symbol — it drives news
+  // queries, price grounding, and economic-event currency filtering. Without
+  // symbols there's nothing to ground the briefing against.
+  const canSubmit = (() => {
+    if (taskType !== 'market_research') return true;
+    const mr = config as MarketResearchConfig | null;
+    return !!mr && (mr.watchlist_symbols ?? []).length > 0;
+  })();
 
   return (
     <Dialog
@@ -432,215 +880,12 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
             </Typography>
 
             {taskType === 'market_research' && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {/* Core monitor config — frequency + threshold drive the whole task */}
-                <Box sx={{ display: 'flex', gap: 1.5 }}>
-                  <FormControl size="small" sx={{ flex: 1 }}>
-                    <InputLabel>Check every</InputLabel>
-                    <Select
-                      value={(config as any).frequency_minutes}
-                      label="Check every"
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          frequency_minutes: e.target.value as 15 | 30 | 60,
-                        })
-                      }
-                      MenuProps={{ sx: { zIndex: 1600 } }}
-                    >
-                      <MenuItem value={15}>15 min</MenuItem>
-                      <MenuItem value={30}>30 min</MenuItem>
-                      <MenuItem value={60}>1 hour</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <FormControl size="small" sx={{ flex: 1 }}>
-                    <InputLabel>Alert on</InputLabel>
-                    <Select
-                      value={(config as any).min_significance}
-                      label="Alert on"
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          min_significance: e.target.value as 'medium' | 'high',
-                        })
-                      }
-                      MenuProps={{ sx: { zIndex: 1600 } }}
-                    >
-                      <MenuItem value="medium">Medium &amp; high</MenuItem>
-                      <MenuItem value="high">High only</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Box>
-
-                <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                    Sessions
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      display: 'block',
-                      color: 'text.secondary',
-                      mb: 1,
-                      fontSize: '0.72rem',
-                    }}
-                  >
-                    Focus the news search and economic-calendar filter on these hours. Doesn't affect when the task runs.
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                    {(Object.keys(SESSION_LABELS) as TradingSession[]).map((s) => (
-                      <Chip
-                        key={s}
-                        label={SESSION_LABELS[s]}
-                        size="small"
-                        onClick={() =>
-                          setConfig({
-                            ...config,
-                            sessions: toggleArrayItem((config as any).sessions, s),
-                          })
-                        }
-                        color={(config as any).sessions.includes(s) ? 'primary' : 'default'}
-                        variant={(config as any).sessions.includes(s) ? 'filled' : 'outlined'}
-                      />
-                    ))}
-                  </Box>
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                    Markets
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                    {MARKET_OPTIONS.map((m) => (
-                      <Chip
-                        key={m.value}
-                        label={m.label}
-                        size="small"
-                        onClick={() =>
-                          setConfig({
-                            ...config,
-                            markets: toggleArrayItem(
-                              (config as any).markets,
-                              m.value
-                            ),
-                          })
-                        }
-                        color={
-                          (config as any).markets.includes(m.value)
-                            ? 'primary'
-                            : 'default'
-                        }
-                        variant={
-                          (config as any).markets.includes(m.value)
-                            ? 'filled'
-                            : 'outlined'
-                        }
-                      />
-                    ))}
-                  </Box>
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                    Custom Topics
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      display: 'block',
-                      color: 'text.secondary',
-                      mb: 1,
-                      fontSize: '0.72rem',
-                    }}
-                  >
-                    Add specific search topics (e.g. "ECB rate decision", "Fed minutes", "China PMI")
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                    <TextField
-                      size="small"
-                      placeholder="Add a topic…"
-                      value={customTopicInput}
-                      onChange={(e) => setCustomTopicInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          const trimmed = customTopicInput.trim();
-                          if (
-                            trimmed &&
-                            !(config as any).custom_topics.includes(trimmed)
-                          ) {
-                            setConfig({
-                              ...config,
-                              custom_topics: [
-                                ...(config as any).custom_topics,
-                                trimmed,
-                              ],
-                            });
-                            setCustomTopicInput('');
-                          }
-                        }
-                      }}
-                      fullWidth
-                    />
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<AddIcon />}
-                      disabled={!customTopicInput.trim()}
-                      onClick={() => {
-                        const trimmed = customTopicInput.trim();
-                        if (
-                          trimmed &&
-                          !(config as any).custom_topics.includes(trimmed)
-                        ) {
-                          setConfig({
-                            ...config,
-                            custom_topics: [
-                              ...(config as any).custom_topics,
-                              trimmed,
-                            ],
-                          });
-                          setCustomTopicInput('');
-                        }
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </Box>
-                  {(config as any).custom_topics.length > 0 && (
-                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                      {(config as any).custom_topics.map((topic: string) => (
-                        <Chip
-                          key={topic}
-                          label={topic}
-                          size="small"
-                          onDelete={() =>
-                            setConfig({
-                              ...config,
-                              custom_topics: (config as any).custom_topics.filter(
-                                (t: string) => t !== topic
-                              ),
-                            })
-                          }
-                        />
-                      ))}
-                    </Box>
-                  )}
-                </Box>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={(config as any).instrument_aware}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          instrument_aware: e.target.checked,
-                        })
-                      }
-                    />
-                  }
-                  label="Instrument-aware (tailor to my traded pairs)"
-                />
-              </Box>
+              <MarketResearchForm
+                config={config as MarketResearchConfig}
+                setConfig={(next) => setConfig(next)}
+                macroQueryInput={macroQueryInput}
+                setMacroQueryInput={setMacroQueryInput}
+              />
             )}
 
             {taskType === 'daily_analysis' && (
@@ -816,7 +1061,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
           <Button
             variant="contained"
             onClick={handleSubmit}
-            disabled={!config || submitting}
+            disabled={!config || submitting || !canSubmit}
           >
             {submitting
               ? (isEditMode ? 'Saving...' : 'Creating...')
