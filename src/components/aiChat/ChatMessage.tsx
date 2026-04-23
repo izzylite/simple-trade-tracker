@@ -191,7 +191,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             wordBreak: 'break-word',
             overflowWrap: 'anywhere',
             lineHeight: 1.65,
-            fontSize: '0.9rem'
+            fontSize: '0.95rem'
           }}
         >
           {renderUserContentWithTagChips}

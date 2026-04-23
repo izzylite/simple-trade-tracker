@@ -28,7 +28,7 @@ import type {
   TaskType,
   TaskConfig,
 } from '../../types/orionTask';
-import { TASK_TYPE_LABELS } from '../../types/orionTask';
+import { TASK_TYPE_LABELS, TASK_TYPE_COLORS } from '../../types/orionTask';
 
 interface OrionTasksContentProps {
   tasks: OrionTask[];
@@ -194,6 +194,7 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
           <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 1 }}>
             {tasks.map((task) => {
               const hasFailures = (task.consecutive_failures ?? 0) > 0;
+              const taskColor = TASK_TYPE_COLORS[task.task_type];
               const chipIcon = hasFailures ? (
                 <WarningIcon sx={{ fontSize: '14px !important' }} />
               )  : undefined;
@@ -209,13 +210,6 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                   label={TASK_TYPE_LABELS[task.task_type]}
                   size="small"
                   title={tooltip}
-                  color={
-                    hasFailures
-                      ? 'warning'
-                      : task.status === 'active'
-                        ? 'primary'
-                        : 'default'
-                  }
                   variant={task.status === 'active' ? 'filled' : 'outlined'}
                   onClick={onUpdateTask ? () => setEditingTask(task) : undefined}
                   onDelete={() => setPendingDeleteTaskId(task.id)}
@@ -227,27 +221,29 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                     height: 26,
                     cursor: onUpdateTask ? 'pointer' : 'default',
                     // Preserve background on hover — MUI's default darken
-                    // for clickable chips fights the "filled accent color"
-                    // we want the chip to hold in both states.
+                    // fights the "filled accent color" we want the chip to
+                    // hold in both states.
                     backgroundColor: hasFailures
                       ? alpha(theme.palette.warning.main, 0.15)
                       : task.status === 'active'
-                        ? theme.palette.primary.main
+                        ? taskColor
                         : 'transparent',
                     color: hasFailures
                       ? theme.palette.warning.dark
                       : task.status === 'active'
-                        ? theme.palette.primary.contrastText
-                        : 'text.primary',
+                        ? '#fff'
+                        : taskColor,
                     borderColor: hasFailures
                       ? theme.palette.warning.main
-                      : undefined,
+                      : task.status === 'active'
+                        ? undefined
+                        : alpha(taskColor, 0.6),
                     '&:hover, &.MuiChip-clickable:hover, &.MuiChip-clickable:focus': {
                       backgroundColor: hasFailures
                         ? alpha(theme.palette.warning.main, 0.15)
                         : task.status === 'active'
-                          ? theme.palette.primary.main
-                          : 'transparent',
+                          ? taskColor
+                          : alpha(taskColor, 0.08),
                     },
                     // Match the leading + trailing icons to the chip's label
                     // color so they don't wash out against the fill.

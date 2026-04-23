@@ -9,6 +9,19 @@ export interface NewsResult {
   source?: string;
 }
 
+/**
+ * Aggregate result for multi-query calls. `errorCount` counts queries that
+ * failed at the HTTP layer (distinct from queries that returned zero results).
+ * The handler uses this to distinguish "Serper is down" from "market is quiet"
+ * — critical so a genuine upstream outage surfaces as a briefing instead of
+ * being silently suppressed by the low-significance filter.
+ */
+export interface SerperBatchResult {
+  results: NewsResult[];
+  errorCount: number;
+  totalQueries: number;
+}
+
 // Time-range filter for Google News queries.
 //   'qdr:h' = past hour
 //   'qdr:d' = past day (default for routine news queries — today's cycle only)
@@ -19,15 +32,23 @@ export interface NewsResult {
 // today's Fed news).
 export type NewsTimeRange = 'qdr:h' | 'qdr:d' | 'qdr:w';
 
+/**
+ * Single news search. Returns:
+ *   NewsResult[]  — success (may be empty if Google News had no matches)
+ *   null          — Serper API failed (network error, 4xx/5xx, missing key)
+ *
+ * Callers MUST treat null and [] differently: null means "data source unavailable,"
+ * [] means "genuinely nothing matched this query."
+ */
 export async function searchNews(
   query: string,
   num = 8,
   timeRange: NewsTimeRange = 'qdr:d'
-): Promise<NewsResult[]> {
+): Promise<NewsResult[] | null> {
   const apiKey = Deno.env.get('SERPER_API_KEY');
   if (!apiKey) {
     log('SERPER_API_KEY not configured', 'warn');
-    return [];
+    return null;
   }
 
   try {
@@ -42,7 +63,7 @@ export async function searchNews(
 
     if (!response.ok) {
       log(`Serper news search failed: ${response.status}`, 'error');
-      return [];
+      return null;
     }
 
     const data = await response.json();
@@ -63,7 +84,7 @@ export async function searchNews(
     return results;
   } catch (err) {
     log('Serper news search error', 'error', err);
-    return [];
+    return null;
   }
 }
 
@@ -71,11 +92,11 @@ export async function searchNewsMultiple(
   queries: string[],
   numPerQuery = 5,
   timeRange: NewsTimeRange = 'qdr:d'
-): Promise<NewsResult[]> {
-  const results = await Promise.all(
+): Promise<SerperBatchResult> {
+  const settled = await Promise.all(
     queries.map((q) => searchNews(q, numPerQuery, timeRange))
   );
-  return results.flat();
+  return aggregateBatch(settled);
 }
 
 /**
@@ -85,18 +106,15 @@ export async function searchNewsMultiple(
  * e.g. a politician's post, an unexpected central-bank statement, or early
  * reporting from outlets that haven't been picked up by Google News.
  *
- * `timeRange`:
- *   'qdr:h' = past hour
- *   'qdr:d' = past day
- *   'qdr:w' = past week
+ * Returns null on API failure, [] on empty results (see searchNews).
  */
 export async function searchBreaking(
   query: string,
   timeRange: 'qdr:h' | 'qdr:d' | 'qdr:w' = 'qdr:h',
   num = 5
-): Promise<NewsResult[]> {
+): Promise<NewsResult[] | null> {
   const apiKey = Deno.env.get('SERPER_API_KEY');
-  if (!apiKey) return [];
+  if (!apiKey) return null;
 
   try {
     const response = await fetch('https://google.serper.dev/search', {
@@ -116,7 +134,7 @@ export async function searchBreaking(
 
     if (!response.ok) {
       log(`Serper breaking search failed: ${response.status}`, 'error');
-      return [];
+      return null;
     }
 
     const data = await response.json();
@@ -137,7 +155,7 @@ export async function searchBreaking(
     return results;
   } catch (err) {
     log('Serper breaking search error', 'error', err);
-    return [];
+    return null;
   }
 }
 
@@ -145,11 +163,26 @@ export async function searchBreakingMultiple(
   queries: string[],
   timeRange: 'qdr:h' | 'qdr:d' | 'qdr:w' = 'qdr:h',
   numPerQuery = 3
-): Promise<NewsResult[]> {
-  const results = await Promise.all(
+): Promise<SerperBatchResult> {
+  const settled = await Promise.all(
     queries.map((q) => searchBreaking(q, timeRange, numPerQuery))
   );
-  return results.flat();
+  return aggregateBatch(settled);
+}
+
+function aggregateBatch(
+  settled: Array<NewsResult[] | null>
+): SerperBatchResult {
+  let errorCount = 0;
+  const results: NewsResult[] = [];
+  for (const r of settled) {
+    if (r === null) {
+      errorCount += 1;
+    } else {
+      results.push(...r);
+    }
+  }
+  return { results, errorCount, totalQueries: settled.length };
 }
 
 // ============================================================
@@ -209,19 +242,24 @@ async function writeCache(
   }
 }
 
+/**
+ * Cached single-news call. Returns null on Serper failure (same contract as
+ * `searchNews`). Cache hits always return `NewsResult[]` — a cached entry
+ * represents a previously-successful call.
+ */
 export async function searchNewsCached(
   supabase: SupabaseClient,
   query: string,
   num: number,
   ttlSeconds: number,
   timeRange: NewsTimeRange = 'qdr:d'
-): Promise<NewsResult[]> {
+): Promise<NewsResult[] | null> {
   const cacheKey = makeCacheKey('news', query, num, timeRange);
   const cached = await readCache(supabase, cacheKey, ttlSeconds);
   if (cached) return cached;
 
   const fresh = await searchNews(query, num, timeRange);
-  if (fresh.length > 0) {
+  if (fresh && fresh.length > 0) {
     await writeCache(supabase, cacheKey, 'news', query, fresh);
   }
   return fresh;
@@ -233,13 +271,13 @@ export async function searchNewsMultipleCached(
   numPerQuery: number,
   ttlSeconds: number,
   timeRange: NewsTimeRange = 'qdr:d'
-): Promise<NewsResult[]> {
-  const results = await Promise.all(
+): Promise<SerperBatchResult> {
+  const settled = await Promise.all(
     queries.map((q) =>
       searchNewsCached(supabase, q, numPerQuery, ttlSeconds, timeRange)
     )
   );
-  return results.flat();
+  return aggregateBatch(settled);
 }
 
 export async function searchBreakingCached(
@@ -248,13 +286,13 @@ export async function searchBreakingCached(
   timeRange: 'qdr:h' | 'qdr:d' | 'qdr:w',
   num: number,
   ttlSeconds: number
-): Promise<NewsResult[]> {
+): Promise<NewsResult[] | null> {
   const cacheKey = makeCacheKey('search', query, num, timeRange);
   const cached = await readCache(supabase, cacheKey, ttlSeconds);
   if (cached) return cached;
 
   const fresh = await searchBreaking(query, timeRange, num);
-  if (fresh.length > 0) {
+  if (fresh && fresh.length > 0) {
     await writeCache(supabase, cacheKey, 'search', query, fresh);
   }
   return fresh;
@@ -266,11 +304,11 @@ export async function searchBreakingMultipleCached(
   timeRange: 'qdr:h' | 'qdr:d' | 'qdr:w',
   numPerQuery: number,
   ttlSeconds: number
-): Promise<NewsResult[]> {
-  const results = await Promise.all(
+): Promise<SerperBatchResult> {
+  const settled = await Promise.all(
     queries.map((q) =>
       searchBreakingCached(supabase, q, timeRange, numPerQuery, ttlSeconds)
     )
   );
-  return results.flat();
+  return aggregateBatch(settled);
 }

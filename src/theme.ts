@@ -180,9 +180,19 @@ export function createAppTheme(mode: 'light' | 'dark') {
             fontWeight: 500,
             fontSize: '0.75rem',
           },
+          // Default (uncolored) filled chip: violet-tinted background with
+          // high-contrast text. The previous violet-on-violet scheme was
+          // illegible. Colored variants (color="primary" etc.) bypass this
+          // override and keep MUI's own background/text handling.
           filled: {
-            backgroundColor: alpha(palette.violet.main, isDark ? 0.12 : 0.08),
-            color: palette.violet.main,
+            backgroundColor: alpha(palette.violet.main, isDark ? 1 : 0.1),
+            color: isDark ? palette.slate[50] : palette.slate[900],
+            '& .MuiChip-deleteIcon': {
+              color: alpha(isDark ? palette.slate[50] : palette.slate[900], 0.6),
+              '&:hover': {
+                color: isDark ? palette.slate[50] : palette.slate[900],
+              },
+            },
           },
         },
       },

@@ -158,8 +158,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
           <Typography
             component="p"
             sx={{
-              mb: 1.5,
-              lineHeight: 1.6,
+              mb: 1.75,
+              fontSize: '0.92rem',
+              lineHeight: 1.8,
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
               overflowWrap: 'anywhere'
@@ -210,8 +211,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
           <Box
             component="li"
             sx={{
-              mb: 0.5,
-              lineHeight: 1.6,
+              mb: 0.75,
+              fontSize: '0.92rem',
+              lineHeight: 1.8,
               '& > p': { mb: 0 }
             }}
           >

@@ -4,6 +4,7 @@
  */
 
 import { corsHeaders, handleCors, log, createServiceClient } from '../_shared/supabase.ts';
+import { callGemini as sharedCallGemini } from '../_shared/gemini.ts';
 import { formatErrorResponse, formatResponseWithHtmlAndCitations } from './formatters.ts';
 import type { AgentRequest, ToolCall } from './types.ts';
 import {
@@ -98,6 +99,28 @@ async function callGeminiWithContents(
     mode?: 'AUTO' | 'ANY' | 'NONE';
   }
 ): Promise<{ text: string; functionCall?: ParsedFunctionCall; rawParts: Array<Record<string, unknown>> }> {
+  // Non-streaming: delegate to the shared `_shared/gemini.ts` helper.
+  // The shared version handles body construction, error handling, and
+  // part extraction; we just map the return shape (shared returns
+  // `functionCalls: []`, chat consumer expects `functionCall` singular).
+  if (!opts.streaming) {
+    const result = await sharedCallGemini({
+      contents: contents as Array<{ role: 'user' | 'model'; parts: Array<Record<string, unknown>> }>,
+      tools: tools.length > 0 ? tools : undefined,
+      toolMode: opts.mode,
+      maxOutputTokens: opts.maxOutputTokens ?? 4000,
+      thinkingLevel: THINKING_LEVEL as 'minimal' | 'low' | 'medium' | 'high',
+    });
+    return {
+      text: result.text,
+      functionCall: result.functionCalls[0],
+      rawParts: result.rawParts,
+    };
+  }
+
+  // Streaming path stays local — SSE writer lifecycle is chat-specific
+  // (reasoning/text/tool_call event emission) and would leak into a shared
+  // helper. Body shape mirrors `_shared/gemini.ts` so behavior stays in sync.
   const body = {
     contents,
     tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
@@ -111,7 +134,7 @@ async function callGeminiWithContents(
     }
   };
 
-  const response = await fetch(buildGeminiUrl(apiKey, opts.streaming), {
+  const response = await fetch(buildGeminiUrl(apiKey, true), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -126,64 +149,49 @@ async function callGeminiWithContents(
   let functionCall: ParsedFunctionCall | undefined;
   const rawParts: Array<Record<string, unknown>> = [];
 
-  if (opts.streaming) {
-    if (!response.body) return { text, functionCall, rawParts };
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.trim() || line.startsWith('data: [DONE]')) continue;
-          const jsonLine = line.startsWith('data: ') ? line.slice(6) : line;
-          if (!jsonLine.trim()) continue;
-          try {
-            const chunk = JSON.parse(jsonLine);
-            const parts = chunk.candidates?.[0]?.content?.parts || [];
-            // Preserve ALL raw parts across chunks — thoughtSignature may arrive
-            // as its own standalone Part preceding the functionCall Part, and
-            // reconstructing would drop it.
-            rawParts.push(...parts);
-            for (const part of parts) {
-              if (!part.text) continue;
-              if (part.thought) {
-                if (opts.writer) await sendSSE(opts.writer, 'reasoning_chunk', { text: part.text });
-                continue;
-              }
-              text += part.text;
-              if (opts.writer) await sendSSE(opts.writer, 'text_chunk', { text: part.text });
+  if (!response.body) return { text, functionCall, rawParts };
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim() || line.startsWith('data: [DONE]')) continue;
+        const jsonLine = line.startsWith('data: ') ? line.slice(6) : line;
+        if (!jsonLine.trim()) continue;
+        try {
+          const chunk = JSON.parse(jsonLine);
+          const parts = chunk.candidates?.[0]?.content?.parts || [];
+          // Preserve ALL raw parts across chunks — thoughtSignature may arrive
+          // as its own standalone Part preceding the functionCall Part, and
+          // reconstructing would drop it.
+          rawParts.push(...parts);
+          for (const part of parts) {
+            if (!part.text) continue;
+            if (part.thought) {
+              if (opts.writer) await sendSSE(opts.writer, 'reasoning_chunk', { text: part.text });
+              continue;
             }
-            const fcPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
-            if (fcPart) {
-              const extracted = extractFunctionCall(fcPart);
-              if (extracted) functionCall = extracted;
-            }
-          } catch (parseError) {
-            log(`Failed to parse streaming chunk: ${parseError}`, 'warn');
+            text += part.text;
+            if (opts.writer) await sendSSE(opts.writer, 'text_chunk', { text: part.text });
           }
+          const fcPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
+          if (fcPart) {
+            const extracted = extractFunctionCall(fcPart);
+            if (extracted) functionCall = extracted;
+          }
+        } catch (parseError) {
+          log(`Failed to parse streaming chunk: ${parseError}`, 'warn');
         }
       }
-    } finally {
-      reader.releaseLock();
     }
-  } else {
-    const data = await response.json();
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    rawParts.push(...parts);
-    const fcPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
-    if (fcPart) {
-      const extracted = extractFunctionCall(fcPart);
-      if (extracted) functionCall = extracted;
-    }
-    text = parts
-      .filter((p: { text?: string; thought?: boolean }) => !p.thought)
-      .map((p: { text?: string }) => p.text || '')
-      .join('');
+  } finally {
+    reader.releaseLock();
   }
 
   return { text, functionCall, rawParts };
@@ -1174,7 +1182,7 @@ function handleStreamingRequest(
             // Retry 2: Simplify - use fewer tools (only custom tools, no MCP)
             clarifiedMessage = `${contextPrefix}User says: "${message}"\n\nProvide a helpful response.`;
             retryTools = allTools.filter(t =>
-              ['execute_sql', 'search_web', 'get_crypto_price', 'get_forex_price', 'create_note', 'update_memory'].includes(t.name)
+              ['execute_sql', 'search_web', 'get_market_price', 'create_note', 'update_memory'].includes(t.name)
             );
             log(`Retry 2: Using reduced tool set (${retryTools.length} tools)`, 'info');
           } else {

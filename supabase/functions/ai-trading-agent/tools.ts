@@ -4,6 +4,8 @@
  */
 
 import { log } from "../_shared/supabase.ts";
+import { fetchSerperScrape, scrapeArticle } from "../_shared/serperScrape.ts";
+import { getMarketPrice } from "../_shared/prices.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { Note } from "./types.ts";
 
@@ -75,47 +77,34 @@ export const scrapeUrlTool: GeminiFunctionDeclaration = {
 };
 
 /**
- * Crypto price tool definition
+ * Universal market price tool — Yahoo Finance (intraday) as primary, with
+ * internal fallbacks to CoinGecko and Frankfurter. Covers all asset classes.
  */
-export const getCryptoPriceTool: GeminiFunctionDeclaration = {
-  name: "get_crypto_price",
+export const getMarketPriceTool: GeminiFunctionDeclaration = {
+  name: "get_market_price",
   description:
-    "Get real-time cryptocurrency price, 24h change, volume, and market cap. Use this to understand current market conditions when analyzing trades.",
-  parameters: {
-    type: "object",
-    properties: {
-      coin_id: {
-        type: "string",
-        description:
-          "Coin ID (lowercase): bitcoin, ethereum, solana, cardano, ripple, dogecoin, etc. Use common names.",
-      },
-    },
-    required: ["coin_id"],
-  },
-};
+    `Get intraday price data for any instrument — forex, indices, commodities, crypto, bonds, or stocks. Returns: price, day change %, day high/low, previous close, and data source.
 
-/**
- * Forex price tool definition
- */
-export const getForexPriceTool: GeminiFunctionDeclaration = {
-  name: "get_forex_price",
-  description:
-    "Get real-time foreign exchange (forex) rates for currency pairs like EUR/USD, GBP/USD, etc. Use this for forex trading analysis.",
+The tool automatically falls back to alternative providers internally if the primary source is unavailable. When fallback data is returned, the response will include a note indicating the source and freshness (e.g. "end-of-day reference rate" for forex fallback) — respect that in your wording (don't say "currently trading at" for end-of-day data).
+
+COMMON SYMBOLS (Yahoo Finance format):
+  Forex: EURUSD=X, GBPUSD=X, USDJPY=X, USDCHF=X, USDCAD=X, AUDUSD=X, NZDUSD=X, EURGBP=X, EURJPY=X, GBPJPY=X, DX-Y.NYB (Dollar Index)
+  Indices: ^GSPC (S&P 500), ^IXIC (Nasdaq), ^DJI (Dow), ^VIX, ^FTSE, ^GDAXI (DAX), ^N225 (Nikkei), ^HSI (Hang Seng)
+  Commodities: GC=F (Gold), SI=F (Silver), CL=F (WTI Oil), BZ=F (Brent), NG=F (Natural Gas), HG=F (Copper)
+  Crypto: BTC-USD, ETH-USD, SOL-USD, XRP-USD, ADA-USD, DOGE-USD
+  Bonds: ^TNX (10Y Yield), ^FVX (5Y), ^TYX (30Y), TLT (20Y+ ETF)
+  Stocks: AAPL, MSFT, NVDA, GOOGL, META, AMZN, TSLA, JPM
+  ETFs: SPY, QQQ, IWM`,
   parameters: {
     type: "object",
     properties: {
-      base_currency: {
+      symbol: {
         type: "string",
         description:
-          "Base currency code (3-letter): EUR, GBP, USD, JPY, CHF, CAD, AUD, NZD, etc.",
-      },
-      quote_currency: {
-        type: "string",
-        description:
-          "Quote currency code (3-letter): USD, EUR, GBP, JPY, CHF, CAD, AUD, NZD, etc.",
+          'Yahoo Finance symbol. Examples: "EURUSD=X", "^GSPC", "GC=F", "BTC-USD", "AAPL"',
       },
     },
-    required: ["base_currency", "quote_currency"],
+    required: ["symbol"],
   },
 };
 
@@ -698,58 +687,29 @@ export async function executeWebSearch(
 }
 
 /**
- * Scrape URL content using Serper API
+ * Scrape URL content using Serper API.
+ *
+ * Thin chat-shaped wrapper around the shared scrape helpers in
+ * `_shared/serperScrape.ts` (also used by Orion market-research). Uses the
+ * shared DB cache when a service-role client is available — headline news
+ * URLs are frequently re-requested across users and sessions, so caching
+ * cuts Serper cost materially. Falls back to the uncached fetcher when no
+ * client is passed (keeps the function callable outside the tool-executor).
  */
-export async function scrapeUrl(url: string): Promise<string> {
-  try {
-    const serperApiKey = Deno.env.get("SERPER_API_KEY");
-    if (!serperApiKey) {
-      return "URL scraping not configured (SERPER_API_KEY missing)";
-    }
-
-    // Validate URL
-    try {
-      new URL(url);
-    } catch {
-      return "Invalid URL format";
-    }
-
-    const response = await fetch("https://google.serper.dev/scrape", {
-      method: "POST",
-      headers: {
-        "X-API-KEY": serperApiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ url }),
-    });
-
-    if (!response.ok) {
-      return `Scraping failed: ${response.status} ${response.statusText}`;
-    }
-
-    const data = await response.json();
-
-    let result = `Content from: ${url}\n\n`;
-
-    if (data.metadata?.title) {
-      result += `Title: ${data.metadata.title}\n\n`;
-    }
-
-    if (data.text) {
-      // Limit content length to manage token usage
-      const maxLength = 3000;
-      const text = data.text.length > maxLength
-        ? data.text.substring(0, maxLength) + "..."
-        : data.text;
-      result += `Content:\n${text}`;
-    }
-
-    return result || "No content extracted from URL";
-  } catch (error) {
-    return `URL scraping error: ${
-      error instanceof Error ? error.message : "Unknown"
-    }`;
+export async function scrapeUrl(
+  url: string,
+  supabase?: SupabaseClient,
+): Promise<string> {
+  const article = supabase
+    ? await scrapeArticle(supabase, url)
+    : await fetchSerperScrape(url);
+  if (!article) {
+    return `URL scraping failed or returned no content for: ${url}`;
   }
+  let result = `Content from: ${article.url}\n\n`;
+  if (article.title) result += `Title: ${article.title}\n\n`;
+  result += `Content:\n${article.text}`;
+  return result;
 }
 
 /**
@@ -839,6 +799,89 @@ export async function getForexPrice(
       error instanceof Error ? error.message : "Unknown"
     }`;
   }
+}
+
+/**
+ * Universal price lookup with fallback chain:
+ *   1. Yahoo Finance (intraday, all asset classes) via shared cache
+ *   2. CoinGecko (crypto only, near-realtime)
+ *   3. Frankfurter/ECB (forex only, end-of-day)
+ *
+ * Each fallback tags its `source` so Gemini knows the data freshness and
+ * adjusts language accordingly ("intraday" vs "end-of-day reference rate").
+ */
+export async function executeGetMarketPrice(
+  symbol: string,
+  supabase?: SupabaseClient,
+): Promise<string> {
+  const trimmed = symbol.trim();
+  if (!trimmed) return "Symbol is required.";
+
+  // --- Primary: Yahoo via shared cache ---
+  if (supabase) {
+    const snap = await getMarketPrice(supabase, trimmed);
+    if (snap) {
+      const dp = snap.price < 10 ? 5 : 2;
+      const arrow = snap.percentChange >= 0 ? "▲" : "▼";
+      const priceStr = snap.price.toLocaleString("en-US", {
+        minimumFractionDigits: dp,
+        maximumFractionDigits: dp,
+      });
+      return [
+        `${snap.displayName} (${snap.symbol})`,
+        `Source: Yahoo Finance (intraday)`,
+        ``,
+        `Price: ${priceStr} ${snap.currency}`,
+        `Day change: ${arrow} ${snap.percentChange.toFixed(2)}%`,
+        `Day range: ${snap.dayLow.toFixed(dp)} – ${snap.dayHigh.toFixed(dp)}`,
+        `Previous close: ${snap.previousClose.toFixed(dp)}`,
+      ].join("\n");
+    }
+  }
+
+  log(`Yahoo miss for ${trimmed}, trying fallbacks`, "info");
+
+  // --- Fallback: CoinGecko for crypto symbols (BTC-USD → bitcoin) ---
+  if (trimmed.endsWith("-USD")) {
+    const coinMap: Record<string, string> = {
+      "BTC-USD": "bitcoin",
+      "ETH-USD": "ethereum",
+      "SOL-USD": "solana",
+      "XRP-USD": "ripple",
+      "ADA-USD": "cardano",
+      "DOGE-USD": "dogecoin",
+      "BNB-USD": "binancecoin",
+      "AVAX-USD": "avalanche-2",
+      "LINK-USD": "chainlink",
+      "LTC-USD": "litecoin",
+    };
+    const coinId = coinMap[trimmed] ??
+      trimmed.replace(/-USD$/, "").toLowerCase();
+    const result = await getCryptoPrice(coinId);
+    if (!result.startsWith("Crypto price error") && !result.startsWith("Failed")) {
+      return `${result}\nSource: CoinGecko (near-realtime, ~60s delay)`;
+    }
+  }
+
+  // --- Fallback: Frankfurter for forex symbols (EURUSD=X → EUR/USD) ---
+  if (trimmed.endsWith("=X") && trimmed.length >= 8) {
+    const pair = trimmed.replace("=X", "");
+    const base = pair.substring(0, 3);
+    const quote = pair.substring(3, 6);
+    if (base.length === 3 && quote.length === 3) {
+      const result = await getForexPrice(base, quote);
+      if (!result.startsWith("Forex rate error") && !result.startsWith("Failed")) {
+        return (
+          result +
+          "\n⚠️ Source: Frankfurter/ECB (end-of-day reference rate — NOT intraday). " +
+          "This is the last published daily rate, not a live quote. " +
+          "Do NOT present this as a current or real-time price."
+        );
+      }
+    }
+  }
+
+  return `Could not fetch price for "${trimmed}". Yahoo, CoinGecko, and Frankfurter all failed or the symbol is unrecognized.`;
 }
 
 /**
@@ -2273,22 +2316,12 @@ export async function executeCustomTool(
 
       case "scrape_url": {
         const url = typeof args.url === "string" ? args.url : "";
-        return await scrapeUrl(url);
+        return await scrapeUrl(url, supabase);
       }
 
-      case "get_crypto_price": {
-        const coinId = typeof args.coin_id === "string" ? args.coin_id : "";
-        return await getCryptoPrice(coinId);
-      }
-
-      case "get_forex_price": {
-        const baseCurrency = typeof args.base_currency === "string"
-          ? args.base_currency
-          : "";
-        const quoteCurrency = typeof args.quote_currency === "string"
-          ? args.quote_currency
-          : "";
-        return await getForexPrice(baseCurrency, quoteCurrency);
+      case "get_market_price": {
+        const sym = typeof args.symbol === "string" ? args.symbol : "";
+        return await executeGetMarketPrice(sym, supabase);
       }
 
       case "generate_chart": {
@@ -2546,8 +2579,7 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
   return [
     searchWebTool,
     scrapeUrlTool,
-    getCryptoPriceTool,
-    getForexPriceTool,
+    getMarketPriceTool,
     generateChartTool,
     createNoteTool,
     updateNoteTool,

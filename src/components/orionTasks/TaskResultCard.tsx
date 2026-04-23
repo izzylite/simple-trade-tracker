@@ -24,7 +24,7 @@ import {
 import Collapse from '@mui/material/Collapse';
 import { format } from 'date-fns';
 import type { OrionTaskResult, Significance } from '../../types/orionTask';
-import { TASK_TYPE_LABELS } from '../../types/orionTask';
+import { TASK_TYPE_LABELS, TASK_TYPE_COLORS } from '../../types/orionTask';
 import CitationsSection from '../aiChat/CitationsSection';
 import type { Citation } from '../../types/aiChat';
 
@@ -124,6 +124,8 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
                 fontSize: '0.7rem',
                 height: 22,
                 fontWeight: 600,
+                backgroundColor: alpha(TASK_TYPE_COLORS[result.task_type], 0.18),
+                color: TASK_TYPE_COLORS[result.task_type],
               }}
             />
             {isError && (
@@ -210,7 +212,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
         <Collapse in={expanded} timeout="auto">
           <Typography
             variant="body2"
-            sx={{ fontSize: '0.82rem', lineHeight: 1.5, whiteSpace: 'pre-wrap', mt: 0.5 }}
+            sx={{ fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', mt: 0.5 }}
             dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
           />
 
@@ -222,7 +224,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
           )}
         </Collapse>
 
-        {(onFollowup || onSaveNote) && (!result.is_read || expanded) && (
+        {(onFollowup || onSaveNote) && (expanded) && (
           <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
             {onSaveNote && (
               <Button

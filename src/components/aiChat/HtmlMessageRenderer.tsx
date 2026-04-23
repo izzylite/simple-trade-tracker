@@ -570,9 +570,11 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
       <Box
         ref={containerRef}
         sx={{
+          fontSize: '0.92rem',
+          lineHeight: 1.8,
           '& p': {
-            margin: '0.5rem 0',
-            lineHeight: 1.5
+            margin: '0.75rem 0',
+            lineHeight: 1.8
           },
           '& strong': {
             fontWeight: 600
@@ -591,11 +593,12 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
           '& h5': { fontSize: '0.95rem' },
           '& h6': { fontSize: '0.9rem' },
           '& ul, & ol': {
-            margin: '0.5rem 0',
+            margin: '0.75rem 0',
             paddingLeft: '1.5rem'
           },
           '& li': {
-            margin: '0.25rem 0'
+            margin: '0.5rem 0',
+            lineHeight: 1.8
           },
           '& blockquote': {
             margin: '0.5rem 0',

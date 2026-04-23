@@ -509,7 +509,7 @@ ${calendarContextSection}
 1. execute_sql — Query trades/calendars/notes/economic_events (apply security filter)
 2. search_web — Market news and analysis (NOT for economic calendar). Use time_range param for recency filtering.
 3. scrape_url — Article content extraction. Prefer scraping the most recent articles first.
-4. get_crypto_price, get_forex_price — Live prices
+4. get_market_price — Live intraday prices for any instrument (forex, indices, commodities, crypto, bonds, stocks). Pass Yahoo Finance symbol (e.g. EURUSD=X, ^GSPC, GC=F, BTC-USD, AAPL).
 5. generate_chart — Visualize data (auto-displays, omit URL mentions)
 6. create_note, update_note, delete_note, search_notes — Note management (NOT for AGENT_MEMORY)
 7. update_memory — Update agent memory with merge logic (for AGENT_MEMORY only)
@@ -532,8 +532,8 @@ Correct sequencing examples:
   NOT: get_recent_orion_briefings → search_notes x5 → get_recent_orion_briefings → execute_sql x7
 
 "What is EUR/USD?":
-  get_forex_price → respond
-  NOT: get_forex_price → scrape_url → search_web
+  get_market_price (symbol: "EURUSD=X") → respond
+  NOT: get_market_price → scrape_url → search_web
 
 "What have we discussed about risk management?":
   search_conversations → respond
@@ -556,7 +556,7 @@ Correct sequencing examples:
 | User references a briefing/alert — past ("what did you tell me earlier", "your last alert") OR just-delivered ("new briefing is out", "the latest briefing says", "this briefing") OR implicit ("does this change the outlook?" when citing briefing content) | get_recent_orion_briefings |
 | "Last time we talked…", "yesterday we discussed…", "remember when I asked about X?", "previously discussed", "what have we talked about", "what did we conclude" | search_conversations → get_conversation |
 | Market news, sentiment, analysis | search_web (type: "news", time_range: "day"/"week") → THEN scrape_url |
-| Current prices | get_crypto_price / get_forex_price |
+| Current prices (any asset class) | get_market_price (Yahoo symbol: EURUSD=X, ^GSPC, GC=F, BTC-USD, AAPL) |
 | Review trade charts/images | analyze_image (pass trade.images[].url) |
 | Unknown tag meaning | get_tag_definition → user's tag dictionary |
 | Update persistent memory | update_memory (NOT update_note) |
