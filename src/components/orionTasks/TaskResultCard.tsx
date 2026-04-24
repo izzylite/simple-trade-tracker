@@ -157,6 +157,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
                 fontSize: '0.7rem',
                 height: 22,
                 fontWeight: 600,
+                minWidth: '120px',
                 backgroundColor: alpha(TASK_TYPE_COLORS[result.task_type], 0.18),
                 color: TASK_TYPE_COLORS[result.task_type],
               }}
@@ -182,6 +183,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
                 size="small"
                 sx={{
                   fontSize: '0.65rem',
+                    minWidth: '80px',
                   height: 20,
                   fontWeight: 700,
                   backgroundColor: alpha(
