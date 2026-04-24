@@ -828,7 +828,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             opacity: 0.7
           }}
         >
-          {`Enter to send • Shift+Enter newline • / for tags & notes • Up to ${MAX_IMAGES} images`}
+          {`Enter to send • Shift+Enter newline • / for commands • @ for notes & tags • Up to ${MAX_IMAGES} images`}
         </Typography>
       </Box>
 
