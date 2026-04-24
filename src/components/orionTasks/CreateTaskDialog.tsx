@@ -202,6 +202,29 @@ const TONE_LABELS: Record<CoachingTone, string> = {
   supportive_mentor: 'Supportive Mentor',
 };
 
+interface CoachingToneSelectProps {
+  value: CoachingTone | undefined;
+  onChange: (tone: CoachingTone) => void;
+}
+
+const CoachingToneSelect: React.FC<CoachingToneSelectProps> = ({ value, onChange }) => (
+  <FormControl fullWidth>
+    <InputLabel>Coaching Tone</InputLabel>
+    <Select
+      value={value ?? 'tough_love'}
+      label="Coaching Tone"
+      onChange={(e) => onChange(e.target.value as CoachingTone)}
+      MenuProps={{ sx: { zIndex: 1600 } }}
+    >
+      {(Object.keys(TONE_LABELS) as CoachingTone[]).map((t) => (
+        <MenuItem key={t} value={t}>
+          {TONE_LABELS[t]}
+        </MenuItem>
+      ))}
+    </Select>
+  </FormControl>
+);
+
 const MARKET_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'forex', label: 'Forex' },
   { value: 'stocks', label: 'Stocks' },
@@ -918,31 +941,19 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                     </Select>
                   </FormControl>
                 </Box>
-                <FormControl fullWidth>
-                  <InputLabel>Coaching Tone</InputLabel>
-                  <Select
-                    value={(config as any).tone}
-                    label="Coaching Tone"
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        tone: e.target.value as CoachingTone,
-                      })
-                    }
-                    MenuProps={{ sx: { zIndex: 1600 } }}
-                  >
-                    {(Object.keys(TONE_LABELS) as CoachingTone[]).map((t) => (
-                      <MenuItem key={t} value={t}>
-                        {TONE_LABELS[t]}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <CoachingToneSelect
+                  value={(config as any).tone}
+                  onChange={(tone) => setConfig({ ...config, tone })}
+                />
               </Box>
             )}
 
             {taskType === 'weekly_review' && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <CoachingToneSelect
+                  value={(config as any).tone}
+                  onChange={(tone) => setConfig({ ...config, tone })}
+                />
                 <FormControl fullWidth>
                   <InputLabel>Run Day</InputLabel>
                   <Select
@@ -1009,6 +1020,10 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
 
             {taskType === 'monthly_rollup' && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <CoachingToneSelect
+                  value={(config as any).tone}
+                  onChange={(tone) => setConfig({ ...config, tone })}
+                />
                 <Box sx={{ display: 'flex', gap: 1.5 }}>
                   <TextField
                     label="Run Time"

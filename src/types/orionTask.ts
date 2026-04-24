@@ -55,12 +55,14 @@ export interface WeeklyReviewConfig {
   run_time_utc: string;
   timezone: string;
   comparison_weeks: number;
+  tone: CoachingTone;
 }
 
 export interface MonthlyRollupConfig {
   run_time_utc: string;
   timezone: string;
   comparison_months: number;
+  tone: CoachingTone;
 }
 
 export type TaskConfig =
@@ -92,6 +94,31 @@ export function detectBrowserTimezone(): string {
   } catch {
     return 'UTC';
   }
+}
+
+/**
+ * Bundle of state and actions exposed by `useOrionTasks`. Passed around as a
+ * single `aiTasks` prop so consumers don't have to thread 13 individual props.
+ */
+export interface AITasksBundle {
+  tasks: OrionTask[];
+  results: OrionTaskResult[];
+  unreadCount: number;
+  loading: boolean;
+  hasMore: boolean;
+  loadingMore: boolean;
+  createTask: (taskType: TaskType, config: TaskConfig) => Promise<OrionTask | undefined>;
+  updateTask: (
+    taskId: string,
+    updates: { status?: OrionTask['status']; config?: TaskConfig }
+  ) => Promise<OrionTask | undefined>;
+  deleteTask: (taskId: string) => Promise<void>;
+  markRead: (resultId: string) => Promise<void>;
+  markAllRead: () => Promise<void>;
+  hideResult: (resultId: string) => Promise<void>;
+  loadMore: () => Promise<void>;
+  refetchTasks: () => Promise<void>;
+  refetchResults: () => Promise<void>;
 }
 
 export interface OrionTaskResult {
@@ -147,11 +174,13 @@ export function buildDefaultConfigs(timezone: string): Record<TaskType, TaskConf
       run_time_utc: '09:00',
       timezone,
       comparison_weeks: 4,
+      tone: 'tough_love',
     },
     monthly_rollup: {
       run_time_utc: '21:00',
       timezone,
       comparison_months: 3,
+      tone: 'tough_love',
     },
   };
 }
