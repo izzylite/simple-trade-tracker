@@ -50,34 +50,24 @@ export interface NoteForExpansion {
 }
 
 /**
- * Rules (see spec §Client-side mention expansion):
- * 1. If the message consists solely of a single slash-command note mention
- *    (ignoring surrounding whitespace), replace the whole message with the
- *    note's content.
- * 2. Otherwise, render each note mention as its title inline; append one
- *    context block per mention at the end:
- *      [Referenced command: <content>]  when SlashCommand
- *      [Referenced note: <content>]     otherwise
- *    Titles are omitted from the block on purpose — the transcript shows a
- *    chip UI with the title, and stripping it from the payload prevents the
- *    LLM from referencing the command by name in its reply.
- * 3. Unknown noteIds render as their title with no context block.
+ * Uniform format for outgoing note mentions:
+ *  1. Each note mention renders as its title inline (where the chip was).
+ *  2. For every mention, a context block is appended:
+ *       [Referenced command:\n<content>\n]   when SlashCommand
+ *       [Referenced note:\n<content>\n]      otherwise
+ *     Titles are intentionally omitted from the block — the transcript shows
+ *     a chip UI with the title, and stripping it from the payload prevents
+ *     the LLM from quoting the command's name in its reply.
+ *  3. Unknown noteIds render as their title with no context block.
+ *
+ * The backend pattern-matches "message body is only a [Referenced command:]
+ * block" to apply execute-as-direct-request framing — no special bare-case
+ * branch needed here on the client.
  */
 export function expandMentionsForSend(
   segments: MessageSegment[],
   notesById: Map<string, NoteForExpansion>
 ): string {
-  const nonWhitespace = segments.filter(s =>
-    s.type === 'note-mention' || (s.type === 'text' && s.value.trim() !== '')
-  );
-
-  if (nonWhitespace.length === 1 && nonWhitespace[0].type === 'note-mention') {
-    const note = notesById.get(nonWhitespace[0].noteId);
-    if (note && note.tags.includes(SLASH_COMMAND_TAG)) {
-      return note.content;
-    }
-  }
-
   const inline = segments
     .map(s => (s.type === 'text' ? s.value : s.noteTitle))
     .join('');

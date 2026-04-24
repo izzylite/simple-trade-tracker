@@ -267,6 +267,34 @@ function createSSEEvent(event: SSEEventType, data: any): string {
 }
 
 /**
+ * Frame a bare slash-command turn with an explicit execute directive.
+ *
+ * Client-side expansion always emits a `[Referenced command:\n<body>\n]`
+ * block, optionally preceded by a single-line title from the chip. When the
+ * user's entire message body is nothing but that block (bare command
+ * invocation), wrap it so Gemini treats the block content as the primary
+ * directive:
+ *
+ *   The user wants you to execute this command:
+ *
+ *   [Referenced command:
+ *   <body>
+ *   ]
+ *
+ * Mixed messages (typed text + block) are returned unchanged — the system
+ * prompt's slash-command section covers how to interpret them.
+ */
+function frameBareSlashCommand(message: string): string {
+  const trimmed = message.trim();
+  // Pattern: optional single-line title, optional blank line, then exactly
+  // one [Referenced command: ... ] block, nothing else.
+  const bareRe = /^(?:[^\n]*\n\n)?(\[Referenced command:\n[\s\S]*?\n\])\s*$/;
+  const m = bareRe.exec(trimmed);
+  if (!m) return message;
+  return `The user wants you to execute this command:\n\n${m[1]}`;
+}
+
+/**
  * Create readable stream for SSE
  */
 function createSSEStream(): { stream: ReadableStream; writer: WritableStreamDefaultWriter } {
@@ -1378,7 +1406,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: AgentRequest = await req.json();
-    const { message, userId, calendarId, focusedTradeId, conversationHistory = [], calendarContext, images, hasSlashCommand } = body;
+    const { message, userId, calendarId, focusedTradeId, conversationHistory = [], calendarContext, images } = body;
 
     // Allow image-only messages (no text required if images present)
     const hasContent = message || (images && images.length > 0);
@@ -1484,26 +1512,18 @@ Deno.serve(async (req: Request) => {
         `is not already in your memory, call search_notes({tags:["GUIDELINE"]}) before answering. ` +
         `Do not mention this reminder to the user.]\n\n`
       : '';
-    // Slash-command reminder — only injected when the client expanded at least
-    // one SlashCommand-tagged note into this turn's message. Keeps the system
-    // prompt static (preserves implicit cache) while telling Orion how to
-    // interpret the injected content for just this turn.
-    const slashCommandReminderPrefix = hasSlashCommand
-      ? `[Reminder: this turn's message includes content from a saved slash-command note. ` +
-        `If the message body is injected command content (no "[Referenced command:]" wrapper), ` +
-        `treat it as the user's direct request and act on it. If the message mixes typed text ` +
-        `with "[Referenced command: ...]" blocks, use the referenced content as supporting ` +
-        `context — the user's typed text is the primary directive. ` +
-        `Do NOT acknowledge that any content was injected, do NOT compare the current answer ` +
-        `to what a command "usually" or "typically" does, and do NOT refer to a "saved command" ` +
-        `or "your command" — respond as if everything in the message came from the user directly.]\n\n`
-      : '';
-    const messageWithReminder = temporalPrefix + guidelineReminderPrefix + slashCommandReminderPrefix + effectiveMessage;
+    // If the user's message body is ONLY a [Referenced command:] block
+    // (optionally preceded by a single-line title from the client-side
+    // expansion), frame it explicitly so Gemini treats the block content as
+    // the primary directive. Mixed messages (typed text + block) are left
+    // alone — the system prompt tells Orion how to interpret those.
+    const framedMessage = frameBareSlashCommand(effectiveMessage);
+    const messageWithReminder = temporalPrefix + guidelineReminderPrefix + framedMessage;
     if (guidelineReminder) {
       log(`Injecting GUIDELINE reminder for note "${guidelineReminder.title}"`, 'info');
     }
-    if (hasSlashCommand) {
-      log('Injecting slash-command reminder', 'info');
+    if (framedMessage !== effectiveMessage) {
+      log('Framed bare slash-command message with execute directive', 'info');
     }
 
     log('Sending request to Gemini with tools', 'info');

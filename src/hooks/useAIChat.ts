@@ -74,7 +74,7 @@ export interface UseAIChatReturn {
   editingMessageId: string | null;
 
   // Actions
-  sendMessage: (messageText: string, images?: AttachedImage[], hasSlashCommand?: boolean) => Promise<void>;
+  sendMessage: (messageText: string, images?: AttachedImage[]) => Promise<void>;
   cancelRequest: () => void;
   editMessage: (messageId: string) => string | null;
   setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[] } | null;
@@ -481,7 +481,7 @@ export function useAIChat({
   /**
    * Send a message to the AI
    */
-  const sendMessage = useCallback(async (messageText: string, images?: AttachedImage[], hasSlashCommand?: boolean) => {
+  const sendMessage = useCallback(async (messageText: string, images?: AttachedImage[]) => {
     const trimmedMessage = messageText.trim();
     if ((!trimmedMessage && (!images || images.length === 0)) || isLoading || !userId) return;
 
@@ -568,8 +568,7 @@ export function useAIChat({
         baseHistory,
         abortController.signal,
         trade?.id,
-        images,
-        hasSlashCommand
+        images
       )) {
         switch (event.type) {
           case 'text_chunk':

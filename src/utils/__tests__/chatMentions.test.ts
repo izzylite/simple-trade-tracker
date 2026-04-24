@@ -69,22 +69,24 @@ describe('expandMentionsForSend', () => {
     expect(expandMentionsForSend(segs, notesMap)).toBe('hello world');
   });
 
-  it('expands a lone slash-command mention to the note content', () => {
+  it('wraps a lone slash-command mention in title + command block', () => {
     const segs: MessageSegment[] = [
       { type: 'note-mention', noteId: 'n1', noteTitle: 'Daily Review' }
     ];
     expect(expandMentionsForSend(segs, notesMap))
-      .toBe("Summarize yesterday's trades and flag rule violations.");
+      .toBe("Daily Review\n\n[Referenced command:\nSummarize yesterday's trades and flag rule violations.\n]");
   });
 
-  it('ignores surrounding whitespace when deciding "lone" mention', () => {
+  it('preserves surrounding whitespace around a lone mention', () => {
     const segs: MessageSegment[] = [
       { type: 'text', value: '  ' },
       { type: 'note-mention', noteId: 'n1', noteTitle: 'Daily Review' },
       { type: 'text', value: ' ' },
     ];
-    expect(expandMentionsForSend(segs, notesMap))
-      .toBe("Summarize yesterday's trades and flag rule violations.");
+    const out = expandMentionsForSend(segs, notesMap);
+    expect(out).toContain('Daily Review');
+    expect(out).toContain('[Referenced command:');
+    expect(out).toContain("Summarize yesterday's trades");
   });
 
   it('wraps slash-command mention as a context block when user text is present', () => {

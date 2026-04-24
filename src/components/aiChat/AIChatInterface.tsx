@@ -32,7 +32,7 @@ import { ChatMessage as ChatMessageType, AttachedImage } from '../../types/aiCha
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
 import { EconomicEvent } from '../../types/economicCalendar';
-import { Note, SLASH_COMMAND_TAG } from '../../types/note';
+import { Note } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
 import { logger } from '../../utils/logger';
@@ -94,7 +94,7 @@ export interface AIChatInterfaceProps {
   isAtMessageLimit: boolean;
 
   // Actions from useAIChat hook
-  sendMessage: (messageText: string, images?: AttachedImage[], hasSlashCommand?: boolean) => Promise<void>;
+  sendMessage: (messageText: string, images?: AttachedImage[]) => Promise<void>;
   cancelRequest: () => void;
   setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[] } | null;
   startNewChat: () => Promise<void>;
@@ -225,15 +225,11 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
     const outgoing = segments.length > 0
       ? expandMentionsForSend(segments, notesMap)
       : plainText;
-    // Flag set when the user mentioned any note tagged SlashCommand — triggers
-    // a turn-scoped reminder on the backend instead of a system-prompt change.
-    const hasSlashCommand = Array.from(notesMap.values())
-      .some(n => n.tags.includes(SLASH_COMMAND_TAG));
 
     const imagesToSend = attachedImages.length > 0 ? [...attachedImages] : undefined;
     setInputMessage('');
     setAttachedImages([]);
-    await sendMessage(outgoing, imagesToSend, hasSlashCommand);
+    await sendMessage(outgoing, imagesToSend);
   };
 
   // Image upload handlers
