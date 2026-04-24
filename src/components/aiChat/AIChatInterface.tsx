@@ -407,6 +407,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
         const result = await notesService.queryCalendarNotes(calendar.id, {
           limit: 500,
           isArchived: false,
+          byAssistant: false,
         });
         if (!cancelled) setCalendarFullNotes(result.notes);
       } catch (err) {
