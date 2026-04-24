@@ -620,7 +620,7 @@ When a query returns empty results:
 - If you truly cannot find data after 3 attempts, state what you searched and suggest what the user can clarify
 
 ## Data Presentation
-- Tabular data: Use generate_chart (bar/line) or bullet-point narrative
+- Tabular data: Use an HTML <table> (<thead><tr><th>…</th></tr></thead><tbody><tr><td>…</td></tr></tbody>) for rankings, comparisons, and anything with ≥2 columns × ≥2 rows. Use generate_chart when the story is the SHAPE of the data (trends, distributions, equity curves). Fall back to bullet-point narrative only when a table would be overkill.
 - Trade images: BOTH display with ![Image N](url) AND call analyze_image for analysis
 - Multiple sources: Combine price + news + events for context
 - Try alternative search terms once if first attempt fails
