@@ -3,6 +3,8 @@
  * and AIChatInterface (submit flow).
  */
 
+import { SLASH_COMMAND_TAG } from '../types/note';
+
 export type MentionKind = 'slash' | 'at';
 
 export interface MentionTrigger {
@@ -34,4 +36,59 @@ export function detectMentionTrigger(
 
   const kind: MentionKind = prefix[pos] === '/' ? 'slash' : 'at';
   return { kind, term, start: pos };
+}
+
+export type MessageSegment =
+  | { type: 'text'; value: string }
+  | { type: 'note-mention'; noteId: string; noteTitle: string };
+
+export interface NoteForExpansion {
+  title: string;
+  content: string;
+  tags: string[];
+}
+
+/**
+ * Rules (see spec §Client-side mention expansion):
+ * 1. If the message consists solely of a single slash-command note mention
+ *    (ignoring surrounding whitespace), replace the whole message with the
+ *    note's content.
+ * 2. Otherwise, render each note mention as its title inline; append one
+ *    context block per mention at the end:
+ *      [Referenced command "<title>": <content>]  when SlashCommand
+ *      [Referenced note "<title>": <content>]     otherwise
+ * 3. Unknown noteIds render as their title with no context block.
+ */
+export function expandMentionsForSend(
+  segments: MessageSegment[],
+  notesById: Map<string, NoteForExpansion>
+): string {
+  const nonWhitespace = segments.filter(s =>
+    s.type === 'note-mention' || (s.type === 'text' && s.value.trim() !== '')
+  );
+
+  if (nonWhitespace.length === 1 && nonWhitespace[0].type === 'note-mention') {
+    const note = notesById.get(nonWhitespace[0].noteId);
+    if (note && note.tags.includes(SLASH_COMMAND_TAG)) {
+      return note.content;
+    }
+  }
+
+  const inline = segments
+    .map(s => (s.type === 'text' ? s.value : s.noteTitle))
+    .join('');
+
+  const contextBlocks: string[] = [];
+  for (const seg of segments) {
+    if (seg.type !== 'note-mention') continue;
+    const note = notesById.get(seg.noteId);
+    if (!note) continue;
+    const label = note.tags.includes(SLASH_COMMAND_TAG)
+      ? 'Referenced command'
+      : 'Referenced note';
+    contextBlocks.push(`[${label} "${note.title}":\n${note.content}\n]`);
+  }
+
+  if (contextBlocks.length === 0) return inline;
+  return `${inline}\n\n${contextBlocks.join('\n\n')}`;
 }
