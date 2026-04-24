@@ -208,12 +208,20 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
     if ((!plainText && attachedImages.length === 0) || isLoading) return;
 
     const segments = inputRef.current?.getSegments() ?? [];
-    const notesMap = new Map(
-      calendarFullNotes.map(n => [
-        n.id,
-        { title: n.title, content: n.content ?? '', tags: n.tags ?? [] }
-      ])
-    );
+    const mentionedIds = segments
+      .filter((s): s is Extract<typeof s, { type: 'note-mention' }> => s.type === 'note-mention')
+      .map(s => s.noteId);
+    const notesMap = new Map<string, { title: string; content: string; tags: string[] }>();
+    if (mentionedIds.length > 0) {
+      const fetched = await Promise.all(mentionedIds.map(id => notesService.getNote(id)));
+      fetched.forEach(note => {
+        if (note) notesMap.set(note.id, {
+          title: note.title,
+          content: note.content ?? '',
+          tags: note.tags ?? [],
+        });
+      });
+    }
     const outgoing = segments.length > 0
       ? expandMentionsForSend(segments, notesMap)
       : plainText;
@@ -393,35 +401,17 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
     onNoteClick?.(noteId, note || undefined);
   }, [onNoteClick]);
 
-  // Load full notes (with tags + content) for the mention input and for
-  // client-side mention expansion at send time.
-  const [calendarFullNotes, setCalendarFullNotes] = useState<Note[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    if (!calendar?.id) {
-      setCalendarFullNotes([]);
-      return;
-    }
-    (async () => {
-      try {
-        const result = await notesService.queryCalendarNotes(calendar.id, {
-          limit: 500,
-          isArchived: false,
-          byAssistant: false,
-        });
-        if (!cancelled) setCalendarFullNotes(result.notes);
-      } catch (err) {
-        logger.error('Failed to load notes for mention input', err);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [calendar?.id]);
-
   // Memoize inputs passed to the mention input so its React.memo can stick.
+  // calendar.notes is a JSONB mirror of {id, title, tags} maintained by a DB
+  // trigger — we can read it directly without a round-trip to the notes table.
   const allTagsMemo = useMemo(() => calendar?.tags || [], [calendar?.tags]);
   const allNotesMemo = useMemo(
-    () => calendarFullNotes.map(n => ({ id: n.id, title: n.title, tags: n.tags ?? [] })),
-    [calendarFullNotes]
+    () => (calendar?.notes ?? []).map(n => ({
+      id: n.id,
+      title: n.title,
+      tags: n.tags ?? [],
+    })),
+    [calendar?.notes]
   );
   const availableTagsMemo = useMemo(() => calendar?.tags || [], [calendar?.tags]);
   const mentionInputSx = useMemo(
