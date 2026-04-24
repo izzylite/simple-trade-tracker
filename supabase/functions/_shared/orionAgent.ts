@@ -97,13 +97,7 @@ export async function runOrionAgent(
   let turnCount = 0;
   let forcedSynthesis = false;
 
-  // Build contents array. We embed the system prompt as the opening user
-  // turn + a canned model ack so the model treats subsequent instructions
-  // as binding without Gemini's `systemInstruction` param (which has worse
-  // adherence for long security-critical prompts per our prior testing).
   const contents: GeminiContent[] = [
-    { role: 'user', parts: [{ text: systemPrompt }] },
-    { role: 'model', parts: [{ text: 'Understood. I will help while maintaining strict security.' }] },
     ...history.map((msg) => ({
       role: (msg.role === 'user' ? 'user' : 'model') as 'user' | 'model',
       parts: [{ text: msg.content }],
@@ -113,6 +107,7 @@ export async function runOrionAgent(
 
   let currentToolMode: 'AUTO' | 'ANY' | 'NONE' = initialToolMode;
   let result = await callGemini({
+    systemInstruction: systemPrompt,
     contents,
     tools: tools.length > 0 ? tools : undefined,
     toolMode: tools.length > 0 ? currentToolMode : undefined,
@@ -184,6 +179,7 @@ export async function runOrionAgent(
     contents.push({ role: 'user', parts: functionResponseParts });
 
     result = await callGemini({
+      systemInstruction: systemPrompt,
       contents,
       tools: tools.length > 0 ? tools : undefined,
       toolMode: tools.length > 0 ? currentToolMode : undefined,
@@ -203,6 +199,7 @@ export async function runOrionAgent(
     log(`No text after ${turnCount} turns with ${toolCalls.length} tool calls — forcing synthesis`, 'warn');
     try {
       const synthesis = await callGemini({
+        systemInstruction: systemPrompt,
         contents: [
           ...contents,
           {

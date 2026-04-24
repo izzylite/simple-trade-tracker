@@ -4,7 +4,7 @@
  * Contains: Messages, Templates, Typing Indicator, Input Area
  */
 
-import React, { useRef, useEffect, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useEffect, useCallback, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import OrionIcon from './OrionIcon';
 import {
   Box,
@@ -319,7 +319,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
     cancelRequest();
   };
 
-  const handleEditMessage = (messageId: string) => {
+  const handleEditMessage = useCallback((messageId: string) => {
     const editData = setInputForEdit(messageId);
     if (editData) {
       setInputMessage(editData.content);
@@ -331,23 +331,62 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
       }
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  };
+  }, [setInputForEdit]);
 
-  const handleKeyPress = (event: React.KeyboardEvent) => {
+  // Stable send handler ref so handleKeyPress can stay referentially stable
+  // without being re-created every time inputMessage changes.
+  const sendRef = useRef<() => void>(() => {});
+  sendRef.current = () => { void handleSendMessage(); };
+
+  const handleKeyPress = useCallback((event: React.KeyboardEvent) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      handleSendMessage();
+      sendRef.current();
     }
-  };
+  }, []);
 
-  const handleTemplateClick = (question: string) => {
+  const handleTemplateClick = useCallback((question: string) => {
     setInputMessage(question);
     setTimeout(() => inputRef.current?.focus(), 100);
-  };
+  }, []);
 
   const handleNewChat = async () => {
     await startNewChat();
   };
+
+  // Stable per-message callbacks so memoized ChatMessage components don't
+  // re-render on every keystroke.
+  const handleTradeClick = useCallback((tradeId: string, contextTrades: Trade[]) => {
+    if (onTradeClick) {
+      onTradeClick(tradeId, contextTrades);
+    } else {
+      logger.log('Trade clicked but handler not provided:', tradeId);
+    }
+  }, [onTradeClick]);
+
+  const handleEventClick = useCallback((event: EconomicEvent) => {
+    logger.log('Economic event clicked:', event);
+    onEventClick?.(event);
+  }, [onEventClick]);
+
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const handleNoteClick = useCallback(async (noteId: string) => {
+    logger.log('Note clicked:', noteId);
+    const note = messagesRef.current
+      .flatMap(m => m.embeddedNotes ? Object.values(m.embeddedNotes) : [])
+      .find(n => n.id === noteId);
+    onNoteClick?.(noteId, note || undefined);
+  }, [onNoteClick]);
+
+  // Memoize inputs passed to the mention input so its React.memo can stick.
+  const allTagsMemo = useMemo(() => calendar?.tags || [], [calendar?.tags]);
+  const allNotesMemo = useMemo(() => calendar?.notes ?? [], [calendar?.notes]);
+  const availableTagsMemo = useMemo(() => calendar?.tags || [], [calendar?.tags]);
+  const mentionInputSx = useMemo(
+    () => ({ flex: 1, minWidth: 0, fontSize: '0.95rem', lineHeight: 1.4 }),
+    []
+  );
 
   // Determine what to display
   const displayMessages = messages.length === 0 ? [getWelcomeMessage()] : messages;
@@ -361,15 +400,16 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
       overflow: 'hidden'
     }}>
       {/* Messages Area */}
+      <Box sx={{ flex: 1, position: 'relative', minHeight: 0 }}>
       <Box
         ref={messagesAreaRef}
         onScroll={handleMessagesScroll}
         sx={{
-          flex: 1,
+          position: 'absolute',
+          inset: 0,
           overflow: 'auto',
           p: 2,
           pb: 1,
-          position: 'relative',
           ...scrollbarStyles(theme)
         }}
       >
@@ -381,27 +421,12 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
               showTimestamp={true}
               isLatestMessage={index === displayMessages.length - 1}
               enableAnimation={index > 0}
-              onTradeClick={(tradeId, contextTrades) => {
-                if (onTradeClick) {
-                  onTradeClick(tradeId, contextTrades);
-                } else {
-                  logger.log('Trade clicked but handler not provided:', tradeId);
-                }
-              }}
-              onEventClick={(event) => {
-                logger.log('Economic event clicked:', event);
-                onEventClick?.(event);
-              }}
-              onNoteClick={async (noteId) => {
-                logger.log('Note clicked:', noteId);
-                const note = messages
-                  .flatMap(m => m.embeddedNotes ? Object.values(m.embeddedNotes) : [])
-                  .find(n => n.id === noteId);
-                onNoteClick?.(noteId, note || undefined);
-              }}
+              onTradeClick={handleTradeClick}
+              onEventClick={handleEventClick}
+              onNoteClick={handleNoteClick}
               onEdit={handleEditMessage}
               trades={trades}
-              availableTags={calendar?.tags || []}
+              availableTags={availableTagsMemo}
             />
           </React.Fragment>
         ))}
@@ -512,6 +537,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
         )}
 
         <div ref={messagesEndRef} />
+      </Box>
 
         {/* Scroll-to-bottom button */}
         {showScrollDown && (
@@ -519,11 +545,10 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             onClick={scrollToBottom}
             size="small"
             sx={{
-              position: 'sticky',
+              position: 'absolute',
               bottom: 12,
               left: '50%',
               transform: 'translateX(-50%)',
-              display: 'flex',
               zIndex: 10,
               backgroundColor: theme.palette.background.paper,
               border: '1px solid',
@@ -685,10 +710,10 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             onKeyDown={handleKeyPress}
             placeholder={calendar ? "Ask Orion… (use / to mention tags & notes)" : "Ask Orion about your trading..."}
             disabled={isLoading || isAtMessageLimit}
-            allTags={calendar?.tags || []}
-            allNotes={calendar?.notes ?? []}
+            allTags={allTagsMemo}
+            allNotes={allNotesMemo}
             maxRows={4}
-            sx={{ flex: 1, minWidth: 0, fontSize: '0.95rem', lineHeight: 1.4 }}
+            sx={mentionInputSx}
           />
           {/* Image upload button */}
           <IconButton

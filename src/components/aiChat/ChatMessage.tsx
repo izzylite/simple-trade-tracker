@@ -37,6 +37,7 @@ import { EconomicEvent } from '../../types/economicCalendar';
 import { format } from 'date-fns';
 import { logger } from '../../utils/logger';
 import { getTagChipStyles } from '../../utils/tagColors';
+import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -66,6 +67,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
   const [reasoningExpanded, setReasoningExpanded] = useState(false);
+  const [zoomImage, setZoomImage] = useState<ImageZoomProp | null>(null);
+
+  const openImageZoom = (index: number) => {
+    const urls = (message.images || []).map(img => img.url).filter(Boolean);
+    if (urls.length === 0) return;
+    setZoomImage({ selectetdImageIndex: index, allImages: urls });
+  };
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const isDark = theme.palette.mode === 'dark';
@@ -201,9 +209,18 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     </Box>
   );
 
+  const imageZoomDialog = zoomImage && (
+    <ImageZoomDialog
+      open={!!zoomImage}
+      onClose={() => setZoomImage(null)}
+      imageProp={zoomImage}
+    />
+  );
+
   // ── ASSISTANT MESSAGE ──────────────────────────────────────────────────────
   if (isAssistant) {
     return (
+      <>
       <Box
         sx={{
           display: 'flex',
@@ -249,7 +266,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                     cursor: 'pointer',
                     '&:hover': { opacity: 0.9 }
                   }}
-                  onClick={() => window.open(image.url, '_blank')}
+                  onClick={() => openImageZoom(index)}
                 />
               ))}
             </Box>
@@ -349,11 +366,14 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           </Box>
         </Box>
       </Box>
+      {imageZoomDialog}
+      </>
     );
   }
 
   // ── USER MESSAGE ───────────────────────────────────────────────────────────
   return (
+    <>
     <Box
       sx={{
         display: 'flex',
@@ -415,7 +435,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                     cursor: 'pointer',
                     '&:hover': { opacity: 0.9 }
                   }}
-                  onClick={() => window.open(image.url, '_blank')}
+                  onClick={() => openImageZoom(index)}
                 />
               ))}
             </Box>
@@ -476,7 +496,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         </Box>
       </Box>
     </Box>
+    {imageZoomDialog}
+    </>
   );
 };
 
-export default ChatMessage;
+export default React.memo(ChatMessage);

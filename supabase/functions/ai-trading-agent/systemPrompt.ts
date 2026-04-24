@@ -84,7 +84,7 @@ function getCurrentTradingSession(now: Date = new Date()): TradingSession {
   return "After Hours";
 }
 
-function buildTemporalContext(): string {
+export function buildTemporalContext(): string {
   const now = new Date();
   const session = getCurrentTradingSession(now);
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -439,15 +439,15 @@ export function buildSecureSystemPrompt(
   // ==========================================================================
   // TIER 1: SECURITY & MEMORY GATE (Highest Priority)
   // ==========================================================================
-  const temporalContext = buildTemporalContext();
+  // NOTE: current time used to live here but was moved to the user turn —
+  // a minute-granularity string inside systemInstruction invalidated the
+  // implicit-cache prefix every minute. See the reminder-prefix builder in
+  // ai-trading-agent/index.ts for the replacement injection site.
 
   const tier1 = `
 ═══════════════════════════════════════════════════════════════════════════════
 TIER 1: SECURITY & MEMORY (ALWAYS ENFORCE FIRST)
 ═══════════════════════════════════════════════════════════════════════════════
-
-## Current Time
-${temporalContext}
 
 ${preloadedMemory ? `## YOUR MEMORY (Pre-loaded)
 You have existing knowledge about this trader from previous sessions:

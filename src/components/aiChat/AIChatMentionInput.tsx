@@ -18,64 +18,60 @@ export interface AIChatMentionInputProps {
   sx?: any;
 }
 
-const createTagMentionComponent = () => {
-  const TagMentionEntity = ({ contentState, entityKey }: any) => {
-    const theme = useTheme();
-    const { tag } = contentState.getEntity(entityKey).getData() as { tag: string };
+// Hoisted entity components — stable identity across mounts so Draft.js
+// doesn't treat them as new component types on every decorator creation.
+const TagMentionEntity = ({ contentState, entityKey }: any) => {
+  const theme = useTheme();
+  const { tag } = contentState.getEntity(entityKey).getData() as { tag: string };
 
-    // Simple: render a Chip instead of the underlying text. We intentionally
-    // do NOT render children here so the raw text is not shown.
-    return (
-      <Chip
-        size="small"
-        label={formatTagForDisplay(tag, true)}
-        contentEditable={false}
-        onMouseDown={(e) => e.preventDefault()}
-        sx={{
-          ...getTagChipStyles(tag, theme),
-          height: 22,
-          fontSize: '0.75rem',
-          userSelect: 'none',
-          verticalAlign: 'middle',
-          display: 'inline-flex'
-        }}
-      />
-    );
-  };
-  (TagMentionEntity as any).displayName = 'TagMentionEntity';
-  return TagMentionEntity;
+  // Simple: render a Chip instead of the underlying text. We intentionally
+  // do NOT render children here so the raw text is not shown.
+  return (
+    <Chip
+      size="small"
+      label={formatTagForDisplay(tag, true)}
+      contentEditable={false}
+      onMouseDown={(e) => e.preventDefault()}
+      sx={{
+        ...getTagChipStyles(tag, theme),
+        height: 22,
+        fontSize: '0.75rem',
+        userSelect: 'none',
+        verticalAlign: 'middle',
+        display: 'inline-flex'
+      }}
+    />
+  );
 };
+(TagMentionEntity as any).displayName = 'TagMentionEntity';
 
-const createNoteMentionComponent = () => {
-  const NoteMentionEntity = ({ contentState, entityKey }: any) => {
-    const theme = useTheme();
-    const { noteTitle } = contentState.getEntity(entityKey).getData() as { noteTitle: string };
+const NoteMentionEntity = ({ contentState, entityKey }: any) => {
+  const theme = useTheme();
+  const { noteTitle } = contentState.getEntity(entityKey).getData() as { noteTitle: string };
 
-    return (
-      <Chip
-        size="small"
-        label={noteTitle}
-        contentEditable={false}
-        onMouseDown={(e) => e.preventDefault()}
-        sx={{
-          height: 22,
-          fontSize: '0.75rem',
-          userSelect: 'none',
-          verticalAlign: 'middle',
-          display: 'inline-flex',
-          backgroundColor: alpha(theme.palette.info.main, 0.1),
-          color: theme.palette.info.main,
-          border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
-          '&:hover': {
-            backgroundColor: alpha(theme.palette.info.main, 0.2)
-          }
-        }}
-      />
-    );
-  };
-  (NoteMentionEntity as any).displayName = 'NoteMentionEntity';
-  return NoteMentionEntity;
+  return (
+    <Chip
+      size="small"
+      label={noteTitle}
+      contentEditable={false}
+      onMouseDown={(e) => e.preventDefault()}
+      sx={{
+        height: 22,
+        fontSize: '0.75rem',
+        userSelect: 'none',
+        verticalAlign: 'middle',
+        display: 'inline-flex',
+        backgroundColor: alpha(theme.palette.info.main, 0.1),
+        color: theme.palette.info.main,
+        border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
+        '&:hover': {
+          backgroundColor: alpha(theme.palette.info.main, 0.2)
+        }
+      }}
+    />
+  );
 };
+(NoteMentionEntity as any).displayName = 'NoteMentionEntity';
 
 const createMentionDecorator = () =>
   new CompositeDecorator([
@@ -90,7 +86,7 @@ const createMentionDecorator = () =>
           (start, end) => callback(start, end)
         );
       },
-      component: createTagMentionComponent()
+      component: TagMentionEntity
     },
     {
       // Render note mentions as chips
@@ -103,7 +99,7 @@ const createMentionDecorator = () =>
           (start, end) => callback(start, end)
         );
       },
-      component: createNoteMentionComponent()
+      component: NoteMentionEntity
     }
   ]);
 
@@ -631,5 +627,5 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
 });
 
 AIChatMentionInput.displayName = 'AIChatMentionInput';
-export default AIChatMentionInput;
+export default React.memo(AIChatMentionInput);
 

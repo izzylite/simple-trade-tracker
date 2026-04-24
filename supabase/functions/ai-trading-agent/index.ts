@@ -10,6 +10,7 @@ import {
   getCachedMCPTools,
 } from '../_shared/orionMcp.ts';
 import { fetchAgentMemory } from '../_shared/orionMemory.ts';
+import { fetchGuidelineReminder } from '../_shared/orionGuideline.ts';
 import { formatErrorResponse, formatResponseWithHtmlAndCitations } from './formatters.ts';
 import type { AgentRequest, ToolCall } from './types.ts';
 import {
@@ -20,7 +21,7 @@ import {
 } from './tools.ts';
 import { fetchEmbeddedData, type EmbeddedData } from './embedDataFetcher.ts';
 import { validateReferenceIds, hasReferenceTags, type ValidationResult } from './idValidator.ts';
-import { buildSecureSystemPrompt } from "./systemPrompt.ts";
+import { buildSecureSystemPrompt, buildTemporalContext } from "./systemPrompt.ts";
 import { encodeBase64 } from "https://deno.land/std@0.208.0/encoding/base64.ts";
 
 /**
@@ -42,6 +43,31 @@ function buildGeminiUrl(apiKey: string, streaming: boolean): string {
   return streaming
     ? `${GEMINI_API_BASE}/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`
     : `${GEMINI_API_BASE}/${MODEL}:generateContent?key=${apiKey}`;
+}
+
+/**
+ * Log Gemini usageMetadata — lets us verify implicit caching is actually
+ * hitting. `cachedContentTokenCount` > 0 means the prefix (systemInstruction +
+ * stable history) matched the on-disk cache and we're paying the discounted
+ * rate for those tokens. Safe to call with undefined (silent no-op).
+ * See https://ai.google.dev/gemini-api/docs/caching#implicit-caching
+ */
+function logUsageMetadata(
+  source: string,
+  usage: Record<string, unknown> | undefined
+): void {
+  if (!usage) return;
+  const prompt = Number(usage.promptTokenCount ?? 0);
+  const cached = Number(usage.cachedContentTokenCount ?? 0);
+  const candidates = Number(usage.candidatesTokenCount ?? 0);
+  const thoughts = Number(usage.thoughtsTokenCount ?? 0);
+  const total = Number(usage.totalTokenCount ?? 0);
+  const hitRate = prompt > 0 ? ((cached / prompt) * 100).toFixed(1) : '0.0';
+  log(
+    `[Usage:${source}] prompt=${prompt} cached=${cached} (${hitRate}%) ` +
+    `candidates=${candidates} thoughts=${thoughts} total=${total}`,
+    'info'
+  );
 }
 
 /**
@@ -102,6 +128,7 @@ async function callGeminiWithContents(
     writer?: WritableStreamDefaultWriter;
     maxOutputTokens?: number;
     mode?: 'AUTO' | 'ANY' | 'NONE';
+    systemInstruction?: string;
   }
 ): Promise<{ text: string; functionCall?: ParsedFunctionCall; rawParts: Array<Record<string, unknown>> }> {
   // Non-streaming: delegate to the shared `_shared/gemini.ts` helper.
@@ -110,12 +137,14 @@ async function callGeminiWithContents(
   // `functionCalls: []`, chat consumer expects `functionCall` singular).
   if (!opts.streaming) {
     const result = await sharedCallGemini({
+      systemInstruction: opts.systemInstruction,
       contents: contents as Array<{ role: 'user' | 'model'; parts: Array<Record<string, unknown>> }>,
       tools: tools.length > 0 ? tools : undefined,
       toolMode: opts.mode,
       maxOutputTokens: opts.maxOutputTokens ?? 4000,
       thinkingLevel: THINKING_LEVEL as 'minimal' | 'low' | 'medium' | 'high',
     });
+    logUsageMetadata('callGeminiWithContents:non-streaming', result.usageMetadata);
     return {
       text: result.text,
       functionCall: result.functionCalls[0],
@@ -126,7 +155,7 @@ async function callGeminiWithContents(
   // Streaming path stays local — SSE writer lifecycle is chat-specific
   // (reasoning/text/tool_call event emission) and would leak into a shared
   // helper. Body shape mirrors `_shared/gemini.ts` so behavior stays in sync.
-  const body = {
+  const body: Record<string, unknown> = {
     contents,
     tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
     tool_config: tools.length > 0 ? {
@@ -138,6 +167,9 @@ async function callGeminiWithContents(
       thinkingConfig: { includeThoughts: true, thinkingLevel: THINKING_LEVEL }
     }
   };
+  if (opts.systemInstruction) {
+    body.systemInstruction = { parts: [{ text: opts.systemInstruction }] };
+  }
 
   const response = await fetch(buildGeminiUrl(apiKey, true), {
     method: 'POST',
@@ -153,6 +185,7 @@ async function callGeminiWithContents(
   let text = '';
   let functionCall: ParsedFunctionCall | undefined;
   const rawParts: Array<Record<string, unknown>> = [];
+  let lastUsageMetadata: Record<string, unknown> | undefined;
 
   if (!response.body) return { text, functionCall, rawParts };
   const reader = response.body.getReader();
@@ -171,6 +204,7 @@ async function callGeminiWithContents(
         if (!jsonLine.trim()) continue;
         try {
           const chunk = JSON.parse(jsonLine);
+          if (chunk.usageMetadata) lastUsageMetadata = chunk.usageMetadata;
           const parts = chunk.candidates?.[0]?.content?.parts || [];
           // Preserve ALL raw parts across chunks — thoughtSignature may arrive
           // as its own standalone Part preceding the functionCall Part, and
@@ -199,6 +233,7 @@ async function callGeminiWithContents(
     reader.releaseLock();
   }
 
+  logUsageMetadata('callGeminiWithContents', lastUsageMetadata);
   return { text, functionCall, rawParts };
 }
 
@@ -451,13 +486,14 @@ async function callGemini(
   message: string,
   conversationHistory: Array<{ role: string; content: string }>,
   tools: GeminiFunctionDeclaration[]
-): Promise<{ text?: string; functionCall?: ParsedFunctionCall; rawParts: Array<Record<string, unknown>> }> {
+): Promise<{ text?: string; functionCall?: ParsedFunctionCall; rawParts: Array<Record<string, unknown>>; usageMetadata?: Record<string, unknown> }> {
   const apiUrl = buildGeminiUrl(apiKey, false);
 
-  // Build contents array
+  // Build contents array — systemPrompt goes in the top-level `systemInstruction`
+  // field (Gemini docs standard) rather than a fake role:user turn. This keeps
+  // the system prompt at the front of the cache prefix for implicit caching
+  // and drops the synthetic "Understood" model acknowledgement.
   const contents = [
-    { role: 'user', parts: [{ text: systemPrompt }] },
-    { role: 'model', parts: [{ text: 'Understood. I will help while maintaining strict security.' }] },
     ...conversationHistory.map(msg => ({
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }]
@@ -466,6 +502,7 @@ async function callGemini(
   ];
 
   const requestBody = {
+    systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
     tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
     // Force function calling on initial request to prevent "I will search..." without action
@@ -493,6 +530,8 @@ async function callGemini(
   }
 
   const data = await response.json();
+  const usageMetadata = data?.usageMetadata;
+  logUsageMetadata('callGemini', usageMetadata);
   const candidate = data.candidates?.[0];
   const content = candidate?.content;
   const parts: Array<Record<string, unknown>> = content?.parts || [];
@@ -501,7 +540,7 @@ async function callGemini(
   const functionCallPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
   if (functionCallPart) {
     const extracted = extractFunctionCall(functionCallPart);
-    if (extracted) return { functionCall: extracted, rawParts: parts };
+    if (extracted) return { functionCall: extracted, rawParts: parts, usageMetadata };
   }
 
   // Get text response (exclude thought-summary parts so chain-of-thought doesn't leak into answer)
@@ -509,7 +548,7 @@ async function callGemini(
     .filter((p: { text?: string; thought?: boolean }) => !p.thought)
     .map((p: { text?: string }) => p.text || '')
     .join('');
-  return { text, rawParts: parts };
+  return { text, rawParts: parts, usageMetadata };
 }
 
 /**
@@ -555,10 +594,11 @@ async function callGeminiStreaming(
   // Add text message
   userMessageParts.push({ text: message });
 
-  // Build contents array
+  // Build contents array — systemPrompt goes into the top-level
+  // `systemInstruction` field (Gemini docs standard), not a fake role:user
+  // turn. Keeps the system prompt at the front of the cache prefix for
+  // implicit caching.
   const contents = [
-    { role: 'user', parts: [{ text: systemPrompt }] },
-    { role: 'model', parts: [{ text: 'Understood. I will help while maintaining strict security.' }] },
     ...conversationHistory.map(msg => ({
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }]
@@ -572,6 +612,7 @@ async function callGeminiStreaming(
   const toolMode = hasImages ? "AUTO" : "ANY";
 
   const requestBody = {
+    systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
     tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
     // Force function calling on initial request (unless images present - then allow direct analysis)
@@ -622,6 +663,9 @@ async function callGeminiStreaming(
   // Part here means the next turn's echo is missing context and the API 400s.
   const rawParts: Array<Record<string, unknown>> = [];
   let chunkCount = 0;
+  // usageMetadata appears on the last streamed chunk — capture it so we can
+  // log implicit-cache behavior once the stream ends.
+  let lastUsageMetadata: Record<string, unknown> | undefined;
 
   if (!response.body) {
     log('Warning: Response body is null - no stream to process', 'warn');
@@ -663,6 +707,12 @@ async function callGeminiStreaming(
             const chunk = JSON.parse(jsonLine);
             chunkCount++;
             const candidate = chunk.candidates?.[0];
+
+            // Capture usageMetadata — Gemini streams it on the final chunk
+            // (sometimes earlier ones too; keep the latest non-empty value).
+            if (chunk.usageMetadata) {
+              lastUsageMetadata = chunk.usageMetadata;
+            }
 
             // Log first chunk for debugging
             if (chunkCount === 1) {
@@ -742,6 +792,7 @@ async function callGeminiStreaming(
 
   // Log final streaming result
   log(`Streaming complete: ${chunkCount} JSON chunks parsed, text=${fullText.length} chars, functionCalls=${functionCalls.length}`, 'info');
+  logUsageMetadata('callGeminiStreaming', lastUsageMetadata);
 
   // Stream text now that we know whether function calls are present
   if (functionCalls.length > 0 || functionCall) {
@@ -898,10 +949,10 @@ function handleStreamingRequest(
         }
       }
 
-      // Build conversation history for multi-turn function calling
+      // Build conversation history for multi-turn function calling.
+      // systemPrompt is passed separately via the `systemInstruction` field
+      // on each callGeminiWithContents call — not embedded here.
       const conversationContents: Array<{ role: string; parts: Array<Record<string, unknown>> }> = [
-        { role: 'user', parts: [{ text: systemPrompt }] },
-        { role: 'model', parts: [{ text: 'Understood. I will help while maintaining strict security.' }] },
         ...conversationHistory.map(msg => ({
           role: msg.role === 'user' ? 'user' : 'model',
           parts: [{ text: msg.content }]
@@ -1065,7 +1116,7 @@ function handleStreamingRequest(
           googleApiKey,
           conversationContents,
           allTools,
-          { streaming: true, writer, maxOutputTokens: 8000 }
+          { streaming: true, writer, maxOutputTokens: 8000, systemInstruction: systemPrompt }
         );
 
         if (!newFunctionCall && newText) {
@@ -1104,7 +1155,7 @@ function handleStreamingRequest(
               { role: 'user', parts: [{ text: 'Please now summarise everything you found and give your final answer. Do not call any more tools.' }] }
             ],
             allTools,
-            { streaming: false, maxOutputTokens: 4000, mode: 'NONE' }
+            { streaming: false, maxOutputTokens: 4000, mode: 'NONE', systemInstruction: systemPrompt }
           );
           if (synthesisResult.text) {
             finalText = synthesisResult.text;
@@ -1193,7 +1244,7 @@ function handleStreamingRequest(
               googleApiKey,
               conversationContents,
               allTools,
-              { streaming: true, writer, maxOutputTokens: 8000 }
+              { streaming: true, writer, maxOutputTokens: 8000, systemInstruction: systemPrompt }
             );
             correctedText = result.text;
           } catch (error) {
@@ -1393,8 +1444,12 @@ Deno.serve(async (req: Request) => {
     const customTools = getAllCustomTools();
     const allTools = [...geminiMcpTools, ...customTools];
 
-    // Pre-load agent memory (enforces memory availability from turn 0)
-    const preloadedMemory = await fetchAgentMemory(userId, calendarId);
+    // Pre-load agent memory (enforces memory availability from turn 0) and
+    // the GUIDELINE-note reminder in parallel — both are independent reads.
+    const [preloadedMemory, guidelineReminder] = await Promise.all([
+      fetchAgentMemory(userId, calendarId),
+      fetchGuidelineReminder(userId, calendarId),
+    ]);
 
     // Pre-fetch focused trade data so the AI has full context from turn 0
     const preloadedTrade = focusedTradeId
@@ -1415,6 +1470,25 @@ Deno.serve(async (req: Request) => {
     // Build system prompt with pre-loaded memory and trade context
     const systemPrompt = buildSecureSystemPrompt(userId, calendarId, calendarContext, focusedTradeId, preloadedMemory, preloadedTrade);
 
+    // Dynamic injections on the user turn (NOT systemInstruction) so the
+    // implicit-cache prefix stays stable:
+    //   - Temporal context — rolls over every minute; would otherwise
+    //     invalidate the cache prefix on every request.
+    //   - GUIDELINE reminder — title-only pointer; Orion calls search_notes
+    //     to read the body when a decision actually needs it. Skipped
+    //     entirely when the user has no guideline note or the body is empty.
+    const temporalPrefix = `[Current time — ${buildTemporalContext()}]\n\n`;
+    const guidelineReminderPrefix = guidelineReminder
+      ? `[Reminder: user has an active GUIDELINE note titled "${guidelineReminder.title}". ` +
+        `If this turn involves strategy, risk, or preference decisions and the relevant rule ` +
+        `is not already in your memory, call search_notes({tags:["GUIDELINE"]}) before answering. ` +
+        `Do not mention this reminder to the user.]\n\n`
+      : '';
+    const messageWithReminder = temporalPrefix + guidelineReminderPrefix + effectiveMessage;
+    if (guidelineReminder) {
+      log(`Injecting GUIDELINE reminder for note "${guidelineReminder.title}"`, 'info');
+    }
+
     log('Sending request to Gemini with tools', 'info');
 
     // Check if client wants streaming (query param is most reliable)
@@ -1430,7 +1504,7 @@ Deno.serve(async (req: Request) => {
       return handleStreamingRequest(
         googleApiKey,
         systemPrompt,
-        effectiveMessage,
+        messageWithReminder,
         conversationHistory,
         allTools,
         userId,
@@ -1446,22 +1520,28 @@ Deno.serve(async (req: Request) => {
     // Non-streaming path (existing implementation)
     // Note: Non-streaming doesn't support images yet - use streaming mode for image analysis
     // Initial call
-    let result = await callGemini(googleApiKey, systemPrompt, effectiveMessage, conversationHistory, allTools);
+    let result = await callGemini(googleApiKey, systemPrompt, messageWithReminder, conversationHistory, allTools);
+
+    // Capture initial-call usage for response metadata — loop continuations
+    // overwrite `result`, losing the field we care about for cache-hit
+    // measurement (the first call is where the long systemInstruction prefix
+    // gets cached or served from cache).
+    const initialUsage = result.usageMetadata;
 
     const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
     let finalText = '';
     let turnCount = 0;
     const maxTurns = 15;
 
-    // Build conversation history for multi-turn function calling
+    // Build conversation history for multi-turn function calling.
+    // systemPrompt is passed separately via the `systemInstruction` field
+    // on each callGeminiWithContents call — not embedded here.
     const conversationContents: Array<{ role: string; parts: Array<Record<string, unknown>> }> = [
-      { role: 'user', parts: [{ text: systemPrompt }] },
-      { role: 'model', parts: [{ text: 'Understood. I will help while maintaining strict security.' }] },
       ...conversationHistory.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
         parts: [{ text: msg.content }]
       })),
-      { role: 'user', parts: [{ text: message }] }
+      { role: 'user', parts: [{ text: messageWithReminder }] }
     ];
 
     // Function calling loop — per Google docs, loop until no function calls remain.
@@ -1535,7 +1615,7 @@ Deno.serve(async (req: Request) => {
         googleApiKey,
         conversationContents,
         allTools,
-        { streaming: false, maxOutputTokens: 4000 }
+        { streaming: false, maxOutputTokens: 4000, systemInstruction: systemPrompt }
       );
       result = newFunctionCall
         ? { functionCall: newFunctionCall, rawParts: newRawParts }
@@ -1556,7 +1636,7 @@ Deno.serve(async (req: Request) => {
             { role: 'user', parts: [{ text: 'Please now summarise everything you found and give your final answer. Do not call any more tools.' }] }
           ],
           allTools,
-          { streaming: false, maxOutputTokens: 4000, mode: 'NONE' }
+          { streaming: false, maxOutputTokens: 4000, mode: 'NONE', systemInstruction: systemPrompt }
         );
         if (synthesisResult.text) {
           finalText = synthesisResult.text;
@@ -1639,7 +1719,7 @@ Deno.serve(async (req: Request) => {
             googleApiKey,
             conversationContents,
             allTools,
-            { streaming: false, maxOutputTokens: 8000 }
+            { streaming: false, maxOutputTokens: 8000, systemInstruction: systemPrompt }
           );
           correctedText = result.text;
         } catch (error) {
@@ -1688,6 +1768,10 @@ Deno.serve(async (req: Request) => {
         functionCalls,
         model: MODEL,
         timestamp: new Date().toISOString(),
+        // Initial-call token accounting — exposes implicit-cache behavior.
+        // cachedContentTokenCount > 0 means the systemInstruction prefix hit
+        // Gemini's on-disk cache; callers/logs can track hit rate over time.
+        usage: initialUsage,
       }
     };
 

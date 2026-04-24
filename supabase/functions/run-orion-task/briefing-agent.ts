@@ -25,7 +25,7 @@ import {
   executeCustomTool,
   getAllCustomTools,
 } from '../ai-trading-agent/tools.ts';
-import { buildSecureSystemPrompt } from '../ai-trading-agent/systemPrompt.ts';
+import { buildSecureSystemPrompt, buildTemporalContext } from '../ai-trading-agent/systemPrompt.ts';
 import type { SupabaseClient, TaskResult } from './types.ts';
 
 /**
@@ -156,9 +156,15 @@ export async function generateBriefing(
 
   // 6. Run the agent. `initialToolMode: 'AUTO'` lets it go straight to a
   //    final answer on quiet days instead of being forced to call a tool.
+  //    Temporal context is prepended to the user turn (not systemInstruction)
+  //    so implicit-cache prefix stays stable across rollup runs — same
+  //    pattern as chat. Every rollup type benefits from explicit "now"
+  //    awareness; weekly/monthly also include dates inline in their own
+  //    messages but an explicit header is cheap and removes any ambiguity.
+  const messageWithTemporal = `[Current time — ${buildTemporalContext()}]\n\n${userMessage}`;
   const agentResult = await runOrionAgent({
     systemPrompt,
-    message: userMessage,
+    message: messageWithTemporal,
     tools: allTools,
     executeTool,
     initialToolMode: 'AUTO',

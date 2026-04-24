@@ -17,6 +17,7 @@ import {
 } from './prices.ts';
 import { scrapeArticle } from '../_shared/serperScrape.ts';
 import { buildMarketResearchSystemPrompt } from './market-research-prompt.ts';
+import { buildTemporalContext } from '../ai-trading-agent/systemPrompt.ts';
 import {
   symbolsToCurrencies,
   symbolsToReadableNames,
@@ -540,7 +541,11 @@ async function callGeminiForBriefing(
       ? prices.map((p) => `- ${formatPriceLine(p)}`).join('\n')
       : '(No price data available this sweep — describe moves qualitatively.)';
 
-  const userPrompt = `Generate a market research briefing.
+  // Temporal context lives in the user turn (not systemInstruction) to keep
+  // the cache prefix stable across sweeps — same pattern as chat briefings.
+  const userPrompt = `[Current time — ${buildTemporalContext()}]
+
+Generate a market research briefing.
 Markets of interest: ${config.markets.join(', ')}.
 
 ## Previously Reported (DEDUPLICATE AGAINST THESE)

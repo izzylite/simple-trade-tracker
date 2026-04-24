@@ -77,6 +77,12 @@ export interface CallGeminiResult {
    * next turn of a tool loop so thoughtSignature round-trips.
    */
   rawParts: Array<Record<string, unknown>>;
+  /**
+   * Token accounting from Gemini. `cachedContentTokenCount` > 0 confirms
+   * implicit prompt caching hit. Callers can log/meter this without re-
+   * parsing the raw response.
+   */
+  usageMetadata?: Record<string, unknown>;
 }
 
 export function extractFunctionCalls(
@@ -180,5 +186,5 @@ export async function callGemini(params: CallGeminiParams): Promise<CallGeminiRe
 
   const functionCalls = extractFunctionCalls(rawParts);
 
-  return { text, functionCalls, rawParts };
+  return { text, functionCalls, rawParts, usageMetadata: data.usageMetadata };
 }
