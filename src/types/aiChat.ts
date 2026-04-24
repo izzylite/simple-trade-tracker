@@ -68,6 +68,7 @@ export interface AIConversation {
   title: string;
   messages: ChatMessage[]; // Transformed to ChatMessage with Date objects
   message_count: number;
+  pinned: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -81,6 +82,7 @@ export interface SerializableAIConversation {
   title: string;
   messages: SerializableChatMessage[]; // Messages with string timestamps
   message_count: number;
+  pinned: boolean;
   created_at: string;
   updated_at: string;
 }

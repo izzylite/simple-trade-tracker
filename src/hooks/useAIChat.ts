@@ -85,6 +85,7 @@ export interface UseAIChatReturn {
   loadMoreConversations: () => Promise<void>;
   selectConversation: (conversation: AIConversation) => void;
   deleteConversation: (conversationId: string) => Promise<boolean>;
+  togglePinConversation: (conversationId: string) => Promise<boolean>;
   startNewChat: () => Promise<void>;
 
   // Message management
@@ -403,6 +404,50 @@ export function useAIChat({
       return false;
     }
   }, [conversationRepo, currentConversationId, startNewChat]);
+
+  /**
+   * Toggle the pinned flag on a conversation and re-sort locally so pinned
+   * items stay at the top without a full refetch.
+   */
+  const togglePinConversation = useCallback(async (conversationId: string): Promise<boolean> => {
+    const target = conversations.find(c => c.id === conversationId);
+    if (!target) return false;
+
+    const nextPinned = !target.pinned;
+
+    // Optimistic update + re-sort (pinned first, then updated_at desc)
+    setConversations(prev => {
+      const updated = prev.map(c =>
+        c.id === conversationId ? { ...c, pinned: nextPinned } : c
+      );
+      return [...updated].sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        return b.updated_at.getTime() - a.updated_at.getTime();
+      });
+    });
+
+    try {
+      const result = await conversationRepo.setPinned(conversationId, nextPinned);
+      if (!result.success) {
+        // Revert on failure
+        setConversations(prev =>
+          prev.map(c =>
+            c.id === conversationId ? { ...c, pinned: target.pinned } : c
+          )
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      logger.error('Error toggling conversation pin:', error);
+      setConversations(prev =>
+        prev.map(c =>
+          c.id === conversationId ? { ...c, pinned: target.pinned } : c
+        )
+      );
+      return false;
+    }
+  }, [conversations, conversationRepo]);
 
   /**
    * Cancel the current request
@@ -841,6 +886,7 @@ What would you like to know about your trading?`,
     loadMoreConversations,
     selectConversation,
     deleteConversation,
+    togglePinConversation,
     startNewChat,
 
     // Message management

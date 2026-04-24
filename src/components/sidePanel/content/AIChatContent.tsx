@@ -37,7 +37,9 @@ import {
   ArrowBack as ArrowBackIcon,
   Delete as DeleteIcon,
   Schedule as ScheduleIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  PushPin as PushPinIcon,
+  PushPinOutlined as PushPinOutlinedIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import Shimmer from '../../Shimmer';
@@ -168,6 +170,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     loadMoreConversations,
     selectConversation,
     deleteConversation,
+    togglePinConversation,
     startNewChat,
     setMessages,
     getWelcomeMessage
@@ -179,6 +182,8 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   const [conversationToDelete, setConversationToDelete] =
     useState<string | null>(null);
   const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historyFilter, setHistoryFilter] =
+    useState<'all' | 'pinned'>('all');
 
   // Economic event detail dialog state
   const [selectedEvent, setSelectedEvent] =
@@ -190,13 +195,17 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
 
-  // Filter conversations based on search query
+  // Filter conversations based on search query + pinned filter
   const filteredConversations = useMemo(() => {
+    const scoped = historyFilter === 'pinned'
+      ? conversations.filter(c => c.pinned)
+      : conversations;
+
     if (!historySearchQuery.trim()) {
-      return conversations;
+      return scoped;
     }
     const query = historySearchQuery.toLowerCase();
-    return conversations.filter(conversation => {
+    return scoped.filter(conversation => {
       if (conversation.title?.toLowerCase().includes(query)) {
         return true;
       }
@@ -212,7 +221,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
       }
       return false;
     });
-  }, [conversations, historySearchQuery]);
+  }, [conversations, historySearchQuery, historyFilter]);
 
   // Focus input when content becomes active
   useEffect(() => {
@@ -275,6 +284,14 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   const handleCancelDelete = () => {
     setDeleteDialogOpen(false);
     setConversationToDelete(null);
+  };
+
+  const handlePinToggle = (
+    conversationId: string,
+    event: React.MouseEvent
+  ) => {
+    event.stopPropagation();
+    togglePinConversation(conversationId);
   };
 
   const getPreviewText = (conversation: AIConversation): string => {
@@ -494,7 +511,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
             flexDirection: 'column',
             overflow: 'hidden'
           }}>
-            {/* Search Bar */}
+            {/* Search Bar with inline filter dropdown */}
             <Box sx={{ p: 2, pb: 1 }}>
               <TextField
                 fullWidth
@@ -511,10 +528,95 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                       />
                     </InputAdornment>
                   ),
+                  endAdornment: (
+                    <InputAdornment position="end" sx={{ mr: 0.5 }}>
+                      <FormControl size="small" variant="standard">
+                        <Select
+                          value={historyFilter}
+                          onChange={(e) =>
+                            setHistoryFilter(
+                              e.target.value as 'all' | 'pinned'
+                            )
+                          }
+                          disableUnderline
+                          MenuProps={{
+                            sx: { zIndex: Z_INDEX.DIALOG_POPUP },
+                            PaperProps: { sx: { mt: 0.5 } }
+                          }}
+                          sx={{
+                            fontSize: '0.78rem',
+                            height: 28,
+                            color: 'text.secondary',
+                            '& .MuiSelect-select': {
+                              py: 0.25,
+                              pl: 1, 
+                              pr: '24px !important',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              backgroundColor: 'transparent',
+                            },
+                            '&:hover .MuiSelect-select': {
+                              backgroundColor: 'transparent',
+                            },
+                            '&:focus .MuiSelect-select': {
+                              backgroundColor: 'transparent',
+                            },
+                            '& .MuiSvgIcon-root': {
+                              color: 'text.secondary',
+                              right: 2,
+                            },
+                          }}
+                          renderValue={(val) => (
+                            <Box sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5
+                            }}>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  fontSize: '0.78rem',
+                                  fontWeight: 500
+                                }}
+                              >
+                                {val === 'pinned' ? 'Pinned' : 'All'}
+                              </Typography>
+                            </Box>
+                          )}
+                        >
+                          <MenuItem
+                            value="all"
+                            sx={{
+                              fontSize: '0.8rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1
+                            }}
+                          >
+                            <span>All</span>
+                          </MenuItem>
+                          <MenuItem
+                            value="pinned"
+                            sx={{
+                              fontSize: '0.8rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1
+                            }}
+                          >
+                             
+                            <span>Pinned</span>
+                          </MenuItem>
+                        </Select>
+                      </FormControl>
+                    </InputAdornment>
+                  ),
                 }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 2,
+                    pr: 0.5,
                     backgroundColor: alpha(
                       theme.palette.background.paper, 0.8
                     ),
@@ -594,7 +696,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                   <Alert severity="info">
                     {historySearchQuery.trim()
                       ? `No conversations found matching "${historySearchQuery}"`
-                      : 'No conversation history yet. Start chatting with the AI to create your first conversation!'}
+                      : historyFilter === 'pinned'
+                        ? 'No pinned conversations yet. Pin a conversation from the list to keep it handy.'
+                        : 'No conversation history yet. Start chatting with the AI to create your first conversation!'}
                   </Alert>
                 </Box>
               ) : (
@@ -692,24 +796,60 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                                 </Typography>
                               </Box>
                             </Box>
-                            <IconButton
-                              onClick={(e) =>
-                                handleDeleteClick(conversation.id, e)
-                              }
-                              size="small"
-                              sx={{
-                                color: 'error.main',
-                                flexShrink: 0,
-                                mt: 0.5,
-                                '&:hover': {
-                                  backgroundColor: alpha(
-                                    theme.palette.error.main, 0.1
-                                  )
+                            <Box sx={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: 0.25,
+                              flexShrink: 0,
+                              mt: 0.25
+                            }}>
+                              <Tooltip
+                                title={
+                                  conversation.pinned
+                                    ? 'Unpin conversation'
+                                    : 'Pin conversation'
                                 }
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
+                              >
+                                <IconButton
+                                  onClick={(e) =>
+                                    handlePinToggle(conversation.id, e)
+                                  }
+                                  size="small"
+                                  sx={{
+                                    color: conversation.pinned
+                                      ? 'primary.main'
+                                      : 'text.secondary',
+                                    '&:hover': {
+                                      backgroundColor: alpha(
+                                        theme.palette.primary.main, 0.1
+                                      )
+                                    }
+                                  }}
+                                >
+                                  {conversation.pinned
+                                    ? <PushPinIcon fontSize="small" />
+                                    : <PushPinOutlinedIcon fontSize="small" />
+                                  }
+                                </IconButton>
+                              </Tooltip>
+                              <IconButton
+                                onClick={(e) =>
+                                  handleDeleteClick(conversation.id, e)
+                                }
+                                size="small"
+                                sx={{
+                                  color: 'error.main',
+                                  '&:hover': {
+                                    backgroundColor: alpha(
+                                      theme.palette.error.main, 0.1
+                                    )
+                                  }
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
                           </ListItemButton>
                         </ListItem>
                         {index < conversations.length - 1 && <Divider />}

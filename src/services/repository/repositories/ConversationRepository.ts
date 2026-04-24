@@ -50,6 +50,7 @@ const parseDate = (dateValue: any, fallback: Date = new Date()): Date => {
 const transformSupabaseConversation = (data: any): AIConversation => {
   return {
     ...data,
+    pinned: Boolean(data.pinned),
     created_at: parseDate(data.created_at),
     updated_at: parseDate(data.updated_at),
     messages: data.messages ? data.messages.map((msg: SerializableChatMessage) => ({
@@ -150,6 +151,7 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
         .select('*')
         .eq('calendar_id', calendarId)
         .is('trade_id', null)
+        .order('pinned', { ascending: false })
         .order('updated_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -201,6 +203,7 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
         .from('ai_conversations')
         .select('*')
         .eq('trade_id', tradeId)
+        .order('pinned', { ascending: false })
         .order('updated_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -275,6 +278,7 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
         .eq('user_id', userId)
         .is('calendar_id', null)
         .is('trade_id', null)
+        .order('pinned', { ascending: false })
         .order('updated_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -421,6 +425,42 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
   // =====================================================
   // CUSTOM OPERATIONS
   // =====================================================
+
+  /**
+   * Toggle the pinned flag on a conversation.
+   * Writes directly to avoid re-serializing messages through update().
+   */
+  async setPinned(
+    conversationId: string,
+    pinned: boolean
+  ): Promise<RepositoryResult<AIConversation>> {
+    try {
+      const { data, error } = await supabase
+        .from('ai_conversations')
+        .update({ pinned })
+        .eq('id', conversationId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: transformSupabaseConversation(data),
+        timestamp: new Date(),
+        operation: 'setPinned'
+      };
+    } catch (error) {
+      logger.error('Error setting conversation pinned:', error);
+      const { parseSupabaseError } = await import('../../../utils/supabaseErrorHandler');
+      return {
+        success: false,
+        error: parseSupabaseError(error, 'Setting conversation pinned'),
+        timestamp: new Date(),
+        operation: 'setPinned'
+      };
+    }
+  }
 
   /**
    * Save or update a conversation
