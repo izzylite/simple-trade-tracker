@@ -19,6 +19,8 @@ import {
   Select,
   FormControl,
   Tooltip,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -27,10 +29,14 @@ import {
   Clear as ClearIcon,
   SmartToy as AIIcon,
   Person as PersonIcon,
+  ViewModule as CardViewIcon,
+  LocalOffer as TagViewIcon,
 } from '@mui/icons-material';
 
 import RoundedTabs from '../../common/RoundedTabs';
 import NoteListItem from '../../notes/NoteListItem';
+import NotesTagView from '../../notes/NotesTagView';
+import { useNotesViewMode } from '../../../hooks/useNotesViewMode';
 import EconomicEventShimmer from '../../economicCalendar/EconomicEventShimmer';
 import NoteEditorDialog from '../../notes/NoteEditorDialog';
 import NoteViewerDialog from '../../notes/NoteViewerDialog';
@@ -96,6 +102,7 @@ const NotesContent: React.FC<NotesContentProps> = ({
   const [creatorFilter, setCreatorFilter] = useState<'assistant' | 'me'>('me');
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerNote, setViewerNote] = useState<Note | null>(null);
+  const [viewMode, setViewMode] = useNotesViewMode();
 
   const {
     notes,
@@ -337,6 +344,22 @@ const NotesContent: React.FC<NotesContentProps> = ({
               </MenuItem>
             </Select>
           </FormControl>
+
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={viewMode}
+            onChange={(_e, v) => v && setViewMode(v)}
+            aria-label="View mode"
+            sx={{ flexShrink: 0 }}
+          >
+            <ToggleButton value="card" aria-label="Card view">
+              <CardViewIcon fontSize="small" />
+            </ToggleButton>
+            <ToggleButton value="tag" aria-label="Tag view">
+              <TagViewIcon fontSize="small" />
+            </ToggleButton>
+          </ToggleButtonGroup>
         </Box>
 
         {/* Notes List */}
@@ -373,23 +396,37 @@ const NotesContent: React.FC<NotesContentProps> = ({
             </Stack>
           ) : (
             <>
-              <Box>
-                {notes.map((note) => (
-                  <NoteListItem
-                    key={note.id}
-                    note={note}
-                    onClick={handleNoteClick}
-                    onPin={isReadOnly ? undefined : handlePin}
-                    onArchive={isReadOnly ? undefined : handleArchive}
-                    onUnarchive={isReadOnly ? undefined : handleArchive}
-                    onConvertToUserNote={
-                      isReadOnly ? undefined : handleConvertToUserNote
-                    }
-                    calendar={getCalendarForNote(note)}
-                    showCalendarBadge={showCalendarPicker && !calendarId}
-                  />
-                ))}
-              </Box>
+              {viewMode === 'tag' ? (
+                <NotesTagView
+                  notes={notes}
+                  calendars={calendars}
+                  showCalendarBadge={showCalendarPicker && !calendarId}
+                  isReadOnly={isReadOnly}
+                  onNoteClick={handleNoteClick}
+                  onPin={note => { void handlePin(note); }}
+                  onArchive={note => { void handleArchive(note); }}
+                  onUnarchive={note => { void handleArchive(note); }}
+                  onConvertToUserNote={note => { void handleConvertToUserNote(note); }}
+                />
+              ) : (
+                <Box>
+                  {notes.map((note) => (
+                    <NoteListItem
+                      key={note.id}
+                      note={note}
+                      onClick={handleNoteClick}
+                      onPin={isReadOnly ? undefined : handlePin}
+                      onArchive={isReadOnly ? undefined : handleArchive}
+                      onUnarchive={isReadOnly ? undefined : handleArchive}
+                      onConvertToUserNote={
+                        isReadOnly ? undefined : handleConvertToUserNote
+                      }
+                      calendar={getCalendarForNote(note)}
+                      showCalendarBadge={showCalendarPicker && !calendarId}
+                    />
+                  ))}
+                </Box>
+              )}
 
               {/* Load More Button */}
               {hasMore && (
