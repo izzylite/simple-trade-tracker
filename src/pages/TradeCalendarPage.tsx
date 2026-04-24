@@ -737,21 +737,8 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
 
-  const {
-    tasks: orionTasks,
-    results: orionResults,
-    unreadCount: taskUnreadCount,
-    loading: tasksLoading,
-    hasMore: taskResultsHasMore,
-    loadingMore: taskResultsLoadingMore,
-    loadMore: loadMoreTaskResults,
-    createTask,
-    updateTask,
-    deleteTask,
-    markRead,
-    markAllRead,
-    hideResult,
-  } = useOrionTasks(calendar?.user_id, calendar?.id);
+  const aiTasks = useOrionTasks(calendar?.user_id, calendar?.id);
+  const taskUnreadCount = aiTasks.unreadCount;
 
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
@@ -2918,19 +2905,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         calendar={calendar!}
         isReadOnly={isReadOnly}
         tradeOperations={tradeOperations}
-        tasks={orionTasks}
-        taskResults={orionResults}
-        taskUnreadCount={taskUnreadCount}
-        tasksLoading={tasksLoading}
-        onCreateTask={createTask}
-        onUpdateTask={updateTask}
-        onDeleteTask={deleteTask}
-        onMarkTaskResultRead={markRead}
-        onMarkAllTaskResultsRead={markAllRead}
-        onHideTaskResult={hideResult}
-        taskResultsHasMore={taskResultsHasMore}
-        taskResultsLoadingMore={taskResultsLoadingMore}
-        onLoadMoreTaskResults={loadMoreTaskResults}
+        aiTasks={aiTasks}
       />
 
       {/* Notes Drawer — <lg only */}

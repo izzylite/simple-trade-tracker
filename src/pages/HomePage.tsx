@@ -154,21 +154,7 @@ const HomeInner: React.FC<HomeProps> = ({
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
 
-  const {
-    tasks: orionTasks,
-    results: orionResults,
-    unreadCount: taskUnreadCount,
-    loading: tasksLoading,
-    hasMore: taskResultsHasMore,
-    loadingMore: taskResultsLoadingMore,
-    loadMore: loadMoreTaskResults,
-    createTask,
-    updateTask,
-    deleteTask,
-    markRead,
-    markAllRead,
-    hideResult,
-  } = useOrionTasks(user?.id, aiChatCalendarId || undefined);
+  const aiTasks = useOrionTasks(user?.id, aiChatCalendarId || undefined);
 
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
@@ -1675,19 +1661,7 @@ const HomeInner: React.FC<HomeProps> = ({
                 availableCalendars={calendars}
                 selectedCalendarId={aiChatCalendarId}
                 onCalendarChange={setAiChatCalendarId}
-                tasks={orionTasks}
-                taskResults={orionResults}
-                taskUnreadCount={taskUnreadCount}
-                tasksLoading={tasksLoading}
-                onCreateTask={createTask}
-                onUpdateTask={updateTask}
-                onDeleteTask={deleteTask}
-                onMarkTaskResultRead={markRead}
-                onMarkAllTaskResultsRead={markAllRead}
-                onHideTaskResult={hideResult}
-                taskResultsHasMore={taskResultsHasMore}
-                taskResultsLoadingMore={taskResultsLoadingMore}
-                onLoadMoreTaskResults={loadMoreTaskResults}
+                aiTasks={aiTasks}
               />
 
               <NotesDrawer

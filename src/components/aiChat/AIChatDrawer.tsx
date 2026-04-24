@@ -26,7 +26,7 @@ import AIChatContent from '../sidePanel/content/AIChatContent';
 import { UseAIChatReturn, useAIChat } from '../../hooks/useAIChat';
 import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
 import OrionTasksContent from '../orionTasks/OrionTasksContent';
-import type { OrionTask, OrionTaskResult, TaskType, TaskConfig } from '../../types/orionTask';
+import type { AITasksBundle, OrionTaskResult } from '../../types/orionTask';
 import { TASK_TYPE_LABELS } from '../../types/orionTask';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { createNote } from '../../services/notesService';
@@ -46,20 +46,9 @@ interface AIChatDrawerProps {
   availableCalendars?: Calendar[];
   selectedCalendarId?: string;
   onCalendarChange?: (calendarId: string) => void;
-  /** Orion Tasks props */
-  tasks?: OrionTask[];
-  taskResults?: OrionTaskResult[];
-  taskUnreadCount?: number;
-  tasksLoading?: boolean;
-  onCreateTask?: (taskType: TaskType, config: TaskConfig) => Promise<OrionTask | undefined>;
-  onUpdateTask?: (taskId: string, updates: { config?: TaskConfig }) => Promise<OrionTask | undefined>;
-  onDeleteTask?: (taskId: string) => Promise<void>;
-  onMarkTaskResultRead?: (resultId: string) => Promise<void>;
-  onMarkAllTaskResultsRead?: () => Promise<void>;
-  onHideTaskResult?: (resultId: string) => Promise<void>;
-  taskResultsHasMore?: boolean;
-  taskResultsLoadingMore?: boolean;
-  onLoadMoreTaskResults?: () => void;
+  /** Orion Tasks state + actions, typically from `useOrionTasks`. When omitted
+   *  the Tasks tab renders in empty/disabled form. */
+  aiTasks?: AITasksBundle;
 }
 
 // Bottom sheet heights
@@ -78,19 +67,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   availableCalendars,
   selectedCalendarId,
   onCalendarChange,
-  tasks,
-  taskResults,
-  taskUnreadCount,
-  tasksLoading,
-  onCreateTask,
-  onUpdateTask,
-  onDeleteTask,
-  onMarkTaskResultRead,
-  onMarkAllTaskResultsRead,
-  onHideTaskResult,
-  taskResultsHasMore,
-  taskResultsLoadingMore,
-  onLoadMoreTaskResults,
+  aiTasks,
 }) => {
   const theme = useTheme();
   const { user } = useAuth();
@@ -271,7 +248,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             <RoundedTabs
               tabs={[
                 { label: 'Chat' },
-                { label: 'Tasks' },
+                { label: 'Tasks', badgeCount: aiTasks?.unreadCount ?? 0 },
               ]}
               activeTab={activeTab}
               onTabChange={(_e, v) => setActiveTab(v)}
@@ -318,19 +295,19 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
             <TabPanel value={activeTab} index={1}>
               <OrionTasksContent
-                tasks={tasks ?? []}
-                results={taskResults ?? []}
-                unreadCount={taskUnreadCount ?? 0}
-                loading={tasksLoading ?? false}
-                hasMore={taskResultsHasMore}
-                loadingMore={taskResultsLoadingMore}
-                onLoadMore={onLoadMoreTaskResults}
-                onCreateTask={onCreateTask ?? (async () => undefined)}
-                onUpdateTask={onUpdateTask}
-                onDeleteTask={onDeleteTask ?? (async () => {})}
-                onMarkRead={onMarkTaskResultRead ?? (async () => {})}
-                onMarkAllRead={onMarkAllTaskResultsRead}
-                onHideResult={onHideTaskResult}
+                tasks={aiTasks?.tasks ?? []}
+                results={aiTasks?.results ?? []}
+                unreadCount={aiTasks?.unreadCount ?? 0}
+                loading={aiTasks?.loading ?? false}
+                hasMore={aiTasks?.hasMore}
+                loadingMore={aiTasks?.loadingMore}
+                onLoadMore={aiTasks?.loadMore}
+                onCreateTask={aiTasks?.createTask ?? (async () => undefined)}
+                onUpdateTask={aiTasks?.updateTask}
+                onDeleteTask={aiTasks?.deleteTask ?? (async () => {})}
+                onMarkRead={aiTasks?.markRead ?? (async () => {})}
+                onMarkAllRead={aiTasks?.markAllRead}
+                onHideResult={aiTasks?.hideResult}
                 onFollowup={handleFollowupAboutResult}
                 onSaveNote={handleSaveNote}
                 calendar={calendar}

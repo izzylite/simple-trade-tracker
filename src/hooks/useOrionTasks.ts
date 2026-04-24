@@ -3,6 +3,7 @@ import { supabase } from '../config/supabase';
 import { orionTaskService } from '../services/orionTaskService';
 import { logger } from '../utils/logger';
 import type {
+  AITasksBundle,
   OrionTask,
   OrionTaskResult,
   TaskType,
@@ -11,7 +12,7 @@ import type {
 
 const PAGE_SIZE = 20;
 
-export function useOrionTasks(userId: string | undefined, calendarId?: string) {
+export function useOrionTasks(userId: string | undefined, calendarId?: string): AITasksBundle {
   const [tasks, setTasks] = useState<OrionTask[]>([]);
   const [results, setResults] = useState<OrionTaskResult[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -71,28 +72,29 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string) {
   }, []);
 
   const markRead = useCallback(async (resultId: string) => {
-    await orionTaskService.markResultRead(resultId);
+    
     setResults((prev) =>
       prev.map((r) => (r.id === resultId ? { ...r, is_read: true } : r))
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
+    await orionTaskService.markResultRead(resultId);
   }, []);
 
   const hideResult = useCallback(async (resultId: string) => {
     // Look up the row before we drop it so we can decrement unread correctly.
-    const target = results.find((r) => r.id === resultId);
-    await orionTaskService.hideResult(resultId);
+    const target = results.find((r) => r.id === resultId); 
     setResults((prev) => prev.filter((r) => r.id !== resultId));
     if (target && !target.is_read) {
       setUnreadCount((prev) => Math.max(0, prev - 1));
     }
+    await orionTaskService.hideResult(resultId);
   }, [results]);
 
   const markAllRead = useCallback(async () => {
-    if (!userId) return;
-    await orionTaskService.markAllResultsRead(userId);
+    if (!userId) return; 
     setResults((prev) => prev.map((r) => ({ ...r, is_read: true })));
     setUnreadCount(0);
+     await orionTaskService.markAllResultsRead(userId);
   }, [userId]);
 
   const loadMore = useCallback(async () => {
