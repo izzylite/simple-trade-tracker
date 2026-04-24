@@ -215,6 +215,7 @@ export async function handleMarketResearch(
   const rawToolCalls: Array<{ name: string }> = [
     ...Array.from({ length: successfulSearches }, () => ({ name: 'search_web' })),
     ...prices.map(() => ({ name: 'get_market_price' })),
+    ...(economicEvents.length > 0 ? [{ name: 'get_economic_events' }] : []),
     ...briefing.scrapedUrls.map(() => ({ name: 'scrape_url' })),
     ...briefing.scrapedUrlsFailed.map(() => ({ name: 'scrape_url' })),
   ];

@@ -14,6 +14,7 @@ export const ORION_TOOL_LABELS: Record<string, string> = {
   analyze_image: 'Analyzing chart',
   generate_chart: 'Generating chart',
   get_market_price: 'Checking market price',
+  get_economic_events: 'Checking economic calendar',
   get_crypto_price: 'Checking crypto price',
   get_forex_price: 'Checking forex price',
   create_note: 'Creating note',
