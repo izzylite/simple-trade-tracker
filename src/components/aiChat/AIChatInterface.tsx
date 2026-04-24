@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import ChatMessage from './ChatMessage';
 import AIChatMentionInput from './AIChatMentionInput';
+import type { AIChatMentionInputHandle } from './AIChatMentionInput';
 import { ChatMessage as ChatMessageType, AttachedImage } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
@@ -36,6 +37,8 @@ import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
 import { logger } from '../../utils/logger';
 import { compressImageToDataUrl } from '../../utils/fileValidation';
+import * as notesService from '../../services/notesService';
+import { expandMentionsForSend } from '../../utils/chatMentions';
 
 // Image limit for AI agent requests (must match backend MAX_IMAGES_PER_REQUEST)
 const MAX_IMAGES = 4;
@@ -149,7 +152,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   const theme = useTheme();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<any>(null);
+  const inputRef = useRef<AIChatMentionInputHandle | null>(null);
 
   // Local UI state
   const [inputMessage, setInputMessage] = useState('');
@@ -201,13 +204,24 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
 
   // Event Handlers
   const handleSendMessage = async () => {
-    const messageText = inputMessage.trim();
-    if ((!messageText && attachedImages.length === 0) || isLoading) return;
+    const plainText = inputMessage.trim();
+    if ((!plainText && attachedImages.length === 0) || isLoading) return;
+
+    const segments = inputRef.current?.getSegments() ?? [];
+    const notesMap = new Map(
+      calendarFullNotes.map(n => [
+        n.id,
+        { title: n.title, content: n.content ?? '', tags: n.tags ?? [] }
+      ])
+    );
+    const outgoing = segments.length > 0
+      ? expandMentionsForSend(segments, notesMap)
+      : plainText;
 
     const imagesToSend = attachedImages.length > 0 ? [...attachedImages] : undefined;
     setInputMessage('');
     setAttachedImages([]);
-    await sendMessage(messageText, imagesToSend);
+    await sendMessage(outgoing, imagesToSend);
   };
 
   // Image upload handlers
@@ -379,9 +393,35 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
     onNoteClick?.(noteId, note || undefined);
   }, [onNoteClick]);
 
+  // Load full notes (with tags + content) for the mention input and for
+  // client-side mention expansion at send time.
+  const [calendarFullNotes, setCalendarFullNotes] = useState<Note[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!calendar?.id) {
+      setCalendarFullNotes([]);
+      return;
+    }
+    (async () => {
+      try {
+        const result = await notesService.queryCalendarNotes(calendar.id, {
+          limit: 500,
+          isArchived: false,
+        });
+        if (!cancelled) setCalendarFullNotes(result.notes);
+      } catch (err) {
+        logger.error('Failed to load notes for mention input', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [calendar?.id]);
+
   // Memoize inputs passed to the mention input so its React.memo can stick.
   const allTagsMemo = useMemo(() => calendar?.tags || [], [calendar?.tags]);
-  const allNotesMemo = useMemo(() => calendar?.notes ?? [], [calendar?.notes]);
+  const allNotesMemo = useMemo(
+    () => calendarFullNotes.map(n => ({ id: n.id, title: n.title, tags: n.tags ?? [] })),
+    [calendarFullNotes]
+  );
   const availableTagsMemo = useMemo(() => calendar?.tags || [], [calendar?.tags]);
   const mentionInputSx = useMemo(
     () => ({ flex: 1, minWidth: 0, fontSize: '0.95rem', lineHeight: 1.4 }),
