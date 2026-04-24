@@ -128,3 +128,53 @@ describe('expandMentionsForSend', () => {
     expect(expandMentionsForSend(segs, notesMap)).toBe('Ghost');
   });
 });
+
+import { ContentState, EditorState, Modifier, SelectionState } from 'draft-js';
+import { extractSegments } from '../chatMentions';
+
+function makeStateWithNoteMention(prefix: string, noteTitle: string, noteId: string, suffix: string) {
+  let content = ContentState.createFromText(prefix);
+  const block = content.getFirstBlock();
+  const insertSel = SelectionState.createEmpty(block.getKey()).merge({
+    anchorOffset: prefix.length,
+    focusOffset: prefix.length,
+  }) as SelectionState;
+
+  content = Modifier.insertText(content, insertSel, noteTitle);
+  content = content.createEntity('NOTE_MENTION', 'IMMUTABLE', { noteTitle, noteId });
+  const entityKey = content.getLastCreatedEntityKey();
+  const entitySel = SelectionState.createEmpty(block.getKey()).merge({
+    anchorOffset: prefix.length,
+    focusOffset: prefix.length + noteTitle.length,
+  }) as SelectionState;
+  content = Modifier.applyEntity(content, entitySel, entityKey);
+
+  const tailSel = SelectionState.createEmpty(block.getKey()).merge({
+    anchorOffset: prefix.length + noteTitle.length,
+    focusOffset: prefix.length + noteTitle.length,
+  }) as SelectionState;
+  content = Modifier.insertText(content, tailSel, suffix);
+
+  return EditorState.createWithContent(content);
+}
+
+describe('extractSegments', () => {
+  it('returns a single text segment for plain text', () => {
+    const state = EditorState.createWithContent(ContentState.createFromText('hello'));
+    expect(extractSegments(state)).toEqual([{ type: 'text', value: 'hello' }]);
+  });
+
+  it('splits around a NOTE_MENTION entity', () => {
+    const state = makeStateWithNoteMention('help me with ', 'Daily Review', 'n1', ' please');
+    expect(extractSegments(state)).toEqual([
+      { type: 'text', value: 'help me with ' },
+      { type: 'note-mention', noteId: 'n1', noteTitle: 'Daily Review' },
+      { type: 'text', value: ' please' },
+    ]);
+  });
+
+  it('joins multi-line blocks with newlines as text', () => {
+    const state = EditorState.createWithContent(ContentState.createFromText('line1\nline2'));
+    expect(extractSegments(state)).toEqual([{ type: 'text', value: 'line1\nline2' }]);
+  });
+});

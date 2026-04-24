@@ -3,6 +3,7 @@
  * and AIChatInterface (submit flow).
  */
 
+import { EditorState } from 'draft-js';
 import { SLASH_COMMAND_TAG } from '../types/note';
 
 export type MentionKind = 'slash' | 'at';
@@ -91,4 +92,53 @@ export function expandMentionsForSend(
 
   if (contextBlocks.length === 0) return inline;
   return `${inline}\n\n${contextBlocks.join('\n\n')}`;
+}
+
+/**
+ * Walk the editor's ContentState and produce flat segments.
+ * NOTE_MENTION entities become `note-mention` segments; TAG_MENTION entities
+ * and plain text become `text` segments (tags are already the tag string in
+ * the block's text, so they fall through as text naturally).
+ * Blocks are joined with '\n'.
+ */
+export function extractSegments(editorState: EditorState): MessageSegment[] {
+  const content = editorState.getCurrentContent();
+  const blocks = content.getBlocksAsArray();
+  const segs: MessageSegment[] = [];
+
+  const pushText = (value: string) => {
+    if (!value) return;
+    const last = segs[segs.length - 1];
+    if (last && last.type === 'text') {
+      last.value += value;
+    } else {
+      segs.push({ type: 'text', value });
+    }
+  };
+
+  blocks.forEach((block, blockIdx) => {
+    if (blockIdx > 0) pushText('\n');
+    const text = block.getText();
+    let i = 0;
+    while (i < text.length) {
+      const entityKey = block.getEntityAt(i);
+      if (!entityKey) {
+        pushText(text[i]);
+        i += 1;
+        continue;
+      }
+      let j = i;
+      while (j < text.length && block.getEntityAt(j) === entityKey) j += 1;
+      const entity = content.getEntity(entityKey);
+      if (entity.getType() === 'NOTE_MENTION') {
+        const data = entity.getData() as { noteTitle: string; noteId: string };
+        segs.push({ type: 'note-mention', noteId: data.noteId, noteTitle: data.noteTitle });
+      } else {
+        pushText(text.slice(i, j));
+      }
+      i = j;
+    }
+  });
+
+  return segs;
 }
