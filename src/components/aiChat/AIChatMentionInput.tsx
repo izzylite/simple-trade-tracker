@@ -5,6 +5,15 @@ import { Tag as TagIcon, Notes as NotesIcon } from '@mui/icons-material';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
+import type { MessageSegment } from '../../utils/chatMentions';
+import { detectMentionTrigger, extractSegments } from '../../utils/chatMentions';
+import { SLASH_COMMAND_TAG } from '../../types/note';
+
+export interface AIChatMentionInputHandle {
+  focus: () => void;
+  moveCursorToEnd: () => void;
+  getSegments: () => MessageSegment[];
+}
 
 export interface AIChatMentionInputProps {
   value: string;
@@ -13,7 +22,7 @@ export interface AIChatMentionInputProps {
   placeholder?: string;
   disabled?: boolean;
   allTags: string[];
-  allNotes: { id: string; title: string }[];
+  allNotes: { id: string; title: string; tags: string[] }[];
   maxRows?: number;
   sx?: any;
 }
@@ -105,7 +114,7 @@ const createMentionDecorator = () =>
 
 type MentionItem = { type: 'note'; id: string; title: string } | { type: 'tag'; tag: string };
 
-const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
+const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInputProps>(({
   value, onChange, onKeyDown, placeholder, disabled, allTags, allNotes, maxRows = 4, sx
 }, ref) => {
   const theme = useTheme();
@@ -113,7 +122,13 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
   const [editorState, setEditorState] = useState(() => EditorState.createWithContent(ContentState.createFromText(value || ''), createMentionDecorator()));
   const editorStateRef = useRef(editorState);
   const [editorKey, setEditorKey] = useState(0);
-  const [mention, setMention] = useState<{ open: boolean; term: string; start: number; blockKey: string } | null>(null);
+  const [mention, setMention] = useState<{
+    open: boolean;
+    kind: 'slash' | 'at';
+    term: string;
+    start: number;
+    blockKey: string;
+  } | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -144,6 +159,7 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
         (editorRef.current as any)?.focus?.();
       }, 0);
     },
+    getSegments: () => extractSegments(editorStateRef.current),
   }));
 
   useEffect(() => {
@@ -194,17 +210,23 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
   const tags = useMemo(() => allTags.sort(), [allTags]);
 
   const filteredNotes = useMemo(() => {
-    const term = mention?.term?.toLowerCase() ?? '';
+    if (!mention) return [];
+    const term = mention.term?.toLowerCase() ?? '';
+    const kindPool =
+      mention.kind === 'slash'
+        ? allNotes.filter(n => (n.tags ?? []).includes(SLASH_COMMAND_TAG))
+        : allNotes.filter(n => !(n.tags ?? []).includes(SLASH_COMMAND_TAG));
     return (term
-      ? allNotes.filter(n => (n.title || '').toLowerCase().includes(term))
-      : allNotes
+      ? kindPool.filter(n => (n.title || '').toLowerCase().includes(term))
+      : kindPool
     ).slice(0, 20);
-  }, [allNotes, mention?.term]);
+  }, [allNotes, mention]);
 
   const filteredTags = useMemo(() => {
-    const term = mention?.term?.toLowerCase() ?? '';
+    if (!mention || mention.kind !== 'at') return [];
+    const term = mention.term?.toLowerCase() ?? '';
     return (term ? tags.filter(t => t.toLowerCase().includes(term)) : tags).slice(0, 30);
-  }, [tags, mention?.term]);
+  }, [tags, mention]);
 
   const flatItems = useMemo<MentionItem[]>(() => [
     ...filteredNotes.map(n => ({ type: 'note' as const, id: n.id, title: n.title })),
@@ -218,13 +240,18 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
     const blockKey = sel.getStartKey();
     const block = content.getBlockForKey(blockKey);
     const offset = sel.getStartOffset();
-    const text = block.getText().slice(0, offset);
-    const at = text.lastIndexOf('/');
-    if (at === -1) return setMention(null);
-    if (at > 0 && /[^\s]/.test(text[at - 1])) return setMention(null);
-    const term = text.slice(at + 1);
-    if (/[^A-Za-z0-9:_.-]/.test(term)) return setMention(null);
-    setMention({ open: true, term, start: at, blockKey });
+    const fullText = block.getText();
+
+    const trigger = detectMentionTrigger(fullText, offset);
+    if (!trigger) return setMention(null);
+
+    setMention({
+      open: true,
+      kind: trigger.kind,
+      term: trigger.term,
+      start: trigger.start,
+      blockKey,
+    });
     setAnchorEl(containerRef.current);
     setSelectedIndex(0);
   }
@@ -297,20 +324,9 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
 
     const content = state.getCurrentContent();
     const blockKey = selection.getStartKey();
-    const block = content.getBlockForKey(blockKey);
-    const text = block.getText();
     const offset = selection.getStartOffset();
 
-    // Find the '/' by scanning backward (same logic as insertTag)
-    let atIndex = -1;
-    for (let i = offset - 1; i >= 0; i -= 1) {
-      const ch = text[i];
-      if (ch === '/') {
-        if (i === 0 || /\s/.test(text[i - 1])) { atIndex = i; }
-        break;
-      }
-      if (/\s/.test(ch)) break;
-    }
+    const atIndex = mention?.start ?? -1;
     if (atIndex === -1) { setMention(null); return; }
 
     const noteTitle = note.title || 'Untitled';
@@ -365,31 +381,10 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
 
     const content = state.getCurrentContent();
     const blockKey = selection.getStartKey();
-    const block = content.getBlockForKey(blockKey);
-    const text = block.getText();
     const offset = selection.getStartOffset();
 
-    // Find the '/' that starts this mention by scanning backwards from the cursor
-    let atIndex = -1;
-    for (let i = offset - 1; i >= 0; i -= 1) {
-      const ch = text[i];
-      if (ch === '/') {
-        // Require start-of-line or whitespace before '/' so we don't match paths, etc.
-        if (i === 0 || /\s/.test(text[i - 1])) {
-          atIndex = i;
-        }
-        break;
-      }
-      if (/\s/.test(ch)) {
-        // Hit whitespace before finding a '/' – no valid mention here
-        break;
-      }
-    }
-
-    if (atIndex === -1) {
-      setMention(null);
-      return;
-    }
+    const atIndex = mention?.start ?? -1;
+    if (atIndex === -1) { setMention(null); return; }
 
     const mentionText = tag; // raw tag, without '@'
 
@@ -519,7 +514,10 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
               color="text.secondary"
               sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 500 }}
             >
-              <TagIcon sx={{ fontSize: 14 }} /> Select a tag or note ({flatItems.length} available)
+              <TagIcon sx={{ fontSize: 14 }} />{' '}
+              {mention?.kind === 'slash'
+                ? `Slash commands (${filteredNotes.length})`
+                : `Tags & notes (${flatItems.length})`}
             </Typography>
           </Box>
           <List sx={{ maxHeight: 200, overflow: 'auto', p: 0, ...scrollbarStyles(theme) }}>
@@ -529,7 +527,9 @@ const AIChatMentionInput = forwardRef<any, AIChatMentionInputProps>(({
                   <Typography variant="body2" color="text.secondary">
                     {allTags.length === 0 && allNotes.length === 0
                       ? 'No tags or notes available.'
-                      : `No matches for "${mention?.term || ''}"`}
+                      : mention?.kind === 'slash'
+                        ? 'No slash-command notes match.'
+                        : `No matches for "${mention?.term || ''}"`}
                   </Typography>
                 </Box>
               </ListItem>
