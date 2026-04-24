@@ -218,6 +218,9 @@ export interface AgentRequest {
   conversationHistory?: ConversationMessage[];
   calendarContext?: Partial<Calendar>;
   images?: UserAttachedImage[]; // User-attached images for analysis
+  // True when the client expanded one or more SlashCommand-tagged notes into
+  // this turn's message. Triggers a turn-scoped reminder prefix (see index.ts).
+  hasSlashCommand?: boolean;
 }
 
 export interface ConversationMessage {

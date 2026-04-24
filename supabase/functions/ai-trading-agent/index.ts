@@ -1378,7 +1378,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: AgentRequest = await req.json();
-    const { message, userId, calendarId, focusedTradeId, conversationHistory = [], calendarContext, images } = body;
+    const { message, userId, calendarId, focusedTradeId, conversationHistory = [], calendarContext, images, hasSlashCommand } = body;
 
     // Allow image-only messages (no text required if images present)
     const hasContent = message || (images && images.length > 0);
@@ -1484,9 +1484,24 @@ Deno.serve(async (req: Request) => {
         `is not already in your memory, call search_notes({tags:["GUIDELINE"]}) before answering. ` +
         `Do not mention this reminder to the user.]\n\n`
       : '';
-    const messageWithReminder = temporalPrefix + guidelineReminderPrefix + effectiveMessage;
+    // Slash-command reminder — only injected when the client expanded at least
+    // one SlashCommand-tagged note into this turn's message. Keeps the system
+    // prompt static (preserves implicit cache) while telling Orion how to
+    // interpret the injected content for just this turn.
+    const slashCommandReminderPrefix = hasSlashCommand
+      ? `[Reminder: this turn's message includes content from a saved slash-command note. ` +
+        `If the message body is injected command content (no "[Referenced command]" wrapper), ` +
+        `treat it as the user's direct request and act on it. If the message mixes typed text ` +
+        `with "[Referenced command "..."]" blocks, use the referenced content as supporting ` +
+        `context — the user's typed text is the primary directive. Do not mention this mechanism ` +
+        `to the user.]\n\n`
+      : '';
+    const messageWithReminder = temporalPrefix + guidelineReminderPrefix + slashCommandReminderPrefix + effectiveMessage;
     if (guidelineReminder) {
       log(`Injecting GUIDELINE reminder for note "${guidelineReminder.title}"`, 'info');
+    }
+    if (hasSlashCommand) {
+      log('Injecting slash-command reminder', 'info');
     }
 
     log('Sending request to Gemini with tools', 'info');

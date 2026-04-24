@@ -129,7 +129,8 @@ class SupabaseAIChatService {
     conversationHistory: ChatMessageType[] = [],
     signal?: AbortSignal,
     focusedTradeId?: string,
-    images?: AttachedImage[]
+    images?: AttachedImage[],
+    hasSlashCommand?: boolean
   ): AsyncGenerator<SSEEvent, void, unknown> {
     try {
       logger.log(`Sending streaming message to AI agent: "${message.substring(0, 50)}..."`);
@@ -173,6 +174,7 @@ class SupabaseAIChatService {
                 mimeType: img.mimeType,
               }))
             : undefined,
+          hasSlashCommand: hasSlashCommand || undefined,
         }),
         signal
       });
