@@ -94,7 +94,8 @@ describe('expandMentionsForSend', () => {
     ];
     const out = expandMentionsForSend(segs, notesMap);
     expect(out).toContain('help me with Daily Review');
-    expect(out).toContain('[Referenced command "Daily Review":');
+    expect(out).toContain('[Referenced command:');
+    expect(out).not.toContain('"Daily Review":');
     expect(out).toContain("Summarize yesterday's trades");
   });
 
@@ -105,7 +106,8 @@ describe('expandMentionsForSend', () => {
     ];
     const out = expandMentionsForSend(segs, notesMap);
     expect(out).toContain('what do you think about Strategy');
-    expect(out).toContain('[Referenced note "Strategy":');
+    expect(out).toContain('[Referenced note:');
+    expect(out).not.toContain('"Strategy":');
     expect(out).toContain('Wait for confirmation candle.');
   });
 
@@ -117,8 +119,8 @@ describe('expandMentionsForSend', () => {
     ];
     const out = expandMentionsForSend(segs, notesMap);
     expect(out).toContain('Daily Review and Strategy');
-    expect(out).toContain('[Referenced command "Daily Review":');
-    expect(out).toContain('[Referenced note "Strategy":');
+    expect(out).toContain('[Referenced command:');
+    expect(out).toContain('[Referenced note:');
   });
 
   it('renders unknown noteId as its title with no expansion', () => {

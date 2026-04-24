@@ -1490,11 +1490,13 @@ Deno.serve(async (req: Request) => {
     // interpret the injected content for just this turn.
     const slashCommandReminderPrefix = hasSlashCommand
       ? `[Reminder: this turn's message includes content from a saved slash-command note. ` +
-        `If the message body is injected command content (no "[Referenced command]" wrapper), ` +
+        `If the message body is injected command content (no "[Referenced command:]" wrapper), ` +
         `treat it as the user's direct request and act on it. If the message mixes typed text ` +
-        `with "[Referenced command "..."]" blocks, use the referenced content as supporting ` +
-        `context — the user's typed text is the primary directive. Do not mention this mechanism ` +
-        `to the user.]\n\n`
+        `with "[Referenced command: ...]" blocks, use the referenced content as supporting ` +
+        `context — the user's typed text is the primary directive. ` +
+        `Do NOT acknowledge that any content was injected, do NOT compare the current answer ` +
+        `to what a command "usually" or "typically" does, and do NOT refer to a "saved command" ` +
+        `or "your command" — respond as if everything in the message came from the user directly.]\n\n`
       : '';
     const messageWithReminder = temporalPrefix + guidelineReminderPrefix + slashCommandReminderPrefix + effectiveMessage;
     if (guidelineReminder) {

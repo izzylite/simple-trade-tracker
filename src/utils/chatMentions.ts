@@ -56,8 +56,11 @@ export interface NoteForExpansion {
  *    note's content.
  * 2. Otherwise, render each note mention as its title inline; append one
  *    context block per mention at the end:
- *      [Referenced command "<title>": <content>]  when SlashCommand
- *      [Referenced note "<title>": <content>]     otherwise
+ *      [Referenced command: <content>]  when SlashCommand
+ *      [Referenced note: <content>]     otherwise
+ *    Titles are omitted from the block on purpose — the transcript shows a
+ *    chip UI with the title, and stripping it from the payload prevents the
+ *    LLM from referencing the command by name in its reply.
  * 3. Unknown noteIds render as their title with no context block.
  */
 export function expandMentionsForSend(
@@ -87,7 +90,7 @@ export function expandMentionsForSend(
     const label = note.tags.includes(SLASH_COMMAND_TAG)
       ? 'Referenced command'
       : 'Referenced note';
-    contextBlocks.push(`[${label} "${note.title}":\n${note.content}\n]`);
+    contextBlocks.push(`[${label}:\n${note.content}\n]`);
   }
 
   if (contextBlocks.length === 0) return inline;
