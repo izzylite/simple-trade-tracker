@@ -1,5 +1,4 @@
-import React, { useMemo, useState } from 'react';
-import DOMPurify from 'dompurify';
+import React, { useState } from 'react';
 import {
   Box,
   Button,
@@ -26,12 +25,16 @@ import { format } from 'date-fns';
 import type { OrionTaskResult, Significance } from '../../types/orionTask';
 import { TASK_TYPE_LABELS, TASK_TYPE_COLORS } from '../../types/orionTask';
 import CitationsSection from '../aiChat/CitationsSection';
+import HtmlMessageRenderer from '../aiChat/HtmlMessageRenderer';
 import type { Citation } from '../../types/aiChat';
-
-const SANITIZE_CONFIG = {
-  ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'h3', 'h4', 'h5', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span'],
-  ALLOWED_ATTR: ['class'],
-};
+import type { Calendar, Trade } from '../../types/dualWrite';
+import type { EconomicEvent } from '../../types/economicCalendar';
+import type { Note } from '../../types/note';
+import type { TradeOperationsProps } from '../../types/tradeOperations';
+import { useBriefingEmbedded } from '../../hooks/useBriefingEmbedded';
+import TradeGalleryDialog from '../TradeGalleryDialog';
+import EconomicEventDetailDialog from '../economicCalendar/EconomicEventDetailDialog';
+import NoteEditorDialog from '../notes/NoteEditorDialog';
 
 interface TaskResultCardProps {
   result: OrionTaskResult;
@@ -45,6 +48,16 @@ interface TaskResultCardProps {
   onFollowup?: (result: OrionTaskResult) => void;
   /** Optional: save this briefing as a note. */
   onSaveNote?: (result: OrionTaskResult) => Promise<void>;
+  /** Calendar context so click-through dialogs (trade gallery, event detail,
+   *  note editor) can render. If omitted, refs still render as chips but do
+   *  nothing on click — acceptable degradation. */
+  calendar?: Calendar;
+  /** All trades for the calendar — used by TradeGalleryDialog to show context.
+   *  Optional: the dialog falls back to fetching by year when omitted. */
+  trades?: Trade[];
+  /** Trade mutation callbacks for the embedded gallery / event / note dialogs. */
+  tradeOperations?: TradeOperationsProps;
+  isReadOnly?: boolean;
 }
 
 const SIGNIFICANCE_COLORS: Record<Significance, string> = {
@@ -59,12 +72,29 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
   onHide,
   onFollowup,
   onSaveNote,
+  calendar,
+  trades,
+  tradeOperations,
+  isReadOnly,
 }) => {
   const theme = useTheme();
   const [isSaving, setIsSaving] = useState(false);
   // Read cards start collapsed; unread start expanded
   const [expanded, setExpanded] = useState(!result.is_read);
   const isError = result.metadata?.error === true;
+
+  // Fetch referenced entities only when the card is expanded. Collapsed briefings
+  // stay cheap — no round-trips until the user opens them.
+  const { embeddedTrades, embeddedEvents, embeddedNotes } = useBriefingEmbedded(
+    result.content_html,
+    expanded
+  );
+
+  // Click-through dialog state. Hosted locally so parent doesn't need to
+  // manage per-briefing dialog stacks.
+  const [galleryTradeId, setGalleryTradeId] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
   const handleSaveNote = async () => {
     if (!onSaveNote || isSaving) return;
@@ -76,14 +106,11 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
     }
   };
 
-  const sanitizedHtml = useMemo(
-    () => DOMPurify.sanitize(result.content_html, SANITIZE_CONFIG),
-    [result.content_html]
-  );
-
   const accentColor = isError
     ? theme.palette.error.main
     : theme.palette.primary.main;
+
+  const canOpenDialogs = !!calendar && !!tradeOperations;
 
   return (
     <Card
@@ -210,11 +237,34 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
         </Box>
 
         <Collapse in={expanded} timeout="auto">
-          <Typography
-            variant="body2"
-            sx={{ fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', mt: 0.5 }}
-            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-          />
+          <Box sx={{ mt: 0.5 }}>
+            <HtmlMessageRenderer
+              html={result.content_html}
+              textColor="text.primary"
+              embeddedTrades={embeddedTrades}
+              embeddedEvents={embeddedEvents}
+              embeddedNotes={embeddedNotes}
+              trades={trades}
+              onTradeClick={
+                canOpenDialogs
+                  ? (tradeId) => setGalleryTradeId(tradeId)
+                  : undefined
+              }
+              onEventClick={
+                canOpenDialogs
+                  ? (event) => setSelectedEvent(event)
+                  : undefined
+              }
+              onNoteClick={
+                canOpenDialogs
+                  ? (noteId) => {
+                      const note = embeddedNotes?.[noteId];
+                      if (note) setSelectedNote(note);
+                    }
+                  : undefined
+              }
+            />
+          </Box>
 
           {Array.isArray(result.metadata?.citations) && (result.metadata.citations as Citation[]).length > 0 && (
             <CitationsSection
@@ -268,6 +318,63 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
           </Box>
         )}
       </CardContent>
+
+      {/* Click-through dialogs — rendered only when a ref is clicked.
+       *  We seed the gallery with the freshly-fetched embedded trades (which
+       *  is guaranteed to contain the clicked trade). If that's somehow
+       *  empty we fall back to the parent-supplied trades list — the gallery
+       *  uses initialTradeId to pick which trade to show first. */}
+      {galleryTradeId && calendar && tradeOperations && (
+        <TradeGalleryDialog
+          open
+          onClose={() => setGalleryTradeId(null)}
+          trades={
+            embeddedTrades && Object.keys(embeddedTrades).length > 0
+              ? Object.values(embeddedTrades)
+              : (trades ?? [])
+          }
+          initialTradeId={galleryTradeId}
+          setZoomedImage={() => {
+            /* briefings don't need cross-dialog zoom; HtmlMessageRenderer
+               handles inline image zoom via ImageZoomDialog already. */
+          }}
+          title="Trade from briefing"
+          calendarId={calendar.id}
+          calendar={calendar}
+          aiOnlyMode={false}
+          isReadOnly={isReadOnly}
+          tradeOperations={tradeOperations}
+        />
+      )}
+
+      {selectedEvent && calendar && tradeOperations && (
+        <EconomicEventDetailDialog
+          open
+          onClose={() => setSelectedEvent(null)}
+          event={selectedEvent}
+          calendarId={calendar.id}
+          tradeOperations={tradeOperations}
+          isReadOnly={isReadOnly}
+        />
+      )}
+
+      {selectedNote && calendar && (
+        <NoteEditorDialog
+          open
+          onClose={() => setSelectedNote(null)}
+          note={selectedNote}
+          calendarId={calendar.id}
+          availableTradeTags={calendar.tags || []}
+          calendarNotes={calendar.notes}
+          onSave={() => {
+            /* The briefing's stored HTML still references the note by id;
+               the next expand will re-fetch the updated version. */
+          }}
+          onDelete={() => {
+            setSelectedNote(null);
+          }}
+        />
+      )}
     </Card>
   );
 };

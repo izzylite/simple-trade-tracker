@@ -105,18 +105,54 @@ Deno.serve(async (req) => {
   const successCount = outcomes.filter((o) => o.status === 'fulfilled').length;
   const failureCount = outcomes.filter((o) => o.status === 'rejected').length;
 
-  // Log failures individually so they show up in the edge function log stream
-  outcomes.forEach((outcome, i) => {
-    if (outcome.status === 'rejected') {
-      log('Task dispatch failed', 'error', {
-        taskId: tasks[i].id,
-        taskType: tasks[i].task_type,
-        reason: outcome.reason instanceof Error
+  // Log failures individually AND persist them to the task row so users see
+  // them in the UI (as last_error) and consecutive_failures ticks up.
+  //
+  // Previously the dispatcher logged to the edge stream only, which meant a
+  // silent regression — e.g. a verify_jwt reset making the fetch 401 — would
+  // leave task rows looking clean (last_run_at advances via the RPC below,
+  // but no error signal). Recording the error here closes that gap. We still
+  // advance next_run_at below on failure to prevent retry loops.
+  const failedUpdates = outcomes
+    .map((outcome, i) => ({ outcome, task: tasks[i] }))
+    .filter(({ outcome }) => outcome.status === 'rejected');
+
+  for (const { outcome, task } of failedUpdates) {
+    const reasonText = outcome.status === 'rejected'
+      ? (outcome.reason instanceof Error
           ? outcome.reason.message
-          : String(outcome.reason),
-      });
+          : String(outcome.reason))
+      : 'unknown';
+    log('Task dispatch failed', 'error', {
+      taskId: task.id,
+      taskType: task.task_type,
+      reason: reasonText,
+    });
+    const truncated = reasonText.length > 500
+      ? reasonText.slice(0, 497) + '...'
+      : reasonText;
+    const { data: existing, error: readErr } = await serviceClient
+      .from('orion_tasks')
+      .select('consecutive_failures')
+      .eq('id', task.id)
+      .single();
+    if (readErr) {
+      log('Failed to read task for failure accounting', 'warn', readErr);
+      continue;
     }
-  });
+    const nextFailures = (existing?.consecutive_failures ?? 0) + 1;
+    const { error: updateErr } = await serviceClient
+      .from('orion_tasks')
+      .update({
+        last_error: `dispatch: ${truncated}`,
+        last_error_at: new Date().toISOString(),
+        consecutive_failures: nextFailures,
+      })
+      .eq('id', task.id);
+    if (updateErr) {
+      log('Failed to persist dispatch failure', 'warn', updateErr);
+    }
+  }
 
   // 3. Advance next_run_at for every dispatched task (regardless of success).
   //    We deliberately advance on failure too: retrying a failed task on the

@@ -742,6 +742,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     results: orionResults,
     unreadCount: taskUnreadCount,
     loading: tasksLoading,
+    hasMore: taskResultsHasMore,
+    loadingMore: taskResultsLoadingMore,
+    loadMore: loadMoreTaskResults,
     createTask,
     updateTask,
     deleteTask,
@@ -2925,6 +2928,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         onMarkTaskResultRead={markRead}
         onMarkAllTaskResultsRead={markAllRead}
         onHideTaskResult={hideResult}
+        taskResultsHasMore={taskResultsHasMore}
+        taskResultsLoadingMore={taskResultsLoadingMore}
+        onLoadMoreTaskResults={loadMoreTaskResults}
       />
 
       {/* Notes Drawer — <lg only */}

@@ -5,6 +5,11 @@
 
 import { corsHeaders, handleCors, log, createServiceClient } from '../_shared/supabase.ts';
 import { callGemini as sharedCallGemini } from '../_shared/gemini.ts';
+import {
+  callMCPTool,
+  getCachedMCPTools,
+} from '../_shared/orionMcp.ts';
+import { fetchAgentMemory } from '../_shared/orionMemory.ts';
 import { formatErrorResponse, formatResponseWithHtmlAndCitations } from './formatters.ts';
 import type { AgentRequest, ToolCall } from './types.ts';
 import {
@@ -199,29 +204,6 @@ async function callGeminiWithContents(
 
 /**
  * ============================================================================
- * TOOL CACHING
- * ============================================================================
- * Cache MCP tools for 5 minutes to avoid repeated fetches on every request.
- * MCP tools rarely change, so this is safe and provides significant performance boost.
- */
-
-interface ToolCache {
-  tools: GeminiFunctionDeclaration[];
-  timestamp: number;
-}
-
-interface MCPSession {
-  sessionId: string;
-  timestamp: number;
-}
-
-let toolCache: ToolCache | null = null;
-let mcpSession: MCPSession | null = null;
-const TOOL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-const MCP_SESSION_TTL = 10 * 60 * 1000; // 10 minutes
-
-/**
- * ============================================================================
  * SERVER-SENT EVENTS (SSE) STREAMING HELPERS
  * ============================================================================
  * Enables real-time streaming of AI responses, tool calls, and results
@@ -371,54 +353,6 @@ async function buildFunctionResponseParts(
 }
 
 /**
- * Fetch AGENT_MEMORY note for pre-loading into system prompt
- * This ensures memory is always available from turn 0 (no checklist needed)
- */
-async function fetchAgentMemory(
-  supabaseUrl: string,
-  supabaseServiceKey: string,
-  userId: string,
-  calendarId?: string
-): Promise<string | null> {
-  try {
-    if (!calendarId) {
-      log('[Memory] No calendar ID, skipping memory fetch', 'info');
-      return null;
-    }
-
-    // Use direct REST API call to fetch memory note
-    const url = `${supabaseUrl}/rest/v1/notes?user_id=eq.${userId}&calendar_id=eq.${calendarId}&tags=cs.{AGENT_MEMORY}&select=content&limit=1`;
-
-    const response = await fetch(url, {
-      headers: {
-        'apikey': supabaseServiceKey,
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      log(`[Memory] Failed to fetch: ${response.status}`, 'warn');
-      return null;
-    }
-
-    const notes = await response.json();
-
-    if (notes && notes.length > 0 && notes[0].content) {
-      const content = notes[0].content;
-      log(`[Memory] Loaded ${content.length} chars of memory`, 'info');
-      return content;
-    }
-
-    log('[Memory] No existing memory found', 'info');
-    return null;
-  } catch (error) {
-    log(`[Memory] Error fetching: ${error}`, 'error');
-    return null;
-  }
-}
-
-/**
  * Pre-fetch focused trade data so the AI has instrument/session/date
  * context from turn 0 (prevents irrelevant tool calls).
  */
@@ -503,264 +437,10 @@ async function fetchTradeImages(
   return results;
 }
 
-/**
- * Get MCP tools with caching
- * Returns cached tools if available and not expired, otherwise fetches fresh
- */
-async function getCachedMCPTools(projectRef: string, accessToken: string): Promise<GeminiFunctionDeclaration[]> {
-  const now = Date.now();
-
-  // Check if cache is valid
-  if (toolCache && (now - toolCache.timestamp) < TOOL_CACHE_TTL) {
-    log(`Using cached MCP tools (${toolCache.tools.length} tools, age: ${Math.round((now - toolCache.timestamp) / 1000)}s)`, 'info');
-    return toolCache.tools;
-  }
-
-  // Cache miss or expired - fetch fresh tools
-  log('Fetching fresh MCP tools (cache miss or expired)', 'info');
-  const mcpTools = await listMCPTools(projectRef, accessToken);
-
-  // Convert MCP tools to Gemini format and sanitize
-  const geminiTools = convertMcpToolsToGeminiFormat(mcpTools);
-
-  // Update cache
-  toolCache = {
-    tools: geminiTools,
-    timestamp: now
-  };
-
-  log(`Cached ${geminiTools.length} MCP tools`, 'info');
-  return geminiTools;
-}
-
-/**
- * Convert MCP tools to Gemini function declaration format
- * Sanitizes JSON Schema to remove unsupported properties
- */
-function convertMcpToolsToGeminiFormat(
-  mcpTools: Array<{
-    name: string;
-    description?: string;
-    inputSchema?: { properties?: unknown; required?: string[] };
-  }>
-): GeminiFunctionDeclaration[] {
-  // Recursively clean JSON Schema to remove unsupported properties
-  const cleanSchema = (schema: unknown): unknown => {
-    if (!schema || typeof schema !== 'object') return schema;
-
-    const cleaned: Record<string, unknown> = {};
-    const obj = schema as Record<string, unknown>;
-
-    // Only keep Gemini-supported properties
-    const supportedKeys = ['type', 'description', 'enum', 'properties', 'items', 'required'];
-    for (const key of supportedKeys) {
-      if (key in obj) {
-        if (key === 'properties' && typeof obj[key] === 'object') {
-          // Recursively clean nested properties
-          const props = obj[key] as Record<string, unknown>;
-          cleaned[key] = Object.fromEntries(
-            Object.entries(props).map(([k, v]) => [k, cleanSchema(v)])
-          );
-        } else if (key === 'items' && typeof obj[key] === 'object') {
-          cleaned[key] = cleanSchema(obj[key]);
-        } else {
-          cleaned[key] = obj[key];
-        }
-      }
-    }
-
-    return cleaned;
-  };
-
-  return mcpTools.map(tool => ({
-    name: tool.name,
-    description: tool.description || `MCP tool: ${tool.name}`,
-    parameters: cleanSchema({
-      type: 'object',
-      properties: tool.inputSchema?.properties || {},
-      required: tool.inputSchema?.required
-    }) as { type: string; properties: Record<string, unknown>; required?: string[] }
-  }));
-}
-
-/**
- * Initialize MCP session and return session ID
- */
-async function initializeMCPSession(projectRef: string, accessToken: string): Promise<string | null> {
-  const now = Date.now();
-
-  // Return cached session if valid
-  if (mcpSession && (now - mcpSession.timestamp) < MCP_SESSION_TTL) {
-    log(`Using cached MCP session (age: ${Math.round((now - mcpSession.timestamp) / 1000)}s)`, 'info');
-    return mcpSession.sessionId;
-  }
-
-  try {
-    const mcpUrl = `https://mcp.supabase.com/mcp?project_ref=${projectRef}&read_only=true`;
-
-    const response = await fetch(mcpUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 0,
-        method: 'initialize',
-        params: {
-          protocolVersion: '2024-11-05',
-          capabilities: {},
-          clientInfo: {
-            name: 'ai-trading-agent',
-            version: '1.0.0'
-          }
-        }
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      log(`MCP initialize failed: ${response.status} - ${errorText}`, 'error');
-      return null;
-    }
-
-    // Get session ID from response header
-    const sessionId = response.headers.get('Mcp-Session-Id');
-    if (sessionId) {
-      mcpSession = { sessionId, timestamp: now };
-      log(`MCP session initialized: ${sessionId.substring(0, 20)}...`, 'info');
-      return sessionId;
-    }
-
-    // Fallback: try to get from response body
-    const data = await response.json();
-    log(`MCP initialize response: ${JSON.stringify(data).substring(0, 200)}`, 'info');
-
-    return null;
-  } catch (error) {
-    log(`MCP initialize error: ${error}`, 'error');
-    return null;
-  }
-}
-
-/**
- * Call Supabase MCP list_tools endpoint
- */
-async function listMCPTools(projectRef: string, accessToken: string): Promise<Array<{
-  name: string;
-  description?: string;
-  inputSchema?: { properties?: unknown; required?: string[] };
-}>> {
-  try {
-    // Initialize session first
-    const sessionId = await initializeMCPSession(projectRef, accessToken);
-
-    const mcpUrl = `https://mcp.supabase.com/mcp?project_ref=${projectRef}&read_only=true`;
-
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream',
-    };
-
-    if (sessionId) {
-      headers['Mcp-Session-Id'] = sessionId;
-    }
-
-    const response = await fetch(mcpUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'tools/list',
-        params: {}
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      log(`MCP list_tools failed: ${response.status} - ${errorText}`, 'error');
-      return [];
-    }
-
-    const data = await response.json();
-    log(`MCP tools response: ${JSON.stringify(data).substring(0, 200)}`, 'info');
-    return data.result?.tools || [];
-  } catch (error) {
-    log(`MCP list_tools error: ${error}`, 'error');
-    return [];
-  }
-}
-
-/**
- * Call Supabase MCP tool
- */
-async function callMCPTool(
-  projectRef: string,
-  accessToken: string,
-  toolName: string,
-  args: Record<string, unknown>
-): Promise<string> {
-  try {
-    // Ensure we have a valid session
-    const sessionId = await initializeMCPSession(projectRef, accessToken);
-
-    const mcpUrl = `https://mcp.supabase.com/mcp?project_ref=${projectRef}&read_only=true`;
-
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream',
-    };
-
-    if (sessionId) {
-      headers['Mcp-Session-Id'] = sessionId;
-    }
-
-    const response = await fetch(mcpUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 2,
-        method: 'tools/call',
-        params: {
-          name: toolName,
-          arguments: args
-        }
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      // If session expired, clear cache and retry once
-      if (response.status === 400 && errorText.includes('Mcp-Session-Id')) {
-        log('MCP session expired, clearing cache and retrying...', 'info');
-        mcpSession = null;
-        return callMCPTool(projectRef, accessToken, toolName, args);
-      }
-      return `MCP tool call failed: ${response.status} - ${errorText}`;
-    }
-
-    const data = await response.json();
-
-    if (data.error) {
-      return `MCP error: ${data.error.message || JSON.stringify(data.error)}`;
-    }
-
-    const content = data.result?.content;
-    if (Array.isArray(content) && content.length > 0 && content[0].text) {
-      return content[0].text;
-    }
-
-    return JSON.stringify(data.result || data);
-  } catch (error) {
-    return `MCP tool error: ${error instanceof Error ? error.message : 'Unknown'}`;
-  }
-}
+// MCP helpers (initializeMCPSession, listMCPTools, callMCPTool, getCachedMCPTools,
+// and the schema sanitizer) live in `_shared/orionMcp.ts` so both the chat
+// agent and the run-orion-task batch handlers talk to the same MCP gateway
+// with the same session + tool caches.
 
 /**
  * Call Gemini API directly
@@ -1636,7 +1316,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         message: 'Function warmed up',
         timestamp: new Date().toISOString(),
-        cacheStatus: toolCache ? `cached (${toolCache.tools.length} tools)` : 'empty'
+        cacheStatus: 'warm',
       }),
       {
         status: 200,
@@ -1698,25 +1378,23 @@ Deno.serve(async (req: Request) => {
       throw new Error('Supabase configuration missing');
     }
 
-    // Get MCP tools (with caching) and filter to only the ones we use
+    // Get MCP tools (with caching) filtered to the ones this agent needs —
+    // execute_sql for queries and list_tables for schema discovery. Any other
+    // MCP tools would just bloat the Gemini tool registry.
     log(`Getting MCP tools for project ${projectRef}`, 'info');
-    const allMcpTools = await getCachedMCPTools(projectRef, supabaseAccessToken);
-
-    // Only keep MCP tools the agent actually needs (reduces context and improves focus)
-    const ALLOWED_MCP_TOOLS = [
-      'execute_sql',      // Database queries (main tool)
-      'list_tables',      // Schema discovery (rarely needed)
-    ];
-    const geminiMcpTools = allMcpTools.filter(tool => ALLOWED_MCP_TOOLS.includes(tool.name));
-    log(`Using ${geminiMcpTools.length}/${allMcpTools.length} MCP tools (filtered)`, 'info');
+    const geminiMcpTools = await getCachedMCPTools(
+      projectRef,
+      supabaseAccessToken,
+      ['execute_sql', 'list_tables']
+    );
+    log(`Using ${geminiMcpTools.length} MCP tools (filtered)`, 'info');
 
     // Combine all tools (MCP + Custom)
     const customTools = getAllCustomTools();
     const allTools = [...geminiMcpTools, ...customTools];
 
     // Pre-load agent memory (enforces memory availability from turn 0)
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const preloadedMemory = await fetchAgentMemory(supabaseUrl, supabaseServiceKey, userId, calendarId);
+    const preloadedMemory = await fetchAgentMemory(userId, calendarId);
 
     // Pre-fetch focused trade data so the AI has full context from turn 0
     const preloadedTrade = focusedTradeId

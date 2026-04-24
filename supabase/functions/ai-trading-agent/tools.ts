@@ -408,7 +408,7 @@ Returns both user-created and AI-created notes. User ID and Calendar ID are auto
  */
 export const getRecentOrionBriefingsTool: GeminiFunctionDeclaration = {
   name: "get_recent_orion_briefings",
-  description: `Retrieve recent Orion task briefings (Market Research, Daily Analysis, Weekly Review, Monthly Rollup) that Orion has already sent this user.
+  description: `Retrieve recent Orion task briefings (Market Research, Daily Analysis, Weekly Review, Monthly Rollup) that Orion (You) has already sent this user.
 
 Use this whenever the user references a briefing or alert you sent — whether past or just-delivered. Trigger signals:
 - Backward refs: "what did you say about…", "your last alert", "summarize your briefings this week"
@@ -1919,6 +1919,7 @@ export async function getRecentOrionBriefings(
       .from("orion_task_results")
       .select("id, task_type, significance, metadata, content_plain, created_at")
       .eq("user_id", userId)
+      .not('metadata', 'cs', '{"serper_outage":true}')
       .gte("created_at", sinceIso)
       .order("created_at", { ascending: false })
       .limit(boundedLimit);

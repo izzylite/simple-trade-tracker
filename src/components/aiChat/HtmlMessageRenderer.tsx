@@ -217,7 +217,11 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
     return purify.sanitize(htmlContent, {
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'span', 'div', 'img'
+        'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'span', 'div', 'img',
+        // Tables — needed for monthly rollup instrument rankings and any chat
+        // response that presents tabular data. Without these, the rows and
+        // cells get flattened into unreadable concatenated text.
+        'table', 'thead', 'tbody', 'tr', 'th', 'td', 'caption'
       ],
       ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style', 'src', 'alt', 'width', 'height'],
       KEEP_CONTENT: true
@@ -652,6 +656,25 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
           '& sup': {
             fontSize: '0.8em',
             verticalAlign: 'super'
+          },
+          // Tables — used by monthly rollups for instrument rankings and by
+          // chat whenever Orion presents tabular data. Keep the styling tight
+          // so a table doesn't dominate a dense briefing/chat card.
+          '& table': {
+            width: '100%',
+            borderCollapse: 'collapse',
+            margin: '0.75rem 0',
+            fontSize: '0.88em'
+          },
+          '& th, & td': {
+            padding: '0.4rem 0.6rem',
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
+            textAlign: 'left',
+            verticalAlign: 'top'
+          },
+          '& th': {
+            fontWeight: 600,
+            backgroundColor: alpha(theme.palette.text.primary, 0.04)
           }
         }}
       >

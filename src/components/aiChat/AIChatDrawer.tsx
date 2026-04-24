@@ -57,6 +57,9 @@ interface AIChatDrawerProps {
   onMarkTaskResultRead?: (resultId: string) => Promise<void>;
   onMarkAllTaskResultsRead?: () => Promise<void>;
   onHideTaskResult?: (resultId: string) => Promise<void>;
+  taskResultsHasMore?: boolean;
+  taskResultsLoadingMore?: boolean;
+  onLoadMoreTaskResults?: () => void;
 }
 
 // Bottom sheet heights
@@ -85,6 +88,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   onMarkTaskResultRead,
   onMarkAllTaskResultsRead,
   onHideTaskResult,
+  taskResultsHasMore,
+  taskResultsLoadingMore,
+  onLoadMoreTaskResults,
 }) => {
   const theme = useTheme();
   const { user } = useAuth();
@@ -316,6 +322,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 results={taskResults ?? []}
                 unreadCount={taskUnreadCount ?? 0}
                 loading={tasksLoading ?? false}
+                hasMore={taskResultsHasMore}
+                loadingMore={taskResultsLoadingMore}
+                onLoadMore={onLoadMoreTaskResults}
                 onCreateTask={onCreateTask ?? (async () => undefined)}
                 onUpdateTask={onUpdateTask}
                 onDeleteTask={onDeleteTask ?? (async () => {})}
@@ -324,6 +333,10 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 onHideResult={onHideTaskResult}
                 onFollowup={handleFollowupAboutResult}
                 onSaveNote={handleSaveNote}
+                calendar={calendar}
+                trades={trades}
+                tradeOperations={tradeOperations}
+                isReadOnly={isReadOnly}
               />
             </TabPanel>
           </Box>

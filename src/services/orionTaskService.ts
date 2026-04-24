@@ -85,7 +85,8 @@ export const orionTaskService = {
   async getResults(
     userId: string,
     taskId?: string,
-    limit = 50
+    limit = 20,
+    offset = 0
   ): Promise<OrionTaskResult[]> {
     let query = supabase
       .from('orion_task_results')
@@ -93,7 +94,7 @@ export const orionTaskService = {
       .eq('user_id', userId)
       .is('hidden_at', null)
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .range(offset, offset + limit - 1);
 
     if (taskId) {
       query = query.eq('task_id', taskId);

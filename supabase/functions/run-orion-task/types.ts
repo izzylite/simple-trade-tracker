@@ -40,18 +40,22 @@ export interface MarketResearchConfig {
   watchlist_symbols?: string[];
 }
 
+export type OrionTone = 'tough_love' | 'blunt_analyst' | 'supportive_mentor';
+
 export interface DailyAnalysisConfig {
   run_time_utc: string;
-  tone: 'tough_love' | 'blunt_analyst' | 'supportive_mentor';
+  tone: OrionTone;
 }
 
 export interface WeeklyReviewConfig {
   run_day: number;
   run_time_utc: string;
   comparison_weeks: number;
+  tone: OrionTone;
 }
 
 export interface MonthlyRollupConfig {
   run_time_utc: string;
   comparison_months: number;
+  tone: OrionTone;
 }

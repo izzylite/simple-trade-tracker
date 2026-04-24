@@ -9,11 +9,15 @@ import type {
   TaskConfig,
 } from '../types/orionTask';
 
+const PAGE_SIZE = 20;
+
 export function useOrionTasks(userId: string | undefined, calendarId?: string) {
   const [tasks, setTasks] = useState<OrionTask[]>([]);
   const [results, setResults] = useState<OrionTaskResult[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const fetchTasks = useCallback(async () => {
     if (!userId) return;
@@ -28,8 +32,9 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string) {
   const fetchResults = useCallback(async () => {
     if (!userId) return;
     try {
-      const data = await orionTaskService.getResults(userId);
+      const data = await orionTaskService.getResults(userId, undefined, PAGE_SIZE, 0);
       setResults(data);
+      setHasMore(data.length === PAGE_SIZE);
     } catch (err) {
       logger.error('Failed to fetch results', err);
     }
@@ -89,6 +94,20 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string) {
     setResults((prev) => prev.map((r) => ({ ...r, is_read: true })));
     setUnreadCount(0);
   }, [userId]);
+
+  const loadMore = useCallback(async () => {
+    if (!userId || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await orionTaskService.getResults(userId, undefined, PAGE_SIZE, results.length);
+      setResults((prev) => [...prev, ...data]);
+      setHasMore(data.length === PAGE_SIZE);
+    } catch (err) {
+      logger.error('Failed to load more results', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [userId, loadingMore, hasMore, results.length]);
 
   const updateTask = useCallback(
     async (taskId: string, updates: { status?: OrionTask['status']; config?: TaskConfig }) => {
@@ -178,12 +197,15 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string) {
     results,
     unreadCount,
     loading,
+    hasMore,
+    loadingMore,
     createTask,
     updateTask,
     deleteTask,
     markRead,
     markAllRead,
     hideResult,
+    loadMore,
     refetchTasks: fetchTasks,
     refetchResults: fetchResults,
   };

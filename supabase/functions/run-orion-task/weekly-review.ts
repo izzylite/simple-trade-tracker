@@ -1,193 +1,96 @@
-import { log } from '../_shared/supabase.ts';
-import { generateContent } from './gemini.ts';
 import type {
   OrionTask,
+  SupabaseClient,
   TaskResult,
   WeeklyReviewConfig,
-  SupabaseClient,
 } from './types.ts';
+import {
+  BRIEFING_RENDER_RULES,
+  countTradesInRange,
+  emptyBriefingResult,
+  generateBriefing,
+} from './briefing-agent.ts';
+import { getToneInstruction } from './tone.ts';
 
+/**
+ * Weekly performance review.
+ *
+ * Pre-query check: count trades in the past 7 days. If zero, skip Orion
+ * entirely and return a friendly default — no point spending tokens
+ * analysing nothing. Otherwise Orion calls calculate_performance_metrics
+ * via execute_sql for this and the prior N weeks.
+ */
 export async function handleWeeklyReview(
   task: OrionTask,
   supabase: SupabaseClient
 ): Promise<TaskResult> {
   const config = task.config as unknown as WeeklyReviewConfig;
+  const tone = getToneInstruction(config.tone);
+  const comparisonWeeks = Math.max(1, config.comparison_weeks ?? 2);
 
   const now = new Date();
+  const dateLabel = now.toISOString().slice(0, 10);
+  const defaultTitle = `Weekly Review — week of ${dateLabel}`;
 
-  const [currentMetrics, comparisonMetrics, calendar] = await Promise.all([
-    fetchPerformanceMetrics(supabase, task.calendar_id, now),
-    fetchComparisonWeeks(supabase, task.calendar_id, now, config.comparison_weeks),
-    fetchCalendarContext(supabase, task.calendar_id),
-  ]);
+  // Rolling 7-day window — close enough for an activity check. Orion will
+  // compute the exact calendar-week range via calculate_performance_metrics.
+  const weekStart = new Date(now);
+  weekStart.setUTCDate(weekStart.getUTCDate() - 7);
 
-  const briefingJson = await callGeminiForWeeklyReview(
-    config,
-    currentMetrics,
-    comparisonMetrics,
-    calendar
+  const tradeCount = await countTradesInRange(
+    supabase,
+    task.user_id,
+    task.calendar_id,
+    weekStart.toISOString(),
+    now.toISOString()
   );
-
-  return parseReviewResponse(briefingJson, 'Weekly Review');
-}
-
-async function fetchPerformanceMetrics(
-  supabase: SupabaseClient,
-  calendarId: string,
-  date: Date
-): Promise<Record<string, unknown> | null> {
-  const { data, error } = await supabase.rpc(
-    'calculate_performance_metrics',
-    {
-      p_calendar_id: calendarId,
-      p_time_period: 'week',
-      p_selected_date: date.toISOString(),
-      p_comparison_tags: null,
-    }
-  );
-
-  if (error) {
-    log('Failed to fetch weekly metrics', 'error', error);
-    return null;
-  }
-  return data;
-}
-
-async function fetchComparisonWeeks(
-  supabase: SupabaseClient,
-  calendarId: string,
-  endDate: Date,
-  numWeeks: number
-): Promise<Array<{ weekStart: string; metrics: Record<string, unknown> | null }>> {
-  const results: Array<{ weekStart: string; metrics: Record<string, unknown> | null }> = [];
-
-  for (let i = 1; i <= numWeeks; i++) {
-    const weekDate = new Date(endDate);
-    weekDate.setDate(weekDate.getDate() - 7 * i);
-
-    const { data, error } = await supabase.rpc(
-      'calculate_performance_metrics',
-      {
-        p_calendar_id: calendarId,
-        p_time_period: 'week',
-        p_selected_date: weekDate.toISOString(),
-        p_comparison_tags: null,
-      }
+  if (tradeCount === 0) {
+    return emptyBriefingResult(
+      'No trades closed this week. Nothing to review.',
+      defaultTitle
     );
-
-    results.push({
-      weekStart: weekDate.toISOString().split('T')[0],
-      metrics: error ? null : data,
-    });
   }
 
-  return results;
-}
+  const userMessage = `Generate a weekly performance review briefing for the week ending ${dateLabel} (UTC).
 
-async function fetchCalendarContext(
-  supabase: SupabaseClient,
-  calendarId: string
-): Promise<Record<string, unknown> | null> {
-  const { data, error } = await supabase
-    .from('calendars')
-    .select(
-      'account_balance, current_balance, weekly_target, ' +
-      'monthly_target, win_rate, profit_factor, total_trades'
-    )
-    .eq('id', calendarId)
-    .single();
+COACHING TONE: ${tone}
 
-  if (error) {
-    log('Failed to fetch calendar context', 'error', error);
-    return null;
-  }
-  return data;
-}
+There were ${tradeCount} closed trade(s) in the past 7 days. Your review must cover:
+1. This week's performance (win rate, P&L, trade count, session breakdown)
+2. Week-over-week comparison against the previous ${comparisonWeeks} week(s) — highlight improvements and regressions
+3. Patterns and observations — emerging setups, recurring mistakes, emotional trends
+4. Focus areas for next week — 2-3 concrete actions
 
-async function callGeminiForWeeklyReview(
-  config: WeeklyReviewConfig,
-  currentMetrics: Record<string, unknown> | null,
-  comparisonWeeks: Array<{ weekStart: string; metrics: Record<string, unknown> | null }>,
-  calendar: Record<string, unknown> | null
-): Promise<string> {
-  const systemPrompt = `You are Orion, an AI trading analyst. Generate a weekly performance review.
+Use the calculate_performance_metrics RPC via execute_sql for this week and each comparison week. The function signature is:
+  calculate_performance_metrics(p_calendar_id UUID, p_time_period TEXT, p_selected_date TIMESTAMPTZ, p_comparison_tags TEXT[]) RETURNS JSONB
+Example call for this week:
+  SELECT calculate_performance_metrics('${task.calendar_id}'::uuid, 'week', '${now.toISOString()}'::timestamptz, NULL);
+For each comparison week, subtract 7 days from p_selected_date.
+Also query the calendars row for target context (weekly_target, win_rate, profit_factor).
 
-Respond ONLY with a JSON object in this exact format:
+Significance guide:
+- "high": significant win rate change (>10% absolute), large drawdown, or major pattern shift
+- "medium": moderate changes, some notable trends
+- "low": steady performance, no major changes
+
+Required HTML sections: Week at a Glance, Performance Trends, Session Breakdown, Patterns & Observations, Focus Areas for Next Week. Keep under 800 words. Use <h4> for section headers, <strong> for key numbers, <ul>/<li> for lists.
+${BRIEFING_RENDER_RULES}
+Suggested response format (JSON):
 {
   "significance": "low" | "medium" | "high",
   "title": "Short title (max 60 chars)",
-  "briefing_html": "HTML formatted review",
+  "briefing_html": "<h4>...</h4><p>...</p>",
   "briefing_plain": "Plain text version"
 }
 
-Significance guide:
-- "high": Significant win rate change (>10%), large drawdown, or major pattern shift
-- "medium": Moderate changes, some notable trends
-- "low": Steady performance, no major changes
+If you can't return JSON, just return HTML and we'll use defaults.`;
 
-HTML formatting rules:
-- Use <h4> for section headers
-- Use <p> for paragraphs, <ul>/<li> for lists, <strong> for emphasis
-- Keep under 800 words
-- Include sections: Week at a Glance, Performance Trends, Session Breakdown, Patterns & Observations, Focus Areas for Next Week`;
-
-  const currentText = currentMetrics
-    ? JSON.stringify(currentMetrics, null, 2)
-    : 'No performance data available for this week.';
-
-  const comparisonText = comparisonWeeks
-    .map((w) =>
-      w.metrics
-        ? `Week of ${w.weekStart}: ${JSON.stringify(w.metrics, null, 2)}`
-        : `Week of ${w.weekStart}: No data`
-    )
-    .join('\n\n');
-
-  const calendarText = calendar
-    ? `Account: $${(calendar as any).account_balance} | Current: $${(calendar as any).current_balance} | ` +
-      `Weekly target: $${(calendar as any).weekly_target || 'Not set'} | ` +
-      `Overall win rate: ${(calendar as any).win_rate || 0}%`
-    : 'Calendar context unavailable.';
-
-  const userPrompt = `Generate a weekly performance review.
-
-## This Week's Performance
-${currentText}
-
-## Previous ${config.comparison_weeks} Week(s) for Comparison
-${comparisonText}
-
-## Account Context
-${calendarText}
-
-Analyze trends across weeks. Highlight improvements and regressions. Generate the JSON review now.`;
-
-  return generateContent(systemPrompt, userPrompt);
-}
-
-function parseReviewResponse(rawJson: string, defaultTitle: string): TaskResult {
-  try {
-    const parsed = JSON.parse(rawJson);
-    return {
-      content_html: parsed.briefing_html || '<p>Review unavailable.</p>',
-      content_plain: parsed.briefing_plain || 'Review unavailable.',
-      significance: ['low', 'medium', 'high'].includes(parsed.significance)
-        ? parsed.significance
-        : null,
-      metadata: {
-        title: parsed.title || defaultTitle,
-        generated_at: new Date().toISOString(),
-      },
-    };
-  } catch {
-    log(`Failed to parse ${defaultTitle} response`, 'error', {
-      raw: rawJson.substring(0, 200),
-    });
-    return {
-      content_html: `<p>${rawJson.substring(0, 3000)}</p>`,
-      content_plain: rawJson.substring(0, 3000),
-      significance: null,
-      metadata: { parse_error: true },
-    };
-  }
+  return generateBriefing({
+    userId: task.user_id,
+    calendarId: task.calendar_id,
+    userMessage,
+    defaultTitle,
+    // Weekly does more querying than daily — extra budget for iterated RPC calls.
+    maxTurns: 25,
+  });
 }
