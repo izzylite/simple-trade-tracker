@@ -68,9 +68,16 @@ export function expandMentionsForSend(
   segments: MessageSegment[],
   notesById: Map<string, NoteForExpansion>
 ): string {
-  const inline = segments
-    .map(s => (s.type === 'text' ? s.value : s.noteTitle))
-    .join('');
+  // "Bare" = exactly one note-mention with no non-whitespace typed text around
+  // it. In that case, skip the inline title — emit only the block. The
+  // backend's frameBareSlashCommand() uses a strict "entire message is a
+  // single block" regex to apply execute-directive framing, so the prefix
+  // must not contain any other text.
+  const mentions = segments.filter(s => s.type === 'note-mention');
+  const hasUserText = segments.some(
+    s => s.type === 'text' && s.value.trim() !== ''
+  );
+  const isBareSingleMention = mentions.length === 1 && !hasUserText;
 
   const contextBlocks: string[] = [];
   for (const seg of segments) {
@@ -82,6 +89,14 @@ export function expandMentionsForSend(
       : 'Referenced note';
     contextBlocks.push(`[${label}:\n${note.content}\n]`);
   }
+
+  if (isBareSingleMention && contextBlocks.length === 1) {
+    return contextBlocks[0];
+  }
+
+  const inline = segments
+    .map(s => (s.type === 'text' ? s.value : s.noteTitle))
+    .join('');
 
   if (contextBlocks.length === 0) return inline;
   return `${inline}\n\n${contextBlocks.join('\n\n')}`;

@@ -285,10 +285,12 @@ function createSSEEvent(event: SSEEventType, data: any): string {
  * prompt's slash-command section covers how to interpret them.
  */
 function frameBareSlashCommand(message: string): string {
+  // Strict: the entire trimmed body must be exactly one [Referenced command:]
+  // block, nothing before or after. The client emits this shape only for
+  // bare-invocation (/-trigger with no other typed text). Mixed messages
+  // always have additional text and fall through unchanged.
   const trimmed = message.trim();
-  // Pattern: optional single-line title, optional blank line, then exactly
-  // one [Referenced command: ... ] block, nothing else.
-  const bareRe = /^(?:[^\n]*\n\n)?(\[Referenced command:\n[\s\S]*?\n\])\s*$/;
+  const bareRe = /^(\[Referenced command:\n[\s\S]*?\n\])$/;
   const m = bareRe.exec(trimmed);
   if (!m) return message;
   return `The user wants you to execute this command:\n\n${m[1]}`;
