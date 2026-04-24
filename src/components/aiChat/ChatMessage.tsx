@@ -29,7 +29,9 @@ import {
   Edit as EditIcon,
   Check as CopiedIcon,
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon
+  ExpandLess as ExpandLessIcon,
+  PlayArrow as PlayArrowIcon,
+  Notes as NotesIcon
 } from '@mui/icons-material';
 import { ChatMessage as ChatMessageType } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
@@ -78,29 +80,50 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const isAssistant = message.role === 'assistant';
   const isDark = theme.palette.mode === 'dark';
 
-  // Split user message text into segments with inline tag chips
+  // Split user message text into segments with inline chips:
+  //  - Tag chips for any availableTags substring
+  //  - Reference chips for [Referenced command:\n...\n] and [Referenced note:\n...\n] blocks
+  //    (reserved block syntax used by client-side expansion when a / or @ mention is sent)
   const renderUserContentWithTagChips = useMemo(() => {
-    if (!isUser || availableTags.length === 0) return null;
-
+    if (!isUser) return null;
     const content = message.content;
-    const sortedTags = [...availableTags].sort((a, b) => b.length - a.length);
 
-    const matches: Array<{ start: number; end: number; tag: string }> = [];
+    type Match =
+      | { kind: 'tag'; start: number; end: number; tag: string }
+      | { kind: 'ref'; start: number; end: number; refType: 'command' | 'note'; body: string };
+
+    const matches: Match[] = [];
+
+    // 1) Reference blocks — highest priority. Non-greedy, match until closing `]` on its own line.
+    const refPattern = /\[Referenced (command|note):\n([\s\S]*?)\n\]/g;
+    let refMatch: RegExpExecArray | null;
+    while ((refMatch = refPattern.exec(content)) !== null) {
+      matches.push({
+        kind: 'ref',
+        start: refMatch.index,
+        end: refMatch.index + refMatch[0].length,
+        refType: refMatch[1] as 'command' | 'note',
+        body: refMatch[2],
+      });
+    }
+
+    // 2) Tag substrings — but only outside ref-block ranges.
+    const sortedTags = [...availableTags].sort((a, b) => b.length - a.length);
     for (const tag of sortedTags) {
       let searchFrom = 0;
       while (searchFrom < content.length) {
         const idx = content.indexOf(tag, searchFrom);
         if (idx === -1) break;
-        const overlaps = matches.some(m => idx < m.end && idx + tag.length > m.start);
+        const end = idx + tag.length;
+        const overlaps = matches.some(m => idx < m.end && end > m.start);
         if (!overlaps) {
-          matches.push({ start: idx, end: idx + tag.length, tag });
+          matches.push({ kind: 'tag', start: idx, end, tag });
         }
         searchFrom = idx + 1;
       }
     }
 
     if (matches.length === 0) return null;
-
     matches.sort((a, b) => a.start - b.start);
 
     const segments: React.ReactNode[] = [];
@@ -110,22 +133,53 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       if (m.start > lastIdx) {
         segments.push(content.substring(lastIdx, m.start));
       }
-      segments.push(
-        <Chip
-          key={`user-tag-${i}`}
-          label={m.tag}
-          size="small"
-          sx={{
-            ...getTagChipStyles(m.tag, theme),
-            display: 'inline-flex',
-            verticalAlign: 'middle',
-            height: 20,
-            fontSize: '0.75rem',
-            mx: 0.25,
-            cursor: 'default',
-          }}
-        />
-      );
+      if (m.kind === 'tag') {
+        segments.push(
+          <Chip
+            key={`user-tag-${i}`}
+            label={m.tag}
+            size="small"
+            sx={{
+              ...getTagChipStyles(m.tag, theme),
+              display: 'inline-flex',
+              verticalAlign: 'middle',
+              height: 20,
+              fontSize: '0.75rem',
+              mx: 0.25,
+              cursor: 'default',
+            }}
+          />
+        );
+      } else {
+        const isCommand = m.refType === 'command';
+        segments.push(
+          <Tooltip
+            key={`user-ref-${i}`}
+            title={<Box sx={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem' }}>{m.body}</Box>}
+            placement="top"
+            arrow
+          >
+            <Chip
+              icon={isCommand
+                ? <PlayArrowIcon sx={{ fontSize: '0.9rem !important' }} />
+                : <NotesIcon sx={{ fontSize: '0.9rem !important' }} />}
+              label={isCommand ? 'Command' : 'Note'}
+              size="small"
+              sx={{
+                display: 'inline-flex',
+                verticalAlign: 'middle',
+                height: 20,
+                fontSize: '0.75rem',
+                mx: 0.25,
+                cursor: 'default',
+                bgcolor: alpha(theme.palette.primary.main, isCommand ? 0.12 : 0.08),
+                color: theme.palette.primary.main,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+              }}
+            />
+          </Tooltip>
+        );
+      }
       lastIdx = m.end;
     });
 
