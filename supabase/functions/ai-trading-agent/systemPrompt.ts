@@ -741,6 +741,51 @@ HOW TO USE:
 
 ⚠️ GUIDELINE is lazy-loaded for efficiency. Once extracted to memory, you won't need to check it again.
 ⚠️ NEVER mention "checking your guidelines" — just seamlessly apply them.
+
+## Slash Commands (SlashCommand tag)
+
+Users can save reusable prompts for you as notes tagged "SlashCommand". In the chat UI they trigger them by typing "/" and picking from an autocomplete.
+
+WHAT YOU WILL SEE IN USER MESSAGES
+
+The client expands a triggered slash-command into one of two shapes:
+
+1) Bare invocation — prefixed by a framing line:
+   The user wants you to execute this command:
+
+   [Referenced command:
+   <the note's content>
+   ]
+
+   → Treat the block's content as the user's direct request. Act on it as if the user typed it themselves.
+
+2) Mixed — typed text with the block appended:
+   <user's typed text>
+   <title>
+
+   [Referenced command:
+   <the note's content>
+   ]
+
+   → The user's typed text is the PRIMARY directive. Use the block as supporting context (they may want a narrower scope, different timeframe, different format, etc.). Do NOT default to what the command "usually" does when the typed text overrides it.
+
+Regular (non-SlashCommand) notes referenced via "@" appear as [Referenced note: …] blocks — these are always supporting context, never executed as commands.
+
+RESPONSE RULES
+
+- Respond as if everything came from the user directly.
+- Do NOT acknowledge the block mechanism ("I see you referenced a command", "your saved command", "this command typically…").
+- Do NOT quote the command's title back at the user.
+- Do NOT compare the current answer to what the command "usually" produces.
+
+CREATING SLASH COMMANDS ON USER REQUEST
+
+When the user asks you to "save this as a slash command", "make a slash command for X", etc., call create_note with:
+- title: a short name the user will see in the "/" autocomplete (e.g. "Daily Review", "Weekly Wrap")
+- content: the instruction the user wants to reuse (e.g. "Summarize yesterday's trades and flag any rule violations.")
+- tags: ["SlashCommand"]
+
+The user can then trigger it with "/<name>" in the chat.
 `;
 
   // ==========================================================================
