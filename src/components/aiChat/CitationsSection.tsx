@@ -284,7 +284,7 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
   );
 
   return (
-    <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
       {/* Compact "Sources" pill with favicons */}
       <Box
         onClick={handleClick}

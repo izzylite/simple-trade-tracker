@@ -26,6 +26,7 @@ import type { OrionTaskResult, Significance } from '../../types/orionTask';
 import { TASK_TYPE_LABELS, TASK_TYPE_COLORS } from '../../types/orionTask';
 import CitationsSection from '../aiChat/CitationsSection';
 import HtmlMessageRenderer from '../aiChat/HtmlMessageRenderer';
+import ToolUsageChip, { type ToolUsageEntry } from '../aiChat/ToolUsageChip';
 import type { Citation } from '../../types/aiChat';
 import type { Calendar, Trade } from '../../types/dualWrite';
 import type { EconomicEvent } from '../../types/economicCalendar';
@@ -114,9 +115,11 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
 
   return (
     <Card
+      onClick={() => setExpanded((v) => !v)}
       sx={{
         mb: 1.5,
         borderRadius: '10px',
+        cursor: 'pointer',
         border: `1px solid ${isError
             ? alpha(theme.palette.error.main, 0.45)
             : result.is_read
@@ -130,7 +133,10 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
             : alpha(theme.palette.primary.main, 0.03),
         transition: 'all 0.2s ease',
         '&:hover': {
-          transform: 'none'
+          transform: 'none',
+          backgroundColor: isError
+            ? alpha(theme.palette.error.main, 0.08)
+            : alpha(theme.palette.primary.main, 0.06),
         },
       }}
     >
@@ -199,7 +205,10 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
               <Tooltip title="Mark as read">
                 <IconButton
                   size="small"
-                  onClick={() => onMarkRead(result.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMarkRead(result.id);
+                  }}
                   sx={{ p: 0.25 }}
                 >
                   <UnreadIcon sx={{ fontSize: 10, color: accentColor }} />
@@ -210,7 +219,10 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
               <Tooltip title="Dismiss from feed">
                 <IconButton
                   size="small"
-                  onClick={() => onHide(result.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onHide(result.id);
+                  }}
                   sx={{ p: 0.25 }}
                 >
                   <CloseIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
@@ -220,7 +232,10 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
             <Tooltip title={expanded ? 'Collapse' : 'Expand'}>
               <IconButton
                 size="small"
-                onClick={() => setExpanded((v) => !v)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpanded((v) => !v);
+                }}
                 sx={{ p: 0.25 }}
               >
                 <ExpandMoreIcon
@@ -236,7 +251,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
           </Box>
         </Box>
 
-        <Collapse in={expanded} timeout="auto">
+        <Collapse in={expanded} timeout="auto" onClick={(e) => e.stopPropagation()}>
           <Box sx={{ mt: 0.5 }}>
             <HtmlMessageRenderer
               html={result.content_html}
@@ -266,16 +281,41 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
             />
           </Box>
 
-          {Array.isArray(result.metadata?.citations) && (result.metadata.citations as Citation[]).length > 0 && (
-            <CitationsSection
-              citations={result.metadata.citations as Citation[]}
-              compact
-            />
-          )}
+          {(() => {
+            const citations = Array.isArray(result.metadata?.citations)
+              ? (result.metadata!.citations as Citation[])
+              : [];
+            const toolCalls = Array.isArray(result.metadata?.tool_calls)
+              ? (result.metadata!.tool_calls as ToolUsageEntry[])
+              : [];
+            const hasAny = citations.length > 0 || toolCalls.length > 0;
+            if (!hasAny) return null;
+            return (
+              <Box
+                sx={{
+                  mt: 1.5,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 1,
+                }}
+              >
+                {citations.length > 0 && (
+                  <CitationsSection citations={citations} compact />
+                )}
+                {toolCalls.length > 0 && (
+                  <ToolUsageChip toolCalls={toolCalls} variant="popover" />
+                )}
+              </Box>
+            );
+          })()}
         </Collapse>
 
         {(onFollowup || onSaveNote) && (expanded) && (
-          <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+          <Box
+            onClick={(e) => e.stopPropagation()}
+            sx={{ mt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}
+          >
             {onSaveNote && (
               <Button
                 size="small"

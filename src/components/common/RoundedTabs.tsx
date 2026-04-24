@@ -12,6 +12,8 @@ export interface TabItem {
   value?: string | number;
   disabled?: boolean;
   icon?: React.ReactElement;
+  /** Optional numeric badge rendered next to the label (e.g. unread count). */
+  badgeCount?: number;
 }
 
 interface TabPanelProps {
@@ -143,32 +145,71 @@ const RoundedTabs: React.FC<RoundedTabsProps> = ({
           }
         }}
       >
-        {tabs.map((tab, index) => (
-          <Tab
-            key={index}
-            label={tab.label}
-            icon={tab.icon}
-            iconPosition="start"
-            disabled={tab.disabled}
-            sx={{
-              minHeight: config.minHeight - 8,
-              my: 0.2,
-              textTransform: 'none',
-              fontSize: config.fontSize,
-              fontWeight: 600,
-              color: 'text.secondary',
-              backgroundColor: 'transparent',
-              borderRadius: '8px',
-              padding: config.padding,
-              minWidth: fullWidth ? 'auto' : 'fit-content',
-              gap: 0.5,
-              '& .MuiTab-iconWrapper': {
-                marginRight: 0,
-                marginBottom: 0
-              }
-            }}
-          />
-        ))}
+        {tabs.map((tab, index) => {
+          const isSelected = activeTab === index;
+          const showBadge = (tab.badgeCount ?? 0) > 0 && !isSelected;
+          const label = showBadge ? (
+            <Box
+              component="span"
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.75,
+                lineHeight: 1,
+              }}
+            >
+              <Box component="span">{tab.label}</Box>
+              <Box
+                component="span"
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 18,
+                  minWidth: 18,
+                  px: '5px',
+                  borderRadius: '9px',
+                  backgroundColor: theme.palette.error.main,
+                  color: theme.palette.error.contrastText,
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  lineHeight: 1,
+                }}
+              >
+                {(tab.badgeCount ?? 0) > 99 ? '99+' : tab.badgeCount}
+              </Box>
+            </Box>
+          ) : (
+            tab.label
+          );
+
+          return (
+            <Tab
+              key={index}
+              label={label}
+              icon={tab.icon}
+              iconPosition="start"
+              disabled={tab.disabled}
+              sx={{
+                minHeight: config.minHeight - 8,
+                my: 0.2,
+                textTransform: 'none',
+                fontSize: config.fontSize,
+                fontWeight: 600,
+                color: 'text.secondary',
+                backgroundColor: 'transparent',
+                borderRadius: '8px',
+                padding: config.padding,
+                minWidth: fullWidth ? 'auto' : 'fit-content',
+                gap: 0.5,
+                '& .MuiTab-iconWrapper': {
+                  marginRight: 0,
+                  marginBottom: 0
+                }
+              }}
+            />
+          );
+        })}
       </Tabs>
       
       {children}

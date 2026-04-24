@@ -1,4 +1,5 @@
 import { log } from '../_shared/supabase.ts';
+import { summarizeToolCalls } from '../_shared/toolLabels.ts';
 import {
   searchNewsMultiple,
   searchNewsMultipleCached,
@@ -200,6 +201,27 @@ export async function handleMarketResearch(
     result.metadata = {
       ...result.metadata,
       scraped_urls_failed: briefing.scrapedUrlsFailed,
+    };
+  }
+
+  // Record tool usage so TaskResultCard can surface the same "N tools used"
+  // chip the chat UI shows. One entry per successfully-executed Serper query
+  // (errored queries are excluded so the count reflects what actually fed the
+  // briefing), one per scrape attempt (success + fail, matching how chat
+  // displays attempted tool calls even when they error), and one per
+  // successfully-fetched price snapshot (the briefing quotes these numbers,
+  // so they count as a tool the pipeline invoked before Gemini).
+  const successfulSearches = Math.max(0, totalQueries - totalErrors);
+  const rawToolCalls: Array<{ name: string }> = [
+    ...Array.from({ length: successfulSearches }, () => ({ name: 'search_web' })),
+    ...prices.map(() => ({ name: 'get_market_price' })),
+    ...briefing.scrapedUrls.map(() => ({ name: 'scrape_url' })),
+    ...briefing.scrapedUrlsFailed.map(() => ({ name: 'scrape_url' })),
+  ];
+  if (rawToolCalls.length > 0) {
+    result.metadata = {
+      ...result.metadata,
+      tool_calls: summarizeToolCalls(rawToolCalls),
     };
   }
 

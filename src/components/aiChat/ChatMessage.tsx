@@ -20,6 +20,7 @@ import AnimatedText from './AnimatedText';
 import HtmlMessageRenderer from './HtmlMessageRenderer';
 import CitationsSection from './CitationsSection';
 import MarkdownRenderer from './MarkdownRenderer';
+import ToolUsageChip from './ToolUsageChip';
 import {
   ContentCopy as CopyIcon,
   CheckCircle as CheckIcon,
@@ -27,7 +28,6 @@ import {
   Schedule as ScheduleIcon,
   Edit as EditIcon,
   Check as CopiedIcon,
-  BuildCircleOutlined as ToolsIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
@@ -65,7 +65,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 }) => {
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
-  const [toolsExpanded, setToolsExpanded] = useState(false);
   const [reasoningExpanded, setReasoningExpanded] = useState(false);
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
@@ -297,51 +296,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           {/* Tool calls — collapsed by default, shows what tools Orion used */}
           {isAssistant && message.toolCalls && message.toolCalls.length > 0 && (
             <Box sx={{ mt: 1.5 }}>
-              <Box
-                onClick={() => setToolsExpanded(v => !v)}
-                sx={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 0.75,
-                  px: 1.25,
-                  py: 0.5,
-                  borderRadius: 1.5,
-                  cursor: 'pointer',
-                  color: 'text.secondary',
-                  border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                  fontSize: '0.78rem',
-                  transition: 'background-color 0.15s',
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.text.primary, 0.04),
-                  },
-                }}
-              >
-                <ToolsIcon sx={{ fontSize: 16 }} />
-                <Typography variant="caption" sx={{ fontSize: '0.78rem', lineHeight: 1 }}>
-                  {message.toolCalls.length} tool{message.toolCalls.length === 1 ? '' : 's'} used
-                </Typography>
-                {toolsExpanded
-                  ? <ExpandLessIcon sx={{ fontSize: 16 }} />
-                  : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
-              </Box>
-              {toolsExpanded && (
-                <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                  {message.toolCalls.map((tool, idx) => (
-                    <Chip
-                      key={`${tool.name}-${idx}`}
-                      label={tool.label}
-                      size="small"
-                      variant="outlined"
-                      sx={{
-                        height: 24,
-                        fontSize: '0.72rem',
-                        borderColor: alpha(theme.palette.divider, 0.8),
-                        color: 'text.secondary',
-                      }}
-                    />
-                  ))}
-                </Box>
-              )}
+              <ToolUsageChip toolCalls={message.toolCalls} />
             </Box>
           )}
 

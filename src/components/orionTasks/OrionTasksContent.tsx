@@ -3,11 +3,12 @@ import {
   Box,
   Typography,
   Button,
-  Chip,
-  Divider,
   useTheme,
   alpha,
   CircularProgress,
+  Select,
+  MenuItem,
+  FormControl,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -229,52 +230,87 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
             <Typography variant="caption" sx={{ color: 'text.secondary', mr: 0.5, flexShrink: 0 }}>
               Filter:
             </Typography>
-            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', flex: 1 }}>
-              <Chip
-                label="All"
-                size="small"
-                variant={filterTaskType === null ? 'filled' : 'outlined'}
-                onClick={() => setFilterTaskType(null)}
-                sx={{ fontSize: '0.72rem', height: 22 }}
-              />
-              {filterableTaskTypes.map((type) => {
-                const task = tasks.find((t) => t.task_type === type)!;
-                const hasFailures = (task.consecutive_failures ?? 0) > 0;
-                const color = TASK_TYPE_COLORS[type];
-                const active = filterTaskType === type;
-                const tooltip = hasFailures
-                  ? `${task.consecutive_failures} consecutive failed run${task.consecutive_failures === 1 ? '' : 's'}${task.last_error ? ` — ${task.last_error}` : ''}`
-                  : '';
-                return (
-                  <Chip
-                    key={type}
-                    icon={hasFailures ? <WarningIcon sx={{ fontSize: '14px !important' }} /> : undefined}
-                    label={TASK_TYPE_LABELS[type]}
-                    size="small"
-                    title={tooltip}
-                    variant={active ? 'filled' : 'outlined'}
-                    onClick={() => setFilterTaskType(active ? null : type)}
-                    sx={{
-                      fontSize: '0.72rem',
-                      height: 22,
-                      backgroundColor: active
-                        ? hasFailures ? alpha(theme.palette.warning.main, 0.3) : color
-                        : 'transparent',
-                      color: active
-                        ? hasFailures ? theme.palette.warning.dark : '#fff'
-                        : hasFailures ? theme.palette.warning.dark : color,
-                      borderColor: hasFailures ? theme.palette.warning.main : alpha(color, 0.6),
-                      '&:hover': {
-                        backgroundColor: active
-                          ? hasFailures ? alpha(theme.palette.warning.main, 0.3) : color
-                          : hasFailures ? alpha(theme.palette.warning.main, 0.1) : alpha(color, 0.08),
-                      },
-                      '& .MuiChip-icon': { color: 'inherit' },
-                    }}
-                  />
-                );
-              })}
-            </Box>
+            <FormControl size="small" sx={{ flex: 1, minWidth: 0 }}>
+              <Select
+                value={filterTaskType ?? '__all__'}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFilterTaskType(v === '__all__' ? null : (v as TaskType));
+                }}
+                MenuProps={{
+                  sx: { zIndex: (t) => t.zIndex.modal + 100 },
+                  PaperProps: { sx: { maxHeight: 320 } },
+                }}
+                sx={{
+                  fontSize: '0.78rem',
+                  height: 30,
+                  '& .MuiSelect-select': { py: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 },
+                }}
+                renderValue={(val) => {
+                  if (val === '__all__') return 'All';
+                  const type = val as TaskType;
+                  const task = tasks.find((t) => t.task_type === type);
+                  const hasFailures = (task?.consecutive_failures ?? 0) > 0;
+                  const color = TASK_TYPE_COLORS[type];
+                  return (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                      {hasFailures && (
+                        <WarningIcon sx={{ fontSize: 14, color: theme.palette.warning.main }} />
+                      )}
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          backgroundColor: color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <Typography variant="caption" sx={{ fontSize: '0.78rem' }}>
+                        {TASK_TYPE_LABELS[type]}
+                      </Typography>
+                    </Box>
+                  );
+                }}
+              >
+                <MenuItem value="__all__" sx={{ fontSize: '0.8rem' }}>
+                  All
+                </MenuItem>
+                {filterableTaskTypes.map((type) => {
+                  const task = tasks.find((t) => t.task_type === type)!;
+                  const hasFailures = (task.consecutive_failures ?? 0) > 0;
+                  const color = TASK_TYPE_COLORS[type];
+                  return (
+                    <MenuItem
+                      key={type}
+                      value={type}
+                      sx={{
+                        fontSize: '0.8rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          backgroundColor: color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span>{TASK_TYPE_LABELS[type]}</span>
+                      {hasFailures && (
+                        <WarningIcon
+                          sx={{ fontSize: 14, color: theme.palette.warning.main, ml: 'auto' }}
+                        />
+                      )}
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </FormControl>
             {/* Edit / delete for the selected task */}
             <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
               {onUpdateTask && (

@@ -19,6 +19,7 @@ import { createServiceClient, log } from '../_shared/supabase.ts';
 import { runOrionAgent } from '../_shared/orionAgent.ts';
 import { callMCPTool, getCachedMCPTools, getMcpConfig } from '../_shared/orionMcp.ts';
 import { fetchAgentMemory } from '../_shared/orionMemory.ts';
+import { summarizeToolCalls } from '../_shared/toolLabels.ts';
 import {
   CUSTOM_TOOL_NAMES,
   executeCustomTool,
@@ -174,6 +175,10 @@ export async function generateBriefing(
     turnCount: agentResult.turnCount,
     toolCallCount: agentResult.toolCalls.length,
     forcedSynthesis: agentResult.forcedSynthesis,
+    // {name,label} pairs rendered as a "N tools used" chip on the
+    // TaskResultCard, matching the Orion chat UI. Kept in metadata (not a
+    // top-level column) so we don't need a schema migration.
+    tool_calls: summarizeToolCalls(agentResult.toolCalls),
   });
 }
 

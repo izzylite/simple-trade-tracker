@@ -88,6 +88,11 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
   onNoteClick,
   trades = []
 }) => {
+  // Defensive default: briefings saved before content_html was made non-null
+  // (or any optimistic-update path that drops the field) would otherwise
+  // throw "Cannot read properties of undefined (reading 'replace')" inside
+  // the segment-parsing memo below. Treat a missing body as empty.
+  const safeHtml = typeof html === 'string' ? html : '';
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
@@ -122,12 +127,12 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
   const contentSegments = useMemo(() => {
     if (!embeddedTrades && !embeddedEvents && !embeddedNotes) {
       // No inline cards needed, return single HTML segment
-      return [{ type: 'html' as const, content: html }];
+      return [{ type: 'html' as const, content: safeHtml }];
     }
 
     const segments: Array<{ type: 'html' | 'trade' | 'event' | 'note'; content: string; id?: string }> = [];
     let lastIndex = 0;
-    let workingHtml = html;
+    let workingHtml = safeHtml;
 
     // Find all inline references (HTML tags: <trade-ref id="xxx"/>, <event-ref id="xxx"/>, <note-ref id="xxx"/>)
     const references: Array<{ type: 'trade' | 'event' | 'note'; id: string; index: number; length: number }> = [];
@@ -206,8 +211,8 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
       }
     }
 
-    return segments.length > 0 ? segments : [{ type: 'html' as const, content: html }];
-  }, [html, embeddedTrades, embeddedEvents, embeddedNotes]);
+    return segments.length > 0 ? segments : [{ type: 'html' as const, content: safeHtml }];
+  }, [safeHtml, embeddedTrades, embeddedEvents, embeddedNotes]);
 
   // Sanitize HTML segments.
   // Note: <tag-chip> is intentionally absent from ALLOWED_TAGS — it is parsed

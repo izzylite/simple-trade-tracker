@@ -85,7 +85,7 @@ export const orionTaskService = {
   async getResults(
     userId: string,
     taskId?: string,
-    limit = 20,
+    limit = 10,
     offset = 0
   ): Promise<OrionTaskResult[]> {
     let query = supabase
