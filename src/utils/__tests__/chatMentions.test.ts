@@ -131,6 +131,34 @@ describe('expandMentionsForSend', () => {
   });
 });
 
+import { stripReferencedBlocks } from '../chatMentions';
+
+describe('stripReferencedBlocks', () => {
+  it('returns plain text unchanged', () => {
+    expect(stripReferencedBlocks('hello world')).toBe('hello world');
+  });
+
+  it('strips a bare command block', () => {
+    const input = '[Referenced command:\nList trades.\n]';
+    expect(stripReferencedBlocks(input)).toBe('');
+  });
+
+  it('strips a trailing command block and preceding blank line', () => {
+    const input = 'Today i want us to Quick Review\n\n[Referenced command:\nList my three most recent closed trades as cards.\n]';
+    expect(stripReferencedBlocks(input)).toBe('Today i want us to Quick Review');
+  });
+
+  it('strips a referenced note block', () => {
+    const input = 'what about this one\n\n[Referenced note:\nWait for confirmation candle.\n]';
+    expect(stripReferencedBlocks(input)).toBe('what about this one');
+  });
+
+  it('strips multiple blocks in one message', () => {
+    const input = 'compare both\n\n[Referenced command:\nA\n]\n\n[Referenced note:\nB\n]';
+    expect(stripReferencedBlocks(input)).toBe('compare both');
+  });
+});
+
 import { ContentState, EditorState, Modifier, SelectionState } from 'draft-js';
 import { extractSegments } from '../chatMentions';
 

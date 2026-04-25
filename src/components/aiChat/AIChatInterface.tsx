@@ -38,7 +38,7 @@ import { Z_INDEX } from '../../styles/zIndex';
 import { logger } from '../../utils/logger';
 import { compressImageToDataUrl } from '../../utils/fileValidation';
 import * as notesService from '../../services/notesService';
-import { expandMentionsForSend } from '../../utils/chatMentions';
+import { expandMentionsForSend, stripReferencedBlocks } from '../../utils/chatMentions';
 
 // Image limit for AI agent requests (must match backend MAX_IMAGES_PER_REQUEST)
 const MAX_IMAGES = 4;
@@ -344,7 +344,9 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   const handleEditMessage = useCallback((messageId: string) => {
     const editData = setInputForEdit(messageId);
     if (editData) {
-      setInputMessage(editData.content);
+      // Strip [Referenced command/note:] blocks so the editor doesn't expose
+      // the raw expansion syntax. User can re-trigger via "/" if they want.
+      setInputMessage(stripReferencedBlocks(editData.content));
       // Restore images when editing
       if (editData.images && editData.images.length > 0) {
         setAttachedImages(editData.images);

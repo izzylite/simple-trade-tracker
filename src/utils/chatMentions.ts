@@ -103,6 +103,24 @@ export function expandMentionsForSend(
 }
 
 /**
+ * Remove [Referenced command:\n...\n] / [Referenced note:\n...\n] blocks
+ * (and the blank line separating them from preceding text) from a string.
+ *
+ * Used when populating the chat editor from a previously-sent message for
+ * edit. The persisted message has the blocks expanded for the LLM, but
+ * dropping them back into the input would expose the raw syntax to the
+ * user. After stripping, what remains is the typed-text portion plus any
+ * inline note titles — the user can re-trigger a slash command via "/" if
+ * they want to restore one.
+ */
+export function stripReferencedBlocks(text: string): string {
+  return text
+    .replace(/\n*\[Referenced (?:command|note):\n[\s\S]*?\n\]/g, '')
+    .replace(/[ \t]+$/gm, '')
+    .trim();
+}
+
+/**
  * Walk the editor's ContentState and produce flat segments.
  * NOTE_MENTION entities become `note-mention` segments; TAG_MENTION entities
  * and plain text become `text` segments (tags are already the tag string in
