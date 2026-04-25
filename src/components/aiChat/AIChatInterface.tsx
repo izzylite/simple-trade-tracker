@@ -27,7 +27,7 @@ import {
 } from '@mui/icons-material';
 import ChatMessage from './ChatMessage';
 import AIChatMentionInput from './AIChatMentionInput';
-import type { AIChatMentionInputHandle } from './AIChatMentionInput';
+import type { AIChatMentionInputHandle, SystemCommand } from './AIChatMentionInput';
 import { ChatMessage as ChatMessageType, AttachedImage } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
@@ -117,12 +117,20 @@ export interface AIChatInterfaceProps {
   autoScroll?: boolean;
   messageLimit?: number;
   questionTemplates?: QuestionTemplate[];
+
+  // Locally-handled slash commands shown above note-based slash commands.
+  // Selecting one consumes the `/term` (no chip) and fires `onSystemCommand`
+  // — these are NOT sent to Orion.
+  systemCommands?: SystemCommand[];
+  onSystemCommand?: (id: string) => void;
 }
 
 export interface AIChatInterfaceRef {
   focus: () => void;
   scrollToBottom: () => void;
   setInput: (value: string) => void;
+  /** Dismiss the slash/mention popup in the chat input if it's open. */
+  closeMention: () => void;
 }
 
 const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
@@ -147,7 +155,9 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   showTemplates: showTemplatesProp,
   autoScroll = true,
   messageLimit = 50,
-  questionTemplates = defaultQuestionTemplates
+  questionTemplates = defaultQuestionTemplates,
+  systemCommands,
+  onSystemCommand,
 }, ref) => {
   const theme = useTheme();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -182,6 +192,9 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
         inputRef.current?.focus?.();
         inputRef.current?.moveCursorToEnd?.();
       });
+    },
+    closeMention: () => {
+      inputRef.current?.closeMention?.();
     }
   }));
 
@@ -489,7 +502,6 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
               message={message}
               showTimestamp={true}
               isLatestMessage={index === displayMessages.length - 1}
-              enableAnimation={index > 0}
               onTradeClick={handleTradeClick}
               onEventClick={handleEventClick}
               onNoteClick={handleNoteClick}
@@ -794,6 +806,8 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             disabled={isLoading || isAtMessageLimit}
             allTags={allTagsMemo}
             allNotes={allNotesMemo}
+            systemCommands={systemCommands}
+            onSystemCommand={onSystemCommand}
             maxRows={4}
             sx={mentionInputSx}
           />

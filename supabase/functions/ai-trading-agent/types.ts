@@ -261,6 +261,16 @@ export interface AgentResponse {
     timestamp: string;
   };
   error?: string;
+  /**
+   * Categorisation of the failure for the frontend. Set whenever success=false
+   * so the client can render the right UI without re-parsing raw provider
+   * messages. Mirrors src/types/aiChat.ts ChatError.type minus 'context_too_large'.
+   */
+  errorType?:
+    | 'rate_limit'
+    | 'api_key_invalid'
+    | 'provider_error'
+    | 'network_error';
 }
 
 // Tool Result Types

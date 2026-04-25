@@ -6,6 +6,17 @@
 import { log } from "../_shared/supabase.ts";
 import { fetchSerperScrape, scrapeArticle } from "../_shared/serperScrape.ts";
 import { getMarketPrice } from "../_shared/prices.ts";
+import {
+  SLASH_COMMAND_TAG,
+  GAME_PLAN_TAG,
+  LESSON_LEARNED_TAG,
+  RISK_MANAGEMENT_TAG,
+  PSYCHOLOGY_TAG,
+  GENERAL_TAG,
+  STRATEGY_TAG,
+  INSIGHT_TAG,
+  AGENT_MEMORY_TAG,
+} from "../_shared/noteTags.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { Note } from "./types.ts";
 
@@ -160,9 +171,9 @@ export const createNoteTool: GeminiFunctionDeclaration = {
 
 USE CASES:
 - Save trading strategies, insights, lessons learned, or game plans for the user
-- Save a reusable prompt as a SlashCommand note (see "Slash Commands" in system prompt) — title becomes the / autocomplete name, content becomes the instruction
+- Save a reusable prompt as a ${SLASH_COMMAND_TAG} note (see "Slash Commands" in system prompt) — title becomes the / autocomplete name, content becomes the instruction
 
-⚠️ CANNOT create AGENT_MEMORY notes - use update_memory tool instead (it auto-creates if needed).
+⚠️ CANNOT create ${AGENT_MEMORY_TAG} notes - use update_memory tool instead (it auto-creates if needed).
 
 Content should be in plain text format. User ID and Calendar ID are automatically provided from context.`,
   parameters: {
@@ -181,7 +192,7 @@ Content should be in plain text format. User ID and Calendar ID are automaticall
         type: "array",
         items: { type: "string" },
         description:
-          'Categorize the note. Available: "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED", "RISK_MANAGEMENT", "PSYCHOLOGY", "GENERAL", "SlashCommand" (reusable / commands — see system prompt). Use "AGENT_MEMORY" ONLY for AI memory notes.',
+          `Categorize the note. Available: "${STRATEGY_TAG}", "${GAME_PLAN_TAG}", "${INSIGHT_TAG}", "${LESSON_LEARNED_TAG}", "${RISK_MANAGEMENT_TAG}", "${PSYCHOLOGY_TAG}", "${GENERAL_TAG}", "${SLASH_COMMAND_TAG}" (reusable / commands — see system prompt). Use "${AGENT_MEMORY_TAG}" ONLY for AI memory notes.`,
       },
       reminder_type: {
         type: "string",
@@ -275,14 +286,29 @@ EXAMPLES:
 export const updateNoteTool: GeminiFunctionDeclaration = {
   name: "update_note",
   description:
-    `Update an existing note. By default you can only update AI-created notes (by_assistant=true). EXCEPTION: notes tagged "SlashCommand" are user-owned but you may still update them on user request (e.g. "change my Daily Review slash command to also flag oversized losses").
+    `Update an existing note. By default you can only update AI-created notes (by_assistant=true). EXCEPTION: notes tagged "${SLASH_COMMAND_TAG}" are user-owned but you may still update them on user request (e.g. "change my Daily Review slash command to also flag oversized losses").
 
-⚠️ CANNOT update AGENT_MEMORY notes - use update_memory tool instead for memory management.
+⚠️ CANNOT update ${AGENT_MEMORY_TAG} notes - use update_memory tool instead for memory management.
+
+CONTENT EDITING — choose ONE approach:
+
+A) INCREMENTAL EDITS (REQUIRED for ${SLASH_COMMAND_TAG} when user says "also", "add", "change X to Y", "remove X", etc.)
+   1. Read the note's current text first (via search_notes or recent context).
+   2. Set content_mode + the matching field(s):
+      - "append": needs content_text (added on a new line at the end).
+      - "replace": needs content_old_text (exact, unique substring) and content_text.
+      - "remove": needs content_old_text (exact, unique substring).
+   The server REJECTS with current content echoed back if content_old_text is missing or not unique. Re-read and retry — do not guess.
+
+B) FULL REWRITE — use ONLY when the user explicitly asks to rewrite from scratch.
+   Set "content" to the entire new note. For ${SLASH_COMMAND_TAG} notes you MUST also set replace_full_content=true to confirm the destructive overwrite, otherwise the call is rejected.
+
+Note: incremental edits do not work on rich-text (Draft.js JSON) notes — those require full overwrite.
 
 USE CASES:
-- Refine strategies or update insights
-- Add/modify/remove tags and reminders
-- Edit a saved SlashCommand note (the user's reusable / prompt)`,
+- Tweak a strategy / insight → content_mode: "append" or "replace"
+- Add/modify/remove tags or reminders → tags / reminder_* params
+- Edit a saved ${SLASH_COMMAND_TAG} (user's reusable / prompt) → incremental edits, NOT full rewrite`,
   parameters: {
     type: "object",
     properties: {
@@ -297,13 +323,34 @@ USE CASES:
       content: {
         type: "string",
         description:
-          "New content in plain text format (optional - only include if changing). Use clear paragraphs and line breaks for readability. Do not use HTML tags.",
+          "FULL REPLACEMENT of the note's content. Destructive — wipes existing text. Prefer content_mode for partial edits. SLASH_COMMAND notes additionally require replace_full_content=true. Plain text, no HTML.",
+      },
+      content_mode: {
+        type: "string",
+        enum: ["append", "replace", "remove"],
+        description:
+          "Incremental content edit. Mutually exclusive with the 'content' param. Not allowed on rich-text (Draft.js JSON) notes.",
+      },
+      content_text: {
+        type: "string",
+        description:
+          "New text. Required for content_mode='append' (added at end on a new line) or 'replace' (replaces content_old_text). Plain text, no HTML.",
+      },
+      content_old_text: {
+        type: "string",
+        description:
+          "Exact, unique substring of the current note to find. Required for content_mode='replace' or 'remove'. Whitespace-sensitive — must match the note verbatim. Read the note first.",
+      },
+      replace_full_content: {
+        type: "boolean",
+        description:
+          "Required confirmation when overwriting a SLASH_COMMAND note via the full 'content' param. Prevents accidental destructive rewrites of user automations. Set true only when the user explicitly asked to rewrite the entire command.",
       },
       tags: {
         type: "array",
         items: { type: "string" },
         description:
-          'Updated tags (optional). Available: "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED", "RISK_MANAGEMENT", "PSYCHOLOGY", "GENERAL", "SlashCommand", "AGENT_MEMORY".',
+          `Updated tags (optional). Available: "${STRATEGY_TAG}", "${GAME_PLAN_TAG}", "${INSIGHT_TAG}", "${LESSON_LEARNED_TAG}", "${RISK_MANAGEMENT_TAG}", "${PSYCHOLOGY_TAG}", "${GENERAL_TAG}", "${SLASH_COMMAND_TAG}", "${AGENT_MEMORY_TAG}".`,
       },
       reminder_type: {
         type: "string",
@@ -336,7 +383,7 @@ USE CASES:
 export const deleteNoteTool: GeminiFunctionDeclaration = {
   name: "delete_note",
   description:
-    `Delete an existing note. By default you can only delete AI-created notes (by_assistant=true). EXCEPTION: notes tagged "SlashCommand" are user-owned but you may delete them on explicit user request (e.g. "remove my Quick Review slash command"). Use this to remove outdated or incorrect notes.`,
+    `Delete an existing note. By default you can only delete AI-created notes (by_assistant=true). EXCEPTION: notes tagged "${SLASH_COMMAND_TAG}" are user-owned but you may delete them on explicit user request (e.g. "remove my Quick Review slash command"). Use this to remove outdated or incorrect notes.`,
   parameters: {
     type: "object",
     properties: {
@@ -356,26 +403,26 @@ export const searchNotesTool: GeminiFunctionDeclaration = {
   name: "search_notes",
   description: `Search and retrieve notes from the user's trading calendar.
 
-CRITICAL: At the START of EVERY session, search with tags: ["AGENT_MEMORY"] to retrieve your persistent memory about this trader.
+CRITICAL: At the START of EVERY session, search with tags: ["${AGENT_MEMORY_TAG}"] to retrieve your persistent memory about this trader.
 
 AVAILABLE TAGS (use these to filter by category):
-- "STRATEGY" - Trading strategies and methodologies
-- "GAME_PLAN" - Daily/weekly trading plans and preparation
-- "INSIGHT" - Market observations and realizations
-- "LESSON_LEARNED" - Post-trade reflections and mistakes to avoid
-- "RISK_MANAGEMENT" - Position sizing, stop loss rules, risk parameters
-- "PSYCHOLOGY" - Trading mindset, emotions, mental frameworks
-- "GENERAL" - Miscellaneous notes
-- "SlashCommand" - User-saved reusable prompts triggered via "/" in chat (see system prompt)
-- "AGENT_MEMORY" - AI persistent memory (retrieve at session start)
+- "${STRATEGY_TAG}" - Trading strategies and methodologies
+- "${GAME_PLAN_TAG}" - Daily/weekly trading plans and preparation
+- "${INSIGHT_TAG}" - Market observations and realizations
+- "${LESSON_LEARNED_TAG}" - Post-trade reflections and mistakes to avoid
+- "${RISK_MANAGEMENT_TAG}" - Position sizing, stop loss rules, risk parameters
+- "${PSYCHOLOGY_TAG}" - Trading mindset, emotions, mental frameworks
+- "${GENERAL_TAG}" - Miscellaneous notes
+- "${SLASH_COMMAND_TAG}" - User-saved reusable prompts triggered via "/" in chat (see system prompt)
+- "${AGENT_MEMORY_TAG}" - AI persistent memory (retrieve at session start)
 
 SMART QUERYING EXAMPLES:
-- Analyze user's risk approach: tags: ["RISK_MANAGEMENT"]
-- Review strategies before trading: tags: ["STRATEGY"]
-- Understand daily preparation: tags: ["GAME_PLAN"]
-- Learn from past mistakes: tags: ["LESSON_LEARNED"]
-- List user's saved slash commands (e.g. "what slash commands do I have?"): tags: ["SlashCommand"]
-- Combine with search_query for precision: tags: ["STRATEGY"], search_query: "scalping"
+- Analyze user's risk approach: tags: ["${RISK_MANAGEMENT_TAG}"]
+- Review strategies before trading: tags: ["${STRATEGY_TAG}"]
+- Understand daily preparation: tags: ["${GAME_PLAN_TAG}"]
+- Learn from past mistakes: tags: ["${LESSON_LEARNED_TAG}"]
+- List user's saved slash commands (e.g. "what slash commands do I have?"): tags: ["${SLASH_COMMAND_TAG}"]
+- Combine with search_query for precision: tags: ["${STRATEGY_TAG}"], search_query: "scalping"
 
 EMBEDDED IMAGES:
 - Notes may contain embedded images (diagrams, charts, frameworks)
@@ -396,7 +443,7 @@ Returns both user-created and AI-created notes. User ID and Calendar ID are auto
         type: "array",
         items: { type: "string" },
         description:
-          'Filter by category. Available: "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED", "RISK_MANAGEMENT", "PSYCHOLOGY", "GENERAL", "SlashCommand", "AGENT_MEMORY". Notes must have ALL specified tags.',
+          `Filter by category. Available: "${STRATEGY_TAG}", "${GAME_PLAN_TAG}", "${INSIGHT_TAG}", "${LESSON_LEARNED_TAG}", "${RISK_MANAGEMENT_TAG}", "${PSYCHOLOGY_TAG}", "${GENERAL_TAG}", "${SLASH_COMMAND_TAG}", "${AGENT_MEMORY_TAG}". Notes must have ALL specified tags.`,
       },
       include_archived: {
         type: "boolean",
@@ -454,7 +501,7 @@ export const searchConversationsTool: GeminiFunctionDeclaration = {
   name: "search_conversations",
   description: `Search the user's past chat conversations with you by keyword. Returns lightweight metadata (title + snippet + timestamp), NOT full message bodies. Use get_conversation(id) afterwards if a result looks relevant.
 
-ONLY USE WHEN the user explicitly references a past chat — phrases like "last time", "yesterday we discussed", "you told me before", "our previous conversation", "remember when I asked about...". Do NOT use on every turn to pad context; AGENT_MEMORY (via search_notes with tags:["AGENT_MEMORY"]) is the primary long-term memory.
+ONLY USE WHEN the user explicitly references a past chat — phrases like "last time", "yesterday we discussed", "you told me before", "our previous conversation", "remember when I asked about...". Do NOT use on every turn to pad context; ${AGENT_MEMORY_TAG} (via search_notes with tags:["${AGENT_MEMORY_TAG}"]) is the primary long-term memory.
 
 Returns: [{ id, title, message_count, created_at, updated_at, snippet }]. The snippet is the first ~200 chars of the most recent message in each conversation.`,
   parameters: {
@@ -982,8 +1029,8 @@ export async function createNote(
 
     // Block creation of AGENT_MEMORY notes - must use update_memory tool instead
     // update_memory auto-creates memory if it doesn't exist and properly merges content
-    if (tags && tags.includes("AGENT_MEMORY")) {
-      return `Cannot create AGENT_MEMORY notes with create_note. Use the update_memory tool instead - it automatically creates the memory note if needed and properly merges new insights with existing memory.`;
+    if (tags && tags.includes(AGENT_MEMORY_TAG)) {
+      return `Cannot create ${AGENT_MEMORY_TAG} notes with create_note. Use the update_memory tool instead - it automatically creates the memory note if needed and properly merges new insights with existing memory.`;
     }
 
     // Assistant Colors Palette (Semantic)
@@ -1013,7 +1060,7 @@ export async function createNote(
     // chat's "/" autocomplete). The calendar.notes JSONB trigger excludes
     // by_assistant=true notes from the mirror, so flip the flag for these
     // — even though Orion is creating them, they belong to the user.
-    const isSlashCommand = !!tags && tags.includes("SlashCommand");
+    const isSlashCommand = !!tags && tags.includes(SLASH_COMMAND_TAG);
 
     const noteData: Record<string, unknown> = {
       user_id: userId,
@@ -1075,6 +1122,17 @@ export async function createNote(
   }
 }
 
+function countOccurrences(haystack: string, needle: string): number {
+  if (!needle) return 0;
+  let count = 0;
+  let idx = 0;
+  while ((idx = haystack.indexOf(needle, idx)) !== -1) {
+    count++;
+    idx += needle.length;
+  }
+  return count;
+}
+
 /**
  * Update an existing AI-created note
  * NOTE: Cannot update AGENT_MEMORY notes - use updateMemory instead
@@ -1089,6 +1147,10 @@ export async function updateNote(
   reminderDate?: string,
   reminderDays?: string[],
   tags?: string[],
+  contentMode?: "append" | "replace" | "remove",
+  contentText?: string,
+  contentOldText?: string,
+  replaceFullContent?: boolean,
 ): Promise<string> {
   try {
     log(`Updating note: ${noteId}`, "info");
@@ -1097,7 +1159,7 @@ export async function updateNote(
     // touching another user's note via a leaked id.
     const { data: existingNote, error: fetchError } = await supabase
       .from("notes")
-      .select("id, by_assistant, title, tags")
+      .select("id, by_assistant, title, tags, content")
       .eq("id", noteId)
       .eq("user_id", userId)
       .single();
@@ -1112,17 +1174,92 @@ export async function updateNote(
 
     // Block updates to AGENT_MEMORY notes - must use update_memory tool instead
     const noteTags = existingNote.tags || [];
-    if (noteTags.includes("AGENT_MEMORY")) {
-      return `Cannot update AGENT_MEMORY notes with update_note. Use the update_memory tool instead - it properly merges new insights with existing memory without losing information.`;
+    if (noteTags.includes(AGENT_MEMORY_TAG)) {
+      return `Cannot update ${AGENT_MEMORY_TAG} notes with update_note. Use the update_memory tool instead - it properly merges new insights with existing memory without losing information.`;
     }
 
     // SlashCommand notes are user-facing automations: even though they're
     // stored as user-owned (by_assistant=false) so they appear in the "/"
     // popup, Orion is allowed to update them on user request.
-    const isSlashCommand = noteTags.includes("SlashCommand");
+    const isSlashCommand = noteTags.includes(SLASH_COMMAND_TAG);
 
     if (!existingNote.by_assistant && !isSlashCommand) {
       return `Permission denied: You can only update AI-created notes. This note was created by the user.`;
+    }
+
+    // Resolve the new content via either incremental edit (content_mode) or
+    // full overwrite (content). Mutually exclusive — both set is ambiguous.
+    const hasMode = contentMode !== undefined;
+    const hasFullContent = content !== undefined;
+    let newContent: string | undefined;
+
+    if (hasMode && hasFullContent) {
+      return `Cannot use both 'content' (full overwrite) and 'content_mode' (incremental edit) in the same call. Choose one.`;
+    }
+
+    if (hasMode) {
+      const current = existingNote.content || "";
+
+      // Incremental text ops are unsafe on rich-text JSON blobs (could produce
+      // invalid Draft.js). Force full overwrite for those.
+      let isDraftJs = false;
+      try {
+        const parsed = JSON.parse(current);
+        if (
+          parsed && (Array.isArray(parsed.blocks) || parsed.entityMap)
+        ) {
+          isDraftJs = true;
+        }
+      } catch {
+        // not JSON — plain text, fine
+      }
+      if (isDraftJs) {
+        return `Cannot use content_mode on this note: it is stored in rich-text (Draft.js) format. Use the 'content' param to fully replace it instead.`;
+      }
+
+      if (contentMode === "append") {
+        if (contentText === undefined || contentText === "") {
+          return `content_mode='append' requires non-empty content_text.`;
+        }
+        newContent = current ? `${current}\n${contentText}` : contentText;
+      } else if (contentMode === "replace") {
+        if (!contentOldText) {
+          return `content_mode='replace' requires content_old_text.`;
+        }
+        if (contentText === undefined) {
+          return `content_mode='replace' requires content_text.`;
+        }
+        const matches = countOccurrences(current, contentOldText);
+        if (matches === 0) {
+          return `content_old_text not found in note "${existingNote.title}". Re-read the note and provide an exact substring (whitespace-sensitive). Current content:\n---\n${current}\n---`;
+        }
+        if (matches > 1) {
+          return `content_old_text appears ${matches} times in note "${existingNote.title}" — must be unique. Add more surrounding context to the substring. Current content:\n---\n${current}\n---`;
+        }
+        newContent = current.replace(contentOldText, contentText);
+      } else if (contentMode === "remove") {
+        if (!contentOldText) {
+          return `content_mode='remove' requires content_old_text.`;
+        }
+        const matches = countOccurrences(current, contentOldText);
+        if (matches === 0) {
+          return `content_old_text not found in note "${existingNote.title}". Current content:\n---\n${current}\n---`;
+        }
+        if (matches > 1) {
+          return `content_old_text appears ${matches} times in note "${existingNote.title}" — must be unique. Current content:\n---\n${current}\n---`;
+        }
+        newContent = current.replace(contentOldText, "");
+      } else {
+        return `Unknown content_mode "${contentMode}". Use "append", "replace", or "remove".`;
+      }
+    } else if (hasFullContent) {
+      // SLASH_COMMAND notes are user automations. Refuse full overwrites
+      // unless the model explicitly confirms — prevents the silent rewrite
+      // bug where "also add X" caused the entire command to be regenerated.
+      if (isSlashCommand && !replaceFullContent) {
+        return `Refusing to overwrite ${SLASH_COMMAND_TAG} note "${existingNote.title}" with full 'content' — this would wipe existing logic. Either: (A) use content_mode='append'/'replace'/'remove' for incremental edits, or (B) if the user explicitly asked to rewrite from scratch, set replace_full_content=true. Current content:\n---\n${existingNote.content || ""}\n---`;
+      }
+      newContent = content;
     }
 
     // Build update object
@@ -1134,8 +1271,8 @@ export async function updateNote(
       updateData.title = title;
     }
 
-    if (content !== undefined) {
-      updateData.content = content;
+    if (newContent !== undefined) {
+      updateData.content = newContent;
     }
 
     // Handle tags update
@@ -1227,7 +1364,7 @@ export async function deleteNote(
     // SlashCommand notes are user-owned (by_assistant=false) so they show in
     // the chat's "/" autocomplete, but Orion is allowed to delete them on
     // user request — symmetric with the create + update path.
-    const isSlashCommand = (existingNote.tags || []).includes("SlashCommand");
+    const isSlashCommand = (existingNote.tags || []).includes(SLASH_COMMAND_TAG);
 
     if (!existingNote.by_assistant && !isSlashCommand) {
       return `Permission denied: You can only delete AI-created notes. This note was created by the user.`;
@@ -1493,7 +1630,7 @@ async function createInitialMemory(
       by_assistant: true,
       is_archived: false,
       is_pinned: true,
-      tags: ["AGENT_MEMORY"],
+      tags: [AGENT_MEMORY_TAG],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -1539,7 +1676,7 @@ export async function updateMemory(
       .select("id, content")
       .eq("user_id", userId)
       .eq("calendar_id", calendarId)
-      .contains("tags", ["AGENT_MEMORY"])
+      .contains("tags", [AGENT_MEMORY_TAG])
       .single();
 
     if (fetchError && fetchError.code !== "PGRST116") {
@@ -2424,6 +2561,21 @@ export async function executeCustomTool(
           ? args.reminder_days
           : undefined;
         const tags = Array.isArray(args.tags) ? args.tags : undefined;
+        const contentMode = args.content_mode === "append" ||
+            args.content_mode === "replace" ||
+            args.content_mode === "remove"
+          ? args.content_mode
+          : undefined;
+        const contentText = typeof args.content_text === "string"
+          ? args.content_text
+          : undefined;
+        const contentOldText = typeof args.content_old_text === "string"
+          ? args.content_old_text
+          : undefined;
+        const replaceFullContent =
+          typeof args.replace_full_content === "boolean"
+            ? args.replace_full_content
+            : undefined;
         return await updateNote(
           supabase,
           userId,
@@ -2434,6 +2586,10 @@ export async function executeCustomTool(
           reminderDate,
           reminderDays,
           tags,
+          contentMode,
+          contentText,
+          contentOldText,
+          replaceFullContent,
         );
       }
 

@@ -7,6 +7,7 @@
  */
 
 import { log } from './supabase.ts';
+import { AGENT_MEMORY_TAG } from './noteTags.ts';
 
 /**
  * Fetch the AGENT_MEMORY note content for a user+calendar. Returns null when
@@ -30,7 +31,7 @@ export async function fetchAgentMemory(
   }
 
   try {
-    const url = `${supabaseUrl}/rest/v1/notes?user_id=eq.${userId}&calendar_id=eq.${calendarId}&tags=cs.{AGENT_MEMORY}&select=content&limit=1`;
+    const url = `${supabaseUrl}/rest/v1/notes?user_id=eq.${userId}&calendar_id=eq.${calendarId}&tags=cs.{${AGENT_MEMORY_TAG}}&select=content&limit=1`;
     const response = await fetch(url, {
       headers: {
         'apikey': serviceKey,

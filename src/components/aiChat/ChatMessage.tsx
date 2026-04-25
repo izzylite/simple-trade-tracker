@@ -16,7 +16,6 @@ import {
   useTheme,
   alpha
 } from '@mui/material';
-import AnimatedText from './AnimatedText';
 import HtmlMessageRenderer from './HtmlMessageRenderer';
 import CitationsSection from './CitationsSection';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -44,7 +43,6 @@ interface ChatMessageProps {
   message: ChatMessageType;
   showTimestamp?: boolean;
   isLatestMessage?: boolean;
-  enableAnimation?: boolean;
   onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void;
   onEventClick?: (event: EconomicEvent) => void;
   onNoteClick?: (noteId: string) => void;
@@ -57,7 +55,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
   showTimestamp = true,
   isLatestMessage = false,
-  enableAnimation = true,
   onTradeClick,
   onEventClick,
   onNoteClick,
@@ -223,12 +220,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           onEventClick={onEventClick}
           onNoteClick={onNoteClick}
           trades={trades}
-        />
-      ) : isAssistant && enableAnimation && isLatestMessage ? (
-        <AnimatedText
-          text={message.content}
-          speed={200}
-          isAnimating={message.status === 'received'}
         />
       ) : isUser && renderUserContentWithTagChips ? (
         <Typography

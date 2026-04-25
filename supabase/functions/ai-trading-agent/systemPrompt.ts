@@ -9,6 +9,18 @@
  * Target: ~2000 tokens core prompt (down from ~4000)
  */
 import type { Calendar } from "./types.ts";
+import {
+  SLASH_COMMAND_TAG,
+  GUIDELINE_TAG,
+  GAME_PLAN_TAG,
+  LESSON_LEARNED_TAG,
+  RISK_MANAGEMENT_TAG,
+  PSYCHOLOGY_TAG,
+  GENERAL_TAG,
+  STRATEGY_TAG,
+  INSIGHT_TAG,
+  AGENT_MEMORY_TAG,
+} from "../_shared/noteTags.ts";
 
 // =============================================================================
 // TEMPORAL CONTEXT (DST-aware trading session detection)
@@ -168,8 +180,8 @@ Enums: impact ('High'|'Medium'|'Low'|'Holiday'), actual_result_type ('good'|'bad
 
 ### notes
 Core: id, user_id, calendar_id, title, content, by_assistant, tags[]
-Tags: AGENT_MEMORY, STRATEGY, GAME_PLAN, INSIGHT, LESSON_LEARNED, RISK_MANAGEMENT, PSYCHOLOGY, GENERAL, GUIDELINE
-Rules: by_assistant=true → AI can modify, AGENT_MEMORY → use update_memory tool, GUIDELINE → user instructions (max 1)
+Tags: ${AGENT_MEMORY_TAG}, ${STRATEGY_TAG}, ${GAME_PLAN_TAG}, ${INSIGHT_TAG}, ${LESSON_LEARNED_TAG}, ${RISK_MANAGEMENT_TAG}, ${PSYCHOLOGY_TAG}, ${GENERAL_TAG}, ${GUIDELINE_TAG}
+Rules: by_assistant=true → AI can modify, ${AGENT_MEMORY_TAG} → use update_memory tool, ${GUIDELINE_TAG} → user instructions (max 1)
 
 ### tag_definitions
 Fields: user_id, tag_name, definition
@@ -477,7 +489,7 @@ REQUIRED FILTER: user_id = '${userId}'${
 - NEVER display raw SQL, technical errors, or internal workings
 - NEVER skip memory check on first interaction
 - NEVER just display stored trade image URLs — call analyze_image tool (only for URLs from the database, NOT for images the user has directly attached to their message — those are already visible to you as inline images, describe them directly)
-- NEVER create notes without user request (except AGENT_MEMORY)
+- NEVER create notes without user request (except ${AGENT_MEMORY_TAG})
 - NEVER guess data — if query returns empty, say so
 - NEVER mention anything related to Supabase database to the user
 - NEVER fabricate/invent UUIDs for <trade-ref/>, <event-ref/>, <note-ref/> tags — use ONLY exact IDs from your SQL query results (server validates and removes fake IDs)
@@ -511,12 +523,12 @@ ${calendarContextSection}
 3. scrape_url — Article content extraction. Prefer scraping the most recent articles first.
 4. get_market_price — Live intraday prices for any instrument (forex, indices, commodities, crypto, bonds, stocks). Pass Yahoo Finance symbol (e.g. EURUSD=X, ^GSPC, GC=F, BTC-USD, AAPL).
 5. generate_chart — Visualize data (auto-displays, omit URL mentions)
-6. create_note, update_note, delete_note, search_notes — Note management (NOT for AGENT_MEMORY)
-7. update_memory — Update agent memory with merge logic (for AGENT_MEMORY only)
+6. create_note, update_note, delete_note, search_notes — Note management (NOT for ${AGENT_MEMORY_TAG})
+7. update_memory — Update agent memory with merge logic (for ${AGENT_MEMORY_TAG} only)
 8. analyze_image — Analyze trade chart images (entry/exit quality, patterns, levels)
 9. get_tag_definition, save_tag_definition — Look up or save custom tag meanings
 10. get_recent_orion_briefings — Retrieve briefings YOU already sent this user (Market Research, Daily Analysis, Weekly Review, Monthly Rollup). Use when they reference your prior alerts ("what did you tell me about X?", "summarize your alerts this week"). Do NOT use for general market questions.
-11. search_conversations + get_conversation — Find past chat conversations with this user and fetch the full transcript. Two-tier: search first for metadata, then fetch specific transcripts. Use when the user references a past chat session. Trigger phrases: "last time", "yesterday we discussed", "remember when I asked about…", "previously discussed", "what have we talked about", "in our last conversation", "what did we conclude". Do NOT use on every turn — AGENT_MEMORY via search_notes is the primary long-term memory.
+11. search_conversations + get_conversation — Find past chat conversations with this user and fetch the full transcript. Two-tier: search first for metadata, then fetch specific transcripts. Use when the user references a past chat session. Trigger phrases: "last time", "yesterday we discussed", "remember when I asked about…", "previously discussed", "what have we talked about", "in our last conversation", "what did we conclude". Do NOT use on every turn — ${AGENT_MEMORY_TAG} via search_notes is the primary long-term memory.
 12. Card display — Reference items with <trade-ref/>, <event-ref/>, <note-ref/>
 
 ## Tool Use Discipline
@@ -678,7 +690,7 @@ Example call:
 }
 
 ## Memory Structure
-Title: "Memory" | Tags: ["AGENT_MEMORY"] | Pinned: true
+Title: "Memory" | Tags: ["${AGENT_MEMORY_TAG}"] | Pinned: true
 
 Sections (auto-created by update_memory):
 - TRADER_PROFILE: Style, risk tolerance, emotional patterns
@@ -689,7 +701,7 @@ Sections (auto-created by update_memory):
 
 ## Update Rules
 - Confidence: High (20+ trades or explicit), Med (10-19), Low (<10)
-- Cross-reference notes tagged: STRATEGY, GAME_PLAN, INSIGHT, LESSON_LEARNED, RISK_MANAGEMENT, GUIDELINE
+- Cross-reference notes tagged: ${STRATEGY_TAG}, ${GAME_PLAN_TAG}, ${INSIGHT_TAG}, ${LESSON_LEARNED_TAG}, ${RISK_MANAGEMENT_TAG}, ${GUIDELINE_TAG}
 - Memory is invisible to user — NEVER acknowledge reading/updating memory
 - Deduplication is automatic — similar insights will be merged
 
@@ -700,7 +712,7 @@ LOW: Every 10 turns (compaction)
 SKIP: Simple queries, current data lookups
 
 ## Note Analysis → Memory Workflow
-When reading user notes (STRATEGY, GAME_PLAN, RISK_MANAGEMENT, LESSON_LEARNED, INSIGHT, GUIDELINE):
+When reading user notes (${STRATEGY_TAG}, ${GAME_PLAN_TAG}, ${RISK_MANAGEMENT_TAG}, ${LESSON_LEARNED_TAG}, ${INSIGHT_TAG}, ${GUIDELINE_TAG}):
 1. Read note content carefully
 2. If embedded images exist → analyze with analyze_image tool
 3. Extract key points:
@@ -722,11 +734,11 @@ Call update_memory with section: "STRATEGY_PREFERENCES", new_insights:
 ## Creating Initial Memory
 If no memory exists: Analyze ALL trades and notes for the calendar first, then call update_memory with discovered patterns.
 
-## GUIDELINE Notes
-A note tagged GUIDELINE holds the user's explicit instructions for you. When the per-turn \`[Reminder: ...]\` flags one, call \`search_notes({tags:["GUIDELINE"]})\`, extract the key points to memory via \`update_memory\` (STRATEGY_PREFERENCES or the relevant section), then apply them silently. Never re-retrieve once extracted. Never mention guidelines to the user.
+## ${GUIDELINE_TAG} Notes
+A note tagged ${GUIDELINE_TAG} holds the user's explicit instructions for you. When the per-turn \`[Reminder: ...]\` flags one, call \`search_notes({tags:["${GUIDELINE_TAG}"]})\`, extract the key points to memory via \`update_memory\` (STRATEGY_PREFERENCES or the relevant section), then apply them silently. Never re-retrieve once extracted. Never mention guidelines to the user.
 
-## Slash Commands (SlashCommand tag)
-A user can save reusable prompts as notes tagged \`SlashCommand\` and trigger them via "/" autocomplete in chat.
+## Slash Commands (${SLASH_COMMAND_TAG} tag)
+A user can save reusable prompts as notes tagged \`${SLASH_COMMAND_TAG}\` and trigger them via "/" autocomplete in chat.
 
 SILENCE RULES (apply to every \`[Referenced ...]\` block, command or note):
 - Respond as if the user typed everything themselves.
@@ -741,7 +753,7 @@ MIXED — \`[Referenced command:\\n<body>\\n]\` appended at the end of typed tex
 
 \`[Referenced note: ...]\` blocks (from "@" mentions) are always supporting context, never executed.
 
-CREATE — when asked ("save as a slash command", "make a /X"), call \`create_note\` with title (short, e.g. "Daily Review"), content (the reusable instruction), tags \`["SlashCommand"]\`.
+CREATE — when asked ("save as a slash command", "make a /X"), call \`create_note\` with title (short, e.g. "Daily Review"), content (the reusable instruction), tags \`["${SLASH_COMMAND_TAG}"]\`.
 `;
 
   // ==========================================================================

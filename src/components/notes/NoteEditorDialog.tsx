@@ -91,7 +91,20 @@ import ImagePickerDialog from '../heroImage/ImagePickerDialog';
 import ConfirmationDialog from '../common/ConfirmationDialog';
 import { useAuthState } from '../../contexts/AuthStateContext';
 import * as notesService from '../../services/notesService';
-import { Note, ReminderType, DayAbbreviation } from '../../types/note';
+import {
+  Note,
+  ReminderType,
+  DayAbbreviation,
+  SLASH_COMMAND_TAG,
+  GUIDELINE_TAG,
+  GAME_PLAN_TAG,
+  LESSON_LEARNED_TAG,
+  RISK_MANAGEMENT_TAG,
+  PSYCHOLOGY_TAG,
+  GENERAL_TAG,
+  STRATEGY_TAG,
+  INSIGHT_TAG,
+} from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { logger } from '../../utils/logger';
 import { getTagColor, isGroupedTag, getTagName, getTagGroup } from '../../utils/tagColors';
@@ -117,15 +130,15 @@ export interface TagInfo {
 }
 
 export const DEFAULT_NOTE_TAGS_MAP: Record<string, TagInfo> = {
-  'STRATEGY': { label: 'Strategy', subtitle: 'Long-term trading approach and rules', Icon: StrategyIcon },
-  'GAME_PLAN': { label: 'Game Plan', subtitle: 'Specific plan for the upcoming session', Icon: GamePlanIcon },
-  'INSIGHT': { label: 'Insight', subtitle: 'Market observations and patterns', Icon: InsightIcon },
-  'LESSON_LEARNED': { label: 'Lesson Learned', subtitle: 'Review of mistakes and successes', Icon: LessonIcon },
-  'GENERAL': { label: 'General', subtitle: 'General notes and thoughts', Icon: GeneralIcon },
-  'RISK_MANAGEMENT': { label: 'Risk Management', subtitle: 'Position sizing and stop-loss rules', Icon: RiskIcon },
-  'PSYCHOLOGY': { label: 'Psychology', subtitle: 'Mental state and emotional control', Icon: PsychologyIcon },
-  'GUIDELINE': { label: 'Guideline', subtitle: 'Instructions for Orion (max 1)', Icon: GuidelineIcon },
-  'SlashCommand': { label: 'Slash Command', subtitle: 'Reusable AI prompt — trigger via "/" in chat', Icon: SlashCommandIcon },
+  [STRATEGY_TAG]: { label: 'Strategy', subtitle: 'Long-term trading approach and rules', Icon: StrategyIcon },
+  [GAME_PLAN_TAG]: { label: 'Game Plan', subtitle: 'Specific plan for the upcoming session', Icon: GamePlanIcon },
+  [INSIGHT_TAG]: { label: 'Insight', subtitle: 'Market observations and patterns', Icon: InsightIcon },
+  [LESSON_LEARNED_TAG]: { label: 'Lesson Learned', subtitle: 'Review of mistakes and successes', Icon: LessonIcon },
+  [GENERAL_TAG]: { label: 'General', subtitle: 'General notes and thoughts', Icon: GeneralIcon },
+  [RISK_MANAGEMENT_TAG]: { label: 'Risk Management', subtitle: 'Position sizing and stop-loss rules', Icon: RiskIcon },
+  [PSYCHOLOGY_TAG]: { label: 'Psychology', subtitle: 'Mental state and emotional control', Icon: PsychologyIcon },
+  [GUIDELINE_TAG]: { label: 'Guideline', subtitle: 'Instructions for Orion (max 1)', Icon: GuidelineIcon },
+  [SLASH_COMMAND_TAG]: { label: 'Slash Command', subtitle: 'Reusable AI prompt — trigger via "/" in chat', Icon: SlashCommandIcon },
 };
 
 // Helper to get display label for a tag (returns original if not a default tag)
@@ -150,6 +163,7 @@ interface NoteEditorDialogProps {
   onDelete?: (noteId: string) => void;
   weekKey?: string; // If set, this is a week note
   gamePlanDay?: DayAbbreviation; // If set, pre-fill as game plan template
+  initialTags?: string[]; // If set (and no `note`), pre-fill tags on a new note
   availableTradeTags?: string[]; // Trade tags from calendar for inline insertion
   calendarNotes?: Array<{ id: string; title: string }>; // Notes from calendar for /note linking
   pinnedEvents?: Array<{
@@ -185,6 +199,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   onDelete,
   weekKey,
   gamePlanDay,
+  initialTags,
   availableTradeTags = [],
   calendarNotes,
   pinnedEvents,
@@ -265,7 +280,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
     const checkGuideline = async () => {
       if (open && user?.id) {
         try {
-          const guidelineNotes = await notesService.getNotesByTag(user.id, 'GUIDELINE');
+          const guidelineNotes = await notesService.getNotesByTag(user.id, GUIDELINE_TAG);
           const existingGuideline = guidelineNotes.find(n => n.id !== initialNote?.id);
           setHasExistingGuideline(!!existingGuideline);
         } catch (error) {
@@ -320,7 +335,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           setIsReminderActive(true);
           setIsReminderExpanded(false);
           setNoteColor(undefined);
-          setTags(['GAME_PLAN']);
+          setTags([GAME_PLAN_TAG]);
           setIsTagsExpanded(false);
         } else {
           setTitle(weekKey ? `Week of ${weekKey}` : '');
@@ -332,8 +347,8 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           setIsReminderActive(false);
           setIsReminderExpanded(true);
           setNoteColor(undefined);
-          setTags([]);
-          setIsTagsExpanded(false);
+          setTags(initialTags ?? []);
+          setIsTagsExpanded(!!initialTags && initialTags.length > 0);
         }
 
         setNewTagInput('');
@@ -1515,7 +1530,7 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
                   size="small"
                   options={defaultTags.filter(t => {
                     if (tags.includes(t)) return false;
-                    if (t === 'GUIDELINE' && hasExistingGuideline) return false;
+                    if (t === GUIDELINE_TAG && hasExistingGuideline) return false;
                     return true;
                   })}
                   getOptionLabel={(option) => getTagDisplayLabel(option)}

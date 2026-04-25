@@ -11,7 +11,8 @@ import {
 } from '../_shared/orionMcp.ts';
 import { fetchAgentMemory } from '../_shared/orionMemory.ts';
 import { fetchGuidelineReminder } from '../_shared/orionGuideline.ts';
-import { formatErrorResponse, formatResponseWithHtmlAndCitations } from './formatters.ts';
+import { GUIDELINE_TAG } from '../_shared/noteTags.ts';
+import { classifyProviderError, formatErrorResponse, formatResponseWithHtmlAndCitations } from './formatters.ts';
 import type { AgentRequest, ToolCall } from './types.ts';
 import {
   type GeminiFunctionDeclaration,
@@ -1372,8 +1373,13 @@ function handleStreamingRequest(
 
     } catch (error) {
       log(`Error in streaming handler: ${error}`, 'error');
+      const rawMessage = error instanceof Error ? error.message : 'Unknown error';
+      const classified = classifyProviderError(rawMessage);
       await sendSSE(writer, 'error', {
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: classified.userMessage,
+        errorType: classified.errorType,
+        details: rawMessage,
+        retryAfter: classified.retryAfterSeconds,
       });
     } finally {
       await writer.close();
@@ -1524,9 +1530,9 @@ Deno.serve(async (req: Request) => {
     //     entirely when the user has no guideline note or the body is empty.
     const temporalPrefix = `[Current time — ${buildTemporalContext()}]\n\n`;
     const guidelineReminderPrefix = guidelineReminder
-      ? `[Reminder: user has an active GUIDELINE note titled "${guidelineReminder.title}". ` +
+      ? `[Reminder: user has an active ${GUIDELINE_TAG} note titled "${guidelineReminder.title}". ` +
         `If this turn involves strategy, risk, or preference decisions and the relevant rule ` +
-        `is not already in your memory, call search_notes({tags:["GUIDELINE"]}) before answering. ` +
+        `is not already in your memory, call search_notes({tags:["${GUIDELINE_TAG}"]}) before answering. ` +
         `Do not mention this reminder to the user.]\n\n`
       : '';
     // If the user's message body is ONLY a [Referenced command:] block

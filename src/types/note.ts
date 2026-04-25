@@ -114,8 +114,37 @@ export interface ReminderConfig {
 }
 
 /**
- * Reserved tag string that marks a note as a slash-command (a reusable Orion prompt).
- * Only special in: (a) the chat input's `/` popup filter, (b) the Orion system prompt
- * contract. Otherwise treated like any user-applied tag.
+ * Reserved system tag values used by the app/Orion to mark notes with
+ * built-in semantics (UI tag picker, "/" command popup, GUIDELINE reminder
+ * injection, etc.). These are the single source of truth — never type the
+ * raw string in components, services, or edge-function code.
+ *
+ * The matching set for the Deno edge functions lives in
+ * `supabase/functions/_shared/noteTags.ts`. Keep both in sync.
  */
-export const SLASH_COMMAND_TAG = 'SlashCommand';
+export const SLASH_COMMAND_TAG = 'SLASH_COMMAND';
+export const GUIDELINE_TAG = 'GUIDELINE';
+export const GAME_PLAN_TAG = 'GAME_PLAN';
+export const LESSON_LEARNED_TAG = 'LESSON_LEARNED';
+export const RISK_MANAGEMENT_TAG = 'RISK_MANAGEMENT';
+export const PSYCHOLOGY_TAG = 'PSYCHOLOGY';
+export const GENERAL_TAG = 'GENERAL';
+export const STRATEGY_TAG = 'STRATEGY';
+export const INSIGHT_TAG = 'INSIGHT';
+export const AGENT_MEMORY_TAG = 'AGENT_MEMORY';
+
+/**
+ * All reserved system tag values. Useful for "is this a system tag?" checks.
+ */
+export const SYSTEM_NOTE_TAGS = [
+  SLASH_COMMAND_TAG,
+  GUIDELINE_TAG,
+  GAME_PLAN_TAG,
+  LESSON_LEARNED_TAG,
+  RISK_MANAGEMENT_TAG,
+  PSYCHOLOGY_TAG,
+  GENERAL_TAG,
+  STRATEGY_TAG,
+  INSIGHT_TAG,
+  AGENT_MEMORY_TAG,
+] as const;

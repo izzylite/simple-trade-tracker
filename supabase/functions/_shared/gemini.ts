@@ -172,7 +172,9 @@ export async function callGemini(params: CallGeminiParams): Promise<CallGeminiRe
       status: response.status,
       body: errorText.substring(0, 500),
     });
-    throw new Error(`Gemini API error: ${response.status}`);
+    // Include status + body so callers (formatErrorResponse / classifyProviderError)
+    // can classify quota / api-key errors without having to re-fetch.
+    throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();

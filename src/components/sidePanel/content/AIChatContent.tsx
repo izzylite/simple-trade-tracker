@@ -56,7 +56,9 @@ import { useAIChat, UseAIChatReturn } from '../../../hooks/useAIChat';
 import EconomicEventDetailDialog
   from '../../economicCalendar/EconomicEventDetailDialog';
 import NoteEditorDialog from '../../notes/NoteEditorDialog';
-import { Note } from '../../../types/note';
+import { Note, SLASH_COMMAND_TAG, GUIDELINE_TAG } from '../../../types/note';
+import * as notesService from '../../../services/notesService';
+import type { SystemCommand } from '../../aiChat/AIChatMentionInput';
 import { TradeOperationsProps } from '../../../types/tradeOperations';
 import { Z_INDEX } from '../../../styles/zIndex';
 
@@ -179,6 +181,17 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
 
   // Local UI state
   const [showHistoryView, setShowHistoryView] = useState(false);
+
+  // Dismiss any open slash/mention popup in the chat input when sliding to the
+  // history view, or when the chat panel itself is dismissed (isActive=false,
+  // e.g. user opens the Notes panel). The Popper renders into a portal, so it
+  // outlives any visibility change to the chat content unless we close it
+  // explicitly.
+  useEffect(() => {
+    if (showHistoryView || !isActive) {
+      chatInterfaceRef.current?.closeMention?.();
+    }
+  }, [showHistoryView, isActive]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] =
     useState<string | null>(null);
@@ -195,6 +208,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   // Note editor dialog state
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
+  // When set, NoteEditorDialog opens in "create new note" mode with these
+  // tags pre-selected. Used by the "New Slash Command" system command.
+  const [newNoteInitialTags, setNewNoteInitialTags] = useState<string[] | null>(null);
 
   // Filter conversations based on search query + pinned filter
   const filteredConversations = useMemo(() => {
@@ -253,9 +269,77 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   // UI EVENT HANDLERS
   // =====================================================
 
+  // System slash commands. Locally handled — never sent to Orion. The
+  // "Orion Guidelines" command is gated on the calendar actually having a
+  // GUIDELINE-tagged note (calendar.notes is a JSONB mirror with tags).
+  const hasGuidelineNote = useMemo(
+    () => (calendar?.notes ?? []).some(
+      n => (n.tags ?? []).includes(GUIDELINE_TAG)
+    ),
+    [calendar?.notes]
+  );
+
+  const systemCommands = useMemo<SystemCommand[]>(() => {
+    const commands: SystemCommand[] = [];
+    if (hasGuidelineNote) {
+      commands.push({
+        id: 'open-guidelines',
+        title: 'Orion Guidelines',
+        subtitle: 'Open the GUIDELINE note for this calendar',
+      });
+    }
+    if (messages.length > 0) {
+      commands.push({
+        id: 'clear-chat',
+        title: 'Clear Chat',
+        subtitle: 'Start a fresh conversation',
+      });
+    }
+    commands.push({
+      id: 'new-slash-command',
+      title: 'New Slash Command',
+      subtitle: 'Create a reusable Orion prompt',
+    });
+    return commands;
+  }, [hasGuidelineNote, messages.length]);
+
+  const handleSystemCommand = async (id: string) => {
+    if (id === 'clear-chat') {
+      setShowHistoryView(false);
+      await startNewChat();
+      return;
+    }
+    if (id === 'open-guidelines') {
+      const stub = (calendar?.notes ?? []).find(
+        n => (n.tags ?? []).includes(GUIDELINE_TAG)
+      );
+      if (!stub) return;
+      // calendar.notes only has {id, title, tags} — fetch the full note before
+      // opening the editor.
+      try {
+        const full = await notesService.getNote(stub.id);
+        if (full) {
+          setSelectedNote(full);
+          setNoteEditorOpen(true);
+        } else {
+          logger.warn('Guideline note not found:', stub.id);
+        }
+      } catch (err) {
+        logger.error('Failed to load guideline note:', err);
+      }
+      return;
+    }
+    if (id === 'new-slash-command') {
+      setSelectedNote(null);
+      setNewNoteInitialTags([SLASH_COMMAND_TAG]);
+      setNoteEditorOpen(true);
+      return;
+    }
+  };
+
   const handleNewChat = async () => {
-    await startNewChat();
     setShowHistoryView(false);
+    await startNewChat();
   };
 
   const handleSelectConversation = (conversation: AIConversation) => {
@@ -511,6 +595,8 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
               }}
               isReadOnly={isReadOnly}
               messageLimit={50}
+              systemCommands={systemCommands}
+              onSystemCommand={handleSystemCommand}
             />
           </Box>
 
@@ -924,14 +1010,16 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
       </Dialog>
 
       {/* Note Editor Dialog */}
-      {noteEditorOpen && selectedNote && calendar && (
+      {noteEditorOpen && calendar && (selectedNote || newNoteInitialTags) && (
         <NoteEditorDialog
           open={noteEditorOpen}
           onClose={() => {
             setNoteEditorOpen(false);
             setSelectedNote(null);
+            setNewNoteInitialTags(null);
           }}
-          note={selectedNote}
+          note={selectedNote || undefined}
+          initialTags={newNoteInitialTags || undefined}
           calendarId={calendar.id}
           availableTradeTags={calendar.tags || []}
           calendarNotes={calendar.notes}
@@ -972,6 +1060,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
             );
             setNoteEditorOpen(false);
             setSelectedNote(null);
+            setNewNoteInitialTags(null);
           }}
         />
       )}

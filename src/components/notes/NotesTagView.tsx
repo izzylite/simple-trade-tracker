@@ -112,6 +112,7 @@ export const NotesTagView: React.FC<NotesTagViewProps> = ({
                   display: 'block',
                   px: 1,
                   pb: 1,
+                  pt: 1,
                   fontStyle: 'italic',
                 }}
               >

@@ -12,6 +12,7 @@
  */
 
 import { log } from './supabase.ts';
+import { GUIDELINE_TAG } from './noteTags.ts';
 
 export interface GuidelineReminder {
   title: string;
@@ -54,7 +55,7 @@ export async function fetchGuidelineReminder(
     const url =
       `${supabaseUrl}/rest/v1/notes` +
       `?user_id=eq.${userId}` +
-      `&tags=cs.{GUIDELINE}` +
+      `&tags=cs.{${GUIDELINE_TAG}}` +
       `&or=(calendar_id.eq.${calendarId},calendar_id.is.null)` +
       `&select=title,content&limit=1`;
 

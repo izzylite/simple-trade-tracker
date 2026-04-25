@@ -4,7 +4,7 @@
  */
 
 import { AbstractBaseRepository, RepositoryConfig, RepositoryResult } from "./BaseRepository";
-import { Note } from "../../../types/note";
+import { Note, GAME_PLAN_TAG } from "../../../types/note";
 import { logger } from "../../../utils/logger";
 import { supabase } from "../../../config/supabase";
 
@@ -266,7 +266,7 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
         .eq("reminder_type", "weekly")
         .eq("is_reminder_active", true)
         .eq("is_archived", false)
-        .contains("tags", ["GAME_PLAN"]);
+        .contains("tags", [GAME_PLAN_TAG]);
 
       if (error) {
         logger.error("Error finding game plan notes:", error);

@@ -8,7 +8,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ChatMessage as ChatMessageType,
-  ChatError,
   AIConversation,
   AttachedImage
 } from '../types/aiChat';
@@ -20,6 +19,7 @@ import {
   ConversationPaginationOptions
 } from '../services/repository/repositories/ConversationRepository';
 import { logger } from '../utils/logger';
+import { supabase } from '../config/supabase';
 
 const CONVERSATIONS_PAGE_SIZE = 15;
 
@@ -93,7 +93,6 @@ export interface UseAIChatReturn {
 
   // Utilities
   getWelcomeMessage: () => ChatMessageType;
-  parseQuotaError: (errorMessage: string) => { isQuotaError: boolean; userMessage: string; retryDelay?: string };
 }
 
 const MESSAGE_LIMIT_DEFAULT = 50;
@@ -127,70 +126,66 @@ export function useAIChat({
   const activeRequestRef = useRef<{ userId: string; aiId: string } | null>(null);
   const messageUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingTextRef = useRef<string>('');
+  const embedChannelIdRef = useRef(
+    `ai-chat-embeds-pg-${Math.random().toString(36).slice(2, 8)}`
+  );
 
   // Check message limit whenever messages change
   useEffect(() => {
     setIsAtMessageLimit(messages.length >= messageLimit);
   }, [messages.length, messageLimit]);
 
-  /**
-   * Parse quota/API key errors from Gemini API and return user-friendly message
-   */
-  const parseQuotaError = useCallback((errorMessage: string): { isQuotaError: boolean; userMessage: string; retryDelay?: string } => {
-    let errorCode = '';
-    let errorReason = '';
+  // Live-patch embeddedNotes / embeddedTrades snapshots inside chat messages
+  // when the underlying row changes. Without this, a chip rendered in turn N
+  // keeps showing pre-update content even after Orion edits the row in turn
+  // N+1, and the detail dialog opens stale.
+  useEffect(() => {
+    if (!userId) return;
 
-    try {
-      const jsonMatch = errorMessage.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const errorJson = JSON.parse(jsonMatch[0]);
-        if (errorJson.error) {
-          errorCode = String(errorJson.error.code || '');
-          errorReason = errorJson.error.details?.[0]?.reason || '';
-        }
-      }
-    } catch {
-      // If JSON parsing fails, use the original message
-    }
+    const patchEmbed = (
+      key: 'embeddedNotes' | 'embeddedTrades',
+      eventType: string,
+      newRow: { id?: string } | undefined,
+      oldRow: { id?: string } | undefined,
+    ) => {
+      const changedId = newRow?.id || oldRow?.id;
+      if (!changedId) return;
+      setMessages(prev => {
+        let touched = false;
+        const next = prev.map(msg => {
+          const embedded = (msg as any)[key] as Record<string, any> | undefined;
+          if (!embedded || !embedded[changedId]) return msg;
+          touched = true;
+          const nextEmbedded = { ...embedded };
+          if (eventType === 'DELETE') {
+            delete nextEmbedded[changedId];
+          } else if (newRow) {
+            nextEmbedded[changedId] = { ...embedded[changedId], ...newRow };
+          }
+          return { ...msg, [key]: nextEmbedded };
+        });
+        return touched ? next : prev;
+      });
+    };
 
-    const isApiKeyError = errorMessage.toLowerCase().includes('api key expired') ||
-                          errorMessage.toLowerCase().includes('api key invalid') ||
-                          errorMessage.toLowerCase().includes('api_key_invalid') ||
-                          errorReason === 'API_KEY_INVALID' ||
-                          errorCode === '400';
+    const channel = supabase
+      .channel(embedChannelIdRef.current)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notes' },
+        (payload: any) => patchEmbed('embeddedNotes', payload.eventType, payload.new, payload.old)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'trades' },
+        (payload: any) => patchEmbed('embeddedTrades', payload.eventType, payload.new, payload.old)
+      )
+      .subscribe();
 
-    const isQuotaError = errorMessage.toLowerCase().includes('quota') ||
-                         errorMessage.includes('429') ||
-                         errorMessage.toUpperCase().includes('RESOURCE_EXHAUSTED') ||
-                         errorMessage.toLowerCase().includes('rate limit');
-
-    if (!isQuotaError && !isApiKeyError) {
-      return { isQuotaError: false, userMessage: errorMessage };
-    }
-
-    const retryMatch = errorMessage.match(/retry in (\d+\.?\d*)\s*s/i) ||
-                       errorMessage.match(/retryDelay["\s:]+(\d+)s/i);
-    const retryDelay = retryMatch ? retryMatch[1] : undefined;
-
-    let userMessage = '';
-
-    if (isApiKeyError) {
-      userMessage = '⚠️ **API Key Error**\n\n';
-      userMessage += 'The AI service encountered an authentication error. ';
-      userMessage += 'Please try again later or contact support.\n';
-    } else {
-      userMessage = '⚠️ **API Quota Exceeded**\n\n';
-      userMessage += 'The AI service has reached its usage limit.\n\n';
-      userMessage += '**What you can do:**\n';
-      userMessage += '• Wait for the quota to reset (usually within a few minutes)\n';
-      if (retryDelay) {
-        const seconds = Math.ceil(parseFloat(retryDelay));
-        userMessage += `\n*You can retry in ${seconds} seconds*`;
-      }
-    }
-
-    return { isQuotaError: true, userMessage, retryDelay };
-  }, []);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   /**
    * Load conversations - either trade-specific or calendar-level
@@ -362,14 +357,14 @@ export function useAIChat({
    * Start a new chat
    */
   const startNewChat = useCallback(async () => {
-    if (messages.length > 0) {
-      await saveCurrentConversation(messages);
-    }
-
+    const msgs = messages;  
     setMessages([]);
     setCurrentConversationId(null);
     setIsAtMessageLimit(false);
     setEditingMessageId(null);
+     if (msgs.length > 0) {
+      await saveCurrentConversation(msgs);
+    }
     logger.log('Started new conversation');
   }, [messages, saveCurrentConversation]);
 
@@ -743,25 +738,19 @@ export function useAIChat({
 
       logger.error('Error sending message to Supabase AI agent:', error);
 
-      const errorDetails = error instanceof Error ? error.message : 'Unknown error';
-      const quotaErrorInfo = parseQuotaError(errorDetails);
-
-      const chatError: ChatError = {
-        type: quotaErrorInfo.isQuotaError ? 'rate_limit' : 'network_error',
-        message: quotaErrorInfo.isQuotaError ? 'API Quota Exceeded' : 'Failed to send message',
-        details: errorDetails,
-        retryable: true
-      };
+      // Backend's formatErrorResponse + classifyProviderError already produced
+      // the user-friendly markdown — error.message is safe to render verbatim.
+      const userMessage = error instanceof Error
+        ? error.message
+        : 'Sorry, I encountered an error processing your message. Please try again.';
 
       const errorMessage: ChatMessageType = {
         id: aiMessageId,
         role: 'assistant',
-        content: quotaErrorInfo.isQuotaError
-          ? quotaErrorInfo.userMessage
-          : 'Sorry, I encountered an error processing your message. Please try again.',
+        content: userMessage,
         timestamp: new Date(),
         status: 'error',
-        error: chatError.message
+        error: userMessage,
       };
 
       if (aiMessageAdded) {
@@ -784,7 +773,7 @@ export function useAIChat({
       setIsTyping(false);
       setToolExecutionStatus('');
     }
-  }, [userId, calendar, trade, messages, editingMessageId, isLoading, parseQuotaError, saveCurrentConversation]);
+  }, [userId, calendar, trade, messages, editingMessageId, isLoading, saveCurrentConversation]);
 
   /**
    * Set up message for editing and return its content and images
@@ -898,7 +887,6 @@ What would you like to know about your trading?`,
 
     // Utilities
     getWelcomeMessage,
-    parseQuotaError
   };
 }
 

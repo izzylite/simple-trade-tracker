@@ -166,18 +166,113 @@ export function formatAgentResponse(
 }
 
 /**
+ * Classify a provider error and produce a user-friendly markdown message.
+ * Centralises what used to live in the frontend (parseQuotaError) so the
+ * client can render error.message verbatim without parsing JSON or matching
+ * provider-specific strings.
+ */
+export function classifyProviderError(rawMessage: string): {
+  errorType: 'rate_limit' | 'api_key_invalid' | 'provider_error' | 'network_error';
+  userMessage: string;
+  retryAfterSeconds?: number;
+} {
+  const lower = rawMessage.toLowerCase();
+
+  // Pull retry hint if Gemini included one in the error JSON.
+  let retryAfterSeconds: number | undefined;
+  const retryMatch =
+    rawMessage.match(/retry in (\d+\.?\d*)\s*s/i) ||
+    rawMessage.match(/retryDelay["\s:]+(\d+)s/i);
+  if (retryMatch) {
+    const seconds = parseFloat(retryMatch[1]);
+    if (!Number.isNaN(seconds)) retryAfterSeconds = Math.ceil(seconds);
+  }
+
+  // Inspect parsed JSON if the provider embedded one in the message.
+  let errorReason = '';
+  let errorCode = '';
+  try {
+    const jsonMatch = rawMessage.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed?.error) {
+        errorCode = String(parsed.error.code || '');
+        errorReason = parsed.error.details?.[0]?.reason || '';
+      }
+    }
+  } catch {
+    // ignore — fall back to substring matches below
+  }
+
+  const isApiKeyError =
+    lower.includes('api key expired') ||
+    lower.includes('api key invalid') ||
+    lower.includes('api_key_invalid') ||
+    errorReason === 'API_KEY_INVALID';
+
+  const isQuotaError =
+    lower.includes('quota') ||
+    lower.includes(' 429') ||
+    lower.includes(':429') ||
+    lower.includes('error: 429') ||
+    lower.includes('resource_exhausted') ||
+    lower.includes('rate limit');
+
+  if (isApiKeyError) {
+    return {
+      errorType: 'api_key_invalid',
+      userMessage:
+        'The AI service encountered an authentication error. Please try again later or contact support.',
+    };
+  }
+
+  if (isQuotaError) {
+    let msg = 'The AI service has reached its usage limit.\n\n';
+    msg += '**What you can do:**\n';
+    msg += '- Wait for the quota to reset (usually within a few minutes)';
+    if (retryAfterSeconds) {
+      msg += `\n\n*You can retry in ${retryAfterSeconds} seconds.*`;
+    }
+    return { errorType: 'rate_limit', userMessage: msg, retryAfterSeconds };
+  }
+
+  // 5xx / timeout / fetch failures from the provider — distinguishable from
+  // local network only by message content. Treat ambiguous as provider_error.
+  if (
+    errorCode.startsWith('5') ||
+    lower.includes('fetch failed') ||
+    lower.includes('timeout') ||
+    lower.includes('econnreset')
+  ) {
+    return {
+      errorType: 'provider_error',
+      userMessage:
+        'The AI service is temporarily unavailable. Please try again in a moment.',
+    };
+  }
+
+  return {
+    errorType: 'network_error',
+    userMessage:
+      'Sorry, I encountered an error processing your message. Please try again.',
+  };
+}
+
+/**
  * Format error response
  */
 export function formatErrorResponse(error: Error, model: string): AgentResponse {
+  const classified = classifyProviderError(error.message);
   return {
     success: false,
-    message: 'I encountered an error processing your request. Please try again.',
+    message: classified.userMessage,
     metadata: {
       functionCalls: [],
       model,
       timestamp: new Date().toISOString(),
     },
     error: error.message,
+    errorType: classified.errorType,
   };
 }
 
@@ -402,6 +497,64 @@ export function convertMarkdownToHtml(
     html = html.replace(original, marker);
   });
 
+  // Extract GFM markdown tables BEFORE escaping/line-break processing.
+  // Pattern: header row | sep row (---) | one or more body rows, all delimited
+  // by `|`. Without this step the pipes survive into the final HTML and the
+  // table renders as a wall of literal `|` characters.
+  const markdownTables: Array<{ marker: string; htmlTable: string }> = [];
+  const tableBlockPattern =
+    /(?:^[ \t]*\|[^\n]+\|[ \t]*\n)(?:^[ \t]*\|[ \t\-:|]+\|[ \t]*\n)(?:^[ \t]*\|[^\n]+\|[ \t]*\n?)+/gm;
+
+  const parseTableRow = (line: string): string[] => {
+    return line
+      .trim()
+      .replace(/^\|/, '')
+      .replace(/\|$/, '')
+      .split('|')
+      .map((c) => c.trim());
+  };
+
+  const renderCellText = (raw: string): string => {
+    let c = raw
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    c = c.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    c = c.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    return c;
+  };
+
+  html = html.replace(tableBlockPattern, (block) => {
+    const lines = block.split('\n').filter((l) => l.trim() !== '');
+    if (lines.length < 2) return block;
+    const sepLine = lines[1].trim();
+    if (!/^\|[\s\-:|]+\|$/.test(sepLine)) return block;
+
+    const headerCells = parseTableRow(lines[0]);
+    const bodyRows = lines.slice(2).map(parseTableRow);
+
+    const headerHtml =
+      `<thead><tr>${headerCells
+        .map((c) => `<th>${renderCellText(c)}</th>`)
+        .join('')}</tr></thead>`;
+    const bodyHtml = `<tbody>${bodyRows
+      .map(
+        (row) =>
+          `<tr>${row.map((c) => `<td>${renderCellText(c)}</td>`).join('')}</tr>`
+      )
+      .join('')}</tbody>`;
+    const tableHtml = `<table>${headerHtml}${bodyHtml}</table>`;
+
+    const marker = `___MARKDOWN_TABLE_${markdownTables.length}___`;
+    markdownTables.push({ marker, htmlTable: tableHtml });
+    // Surround with blank lines so the marker becomes its own paragraph after
+    // the \n\n → </p><p> conversion below — keeps the <table> from getting
+    // wrapped inside a sentence-level <p>.
+    return `\n\n${marker}\n\n`;
+  });
+
   // Escape HTML special characters
   html = html
     .replace(/&/g, '&amp;')
@@ -436,6 +589,20 @@ export function convertMarkdownToHtml(
   if (!html.startsWith('<h') && !html.startsWith('<ul')) {
     html = `<p>${html}</p>`;
   }
+
+  // Restore markdown tables. Done BEFORE the ref/image restorations so any
+  // ref/image placeholders that lived inside cells are still findable in the
+  // final HTML when those passes run below.
+  markdownTables.forEach(({ marker, htmlTable }) => {
+    html = html.replace(marker, htmlTable);
+  });
+  // The marker was wrapped in `\n\n…\n\n` which became `</p><p>…</p><p>`,
+  // leaving the <table> wrapped in a stray <p>. Strip those wrappers — a
+  // <table> is block-level and shouldn't be inside a paragraph.
+  html = html.replace(
+    /<p>\s*(<table>[\s\S]*?<\/table>)\s*<\/p>/g,
+    '$1'
+  );
 
   // Replace chart placeholders with actual <img> tags
   chartImages.forEach(({ url }, index) => {

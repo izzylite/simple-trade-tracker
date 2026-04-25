@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { Editor, EditorState, ContentState, CompositeDecorator, Modifier, SelectionState } from 'draft-js';
 import { Box, Chip, Popper, Paper, List, ListItem, ListItemButton, Typography, useTheme, alpha } from '@mui/material';
-import { Tag as TagIcon, Notes as NotesIcon } from '@mui/icons-material';
+import { Tag as TagIcon, Notes as NotesIcon, Bolt as BoltIcon } from '@mui/icons-material';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
@@ -20,6 +20,20 @@ export interface AIChatMentionInputHandle {
    * to restore chip rendering for previously-sent messages.
    */
   setSegments: (segments: MessageSegment[]) => void;
+  /** Imperatively dismiss the slash/mention popup if it's open. */
+  closeMention: () => void;
+}
+
+/**
+ * A locally-handled command shown in the slash popup. Selecting a system
+ * command does NOT insert a chip or send anything to Orion — it consumes the
+ * `/term` text and fires `onSystemCommand(id)` so the parent can invoke an
+ * app-level action (open a note, clear chat, etc.).
+ */
+export interface SystemCommand {
+  id: string;
+  title: string;
+  subtitle?: string;
 }
 
 export interface AIChatMentionInputProps {
@@ -30,6 +44,8 @@ export interface AIChatMentionInputProps {
   disabled?: boolean;
   allTags: string[];
   allNotes: { id: string; title: string; tags: string[] }[];
+  systemCommands?: SystemCommand[];
+  onSystemCommand?: (id: string) => void;
   maxRows?: number;
   sx?: any;
 }
@@ -119,10 +135,14 @@ const createMentionDecorator = () =>
     }
   ]);
 
-type MentionItem = { type: 'note'; id: string; title: string } | { type: 'tag'; tag: string };
+type MentionItem =
+  | { type: 'note'; id: string; title: string }
+  | { type: 'tag'; tag: string }
+  | { type: 'system'; id: string; title: string; subtitle?: string };
 
 const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInputProps>(({
-  value, onChange, onKeyDown, placeholder, disabled, allTags, allNotes, maxRows = 4, sx
+  value, onChange, onKeyDown, placeholder, disabled, allTags, allNotes,
+  systemCommands, onSystemCommand, maxRows = 4, sx
 }, ref) => {
   const theme = useTheme();
   const editorRef = useRef<Editor>(null as any);
@@ -139,6 +159,8 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const popperRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const moveCursorToEndOnNextUpdate = useRef(false);
 
   useImperativeHandle(ref, () => ({
@@ -167,6 +189,7 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
       }, 0);
     },
     getSegments: () => extractSegments(editorStateRef.current),
+    closeMention: () => setMention(null),
     setSegments: (segments: MessageSegment[]) => {
       // Build a fresh ContentState block-by-block, applying NOTE_MENTION
       // entities for note-mention segments. Result is a single block
@@ -291,10 +314,51 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
     return (term ? tags.filter(t => t.toLowerCase().includes(term)) : tags).slice(0, 30);
   }, [tags, mention]);
 
+  const filteredSystemCommands = useMemo(() => {
+    if (!mention || mention.kind !== 'slash' || !systemCommands?.length) return [];
+    const term = mention.term?.toLowerCase() ?? '';
+    return term
+      ? systemCommands.filter(c => c.title.toLowerCase().includes(term))
+      : systemCommands;
+  }, [systemCommands, mention]);
+
   const flatItems = useMemo<MentionItem[]>(() => [
+    ...filteredSystemCommands.map(c => ({
+      type: 'system' as const, id: c.id, title: c.title, subtitle: c.subtitle,
+    })),
     ...filteredNotes.map(n => ({ type: 'note' as const, id: n.id, title: n.title })),
     ...filteredTags.map(t => ({ type: 'tag' as const, tag: t }))
-  ], [filteredNotes, filteredTags]);
+  ], [filteredSystemCommands, filteredNotes, filteredTags]);
+
+  useEffect(() => {
+    if (!mention?.open) return;
+    const list = listRef.current;
+    if (!list) return;
+    const selectableButtons = list.querySelectorAll<HTMLElement>('[data-mention-item="true"]');
+    const target = selectableButtons[selectedIndex];
+    if (target) target.scrollIntoView({ block: 'nearest' });
+  }, [selectedIndex, mention?.open, flatItems.length]);
+
+  // Dismiss the mention popup on any pointerdown outside the editor and the
+  // popup itself — covers clicks on the history button, calendar picker,
+  // pager swap, etc. Popper renders into a portal, so the editor's container
+  // doesn't include it; we check both regions explicitly.
+  useEffect(() => {
+    if (!mention?.open) return;
+    const handlePointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (containerRef.current?.contains(target)) return;
+      if (popperRef.current?.contains(target)) return;
+      setMention(null);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+    };
+  }, [mention?.open]);
 
   function updateMentionState(state: EditorState) {
     const sel = state.getSelection();
@@ -334,6 +398,7 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
         const item = flatItems[selectedIndex];
         if (item) {
           if (item.type === 'tag') insertTag(item.tag);
+          else if (item.type === 'system') invokeSystemCommand(item.id);
           else insertNoteFromMention(item);
         }
         return;
@@ -378,6 +443,40 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
       }
     }
     onKeyDown?.(e);
+  }
+
+  // Consume the typed `/term` (no chip, no trailing space) and fire the
+  // app-level handler. Used by system slash commands like "Clear Chat".
+  function invokeSystemCommand(id: string) {
+    const state = editorStateRef.current || editorState;
+    const selection = state.getSelection();
+    const atIndex = mention?.start ?? -1;
+    if (!selection.isCollapsed() || atIndex === -1) {
+      setMention(null);
+      onSystemCommand?.(id);
+      return;
+    }
+
+    const blockKey = selection.getStartKey();
+    const offset = selection.getStartOffset();
+    const removeSel = SelectionState.createEmpty(blockKey).merge({
+      anchorOffset: atIndex,
+      focusOffset: offset,
+    }) as SelectionState;
+    const newContent = Modifier.removeRange(
+      state.getCurrentContent(), removeSel, 'backward'
+    );
+    const cursor = SelectionState.createEmpty(blockKey).merge({
+      anchorOffset: atIndex,
+      focusOffset: atIndex,
+    }) as SelectionState;
+    let newState = EditorState.createWithContent(newContent, createMentionDecorator());
+    newState = EditorState.forceSelection(newState, cursor);
+
+    setEditorKey(k => k + 1);
+    setMention(null);
+    handleChange(newState);
+    onSystemCommand?.(id);
   }
 
   function insertNoteFromMention(note: { id: string; title: string }) {
@@ -554,6 +653,7 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
         sx={{ zIndex: Z_INDEX.RICH_TEXT_MENU }}
       >
         <Paper
+          ref={popperRef}
           elevation={8}
           sx={{
             maxHeight: 260,
@@ -579,25 +679,66 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
             >
               <TagIcon sx={{ fontSize: 14 }} />{' '}
               {mention?.kind === 'slash'
-                ? `Slash commands (${filteredNotes.length})`
+                ? `Slash commands (${flatItems.length})`
                 : `Tags & notes (${flatItems.length})`}
             </Typography>
           </Box>
-          <List sx={{ maxHeight: 200, overflow: 'auto', p: 0, ...scrollbarStyles(theme) }}>
+          <List ref={listRef} sx={{ maxHeight: 200, overflow: 'auto', p: 0, ...scrollbarStyles(theme) }}>
             {flatItems.length === 0 ? (
               <ListItem>
                 <Box sx={{ p: 2, textAlign: 'center', width: '100%' }}>
                   <Typography variant="body2" color="text.secondary">
-                    {allTags.length === 0 && allNotes.length === 0
+                    {allTags.length === 0 && allNotes.length === 0 && !systemCommands?.length
                       ? 'No tags or notes available.'
                       : mention?.kind === 'slash'
-                        ? 'No slash-command notes match.'
+                        ? `No slash commands match "${mention?.term || ''}".`
                         : `No matches for "${mention?.term || ''}"`}
                   </Typography>
                 </Box>
               </ListItem>
             ) : (
               <>
+                {filteredSystemCommands.length > 0 && (
+                  <>
+                    <ListItem
+                      sx={{
+                        py: 0.5,
+                        px: 2,
+                        backgroundColor: alpha(theme.palette.warning.main, 0.06),
+                        borderBottom: '1px solid',
+                        borderColor: 'divider'
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600 }}
+                      >
+                        <BoltIcon sx={{ fontSize: 12 }} /> System
+                      </Typography>
+                    </ListItem>
+                    {filteredSystemCommands.map((cmd, idx) => (
+                      <ListItem key={cmd.id} disablePadding>
+                        <ListItemButton
+                          data-mention-item="true"
+                          selected={idx === selectedIndex}
+                          onMouseDown={(e) => { e.preventDefault(); invokeSystemCommand(cmd.id); }}
+                          onClick={(e) => { e.preventDefault(); invokeSystemCommand(cmd.id); }}
+                          sx={{ py: 1, px: 2, display: 'block' }}
+                        >
+                          <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+                            {cmd.title}
+                          </Typography>
+                          {cmd.subtitle && (
+                            <Typography variant="caption" color="text.secondary" noWrap>
+                              {cmd.subtitle}
+                            </Typography>
+                          )}
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </>
+                )}
                 {filteredNotes.length > 0 && (
                   <>
                     <ListItem
@@ -617,20 +758,24 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
                         <NotesIcon sx={{ fontSize: 12 }} /> Notes
                       </Typography>
                     </ListItem>
-                    {filteredNotes.map((note, idx) => (
-                      <ListItem key={note.id} disablePadding>
-                        <ListItemButton
-                          selected={idx === selectedIndex}
-                          onMouseDown={(e) => { e.preventDefault(); insertNoteFromMention(note); }}
-                          onClick={(e) => { e.preventDefault(); insertNoteFromMention(note); }}
-                          sx={{ py: 1, px: 2 }}
-                        >
-                          <Typography variant="body2" noWrap>
-                            {note.title || 'Untitled'}
-                          </Typography>
-                        </ListItemButton>
-                      </ListItem>
-                    ))}
+                    {filteredNotes.map((note, idx) => {
+                      const flatIdx = filteredSystemCommands.length + idx;
+                      return (
+                        <ListItem key={note.id} disablePadding>
+                          <ListItemButton
+                            data-mention-item="true"
+                            selected={flatIdx === selectedIndex}
+                            onMouseDown={(e) => { e.preventDefault(); insertNoteFromMention(note); }}
+                            onClick={(e) => { e.preventDefault(); insertNoteFromMention(note); }}
+                            sx={{ py: 1, px: 2 }}
+                          >
+                            <Typography variant="body2" noWrap>
+                              {note.title || 'Untitled'}
+                            </Typography>
+                          </ListItemButton>
+                        </ListItem>
+                      );
+                    })}
                   </>
                 )}
                 {filteredTags.length > 0 && (
@@ -653,10 +798,11 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
                       </Typography>
                     </ListItem>
                     {filteredTags.map((tag, idx) => {
-                      const flatIdx = filteredNotes.length + idx;
+                      const flatIdx = filteredSystemCommands.length + filteredNotes.length + idx;
                       return (
                         <ListItem key={tag} disablePadding>
                           <ListItemButton
+                            data-mention-item="true"
                             selected={flatIdx === selectedIndex}
                             onMouseDown={(e) => { e.preventDefault(); insertTag(tag); }}
                             onClick={(e) => { e.preventDefault(); insertTag(tag); }}

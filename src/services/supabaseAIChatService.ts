@@ -179,23 +179,20 @@ class SupabaseAIChatService {
 
       if (!response.ok) {
         const errorText = await response.text();
-
-        // Try to parse error response as JSON to get detailed error message
-        let detailedError = errorText;
+        // Backend (formatErrorResponse) puts the user-friendly markdown in
+        // .message and the raw provider detail in .error. Prefer .message.
+        let userMessage = errorText;
         try {
           const errorJson = JSON.parse(errorText);
-          // Extract the error field from AgentResponse
-          if (errorJson.error) {
-            detailedError = errorJson.error;
-          } else if (errorJson.message) {
-            detailedError = errorJson.message;
+          if (errorJson.message) {
+            userMessage = errorJson.message;
+          } else if (errorJson.error) {
+            userMessage = errorJson.error;
           }
         } catch {
-          // If not JSON, use the raw text
+          // not JSON — use raw text
         }
-
-        // Throw error with the detailed message (will be parsed by parseQuotaError in component)
-        throw new Error(detailedError);
+        throw new Error(userMessage);
       }
 
       if (!response.body) {
@@ -392,21 +389,20 @@ class SupabaseAIChatService {
 
       if (!response.ok) {
         // Try to parse error response as JSON to get detailed error message
-        let detailedError = responseText;
+        // Backend (formatErrorResponse) puts the user-friendly markdown in
+        // .message and the raw provider detail in .error. Prefer .message.
+        let userMessage = responseText;
         try {
           const errorJson = JSON.parse(responseText);
-          // Extract the error field from AgentResponse
-          if (errorJson.error) {
-            detailedError = errorJson.error;
-          } else if (errorJson.message) {
-            detailedError = errorJson.message;
+          if (errorJson.message) {
+            userMessage = errorJson.message;
+          } else if (errorJson.error) {
+            userMessage = errorJson.error;
           }
         } catch {
-          // If not JSON, use the raw text
+          // not JSON — use raw text
         }
-
-        // Throw error with the detailed message (will be parsed by parseQuotaError in component)
-        throw new Error(detailedError);
+        throw new Error(userMessage);
       }
 
       // Parse successful response
