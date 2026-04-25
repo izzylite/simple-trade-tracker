@@ -16,6 +16,7 @@ import {
 } from '../../../types/aiChat';
 import { logger } from '../../../utils/logger';
 import { supabase } from '../../../config/supabase';
+import { stripReferencedBlocks } from '../../../utils/chatMentions';
 
 /**
  * Pagination options for conversation queries
@@ -71,17 +72,40 @@ const serializeMessages = (messages: ChatMessage[]): SerializableChatMessage[] =
 };
 
 /**
- * Generate conversation title from first user message
+ * Generate conversation title from first user message.
+ *
+ * Bare invocations (the entire message is just `[Referenced command:]` or
+ * `[Referenced note:]` blocks with no typed text) get a friendly label
+ * instead of leaking the raw block syntax into the sidebar — see the
+ * sidebar showing "[Referenced command: List my three…" titles before
+ * this change. Mixed messages strip the trailing block(s) and use the
+ * typed text only.
  */
 const generateConversationTitle = (messages: ChatMessage[]): string => {
   const firstUserMessage = messages.find(msg => msg.role === 'user');
-  if (firstUserMessage && firstUserMessage.content) {
-    // Take first 50 characters and add ellipsis if truncated
-    const title = firstUserMessage.content.substring(0, 50);
-    return title.length < firstUserMessage.content.length ? `${title}...` : title;
+  if (!firstUserMessage || !firstUserMessage.content) {
+    return `Conversation on ${new Date().toLocaleDateString()}`;
   }
-  // Fallback to timestamp
-  return `Conversation on ${new Date().toLocaleDateString()}`;
+
+  const raw = firstUserMessage.content;
+  const stripped = stripReferencedBlocks(raw);
+
+  // Bare: stripping all blocks leaves nothing typed → label by block kind.
+  if (!stripped.trim()) {
+    const cmdCount = (raw.match(/\[Referenced command:/g) || []).length;
+    const noteCount = (raw.match(/\[Referenced note:/g) || []).length;
+    if (cmdCount > 0 && noteCount === 0) {
+      return cmdCount === 1 ? 'Slash Command' : 'Slash Commands';
+    }
+    if (noteCount > 0 && cmdCount === 0) {
+      return noteCount === 1 ? 'Referenced Note' : 'Referenced Notes';
+    }
+    return 'Slash Commands & Notes';
+  }
+
+  // Mixed or plain: use typed text (with blocks stripped), trimmed to 50 chars.
+  const title = stripped.substring(0, 50);
+  return title.length < stripped.length ? `${title}...` : title;
 };
 
 export class ConversationRepository extends AbstractBaseRepository<AIConversation> {
@@ -151,7 +175,6 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
         .select('*')
         .eq('calendar_id', calendarId)
         .is('trade_id', null)
-        .order('pinned', { ascending: false })
         .order('updated_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -203,7 +226,6 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
         .from('ai_conversations')
         .select('*')
         .eq('trade_id', tradeId)
-        .order('pinned', { ascending: false })
         .order('updated_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -278,7 +300,6 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
         .eq('user_id', userId)
         .is('calendar_id', null)
         .is('trade_id', null)
-        .order('pinned', { ascending: false })
         .order('updated_at', { ascending: false })
         .range(offset, offset + limit - 1);
 

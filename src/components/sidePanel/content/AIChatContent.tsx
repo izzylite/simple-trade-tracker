@@ -42,7 +42,7 @@ import {
   PushPinOutlined as PushPinOutlinedIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import Shimmer from '../../Shimmer';
+import EconomicEventShimmer from '../../economicCalendar/EconomicEventShimmer';
 import AIChatInterface, { AIChatInterfaceRef, QuestionTemplate } from '../../aiChat/AIChatInterface';
 import { AIConversation } from '../../../types/aiChat';
 import { Trade } from '../../../types/trade';
@@ -50,6 +50,7 @@ import { Calendar } from '../../../types/calendar';
 import { EconomicEvent } from '../../../types/economicCalendar';
 import { scrollbarStyles } from '../../../styles/scrollbarStyles';
 import { logger } from '../../../utils/logger';
+import { stripReferencedBlocks } from '../../../utils/chatMentions';
 import { useAuthState } from '../../../contexts/AuthStateContext';
 import { useAIChat, UseAIChatReturn } from '../../../hooks/useAIChat';
 import EconomicEventDetailDialog
@@ -297,11 +298,21 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   const getPreviewText = (conversation: AIConversation): string => {
     const firstUserMessage =
       conversation.messages.find(msg => msg.role === 'user');
-    if (firstUserMessage && firstUserMessage.content) {
-      return firstUserMessage.content.substring(0, 80) +
-        (firstUserMessage.content.length > 80 ? '...' : '');
+    if (!firstUserMessage || !firstUserMessage.content) return 'No messages';
+
+    const raw = firstUserMessage.content;
+    // Strip [Referenced …:] block syntax so the preview reads naturally
+    // instead of leaking "[Referenced command: …]" into the sidebar.
+    let preview = stripReferencedBlocks(raw).trim();
+    // Bare invocation (no typed text): fall back to the body of the first
+    // block so the user sees what the command/note actually says.
+    if (!preview) {
+      const firstBlockBody = raw.match(
+        /\[Referenced (?:command|note):\n([\s\S]*?)\n\]/
+      )?.[1]?.trim();
+      preview = firstBlockBody || raw;
     }
-    return 'No messages';
+    return preview.length > 80 ? `${preview.substring(0, 80)}...` : preview;
   };
 
   return (
@@ -638,59 +649,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
               ...scrollbarStyles(theme)
             }}>
               {loadingConversations ? (
-                <List sx={{ p: 0 }}>
-                  {Array.from({ length: 10 }).map((_, index) => (
-                    <React.Fragment key={index}>
-                      <ListItem sx={{ py: 2, px: 2 }}>
-                        <Box sx={{ width: '100%' }}>
-                          <Box sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
-                            mb: 1
-                          }}>
-                            <Shimmer
-                              height={20}
-                              width="60%"
-                              borderRadius={4}
-                              variant="wave"
-                              intensity="medium"
-                            />
-                            <Shimmer
-                              height={20}
-                              width={60}
-                              borderRadius={10}
-                              variant="pulse"
-                              intensity="low"
-                            />
-                          </Box>
-                          <Shimmer
-                            height={16}
-                            width="90%"
-                            borderRadius={4}
-                            variant="default"
-                            intensity="low"
-                            sx={{ mb: 0.5 }}
-                          />
-                          <Box sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5
-                          }}>
-                            <Shimmer
-                              height={14}
-                              width={120}
-                              borderRadius={4}
-                              variant="default"
-                              intensity="low"
-                            />
-                          </Box>
-                        </Box>
-                      </ListItem>
-                      {index < 4 && <Divider />}
-                    </React.Fragment>
-                  ))}
-                </List>
+                <EconomicEventShimmer count={10} />
               ) : filteredConversations.length === 0 ? (
                 <Box sx={{ p: 3 }}>
                   <Alert severity="info">
