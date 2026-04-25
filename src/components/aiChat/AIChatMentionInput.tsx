@@ -13,6 +13,13 @@ export interface AIChatMentionInputHandle {
   focus: () => void;
   moveCursorToEnd: () => void;
   getSegments: () => MessageSegment[];
+  /**
+   * Replace the editor's content from a `MessageSegment[]` produced by a
+   * previous `getSegments()` call. Note-mention segments become `NOTE_MENTION`
+   * entities (chips); text segments become plain text. Used by the edit flow
+   * to restore chip rendering for previously-sent messages.
+   */
+  setSegments: (segments: MessageSegment[]) => void;
 }
 
 export interface AIChatMentionInputProps {
@@ -160,6 +167,62 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
       }, 0);
     },
     getSegments: () => extractSegments(editorStateRef.current),
+    setSegments: (segments: MessageSegment[]) => {
+      // Build a fresh ContentState block-by-block, applying NOTE_MENTION
+      // entities for note-mention segments. Result is a single block
+      // containing text+chips (newlines in text segments stay as soft breaks
+      // within the same block — fine for chat input which is rarely
+      // multi-line for mentions).
+      let content = ContentState.createFromText('');
+      const blockKey = content.getFirstBlock().getKey();
+      let cursor = 0;
+
+      const insertAt = (text: string) => {
+        const sel = SelectionState.createEmpty(blockKey).merge({
+          anchorOffset: cursor,
+          focusOffset: cursor,
+        }) as SelectionState;
+        content = Modifier.insertText(content, sel, text);
+        cursor += text.length;
+      };
+
+      for (const seg of segments) {
+        if (seg.type === 'text') {
+          insertAt(seg.value);
+        } else {
+          const start = cursor;
+          insertAt(seg.noteTitle);
+          content = content.createEntity('NOTE_MENTION', 'IMMUTABLE', {
+            noteTitle: seg.noteTitle,
+            noteId: seg.noteId,
+          });
+          const entityKey = content.getLastCreatedEntityKey();
+          const range = SelectionState.createEmpty(blockKey).merge({
+            anchorOffset: start,
+            focusOffset: cursor,
+          }) as SelectionState;
+          content = Modifier.applyEntity(content, range, entityKey);
+        }
+      }
+
+      // Force-mount a fresh editor (matches the pattern used after
+      // insertNoteFromMention — IMMUTABLE entity edges occasionally leave
+      // stale DOM if we just push state into the existing editor).
+      let newState = EditorState.createWithContent(content, createMentionDecorator());
+      const tail = SelectionState.createEmpty(blockKey).merge({
+        anchorOffset: cursor,
+        focusOffset: cursor,
+      }) as SelectionState;
+      newState = EditorState.forceSelection(newState, tail);
+
+      setEditorKey(k => k + 1);
+      setEditorState(newState);
+      editorStateRef.current = newState;
+
+      // Notify parent so its `value` prop matches (avoids the sync effect
+      // overwriting our chips on the next render).
+      onChange(content.getPlainText());
+    },
   }));
 
   useEffect(() => {

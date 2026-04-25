@@ -46,6 +46,14 @@ export interface ChatMessage {
   // Gemini chain-of-thought summary (thinkingConfig.includeThoughts). Streamed
   // in as reasoning_chunk SSE events and rendered in an expandable panel.
   reasoning?: string;
+  // For user messages only: editor segments at send time (text fragments and
+  // note-mention chip placeholders). Persisted so the editor can rebuild
+  // chip entities when the user clicks Edit, instead of dumping the
+  // expanded "[Referenced ...:]" syntax into the input.
+  segments?: Array<
+    | { type: 'text'; value: string }
+    | { type: 'note-mention'; noteId: string; noteTitle: string }
+  >;
 }
 
 export interface ToolCallRecord {

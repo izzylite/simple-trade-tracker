@@ -29,10 +29,9 @@ import {
   Edit as EditIcon,
   Check as CopiedIcon,
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  PlayArrow as PlayArrowIcon,
-  Notes as NotesIcon
+  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
+import { stripReferencedBlocks } from '../../utils/chatMentions';
 import { ChatMessage as ChatMessageType } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
 import { EconomicEvent } from '../../types/economicCalendar';
@@ -80,115 +79,102 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const isAssistant = message.role === 'assistant';
   const isDark = theme.palette.mode === 'dark';
 
-  // Split user message text into segments with inline chips:
-  //  - Tag chips for any availableTags substring
-  //  - Reference chips for [Referenced command:\n...\n] and [Referenced note:\n...\n] blocks
-  //    (reserved block syntax used by client-side expansion when a / or @ mention is sent)
-  const renderUserContentWithTagChips = useMemo(() => {
-    if (!isUser) return null;
-    const content = message.content;
+  // Render a note-mention as a simple title chip — matches the editor's
+  // NoteMentionEntity styling so the chip in the transcript looks identical
+  // to the chip that appears while editing.
+  const noteChipSx = useMemo(() => ({
+    display: 'inline-flex',
+    verticalAlign: 'middle',
+    height: 22,
+    fontSize: '0.75rem',
+    mx: 0.25,
+    cursor: 'default',
+    backgroundColor: alpha(theme.palette.info.main, 0.1),
+    color: theme.palette.info.main,
+    border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
+  }), [theme]);
 
-    type Match =
-      | { kind: 'tag'; start: number; end: number; tag: string }
-      | { kind: 'ref'; start: number; end: number; refType: 'command' | 'note'; body: string };
-
-    const matches: Match[] = [];
-
-    // 1) Reference blocks — highest priority. Non-greedy, match until closing `]` on its own line.
-    const refPattern = /\[Referenced (command|note):\n([\s\S]*?)\n\]/g;
-    let refMatch: RegExpExecArray | null;
-    while ((refMatch = refPattern.exec(content)) !== null) {
-      matches.push({
-        kind: 'ref',
-        start: refMatch.index,
-        end: refMatch.index + refMatch[0].length,
-        refType: refMatch[1] as 'command' | 'note',
-        body: refMatch[2],
-      });
-    }
-
-    // 2) Tag substrings — but only outside ref-block ranges.
+  // Render a run of plain text, with any availableTags substrings converted
+  // to tag chips (same behaviour as before for typed text).
+  const renderTextWithTagChips = (text: string, keyPrefix: string): React.ReactNode[] => {
+    if (availableTags.length === 0) return [text];
     const sortedTags = [...availableTags].sort((a, b) => b.length - a.length);
+    const matches: Array<{ start: number; end: number; tag: string }> = [];
     for (const tag of sortedTags) {
       let searchFrom = 0;
-      while (searchFrom < content.length) {
-        const idx = content.indexOf(tag, searchFrom);
+      while (searchFrom < text.length) {
+        const idx = text.indexOf(tag, searchFrom);
         if (idx === -1) break;
         const end = idx + tag.length;
         const overlaps = matches.some(m => idx < m.end && end > m.start);
-        if (!overlaps) {
-          matches.push({ kind: 'tag', start: idx, end, tag });
-        }
+        if (!overlaps) matches.push({ start: idx, end, tag });
         searchFrom = idx + 1;
       }
     }
-
-    if (matches.length === 0) return null;
+    if (matches.length === 0) return [text];
     matches.sort((a, b) => a.start - b.start);
-
-    const segments: React.ReactNode[] = [];
+    const out: React.ReactNode[] = [];
     let lastIdx = 0;
-
     matches.forEach((m, i) => {
-      if (m.start > lastIdx) {
-        segments.push(content.substring(lastIdx, m.start));
-      }
-      if (m.kind === 'tag') {
-        segments.push(
-          <Chip
-            key={`user-tag-${i}`}
-            label={m.tag}
-            size="small"
-            sx={{
-              ...getTagChipStyles(m.tag, theme),
-              display: 'inline-flex',
-              verticalAlign: 'middle',
-              height: 20,
-              fontSize: '0.75rem',
-              mx: 0.25,
-              cursor: 'default',
-            }}
-          />
-        );
-      } else {
-        const isCommand = m.refType === 'command';
-        segments.push(
-          <Tooltip
-            key={`user-ref-${i}`}
-            title={<Box sx={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem' }}>{m.body}</Box>}
-            placement="top"
-            arrow
-          >
-            <Chip
-              icon={isCommand
-                ? <PlayArrowIcon sx={{ fontSize: '0.9rem !important' }} />
-                : <NotesIcon sx={{ fontSize: '0.9rem !important' }} />}
-              label={isCommand ? 'Command' : 'Note'}
-              size="small"
-              sx={{
-                display: 'inline-flex',
-                verticalAlign: 'middle',
-                height: 20,
-                fontSize: '0.75rem',
-                mx: 0.25,
-                cursor: 'default',
-                bgcolor: alpha(theme.palette.primary.main, isCommand ? 0.12 : 0.08),
-                color: theme.palette.primary.main,
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-              }}
-            />
-          </Tooltip>
-        );
-      }
+      if (m.start > lastIdx) out.push(text.substring(lastIdx, m.start));
+      out.push(
+        <Chip
+          key={`${keyPrefix}-tag-${i}`}
+          label={m.tag}
+          size="small"
+          sx={{
+            ...getTagChipStyles(m.tag, theme),
+            display: 'inline-flex',
+            verticalAlign: 'middle',
+            height: 20,
+            fontSize: '0.75rem',
+            mx: 0.25,
+            cursor: 'default',
+          }}
+        />
+      );
       lastIdx = m.end;
     });
+    if (lastIdx < text.length) out.push(text.substring(lastIdx));
+    return out;
+  };
 
-    if (lastIdx < content.length) {
-      segments.push(content.substring(lastIdx));
+  // User message rendering:
+  //  - If segments were persisted (note mentions present), render each text
+  //    segment with tag-chip splitting + each note-mention as a title chip.
+  //    This is the common case for mentions and gives transcript↔editor parity.
+  //  - Otherwise, strip any leftover [Referenced ...:] blocks from the raw
+  //    content (legacy messages) and render typed text with tag chips only.
+  const renderUserContentWithTagChips = useMemo(() => {
+    if (!isUser) return null;
+
+    if (message.segments && message.segments.length > 0) {
+      const out: React.ReactNode[] = [];
+      message.segments.forEach((seg, i) => {
+        if (seg.type === 'text') {
+          out.push(...renderTextWithTagChips(seg.value, `seg-${i}`));
+        } else {
+          out.push(
+            <Chip
+              key={`seg-${i}-note`}
+              label={seg.noteTitle}
+              size="small"
+              sx={noteChipSx}
+            />
+          );
+        }
+      });
+      return out;
     }
 
-    return segments;
-  }, [isUser, message.content, availableTags, theme]);
+    const plain = stripReferencedBlocks(message.content);
+    const rendered = renderTextWithTagChips(plain, 'plain');
+    if (rendered.length === 1 && typeof rendered[0] === 'string' && rendered[0] === message.content) {
+      return null; // no transformation happened — let the fallback renderer handle it
+    }
+    return rendered;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUser, message.content, message.segments, availableTags, theme, noteChipSx]);
 
   const handleCopy = async () => {
     try {

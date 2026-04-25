@@ -94,9 +94,9 @@ export interface AIChatInterfaceProps {
   isAtMessageLimit: boolean;
 
   // Actions from useAIChat hook
-  sendMessage: (messageText: string, images?: AttachedImage[]) => Promise<void>;
+  sendMessage: (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments']) => Promise<void>;
   cancelRequest: () => void;
-  setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[] } | null;
+  setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[]; segments?: ChatMessageType['segments'] } | null;
   startNewChat: () => Promise<void>;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessageType[]>>;
   getWelcomeMessage: () => ChatMessageType;
@@ -229,7 +229,11 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
     const imagesToSend = attachedImages.length > 0 ? [...attachedImages] : undefined;
     setInputMessage('');
     setAttachedImages([]);
-    await sendMessage(outgoing, imagesToSend);
+    // Persist segments alongside the message so Edit can rebuild chips.
+    const segmentsToPersist = segments.some(s => s.type === 'note-mention')
+      ? segments
+      : undefined;
+    await sendMessage(outgoing, imagesToSend, segmentsToPersist);
   };
 
   // Image upload handlers
@@ -344,9 +348,22 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   const handleEditMessage = useCallback((messageId: string) => {
     const editData = setInputForEdit(messageId);
     if (editData) {
-      // Strip [Referenced command/note:] blocks so the editor doesn't expose
-      // the raw expansion syntax. User can re-trigger via "/" if they want.
-      setInputMessage(stripReferencedBlocks(editData.content));
+      if (editData.segments && editData.segments.length > 0) {
+        // Rebuild the editor with chip entities from persisted segments.
+        // Plain text matches what the chips serialize to, so the parent's
+        // value-sync effect won't clobber.
+        const plainFromSegs = editData.segments
+          .map(s => (s.type === 'text' ? s.value : s.noteTitle))
+          .join('');
+        setInputMessage(plainFromSegs);
+        // Defer to next tick so setInputMessage's re-render runs the value
+        // sync effect first; setSegments then takes over with the rich state.
+        setTimeout(() => inputRef.current?.setSegments?.(editData.segments!), 0);
+      } else {
+        // Legacy / no-mention message — strip any leftover Referenced blocks
+        // and use plain text. User can re-add a slash command via "/".
+        setInputMessage(stripReferencedBlocks(editData.content));
+      }
       // Restore images when editing
       if (editData.images && editData.images.length > 0) {
         setAttachedImages(editData.images);

@@ -74,10 +74,10 @@ export interface UseAIChatReturn {
   editingMessageId: string | null;
 
   // Actions
-  sendMessage: (messageText: string, images?: AttachedImage[]) => Promise<void>;
+  sendMessage: (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments']) => Promise<void>;
   cancelRequest: () => void;
   editMessage: (messageId: string) => string | null;
-  setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[] } | null;
+  setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[]; segments?: ChatMessageType['segments'] } | null;
   clearEditingState: () => void;
 
   // Conversation management
@@ -481,7 +481,7 @@ export function useAIChat({
   /**
    * Send a message to the AI
    */
-  const sendMessage = useCallback(async (messageText: string, images?: AttachedImage[]) => {
+  const sendMessage = useCallback(async (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments']) => {
     const trimmedMessage = messageText.trim();
     if ((!trimmedMessage && (!images || images.length === 0)) || isLoading || !userId) return;
 
@@ -503,6 +503,7 @@ export function useAIChat({
           role: 'user',
           content: trimmedMessage,
           images: images,
+          segments: segments,
           timestamp: new Date(),
           status: 'sent'
         };
@@ -514,6 +515,7 @@ export function useAIChat({
           ...originalMessage,
           content: trimmedMessage,
           images: images,
+          segments: segments,
           timestamp: new Date(),
           status: 'sent'
         };
@@ -528,6 +530,7 @@ export function useAIChat({
         role: 'user',
         content: trimmedMessage,
         images: images,
+        segments: segments,
         timestamp: new Date(),
         status: 'sent'
       };
@@ -786,14 +789,15 @@ export function useAIChat({
   /**
    * Set up message for editing and return its content and images
    */
-  const setInputForEdit = useCallback((messageId: string): { content: string; images?: AttachedImage[] } | null => {
+  const setInputForEdit = useCallback((messageId: string): { content: string; images?: AttachedImage[]; segments?: ChatMessageType['segments'] } | null => {
     const messageToEdit = messages.find(msg => msg.id === messageId);
     if (!messageToEdit || messageToEdit.role !== 'user') return null;
 
     setEditingMessageId(messageId);
     return {
       content: messageToEdit.content,
-      images: messageToEdit.images
+      images: messageToEdit.images,
+      segments: messageToEdit.segments
     };
   }, [messages]);
 
