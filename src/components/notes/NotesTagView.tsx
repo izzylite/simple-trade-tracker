@@ -1,8 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { Box, Collapse, Typography, IconButton } from '@mui/material';
-import { ExpandLess, ExpandMore } from '@mui/icons-material';
+import { ExpandLess, ExpandMore, LabelOutlined } from '@mui/icons-material';
 
 import NoteListItem from './NoteListItem';
+import {
+  getTagDisplayLabel,
+  getTagSubtitle,
+  getTagIcon,
+} from './NoteEditorDialog';
 import { Note } from '../../types/note';
 import { Calendar } from '../../types/calendar';
 
@@ -48,7 +53,9 @@ export const NotesTagView: React.FC<NotesTagViewProps> = ({
     if (byTag.has(UNTAGGED)) keys.push(UNTAGGED);
     return keys.map(k => ({
       key: k,
-      label: k === UNTAGGED ? UNTAGGED_LABEL : k,
+      label: k === UNTAGGED ? UNTAGGED_LABEL : getTagDisplayLabel(k),
+      subtitle: k === UNTAGGED ? '' : getTagSubtitle(k),
+      Icon: k === UNTAGGED ? undefined : getTagIcon(k),
       items: byTag.get(k)!,
     }));
   }, [notes]);
@@ -68,7 +75,9 @@ export const NotesTagView: React.FC<NotesTagViewProps> = ({
 
   return (
     <Box>
-      {groups.map(group => (
+      {groups.map(group => {
+        const HeaderIcon = group.Icon ?? LabelOutlined;
+        return (
         <Box key={group.key} sx={{ mb: 1 }}>
           <Box
             onClick={() => toggle(group.key)}
@@ -82,6 +91,7 @@ export const NotesTagView: React.FC<NotesTagViewProps> = ({
               '&:hover': { bgcolor: 'action.hover' },
             }}
           >
+            <HeaderIcon sx={{ fontSize: 18, mr: 1, color: 'text.secondary' }} />
             <Typography variant="subtitle2" sx={{ flex: 1, fontWeight: 600 }}>
               {group.label}
               <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
@@ -94,6 +104,20 @@ export const NotesTagView: React.FC<NotesTagViewProps> = ({
           </Box>
 
           <Collapse in={isOpen(group.key)} timeout="auto" unmountOnExit>
+            {group.subtitle && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  display: 'block',
+                  px: 1,
+                  pb: 1,
+                  fontStyle: 'italic',
+                }}
+              >
+                {group.subtitle}
+              </Typography>
+            )}
             {group.items.map(note => (
               <NoteListItem
                 key={`${group.key}-${note.id}`}
@@ -109,7 +133,8 @@ export const NotesTagView: React.FC<NotesTagViewProps> = ({
             ))}
           </Collapse>
         </Box>
-      ))}
+        );
+      })}
     </Box>
   );
 };

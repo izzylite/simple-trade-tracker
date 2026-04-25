@@ -1029,24 +1029,11 @@ export async function createNote(
       tags: tags || [],
     };
 
-    // Assign color: use provided color or random assistant color
     if (color) {
       noteData.color = color;
     } else {
-      // Randomly select a color from the assistant palette
-      const randomColor =
+      noteData.color =
         ASSISTANT_COLORS[Math.floor(Math.random() * ASSISTANT_COLORS.length)];
-      noteData.color = randomColor;
-    }
-
-    // Assign color: use provided color or random assistant color
-    if (color) {
-      noteData.color = color;
-    } else {
-      // Randomly select a color from the assistant palette
-      const randomColor =
-        ASSISTANT_COLORS[Math.floor(Math.random() * ASSISTANT_COLORS.length)];
-      noteData.color = randomColor;
     }
 
     // Add reminder fields if provided
@@ -1094,6 +1081,7 @@ export async function createNote(
  */
 export async function updateNote(
   supabase: SupabaseClient,
+  userId: string,
   noteId: string,
   title?: string,
   content?: string,
@@ -1105,11 +1093,13 @@ export async function updateNote(
   try {
     log(`Updating note: ${noteId}`, "info");
 
-    // First, verify this is an AI-created note and check for AGENT_MEMORY
+    // Scope by user_id so service-role queries can't be tricked into
+    // touching another user's note via a leaked id.
     const { data: existingNote, error: fetchError } = await supabase
       .from("notes")
       .select("id, by_assistant, title, tags")
       .eq("id", noteId)
+      .eq("user_id", userId)
       .single();
 
     if (fetchError) {
@@ -1179,11 +1169,13 @@ export async function updateNote(
 
     // Update the note. The "by_assistant=true" safety filter applies only
     // to non-SlashCommand notes — SlashCommand notes are user-owned but
-    // intentionally manageable by Orion (see check above).
+    // intentionally manageable by Orion (see check above). user_id is
+    // always enforced so we can't write across user boundaries.
     let updateQuery = supabase
       .from("notes")
       .update(updateData)
-      .eq("id", noteId);
+      .eq("id", noteId)
+      .eq("user_id", userId);
     if (!isSlashCommand) {
       updateQuery = updateQuery.eq("by_assistant", true);
     }
@@ -1209,16 +1201,19 @@ export async function updateNote(
  */
 export async function deleteNote(
   supabase: SupabaseClient,
+  userId: string,
   noteId: string,
 ): Promise<string> {
   try {
     log(`Deleting note: ${noteId}`, "info");
 
-    // First, verify this is an AI-created note
+    // Scope by user_id so service-role queries can't be tricked into
+    // touching another user's note via a leaked id.
     const { data: existingNote, error: fetchError } = await supabase
       .from("notes")
       .select("id, by_assistant, title, tags")
       .eq("id", noteId)
+      .eq("user_id", userId)
       .single();
 
     if (fetchError) {
@@ -1238,11 +1233,13 @@ export async function deleteNote(
       return `Permission denied: You can only delete AI-created notes. This note was created by the user.`;
     }
 
-    // Delete the note
+    // Delete the note. user_id is always enforced; the by_assistant
+    // safety filter applies only to non-SlashCommand notes.
     let deleteQuery = supabase
       .from("notes")
       .delete()
-      .eq("id", noteId);
+      .eq("id", noteId)
+      .eq("user_id", userId);
     if (!isSlashCommand) {
       deleteQuery = deleteQuery.eq("by_assistant", true);
     }
@@ -2408,6 +2405,10 @@ export async function executeCustomTool(
         if (!supabase) {
           return "Supabase client not available for note update";
         }
+        const userId = context.userId || "";
+        if (!userId) {
+          return "User context required for note update";
+        }
         const noteId = typeof args.note_id === "string" ? args.note_id : "";
         const title = typeof args.title === "string" ? args.title : undefined;
         const content = typeof args.content === "string"
@@ -2425,6 +2426,7 @@ export async function executeCustomTool(
         const tags = Array.isArray(args.tags) ? args.tags : undefined;
         return await updateNote(
           supabase,
+          userId,
           noteId,
           title,
           content,
@@ -2439,8 +2441,12 @@ export async function executeCustomTool(
         if (!supabase) {
           return "Supabase client not available for note deletion";
         }
+        const userId = context.userId || "";
+        if (!userId) {
+          return "User context required for note deletion";
+        }
         const noteId = typeof args.note_id === "string" ? args.note_id : "";
-        return await deleteNote(supabase, noteId);
+        return await deleteNote(supabase, userId, noteId);
       }
 
       case "search_notes": {

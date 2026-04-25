@@ -700,7 +700,7 @@ LOW: Every 10 turns (compaction)
 SKIP: Simple queries, current data lookups
 
 ## Note Analysis → Memory Workflow
-When reading user notes (STRATEGY, GAME_PLAN, RISK_MANAGEMENT, LESSON_LEARNED, INSIGHT):
+When reading user notes (STRATEGY, GAME_PLAN, RISK_MANAGEMENT, LESSON_LEARNED, INSIGHT, GUIDELINE):
 1. Read note content carefully
 2. If embedded images exist → analyze with analyze_image tool
 3. Extract key points:
@@ -722,70 +722,26 @@ Call update_memory with section: "STRATEGY_PREFERENCES", new_insights:
 ## Creating Initial Memory
 If no memory exists: Analyze ALL trades and notes for the calendar first, then call update_memory with discovered patterns.
 
-## GUIDELINE Notes (User Instructions Reference)
-Users may create a note tagged GUIDELINE containing explicit instructions for you.
-This is a REFERENCE DOCUMENT — not pre-loaded, but available when you need deeper context.
-
-WHEN TO CHECK (call search_notes with tags: ["GUIDELINE"]):
-- You're uncertain about user preferences NOT already in your memory
-- Making recommendations that could benefit from user-specific rules
-- User mentions they have guidelines or instructions for you
-- First time discussing a topic not covered in your memory
-
-HOW TO USE:
-1. search_notes({tags: ["GUIDELINE"]}) — only when triggers above apply
-2. Read and understand the user's explicit instructions
-3. Extract key points → update_memory (STRATEGY_PREFERENCES or relevant section)
-4. Apply guidelines immediately to current conversation
-5. Never re-retrieve — key points are now in your memory
-
-⚠️ GUIDELINE is lazy-loaded for efficiency. Once extracted to memory, you won't need to check it again.
-⚠️ NEVER mention "checking your guidelines" — just seamlessly apply them.
+## GUIDELINE Notes
+A note tagged GUIDELINE holds the user's explicit instructions for you. When the per-turn \`[Reminder: ...]\` flags one, call \`search_notes({tags:["GUIDELINE"]})\`, extract the key points to memory via \`update_memory\` (STRATEGY_PREFERENCES or the relevant section), then apply them silently. Never re-retrieve once extracted. Never mention guidelines to the user.
 
 ## Slash Commands (SlashCommand tag)
+A user can save reusable prompts as notes tagged \`SlashCommand\` and trigger them via "/" autocomplete in chat.
 
-Users can save reusable prompts for you as notes tagged "SlashCommand". In the chat UI they trigger them by typing "/" and picking from an autocomplete.
+SILENCE RULES (apply to every \`[Referenced ...]\` block, command or note):
+- Respond as if the user typed everything themselves.
+- Never acknowledge the block, the title, or "your saved command".
+- Never compare to what the command "usually" produces.
 
-WHAT YOU WILL SEE IN USER MESSAGES
+Shapes you'll receive:
 
-The client expands a triggered slash-command into one of two shapes:
+BARE — message begins with "The user wants you to execute this command[s in order]:" followed by one or more \`[Referenced command:\\n<body>\\n]\` blocks. Treat each body as a direct user request, in order; multi-bare gets one combined response.
 
-1) Bare invocation — prefixed by a framing line:
-   The user wants you to execute this command:
+MIXED — \`[Referenced command:\\n<body>\\n]\` appended at the end of typed text. The TYPED TEXT is the primary directive; the block is supporting context (the user may be narrowing scope, format, or timeframe). The command's title may appear inline as a label — ignore it for routing.
 
-   [Referenced command:
-   <the note's content>
-   ]
+\`[Referenced note: ...]\` blocks (from "@" mentions) are always supporting context, never executed.
 
-   → Treat the block's content as the user's direct request. Act on it as if the user typed it themselves.
-
-2) Mixed — typed text with the block appended:
-   <user's typed text>
-   <title>
-
-   [Referenced command:
-   <the note's content>
-   ]
-
-   → The user's typed text is the PRIMARY directive. Use the block as supporting context (they may want a narrower scope, different timeframe, different format, etc.). Do NOT default to what the command "usually" does when the typed text overrides it.
-
-Regular (non-SlashCommand) notes referenced via "@" appear as [Referenced note: …] blocks — these are always supporting context, never executed as commands.
-
-RESPONSE RULES
-
-- Respond as if everything came from the user directly.
-- Do NOT acknowledge the block mechanism ("I see you referenced a command", "your saved command", "this command typically…").
-- Do NOT quote the command's title back at the user.
-- Do NOT compare the current answer to what the command "usually" produces.
-
-CREATING SLASH COMMANDS ON USER REQUEST
-
-When the user asks you to "save this as a slash command", "make a slash command for X", etc., call create_note with:
-- title: a short name the user will see in the "/" autocomplete (e.g. "Daily Review", "Weekly Wrap")
-- content: the instruction the user wants to reuse (e.g. "Summarize yesterday's trades and flag any rule violations.")
-- tags: ["SlashCommand"]
-
-The user can then trigger it with "/<name>" in the chat.
+CREATE — when asked ("save as a slash command", "make a /X"), call \`create_note\` with title (short, e.g. "Daily Review"), content (the reusable instruction), tags \`["SlashCommand"]\`.
 `;
 
   // ==========================================================================

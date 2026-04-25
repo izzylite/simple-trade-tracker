@@ -158,7 +158,12 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   const [inputMessage, setInputMessage] = useState('');
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [showScrollDown, setShowScrollDown] = useState(false);
+  const [mentionWarning, setMentionWarning] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Re-entrancy guard: isLoading is only flipped inside sendMessage(), but
+  // we await note fetches before reaching that call. Without this ref a
+  // double-click on Send fires two parallel requests.
+  const sendingRef = useRef(false);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -206,34 +211,53 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   const handleSendMessage = async () => {
     const plainText = inputMessage.trim();
     if ((!plainText && attachedImages.length === 0) || isLoading) return;
-
-    const segments = inputRef.current?.getSegments() ?? [];
-    const mentionedIds = segments
-      .filter((s): s is Extract<typeof s, { type: 'note-mention' }> => s.type === 'note-mention')
-      .map(s => s.noteId);
-    const notesMap = new Map<string, { title: string; content: string; tags: string[] }>();
-    if (mentionedIds.length > 0) {
-      const fetched = await Promise.all(mentionedIds.map(id => notesService.getNote(id)));
-      fetched.forEach(note => {
-        if (note) notesMap.set(note.id, {
-          title: note.title,
-          content: note.content ?? '',
-          tags: note.tags ?? [],
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    try {
+      const segments = inputRef.current?.getSegments() ?? [];
+      const mentionSegs = segments.filter(
+        (s): s is Extract<typeof s, { type: 'note-mention' }> => s.type === 'note-mention'
+      );
+      const mentionedIds = mentionSegs.map(s => s.noteId);
+      const notesMap = new Map<string, { title: string; content: string; tags: string[] }>();
+      if (mentionedIds.length > 0) {
+        const fetched = await Promise.all(mentionedIds.map(id => notesService.getNote(id)));
+        fetched.forEach(note => {
+          if (note) notesMap.set(note.id, {
+            title: note.title,
+            content: note.content ?? '',
+            tags: note.tags ?? [],
+          });
         });
-      });
-    }
-    const outgoing = segments.length > 0
-      ? expandMentionsForSend(segments, notesMap)
-      : plainText;
 
-    const imagesToSend = attachedImages.length > 0 ? [...attachedImages] : undefined;
-    setInputMessage('');
-    setAttachedImages([]);
-    // Persist segments alongside the message so Edit can rebuild chips.
-    const segmentsToPersist = segments.some(s => s.type === 'note-mention')
-      ? segments
-      : undefined;
-    await sendMessage(outgoing, imagesToSend, segmentsToPersist);
+        // Block the send when any referenced note has been deleted —
+        // otherwise expandMentionsForSend silently drops the block and the
+        // user gets a stray title in their message with no idea why.
+        const missing = mentionSegs.filter(s => !notesMap.has(s.noteId));
+        if (missing.length > 0) {
+          const titles = missing.map(s => `"${s.noteTitle}"`).join(', ');
+          const noun = missing.length === 1 ? 'note' : 'notes';
+          setMentionWarning(
+            `Referenced ${noun} ${titles} no longer exist. Remove the chip or pick a different ${noun} to send.`
+          );
+          return;
+        }
+      }
+      setMentionWarning(null);
+
+      const outgoing = segments.length > 0
+        ? expandMentionsForSend(segments, notesMap)
+        : plainText;
+
+      const imagesToSend = attachedImages.length > 0 ? [...attachedImages] : undefined;
+      setInputMessage('');
+      setAttachedImages([]);
+      // Persist segments alongside the message so Edit can rebuild chips.
+      const segmentsToPersist = mentionSegs.length > 0 ? segments : undefined;
+      await sendMessage(outgoing, imagesToSend, segmentsToPersist);
+    } finally {
+      sendingRef.current = false;
+    }
   };
 
   // Image upload handlers
@@ -349,16 +373,11 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
     const editData = setInputForEdit(messageId);
     if (editData) {
       if (editData.segments && editData.segments.length > 0) {
-        // Rebuild the editor with chip entities from persisted segments.
-        // Plain text matches what the chips serialize to, so the parent's
-        // value-sync effect won't clobber.
-        const plainFromSegs = editData.segments
-          .map(s => (s.type === 'text' ? s.value : s.noteTitle))
-          .join('');
-        setInputMessage(plainFromSegs);
-        // Defer to next tick so setInputMessage's re-render runs the value
-        // sync effect first; setSegments then takes over with the rich state.
-        setTimeout(() => inputRef.current?.setSegments?.(editData.segments!), 0);
+        // Rebuild the editor with chip entities. setSegments calls onChange
+        // internally to sync the parent's value, so the value-sync effect
+        // sees a matching plain text and bails out instead of rebuilding
+        // a plain EditorState that would wipe the chips.
+        inputRef.current?.setSegments?.(editData.segments);
       } else {
         // Legacy / no-mention message — strip any leftover Referenced blocks
         // and use plain text. User can re-add a slash command via "/".
@@ -651,6 +670,19 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
               This conversation has reached the maximum length of {messageLimit} messages.
               Please start a new conversation to continue.
             </Typography>
+          </Alert>
+        </Box>
+      )}
+
+      {/* Mention Warning (deleted referenced note) */}
+      {mentionWarning && (
+        <Box sx={{ p: 2, pb: 0 }}>
+          <Alert
+            severity="warning"
+            onClose={() => setMentionWarning(null)}
+            sx={{ borderRadius: 2 }}
+          >
+            <Typography variant="body2">{mentionWarning}</Typography>
           </Alert>
         </Box>
       )}

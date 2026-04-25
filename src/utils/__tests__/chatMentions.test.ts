@@ -35,8 +35,27 @@ describe('detectMentionTrigger', () => {
   });
 
   it('returns null when term contains invalid chars', () => {
-    expect(detectMentionTrigger('/foo bar', 8)).toBeNull();
     expect(detectMentionTrigger('/foo!', 5)).toBeNull();
+    expect(detectMentionTrigger('/foo?', 5)).toBeNull();
+  });
+
+  it('allows spaces inside term to filter multi-word slash commands', () => {
+    expect(detectMentionTrigger('/Daily Review', 13)).toEqual({
+      kind: 'slash', term: 'Daily Review', start: 0,
+    });
+    expect(detectMentionTrigger('/Daily ', 7)).toEqual({
+      kind: 'slash', term: 'Daily ', start: 0,
+    });
+  });
+
+  it('closes the popup on pure-trailing-space (stale "/" residue)', () => {
+    expect(detectMentionTrigger('/ ', 2)).toBeNull();
+    expect(detectMentionTrigger('/   ', 4)).toBeNull();
+  });
+
+  it('closes the popup once the term is unreasonably long', () => {
+    const longish = '/' + 'a'.repeat(50);
+    expect(detectMentionTrigger(longish, longish.length)).toBeNull();
   });
 
   it('prefers the most recent trigger char', () => {
@@ -156,6 +175,40 @@ describe('stripReferencedBlocks', () => {
   it('strips multiple blocks in one message', () => {
     const input = 'compare both\n\n[Referenced command:\nA\n]\n\n[Referenced note:\nB\n]';
     expect(stripReferencedBlocks(input)).toBe('compare both');
+  });
+
+  it('does not terminate early on a `\\n]` inside note content', () => {
+    // Content with a markdown-list-style line ending in `]` used to make
+    // the strip stop at the first `\n]`, leaving an orphan tail.
+    const input = '[Referenced command:\n[a]\n[b]\n]';
+    expect(stripReferencedBlocks(input)).toBe('');
+  });
+
+  it('round-trips with the producer for a slash-command containing `\\n]`', () => {
+    const note = { title: 'X', content: 'foo\n]bar', tags: [SLASH_COMMAND_TAG] };
+    const segs: MessageSegment[] = [
+      { type: 'note-mention', noteId: 'rx', noteTitle: 'X' }
+    ];
+    const produced = expandMentionsForSend(
+      segs,
+      new Map([['rx', note]])
+    );
+    expect(stripReferencedBlocks(produced)).toBe('');
+  });
+});
+
+describe('expandMentionsForSend (length cap)', () => {
+  it('truncates very large note content with a marker', () => {
+    const huge = 'x'.repeat(20000);
+    const map = new Map([
+      ['big', { title: 'Big', content: huge, tags: [SLASH_COMMAND_TAG] }],
+    ]);
+    const out = expandMentionsForSend(
+      [{ type: 'note-mention', noteId: 'big', noteTitle: 'Big' }],
+      map
+    );
+    expect(out.length).toBeLessThan(huge.length);
+    expect(out).toMatch(/truncated: \d+ more chars/);
   });
 });
 

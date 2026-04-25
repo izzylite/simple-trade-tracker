@@ -69,7 +69,17 @@ import {
   StickyNote2Outlined as NoteIcon,
   LocalOfferOutlined as TagIcon2,
   EventOutlined as EventIcon,
+  TrackChanges as StrategyIcon,
+  EventNote as GamePlanIcon,
+  Lightbulb as InsightIcon,
+  School as LessonIcon,
+  Description as GeneralIcon,
+  Shield as RiskIcon,
+  Psychology as PsychologyIcon,
+  Gavel as GuidelineIcon,
+  Bolt as SlashCommandIcon,
 } from '@mui/icons-material';
+import type { SvgIconComponent } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -103,17 +113,19 @@ import type {
 export interface TagInfo {
   label: string;
   subtitle: string;
+  Icon: SvgIconComponent;
 }
 
 export const DEFAULT_NOTE_TAGS_MAP: Record<string, TagInfo> = {
-  'STRATEGY': { label: 'Strategy', subtitle: 'Long-term trading approach and rules' },
-  'GAME_PLAN': { label: 'Game Plan', subtitle: 'Specific plan for the upcoming session' },
-  'INSIGHT': { label: 'Insight', subtitle: 'Market observations and patterns' },
-  'LESSON_LEARNED': { label: 'Lesson Learned', subtitle: 'Review of mistakes and successes' },
-  'GENERAL': { label: 'General', subtitle: 'General notes and thoughts' },
-  'RISK_MANAGEMENT': { label: 'Risk Management', subtitle: 'Position sizing and stop-loss rules' },
-  'PSYCHOLOGY': { label: 'Psychology', subtitle: 'Mental state and emotional control' },
-  'GUIDELINE': { label: 'Guideline', subtitle: 'Instructions for the Orion (Max 1)' },
+  'STRATEGY': { label: 'Strategy', subtitle: 'Long-term trading approach and rules', Icon: StrategyIcon },
+  'GAME_PLAN': { label: 'Game Plan', subtitle: 'Specific plan for the upcoming session', Icon: GamePlanIcon },
+  'INSIGHT': { label: 'Insight', subtitle: 'Market observations and patterns', Icon: InsightIcon },
+  'LESSON_LEARNED': { label: 'Lesson Learned', subtitle: 'Review of mistakes and successes', Icon: LessonIcon },
+  'GENERAL': { label: 'General', subtitle: 'General notes and thoughts', Icon: GeneralIcon },
+  'RISK_MANAGEMENT': { label: 'Risk Management', subtitle: 'Position sizing and stop-loss rules', Icon: RiskIcon },
+  'PSYCHOLOGY': { label: 'Psychology', subtitle: 'Mental state and emotional control', Icon: PsychologyIcon },
+  'GUIDELINE': { label: 'Guideline', subtitle: 'Instructions for Orion (max 1)', Icon: GuidelineIcon },
+  'SlashCommand': { label: 'Slash Command', subtitle: 'Reusable AI prompt — trigger via "/" in chat', Icon: SlashCommandIcon },
 };
 
 // Helper to get display label for a tag (returns original if not a default tag)
@@ -123,6 +135,10 @@ export const getTagDisplayLabel = (tag: string): string => {
 
 export const getTagSubtitle = (tag: string): string => {
   return DEFAULT_NOTE_TAGS_MAP[tag]?.subtitle || '';
+};
+
+export const getTagIcon = (tag: string): SvgIconComponent | undefined => {
+  return DEFAULT_NOTE_TAGS_MAP[tag]?.Icon;
 };
 
 interface NoteEditorDialogProps {

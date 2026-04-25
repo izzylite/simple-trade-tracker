@@ -285,15 +285,30 @@ function createSSEEvent(event: SSEEventType, data: any): string {
  * prompt's slash-command section covers how to interpret them.
  */
 function frameBareSlashCommand(message: string): string {
-  // Strict: the entire trimmed body must be exactly one [Referenced command:]
-  // block, nothing before or after. The client emits this shape only for
-  // bare-invocation (/-trigger with no other typed text). Mixed messages
-  // always have additional text and fall through unchanged.
+  // Strict: the entire trimmed body must be one or more [Referenced command:]
+  // blocks separated by `\n\n`, nothing before or after. The client emits
+  // this shape only when the user invoked one or more slash commands with
+  // no other typed text. Mixed messages — any user text, or any
+  // [Referenced note:] block — fall through unchanged.
+  //
+  // The inner content uses a tempered greedy token `(?:(?!\n\n\[Referenced ).)*?`
+  // (with the s-flag so `.` matches newlines) to prevent the lazy match
+  // from extending past a block boundary. Without this, a message like
+  // `[Referenced command:\nA\n]\n\n[Referenced note:\nB\n]` would match
+  // as a single bare command whose body includes the trailing note block.
+  //
+  // Format constants live in src/utils/chatMentions.ts (BLOCK_OPEN_PREFIX
+  // etc). If you change them there, update this regex too.
   const trimmed = message.trim();
-  const bareRe = /^(\[Referenced command:\n[\s\S]*?\n\])$/;
+  const bareRe =
+    /^(\[Referenced command:\n(?:(?!\n\n\[Referenced ).)*?\n\](?:\n\n\[Referenced command:\n(?:(?!\n\n\[Referenced ).)*?\n\])*)$/s;
   const m = bareRe.exec(trimmed);
   if (!m) return message;
-  return `The user wants you to execute this command:\n\n${m[1]}`;
+  const isMulti = m[1].includes('\n\n[Referenced command:');
+  const directive = isMulti
+    ? 'The user wants you to execute these commands in order:'
+    : 'The user wants you to execute this command:';
+  return `${directive}\n\n${m[1]}`;
 }
 
 /**
