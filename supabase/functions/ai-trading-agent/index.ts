@@ -267,6 +267,51 @@ function createSSEEvent(event: SSEEventType, data: any): string {
 }
 
 /**
+ * Frame a bare slash-command turn with an explicit execute directive.
+ *
+ * Client-side expansion always emits a `[Referenced command:\n<body>\n]`
+ * block, optionally preceded by a single-line title from the chip. When the
+ * user's entire message body is nothing but that block (bare command
+ * invocation), wrap it so Gemini treats the block content as the primary
+ * directive:
+ *
+ *   The user wants you to execute this command:
+ *
+ *   [Referenced command:
+ *   <body>
+ *   ]
+ *
+ * Mixed messages (typed text + block) are returned unchanged — the system
+ * prompt's slash-command section covers how to interpret them.
+ */
+function frameBareSlashCommand(message: string): string {
+  // Strict: the entire trimmed body must be one or more [Referenced command:]
+  // blocks separated by `\n\n`, nothing before or after. The client emits
+  // this shape only when the user invoked one or more slash commands with
+  // no other typed text. Mixed messages — any user text, or any
+  // [Referenced note:] block — fall through unchanged.
+  //
+  // The inner content uses a tempered greedy token `(?:(?!\n\n\[Referenced ).)*?`
+  // (with the s-flag so `.` matches newlines) to prevent the lazy match
+  // from extending past a block boundary. Without this, a message like
+  // `[Referenced command:\nA\n]\n\n[Referenced note:\nB\n]` would match
+  // as a single bare command whose body includes the trailing note block.
+  //
+  // Format constants live in src/utils/chatMentions.ts (BLOCK_OPEN_PREFIX
+  // etc). If you change them there, update this regex too.
+  const trimmed = message.trim();
+  const bareRe =
+    /^(\[Referenced command:\n(?:(?!\n\n\[Referenced ).)*?\n\](?:\n\n\[Referenced command:\n(?:(?!\n\n\[Referenced ).)*?\n\])*)$/s;
+  const m = bareRe.exec(trimmed);
+  if (!m) return message;
+  const isMulti = m[1].includes('\n\n[Referenced command:');
+  const directive = isMulti
+    ? 'The user wants you to execute these commands in order:'
+    : 'The user wants you to execute this command:';
+  return `${directive}\n\n${m[1]}`;
+}
+
+/**
  * Create readable stream for SSE
  */
 function createSSEStream(): { stream: ReadableStream; writer: WritableStreamDefaultWriter } {
@@ -1484,9 +1529,18 @@ Deno.serve(async (req: Request) => {
         `is not already in your memory, call search_notes({tags:["GUIDELINE"]}) before answering. ` +
         `Do not mention this reminder to the user.]\n\n`
       : '';
-    const messageWithReminder = temporalPrefix + guidelineReminderPrefix + effectiveMessage;
+    // If the user's message body is ONLY a [Referenced command:] block
+    // (optionally preceded by a single-line title from the client-side
+    // expansion), frame it explicitly so Gemini treats the block content as
+    // the primary directive. Mixed messages (typed text + block) are left
+    // alone — the system prompt tells Orion how to interpret those.
+    const framedMessage = frameBareSlashCommand(effectiveMessage);
+    const messageWithReminder = temporalPrefix + guidelineReminderPrefix + framedMessage;
     if (guidelineReminder) {
       log(`Injecting GUIDELINE reminder for note "${guidelineReminder.title}"`, 'info');
+    }
+    if (framedMessage !== effectiveMessage) {
+      log('Framed bare slash-command message with execute directive', 'info');
     }
 
     log('Sending request to Gemini with tools', 'info');

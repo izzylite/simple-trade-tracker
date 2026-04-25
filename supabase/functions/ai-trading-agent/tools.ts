@@ -160,6 +160,7 @@ export const createNoteTool: GeminiFunctionDeclaration = {
 
 USE CASES:
 - Save trading strategies, insights, lessons learned, or game plans for the user
+- Save a reusable prompt as a SlashCommand note (see "Slash Commands" in system prompt) — title becomes the / autocomplete name, content becomes the instruction
 
 ⚠️ CANNOT create AGENT_MEMORY notes - use update_memory tool instead (it auto-creates if needed).
 
@@ -180,7 +181,7 @@ Content should be in plain text format. User ID and Calendar ID are automaticall
         type: "array",
         items: { type: "string" },
         description:
-          'Categorize the note. Available: "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED", "RISK_MANAGEMENT", "PSYCHOLOGY", "GENERAL". Use "AGENT_MEMORY" ONLY for AI memory notes.',
+          'Categorize the note. Available: "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED", "RISK_MANAGEMENT", "PSYCHOLOGY", "GENERAL", "SlashCommand" (reusable / commands — see system prompt). Use "AGENT_MEMORY" ONLY for AI memory notes.',
       },
       reminder_type: {
         type: "string",
@@ -274,13 +275,14 @@ EXAMPLES:
 export const updateNoteTool: GeminiFunctionDeclaration = {
   name: "update_note",
   description:
-    `Update an existing AI-created note. You can only update notes that you created (by_assistant=true).
+    `Update an existing note. By default you can only update AI-created notes (by_assistant=true). EXCEPTION: notes tagged "SlashCommand" are user-owned but you may still update them on user request (e.g. "change my Daily Review slash command to also flag oversized losses").
 
 ⚠️ CANNOT update AGENT_MEMORY notes - use update_memory tool instead for memory management.
 
 USE CASES:
 - Refine strategies or update insights
-- Add/modify/remove tags and reminders`,
+- Add/modify/remove tags and reminders
+- Edit a saved SlashCommand note (the user's reusable / prompt)`,
   parameters: {
     type: "object",
     properties: {
@@ -301,7 +303,7 @@ USE CASES:
         type: "array",
         items: { type: "string" },
         description:
-          'Updated tags (optional). Available: "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED", "RISK_MANAGEMENT", "PSYCHOLOGY", "GENERAL", "AGENT_MEMORY".',
+          'Updated tags (optional). Available: "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED", "RISK_MANAGEMENT", "PSYCHOLOGY", "GENERAL", "SlashCommand", "AGENT_MEMORY".',
       },
       reminder_type: {
         type: "string",
@@ -334,7 +336,7 @@ USE CASES:
 export const deleteNoteTool: GeminiFunctionDeclaration = {
   name: "delete_note",
   description:
-    "Delete an existing AI-created note. You can only delete notes that you created (by_assistant=true). Use this to remove outdated or incorrect notes.",
+    `Delete an existing note. By default you can only delete AI-created notes (by_assistant=true). EXCEPTION: notes tagged "SlashCommand" are user-owned but you may delete them on explicit user request (e.g. "remove my Quick Review slash command"). Use this to remove outdated or incorrect notes.`,
   parameters: {
     type: "object",
     properties: {
@@ -364,6 +366,7 @@ AVAILABLE TAGS (use these to filter by category):
 - "RISK_MANAGEMENT" - Position sizing, stop loss rules, risk parameters
 - "PSYCHOLOGY" - Trading mindset, emotions, mental frameworks
 - "GENERAL" - Miscellaneous notes
+- "SlashCommand" - User-saved reusable prompts triggered via "/" in chat (see system prompt)
 - "AGENT_MEMORY" - AI persistent memory (retrieve at session start)
 
 SMART QUERYING EXAMPLES:
@@ -371,6 +374,7 @@ SMART QUERYING EXAMPLES:
 - Review strategies before trading: tags: ["STRATEGY"]
 - Understand daily preparation: tags: ["GAME_PLAN"]
 - Learn from past mistakes: tags: ["LESSON_LEARNED"]
+- List user's saved slash commands (e.g. "what slash commands do I have?"): tags: ["SlashCommand"]
 - Combine with search_query for precision: tags: ["STRATEGY"], search_query: "scalping"
 
 EMBEDDED IMAGES:
@@ -392,7 +396,7 @@ Returns both user-created and AI-created notes. User ID and Calendar ID are auto
         type: "array",
         items: { type: "string" },
         description:
-          'Filter by category. Available: "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED", "RISK_MANAGEMENT", "PSYCHOLOGY", "GENERAL", "AGENT_MEMORY". Notes must have ALL specified tags.',
+          'Filter by category. Available: "STRATEGY", "GAME_PLAN", "INSIGHT", "LESSON_LEARNED", "RISK_MANAGEMENT", "PSYCHOLOGY", "GENERAL", "SlashCommand", "AGENT_MEMORY". Notes must have ALL specified tags.',
       },
       include_archived: {
         type: "boolean",
@@ -1005,12 +1009,18 @@ export async function createNote(
       "blueGrey",
     ];
 
+    // SlashCommand notes are user-facing automations (they appear in the
+    // chat's "/" autocomplete). The calendar.notes JSONB trigger excludes
+    // by_assistant=true notes from the mirror, so flip the flag for these
+    // — even though Orion is creating them, they belong to the user.
+    const isSlashCommand = !!tags && tags.includes("SlashCommand");
+
     const noteData: Record<string, unknown> = {
       user_id: userId,
       calendar_id: calendarId,
       title: title,
       content: content,
-      by_assistant: true,
+      by_assistant: !isSlashCommand,
       is_archived: false,
       is_pinned: false,
       cover_image: null,
@@ -1019,24 +1029,11 @@ export async function createNote(
       tags: tags || [],
     };
 
-    // Assign color: use provided color or random assistant color
     if (color) {
       noteData.color = color;
     } else {
-      // Randomly select a color from the assistant palette
-      const randomColor =
+      noteData.color =
         ASSISTANT_COLORS[Math.floor(Math.random() * ASSISTANT_COLORS.length)];
-      noteData.color = randomColor;
-    }
-
-    // Assign color: use provided color or random assistant color
-    if (color) {
-      noteData.color = color;
-    } else {
-      // Randomly select a color from the assistant palette
-      const randomColor =
-        ASSISTANT_COLORS[Math.floor(Math.random() * ASSISTANT_COLORS.length)];
-      noteData.color = randomColor;
     }
 
     // Add reminder fields if provided
@@ -1084,6 +1081,7 @@ export async function createNote(
  */
 export async function updateNote(
   supabase: SupabaseClient,
+  userId: string,
   noteId: string,
   title?: string,
   content?: string,
@@ -1095,11 +1093,13 @@ export async function updateNote(
   try {
     log(`Updating note: ${noteId}`, "info");
 
-    // First, verify this is an AI-created note and check for AGENT_MEMORY
+    // Scope by user_id so service-role queries can't be tricked into
+    // touching another user's note via a leaked id.
     const { data: existingNote, error: fetchError } = await supabase
       .from("notes")
       .select("id, by_assistant, title, tags")
       .eq("id", noteId)
+      .eq("user_id", userId)
       .single();
 
     if (fetchError) {
@@ -1116,7 +1116,12 @@ export async function updateNote(
       return `Cannot update AGENT_MEMORY notes with update_note. Use the update_memory tool instead - it properly merges new insights with existing memory without losing information.`;
     }
 
-    if (!existingNote.by_assistant) {
+    // SlashCommand notes are user-facing automations: even though they're
+    // stored as user-owned (by_assistant=false) so they appear in the "/"
+    // popup, Orion is allowed to update them on user request.
+    const isSlashCommand = noteTags.includes("SlashCommand");
+
+    if (!existingNote.by_assistant && !isSlashCommand) {
       return `Permission denied: You can only update AI-created notes. This note was created by the user.`;
     }
 
@@ -1162,12 +1167,19 @@ export async function updateNote(
       }
     }
 
-    // Update the note
-    const { error: updateError } = await supabase
+    // Update the note. The "by_assistant=true" safety filter applies only
+    // to non-SlashCommand notes — SlashCommand notes are user-owned but
+    // intentionally manageable by Orion (see check above). user_id is
+    // always enforced so we can't write across user boundaries.
+    let updateQuery = supabase
       .from("notes")
       .update(updateData)
       .eq("id", noteId)
-      .eq("by_assistant", true); // Extra safety check
+      .eq("user_id", userId);
+    if (!isSlashCommand) {
+      updateQuery = updateQuery.eq("by_assistant", true);
+    }
+    const { error: updateError } = await updateQuery;
 
     if (updateError) {
       log(`Error updating note: ${updateError.message}`, "error");
@@ -1189,16 +1201,19 @@ export async function updateNote(
  */
 export async function deleteNote(
   supabase: SupabaseClient,
+  userId: string,
   noteId: string,
 ): Promise<string> {
   try {
     log(`Deleting note: ${noteId}`, "info");
 
-    // First, verify this is an AI-created note
+    // Scope by user_id so service-role queries can't be tricked into
+    // touching another user's note via a leaked id.
     const { data: existingNote, error: fetchError } = await supabase
       .from("notes")
-      .select("id, by_assistant, title")
+      .select("id, by_assistant, title, tags")
       .eq("id", noteId)
+      .eq("user_id", userId)
       .single();
 
     if (fetchError) {
@@ -1209,16 +1224,26 @@ export async function deleteNote(
       return `Note not found with ID: ${noteId}`;
     }
 
-    if (!existingNote.by_assistant) {
+    // SlashCommand notes are user-owned (by_assistant=false) so they show in
+    // the chat's "/" autocomplete, but Orion is allowed to delete them on
+    // user request — symmetric with the create + update path.
+    const isSlashCommand = (existingNote.tags || []).includes("SlashCommand");
+
+    if (!existingNote.by_assistant && !isSlashCommand) {
       return `Permission denied: You can only delete AI-created notes. This note was created by the user.`;
     }
 
-    // Delete the note
-    const { error: deleteError } = await supabase
+    // Delete the note. user_id is always enforced; the by_assistant
+    // safety filter applies only to non-SlashCommand notes.
+    let deleteQuery = supabase
       .from("notes")
       .delete()
       .eq("id", noteId)
-      .eq("by_assistant", true); // Extra safety check
+      .eq("user_id", userId);
+    if (!isSlashCommand) {
+      deleteQuery = deleteQuery.eq("by_assistant", true);
+    }
+    const { error: deleteError } = await deleteQuery;
 
     if (deleteError) {
       log(`Error deleting note: ${deleteError.message}`, "error");
@@ -2380,6 +2405,10 @@ export async function executeCustomTool(
         if (!supabase) {
           return "Supabase client not available for note update";
         }
+        const userId = context.userId || "";
+        if (!userId) {
+          return "User context required for note update";
+        }
         const noteId = typeof args.note_id === "string" ? args.note_id : "";
         const title = typeof args.title === "string" ? args.title : undefined;
         const content = typeof args.content === "string"
@@ -2397,6 +2426,7 @@ export async function executeCustomTool(
         const tags = Array.isArray(args.tags) ? args.tags : undefined;
         return await updateNote(
           supabase,
+          userId,
           noteId,
           title,
           content,
@@ -2411,8 +2441,12 @@ export async function executeCustomTool(
         if (!supabase) {
           return "Supabase client not available for note deletion";
         }
+        const userId = context.userId || "";
+        if (!userId) {
+          return "User context required for note deletion";
+        }
         const noteId = typeof args.note_id === "string" ? args.note_id : "";
-        return await deleteNote(supabase, noteId);
+        return await deleteNote(supabase, userId, noteId);
       }
 
       case "search_notes": {

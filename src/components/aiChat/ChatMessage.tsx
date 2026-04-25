@@ -31,6 +31,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
+import { stripReferencedBlocks } from '../../utils/chatMentions';
 import { ChatMessage as ChatMessageType } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
 import { EconomicEvent } from '../../types/economicCalendar';
@@ -78,41 +79,47 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const isAssistant = message.role === 'assistant';
   const isDark = theme.palette.mode === 'dark';
 
-  // Split user message text into segments with inline tag chips
-  const renderUserContentWithTagChips = useMemo(() => {
-    if (!isUser || availableTags.length === 0) return null;
+  // Render a note-mention as a simple title chip — matches the editor's
+  // NoteMentionEntity styling so the chip in the transcript looks identical
+  // to the chip that appears while editing.
+  const noteChipSx = useMemo(() => ({
+    display: 'inline-flex',
+    verticalAlign: 'middle',
+    height: 22,
+    fontSize: '0.75rem',
+    mx: 0.25,
+    cursor: 'default',
+    backgroundColor: alpha(theme.palette.info.main, 0.1),
+    color: theme.palette.info.main,
+    border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
+  }), [theme]);
 
-    const content = message.content;
+  // Render a run of plain text, with any availableTags substrings converted
+  // to tag chips (same behaviour as before for typed text).
+  const renderTextWithTagChips = (text: string, keyPrefix: string): React.ReactNode[] => {
+    if (availableTags.length === 0) return [text];
     const sortedTags = [...availableTags].sort((a, b) => b.length - a.length);
-
     const matches: Array<{ start: number; end: number; tag: string }> = [];
     for (const tag of sortedTags) {
       let searchFrom = 0;
-      while (searchFrom < content.length) {
-        const idx = content.indexOf(tag, searchFrom);
+      while (searchFrom < text.length) {
+        const idx = text.indexOf(tag, searchFrom);
         if (idx === -1) break;
-        const overlaps = matches.some(m => idx < m.end && idx + tag.length > m.start);
-        if (!overlaps) {
-          matches.push({ start: idx, end: idx + tag.length, tag });
-        }
+        const end = idx + tag.length;
+        const overlaps = matches.some(m => idx < m.end && end > m.start);
+        if (!overlaps) matches.push({ start: idx, end, tag });
         searchFrom = idx + 1;
       }
     }
-
-    if (matches.length === 0) return null;
-
+    if (matches.length === 0) return [text];
     matches.sort((a, b) => a.start - b.start);
-
-    const segments: React.ReactNode[] = [];
+    const out: React.ReactNode[] = [];
     let lastIdx = 0;
-
     matches.forEach((m, i) => {
-      if (m.start > lastIdx) {
-        segments.push(content.substring(lastIdx, m.start));
-      }
-      segments.push(
+      if (m.start > lastIdx) out.push(text.substring(lastIdx, m.start));
+      out.push(
         <Chip
-          key={`user-tag-${i}`}
+          key={`${keyPrefix}-tag-${i}`}
           label={m.tag}
           size="small"
           sx={{
@@ -128,13 +135,46 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       );
       lastIdx = m.end;
     });
+    if (lastIdx < text.length) out.push(text.substring(lastIdx));
+    return out;
+  };
 
-    if (lastIdx < content.length) {
-      segments.push(content.substring(lastIdx));
+  // User message rendering:
+  //  - If segments were persisted (note mentions present), render each text
+  //    segment with tag-chip splitting + each note-mention as a title chip.
+  //    This is the common case for mentions and gives transcript↔editor parity.
+  //  - Otherwise, strip any leftover [Referenced ...:] blocks from the raw
+  //    content (legacy messages) and render typed text with tag chips only.
+  const renderUserContentWithTagChips = useMemo(() => {
+    if (!isUser) return null;
+
+    if (message.segments && message.segments.length > 0) {
+      const out: React.ReactNode[] = [];
+      message.segments.forEach((seg, i) => {
+        if (seg.type === 'text') {
+          out.push(...renderTextWithTagChips(seg.value, `seg-${i}`));
+        } else {
+          out.push(
+            <Chip
+              key={`seg-${i}-note`}
+              label={seg.noteTitle}
+              size="small"
+              sx={noteChipSx}
+            />
+          );
+        }
+      });
+      return out;
     }
 
-    return segments;
-  }, [isUser, message.content, availableTags, theme]);
+    const plain = stripReferencedBlocks(message.content);
+    const rendered = renderTextWithTagChips(plain, 'plain');
+    if (rendered.length === 1 && typeof rendered[0] === 'string' && rendered[0] === message.content) {
+      return null; // no transformation happened — let the fallback renderer handle it
+    }
+    return rendered;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUser, message.content, message.segments, availableTags, theme, noteChipSx]);
 
   const handleCopy = async () => {
     try {

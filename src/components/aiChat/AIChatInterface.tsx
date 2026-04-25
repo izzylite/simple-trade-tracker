@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import ChatMessage from './ChatMessage';
 import AIChatMentionInput from './AIChatMentionInput';
+import type { AIChatMentionInputHandle } from './AIChatMentionInput';
 import { ChatMessage as ChatMessageType, AttachedImage } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
@@ -36,6 +37,8 @@ import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
 import { logger } from '../../utils/logger';
 import { compressImageToDataUrl } from '../../utils/fileValidation';
+import * as notesService from '../../services/notesService';
+import { expandMentionsForSend, stripReferencedBlocks } from '../../utils/chatMentions';
 
 // Image limit for AI agent requests (must match backend MAX_IMAGES_PER_REQUEST)
 const MAX_IMAGES = 4;
@@ -91,9 +94,9 @@ export interface AIChatInterfaceProps {
   isAtMessageLimit: boolean;
 
   // Actions from useAIChat hook
-  sendMessage: (messageText: string, images?: AttachedImage[]) => Promise<void>;
+  sendMessage: (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments']) => Promise<void>;
   cancelRequest: () => void;
-  setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[] } | null;
+  setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[]; segments?: ChatMessageType['segments'] } | null;
   startNewChat: () => Promise<void>;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessageType[]>>;
   getWelcomeMessage: () => ChatMessageType;
@@ -149,13 +152,18 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   const theme = useTheme();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<any>(null);
+  const inputRef = useRef<AIChatMentionInputHandle | null>(null);
 
   // Local UI state
   const [inputMessage, setInputMessage] = useState('');
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [showScrollDown, setShowScrollDown] = useState(false);
+  const [mentionWarning, setMentionWarning] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Re-entrancy guard: isLoading is only flipped inside sendMessage(), but
+  // we await note fetches before reaching that call. Without this ref a
+  // double-click on Send fires two parallel requests.
+  const sendingRef = useRef(false);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -201,13 +209,55 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
 
   // Event Handlers
   const handleSendMessage = async () => {
-    const messageText = inputMessage.trim();
-    if ((!messageText && attachedImages.length === 0) || isLoading) return;
+    const plainText = inputMessage.trim();
+    if ((!plainText && attachedImages.length === 0) || isLoading) return;
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    try {
+      const segments = inputRef.current?.getSegments() ?? [];
+      const mentionSegs = segments.filter(
+        (s): s is Extract<typeof s, { type: 'note-mention' }> => s.type === 'note-mention'
+      );
+      const mentionedIds = mentionSegs.map(s => s.noteId);
+      const notesMap = new Map<string, { title: string; content: string; tags: string[] }>();
+      if (mentionedIds.length > 0) {
+        const fetched = await Promise.all(mentionedIds.map(id => notesService.getNote(id)));
+        fetched.forEach(note => {
+          if (note) notesMap.set(note.id, {
+            title: note.title,
+            content: note.content ?? '',
+            tags: note.tags ?? [],
+          });
+        });
 
-    const imagesToSend = attachedImages.length > 0 ? [...attachedImages] : undefined;
-    setInputMessage('');
-    setAttachedImages([]);
-    await sendMessage(messageText, imagesToSend);
+        // Block the send when any referenced note has been deleted —
+        // otherwise expandMentionsForSend silently drops the block and the
+        // user gets a stray title in their message with no idea why.
+        const missing = mentionSegs.filter(s => !notesMap.has(s.noteId));
+        if (missing.length > 0) {
+          const titles = missing.map(s => `"${s.noteTitle}"`).join(', ');
+          const noun = missing.length === 1 ? 'note' : 'notes';
+          setMentionWarning(
+            `Referenced ${noun} ${titles} no longer exist. Remove the chip or pick a different ${noun} to send.`
+          );
+          return;
+        }
+      }
+      setMentionWarning(null);
+
+      const outgoing = segments.length > 0
+        ? expandMentionsForSend(segments, notesMap)
+        : plainText;
+
+      const imagesToSend = attachedImages.length > 0 ? [...attachedImages] : undefined;
+      setInputMessage('');
+      setAttachedImages([]);
+      // Persist segments alongside the message so Edit can rebuild chips.
+      const segmentsToPersist = mentionSegs.length > 0 ? segments : undefined;
+      await sendMessage(outgoing, imagesToSend, segmentsToPersist);
+    } finally {
+      sendingRef.current = false;
+    }
   };
 
   // Image upload handlers
@@ -322,7 +372,17 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   const handleEditMessage = useCallback((messageId: string) => {
     const editData = setInputForEdit(messageId);
     if (editData) {
-      setInputMessage(editData.content);
+      if (editData.segments && editData.segments.length > 0) {
+        // Rebuild the editor with chip entities. setSegments calls onChange
+        // internally to sync the parent's value, so the value-sync effect
+        // sees a matching plain text and bails out instead of rebuilding
+        // a plain EditorState that would wipe the chips.
+        inputRef.current?.setSegments?.(editData.segments);
+      } else {
+        // Legacy / no-mention message — strip any leftover Referenced blocks
+        // and use plain text. User can re-add a slash command via "/".
+        setInputMessage(stripReferencedBlocks(editData.content));
+      }
       // Restore images when editing
       if (editData.images && editData.images.length > 0) {
         setAttachedImages(editData.images);
@@ -380,8 +440,17 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   }, [onNoteClick]);
 
   // Memoize inputs passed to the mention input so its React.memo can stick.
+  // calendar.notes is a JSONB mirror of {id, title, tags} maintained by a DB
+  // trigger — we can read it directly without a round-trip to the notes table.
   const allTagsMemo = useMemo(() => calendar?.tags || [], [calendar?.tags]);
-  const allNotesMemo = useMemo(() => calendar?.notes ?? [], [calendar?.notes]);
+  const allNotesMemo = useMemo(
+    () => (calendar?.notes ?? []).map(n => ({
+      id: n.id,
+      title: n.title,
+      tags: n.tags ?? [],
+    })),
+    [calendar?.notes]
+  );
   const availableTagsMemo = useMemo(() => calendar?.tags || [], [calendar?.tags]);
   const mentionInputSx = useMemo(
     () => ({ flex: 1, minWidth: 0, fontSize: '0.95rem', lineHeight: 1.4 }),
@@ -605,6 +674,19 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
         </Box>
       )}
 
+      {/* Mention Warning (deleted referenced note) */}
+      {mentionWarning && (
+        <Box sx={{ p: 2, pb: 0 }}>
+          <Alert
+            severity="warning"
+            onClose={() => setMentionWarning(null)}
+            sx={{ borderRadius: 2 }}
+          >
+            <Typography variant="body2">{mentionWarning}</Typography>
+          </Alert>
+        </Box>
+      )}
+
       {/* Input Area */}
       <Box sx={{
         p: 2,
@@ -797,7 +879,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             opacity: 0.7
           }}
         >
-          {`Enter to send • Shift+Enter newline • / for tags & notes • Up to ${MAX_IMAGES} images`}
+          {`Enter to send • Shift+Enter newline • / for commands • @ for notes & tags • Up to ${MAX_IMAGES} images`}
         </Typography>
       </Box>
 

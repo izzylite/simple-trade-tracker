@@ -112,3 +112,10 @@ export interface ReminderConfig {
   date?: Date | null;
   days?: DayAbbreviation[];
 }
+
+/**
+ * Reserved tag string that marks a note as a slash-command (a reusable Orion prompt).
+ * Only special in: (a) the chat input's `/` popup filter, (b) the Orion system prompt
+ * contract. Otherwise treated like any user-applied tag.
+ */
+export const SLASH_COMMAND_TAG = 'SlashCommand';
