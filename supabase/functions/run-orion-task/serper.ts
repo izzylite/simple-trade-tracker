@@ -186,7 +186,7 @@ function aggregateBatch(
 }
 
 // ============================================================
-// Cached variants — shared across all users via serper_cache table
+// Cached variants — delegate to shared searchCache module
 // ============================================================
 //
 // Only use for queries that are TRULY shared (macro/session/market/breaking
@@ -194,59 +194,12 @@ function aggregateBatch(
 // cache because their keys would rarely hit.
 // ============================================================
 
-function makeCacheKey(
-  endpoint: 'news' | 'search',
-  query: string,
-  num: number,
-  timeRange?: string
-): string {
-  return `${endpoint}::${query}::${num}::${timeRange ?? ''}`;
-}
+import {
+  makeCacheKey,
+  readCache,
+  writeCache,
+} from '../_shared/searchCache.ts';
 
-async function readCache(
-  supabase: SupabaseClient,
-  cacheKey: string,
-  ttlSeconds: number
-): Promise<NewsResult[] | null> {
-  const cutoff = new Date(Date.now() - ttlSeconds * 1000).toISOString();
-  const { data, error } = await supabase
-    .from('serper_cache')
-    .select('results')
-    .eq('cache_key', cacheKey)
-    .gte('fetched_at', cutoff)
-    .maybeSingle();
-  if (error) {
-    log('Serper cache read error', 'warn', error);
-    return null;
-  }
-  if (!data) return null;
-  return data.results as NewsResult[];
-}
-
-async function writeCache(
-  supabase: SupabaseClient,
-  cacheKey: string,
-  endpoint: 'news' | 'search',
-  query: string,
-  results: NewsResult[]
-): Promise<void> {
-  const { error } = await supabase.from('serper_cache').upsert({
-    cache_key: cacheKey,
-    query,
-    endpoint,
-    results,
-    fetched_at: new Date().toISOString(),
-  });
-  if (error) {
-    log('Serper cache write error', 'warn', error);
-  }
-}
-
-/**
- * Cached single-news call. Returns null on Serper failure (same contract as
- * `searchNews`). Cache hits always return `NewsResult[]` — a cached entry
- * represents a previously-successful call.
- */
 export async function searchNewsCached(
   supabase: SupabaseClient,
   query: string,
@@ -254,7 +207,7 @@ export async function searchNewsCached(
   ttlSeconds: number,
   timeRange: NewsTimeRange = 'qdr:d'
 ): Promise<NewsResult[] | null> {
-  const cacheKey = makeCacheKey('news', query, num, timeRange);
+  const cacheKey = makeCacheKey('serper', 'news', query, num, timeRange);
   const cached = await readCache(supabase, cacheKey, ttlSeconds);
   if (cached) return cached;
 
@@ -287,7 +240,7 @@ export async function searchBreakingCached(
   num: number,
   ttlSeconds: number
 ): Promise<NewsResult[] | null> {
-  const cacheKey = makeCacheKey('search', query, num, timeRange);
+  const cacheKey = makeCacheKey('serper', 'search', query, num, timeRange);
   const cached = await readCache(supabase, cacheKey, ttlSeconds);
   if (cached) return cached;
 
