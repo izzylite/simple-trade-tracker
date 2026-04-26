@@ -60,8 +60,11 @@ export async function acquireKey(
     log("acquireKey: no available keys", "warn", { source });
     return null;
   }
-  const row = data as { id: number; key: string };
-  return { id: row.id, key: row.key };
+  // .maybeSingle() types data as `{} | null`; narrow with a single cast that
+  // matches the RPC's renamed OUT params (renamed from id/key to avoid
+  // shadowing the api_keys.id column inside the SQL function).
+  const row = data as { acquired_id: number; acquired_key: string };
+  return { id: row.acquired_id, key: row.acquired_key };
 }
 
 /**
@@ -74,35 +77,19 @@ export async function markQuotaExhausted(
   keyId: number,
   reason: string
 ): Promise<void> {
-  // Read current failure count, then write updated state. Two-step is fine
-  // here because last writer wins is acceptable — a slightly-too-short
-  // cooldown from a race just means we retry sooner than ideal.
-  const { data: row, error: readErr } = await supabase
-    .from("api_keys")
-    .select("consecutive_failures")
-    .eq("id", keyId)
-    .maybeSingle();
+  // Schedule is the BACKOFF_SCHEDULE_SECONDS array minus the index-0 sentinel.
+  // SQL receives a 1-indexed array where index N == cooldown for failure N,
+  // with the last entry acting as the cap (LEAST(failures, length) clamps).
+  const schedule = BACKOFF_SCHEDULE_SECONDS.slice(1);
 
-  if (readErr || !row) {
-    log("markQuotaExhausted: failed to read row", "error", { keyId, error: readErr });
-    return;
-  }
+  const { error } = await supabase.rpc("mark_quota_exhausted", {
+    p_key_id: keyId,
+    p_reason: reason,
+    p_schedule_seconds: schedule,
+  });
 
-  const newFailures = (row.consecutive_failures as number) + 1;
-  const cooldownMs = nextBackoffSeconds(newFailures) * 1000;
-  const nextRetry = new Date(Date.now() + cooldownMs).toISOString();
-
-  const { error: writeErr } = await supabase
-    .from("api_keys")
-    .update({
-      consecutive_failures: newFailures,
-      next_retry_at: nextRetry,
-      last_failure_reason: reason,
-    })
-    .eq("id", keyId);
-
-  if (writeErr) {
-    log("markQuotaExhausted: failed to write state", "error", { keyId, error: writeErr });
+  if (error) {
+    log("markQuotaExhausted: RPC failed", "error", { keyId, error });
   }
 }
 

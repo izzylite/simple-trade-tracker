@@ -2,9 +2,16 @@
 -- SKIP LOCKED ensures concurrent callers get different keys instead of blocking.
 -- SECURITY DEFINER so service_role can call it; we lock function ownership down
 -- via REVOKE/GRANT below.
+--
+-- DROP FUNCTION first because the OUT-parameter names were renamed
+-- (id/key -> acquired_id/acquired_key) to avoid shadowing api_keys.id inside
+-- the function body. Postgres treats a change in OUT param names/types as a
+-- return-type change, which CREATE OR REPLACE refuses.
+
+DROP FUNCTION IF EXISTS public.acquire_api_key(text);
 
 CREATE OR REPLACE FUNCTION public.acquire_api_key(p_source text)
-RETURNS TABLE(id bigint, key text)
+RETURNS TABLE(acquired_id bigint, acquired_key text)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
@@ -26,7 +33,7 @@ BEGIN
     RETURN;  -- empty result set: no keys available
   END IF;
 
-  UPDATE public.api_keys SET last_used_at = now() WHERE public.api_keys.id = v_id;
+  UPDATE public.api_keys SET last_used_at = now() WHERE id = v_id;
 
   RETURN QUERY SELECT v_id, v_key;
 END;
