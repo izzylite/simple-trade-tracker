@@ -18,7 +18,12 @@
 import { createServiceClient, log } from '../_shared/supabase.ts';
 import { runOrionAgent } from '../_shared/orionAgent.ts';
 import { callMCPTool, getCachedMCPTools, getMcpConfig } from '../_shared/orionMcp.ts';
-import { fetchAgentMemory } from '../_shared/orionMemory.ts';
+import { fetchMemory } from '../_shared/memory/index.ts';
+// Briefing-agent runs as a scheduled job with no live user — restrict
+// destructive memory ops because there's no user-in-the-loop signal that
+// could have authorised an UPDATE / REMOVE / REPLACE_SECTION. Additive
+// observations (patterns, etc.) are fine.
+const BRIEFING_ALLOWED_MEMORY_OPS: Set<'ADD'> = new Set(['ADD']);
 import { summarizeToolCalls } from '../_shared/toolLabels.ts';
 import {
   CUSTOM_TOOL_NAMES,
@@ -129,7 +134,7 @@ export async function generateBriefing(
   const allTools = [...mcpTools, ...customTools];
 
   // 3. Pre-load memory so the briefing is personalized from turn 0.
-  const preloadedMemory = await fetchAgentMemory(userId, calendarId);
+  const preloadedMemory = await fetchMemory(userId, calendarId);
 
   // 4. Build the same Orion system prompt chat uses. Rollup tasks get the full
   //    persona, guardrails, and reference docs for free.
@@ -149,7 +154,12 @@ export async function generateBriefing(
     args: Record<string, unknown>
   ): Promise<string> => {
     if (CUSTOM_TOOL_NAMES.has(name)) {
-      return executeCustomTool(name, args, { userId, calendarId }, supabase);
+      return executeCustomTool(
+        name,
+        args,
+        { userId, calendarId, allowedMemoryOps: BRIEFING_ALLOWED_MEMORY_OPS },
+        supabase,
+      );
     }
     return callMCPTool(projectRef, accessToken, name, args);
   };

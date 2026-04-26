@@ -19,6 +19,29 @@ import {
 } from "../_shared/noteTags.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { Note } from "./types.ts";
+import {
+  applyRuleChange,
+  type EpisodicEventType,
+  type MemoryOp,
+  type MemorySection,
+  recallEvents,
+  recordEvent,
+  updateMemory,
+} from "../_shared/memory/index.ts";
+
+/**
+ * Per-call context passed by edge-function entrypoints into the tool
+ * dispatcher. The chat function passes the user's id + calendar (memory
+ * is read-write); briefing-agent passes the same plus a restricted
+ * `allowedMemoryOps` set so unattended jobs can't do destructive edits
+ * without user-in-the-loop signal.
+ */
+export interface ToolContext {
+  userId?: string;
+  calendarId?: string;
+  // When omitted, updateMemory defaults to all ops permitted.
+  allowedMemoryOps?: Set<MemoryOp>;
+}
 
 /**
  * Gemini function declaration type
@@ -230,28 +253,39 @@ Content should be in plain text format. User ID and Calendar ID are automaticall
 export const updateMemoryTool: GeminiFunctionDeclaration = {
   name: "update_memory",
   description:
-    `Update your persistent memory with new insights. This tool MERGES new information with existing memory - it does NOT replace.
+    `Mutate your persistent memory with one of four ops:
 
-CRITICAL: Provide ONLY the new information to add. The system will automatically merge it with existing content.
+- ADD (default): append new bullets to a section. The server dedups against existing bullets — provide ONLY new information.
+- UPDATE: replace ONE existing bullet with refined text. Use when a fact changed but the topic is the same (e.g. user changed daily stop from $200 to $150 and the old "$200 stop" bullet is now wrong).
+- REMOVE: delete ONE existing bullet that is no longer true (e.g. user no longer trades a session they used to avoid).
+- REPLACE_SECTION: replace the entire ACTIVE_FOCUS section in one shot. Only valid for ACTIVE_FOCUS — other sections must use ADD/UPDATE/REMOVE.
 
-SECTIONS (choose one):
-- TRADER_PROFILE: Trading style, risk tolerance, experience level, timeframes
-- PERFORMANCE_PATTERNS: Setups/sessions that work, with win rates and evidence
-- STRATEGY_PREFERENCES: User-stated rules, entry criteria, risk management
-- PSYCHOLOGICAL_PATTERNS: Emotional triggers, tilt patterns, confidence cycles, behavioral tendencies
-- LESSONS_LEARNED: Errors to avoid, corrections received, communication preferences
-- ACTIVE_FOCUS: Current goals, things to watch (this section CAN be replaced)
+UPDATE and REMOVE identify the target via fuzzy text matching (Jaccard ≥ 0.85). If multiple bullets match or none match, the call is rejected — you'll receive the section's current contents to retry with a more specific target_text.
+
+SECTIONS:
+- TRADER_PROFILE — style, risk tolerance, baseline preferences
+- PERFORMANCE_PATTERNS — setups/sessions that work, with win rates + evidence
+- STRATEGY_PREFERENCES — user-stated rules, entry criteria, risk management
+- PSYCHOLOGICAL_PATTERNS — emotional triggers, tilt patterns, behavioral biases
+- LESSONS_LEARNED — errors to avoid, corrections, communication preferences
+- ACTIVE_FOCUS — current goals (this is the only section that supports REPLACE_SECTION)
 
 FORMAT each insight as: "[Pattern/Rule]: [Evidence] [Confidence: High/Med/Low] [YYYY-MM]"
 
 EXAMPLES:
-- "London session scalps: 72% win rate on 15 trades [High] [2024-12]"
-- "Avoids trading during FOMC: User preference stated [High] [2024-12]"
-- "Struggles with counter-trend entries: 30% win rate [Med] [2024-12]"
-- "Tends to overtrade after 2+ consecutive wins: Observed pattern [Med] [2024-12]"`,
+ADD:    op="ADD",    section="PERFORMANCE_PATTERNS", new_insights=["London scalps: 72% wr on 15 trades [High] [2026-04]"]
+UPDATE: op="UPDATE", section="STRATEGY_PREFERENCES", target_text="Daily stop $200", new_text="Daily stop $150 [High] [2026-04]"
+REMOVE: op="REMOVE", section="STRATEGY_PREFERENCES", target_text="Avoids Asian session"
+REPLACE_SECTION: op="REPLACE_SECTION", section="ACTIVE_FOCUS", new_insights=["Improve B+ execution discipline"]`,
   parameters: {
     type: "object",
     properties: {
+      op: {
+        type: "string",
+        enum: ["ADD", "UPDATE", "REMOVE", "REPLACE_SECTION"],
+        description:
+          "Operation to apply. Defaults to ADD if omitted. UPDATE/REMOVE require target_text; UPDATE additionally requires new_text; ADD/REPLACE_SECTION require new_insights.",
+      },
       section: {
         type: "string",
         enum: [
@@ -262,21 +296,240 @@ EXAMPLES:
           "LESSONS_LEARNED",
           "ACTIVE_FOCUS",
         ],
-        description: "Which section to update",
+        description: "Which section the op targets.",
       },
       new_insights: {
         type: "array",
         items: { type: "string" },
         description:
-          "New bullet points to ADD to this section (will be merged with existing)",
+          "ADD: bullets to append. REPLACE_SECTION: the new ACTIVE_FOCUS contents.",
       },
-      replace_section: {
-        type: "boolean",
+      target_text: {
+        type: "string",
         description:
-          "If true, replaces section entirely. Only use for ACTIVE_FOCUS when goals change completely. Default: false (merge mode)",
+          "UPDATE / REMOVE: text identifying the existing bullet to operate on. Fuzzy-matched against the section.",
+      },
+      new_text: {
+        type: "string",
+        description: "UPDATE: replacement text for the matched bullet.",
       },
     },
-    required: ["section", "new_insights"],
+    required: ["section"],
+  },
+};
+
+/**
+ * apply_rule_change — atomic pairing of record_event + update_memory.
+ *
+ * Designed because Gemini's function-calling consistently emits one tool
+ * per turn. Asking the model to coordinate record_event + update_memory
+ * via prompt rules failed in practice — model logged the event but
+ * skipped the memory mutation, leaving stale state. This tool collapses
+ * both writes into a single decision point.
+ */
+export const applyRuleChangeTool: GeminiFunctionDeclaration = {
+  name: "apply_rule_change",
+  description:
+    `ATOMIC PAIRING: logs an episodic event AND mutates core memory in a SINGLE call. Use this whenever the user changes a rule, makes a decision, or corrects something — INSTEAD OF calling record_event + update_memory separately.
+
+WHEN TO CALL:
+- User states they CHANGED, DECIDED, CORRECTED, TIGHTENED, LOOSENED, SWITCHED, or PIVOTED something.
+- User says "I've decided", "I'm changing", "from now on", "going forward", "actually", "you're wrong", "no it's", "let's change".
+- These triggers previously routed to record_event — now route to apply_rule_change so the stable memory state stays in sync with the event log.
+
+WHEN NOT TO CALL (use record_event alone instead):
+- You observed a pattern from data (no rule change) → record_event(pattern_observed)
+- A strategy was discussed but no rule change was decided → record_event(strategy_discussion)
+- You're extracting bullets from a note → update_memory(op=ADD)
+
+MEMORY OP CHOICE:
+- memory_op=UPDATE — for CHANGED facts: replace one bullet (provide target_text + new_text)
+- memory_op=REMOVE — for REVERSED preferences: delete one bullet (provide target_text)
+- memory_op=ADD — for genuinely-NEW rules with no existing bullet to update (provide new_insights)
+
+If memory_op rejection happens (no match / multi-match), the event is still logged; retry the memory leg only by calling update_memory directly with a sharper target_text.
+
+Example — user says "I'm tightening my max leverage from 2% to 1.5%":
+  apply_rule_change(
+    event_type="rule_changed",
+    summary="User tightened max leverage from 2% to 1.5%",
+    memory_op="UPDATE",
+    memory_section="STRATEGY_PREFERENCES",
+    target_text="Leverage Min 0.5% Max 2%",
+    new_text="Leverage: Min 0.5%, Max 1.5% [High] [2026-04]"
+  )`,
+  parameters: {
+    type: "object",
+    properties: {
+      event_type: {
+        type: "string",
+        enum: ["rule_changed", "user_correction", "decision_made"],
+      },
+      summary: {
+        type: "string",
+        description: "Past-tense single sentence (≤500 chars) describing what happened. Goes to the episodic log.",
+      },
+      memory_op: {
+        type: "string",
+        enum: ["ADD", "UPDATE", "REMOVE"],
+        description: "How to mutate core memory.",
+      },
+      memory_section: {
+        type: "string",
+        enum: [
+          "TRADER_PROFILE",
+          "PERFORMANCE_PATTERNS",
+          "STRATEGY_PREFERENCES",
+          "PSYCHOLOGICAL_PATTERNS",
+          "LESSONS_LEARNED",
+          "ACTIVE_FOCUS",
+        ],
+      },
+      target_text: {
+        type: "string",
+        description: "UPDATE / REMOVE: text identifying the existing bullet to operate on.",
+      },
+      new_text: {
+        type: "string",
+        description: "UPDATE: replacement for the matched bullet.",
+      },
+      new_insights: {
+        type: "array",
+        items: { type: "string" },
+        description: "ADD: bullets to append.",
+      },
+    },
+    required: ["event_type", "summary", "memory_op", "memory_section"],
+  },
+};
+
+/**
+ * Record an episodic event — time-stamped fact about *what happened*
+ * (separate from update_memory, which captures *what is true now*).
+ *
+ * Backed by the agent_memory_events table. Capped at 50 writes per
+ * (user, calendar) per day to prevent runaway prompts from spamming
+ * the log.
+ */
+export const recordEventTool: GeminiFunctionDeclaration = {
+  name: "record_event",
+  description:
+    `Append a time-stamped event to the episodic log. Use this to capture *what happened* during a session — corrections, rule changes, observed patterns, decisions — separately from update_memory which captures the trader's stable profile.
+
+WHEN TO CALL:
+- The user corrected something you said: event_type="user_correction"
+- The user changed a rule (stop, size, session, setup): event_type="rule_changed"
+- A pattern was discovered (e.g. losing streaks after 2 wins): event_type="pattern_observed"
+- A specific trading decision was discussed and agreed: event_type="decision_made"
+- A strategy was discussed in detail: event_type="strategy_discussion"
+
+WHEN NOT TO CALL:
+- Casual chitchat, simple data lookups, or routine acknowledgements
+- Anything the user wouldn't expect you to "remember happened on a specific day"
+
+FORMAT summary as ONE past-tense sentence in third person, max 500 chars:
+- Good: "User changed daily stop from $200 to $150 due to recent drawdown"
+- Bad: "I should remember that the user's stop is now $150" (first person, future-facing)
+- Bad: "Stop change" (too terse)
+
+Limit: 50 events per day per (user, calendar). Excess calls return a "log full" notice — do NOT retry on this turn.`,
+  parameters: {
+    type: "object",
+    properties: {
+      event_type: {
+        type: "string",
+        enum: [
+          "pattern_observed",
+          "user_correction",
+          "strategy_discussion",
+          "decision_made",
+          "rule_changed",
+        ],
+        description: "What kind of event to log.",
+      },
+      summary: {
+        type: "string",
+        description:
+          "Single past-tense sentence describing the event (max 500 chars).",
+      },
+      tags: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Optional tags for later recall (e.g. ['risk', 'london-session']).",
+      },
+      metadata: {
+        type: "object",
+        description:
+          "Optional structured context: trade_ids, source_note_id, confidence, etc.",
+      },
+    },
+    required: ["event_type", "summary"],
+  },
+};
+
+/**
+ * Recall episodic events — answers "have we discussed X / what changed
+ * last week / when did we decide Y" without scraping chat history.
+ *
+ * Backed by agent_memory_events. At least one filter is required to
+ * avoid full-table paginates — unfiltered recall is almost never what
+ * the agent actually wants.
+ */
+export const recallEventsTool: GeminiFunctionDeclaration = {
+  name: "recall_events",
+  description:
+    `Query the episodic event log to answer questions about *what happened* across past sessions. Prefer this over search_chat_history for "have we discussed X", "last time we talked about Y", "what changed recently" — events are structured and timestamped, chat history is fuzzy.
+
+REQUIRES at least one filter (event_types, tags, since, or query). Unfiltered calls are rejected.
+
+FILTERS (combine freely):
+- event_types: limit to specific kinds (rule_changed, user_correction, etc.)
+- tags: events tagged with ALL of these (intersection)
+- since: ISO timestamp — only events on/after this date
+- query: substring match on the event summary (case-insensitive)
+
+Returns at most 10 events by default (50 max), most recent first.
+
+EXAMPLES:
+- "What rules has the user changed in the last month?" → since=<30d ago>, event_types=['rule_changed']
+- "Have we discussed FOMC before?" → query='FOMC'
+- "Recent corrections about position sizing" → query='position', event_types=['user_correction']`,
+  parameters: {
+    type: "object",
+    properties: {
+      event_types: {
+        type: "array",
+        items: {
+          type: "string",
+          enum: [
+            "pattern_observed",
+            "user_correction",
+            "strategy_discussion",
+            "decision_made",
+            "rule_changed",
+          ],
+        },
+        description: "Filter to these event types only.",
+      },
+      tags: {
+        type: "array",
+        items: { type: "string" },
+        description: "Match events containing ALL of these tags.",
+      },
+      since: {
+        type: "string",
+        description: "ISO timestamp — only return events on/after this date.",
+      },
+      query: {
+        type: "string",
+        description: "Case-insensitive substring match on summary text.",
+      },
+      limit: {
+        type: "number",
+        description: "Max events to return (1..50, default 10).",
+      },
+    },
   },
 };
 
@@ -1397,475 +1650,6 @@ export async function deleteNote(
   }
 }
 
-// =============================================================================
-// MEMORY SYSTEM - Dedicated merge-based memory management
-// =============================================================================
-
-type MemorySection =
-  | "TRADER_PROFILE"
-  | "PERFORMANCE_PATTERNS"
-  | "STRATEGY_PREFERENCES"
-  | "PSYCHOLOGICAL_PATTERNS"
-  | "LESSONS_LEARNED"
-  | "ACTIVE_FOCUS";
-
-const MEMORY_SECTION_ORDER: MemorySection[] = [
-  "TRADER_PROFILE",
-  "PERFORMANCE_PATTERNS",
-  "STRATEGY_PREFERENCES",
-  "PSYCHOLOGICAL_PATTERNS",
-  "LESSONS_LEARNED",
-  "ACTIVE_FOCUS",
-];
-
-/**
- * Normalize content to handle various edge cases:
- * - Convert CRLF to LF
- * - Fix bullets with asterisks or no space after dash
- * - Normalize section headers (case-insensitive, remove trailing text)
- */
-function normalizeMemoryContent(content: string): string {
-  // Normalize line endings (CRLF -> LF)
-  let normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-
-  // Fix section headers: case-insensitive match and remove trailing text
-  // e.g., "## strategy_preferences - note" -> "## STRATEGY_PREFERENCES"
-  for (const section of MEMORY_SECTION_ORDER) {
-    const headerPattern = new RegExp(
-      `^## ?${section}[^\\n]*$`,
-      "gmi"
-    );
-    normalized = normalized.replace(headerPattern, `## ${section}`);
-  }
-
-  // Fix bullet points:
-  // - Convert asterisks to dashes: "* item" -> "- item"
-  // - Add space after dash if missing: "-item" -> "- item"
-  normalized = normalized
-    .split("\n")
-    .map((line) => {
-      const trimmed = line.trim();
-      // Convert "* item" to "- item"
-      if (trimmed.startsWith("* ")) {
-        return line.replace(/^\s*\* /, "- ");
-      }
-      // Convert "*item" to "- item"
-      if (trimmed.startsWith("*") && !trimmed.startsWith("* ")) {
-        return line.replace(/^\s*\*/, "- ");
-      }
-      // Convert "-item" (no space) to "- item"
-      if (trimmed.startsWith("-") && !trimmed.startsWith("- ") && trimmed.length > 1) {
-        return line.replace(/^(\s*)-([^\s])/, "$1- $2");
-      }
-      return line;
-    })
-    .join("\n");
-
-  return normalized;
-}
-
-/**
- * Parse memory content into sections
- */
-function parseMemorySections(content: string): Record<MemorySection, string[]> {
-  const sections: Record<MemorySection, string[]> = {
-    TRADER_PROFILE: [],
-    PERFORMANCE_PATTERNS: [],
-    STRATEGY_PREFERENCES: [],
-    PSYCHOLOGICAL_PATTERNS: [],
-    LESSONS_LEARNED: [],
-    ACTIVE_FOCUS: [],
-  };
-
-  // Handle empty content
-  if (!content || content.trim().length === 0) {
-    log(`[parseMemorySections] Empty content received`, "warn");
-    return sections;
-  }
-
-  // Normalize content to handle edge cases (CRLF, asterisks, case issues, etc.)
-  const normalizedContent = normalizeMemoryContent(content);
-
-  // Split by section headers
-  const sectionPattern =
-    /^## (TRADER_PROFILE|PERFORMANCE_PATTERNS|STRATEGY_PREFERENCES|PSYCHOLOGICAL_PATTERNS|LESSONS_LEARNED|ACTIVE_FOCUS)\s*$/gm;
-  const parts = normalizedContent.split(sectionPattern);
-
-  // Debug: log how many parts were found
-  const sectionNamesFound = parts.filter((_, i) => i % 2 === 1);
-  log(
-    `[parseMemorySections] Found ${sectionNamesFound.length} section headers: ${
-      sectionNamesFound.join(", ")
-    }`,
-    "info",
-  );
-
-  // parts will be: [preamble, "SECTION_NAME", content, "SECTION_NAME", content, ...]
-  for (let i = 1; i < parts.length; i += 2) {
-    const sectionName = parts[i] as MemorySection;
-    const sectionContent = parts[i + 1] || "";
-
-    // Extract bullet points from section content (excluding placeholder text)
-    const bullets = sectionContent
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.startsWith("- "))
-      .map((line) => line.substring(2).trim())
-      .filter((line) => line.length > 0)
-      .filter((line) => line !== "(No data yet)");
-
-    if (MEMORY_SECTION_ORDER.includes(sectionName)) {
-      sections[sectionName] = bullets;
-    }
-  }
-
-  // Warn if no sections were parsed from non-empty content
-  const totalBullets = Object.values(sections).reduce(
-    (sum, arr) => sum + arr.length,
-    0,
-  );
-  if (content.length > 50 && totalBullets === 0) {
-    log(
-      `[parseMemorySections] WARNING: No bullets parsed from ${content.length} char content. Content may be malformed.`,
-      "warn",
-    );
-    log(
-      `[parseMemorySections] Content start: ${
-        content.substring(0, 200).replace(/\n/g, "\\n")
-      }`,
-      "warn",
-    );
-  }
-
-  return sections;
-}
-
-/**
- * Build memory content from sections
- */
-function buildMemoryContent(sections: Record<MemorySection, string[]>): string {
-  const parts: string[] = [];
-
-  for (const section of MEMORY_SECTION_ORDER) {
-    const items = sections[section] || [];
-    parts.push(`## ${section}`);
-    if (items.length > 0) {
-      parts.push(items.map((item) => `- ${item}`).join("\n"));
-    } else {
-      parts.push("- (No data yet)");
-    }
-    parts.push(""); // Empty line between sections
-  }
-
-  return parts.join("\n").trim();
-}
-
-/**
- * Deduplicate similar insights (basic similarity check)
- */
-function deduplicateInsights(insights: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-
-  for (const insight of insights) {
-    // Normalize for comparison: lowercase, remove dates, trim
-    const normalized = insight
-      .toLowerCase()
-      .replace(/\[\d{4}-\d{2}\]/g, "") // Remove date tags
-      .replace(/\[high\]|\[med\]|\[low\]/gi, "") // Remove confidence
-      .trim();
-
-    // Check if we've seen something very similar
-    let isDuplicate = false;
-    for (const seenNorm of seen) {
-      // Simple similarity: if 80%+ of words match, consider duplicate
-      const words1 = new Set(normalized.split(/\s+/));
-      const words2 = new Set(seenNorm.split(/\s+/));
-      const intersection = [...words1].filter((w) => words2.has(w)).length;
-      const union = new Set([...words1, ...words2]).size;
-      if (union > 0 && intersection / union > 0.8) {
-        isDuplicate = true;
-        break;
-      }
-    }
-
-    if (!isDuplicate) {
-      seen.add(normalized);
-      result.push(insight);
-    }
-  }
-
-  return result;
-}
-
-/**
- * Create initial memory note with structure
- */
-async function createInitialMemory(
-  supabase: SupabaseClient,
-  userId: string,
-  calendarId: string,
-  section: MemorySection,
-  insights: string[],
-): Promise<string> {
-  const sections: Record<MemorySection, string[]> = {
-    TRADER_PROFILE: [],
-    PERFORMANCE_PATTERNS: [],
-    STRATEGY_PREFERENCES: [],
-    PSYCHOLOGICAL_PATTERNS: [],
-    LESSONS_LEARNED: [],
-    ACTIVE_FOCUS: [],
-  };
-
-  sections[section] = insights;
-  const content = buildMemoryContent(sections);
-
-  const { data, error } = await supabase
-    .from("notes")
-    .insert({
-      user_id: userId,
-      calendar_id: calendarId,
-      title: "Memory",
-      content: content,
-      by_assistant: true,
-      is_archived: false,
-      is_pinned: true,
-      tags: [AGENT_MEMORY_TAG],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
-
-  if (error) {
-    log(`Error creating memory: ${error.message}`, "error");
-    return `Failed to create memory: ${error.message}`;
-  }
-
-  log(`Memory created with ID: ${data.id}`, "info");
-  return `Memory initialized with ${insights.length} insight(s) in ${section}.`;
-}
-
-/**
- * Update memory with merge logic - preserves existing knowledge
- */
-export async function updateMemory(
-  supabase: SupabaseClient,
-  userId: string,
-  calendarId: string,
-  section: MemorySection,
-  newInsights: string[],
-  replaceSection: boolean = false,
-): Promise<string> {
-  try {
-    // Enhanced logging for debugging
-    log(
-      `[updateMemory] START - section: ${section}, newInsights: ${newInsights.length}, replaceSection: ${replaceSection}`,
-      "info",
-    );
-    log(
-      `[updateMemory] New insights to add: ${
-        JSON.stringify(newInsights).substring(0, 500)
-      }`,
-      "info",
-    );
-
-    // 1. Fetch existing memory note
-    const { data: memoryNote, error: fetchError } = await supabase
-      .from("notes")
-      .select("id, content")
-      .eq("user_id", userId)
-      .eq("calendar_id", calendarId)
-      .contains("tags", [AGENT_MEMORY_TAG])
-      .single();
-
-    if (fetchError && fetchError.code !== "PGRST116") {
-      log(
-        `[updateMemory] Error fetching memory: ${fetchError.message}`,
-        "error",
-      );
-      return `Failed to fetch memory: ${fetchError.message}`;
-    }
-
-    // 2. If no memory exists, create initial one
-    if (!memoryNote) {
-      log(
-        "[updateMemory] No existing memory found, creating initial memory",
-        "info",
-      );
-      return await createInitialMemory(
-        supabase,
-        userId,
-        calendarId,
-        section,
-        newInsights,
-      );
-    }
-
-    // 3. Parse existing content into sections
-    const existingContent = memoryNote.content || "";
-    log(
-      `[updateMemory] Existing content length: ${existingContent.length} chars`,
-      "info",
-    );
-
-    // Debug: Log first 500 chars of existing content
-    if (existingContent.length > 0) {
-      log(
-        `[updateMemory] Existing content preview: ${
-          existingContent.substring(0, 500).replace(/\n/g, "\\n")
-        }`,
-        "info",
-      );
-    }
-
-    const sections = parseMemorySections(existingContent);
-
-    // Debug: Log what was parsed from each section
-    log(
-      `[updateMemory] Parsed sections - TRADER_PROFILE: ${sections.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${sections.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${sections.STRATEGY_PREFERENCES.length}, PSYCHOLOGICAL_PATTERNS: ${sections.PSYCHOLOGICAL_PATTERNS.length}, LESSONS_LEARNED: ${sections.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${sections.ACTIVE_FOCUS.length}`,
-      "info",
-    );
-
-    const existingCount = sections[section].length;
-    log(
-      `[updateMemory] Target section ${section} has ${existingCount} existing insights: ${
-        JSON.stringify(sections[section]).substring(0, 300)
-      }`,
-      "info",
-    );
-
-    // 4. Merge or replace section
-    if (replaceSection) {
-      // SAFEGUARD: Only allow replace_section for ACTIVE_FOCUS
-      if (section !== "ACTIVE_FOCUS") {
-        log(
-          `[updateMemory] WARNING: replace_section=true attempted on ${section}, but only ACTIVE_FOCUS can be replaced. Falling back to MERGE mode.`,
-          "warn",
-        );
-        // Fall through to merge logic instead of replacing
-      } else {
-        log(
-          `[updateMemory] REPLACING ${section} section entirely (was: ${existingCount}, will be: ${newInsights.length})`,
-          "info",
-        );
-        sections[section] = newInsights;
-        // Skip the else block by returning early after the full flow
-      }
-    }
-
-    // MERGE mode (default) - also used when replace_section was incorrectly set for non-ACTIVE_FOCUS
-    if (!replaceSection || section !== "ACTIVE_FOCUS") {
-      // APPEND new insights, preserving existing
-      log(
-        `[updateMemory] MERGING ${newInsights.length} new insights into ${section} (existing: ${existingCount})`,
-        "info",
-      );
-      sections[section] = [...sections[section], ...newInsights];
-
-      // Deduplicate similar entries
-      const beforeDedup = sections[section].length;
-      sections[section] = deduplicateInsights(sections[section]);
-      const afterDedup = sections[section].length;
-
-      if (beforeDedup !== afterDedup) {
-        log(
-          `[updateMemory] Deduplication removed ${
-            beforeDedup - afterDedup
-          } similar insights`,
-          "info",
-        );
-      }
-
-      log(
-        `[updateMemory] After merge - ${section}: ${
-          sections[section].length
-        } insights`,
-        "info",
-      );
-    }
-
-    // 5. Rebuild content preserving structure
-    const updatedContent = buildMemoryContent(sections);
-    log(
-      `[updateMemory] Updated content length: ${updatedContent.length} chars`,
-      "info",
-    );
-
-    // Debug: Verify all sections are present in rebuilt content
-    const verifyParsed = parseMemorySections(updatedContent);
-    log(
-      `[updateMemory] VERIFY after rebuild - TRADER_PROFILE: ${verifyParsed.TRADER_PROFILE.length}, PERFORMANCE_PATTERNS: ${verifyParsed.PERFORMANCE_PATTERNS.length}, STRATEGY_PREFERENCES: ${verifyParsed.STRATEGY_PREFERENCES.length}, PSYCHOLOGICAL_PATTERNS: ${verifyParsed.PSYCHOLOGICAL_PATTERNS.length}, LESSONS_LEARNED: ${verifyParsed.LESSONS_LEARNED.length}, ACTIVE_FOCUS: ${verifyParsed.ACTIVE_FOCUS.length}`,
-      "info",
-    );
-
-    // 5.5 DATA LOSS PREVENTION: Check if other sections lost data during the update
-    // Compare sections (except the one being updated) to ensure no data was lost
-    const originalParsed = parseMemorySections(existingContent);
-    for (const sectionKey of MEMORY_SECTION_ORDER) {
-      if (sectionKey === section) continue; // Skip the section being updated
-
-      const originalCount = originalParsed[sectionKey].length;
-      const newCount = sections[sectionKey].length;
-
-      // If a section that HAD data now has LESS data, this is data loss
-      if (originalCount > 0 && newCount < originalCount) {
-        log(
-          `[updateMemory] DATA LOSS DETECTED in ${sectionKey}: was ${originalCount}, now ${newCount}. Aborting update.`,
-          "error",
-        );
-        log(
-          `[updateMemory] Original ${sectionKey} items: ${JSON.stringify(originalParsed[sectionKey])}`,
-          "error",
-        );
-        return `Memory update aborted: Data loss detected in ${sectionKey} section. Original had ${originalCount} items, new has ${newCount}. Please report this issue.`;
-      }
-    }
-
-    // 6. Check size limit (~2000 tokens ≈ 8000 chars)
-    if (updatedContent.length > 8000) {
-      log(
-        `[updateMemory] Memory exceeds size limit (${updatedContent.length} chars), consider compression`,
-        "warn",
-      );
-    }
-
-    // 7. Update note
-    const { error: updateError } = await supabase
-      .from("notes")
-      .update({
-        content: updatedContent,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", memoryNote.id);
-
-    if (updateError) {
-      log(
-        `[updateMemory] Error updating memory: ${updateError.message}`,
-        "error",
-      );
-      return `Failed to update memory: ${updateError.message}`;
-    }
-
-    const finalCount = sections[section].length;
-    const addedCount = replaceSection
-      ? newInsights.length
-      : (finalCount - existingCount);
-
-    log(
-      `[updateMemory] SUCCESS - ${section} now has ${finalCount} insights (added: ${addedCount})`,
-      "info",
-    );
-    return `Memory updated: ${
-      replaceSection ? "Replaced" : "Added"
-    } ${addedCount} insight(s) in ${section}. Total: ${finalCount} insights in section.`;
-  } catch (error) {
-    log(`[updateMemory] ERROR: ${error}`, "error");
-    return `Memory update error: ${
-      error instanceof Error ? error.message : "Unknown"
-    }`;
-  }
-}
 
 /**
  * Extract image URLs from Draft.js content
@@ -2463,7 +2247,7 @@ ${taskInstruction}`;
 export async function executeCustomTool(
   toolName: string,
   args: Record<string, unknown>,
-  context: Record<string, string | undefined>,
+  context: ToolContext,
   supabase?: SupabaseClient,
 ): Promise<string> {
   try {
@@ -2728,29 +2512,94 @@ export async function executeCustomTool(
         }
         const userId = context.userId || "";
         const calendarId = context.calendarId || "";
-        const section = typeof args.section === "string"
-          ? args.section as
-            | "TRADER_PROFILE"
-            | "PERFORMANCE_PATTERNS"
-            | "STRATEGY_PREFERENCES"
-            | "PSYCHOLOGICAL_PATTERNS"
-            | "LESSONS_LEARNED"
-            | "ACTIVE_FOCUS"
-          : "PERFORMANCE_PATTERNS";
-        const newInsights = Array.isArray(args.new_insights)
-          ? args.new_insights.map((i) => String(i))
-          : [];
-        const replaceSection = typeof args.replace_section === "boolean"
-          ? args.replace_section
-          : false;
-        return await updateMemory(
-          supabase,
-          userId,
-          calendarId,
-          section,
-          newInsights,
-          replaceSection,
+        // Pass-through: validation + permission gating live inside
+        // updateMemory. Defaulting op to ADD preserves pre-Step-5
+        // behaviour for any caller (or older prompt) that omits it.
+        return await updateMemory(supabase, userId, calendarId, {
+          op: typeof args.op === "string" ? args.op as MemoryOp : "ADD",
+          section: args.section as MemorySection,
+          new_insights: Array.isArray(args.new_insights)
+            ? args.new_insights.map((i) => String(i))
+            : undefined,
+          target_text: typeof args.target_text === "string" ? args.target_text : undefined,
+          new_text: typeof args.new_text === "string" ? args.new_text : undefined,
+          // Chat function = full ops. briefing-agent overrides via its own
+          // allowedOps (see run-orion-task/briefing-agent.ts). The context
+          // field carries the per-caller override when present.
+          allowedOps: context.allowedMemoryOps,
+        });
+      }
+
+      case "apply_rule_change": {
+        if (!supabase) {
+          return "Supabase client not available for apply_rule_change";
+        }
+        const userId = context.userId || "";
+        const calendarId = context.calendarId || "";
+        return await applyRuleChange(supabase, userId, calendarId, {
+          event_type: args.event_type as EpisodicEventType,
+          summary: typeof args.summary === "string" ? args.summary : "",
+          memory_op: (typeof args.memory_op === "string"
+            ? args.memory_op
+            : "ADD") as MemoryOp,
+          memory_section: args.memory_section as MemorySection,
+          new_insights: Array.isArray(args.new_insights)
+            ? args.new_insights.map((i) => String(i))
+            : undefined,
+          target_text: typeof args.target_text === "string"
+            ? args.target_text
+            : undefined,
+          new_text: typeof args.new_text === "string"
+            ? args.new_text
+            : undefined,
+          allowedOps: context.allowedMemoryOps,
+        });
+      }
+
+      case "record_event": {
+        if (!supabase) {
+          return "Supabase client not available for record_event";
+        }
+        const userId = context.userId || "";
+        const calendarId = context.calendarId || "";
+        // Pass-through dispatcher: hand args to episodic.ts unmodified so
+        // its validator can produce an actionable error for any shape
+        // problems. We do NOT coerce types here (e.g. via String(t)) —
+        // that would silently mask the validator's "tags must be strings"
+        // and "event_type must be one of ..." rejections.
+        return await recordEvent(supabase, userId, calendarId, {
+          event_type: args.event_type as EpisodicEventType,
+          summary: args.summary as string,
+          tags: args.tags as string[] | undefined,
+          metadata: args.metadata as Record<string, unknown> | undefined,
+        });
+      }
+
+      case "recall_events": {
+        if (!supabase) {
+          return "Supabase client not available for recall_events";
+        }
+        const userId = context.userId || "";
+        const calendarId = context.calendarId || "";
+        // Same pass-through philosophy as record_event: normalizeRecallFilter
+        // handles bad types, empty arrays, and clamping. Avoid pre-coercion
+        // here so that filter logic is testable in one place.
+        const result = await recallEvents(supabase, userId, calendarId, {
+          event_types: args.event_types as EpisodicEventType[] | undefined,
+          tags: args.tags as string[] | undefined,
+          since: args.since as string | undefined,
+          query: args.query as string | undefined,
+          limit: args.limit as number | undefined,
+        });
+        // Format for the LLM: header line + one line per event. Keeps the
+        // model's parsing job trivial and the response token-cheap.
+        if (result.events.length === 0) return result.message;
+        const lines = result.events.map((e) =>
+          `- [${e.occurred_at}] (${e.event_type}) ${e.summary}${
+            e.tags.length > 0 ? ` [tags: ${e.tags.join(", ")}]` : ""
+          }`
         );
+        return `${result.message}\n${lines.join("\n")}`;
       }
 
       default:
@@ -2783,6 +2632,9 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     getTagDefinitionTool,
     saveTagDefinitionTool,
     updateMemoryTool,
+    applyRuleChangeTool,
+    recordEventTool,
+    recallEventsTool,
   ];
 }
 

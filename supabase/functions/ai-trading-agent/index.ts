@@ -9,7 +9,7 @@ import {
   callMCPTool,
   getCachedMCPTools,
 } from '../_shared/orionMcp.ts';
-import { fetchAgentMemory } from '../_shared/orionMemory.ts';
+import { fetchMemory } from '../_shared/memory/index.ts';
 import { fetchGuidelineReminder } from '../_shared/orionGuideline.ts';
 import { GUIDELINE_TAG } from '../_shared/noteTags.ts';
 import { classifyProviderError, formatErrorResponse, formatResponseWithHtmlAndCitations } from './formatters.ts';
@@ -1498,7 +1498,7 @@ Deno.serve(async (req: Request) => {
     // Pre-load agent memory (enforces memory availability from turn 0) and
     // the GUIDELINE-note reminder in parallel — both are independent reads.
     const [preloadedMemory, guidelineReminder] = await Promise.all([
-      fetchAgentMemory(userId, calendarId),
+      fetchMemory(userId, calendarId),
       fetchGuidelineReminder(userId, calendarId),
     ]);
 

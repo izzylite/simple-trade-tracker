@@ -4,7 +4,7 @@
  */
 
 import { AbstractBaseRepository, RepositoryConfig, RepositoryResult } from "./BaseRepository";
-import { Note, GAME_PLAN_TAG } from "../../../types/note";
+import { Note, GAME_PLAN_TAG, AGENT_MEMORY_TAG } from "../../../types/note";
 import { logger } from "../../../utils/logger";
 import { supabase } from "../../../config/supabase";
 
@@ -79,10 +79,12 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
 
   async findByUserId(userId: string): Promise<Note[]> {
     try {
+      // AGENT_MEMORY is excluded — agent reads via _shared/memory/operations.ts.
       const { data, error } = await supabase
         .from("notes")
         .select("*")
         .eq("user_id", userId)
+        .not("tags", "cs", `{${AGENT_MEMORY_TAG}}`)
         .order("updated_at", { ascending: false });
 
       if (error) {
@@ -134,11 +136,15 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
         offset = 0,
       } = options;
 
-      // Build the query
+      // Build the query. AGENT_MEMORY is the agent's private memory note —
+      // exclude from user-facing queries so it doesn't appear in the notes
+      // drawer / tag view. Agent-side queries reach the row via
+      // _shared/memory/operations.ts (separate code path).
       let query = supabase
         .from("notes")
         .select("*", { count: "exact" })
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .not("tags", "cs", `{${AGENT_MEMORY_TAG}}`);
 
       // Apply filters
       if (isPinned !== undefined) {
@@ -183,11 +189,14 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
 
   async findByCalendarId(calendarId: string): Promise<Note[]> {
     try {
-      // Include both calendar-specific notes AND global notes (calendar_id = null)
+      // Include both calendar-specific notes AND global notes (calendar_id = null).
+      // AGENT_MEMORY is excluded from user-facing queries; agent reads memory
+      // via _shared/memory/operations.ts directly.
       const { data, error } = await supabase
         .from("notes")
         .select("*")
         .or(`calendar_id.eq.${calendarId},calendar_id.is.null`)
+        .not("tags", "cs", `{${AGENT_MEMORY_TAG}}`)
         .order("updated_at", { ascending: false });
 
       if (error) {
@@ -296,11 +305,14 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
         offset = 0,
       } = options;
 
-      // Build the query - include both calendar-specific notes AND global notes (calendar_id = null)
+      // Build the query - include both calendar-specific notes AND global
+      // notes (calendar_id = null). AGENT_MEMORY excluded from user-facing
+      // queries; see queryByUserId for the rationale.
       let query = supabase
         .from("notes")
         .select("*", { count: "exact" })
-        .or(`calendar_id.eq.${calendarId},calendar_id.is.null`);
+        .or(`calendar_id.eq.${calendarId},calendar_id.is.null`)
+        .not("tags", "cs", `{${AGENT_MEMORY_TAG}}`);
 
       // Apply filters
       if (isPinned !== undefined) {
