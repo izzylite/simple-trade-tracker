@@ -6,7 +6,8 @@ import {
   markHealthy,
   markQuotaExhausted,
 } from "./apiKeyPool.ts";
-import type { NewsResult, NewsTimeRange } from "../run-orion-task/serper.ts";
+import type { NewsResult } from "./searchCache.ts";
+import type { NewsTimeRange } from "../run-orion-task/serper.ts";
 
 // Tavily error codes (verified against /websites/tavily docs, 2026-04-26):
 //   400 — bad request (our bug; log, don't penalize key)

@@ -1,9 +1,22 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { log } from "./supabase.ts";
-import type { NewsResult } from "../run-orion-task/serper.ts";
 
 export type SearchProvider = "serper" | "tavily";
 export type CacheEndpoint = "news" | "search";
+
+/**
+ * Shared shape for a single news/search result. Lives here (not in
+ * run-orion-task/serper.ts) so the _shared/ tree never imports back into a
+ * feature dir. serper.ts re-exports it for backward-compat with existing
+ * callers (market-research.ts, tavily.ts, etc.).
+ */
+export interface NewsResult {
+  title: string;
+  link: string;
+  snippet: string;
+  date?: string;
+  source?: string;
+}
 
 /**
  * Cache key format: `<provider>::<endpoint>::<query>::<num>::<timeRange>`.

@@ -1,13 +1,7 @@
 import { log } from '../_shared/supabase.ts';
 import type { SupabaseClient } from './types.ts';
-
-export interface NewsResult {
-  title: string;
-  link: string;
-  snippet: string;
-  date?: string;
-  source?: string;
-}
+import type { NewsResult } from '../_shared/searchCache.ts';
+export type { NewsResult } from '../_shared/searchCache.ts';
 
 /**
  * Aggregate result for multi-query calls. `errorCount` counts queries that
