@@ -49,6 +49,11 @@ export function mapTimeRange(range: NewsTimeRange): "day" | "week" {
   return "day";  // qdr:h and qdr:d both map here
 }
 
+/**
+ * Map Tavily result items to the shared NewsResult shape (same as serper.ts).
+ * If `cap` is undefined, returns all results. If `cap === 0`, returns an
+ * empty array (treated as "skip") — callers passing 0 should expect no work.
+ */
 export function normalizeTavilyResponse(
   resp: TavilyResponse,
   cap?: number
@@ -94,6 +99,13 @@ async function searchTavily(
   const acquired = await acquireKey(supabase, "tavily");
   if (!acquired) return null;
 
+  // 15s timeout: caps tail latency on Tavily hangs so a stuck request can't
+  // burn the whole edge-function wall-clock budget. Aborted requests surface
+  // as DOMException("...aborted...") in the catch block — same null-return
+  // path as a network error, so callers see "data source unavailable."
+  const ctrl = new AbortController();
+  const timeoutId = setTimeout(() => ctrl.abort(), 15_000);
+
   try {
     const response = await fetch("https://api.tavily.com/search", {
       method: "POST",
@@ -106,6 +118,7 @@ async function searchTavily(
         max_results: params.num,
         include_raw_content: false,
       }),
+      signal: ctrl.signal,
     });
 
     if (!response.ok) {
@@ -120,7 +133,9 @@ async function searchTavily(
         await markQuotaExhausted(supabase, acquired.id, `server_${status}`);
       } else if (TAVILY_CLIENT_BUG_CODES.has(status)) {
         // 400 is our bug, not the key's fault. Don't penalize the key —
-        // the next caller using this key will succeed.
+        // the next caller using this key will succeed. If 400 storms ever
+        // become a thing (Tavily regression making valid queries 400),
+        // cool the request down at the caller level, not the key level.
         log("Tavily: 400 bad request (client bug)", "error", {
           status, query: params.query,
         });
@@ -137,6 +152,8 @@ async function searchTavily(
     log("Tavily: network error", "error", err);
     // Don't mark the key — network errors aren't the key's fault.
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

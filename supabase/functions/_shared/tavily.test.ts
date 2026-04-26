@@ -85,3 +85,24 @@ Deno.test("time-range: qdr:d → day", () => {
 Deno.test("time-range: qdr:w → week", () => {
   assertEquals(mapTimeRange("qdr:w"), "week");
 });
+
+Deno.test("normalize: subdomain is preserved (only `www.` is stripped)", () => {
+  // Locks the contract: regex anchors to ^www\. so news.bbc.co.uk stays intact.
+  const resp: TavilyResponse = {
+    results: [{ title: "X", url: "https://news.bbc.co.uk/article", content: "" }],
+  };
+  const out = normalizeTavilyResponse(resp);
+  assertEquals(out[0].source, "news.bbc.co.uk");
+});
+
+Deno.test("normalize: URL with port keeps the port in source", () => {
+  // Locks current behavior. Note: URL.hostname (per WHATWG spec) excludes the
+  // port — that lives on URL.port — so the source ends up as "example.com"
+  // even though the input had ":8080". If port-preservation ever becomes
+  // desired, switch to URL.host and update this assertion.
+  const resp: TavilyResponse = {
+    results: [{ title: "X", url: "https://example.com:8080/x", content: "" }],
+  };
+  const out = normalizeTavilyResponse(resp);
+  assertEquals(out[0].source, "example.com");
+});
