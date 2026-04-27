@@ -34,20 +34,35 @@ async function dispatchNews(
   provider: SearchProvider,
   args: NewsCallArgs
 ): Promise<NewsResult[] | null> {
-  if (provider === "tavily") {
-    return tavilySearchNews(args.supabase, args.query, args.num, args.timeRange);
+  switch (provider) {
+    case "tavily":
+      return tavilySearchNews(args.supabase, args.query, args.num, args.timeRange);
+    case "serper":
+      return serperSearchNews(args.query, args.num, args.timeRange);
+    default: {
+      // Exhaustiveness check: TS errors here if a new SearchProvider variant
+      // is added without a case. Runtime throw catches stringly-typed inputs
+      // (e.g. provider sourced from a DB column) that bypass the TS union.
+      const _exhaustive: never = provider;
+      throw new Error(`searchProvider: unknown provider ${_exhaustive}`);
+    }
   }
-  return serperSearchNews(args.query, args.num, args.timeRange);
 }
 
 async function dispatchBreaking(
   provider: SearchProvider,
   args: BreakingCallArgs
 ): Promise<NewsResult[] | null> {
-  if (provider === "tavily") {
-    return tavilySearchBreaking(args.supabase, args.query, args.timeRange, args.num);
+  switch (provider) {
+    case "tavily":
+      return tavilySearchBreaking(args.supabase, args.query, args.timeRange, args.num);
+    case "serper":
+      return serperSearchBreaking(args.query, args.timeRange, args.num);
+    default: {
+      const _exhaustive: never = provider;
+      throw new Error(`searchProvider: unknown provider ${_exhaustive}`);
+    }
   }
-  return serperSearchBreaking(args.query, args.timeRange, args.num);
 }
 
 /**
