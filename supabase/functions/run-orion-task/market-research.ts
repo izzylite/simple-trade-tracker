@@ -4,8 +4,8 @@ import {
   searchNewsMultiple,
   searchNewsMultipleCached,
   searchBreakingMultipleCached,
-  type SerperBatchResult,
-} from './serper.ts';
+} from '../_shared/searchProvider.ts';
+import type { SerperBatchResult } from './serper.ts';
 import {
   generateBriefingWithScrape,
   type BriefingWithScrapeResult,
@@ -140,8 +140,10 @@ export async function handleMarketResearch(
   let instrumentTotalQueries = 0;
   if (instrumentNames.length > 0) {
     const batch = await searchNewsMultiple(
+      supabase,
       instrumentNames.map((n) => `${n} trading analysis today`),
-      3
+      3,
+      'tavily'
     );
     instrumentNews = batch.results;
     instrumentErrorCount = batch.errorCount;
@@ -160,7 +162,7 @@ export async function handleMarketResearch(
   const totalErrors = newsBundle.errorCount + instrumentErrorCount;
   const totalQueries = newsBundle.totalQueries + instrumentTotalQueries;
   if (totalQueries > 0 && totalErrors === totalQueries) {
-    log('Market research: Serper outage detected — all queries failed', 'error', {
+    log('Market research: search provider outage detected — all queries failed', 'error', {
       totalErrors,
       totalQueries,
     });
@@ -177,7 +179,7 @@ export async function handleMarketResearch(
       metadata: {
         title: 'Data source unavailable',
         generated_at: new Date().toISOString(),
-        serper_outage: true,
+        search_outage: true,
         failed_queries: totalErrors,
       },
     };
@@ -347,17 +349,18 @@ async function gatherMarketNews(
   const [macroBatch, marketBatch, breakingBatch] =
     await Promise.all([
       queries.macro.length > 0
-        ? searchNewsMultipleCached(supabase, queries.macro, 3, NEWS_CACHE_TTL_SECONDS)
+        ? searchNewsMultipleCached(supabase, queries.macro, 3, NEWS_CACHE_TTL_SECONDS, 'tavily')
         : Promise.resolve(EMPTY_BATCH),
       queries.market.length > 0
-        ? searchNewsMultipleCached(supabase, queries.market, 4, NEWS_CACHE_TTL_SECONDS)
+        ? searchNewsMultipleCached(supabase, queries.market, 4, NEWS_CACHE_TTL_SECONDS, 'tavily')
         : Promise.resolve(EMPTY_BATCH),
       searchBreakingMultipleCached(
         supabase,
         BREAKING_MACRO_QUERIES,
         'qdr:h',
         3,
-        BREAKING_CACHE_TTL_SECONDS
+        BREAKING_CACHE_TTL_SECONDS,
+        'tavily'
       ),
     ]);
 
@@ -435,7 +438,7 @@ async function fetchRecentBriefings(
     .from('orion_task_results')
     .select('metadata, content_plain, created_at')
     .eq('task_id', taskId)
-    .not('metadata', 'cs', '{"serper_outage":true}')
+    .not('metadata', 'cs', '{"search_outage":true}')
     .order('created_at', { ascending: false })
     .limit(limit);
 
