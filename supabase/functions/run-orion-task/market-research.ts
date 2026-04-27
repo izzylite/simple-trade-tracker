@@ -358,13 +358,20 @@ async function gatherMarketNews(
       queries.market.length > 0
         ? searchNewsMultipleCached(supabase, queries.market, 4, NEWS_CACHE_TTL_SECONDS, 'tavily')
         : Promise.resolve(EMPTY_BATCH),
+      // Breaking-content stays on Serper. Tavily has no past-hour bucket
+      // (only day/week/month/year) and empirical testing showed its `day`
+      // results skew 4-12h old — it ranks by relevance, not recency. Serper's
+      // qdr:h is a literal "past 60 minutes" filter, irreplaceable here for
+      // catching political posts / central-bank surprises / flash headlines.
+      // Macro and instrument queries above stay on Tavily — they're daily-
+      // cycle content where freshness within an hour doesn't matter.
       searchBreakingMultipleCached(
         supabase,
         BREAKING_MACRO_QUERIES,
         'qdr:h',
         3,
         BREAKING_CACHE_TTL_SECONDS,
-        'tavily'
+        'serper'
       ),
     ]);
 
