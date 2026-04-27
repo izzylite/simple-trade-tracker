@@ -1865,6 +1865,11 @@ export async function getRecentOrionBriefings(
       .from("orion_task_results")
       .select("id, task_type, significance, metadata, content_plain, created_at")
       .eq("user_id", userId)
+      // Exclude system "data source unavailable" rows from both pre- and
+      // post-Tavily-migration eras. New outages write `search_outage:true`;
+      // legacy rows still in the 72h window have `serper_outage:true`. Drop
+      // the `serper_outage` filter once production rows have aged out.
+      .not('metadata', 'cs', '{"search_outage":true}')
       .not('metadata', 'cs', '{"serper_outage":true}')
       .gte("created_at", sinceIso)
       .order("created_at", { ascending: false })

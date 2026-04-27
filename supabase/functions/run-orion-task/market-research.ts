@@ -30,10 +30,10 @@ import type {
 } from './types.ts';
 import type { NewsResult } from './serper.ts';
 
-// Defensive cap on macro queries per task. Each query fires a Serper call every
-// sweep, so an unbounded list burns API quota linearly. UI enforces the same
-// cap at save time; the edge function trims here in case a stale row or direct
-// DB edit bypassed validation.
+// Defensive cap on macro queries per task. Each query fires a search-provider
+// call every sweep, so an unbounded list burns API quota linearly. UI enforces
+// the same cap at save time; the edge function trims here in case a stale row
+// or direct DB edit bypassed validation.
 const MAX_MACRO_QUERIES = 10;
 
 const DEFAULT_MACRO_QUERIES = [
@@ -153,12 +153,16 @@ export async function handleMarketResearch(
   const allNews = deduplicateNews([...newsBundle.news, ...instrumentNews]);
   const breakingNews = deduplicateNews(newsBundle.breaking);
 
-  // Outage detection: if every Serper call errored, the data source is down
-  // and any briefing we generate would be meaningless. Surface a medium-
-  // significance "data source unavailable" card so the user knows the
-  // monitor ran but couldn't work — distinct from "market is quiet," which
-  // is also silent. Threshold filter would normally suppress this; bypass
-  // it because an outage notification IS the signal the user needs.
+  // Outage detection: if every search-provider call errored, the data source
+  // is down (Tavily key pool exhausted, all keys cooling down, or Tavily
+  // upstream itself unavailable) and any briefing we generate would be
+  // meaningless. Surface a medium-significance "data source unavailable"
+  // card so the user knows the monitor ran but couldn't work — distinct
+  // from "market is quiet," which is also silent. Threshold filter would
+  // normally suppress this; bypass it because an outage notification IS
+  // the signal the user needs. Significance stays `medium` (not `high`)
+  // so an outage doesn't promote past a user's `min_significance: 'high'`
+  // threshold — outage cards aren't actionable, just informational.
   const totalErrors = newsBundle.errorCount + instrumentErrorCount;
   const totalQueries = newsBundle.totalQueries + instrumentTotalQueries;
   if (totalQueries > 0 && totalErrors === totalQueries) {
@@ -208,7 +212,7 @@ export async function handleMarketResearch(
   }
 
   // Record tool usage so TaskResultCard can surface the same "N tools used"
-  // chip the chat UI shows. One entry per successfully-executed Serper query
+  // chip the chat UI shows. One entry per successfully-executed search query
   // (errored queries are excluded so the count reflects what actually fed the
   // briefing), one per scrape attempt (success + fail, matching how chat
   // displays attempted tool calls even when they error), and one per
@@ -308,7 +312,7 @@ function buildSearchQueries(config: MarketResearchConfig): CategorizedQueries {
 // Cache TTLs:
 //   NEWS_TTL: 5 min — news articles don't change meaningfully within a window
 //     that short, and with N shared queries × M users we collapse to N total
-//     Serper calls per 5-min window across the whole user base.
+//     search-provider calls per 5-min window across the whole user base.
 //   BREAKING_TTL: 2 min — breaking content needs to be fresher, but same
 //     sharing logic applies.
 //   Instrument queries skip the cache (user-specific by watchlist choice).
@@ -325,9 +329,9 @@ const MIN_TASK_FREQUENCY_SECONDS = 15 * 60;
 interface MarketNewsBundle {
   news: NewsResult[];
   breaking: NewsResult[];
-  /** How many Serper queries errored across all batches (HTTP-layer failures). */
+  /** How many search-provider queries errored across all batches (HTTP-layer failures). */
   errorCount: number;
-  /** Total Serper queries attempted. Used with errorCount to detect outage. */
+  /** Total search-provider queries attempted. Used with errorCount to detect outage. */
   totalQueries: number;
 }
 
