@@ -39,25 +39,31 @@ const generateFallbackSound = (): Promise<void> => {
   });
 };
 
-// Simple function to play notification sound
-export const playNotificationSound = async (): Promise<void> => {
+// Internal helper: try an MP3 file, fall back to the synth chirp on any error.
+// Both notifications use the same fallback path so a missing/blocked asset
+// degrades to "audible something" instead of silent.
+const playSoundFile = async (src: string, volume = 0.6): Promise<void> => {
   try {
-    // Try to play the downloaded MP3 file first
-    const audio = new Audio('/notification.mp3');
-    audio.volume = 0.6; // Set volume to 60%
-
+    const audio = new Audio(src);
+    audio.volume = volume;
     const playPromise = audio.play();
-
-    if (playPromise !== undefined) {
-      await playPromise;
-    }
+    if (playPromise !== undefined) await playPromise;
   } catch (error) {
     try {
-      // Fallback to generated sound if MP3 fails to load or play
       await generateFallbackSound();
-    } catch (fallbackError) {
-      // Silently fail if sound can't be played
-      logger.debug('Could not play notification sound:', error);
+    } catch {
+      logger.debug(`Could not play sound ${src}:`, error);
     }
   }
+};
+
+// Economic event notifications — used by TradeCalendarPage.
+export const playNotificationSound = async (): Promise<void> => {
+  await playSoundFile('/notification.mp3');
+};
+
+// Orion task arrival — distinct sound so traders can distinguish a scheduled
+// economic event ping from an Orion catalyst briefing by ear alone.
+export const playTaskNotificationSound = async (): Promise<void> => {
+  await playSoundFile('/task-notification.mp3');
 };

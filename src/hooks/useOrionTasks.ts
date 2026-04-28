@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../config/supabase';
 import { orionTaskService } from '../services/orionTaskService';
 import { logger } from '../utils/logger';
+import { playTaskNotificationSound } from '../utils/notificationSound';
 import type {
   AITasksBundle,
   OrionTask,
@@ -142,6 +143,11 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string): 
           const newResult = payload.new as OrionTaskResult;
           setResults((prev) => [newResult, ...prev]);
           setUnreadCount((prev) => prev + 1);
+          // Audibly distinct from the economic-event chime in TradeCalendarPage
+          // so traders can tell "scheduled event" from "Orion catalyst" by ear.
+          playTaskNotificationSound().catch((err) => {
+            logger.debug('Task notification sound failed', err);
+          });
         }
       )
       .on(
