@@ -4,7 +4,8 @@
  */
 
 import { log } from "../_shared/supabase.ts";
-import { fetchSerperScrape, scrapeArticle } from "../_shared/serperScrape.ts";
+import { fetchSerperScrape } from "../_shared/serperScrape.ts";
+import { scrapeWithFallback } from "../_shared/scrapeProvider.ts";
 import { getMarketPrice } from "../_shared/prices.ts";
 import {
   SLASH_COMMAND_TAG,
@@ -991,21 +992,24 @@ export async function executeWebSearch(
 }
 
 /**
- * Scrape URL content using Serper API.
+ * Scrape URL content using Tavily Extract with Serper fallback.
  *
- * Thin chat-shaped wrapper around the shared scrape helpers in
- * `_shared/serperScrape.ts` (also used by Orion market-research). Uses the
- * shared DB cache when a service-role client is available — headline news
- * URLs are frequently re-requested across users and sessions, so caching
- * cuts Serper cost materially. Falls back to the uncached fetcher when no
- * client is passed (keeps the function callable outside the tool-executor).
+ * Thin chat-shaped wrapper around scrapeProvider.scrapeWithFallback. Tavily
+ * Extract is the primary path (LLM-tuned content, free 10-key pool); Serper
+ * scrape is the fallback when Tavily can't render a URL (dynamic JS pages,
+ * pool exhausted, transient extract failure). The shared DB cache is keyed
+ * by URL so a successful scrape from either provider serves any future call.
+ *
+ * When no service-role client is available (rare — only when called outside
+ * the tool-executor), falls through to the raw uncached Serper fetcher
+ * because Tavily's path requires a client to acquire pool keys.
  */
 export async function scrapeUrl(
   url: string,
   supabase?: SupabaseClient,
 ): Promise<string> {
   const article = supabase
-    ? await scrapeArticle(supabase, url)
+    ? await scrapeWithFallback(supabase, url)
     : await fetchSerperScrape(url);
   if (!article) {
     return `URL scraping failed or returned no content for: ${url}`;
