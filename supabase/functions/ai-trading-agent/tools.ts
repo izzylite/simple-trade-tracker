@@ -5,7 +5,7 @@
 
 import { log } from "../_shared/supabase.ts";
 import { fetchSerperScrape } from "../_shared/serperScrape.ts";
-import { scrapeWithFallback } from "../_shared/scrapeProvider.ts";
+import { scrapeArticle } from "../_shared/scrapeProvider.ts";
 import { getMarketPrice } from "../_shared/prices.ts";
 import {
   SLASH_COMMAND_TAG,
@@ -994,11 +994,12 @@ export async function executeWebSearch(
 /**
  * Scrape URL content using Tavily Extract with Serper fallback.
  *
- * Thin chat-shaped wrapper around scrapeProvider.scrapeWithFallback. Tavily
- * Extract is the primary path (LLM-tuned content, free 10-key pool); Serper
- * scrape is the fallback when Tavily can't render a URL (dynamic JS pages,
- * pool exhausted, transient extract failure). The shared DB cache is keyed
- * by URL so a successful scrape from either provider serves any future call.
+ * Tavily Extract is the primary path (LLM-tuned content, free 10-key pool);
+ * Serper scrape is the fallback when Tavily can't render a URL (dynamic JS
+ * pages, pool exhausted, transient extract failure). The shared DB cache is
+ * keyed by URL so a successful scrape from either provider serves any future
+ * call — the second cache check on the fallback path is a no-op miss but
+ * cheap (sub-ms point-read on the indexed url column).
  *
  * When no service-role client is available (rare — only when called outside
  * the tool-executor), falls through to the raw uncached Serper fetcher
@@ -1009,7 +1010,8 @@ export async function scrapeUrl(
   supabase?: SupabaseClient,
 ): Promise<string> {
   const article = supabase
-    ? await scrapeWithFallback(supabase, url)
+    ? (await scrapeArticle(supabase, url, 3600, 'tavily'))
+      ?? (await scrapeArticle(supabase, url, 3600, 'serper'))
     : await fetchSerperScrape(url);
   if (!article) {
     return `URL scraping failed or returned no content for: ${url}`;
