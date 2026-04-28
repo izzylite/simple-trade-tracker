@@ -41,15 +41,18 @@ export async function generateContent(
 // function-calling — no multi-round reasoning, no tool orchestration. A
 // generic loop would add abstraction without buying anything.
 
-export const MAX_SCRAPES_PER_BRIEFING = 3;
+// Raised from 3 → 5 when scraping migrated to Tavily Extract: per-call cost
+// is negligible against the 10-key pool, and 5 parallel extracts complete
+// in normal briefing latency (~1-2s each, all parallel).
+export const MAX_SCRAPES_PER_BRIEFING = 5;
 
 const SCRAPE_TOOL_DECLARATION = {
   name: 'scrape_url',
   description:
-    'Fetch the full body text of a news article URL. Use this ONLY when a headline ' +
-    'strongly suggests a major market-moving catalyst (central bank surprise, ' +
-    'unexpected data miss/beat, geopolitical shock, head-of-state statement) and ' +
-    'the snippet is too thin to judge impact. Do not scrape routine headlines. ' +
+    'Fetch the full body text of a news article URL. Use when a headline hints ' +
+    'at a catalyst whose direction or magnitude can\'t be judged from the snippet ' +
+    'alone (dovish vs hawkish pivot, exact bps move, source-of-statement, etc). ' +
+    'Skip routine session color and headlines already covered in Previously Reported. ' +
     `You may call this in parallel for up to ${MAX_SCRAPES_PER_BRIEFING} URLs ` +
     'in a single turn. Only call for URLs that appear in the "Recent Market News" ' +
     'or "Breaking Content" sections of the user prompt.',

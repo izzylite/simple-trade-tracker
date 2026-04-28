@@ -15,7 +15,7 @@ import {
   formatPriceLine,
   type PriceSnapshot,
 } from './prices.ts';
-import { scrapeArticle } from '../_shared/serperScrape.ts';
+import { scrapeArticle } from '../_shared/scrapeProvider.ts';
 import { buildMarketResearchSystemPrompt } from './market-research-prompt.ts';
 import { buildTemporalContext } from '../ai-trading-agent/systemPrompt.ts';
 import {
@@ -590,7 +590,7 @@ Generate the JSON briefing now.`;
   return generateBriefingWithScrape(
     systemPrompt,
     userPrompt,
-    (url) => scrapeArticle(supabase, url, 3600)
+    (url) => scrapeArticle(supabase, url, 3600, 'tavily')
   );
 }
 

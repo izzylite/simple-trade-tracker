@@ -7,6 +7,7 @@ import {
 import {
   normalizeTavilyResponse,
   mapTimeRange,
+  stripChrome,
   type TavilyResponse,
 } from "./tavily.ts";
 
@@ -105,4 +106,58 @@ Deno.test("normalize: URL with port keeps the port in source", () => {
   };
   const out = normalizeTavilyResponse(resp);
   assertEquals(out[0].source, "example.com");
+});
+
+// ============================================================
+// stripChrome — pure helper for Tavily extract responses
+// ============================================================
+//
+// Tavily extract responses include ~30-40% navigation chrome (menu items,
+// section names) before the article body. The strip locates the article
+// title in the content and slices from there.
+
+Deno.test("stripChrome: anchors on article title and removes preceding chrome", () => {
+  const content = "CNBC\n Markets\n Tech\nFed signals dovish pivot\nThe Federal Reserve hinted today...";
+  const title = "Fed signals dovish pivot";
+  assertEquals(stripChrome(content, title), "Fed signals dovish pivot\nThe Federal Reserve hinted today...");
+});
+
+Deno.test("stripChrome: handles title with site-name suffix", () => {
+  // Tavily often returns title as "Headline - Site" or "Headline | Site".
+  // Match by the first 20 chars of the headline portion only.
+  const content = "Skip Navigation\nNasdaq rallies on Fed pivot\nMarkets surged today...";
+  const title = "Nasdaq rallies on Fed pivot - WSJ";
+  assertEquals(
+    stripChrome(content, title),
+    "Nasdaq rallies on Fed pivot\nMarkets surged today...",
+  );
+});
+
+Deno.test("stripChrome: returns full content when title not found", () => {
+  // Defensive: if the headline doesn't appear in the body verbatim, don't
+  // drop content. Better to feed Gemini chrome+article than an empty string.
+  const content = "Some text without the headline anywhere";
+  const title = "An entirely different headline";
+  assertEquals(stripChrome(content, title), content);
+});
+
+Deno.test("stripChrome: very short title returns full content", () => {
+  // Anchoring on <5 chars would match too aggressively (e.g. "AI" matches
+  // anything). Skip the strip if the headline is too short to anchor.
+  const content = "CNBC\n Markets\n AI is everywhere now...";
+  const title = "AI";
+  assertEquals(stripChrome(content, title), content);
+});
+
+Deno.test("stripChrome: empty title returns full content", () => {
+  const content = "Some article content";
+  assertEquals(stripChrome(content, ""), content);
+});
+
+Deno.test("stripChrome: title at position 0 returns full content (no chrome to strip)", () => {
+  // If the title IS at position 0, indexOf returns 0, our `idx > 0` guard
+  // returns the full content. Equivalent outcome to slicing at 0; safer.
+  const content = "Article Title\nBody text here";
+  const title = "Article Title";
+  assertEquals(stripChrome(content, title), content);
 });
