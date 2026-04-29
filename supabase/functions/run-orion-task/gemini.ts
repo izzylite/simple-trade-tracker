@@ -49,10 +49,13 @@ export const MAX_SCRAPES_PER_BRIEFING = 5;
 const SCRAPE_TOOL_DECLARATION = {
   name: 'scrape_url',
   description:
-    'Fetch the full body text of a news article URL. Use when a headline hints ' +
-    'at a catalyst whose direction or magnitude can\'t be judged from the snippet ' +
-    'alone (dovish vs hawkish pivot, exact bps move, source-of-statement, etc). ' +
-    'Skip routine session color and headlines already covered in Previously Reported. ' +
+    'Fetch the full body text of a news article URL. Use for (a) major catalysts ' +
+    'where the article body would add specific quotes, figures, or market follow-' +
+    'through context (central bank decisions/speeches, head-of-state statements, ' +
+    'geopolitical shocks, surprise data misses/beats), OR (b) ambiguous headlines ' +
+    'whose direction or magnitude can\'t be pinned down from the snippet (dovish ' +
+    'vs hawkish, exact bps, source-of-statement). Skip routine session color and ' +
+    'headlines already covered in Previously Reported. ' +
     `You may call this in parallel for up to ${MAX_SCRAPES_PER_BRIEFING} URLs ` +
     'in a single turn. Only call for URLs that appear in the "Recent Market News" ' +
     'or "Breaking Content" sections of the user prompt.',

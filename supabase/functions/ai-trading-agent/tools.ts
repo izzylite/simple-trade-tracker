@@ -6,6 +6,7 @@
 import { log } from "../_shared/supabase.ts";
 import { fetchSerperScrape } from "../_shared/serperScrape.ts";
 import { scrapeArticle } from "../_shared/scrapeProvider.ts";
+import { tavilySearchNews, tavilySearchBreaking } from "../_shared/tavily.ts";
 import { getMarketPrice } from "../_shared/prices.ts";
 import {
   SLASH_COMMAND_TAG,
@@ -897,18 +898,44 @@ Never call this tool without user consent.`,
  */
 
 /**
- * Execute web search using Serper API
+ * Execute web search with Serper primary + Tavily fallback.
+ *
+ * Serper is the primary provider (Google index, knowledge-graph support, no
+ * day-granularity limit). Tavily falls in when Serper is unavailable, errors,
+ * or returns nothing — preserves chat reliability if SERPER_API_KEY is
+ * missing or quota-exhausted, and gives a second-chance index lookup for
+ * obscure queries Google didn't surface.
  */
 export async function executeWebSearch(
   query: string,
   searchType: string = "search",
   timeRange?: string,
+  supabase?: SupabaseClient,
 ): Promise<string> {
+  const serperResult = await trySerperSearch(query, searchType, timeRange);
+  if (serperResult) return serperResult;
+
+  if (supabase) {
+    const tavilyResult = await tryTavilySearch(supabase, query, searchType, timeRange);
+    if (tavilyResult) return tavilyResult;
+  }
+
+  return `⚠️ NO RESULTS FOUND for query: "${query}". Try different search terms or use your market knowledge.`;
+}
+
+/**
+ * Serper search attempt. Returns formatted results on success, null on any
+ * failure (missing key, HTTP error, empty results, exception) so the caller
+ * can decide whether to fall back to Tavily.
+ */
+async function trySerperSearch(
+  query: string,
+  searchType: string,
+  timeRange: string | undefined,
+): Promise<string | null> {
   try {
     const serperApiKey = Deno.env.get("SERPER_API_KEY");
-    if (!serperApiKey) {
-      return "Web search not configured";
-    }
+    if (!serperApiKey) return null;
 
     const endpoint = searchType === "news"
       ? "https://google.serper.dev/news"
@@ -939,31 +966,22 @@ export async function executeWebSearch(
       body: JSON.stringify(body),
     });
 
-    if (!response.ok) {
-      return `Search failed: ${response.status}`;
-    }
+    if (!response.ok) return null;
 
     const data = await response.json();
-
-    // Check if we have any results
-    // For search endpoint: data.organic
-    // For news endpoint: data.news
     const hasOrganic = data.organic && data.organic.length > 0;
     const hasNews = data.news && data.news.length > 0;
     const hasKnowledge = data.knowledgeGraph &&
       (data.knowledgeGraph.title || data.knowledgeGraph.description);
 
-    if (!hasOrganic && !hasNews && !hasKnowledge) {
-      return `⚠️ NO RESULTS FOUND for query: "${query}". Try different search terms or use your market knowledge.`;
-    }
+    if (!hasOrganic && !hasNews && !hasKnowledge) return null;
 
     let results = `Search results for: "${query}"\n\n`;
 
     if (hasOrganic) {
       results += "Top Results:\n";
       for (const result of data.organic.slice(0, 5)) {
-        results +=
-          `\n- ${result.title}\n  ${result.snippet}\n  ${result.link}\n`;
+        results += `\n- ${result.title}\n  ${result.snippet}\n  ${result.link}\n`;
       }
     }
 
@@ -984,10 +1002,45 @@ export async function executeWebSearch(
     }
 
     return results;
-  } catch (error) {
-    return `Search error: ${
-      error instanceof Error ? error.message : "Unknown"
-    }`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tavily search fallback. Maps chat's day/week/month time-range to Tavily's
+ * coarser day/week buckets (Tavily has no month bucket via our integration —
+ * a month-range chat query falls back to week, which is acceptable for
+ * fallback semantics; Serper had first crack at the precise range).
+ */
+async function tryTavilySearch(
+  supabase: SupabaseClient,
+  query: string,
+  searchType: string,
+  timeRange: string | undefined,
+): Promise<string | null> {
+  try {
+    const tavilyTimeRange: "qdr:h" | "qdr:d" | "qdr:w" =
+      timeRange === "week" ? "qdr:w" :
+      timeRange === "month" ? "qdr:w" :
+      "qdr:d";
+
+    // News-type chat searches → Tavily news topic; everything else → general.
+    const results = searchType === "news"
+      ? await tavilySearchNews(supabase, query, 10, tavilyTimeRange)
+      : await tavilySearchBreaking(supabase, query, tavilyTimeRange, 10);
+
+    if (!results || results.length === 0) return null;
+
+    let out = `Search results for: "${query}" (Tavily fallback)\n\n`;
+    out += searchType === "news" ? "News Results:\n" : "Top Results:\n";
+    for (const r of results.slice(0, 5)) {
+      const date = r.date ? ` [${r.date}]` : "";
+      out += `\n- ${r.title}${date}\n  ${r.snippet}\n  ${r.link}\n`;
+    }
+    return out;
+  } catch {
+    return null;
   }
 }
 
@@ -2269,7 +2322,7 @@ export async function executeCustomTool(
         const timeRange = typeof args.time_range === "string"
           ? args.time_range
           : undefined;
-        return await executeWebSearch(query, searchType, timeRange);
+        return await executeWebSearch(query, searchType, timeRange, supabase);
       }
 
       case "scrape_url": {
