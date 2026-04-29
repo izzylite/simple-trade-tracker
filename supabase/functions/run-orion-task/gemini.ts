@@ -46,19 +46,33 @@ export async function generateContent(
 // in normal briefing latency (~1-2s each, all parallel).
 export const MAX_SCRAPES_PER_BRIEFING = 5;
 
+// This description is the canonical scrape policy. The system prompt only
+// references it ("see scrape_url tool description") to prevent the kind of
+// drift that caused the Apr 28 zero-scrape regression — when policy lived
+// in two places and the wordings diverged.
 const SCRAPE_TOOL_DECLARATION = {
   name: 'scrape_url',
   description:
-    'Fetch the full body text of a news article URL. Use for (a) major catalysts ' +
-    'where the article body would add specific quotes, figures, or market follow-' +
-    'through context (central bank decisions/speeches, head-of-state statements, ' +
-    'geopolitical shocks, surprise data misses/beats), OR (b) ambiguous headlines ' +
-    'whose direction or magnitude can\'t be pinned down from the snippet (dovish ' +
-    'vs hawkish, exact bps, source-of-statement). Skip routine session color and ' +
-    'headlines already covered in Previously Reported. ' +
-    `You may call this in parallel for up to ${MAX_SCRAPES_PER_BRIEFING} URLs ` +
-    'in a single turn. Only call for URLs that appear in the "Recent Market News" ' +
-    'or "Breaking Content" sections of the user prompt.',
+    'Fetch the full body text of a news article URL. Snippets give you the headline; ' +
+    'the body has the trader\'s-eye details — specific quotes, exact figures, market ' +
+    'follow-through.\n' +
+    'Call this tool when ANY of:\n' +
+    '(a) The snippet describes a major catalyst (central bank decision/speech, head-' +
+    'of-state statement, geopolitical shock, surprise data miss/beat) — even if ' +
+    'direction is clear from the headline, the body adds context the briefing ' +
+    'genuinely needs.\n' +
+    '(b) The snippet hints at direction or magnitude but doesn\'t pin it down (e.g. ' +
+    '"Fed signals pivot" without dovish/hawkish, "rate cut expected" without bps, ' +
+    '"policy shift" without specifics).\n' +
+    'Examples:\n' +
+    '- "Fed Holds Rates in Split Decision" → SCRAPE (vote split, dot-plot details, Powell language live in body)\n' +
+    '- "Trump Sets 48-Hour Iran Deadline" → SCRAPE (timing, demands, response specifics live in body)\n' +
+    '- "ECB\'s Lagarde: Inflation persistent but path is clear" → SCRAPE (b — direction unclear from "persistent but clear")\n' +
+    '- "DXY edges higher in quiet European session" → SKIP (routine session color, snippet says everything)\n' +
+    '- Any headline whose catalyst is already in Previously Reported → SKIP\n' +
+    `You may call this in parallel for up to ${MAX_SCRAPES_PER_BRIEFING} URLs in a single turn. ` +
+    'Only call for URLs that appear in the "Recent Market News" or "Breaking Content" sections ' +
+    'of the user prompt.',
   parameters: {
     type: 'object',
     properties: {
