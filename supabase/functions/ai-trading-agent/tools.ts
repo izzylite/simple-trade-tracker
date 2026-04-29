@@ -725,7 +725,7 @@ When the user references a briefing AND asks a market/trading question, call thi
 
 Do NOT use this for general market questions with no briefing reference; use search_web for those.
 
-Results include: title, significance (low/medium/high), task type, plain-text body, and timestamp. User ID is automatically provided from context.`,
+Results include: title, significance (low/medium/high), task type, plain-text body, timestamp, and the source URLs Orion saw when generating the briefing. If the user asks for deeper context on a past briefing, call scrape_url on those source URLs to read the full articles. User ID is automatically provided from context.`,
   parameters: {
     type: "object",
     properties: {
@@ -1952,15 +1952,44 @@ export async function getRecentOrionBriefings(
       }.`;
     }
 
+    interface BriefingCitation {
+      url?: string;
+      title?: string;
+      source?: string;
+    }
+
     const lines = rows.map((r, i) => {
-      const title =
-        (r.metadata as { title?: string } | null)?.title ?? "Briefing";
+      const meta = r.metadata as
+        | { title?: string; citations?: BriefingCitation[] }
+        | null;
+      const title = meta?.title ?? "Briefing";
       const sig = r.significance ? r.significance.toUpperCase() : "—";
-      const body = (r.content_plain ?? "").substring(0, 800);
+      // No body trim: content_plain is already a Gemini-summarized briefing
+      // (system prompt caps it at ~800 words). A char-level cut would chop
+      // the summary mid-sentence for no benefit.
+      const body = r.content_plain ?? "";
+
+      const citations = Array.isArray(meta?.citations) ? meta!.citations : [];
+      const sourceLines = citations
+        .filter((c): c is BriefingCitation & { url: string } =>
+          typeof c?.url === "string" && c.url.length > 0
+        )
+        .map((c) => {
+          let domain = "";
+          try { domain = new URL(c.url).hostname.replace(/^www\./, ""); }
+          catch { /* fall through with empty domain */ }
+          const label = c.source || domain || "source";
+          return c.title
+            ? `      - ${label}: ${c.title} (${c.url})`
+            : `      - ${label}: (${c.url})`;
+        });
+      const sourcesBlock =
+        sourceLines.length > 0 ? `\n    Sources:\n${sourceLines.join("\n")}` : "";
+
       return (
         `[${i + 1}] ${r.created_at} | ${r.task_type} | ${sig}\n` +
         `    Title: ${title}\n` +
-        `    ${body}${(r.content_plain?.length ?? 0) > 800 ? "..." : ""}`
+        `    ${body}${sourcesBlock}`
       );
     });
 
