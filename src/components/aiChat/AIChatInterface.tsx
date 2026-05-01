@@ -26,6 +26,7 @@ import {
   KeyboardArrowDown as ScrollDownIcon
 } from '@mui/icons-material';
 import ChatMessage from './ChatMessage';
+import ReminderSeparator from './ReminderSeparator';
 import AIChatMentionInput from './AIChatMentionInput';
 import type { AIChatMentionInputHandle, SystemCommand } from './AIChatMentionInput';
 import { ChatMessage as ChatMessageType, AttachedImage } from '../../types/aiChat';
@@ -497,7 +498,9 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
       >
         {displayMessages.map((message, index) => (
           <React.Fragment key={message.id}>
-            
+            {message.metadata?.triggered_by?.startsWith('reminder:') && (
+              <ReminderSeparator description={message.metadata.reminder_description} />
+            )}
             <ChatMessage
               message={message}
               showTimestamp={true}
