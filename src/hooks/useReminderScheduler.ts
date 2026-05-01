@@ -16,6 +16,7 @@
  *   + backoff) so the timer set survives transient network blips.
  */
 import { useCallback, useEffect, useRef } from 'react';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, supabaseUrl } from '../config/supabase';
 import {
   getReminders,
@@ -73,12 +74,10 @@ export function useReminderScheduler(enabled: boolean = true): void {
     };
   }, [enabled, scheduleTimer]);
 
-  // Realtime subscription with reconnect/backoff.
-  useRealtimeSubscription({
-    channelName: 'reminders-scheduler',
-    enabled,
-    privateChannel: false,
-    onChannelCreated: (channel) => {
+  // Stable handler identities so useRealtimeSubscription's createChannel
+  // deps don't churn on every parent re-render (e.g. chat input typing).
+  const handleChannelCreated = useCallback(
+    (channel: RealtimeChannel) => {
       channel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'reminders' },
@@ -96,22 +95,33 @@ export function useReminderScheduler(enabled: boolean = true): void {
         },
       );
     },
-    onSubscribed: () => {
-      // After (re)connecting, refresh from DB in case we missed events
-      // during the disconnect window.
-      void getReminders()
-        .then((rows) => {
-          // Cancel anything no longer pending; (re)schedule current ones.
-          const stillPending = new Set(rows.map((r) => r.id));
-          for (const id of Array.from(timersRef.current.keys())) {
-            if (!stillPending.has(id)) cancelTimer(id);
-          }
-          for (const r of rows) scheduleTimer(r);
-        })
-        .catch((err) => {
-          logger.error('Failed to resync reminders on reconnect:', err);
-        });
-    },
+    [scheduleTimer, cancelTimer],
+  );
+
+  const handleSubscribed = useCallback(() => {
+    // After (re)connecting, refresh from DB in case we missed events
+    // during the disconnect window.
+    void getReminders()
+      .then((rows) => {
+        // Cancel anything no longer pending; (re)schedule current ones.
+        const stillPending = new Set(rows.map((r) => r.id));
+        for (const id of Array.from(timersRef.current.keys())) {
+          if (!stillPending.has(id)) cancelTimer(id);
+        }
+        for (const r of rows) scheduleTimer(r);
+      })
+      .catch((err) => {
+        logger.error('Failed to resync reminders on reconnect:', err);
+      });
+  }, [scheduleTimer, cancelTimer]);
+
+  // Realtime subscription with reconnect/backoff.
+  useRealtimeSubscription({
+    channelName: 'reminders-scheduler',
+    enabled,
+    privateChannel: false,
+    onChannelCreated: handleChannelCreated,
+    onSubscribed: handleSubscribed,
   });
 
   // Cleanup all timers on unmount.
