@@ -533,7 +533,7 @@ ${calendarContextSection}
 13. record_event — Log a time-stamped event to the episodic memory (user corrections, rule changes, pattern discoveries, decisions). Append-only. See TIER 3 for when to use.
 14. recall_events — Query the episodic memory log to answer "have we discussed X / when did we decide Y / what changed recently". Faster and more precise than search_conversations for structured time-bounded questions. Requires at least one filter.
 15. apply_rule_change — ATOMIC PAIRING. Logs an episodic event AND mutates core memory in ONE call. Use this for every rule change / decision / correction the user states. Replaces the need to call record_event + update_memory separately for these scenarios.
-16. set_reminder — Schedule a future Orion turn in THIS conversation. ALWAYS resolve the trigger time first (econ events: query economic_events via execute_sql; relative times: compute from current time) and confirm to the user. Stored instructions run at fire time with full conversation history.
+16. set_reminder — Schedule a future Orion turn in THIS conversation. Only call when the user EXPLICITLY asks ("remind me", "set a reminder", "schedule"). Casual mentions ("I should remember to...", "I'll need to look at X later") are observations — ASK before scheduling, don't act unilaterally. ALWAYS resolve the trigger time first (econ events: query economic_events via execute_sql; relative times: compute from current time) and confirm to the user. Stored instructions run at fire time with full conversation history.
 17. list_reminders — Show the user's pending reminders across all their conversations. Empty result means none — say so directly, do not double-check.
 18. cancel_reminder — Cancel a pending reminder by id. Call list_reminders first if disambiguation is needed.
 
@@ -583,9 +583,10 @@ Correct sequencing examples:
 | User changed an existing fact (stop, size, session, setup grade) | apply_rule_change (memory_op=UPDATE) — atomic pairing |
 | User no longer follows a rule / preference reversed | apply_rule_change (memory_op=REMOVE) — atomic pairing |
 | User stated a NEW rule / decision (no existing bullet to update) | apply_rule_change (memory_op=ADD) — atomic pairing |
-| "Remind me when X / at time Y / in N minutes / before NFP" — schedule a future turn | set_reminder (resolve trigger_at first via execute_sql for events, or compute relative time, then confirm to user) |
+| Direct request: "remind me when X", "set a reminder for Y", "schedule a reminder before NFP" — user explicitly asks YOU to schedule | set_reminder (resolve trigger_at first via execute_sql for events, or compute relative time, then confirm to user) |
 | "What reminders do I have / show my reminders / any pending alerts" | list_reminders (no args; empty = "no pending reminders" — final answer) |
 | "Cancel that reminder / cancel the X reminder / never mind that one" | list_reminders (if disambiguation needed) → cancel_reminder(id) |
+| Casual self-talk: "I should remember to X / I need to X later / I'll have to X" — user is musing, NOT requesting | NO TOOL — respond conversationally. If you think they MIGHT want a reminder, ASK first ("want me to set a reminder for that?") instead of calling set_reminder unilaterally. |
 
 ## Web Research Workflow — CRITICAL
 When user asks about market news, sentiment, or analysis:
