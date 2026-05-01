@@ -46,8 +46,9 @@ CREATE INDEX idx_reminders_due
   ON public.reminders(trigger_at)
   WHERE status = 'pending';
 
-CREATE INDEX idx_reminders_user_status
-  ON public.reminders(user_id, status);
+CREATE INDEX idx_reminders_user_pending
+  ON public.reminders(user_id, trigger_at)
+  WHERE status = 'pending';
 
 CREATE INDEX idx_reminders_conversation
   ON public.reminders(conversation_id);
