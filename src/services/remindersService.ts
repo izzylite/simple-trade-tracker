@@ -1,10 +1,11 @@
 /**
- * Reminders service: CRUD + realtime subscription for chat-driven reminders.
+ * Reminders service: read/cancel operations for chat-driven reminders.
  *
  * The browser local-timer scheduler (useReminderScheduler) and the reminders
  * panel UI (RemindersPanel) both consume this service so their view of
- * reminder state stays consistent. The cron-based fallback (dispatch-reminders
- * edge function) is the only other writer.
+ * reminder state stays consistent. Realtime subscriptions are handled directly
+ * by those callers via useRealtimeSubscription. The cron-based fallback
+ * (dispatch-reminders edge function) is the only other writer.
  *
  * Note: there is no client-side claimReminder — claim_reminder() is a
  * service-role-only RPC. The browser fires reminders by POSTing to the
@@ -12,7 +13,6 @@
  * performs the atomic claim internally. Single chokepoint, least-privilege.
  */
 import { supabase } from '../config/supabase';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export type ReminderStatus =
   | 'pending'
@@ -69,39 +69,4 @@ export async function cancelReminder(id: string): Promise<Reminder | null> {
     .maybeSingle();
   if (error) throw error;
   return (data as Reminder) ?? null;
-}
-
-export interface ReminderEvent {
-  type: 'INSERT' | 'UPDATE' | 'DELETE';
-  newRow: Reminder | null;
-  oldRow: Reminder | null;
-}
-
-/**
- * Subscribe to changes on the user's reminders. The user filter is enforced
- * by RLS — the realtime stream only emits rows visible to the current auth.
- *
- * Returns an unsubscribe function.
- */
-export function subscribeToReminders(
-  onEvent: (event: ReminderEvent) => void,
-): () => void {
-  const channel: RealtimeChannel = supabase
-    .channel('reminders-changes')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'reminders' },
-      (payload) => {
-        onEvent({
-          type: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
-          newRow: (payload.new as Reminder | null) ?? null,
-          oldRow: (payload.old as Reminder | null) ?? null,
-        });
-      },
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
 }

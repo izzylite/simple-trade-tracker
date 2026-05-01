@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { Box, Typography, useTheme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import AlarmIcon from '@mui/icons-material/Alarm';
 
 interface ReminderSeparatorProps {
@@ -27,13 +28,13 @@ const ReminderSeparator: React.FC<ReminderSeparatorProps> = ({ description }) =>
         py: 0.75,
         borderRadius: 999,
         alignSelf: 'flex-start',
-        bgcolor: theme.palette.action.hover,
+        bgcolor: alpha(theme.palette.action.hover, 0.6),
         color: theme.palette.text.secondary,
         fontSize: 12,
         width: 'fit-content',
       }}
     >
-      <AlarmIcon sx={{ fontSize: 14 }} />
+      <AlarmIcon aria-hidden sx={{ fontSize: 14 }} />
       <Typography variant="caption" sx={{ fontSize: 12 }}>
         Reminder{description ? `: ${description}` : ''}
       </Typography>

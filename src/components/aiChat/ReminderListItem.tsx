@@ -17,6 +17,7 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import CancelIcon from '@mui/icons-material/Cancel';
 import AlarmIcon from '@mui/icons-material/Alarm';
 import type { Reminder } from '../../services/remindersService';
@@ -72,7 +73,7 @@ const ReminderListItem: React.FC<ReminderListItemProps> = ({
         p: 1.5,
         borderRadius: 2,
         cursor: 'pointer',
-        '&:hover': { bgcolor: theme.palette.action.hover },
+        '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.6) },
         '&:focus-visible': {
           outline: `2px solid ${theme.palette.primary.main}`,
           outlineOffset: 2,

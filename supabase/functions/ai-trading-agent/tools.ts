@@ -2342,7 +2342,8 @@ export const setReminderTool: GeminiFunctionDeclaration = {
     "and tool access — exactly as if the user had asked the question themselves at that moment. " +
     "The response posts as an assistant message into this conversation, marked with a small 'Reminder' label. " +
     "ALWAYS resolve the trigger time first (e.g., call get_economic_events for an econ release) " +
-    "and confirm the resolved time back to the user in your reply.",
+    "and confirm the resolved time back to the user in your reply. " +
+    "Use list_reminders to see existing ones, cancel_reminder to remove one.",
   parameters: {
     type: "object",
     properties: {
