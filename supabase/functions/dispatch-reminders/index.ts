@@ -1,5 +1,4 @@
 import {
-  corsHeaders,
   handleCors,
   log,
   createServiceClient,
@@ -111,7 +110,7 @@ Deno.serve(async (req) => {
       // ai-trading-agent reports `claimed: false` when another caller (e.g.
       // the browser local timer) won the atomic claim race. That's not a
       // failure — it's the correct outcome.
-      const wasClaimed = !(fireBody && fireBody.claimed === false);
+      const wasClaimed = fireBody?.claimed !== false;
       return { id: r.id, claimed: wasClaimed };
     })
   );
