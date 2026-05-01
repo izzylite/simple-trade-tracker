@@ -2452,9 +2452,9 @@ async function executeSetReminder(
     }
     return {
       success: true,
-      id: data.id as string,
-      trigger_at: data.trigger_at as string,
-      description: data.description as string,
+      id: data.id,
+      trigger_at: data.trigger_at,
+      description: data.description,
     };
   })();
 
