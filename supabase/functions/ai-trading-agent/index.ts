@@ -1542,6 +1542,24 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
     return errorResponse('conversation not found', 404);
   }
 
+  // Defense in depth against cross-tenant reminder injection: the reminder
+  // row's user_id was already cross-checked against the authed userId in 3d,
+  // but the conversation FK doesn't enforce that the conversation belongs to
+  // user_id. A reminder planted with someone else's conversation_id would
+  // otherwise let an attacker write into a victim's conversation.
+  if (convo.user_id !== userId) {
+    log('Reminder conversation ownership mismatch — refusing to fire', 'warn', {
+      reminderId,
+      reminderUserId: userId,
+      conversationOwner: convo.user_id,
+    });
+    await serviceClient
+      .from('reminders')
+      .update({ status: 'failed', last_error: 'conversation_owner_mismatch' })
+      .eq('id', reminderId);
+    return errorResponse('conversation does not belong to reminder owner', 403);
+  }
+
   const currentCount = Number(convo.message_count ?? 0);
   if (currentCount >= 50) {
     await serviceClient
@@ -1730,13 +1748,20 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
   };
 
   const existingMessages = Array.isArray(convo.messages) ? convo.messages : [];
-  const { error: appendErr } = await serviceClient
+  // Atomic cap guard: `.lt('message_count', 50)` filters at the row-lock
+  // level. If a concurrent reminder fire pushed count to 50 between our 3e
+  // read and this UPDATE, the WHERE fails and `appendData` is null — we then
+  // mark this reminder failed as conversation_full (don't double-write).
+  const { data: appendData, error: appendErr } = await serviceClient
     .from('ai_conversations')
     .update({
       messages: [...existingMessages, newMessage],
       message_count: currentCount + 1,
     })
-    .eq('id', conversationId);
+    .eq('id', conversationId)
+    .lt('message_count', 50)
+    .select('id')
+    .maybeSingle();
 
   if (appendErr) {
     // Agent ran successfully but the append failed — mark failed so the user
@@ -1746,6 +1771,18 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
       .update({ status: 'failed', last_error: `append: ${appendErr.message}`.slice(0, 500) })
       .eq('id', reminderId);
     return errorResponse(`append failed: ${appendErr.message}`, 500);
+  }
+  if (!appendData) {
+    // Lost the cap-guard race OR the conversation was deleted between 3e and
+    // here. Either way, don't pretend this fired.
+    await serviceClient
+      .from('reminders')
+      .update({ status: 'failed', last_error: 'conversation_full_or_gone' })
+      .eq('id', reminderId);
+    return successResponse(
+      { claimed: true, fired: false, reason: 'conversation_full_or_gone' },
+      'Append skipped'
+    );
   }
 
   // ---- 3i. Mark reminder fired ----

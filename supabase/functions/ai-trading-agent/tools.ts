@@ -2341,8 +2341,12 @@ export const setReminderTool: GeminiFunctionDeclaration = {
     "At fire time, Orion runs a fresh turn with the stored instructions, full conversation history, " +
     "and tool access — exactly as if the user had asked the question themselves at that moment. " +
     "The response posts as an assistant message into this conversation, marked with a small 'Reminder' label. " +
-    "ALWAYS resolve the trigger time first (e.g., call get_economic_events for an econ release) " +
-    "and confirm the resolved time back to the user in your reply. " +
+    "ALWAYS resolve the trigger time first — for an economic release, query the economic_events table " +
+    "via execute_sql (SELECT event_date, time_utc FROM economic_events WHERE event_name ILIKE '%X%' AND event_date >= CURRENT_DATE ORDER BY event_date LIMIT 1). " +
+    "For 'in N hours/days', compute trigger_at relative to current time. Confirm the resolved trigger time back to the user. " +
+    "Returns JSON: {success: true, id, trigger_at, description} on success, or {success: false, error_code, error} on failure. " +
+    "Possible error_codes: past_trigger_at (trigger is now or earlier), too_far_future (>1 year out), " +
+    "reminder_limit_reached (user has 50 pending — ask them to cancel one first), invalid_args, db_error. " +
     "Use list_reminders to see existing ones, cancel_reminder to remove one.",
   parameters: {
     type: "object",
@@ -2436,6 +2440,28 @@ async function executeSetReminder(
       return { success: false, error_code: "reminder_limit_reached" as const, error: "max 50 pending reminders" };
     }
 
+    // Verify the conversation actually belongs to this user. The conversation
+    // FK only enforces existence, not ownership — without this check, a caller
+    // could plant a reminder targeting another user's conversation, and it
+    // would be visible in the victim's realtime sub. ai-trading-agent's
+    // reminder mode also rejects on owner mismatch at fire time, but blocking
+    // at write time keeps phantom rows out of the DB entirely.
+    const { data: convoOwner, error: ownerErr } = await supabase
+      .from("ai_conversations")
+      .select("user_id")
+      .eq("id", conversationId)
+      .maybeSingle();
+    if (ownerErr) {
+      return { success: false, error_code: "db_error" as const, error: ownerErr.message };
+    }
+    if (!convoOwner || convoOwner.user_id !== userId) {
+      return {
+        success: false,
+        error_code: "no_conversation_context" as const,
+        error: "conversation not found or not owned by user",
+      };
+    }
+
     const { data, error } = await supabase
       .from("reminders")
       .insert({
@@ -2467,7 +2493,8 @@ export const listRemindersTool: GeminiFunctionDeclaration = {
   description:
     "List all of the user's pending reminders across all their conversations. " +
     "Use when the user asks 'what reminders do I have?' or before cancelling so you can disambiguate. " +
-    "Returns id, description, trigger_at, instructions, conversation_id, and conversation_title for each.",
+    "Returns JSON: {success: true, reminders: [{id, description, trigger_at, instructions, conversation_id, conversation_title}, ...]}. " +
+    "An empty array means the user has no pending reminders — say so directly; do NOT call other tools to double-check.",
   parameters: {
     type: "object",
     properties: {},
@@ -2534,7 +2561,8 @@ export const cancelReminderTool: GeminiFunctionDeclaration = {
   name: "cancel_reminder",
   description:
     "Cancel a pending reminder by id. Call list_reminders first if you need to disambiguate. " +
-    "Returns success or an error code (not_found, not_pending).",
+    "Returns JSON: {success: true, id} on success, or {success: false, error_code, error} on failure. " +
+    "Possible error_codes: not_found (no reminder with that id for this user), not_pending (already fired/cancelled), invalid_args.",
   parameters: {
     type: "object",
     properties: {
