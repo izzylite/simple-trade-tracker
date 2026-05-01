@@ -2529,6 +2529,82 @@ async function executeListReminders(
   return JSON.stringify({ success: true, reminders: rows });
 }
 
+export const cancelReminderTool: GeminiFunctionDeclaration = {
+  name: "cancel_reminder",
+  description:
+    "Cancel a pending reminder by id. Call list_reminders first if you need to disambiguate. " +
+    "Returns success or an error code (not_found, not_pending).",
+  parameters: {
+    type: "object",
+    properties: {
+      id: {
+        type: "string",
+        description: "The reminder id to cancel (UUID).",
+      },
+    },
+    required: ["id"],
+  },
+};
+
+async function executeCancelReminder(
+  id: string,
+  context: ToolContext,
+  supabase: SupabaseClient | undefined,
+): Promise<string> {
+  if (!supabase) {
+    return JSON.stringify({ success: false, error: "no supabase client" });
+  }
+  const userId = context.userId ?? "";
+  if (!userId) {
+    return JSON.stringify({ success: false, error: "no user id" });
+  }
+  if (!id || typeof id !== "string") {
+    return JSON.stringify({
+      success: false,
+      error_code: "invalid_args",
+      error: "id required",
+    });
+  }
+
+  // Conditional update: only flips pending -> cancelled.
+  // Match user_id for defense-in-depth even though the service-role client
+  // bypasses RLS — keeps cross-user cancels impossible regardless of caller.
+  const { data, error } = await supabase
+    .from("reminders")
+    .update({ status: "cancelled" })
+    .eq("id", id)
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+  if (!data) {
+    // Either not found or not pending. Inspect to give a useful error.
+    const { data: existing } = await supabase
+      .from("reminders")
+      .select("id, status")
+      .eq("id", id)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!existing) {
+      return JSON.stringify({
+        success: false,
+        error_code: "not_found",
+        error: "reminder not found",
+      });
+    }
+    return JSON.stringify({
+      success: false,
+      error_code: "not_pending",
+      error: `reminder is ${existing.status}, not pending`,
+    });
+  }
+  return JSON.stringify({ success: true, id });
+}
+
 /**
  * ============================================================================
  * TOOL EXECUTOR
@@ -2907,6 +2983,11 @@ export async function executeCustomTool(
         return await executeListReminders(context, supabase);
       }
 
+      case "cancel_reminder": {
+        const id = typeof args.id === "string" ? args.id : "";
+        return await executeCancelReminder(id, context, supabase);
+      }
+
       default:
         return `Unknown custom tool: ${toolName}`;
     }
@@ -2942,6 +3023,7 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     recallEventsTool,
     setReminderTool,
     listRemindersTool,
+    cancelReminderTool,
   ];
 }
 
