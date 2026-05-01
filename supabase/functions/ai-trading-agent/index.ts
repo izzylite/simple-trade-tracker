@@ -3,7 +3,7 @@
  * Direct HTTP calls to both Gemini API and Supabase MCP (no SDKs)
  */
 
-import { corsHeaders, handleCors, log, createServiceClient } from '../_shared/supabase.ts';
+import { corsHeaders, handleCors, log, createServiceClient, errorResponse, successResponse } from '../_shared/supabase.ts';
 import { callGemini as sharedCallGemini } from '../_shared/gemini.ts';
 import {
   callMCPTool,
@@ -905,7 +905,8 @@ function handleStreamingRequest(
   supabaseAccessToken: string,
   supabaseUrl: string,
   userImages?: Array<{ url: string; mimeType: string }>,
-  calendarTags?: string[]
+  calendarTags?: string[],
+  conversationId?: string
 ): Response {
   // Create SSE stream
   const { stream, writer } = createSSEStream();
@@ -1037,7 +1038,8 @@ function handleStreamingRequest(
               const result = CUSTOM_TOOL_NAMES.has(call.name)
                 ? await executeCustomTool(call.name, call.args, {
                   userId,
-                  calendarId: _calendarId
+                  calendarId: _calendarId,
+                  conversationId
                 }, supabaseClient)
                 : await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
               return { call, result, success: true };
@@ -1118,7 +1120,8 @@ function handleStreamingRequest(
           if (CUSTOM_TOOL_NAMES.has(call.name)) {
             functionResult = await executeCustomTool(call.name, call.args, {
                   userId,
-                  calendarId: _calendarId
+                  calendarId: _calendarId,
+                  conversationId
                 }, supabaseClient);
           } else {
             functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
@@ -1404,6 +1407,360 @@ function handleStreamingRequest(
  */
 
 /**
+ * Constant-time string comparison for service-role bearer match. Prevents
+ * timing-based key disclosure if a malicious caller probes byte-by-byte.
+ */
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
+/**
+ * Verify the Authorization header for a reminder-mode call. Returns:
+ *   - { kind: 'service' } if the header matched the service role key
+ *   - { kind: 'user', userId } if a user JWT verified successfully
+ *   - null otherwise (caller returns 401)
+ *
+ * Service role: cron-dispatcher path. JWT: browser-local-timer path.
+ * The JWT path's userId OVERRIDES the request body — never trust client-supplied
+ * userId on the JWT path.
+ */
+async function authReminderRequest(
+  req: Request
+): Promise<{ kind: 'service' } | { kind: 'user'; userId: string } | null> {
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (!authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.slice(7);
+
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (serviceKey && constantTimeEqual(token, serviceKey)) {
+    return { kind: 'service' };
+  }
+
+  // Try JWT verification via the service client (auth.getUser accepts any JWT).
+  try {
+    const client = createServiceClient();
+    const { data, error } = await client.auth.getUser(token);
+    if (error || !data?.user?.id) return null;
+    return { kind: 'user', userId: data.user.id };
+  } catch (err) {
+    log(`Reminder auth JWT verify failed: ${err instanceof Error ? err.message : String(err)}`, 'warn');
+    return null;
+  }
+}
+
+/**
+ * Handle a mode='reminder' POST. Atomically claims the reminder, loads the
+ * conversation, runs a NON-streaming Orion turn with the stored instructions
+ * as the user message + a reminder-aware system hint, appends the assistant
+ * message to ai_conversations.messages with metadata.triggered_by='reminder:<id>',
+ * and marks the reminder fired (or failed on any error past the claim).
+ *
+ * Both fire paths funnel through here; whichever invocation wins claim_reminder
+ * owns the fire — the other gets `claimed: false` and bails. Single chokepoint
+ * = exactly-once delivery.
+ */
+async function handleReminderRequest(req: Request, body: AgentRequest): Promise<Response> {
+  // ---- 3a. Dual auth check ----
+  const auth = await authReminderRequest(req);
+  if (!auth) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  // For service-role calls, trust body.userId (cron is trusted). For user
+  // JWT calls, OVERRIDE body.userId with the verified subject.
+  const userId = auth.kind === 'user' ? auth.userId : body.userId;
+
+  // ---- 3b. Validate request ----
+  const { conversationId, reminderId, message } = body;
+  if (!conversationId || !reminderId || !userId || !message) {
+    return errorResponse(
+      'Missing required fields for mode=reminder: conversationId, reminderId, userId, message',
+      400
+    );
+  }
+
+  // ---- 3c. Atomic claim — the chokepoint ----
+  const serviceClient = createServiceClient();
+  const { data: claimedRows, error: claimErr } = await serviceClient
+    .rpc('claim_reminder', { p_id: reminderId });
+  if (claimErr) {
+    log('claim_reminder error', 'error', claimErr);
+    return errorResponse(`claim failed: ${claimErr.message}`, 500);
+  }
+  if (!claimedRows || (Array.isArray(claimedRows) && claimedRows.length === 0)) {
+    // Another caller (cron / different tab) already claimed. Not an error.
+    log('reminder already claimed', 'info', { reminderId });
+    return successResponse({ claimed: false }, 'Already claimed');
+  }
+  const claimed = (Array.isArray(claimedRows) ? claimedRows[0] : claimedRows) as {
+    id: string;
+    user_id: string;
+    conversation_id: string;
+    instructions: string;
+    description: string | null;
+    created_at: string;
+  };
+
+  // ---- 3d. Cross-check authorization vs claimed row ----
+  if (claimed.user_id !== userId || claimed.conversation_id !== conversationId) {
+    log(
+      'reminder ownership mismatch',
+      'error',
+      {
+        reminderId,
+        claimedUserId: claimed.user_id,
+        callerUserId: userId,
+        claimedConversationId: claimed.conversation_id,
+        callerConversationId: conversationId,
+      }
+    );
+    // Mark failed so we don't retry forever on a poisoned row.
+    await serviceClient
+      .from('reminders')
+      .update({ status: 'failed', last_error: 'ownership_mismatch' })
+      .eq('id', reminderId);
+    return errorResponse('Forbidden: reminder ownership mismatch', 403);
+  }
+
+  // ---- 3e. Load conversation + check 50-message cap ----
+  const { data: convo, error: convoErr } = await serviceClient
+    .from('ai_conversations')
+    .select('id, user_id, calendar_id, title, messages, message_count')
+    .eq('id', conversationId)
+    .single();
+
+  if (convoErr || !convo) {
+    await serviceClient
+      .from('reminders')
+      .update({ status: 'failed', last_error: 'conversation_not_found' })
+      .eq('id', reminderId);
+    return errorResponse('conversation not found', 404);
+  }
+
+  const currentCount = Number(convo.message_count ?? 0);
+  if (currentCount >= 50) {
+    await serviceClient
+      .from('reminders')
+      .update({ status: 'failed', last_error: 'conversation_full' })
+      .eq('id', reminderId);
+    return successResponse(
+      { claimed: true, fired: false, reason: 'conversation_full' },
+      'Conversation full'
+    );
+  }
+
+  const calendarId = (convo.calendar_id as string | null) ?? undefined;
+
+  // ---- 3f. Build the reminder-aware system instruction ----
+  // Standard system prompt (no calendarContext/focused trade — not applicable
+  // at fire time), with a reminder hint appended so the model continues the
+  // conversation rather than greeting fresh.
+  const baseSystemPrompt = buildSecureSystemPrompt(userId, calendarId);
+  const reminderHint = `\n---\nThis turn is firing because of a reminder you (the user) set on ${claimed.created_at}.\nThe original instructions were: "${claimed.instructions}"\nConversation history follows. Respond directly as a continuation of the conversation —\ndo NOT greet the user as if starting fresh.\n`;
+  const systemPrompt = baseSystemPrompt + reminderHint;
+
+  // Translate stored messages -> the {role, content} shape callGemini expects.
+  // Stored messages use `role: 'user' | 'assistant' | 'system'` and `content: string`.
+  // System messages are skipped (they don't belong in user-turn history).
+  const storedMessages = Array.isArray(convo.messages) ? convo.messages : [];
+  const conversationHistory = storedMessages
+    .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .map((m: any) => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content as string,
+    }));
+
+  // ---- 3g. Run the agent loop with the stored instructions as the user message ----
+  const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
+  if (!googleApiKey) {
+    await serviceClient
+      .from('reminders')
+      .update({ status: 'failed', last_error: 'GOOGLE_API_KEY missing' })
+      .eq('id', reminderId);
+    return errorResponse('AI service is not configured.', 500);
+  }
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const projectRef = supabaseUrl?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+  const supabaseAccessToken = Deno.env.get('AGENT_SUPABASE_ACCESS_TOKEN');
+  if (!supabaseUrl || !projectRef || !supabaseAccessToken) {
+    await serviceClient
+      .from('reminders')
+      .update({ status: 'failed', last_error: 'Supabase configuration missing' })
+      .eq('id', reminderId);
+    return errorResponse('Supabase configuration missing', 500);
+  }
+
+  const userTurnMessage = claimed.instructions;
+
+  let finalText = '';
+  const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
+  try {
+    // Build tools (MCP + custom) — same as chat path.
+    const geminiMcpTools = await getCachedMCPTools(
+      projectRef,
+      supabaseAccessToken,
+      ['execute_sql', 'list_tables']
+    );
+    const customTools = getAllCustomTools();
+    const allTools = [...geminiMcpTools, ...customTools];
+
+    // Initial call.
+    let result = await callGemini(googleApiKey, systemPrompt, userTurnMessage, conversationHistory, allTools);
+
+    const conversationContents: Array<{ role: string; parts: Array<Record<string, unknown>> }> = [
+      ...conversationHistory.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.content }]
+      })),
+      { role: 'user', parts: [{ text: userTurnMessage }] }
+    ];
+
+    let turnCount = 0;
+    const maxTurns = 15;
+    while (turnCount < maxTurns) {
+      turnCount++;
+
+      if (result.text && !result.functionCall) {
+        finalText = result.text;
+        break;
+      }
+      if (!result.functionCall) break;
+
+      const call = result.functionCall;
+      log(`[reminder] Executing function: ${call.name}`, 'info');
+
+      // Repeat-call detection (mirrors chat path).
+      const lastCall = functionCalls[functionCalls.length - 1];
+      if (lastCall && lastCall.name === call.name &&
+          JSON.stringify(lastCall.args) === JSON.stringify(call.args)) {
+        log('[reminder] Detected repeated function call - breaking loop', 'info');
+        break;
+      }
+
+      let functionResult: string;
+      if (CUSTOM_TOOL_NAMES.has(call.name)) {
+        functionResult = await executeCustomTool(
+          call.name,
+          call.args,
+          { userId, calendarId, conversationId },
+          serviceClient
+        );
+      } else {
+        functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
+      }
+      functionCalls.push({ name: call.name, args: call.args, result: functionResult });
+
+      const modelTurnParts = result.rawParts && result.rawParts.length > 0
+        ? result.rawParts
+        : [buildFunctionCallPart(call)];
+      conversationContents.push({ role: 'model', parts: modelTurnParts });
+      const responseParts = await buildFunctionResponseParts(call.name, functionResult);
+      conversationContents.push({ role: 'user', parts: responseParts });
+
+      const cont = await callGeminiWithContents(
+        googleApiKey,
+        conversationContents,
+        allTools,
+        { streaming: false, maxOutputTokens: 4000, systemInstruction: systemPrompt }
+      );
+      result = cont.functionCall
+        ? { functionCall: cont.functionCall, rawParts: cont.rawParts }
+        : { text: cont.text, rawParts: cont.rawParts };
+    }
+
+    // Force-synthesis fallback if the model exited without producing final text.
+    if (!finalText) {
+      log('[reminder] No final text — forcing synthesis with tool_config=NONE', 'warn');
+      try {
+        const synth = await callGeminiWithContents(
+          googleApiKey,
+          [
+            ...conversationContents,
+            { role: 'user', parts: [{ text: 'Please now summarise everything you found and give your final answer. Do not call any more tools.' }] }
+          ],
+          allTools,
+          { streaming: false, maxOutputTokens: 4000, mode: 'NONE', systemInstruction: systemPrompt }
+        );
+        if (synth.text) finalText = synth.text;
+      } catch (synthErr) {
+        log(`[reminder] Forced synthesis failed: ${synthErr}`, 'error');
+      }
+      if (!finalText) {
+        finalText = "I attempted to follow up on the reminder but ran into a temporary issue composing my response.";
+      }
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log(`[reminder] agent failure: ${msg}`, 'error', err);
+    await serviceClient
+      .from('reminders')
+      .update({ status: 'failed', last_error: msg.slice(0, 500) })
+      .eq('id', reminderId);
+    return errorResponse(`agent failure: ${msg}`, 500);
+  }
+
+  // ---- 3h. Append assistant message to ai_conversations.messages ----
+  // Mirror SerializableChatMessage shape (id/role/content/timestamp/status +
+  // optional citations/messageHtml). Add a `metadata` object with triggered_by
+  // — JSONB tolerates extra fields, and the frontend can read it to badge the
+  // bubble as reminder-fired.
+  const { messageHtml, citations } = formatResponseWithHtmlAndCitations(
+    finalText,
+    functionCalls as ToolCall[]
+  );
+
+  const newMessage = {
+    id: crypto.randomUUID(),
+    role: 'assistant',
+    content: finalText,
+    messageHtml,
+    timestamp: new Date().toISOString(),
+    status: 'received',
+    citations: citations ?? [],
+    toolCalls: functionCalls.map(fc => ({ name: fc.name, label: fc.name })),
+    metadata: {
+      triggered_by: `reminder:${reminderId}`,
+      reminder_description: claimed.description ?? null,
+    },
+  };
+
+  const existingMessages = Array.isArray(convo.messages) ? convo.messages : [];
+  const { error: appendErr } = await serviceClient
+    .from('ai_conversations')
+    .update({
+      messages: [...existingMessages, newMessage],
+      message_count: currentCount + 1,
+    })
+    .eq('id', conversationId);
+
+  if (appendErr) {
+    // Agent ran successfully but the append failed — mark failed so the user
+    // can see the error, but don't pretend the run never happened.
+    await serviceClient
+      .from('reminders')
+      .update({ status: 'failed', last_error: `append: ${appendErr.message}`.slice(0, 500) })
+      .eq('id', reminderId);
+    return errorResponse(`append failed: ${appendErr.message}`, 500);
+  }
+
+  // ---- 3i. Mark reminder fired ----
+  await serviceClient
+    .from('reminders')
+    .update({ status: 'fired', fired_at: new Date().toISOString() })
+    .eq('id', reminderId);
+
+  return successResponse(
+    { claimed: true, fired: true, reminderId, conversationId },
+    'Reminder fired'
+  );
+}
+
+/**
  * Main edge function handler
  */
 Deno.serve(async (req: Request) => {
@@ -1429,7 +1786,15 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: AgentRequest = await req.json();
+
+    // mode='reminder' branch — atomically claim + run + append + mark fired.
+    // Both fire paths (cron dispatcher + browser local timer) hit this entry.
+    if (body.mode === 'reminder') {
+      return await handleReminderRequest(req, body);
+    }
+
     const { message, userId, calendarId, focusedTradeId, conversationHistory = [], calendarContext, images } = body;
+    const conversationId = body.conversationId;
 
     // Allow image-only messages (no text required if images present)
     const hasContent = message || (images && images.length > 0);
@@ -1573,7 +1938,8 @@ Deno.serve(async (req: Request) => {
         supabaseAccessToken,
         supabaseUrl,
         allImages.length > 0 ? allImages : images, // Trade + user images
-        calendarContext?.tags
+        calendarContext?.tags,
+        conversationId
       );
     }
 
@@ -1645,7 +2011,8 @@ Deno.serve(async (req: Request) => {
         // Execute custom tool
         functionResult = await executeCustomTool(call.name, call.args, {
                   userId,
-                  calendarId
+                  calendarId,
+                  conversationId
                 }, supabaseClient);
         functionCalls.push({ name: call.name, args: call.args, result: functionResult });
       } else {

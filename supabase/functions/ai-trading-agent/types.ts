@@ -210,6 +210,8 @@ export interface UserAttachedImage {
 }
 
 // Request/Response Types
+export type AgentRequestMode = 'chat' | 'reminder';
+
 export interface AgentRequest {
   message: string;
   userId: string;
@@ -218,6 +220,13 @@ export interface AgentRequest {
   conversationHistory?: ConversationMessage[];
   calendarContext?: Partial<Calendar>;
   images?: UserAttachedImage[]; // User-attached images for analysis
+
+  // Reminder-mode fields. mode defaults to 'chat' when omitted.
+  // For mode='reminder', conversationId + reminderId are REQUIRED in the request.
+  mode?: AgentRequestMode;
+  conversationId?: string;
+  reminderId?: string;
+  reminderDescription?: string;
 }
 
 export interface ConversationMessage {
