@@ -39,7 +39,8 @@ import {
   Schedule as ScheduleIcon,
   Search as SearchIcon,
   PushPin as PushPinIcon,
-  PushPinOutlined as PushPinOutlinedIcon
+  PushPinOutlined as PushPinOutlinedIcon,
+  Alarm as AlarmIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import EconomicEventShimmer from '../../economicCalendar/EconomicEventShimmer';
@@ -57,8 +58,11 @@ import { useReminderScheduler } from '../../../hooks/useReminderScheduler';
 import EconomicEventDetailDialog
   from '../../economicCalendar/EconomicEventDetailDialog';
 import NoteEditorDialog from '../../notes/NoteEditorDialog';
+import RemindersPanel from '../../aiChat/RemindersPanel';
 import { Note, SLASH_COMMAND_TAG, GUIDELINE_TAG } from '../../../types/note';
 import * as notesService from '../../../services/notesService';
+import { ConversationRepository }
+  from '../../../services/repository/repositories/ConversationRepository';
 import type { SystemCommand } from '../../aiChat/AIChatMentionInput';
 import { TradeOperationsProps } from '../../../types/tradeOperations';
 import { Z_INDEX } from '../../../styles/zIndex';
@@ -187,17 +191,18 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
 
   // Local UI state
   const [showHistoryView, setShowHistoryView] = useState(false);
+  const [showRemindersView, setShowRemindersView] = useState(false);
 
   // Dismiss any open slash/mention popup in the chat input when sliding to the
-  // history view, or when the chat panel itself is dismissed (isActive=false,
-  // e.g. user opens the Notes panel). The Popper renders into a portal, so it
-  // outlives any visibility change to the chat content unless we close it
-  // explicitly.
+  // history view, opening the reminders overlay, or when the chat panel itself
+  // is dismissed (isActive=false, e.g. user opens the Notes panel). The Popper
+  // renders into a portal, so it outlives any visibility change to the chat
+  // content unless we close it explicitly.
   useEffect(() => {
-    if (showHistoryView || !isActive) {
+    if (showHistoryView || showRemindersView || !isActive) {
       chatInterfaceRef.current?.closeMention?.();
     }
-  }, [showHistoryView, isActive]);
+  }, [showHistoryView, showRemindersView, isActive]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] =
     useState<string | null>(null);
@@ -353,6 +358,28 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     setShowHistoryView(false);
   };
 
+  // Repository ref for the reminder-driven nav fallback (when the target
+  // conversation isn't in the local cache yet).
+  const conversationRepoRef = useRef(new ConversationRepository());
+
+  const handleNavigateFromReminder = async (conversationId: string) => {
+    const cached = conversations.find(c => c.id === conversationId);
+    if (cached) {
+      selectConversation(cached);
+    } else {
+      const fetched = await conversationRepoRef.current.findById(conversationId);
+      if (fetched) {
+        selectConversation(fetched);
+      } else {
+        logger.warn(
+          'Reminder target conversation not found:', conversationId
+        );
+        return;
+      }
+    }
+    setShowRemindersView(false);
+  };
+
   const handleDeleteClick = (
     conversationId: string,
     event: React.MouseEvent
@@ -497,7 +524,15 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
             >
               <IconButton
                 size="small"
-                onClick={() => setShowHistoryView(!showHistoryView)}
+                onClick={() => {
+                  setShowHistoryView(prev => !prev);
+                  setShowRemindersView(false);
+                }}
+                aria-label={
+                  showHistoryView
+                    ? 'Back to Chat'
+                    : 'Conversation History'
+                }
                 sx={{
                   color: showHistoryView
                     ? 'primary.main'
@@ -513,6 +548,31 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                   ? <ArrowBackIcon fontSize="small" />
                   : <HistoryIcon fontSize="small" />
                 }
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip
+              title={showRemindersView ? 'Back to Chat' : 'Reminders'}
+            >
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setShowRemindersView(prev => !prev);
+                  setShowHistoryView(false);
+                }}
+                aria-label={showRemindersView ? 'Back to Chat' : 'Reminders'}
+                sx={{
+                  color: showRemindersView
+                    ? 'primary.main'
+                    : 'text.secondary',
+                  '&:hover': {
+                    backgroundColor: alpha(
+                      theme.palette.action.hover, 0.5
+                    )
+                  }
+                }}
+              >
+                <AlarmIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </Box>
@@ -968,6 +1028,26 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
           {/* End History View */}
         </Box>
         {/* End Pager Container */}
+
+        {/* Reminders View — overlays the pager when toggled. Mutually
+            exclusive with the history view (the alarm-clock toggle closes
+            history, and vice versa). */}
+        {showRemindersView && (
+          <Box sx={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: theme.palette.background.default,
+            overflow: 'auto',
+            ...scrollbarStyles(theme),
+            zIndex: 1
+          }}>
+            <RemindersPanel
+              onNavigateToConversation={(conversationId) => {
+                void handleNavigateFromReminder(conversationId);
+              }}
+            />
+          </Box>
+        )}
       </Box>
 
       {/* Economic Event Detail Dialog */}
