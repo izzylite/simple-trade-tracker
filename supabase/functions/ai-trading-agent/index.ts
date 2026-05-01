@@ -1749,10 +1749,18 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
   }
 
   // ---- 3i. Mark reminder fired ----
-  await serviceClient
+  const { error: markFiredErr } = await serviceClient
     .from('reminders')
     .update({ status: 'fired', fired_at: new Date().toISOString() })
     .eq('id', reminderId);
+  if (markFiredErr) {
+    // Reminder is stuck in 'firing' state — fail-safe (no double-fire, since cron
+    // only picks up 'pending'), but worth a loud log so this can be cleaned up.
+    log('Failed to mark reminder fired (stuck in firing state)', 'error', {
+      reminderId,
+      error: markFiredErr.message,
+    });
+  }
 
   return successResponse(
     { claimed: true, fired: true, reminderId, conversationId },
