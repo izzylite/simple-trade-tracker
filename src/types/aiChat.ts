@@ -54,6 +54,14 @@ export interface ChatMessage {
     | { type: 'text'; value: string }
     | { type: 'note-mention'; noteId: string; noteTitle: string }
   >;
+  // Reminder + future-trigger metadata. Present when this turn was fired
+  // by something other than the user typing — e.g. a reminder. The UI
+  // renders a small system separator above any message with a triggered_by
+  // value starting with 'reminder:'.
+  metadata?: {
+    triggered_by?: string;          // e.g. 'reminder:<uuid>'
+    reminder_description?: string | null;
+  };
 }
 
 export interface ToolCallRecord {
