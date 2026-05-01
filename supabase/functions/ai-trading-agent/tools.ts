@@ -2461,6 +2461,74 @@ async function executeSetReminder(
   return JSON.stringify(result);
 }
 
+export const listRemindersTool: GeminiFunctionDeclaration = {
+  name: "list_reminders",
+  description:
+    "List all of the user's pending reminders across all their conversations. " +
+    "Use when the user asks 'what reminders do I have?' or before cancelling so you can disambiguate. " +
+    "Returns id, description, trigger_at, instructions, conversation_id, and conversation_title for each.",
+  parameters: {
+    type: "object",
+    properties: {},
+  },
+};
+
+interface ListRemindersRow {
+  id: string;
+  description: string | null;
+  trigger_at: string;
+  instructions: string;
+  conversation_id: string;
+  conversation_title: string;
+}
+
+async function executeListReminders(
+  context: ToolContext,
+  supabase: SupabaseClient | undefined,
+): Promise<string> {
+  if (!supabase) {
+    return JSON.stringify({ success: false, error: "no supabase client" });
+  }
+  const userId = context.userId ?? "";
+  if (!userId) {
+    return JSON.stringify({ success: false, error: "no user id" });
+  }
+
+  const { data, error } = await supabase
+    .from("reminders")
+    .select(`
+      id,
+      description,
+      trigger_at,
+      instructions,
+      conversation_id,
+      ai_conversations!inner(title)
+    `)
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .order("trigger_at", { ascending: true });
+
+  if (error) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+
+  const rows: ListRemindersRow[] = (data ?? []).map((r) => {
+    const conv = (r as { ai_conversations: { title?: string } | { title?: string }[] | null })
+      .ai_conversations;
+    const title = Array.isArray(conv) ? conv[0]?.title : conv?.title;
+    return {
+      id: r.id,
+      description: r.description ?? null,
+      trigger_at: r.trigger_at,
+      instructions: r.instructions,
+      conversation_id: r.conversation_id,
+      conversation_title: title ?? "(untitled)",
+    };
+  });
+
+  return JSON.stringify({ success: true, reminders: rows });
+}
+
 /**
  * ============================================================================
  * TOOL EXECUTOR
@@ -2835,6 +2903,10 @@ export async function executeCustomTool(
         return await executeSetReminder(triggerAt, instructions, description, context, supabase);
       }
 
+      case "list_reminders": {
+        return await executeListReminders(context, supabase);
+      }
+
       default:
         return `Unknown custom tool: ${toolName}`;
     }
@@ -2869,6 +2941,7 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     recordEventTool,
     recallEventsTool,
     setReminderTool,
+    listRemindersTool,
   ];
 }
 
