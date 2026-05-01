@@ -53,6 +53,7 @@ import { logger } from '../../../utils/logger';
 import { stripReferencedBlocks } from '../../../utils/chatMentions';
 import { useAuthState } from '../../../contexts/AuthStateContext';
 import { useAIChat, UseAIChatReturn } from '../../../hooks/useAIChat';
+import { useReminderScheduler } from '../../../hooks/useReminderScheduler';
 import EconomicEventDetailDialog
   from '../../economicCalendar/EconomicEventDetailDialog';
 import NoteEditorDialog from '../../notes/NoteEditorDialog';
@@ -145,6 +146,11 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
         },
       ];
     }, [focusedTrade]);
+
+  // Schedule browser-local timers for chat-driven reminders. Mounted here so
+  // it runs only when the chat panel is alive — cron handles users who never
+  // open chat, and longer-than-24-day reminders.
+  useReminderScheduler();
 
   // Use shared chat state if provided, otherwise create own instance
   const ownChatState = useAIChat({
