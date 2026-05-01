@@ -41,6 +41,7 @@ import {
 export interface ToolContext {
   userId?: string;
   calendarId?: string;
+  conversationId?: string;  // NEW: for set_reminder/list_reminders binding to current chat
   // When omitted, updateMemory defaults to all ops permitted.
   allowedMemoryOps?: Set<MemoryOp>;
 }
@@ -2328,6 +2329,138 @@ ${taskInstruction}`;
   }
 }
 
+// ============================================================
+// REMINDERS TOOLS
+// ============================================================
+
+export const setReminderTool: GeminiFunctionDeclaration = {
+  name: "set_reminder",
+  description:
+    "Schedule a future Orion turn that will fire at a specific time in this same conversation. " +
+    "Use when the user asks 'remind me when X happens' or 'check on Y at time Z'. " +
+    "At fire time, Orion runs a fresh turn with the stored instructions, full conversation history, " +
+    "and tool access — exactly as if the user had asked the question themselves at that moment. " +
+    "The response posts as an assistant message into this conversation, marked with a small 'Reminder' label. " +
+    "ALWAYS resolve the trigger time first (e.g., call get_economic_events for an econ release) " +
+    "and confirm the resolved time back to the user in your reply.",
+  parameters: {
+    type: "object",
+    properties: {
+      trigger_at: {
+        type: "string",
+        description:
+          "ISO 8601 UTC timestamp when the reminder should fire. Must be in the future and within 1 year.",
+      },
+      instructions: {
+        type: "string",
+        description:
+          "What Orion should do at fire time, written as a prompt — e.g. 'Look up the latest jobless claims " +
+          "release and summarize the result vs forecast'. 1-1000 chars.",
+      },
+      description: {
+        type: "string",
+        description:
+          "Short user-facing label shown in the reminders panel — e.g. 'Jobless claims report'. <=200 chars.",
+      },
+    },
+    required: ["trigger_at", "instructions", "description"],
+  },
+};
+
+interface SetReminderResult {
+  success: boolean;
+  id?: string;
+  trigger_at?: string;
+  description?: string;
+  error?: string;
+  error_code?:
+    | "past_trigger_at"
+    | "too_far_future"
+    | "reminder_limit_reached"
+    | "invalid_args"
+    | "no_user_context"
+    | "no_conversation_context"
+    | "db_error";
+}
+
+async function executeSetReminder(
+  triggerAt: string,
+  instructions: string,
+  description: string,
+  context: ToolContext,
+  supabase: SupabaseClient | undefined,
+): Promise<string> {
+  const result: SetReminderResult = await (async () => {
+    if (!supabase) {
+      return { success: false, error_code: "db_error" as const, error: "no supabase client" };
+    }
+    const userId = context.userId ?? "";
+    if (!userId) {
+      return { success: false, error_code: "no_user_context" as const, error: "no user id" };
+    }
+    const conversationId = context.conversationId ?? "";
+    if (!conversationId) {
+      return { success: false, error_code: "no_conversation_context" as const, error: "no conversation id" };
+    }
+
+    const trigger = new Date(triggerAt);
+    if (Number.isNaN(trigger.getTime())) {
+      return { success: false, error_code: "invalid_args" as const, error: "trigger_at not parseable" };
+    }
+    const now = Date.now();
+    if (trigger.getTime() <= now) {
+      return { success: false, error_code: "past_trigger_at" as const, error: "trigger_at must be in the future" };
+    }
+    if (trigger.getTime() > now + 365 * 24 * 60 * 60 * 1000) {
+      return { success: false, error_code: "too_far_future" as const, error: "trigger_at must be within 1 year" };
+    }
+
+    if (instructions.length < 1 || instructions.length > 1000) {
+      return { success: false, error_code: "invalid_args" as const, error: "instructions must be 1-1000 chars" };
+    }
+    if (description.length > 200) {
+      return { success: false, error_code: "invalid_args" as const, error: "description must be <=200 chars" };
+    }
+
+    // Per-user pending cap (50). Cheap query — partial index covers it.
+    const { count, error: countErr } = await supabase
+      .from("reminders")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "pending");
+    if (countErr) {
+      return { success: false, error_code: "db_error" as const, error: countErr.message };
+    }
+    if ((count ?? 0) >= 50) {
+      return { success: false, error_code: "reminder_limit_reached" as const, error: "max 50 pending reminders" };
+    }
+
+    const { data, error } = await supabase
+      .from("reminders")
+      .insert({
+        user_id: userId,
+        conversation_id: conversationId,
+        trigger_at: trigger.toISOString(),
+        instructions,
+        description,
+      })
+      .select("id, trigger_at, description")
+      .single();
+
+    if (error) {
+      return { success: false, error_code: "db_error" as const, error: error.message };
+    }
+    return {
+      success: true,
+      id: data.id as string,
+      trigger_at: data.trigger_at as string,
+      description: data.description as string,
+    };
+  })();
+
+  return JSON.stringify(result);
+}
+
 /**
  * ============================================================================
  * TOOL EXECUTOR
@@ -2695,6 +2828,13 @@ export async function executeCustomTool(
         return `${result.message}\n${lines.join("\n")}`;
       }
 
+      case "set_reminder": {
+        const triggerAt = typeof args.trigger_at === "string" ? args.trigger_at : "";
+        const instructions = typeof args.instructions === "string" ? args.instructions : "";
+        const description = typeof args.description === "string" ? args.description : "";
+        return await executeSetReminder(triggerAt, instructions, description, context, supabase);
+      }
+
       default:
         return `Unknown custom tool: ${toolName}`;
     }
@@ -2728,6 +2868,7 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     applyRuleChangeTool,
     recordEventTool,
     recallEventsTool,
+    setReminderTool,
   ];
 }
 
