@@ -182,6 +182,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     loadConversations,
     loadMoreConversations,
     selectConversation,
+    currentConversationId,
     deleteConversation,
     togglePinConversation,
     startNewChat,
@@ -317,7 +318,19 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   const handleSystemCommand = async (id: string) => {
     if (id === 'clear-chat') {
       setShowHistoryView(false);
-      await startNewChat();
+      // Abort any in-flight ai-trading-agent fetch BEFORE deleting — otherwise
+      // the backend's turn-end UPDATE would race with our DELETE. UPDATE no-ops
+      // on a deleted row, so this is belt-and-braces.
+      cancelRequest();
+      if (currentConversationId) {
+        // deleteConversation already calls startNewChat() when the deleted id
+        // matches currentConversationId (see useAIChat.ts), so we don't need
+        // to call it twice.
+        await deleteConversation(currentConversationId);
+      } else {
+        // No persisted conversation yet (first turn never landed) — just reset.
+        await startNewChat();
+      }
       return;
     }
     if (id === 'open-guidelines') {
