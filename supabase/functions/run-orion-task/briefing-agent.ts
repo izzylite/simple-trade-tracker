@@ -243,7 +243,28 @@ function parseBriefingResponse(
     }
   }
 
-  // Fallback: treat the whole response as the briefing body.
+  // Salvage path: model returned a fenced/JSON-shaped response that didn't
+  // parse (most common cause: output token cap truncated the closing `}` and
+  // ``` for a long monthly briefing). Try to recover the briefing_html and
+  // title fields directly so the user still sees rendered HTML instead of a
+  // raw `\`\`\`json {...` dump in the card.
+  const salvaged = salvageBriefingFields(rawText);
+  if (salvaged?.html) {
+    return {
+      content_html: salvaged.html,
+      content_plain: stripHtml(salvaged.html),
+      significance: null,
+      metadata: {
+        ...meta,
+        title: salvaged.title ?? defaultTitle,
+        generated_at: new Date().toISOString(),
+        parse_fallback: true,
+        salvaged: true,
+      },
+    };
+  }
+
+  // Final fallback: treat the whole response as the briefing body.
   const html = rawText.trim().startsWith('<') ? rawText : `<p>${escapeHtml(rawText)}</p>`;
   return {
     content_html: html,
@@ -258,6 +279,45 @@ function parseBriefingResponse(
   };
 }
 
+// Recover `briefing_html` and `title` from a malformed/truncated JSON
+// response. Walks the string field char-by-char honouring `\"` escapes so
+// the HTML body's escaped quotes don't terminate the match early. Tolerates
+// a missing closing `"` (truncated mid-string) by returning whatever was
+// captured up to end-of-input.
+function salvageBriefingFields(
+  text: string
+): { html: string | null; title: string | null } | null {
+  const html = extractJsonStringField(text, 'briefing_html');
+  if (!html) return null;
+  const title = extractJsonStringField(text, 'title');
+  return { html: unescapeJsonString(html), title: title ? unescapeJsonString(title) : null };
+}
+
+function extractJsonStringField(text: string, field: string): string | null {
+  const re = new RegExp(`"${field}"\\s*:\\s*"`);
+  const m = re.exec(text);
+  if (!m) return null;
+  const start = m.index + m[0].length;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (escaped) { escaped = false; continue; }
+    if (c === '\\') { escaped = true; continue; }
+    if (c === '"') return text.slice(start, i);
+  }
+  // Truncated mid-string — return whatever we have.
+  return text.slice(start);
+}
+
+function unescapeJsonString(s: string): string {
+  // Best-effort JSON string unescape. Wrap and parse; on failure return raw.
+  try {
+    return JSON.parse(`"${s.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
+  } catch {
+    return s;
+  }
+}
+
 // Extract a JSON object from the response. Handles the three realistic
 // shapes we see from Gemini:
 //   1. Fenced in ```json ... ```
@@ -266,8 +326,19 @@ function parseBriefingResponse(
 // and is string-aware (tracks quotes + escapes) so a literal `{` or `}` in
 // briefing_html doesn't throw off the bracket counter.
 function extractJsonBlock(text: string): string | null {
+  // Try fenced ```json {...} ``` first, but only accept it if it actually
+  // parses. A non-greedy `\{[\s\S]*?\}` can stop at a `}` embedded inside a
+  // string field (e.g. CSS in briefing_html), returning a truncated slice
+  // that won't parse. On failure we fall through to the bracket walker.
   const fenced = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-  if (fenced) return fenced[1];
+  if (fenced) {
+    try {
+      JSON.parse(fenced[1]);
+      return fenced[1];
+    } catch {
+      // fall through
+    }
+  }
 
   // Walk every candidate `{` in the text, try to find a balanced object
   // starting there, and validate by JSON.parse. First parseable wins.

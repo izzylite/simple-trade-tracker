@@ -361,8 +361,8 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
   const saveNote = async () => {
     if (!user?.uid) return;
 
-    // In game plan mode, require both title and content
-    if (gamePlanDay && (!title.trim() || !content.trim())) return;
+    // Require both title and content to save
+    if (!title.trim() || !content.trim()) return;
 
     try {
       setSaving(true);

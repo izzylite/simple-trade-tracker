@@ -114,7 +114,7 @@ const MemoryLogsPanel: React.FC<MemoryLogsPanelProps> = ({ calendarId }) => {
       {tab === 0 && (
         <Box sx={{ flex: 1, overflow: 'auto', ...scrollbarStyles(theme) }}>
           {auditLoading ? (
-            <EconomicEventShimmer count={6} />
+            <EconomicEventShimmer count={10} />
           ) : auditRows.length === 0 ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', p: 4, gap: 1.5, textAlign: 'center' }}>
               <HistoryEduIcon sx={{ fontSize: 40, color: alpha(theme.palette.text.secondary, 0.4) }} />
@@ -133,7 +133,7 @@ const MemoryLogsPanel: React.FC<MemoryLogsPanelProps> = ({ calendarId }) => {
                     px: 2,
                     py: 1.5,
                     cursor: 'pointer',
-                    '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.5) },
+                    '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.1) },
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
@@ -194,7 +194,7 @@ const MemoryLogsPanel: React.FC<MemoryLogsPanelProps> = ({ calendarId }) => {
       {tab === 1 && (
         <Box sx={{ flex: 1, overflow: 'auto', ...scrollbarStyles(theme) }}>
           {memoryLoading ? (
-            <EconomicEventShimmer count={6} />
+            <EconomicEventShimmer count={10} />
           ) : memoryContent == null ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', p: 4, gap: 1.5, textAlign: 'center' }}>
               <PsychologyIcon sx={{ fontSize: 40, color: alpha(theme.palette.text.secondary, 0.4) }} />
