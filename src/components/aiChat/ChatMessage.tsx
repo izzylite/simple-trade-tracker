@@ -165,6 +165,23 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     }
 
     const plain = stripReferencedBlocks(message.content);
+
+    // Bare slash-command loaded from history (no segments persisted): extract
+    // command name(s) from `[Referenced command "Title":` headers and render
+    // as chips — same appearance as the live-session segments path.
+    if (!plain.trim()) {
+      const cmdTitleRe = /\[Referenced command "([^"]+)":/g;
+      const chips: React.ReactNode[] = [];
+      let chipMatch;
+      let chipIdx = 0;
+      while ((chipMatch = cmdTitleRe.exec(message.content)) !== null) {
+        chips.push(<Chip key={`cmd-chip-${chipIdx++}`} label={chipMatch[1]} size="small" sx={noteChipSx} />);
+      }
+      if (chips.length > 0) return chips;
+      // Old format (no title in header): let MarkdownRenderer handle it.
+      return null;
+    }
+
     const rendered = renderTextWithTagChips(plain, 'plain');
     if (rendered.length === 1 && typeof rendered[0] === 'string' && rendered[0] === message.content) {
       return null; // no transformation happened — let the fallback renderer handle it
