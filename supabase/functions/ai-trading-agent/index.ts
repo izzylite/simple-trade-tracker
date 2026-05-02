@@ -1362,6 +1362,34 @@ function handleStreamingRequest(
         }
       }
 
+      // ---- Persist the assistant reply at turn end ----
+      if (conversationId) {
+        const persistClient = createServiceClient();
+        const assistantRecord = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: finalText,
+          timestamp: new Date().toISOString(),
+          status: 'received',
+          messageHtml: messageHtml ?? undefined,
+          citations: citations ?? undefined,
+          toolCalls: functionCalls && functionCalls.length > 0
+            ? functionCalls.map(fc => ({ name: fc.name, label: fc.name }))
+            : undefined,
+        };
+        const assistantPersist = await appendAssistantMessage(persistClient, {
+          conversationId,
+          userId,
+          assistantMessage: assistantRecord,
+        });
+        if (!assistantPersist.ok && !assistantPersist.deleted) {
+          log('Assistant message persist failed (streaming)', 'error', {
+            conversationId,
+            error: assistantPersist.error,
+          });
+        }
+      }
+
       // Send done event (with cleaned/validated text)
       await sendSSE(writer, 'done', {
         success: !!cleanedFinalText,
@@ -2473,6 +2501,28 @@ Deno.serve(async (req: Request) => {
     }
 
     log('Response validated - security check passed', 'info');
+
+    // ---- Persist the assistant reply at turn end ----
+    const assistantRecord = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: cleanedFinalText,
+      timestamp: new Date().toISOString(),
+      status: 'received',
+      toolCalls: functionCalls.map(fc => ({ name: fc.name, label: fc.name })),
+    };
+    const assistantPersist = await appendAssistantMessage(serviceClientForPersistence, {
+      conversationId,
+      userId,
+      assistantMessage: assistantRecord,
+    });
+    if (!assistantPersist.ok && !assistantPersist.deleted) {
+      log('Assistant message persist failed (non-streaming)', 'error', {
+        conversationId,
+        error: assistantPersist.error,
+      });
+      // Don't fail the response — the user has the text, we just couldn't store it.
+    }
 
     return new Response(JSON.stringify(formattedResponse), {
       status: 200,
