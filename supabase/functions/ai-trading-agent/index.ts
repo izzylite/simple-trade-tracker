@@ -1879,22 +1879,24 @@ async function appendUserMessage(
   // error — the optimistic row in the client gets rolled back.
   const existing = Array.isArray(convo.messages) ? convo.messages : [];
   const nextMessages = [...existing, userMessage];
+  const currentCount = Number(convo.message_count ?? 0);
 
   const { data: updated, error: updateErr } = await serviceClient
     .from('ai_conversations')
     .update({
       messages: nextMessages,
-      message_count: nextMessages.length,
+      message_count: currentCount + 1,
       updated_at: new Date().toISOString(),
     })
     .eq('id', conversationId)
     .eq('user_id', userId)
     .lt('message_count', 50)
-    .select('id');
+    .select('id')
+    .maybeSingle();
   if (updateErr) {
     return { ok: false, code: 'unknown', message: updateErr.message };
   }
-  if (!updated || updated.length === 0) {
+  if (!updated) {
     return { ok: false, code: 'message_limit_reached' };
   }
 
