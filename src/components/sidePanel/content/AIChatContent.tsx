@@ -464,9 +464,11 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     let preview = stripReferencedBlocks(raw).trim();
     // Bare invocation (no typed text): fall back to the body of the first
     // block so the user sees what the command/note actually says.
+    // Handles both old format `[Referenced command:\n` and new format
+    // `[Referenced command "Title":\n`.
     if (!preview) {
       const firstBlockBody = raw.match(
-        /\[Referenced (?:command|note):\n([\s\S]*?)\n\]/
+        /\[Referenced (?:command|note)(?:\s+"[^"]*")?:\n([\s\S]*?)\n\]/
       )?.[1]?.trim();
       preview = firstBlockBody || raw;
     }
