@@ -697,6 +697,12 @@ export function useAIChat({
         setMessages(prev => [...prev, finalMessage]);
       }
 
+      // Refresh the history list after a successful turn. Backend persisted
+      // the row turn-by-turn; without this the in-memory list drifts from
+      // the DB and the History panel shows stale entries when reopened.
+      // Fire-and-forget — don't block the UI on a list refetch.
+      void loadConversations();
+
     } catch (error) {
       const isAbortError =
         typeof error === 'object' &&
@@ -746,7 +752,7 @@ export function useAIChat({
       setIsTyping(false);
       setToolExecutionStatus('');
     }
-  }, [userId, calendar, trade, messages, editingMessageId, isLoading]);
+  }, [userId, calendar, trade, messages, editingMessageId, isLoading, loadConversations]);
 
   /**
    * Set up message for editing and return its content and images
