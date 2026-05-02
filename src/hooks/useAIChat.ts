@@ -502,6 +502,11 @@ export function useAIChat({
 
     let baseHistory: ChatMessageType[];
     let userMessage: ChatMessageType;
+    // Capture the edit-mode signal before we reset it below — the backend
+    // needs it to truncate the persisted messages array. Without this, the
+    // edit-and-resend flow leaves orphaned old turns in the DB, and they
+    // reappear on next reload.
+    const editTargetId = editingMessageId;
 
     // Handle edit mode
     if (editingMessageId) {
@@ -595,6 +600,8 @@ export function useAIChat({
         trade?.id,
         images,
         activeConversationId,
+        userMessage.id,
+        editTargetId ?? undefined,
       )) {
         switch (event.type) {
           case 'text_chunk':

@@ -227,6 +227,15 @@ export interface AgentRequest {
   conversationId?: string;
   reminderId?: string;
   reminderDescription?: string;
+
+  // Chat-mode persistence hints (optional, used by appendUserMessage).
+  // userMessageId: client-side id for the new user message; backend uses it
+  //   so the persisted record matches what the optimistic UI rendered.
+  // editingMessageId: when present, backend truncates the persisted messages
+  //   array at this id (inclusive) before appending. Mirrors the frontend's
+  //   slice-on-edit behavior so the DB doesn't accumulate orphan turns.
+  userMessageId?: string;
+  editingMessageId?: string;
 }
 
 export interface ConversationMessage {

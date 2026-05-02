@@ -1860,12 +1860,20 @@ async function appendUserMessage(
     tradeId?: string | null;
     userMessage: { id: string; role: 'user'; content: string; timestamp: string; status?: string };
     titleFallback: string;
+    /**
+     * If set, the existing messages array is truncated at the index of this
+     * id (inclusive) before the new message is appended. Mirrors the
+     * frontend's `messages.slice(0, messageIndex)` behavior on edit-resend.
+     * Without this, the DB accumulates orphan turns and they reappear on
+     * next reload.
+     */
+    editingMessageId?: string;
   }
 ): Promise<
   | { ok: true; conversationId: string }
   | { ok: false; code: 'message_limit_reached' | 'forbidden' | 'unknown'; message?: string }
 > {
-  const { conversationId, userId, calendarId, tradeId, userMessage, titleFallback } = params;
+  const { conversationId, userId, calendarId, tradeId, userMessage, titleFallback, editingMessageId } = params;
 
   // Step A: upsert the row. ignoreDuplicates means we never overwrite an
   // existing row's title/messages — only insert when the id is new.
@@ -1906,18 +1914,27 @@ async function appendUserMessage(
     return { ok: false, code: 'forbidden' };
   }
 
-  // Step C: atomic append guarded by `message_count < 50`. If a parallel turn
-  // raced us to the cap, this UPDATE matches 0 rows and we return the cap
-  // error — the optimistic row in the client gets rolled back.
-  const existing = Array.isArray(convo.messages) ? convo.messages : [];
-  const nextMessages = [...existing, userMessage];
-  const currentCount = Number(convo.message_count ?? 0);
+  // Step C: build the next messages array. On edit-resend, truncate at the
+  // edited message's id so old turns are dropped server-side. Otherwise just
+  // append. Atomic UPDATE guarded by `message_count < 50` so two-tab races
+  // can't blow past the cap; if a parallel turn raced us to the cap this
+  // UPDATE matches 0 rows and we return the cap error.
+  const existingRaw = Array.isArray(convo.messages) ? convo.messages : [];
+  const truncatedExisting = editingMessageId
+    ? (() => {
+        const idx = existingRaw.findIndex(
+          (m: any) => m && typeof m === 'object' && m.id === editingMessageId
+        );
+        return idx >= 0 ? existingRaw.slice(0, idx) : existingRaw;
+      })()
+    : existingRaw;
+  const nextMessages = [...truncatedExisting, userMessage];
 
   const { data: updated, error: updateErr } = await serviceClient
     .from('ai_conversations')
     .update({
       messages: nextMessages,
-      message_count: currentCount + 1,
+      message_count: nextMessages.length,
       updated_at: new Date().toISOString(),
     })
     .eq('id', conversationId)
@@ -2075,6 +2092,7 @@ Deno.serve(async (req: Request) => {
       tradeId: focusedTradeId ?? null,
       userMessage: userMessageRecord,
       titleFallback: (message ?? 'New conversation').slice(0, 60),
+      editingMessageId: body.editingMessageId,
     });
 
     if (!persistResult.ok) {
