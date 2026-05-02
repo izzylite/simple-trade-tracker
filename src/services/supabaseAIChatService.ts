@@ -129,7 +129,8 @@ class SupabaseAIChatService {
     conversationHistory: ChatMessageType[] = [],
     signal?: AbortSignal,
     focusedTradeId?: string,
-    images?: AttachedImage[]
+    images?: AttachedImage[],
+    conversationId?: string
   ): AsyncGenerator<SSEEvent, void, unknown> {
     try {
       logger.log(`Sending streaming message to AI agent: "${message.substring(0, 50)}..."`);
@@ -162,6 +163,7 @@ class SupabaseAIChatService {
           message: finalMessage,
           userId,
           calendarId: calendar?.id,
+          conversationId,
           focusedTradeId: focusedTradeId || undefined,
           conversationHistory: formattedHistory,
           calendarContext: calendar
