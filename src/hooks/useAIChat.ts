@@ -187,6 +187,58 @@ export function useAIChat({
     };
   }, [userId]);
 
+  // Listen for reminder-fired messages on the active conversation. The reminder
+  // fire path runs entirely server-side (cron → dispatch-reminders →
+  // ai-trading-agent in mode='reminder' → ai_conversations.messages append),
+  // so without realtime the open chat doesn't see the new message until next
+  // mount. We dedupe by id and only adopt messages tagged with
+  // metadata.triggered_by='reminder:...' to avoid fighting the optimistic
+  // streaming UI on normal chat sends (where client and server use different
+  // message ids).
+  useEffect(() => {
+    if (!currentConversationId) return;
+
+    const channel = supabase
+      .channel(`ai-convo-realtime-${currentConversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'ai_conversations',
+          filter: `id=eq.${currentConversationId}`,
+        },
+        (payload: any) => {
+          const incoming = Array.isArray(payload?.new?.messages)
+            ? payload.new.messages
+            : [];
+          const reminderMsgs = incoming.filter(
+            (m: any) =>
+              m && typeof m === 'object' &&
+              typeof m.metadata?.triggered_by === 'string' &&
+              m.metadata.triggered_by.startsWith('reminder:')
+          );
+          if (reminderMsgs.length === 0) return;
+          setMessages(prev => {
+            const have = new Set(prev.map(m => m.id));
+            const toAppend = reminderMsgs.filter((m: any) => !have.has(m.id));
+            if (toAppend.length === 0) return prev;
+            // Convert stored timestamps (ISO strings) back to Date for the UI.
+            const normalized = toAppend.map((m: any) => ({
+              ...m,
+              timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+            }));
+            return [...prev, ...normalized];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentConversationId]);
+
   /**
    * Load conversations - either trade-specific or calendar-level
    * If trade is provided: loads trade-specific conversations
