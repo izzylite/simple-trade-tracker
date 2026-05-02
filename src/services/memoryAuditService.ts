@@ -28,6 +28,11 @@ export async function getMemoryAudit(calendarId: string): Promise<MemoryAuditRow
 }
 
 export async function getMemoryNote(calendarId: string): Promise<string | null> {
+  // Security: ownership enforced by RLS via calendars.user_id = auth.uid().
+  // calendarId must belong to the calling user — never pass an untrusted value.
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
   const { data, error } = await supabase
     .from('notes')
     .select('content')
