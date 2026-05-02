@@ -375,6 +375,34 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   // conversation isn't in the local cache yet).
   const conversationRepoRef = useRef(new ConversationRepository());
 
+  // Sentinel for the infinite-scroll loader at the bottom of the history
+  // list. The IntersectionObserver fires `loadMoreConversations()` when the
+  // sentinel scrolls into view, replacing the old "Load More" button.
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!showHistoryView) return;
+    const node = loadMoreSentinelRef.current;
+    if (!node) return;
+    if (!hasMoreConversations) return;
+    if (loadingMoreConversations) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          void loadMoreConversations();
+        }
+      },
+      { rootMargin: '120px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [
+    showHistoryView,
+    hasMoreConversations,
+    loadingMoreConversations,
+    loadMoreConversations,
+    conversations.length,
+  ]);
+
   const handleNavigateFromReminder = async (conversationId: string) => {
     const cached = conversations.find(c => c.id === conversationId);
     if (cached) {
@@ -509,78 +537,89 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
 
         {user && (
           <Box sx={{ display: 'flex', gap: 0.5, ml: 'auto' }}>
-            <Tooltip title="New Chat">
-              <IconButton
-                size="small"
-                onClick={handleNewChat}
-                disabled={messages.length === 0}
-                sx={{
-                  color: 'primary.main',
-                  '&:hover': {
-                    backgroundColor: alpha(
-                      theme.palette.primary.main, 0.1
-                    )
-                  },
-                  '&:disabled': { color: 'text.disabled' }
-                }}
-              >
-                <NewChatIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            {/* First slot morphs: shows "+" on chat view, "back arrow" when
+                we're inside history or reminders so users have a clear
+                single way back to chat. */}
+            {showHistoryView || showRemindersView ? (
+              <Tooltip title="Back to Chat">
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setShowHistoryView(false);
+                    setShowRemindersView(false);
+                  }}
+                  aria-label="Back to Chat"
+                  sx={{
+                    color: 'primary.main',
+                    '&:hover': {
+                      backgroundColor: alpha(
+                        theme.palette.primary.main, 0.1
+                      )
+                    }
+                  }}
+                >
+                  <ArrowBackIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <Tooltip title="New Chat">
+                <IconButton
+                  size="small"
+                  onClick={handleNewChat}
+                  disabled={messages.length === 0}
+                  sx={{
+                    color: 'primary.main',
+                    '&:hover': {
+                      backgroundColor: alpha(
+                        theme.palette.primary.main, 0.1
+                      )
+                    },
+                    '&:disabled': { color: 'text.disabled' }
+                  }}
+                >
+                  <NewChatIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
 
-            <Tooltip
-              title={
-                showHistoryView
-                  ? "Back to Chat"
-                  : "Conversation History"
-              }
-            >
+            <Tooltip title="Conversation History">
               <IconButton
                 size="small"
                 onClick={() => {
                   setShowHistoryView(prev => !prev);
                   setShowRemindersView(false);
                 }}
-                aria-label={
-                  showHistoryView
-                    ? 'Back to Chat'
-                    : 'Conversation History'
-                }
+                aria-label="Conversation History"
                 sx={{
                   color: showHistoryView
                     ? 'primary.main'
                     : 'text.secondary',
                   '&:hover': {
                     backgroundColor: alpha(
-                      theme.palette.action.hover, 0.5
+                      theme.palette.primary.main, 0.08
                     )
                   }
                 }}
               >
-                {showHistoryView
-                  ? <ArrowBackIcon fontSize="small" />
-                  : <HistoryIcon fontSize="small" />
-                }
+                <HistoryIcon fontSize="small" />
               </IconButton>
             </Tooltip>
 
-            <Tooltip
-              title={showRemindersView ? 'Back to Chat' : 'Reminders'}
-            >
+            <Tooltip title="Reminders">
               <IconButton
                 size="small"
                 onClick={() => {
                   setShowRemindersView(prev => !prev);
                   setShowHistoryView(false);
                 }}
-                aria-label={showRemindersView ? 'Back to Chat' : 'Reminders'}
+                aria-label="Reminders"
                 sx={{
                   color: showRemindersView
                     ? 'primary.main'
                     : 'text.secondary',
                   '&:hover': {
                     backgroundColor: alpha(
-                      theme.palette.action.hover, 0.5
+                      theme.palette.primary.main, 0.08
                     )
                   }
                 }}
@@ -593,7 +632,10 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
 
       </Box>
 
-      {/* Content - Sliding Pager */}
+      {/* Content area. Chat is always rendered; history and reminders
+          render as absolute overlays when active (no slide animation —
+          consistent across both side panels, and avoids the 200%-width
+          translateX trick). */}
       <Box sx={{
         flex: 1,
         display: 'flex',
@@ -601,24 +643,14 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
         overflow: 'hidden',
         position: 'relative'
       }}>
-        {/* Pager Container */}
+        {/* Chat View */}
         <Box sx={{
-          display: 'flex',
-          width: '200%',
+          width: '100%',
           height: '100%',
-          transform: showHistoryView
-            ? 'translateX(-50%)'
-            : 'translateX(0)',
-          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}>
-          {/* Chat View */}
-          <Box sx={{
-            width: '50%',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden'
-          }}>
             <AIChatInterface
               ref={chatInterfaceRef}
               messages={messages}
@@ -679,13 +711,18 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
             />
           </Box>
 
-          {/* History View */}
+        {/* History View — overlay (mirrors the Reminders pattern below).
+            Mutually exclusive with reminders; the active toggle button or
+            the back-arrow in the header closes it. */}
+        {showHistoryView && (
           <Box sx={{
-            width: '50%',
-            height: '100%',
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: theme.palette.background.default,
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            zIndex: 1
           }}>
             {/* Search Bar with inline filter dropdown */}
             <Box sx={{ p: 2, pb: 1 }}>
@@ -982,46 +1019,32 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                   )}
                 </List>
               )}
-            </Box>
 
-            {/* Load More Button */}
-            {!loadingConversations && hasMoreConversations && (
-              <Box sx={{
-                p: 2,
-                display: 'flex',
-                justifyContent: 'center',
-                borderTop:
-                  `1px solid ${alpha(theme.palette.divider, 0.1)}`
-              }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={loadMoreConversations}
-                  disabled={loadingMoreConversations}
-                  startIcon={loadingMoreConversations ? (
-                    <CircularProgress size={16} color="inherit" />
-                  ) : null}
+              {/* Infinite-scroll sentinel — when this enters the viewport
+                  the IntersectionObserver above triggers loadMoreConversations.
+                  The inline spinner shows during the fetch. */}
+              {!loadingConversations && hasMoreConversations && (
+                <Box
+                  ref={loadMoreSentinelRef}
                   sx={{
-                    borderRadius: 2,
-                    textTransform: 'none',
-                    px: 3
+                    py: 2,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    minHeight: 48,
                   }}
                 >
-                  {loadingMoreConversations
-                    ? 'Loading...'
-                    : 'Load More'}
-                </Button>
-              </Box>
-            )}
+                  {loadingMoreConversations && (
+                    <CircularProgress size={20} color="inherit" />
+                  )}
+                </Box>
+              )}
+            </Box>
 
             {/* Footer Info */}
             {!loadingConversations && conversations.length > 0 && (
               <Box sx={{
                 p: 2,
-                pt: hasMoreConversations ? 0 : 2,
-                borderTop: hasMoreConversations
-                  ? 'none'
-                  : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                 backgroundColor: alpha(
                   theme.palette.background.default, 0.5
                 )
@@ -1038,13 +1061,11 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
               </Box>
             )}
           </Box>
-          {/* End History View */}
-        </Box>
-        {/* End Pager Container */}
+        )}
+        {/* End History overlay */}
 
-        {/* Reminders View — overlays the pager when toggled. Mutually
-            exclusive with the history view (the alarm-clock toggle closes
-            history, and vice versa). */}
+        {/* Reminders View — overlay. Mutually exclusive with the history
+            view (the alarm-clock toggle closes history, and vice versa). */}
         {showRemindersView && (
           <Box sx={{
             position: 'absolute',

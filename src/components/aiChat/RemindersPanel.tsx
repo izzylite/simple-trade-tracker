@@ -12,7 +12,9 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Box, Stack, Typography } from '@mui/material';
+import { Box, Stack, Typography, useTheme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
+import AlarmIcon from '@mui/icons-material/Alarm';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   getReminders,
@@ -31,6 +33,7 @@ interface RemindersPanelProps {
 const RemindersPanel: React.FC<RemindersPanelProps> = ({
   onNavigateToConversation,
 }) => {
+  const theme = useTheme();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const cancelledRef = useRef(false);
@@ -111,15 +114,43 @@ const RemindersPanel: React.FC<RemindersPanelProps> = ({
   );
 
   if (loading) {
-    return <EconomicEventShimmer count={6} />;
+    return <EconomicEventShimmer count={10} />;
   }
 
   if (reminders.length === 0) {
     return (
-      <Box p={3}>
-        <Typography variant="body2" color="text.secondary" textAlign="center">
-          No active reminders. Ask Orion to set one — e.g. &quot;remind me when
-          jobless claims comes out&quot;.
+      <Box
+        sx={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          px: 4,
+          gap: 1.5,
+        }}
+      >
+        <Box
+          sx={{
+            width: 64,
+            height: 64,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: alpha(theme.palette.primary.main, 0.1),
+            color: theme.palette.primary.main,
+          }}
+        >
+          <AlarmIcon sx={{ fontSize: 32 }} />
+        </Box>
+        <Typography variant="subtitle1" fontWeight={600}>
+          No active reminders
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 280 }}>
+          Ask Orion to set one — e.g. &quot;remind me when jobless claims
+          comes out&quot;.
         </Typography>
       </Box>
     );

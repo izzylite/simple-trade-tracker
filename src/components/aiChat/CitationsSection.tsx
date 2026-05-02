@@ -219,8 +219,8 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
             cursor: 'pointer',
             transition: 'all 0.15s ease',
             '&:hover': {
-              backgroundColor: alpha(theme.palette.action.hover, 0.6),
-              borderColor: alpha(theme.palette.primary.main, 0.5)
+              backgroundColor: alpha(theme.palette.action.hover, 0.2),
+              borderColor: alpha(theme.palette.primary.main, 0.4)
             }
           }}
           onClick={() => handleOpenUrl(citation.url)}
@@ -300,7 +300,7 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
           cursor: 'pointer',
           transition: 'all 0.15s ease',
           '&:hover': {
-            backgroundColor: alpha(theme.palette.action.hover, 0.6),
+            backgroundColor: alpha(theme.palette.action.hover, 0.2),
             borderColor: alpha(theme.palette.primary.main, 0.4)
           }
         }}
