@@ -2017,6 +2017,57 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // ---- Persist the user message at turn start ----
+    // We require conversationId from the client. Without it tools that need
+    // the conversation row (set_reminder, etc.) would fail mid-turn.
+    if (!conversationId) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing required field: conversationId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const serviceClientForPersistence = createServiceClient();
+    const userMessageRecord = {
+      id: body.userMessageId ?? crypto.randomUUID(),
+      role: 'user' as const,
+      content: message ?? '',
+      timestamp: new Date().toISOString(),
+      status: 'sent',
+    };
+
+    const persistResult = await appendUserMessage(serviceClientForPersistence, {
+      conversationId,
+      userId,
+      calendarId: calendarId ?? null,
+      tradeId: focusedTradeId ?? null,
+      userMessage: userMessageRecord,
+      titleFallback: (message ?? 'New conversation').slice(0, 60),
+    });
+
+    if (!persistResult.ok) {
+      if (persistResult.code === 'message_limit_reached') {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            code: 'message_limit_reached',
+            error: 'This conversation has reached the 50-message limit. Start a new chat to continue.',
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (persistResult.code === 'forbidden') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Forbidden' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ success: false, error: persistResult.message ?? 'Failed to persist message' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
     if (!googleApiKey) {
       return new Response(
