@@ -594,6 +594,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                 onClick={() => {
                   setShowHistoryView(prev => !prev);
                   setShowRemindersView(false);
+                  setShowMemoryLogsView(false);
                 }}
                 aria-label="Conversation History"
                 sx={{
