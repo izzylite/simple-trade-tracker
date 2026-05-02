@@ -1904,6 +1904,63 @@ async function appendUserMessage(
 }
 
 /**
+ * Persist the assistant's reply at turn end.
+ *
+ * Always UPDATE (never UPSERT) — if the user hit /clear mid-turn and deleted
+ * the row, this becomes a no-op rather than resurrecting it. We don't enforce
+ * the message_count cap here: the user-message append already gated entry to
+ * the turn, so worst case we land at count = 51 (cap + assistant), which is
+ * acceptable.
+ */
+async function appendAssistantMessage(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  params: {
+    conversationId: string;
+    userId: string;
+    assistantMessage: Record<string, unknown>;
+  }
+): Promise<{ ok: boolean; deleted?: boolean; error?: string }> {
+  const { conversationId, userId, assistantMessage } = params;
+
+  const { data: convo, error: readErr } = await serviceClient
+    .from('ai_conversations')
+    .select('id, user_id, messages, message_count')
+    .eq('id', conversationId)
+    .maybeSingle();
+  if (readErr) {
+    log('appendAssistantMessage read failed', 'error', { conversationId, error: readErr.message });
+    return { ok: false, error: readErr.message };
+  }
+  if (!convo) {
+    // Row was deleted (likely /clear during turn). No-op is correct.
+    return { ok: true, deleted: true };
+  }
+  if (convo.user_id !== userId) {
+    log('appendAssistantMessage cross-tenant attempt blocked', 'warn', { conversationId });
+    return { ok: false, error: 'forbidden' };
+  }
+
+  const existing = Array.isArray(convo.messages) ? convo.messages : [];
+  const next = [...existing, assistantMessage];
+  const currentCount = Number(convo.message_count ?? 0);
+
+  const { error: updateErr } = await serviceClient
+    .from('ai_conversations')
+    .update({
+      messages: next,
+      message_count: currentCount + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', conversationId)
+    .eq('user_id', userId);
+  if (updateErr) {
+    log('appendAssistantMessage update failed', 'error', { conversationId, error: updateErr.message });
+    return { ok: false, error: updateErr.message };
+  }
+  return { ok: true };
+}
+
+/**
  * Main edge function handler
  */
 Deno.serve(async (req: Request) => {
