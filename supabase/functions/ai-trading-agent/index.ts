@@ -1363,12 +1363,16 @@ function handleStreamingRequest(
       }
 
       // ---- Persist the assistant reply at turn end ----
+      // Use cleanedFinalText so the stored content stays consistent with
+      // messageHtml (which is built from the same cleaned text). finalText
+      // and cleanedFinalText only diverge when reference validation stripped
+      // dead trade-ref/event-ref/note-ref tags.
       if (conversationId) {
         const persistClient = createServiceClient();
         const assistantRecord = {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: finalText,
+          content: cleanedFinalText,
           timestamp: new Date().toISOString(),
           status: 'received',
           messageHtml: messageHtml ?? undefined,
