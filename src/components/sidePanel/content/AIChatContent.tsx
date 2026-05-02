@@ -538,7 +538,13 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
               <IconButton
                 size="small"
                 onClick={() => {
-                  setShowHistoryView(prev => !prev);
+                  // Refresh the list when opening — backend persists messages
+                  // turn-by-turn so the snapshot from initial mount is stale
+                  // after each chat exchange.
+                  setShowHistoryView(prev => {
+                    if (!prev) loadConversations();
+                    return !prev;
+                  });
                   setShowRemindersView(false);
                 }}
                 aria-label={
