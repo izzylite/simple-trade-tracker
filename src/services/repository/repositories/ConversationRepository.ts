@@ -390,6 +390,11 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
    * Update an existing conversation in Supabase
    */
   protected async updateInSupabase(id: string, updates: Partial<AIConversation>): Promise<AIConversation> {
+    if ((updates as { messages?: unknown }).messages !== undefined) {
+      throw new Error(
+        'ConversationRepository.update: writing `messages` from the client is no longer supported — backend persists messages on each turn'
+      );
+    }
     const updateData: any = {
       updated_at: new Date()
     };
@@ -479,68 +484,6 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
         error: parseSupabaseError(error, 'Setting conversation pinned'),
         timestamp: new Date(),
         operation: 'setPinned'
-      };
-    }
-  }
-
-  /**
-   * Save or update a conversation
-   * If conversation has an ID, update it; otherwise create new
-   * If update fails (conversation not found), create a new one
-   * @param tradeId - Optional: If provided, creates a trade-specific conversation
-   */
-  async saveConversation(
-    conversationId: string | null,
-    calendarId: string | null,
-    userId: string,
-    messages: ChatMessage[],
-    title?: string,
-    tradeId?: string | null
-  ): Promise<RepositoryResult<AIConversation>> {
-    try {
-      const conversationTitle = title || generateConversationTitle(messages);
-
-      if (conversationId) {
-        // Try to update existing conversation
-        const updateResult = await this.update(conversationId, {
-          messages,
-          message_count: messages.length,
-          title: conversationTitle
-        } as Partial<AIConversation>);
-
-        // If update failed because conversation doesn't exist, create new one
-        if (!updateResult.success && updateResult.error?.message?.includes('not found')) {
-          logger.warn(`Conversation ${conversationId} not found, creating new conversation`);
-          return await this.create({
-            calendar_id: calendarId,
-            user_id: userId,
-            trade_id: tradeId || null,
-            title: conversationTitle,
-            messages,
-            message_count: messages.length
-          } as Omit<AIConversation, 'id' | 'created_at' | 'updated_at'>);
-        }
-
-        return updateResult;
-      } else {
-        // Create new conversation
-        return await this.create({
-          calendar_id: calendarId,
-          user_id: userId,
-          trade_id: tradeId || null,
-          title: conversationTitle,
-          messages,
-          message_count: messages.length
-        } as Omit<AIConversation, 'id' | 'created_at' | 'updated_at'>);
-      }
-    } catch (error) {
-      logger.error('Error saving conversation:', error);
-      const { parseSupabaseError } = await import('../../../utils/supabaseErrorHandler');
-      return {
-        success: false,
-        error: parseSupabaseError(error, 'Saving conversation'),
-        timestamp: new Date(),
-        operation: conversationId ? 'update' : 'create'
       };
     }
   }
