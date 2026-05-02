@@ -42,6 +42,7 @@ import {
   PushPinOutlined as PushPinOutlinedIcon,
   Alarm as AlarmIcon
 } from '@mui/icons-material';
+import ManageSearchIcon from '@mui/icons-material/ManageSearch';
 import { format } from 'date-fns';
 import EconomicEventShimmer from '../../economicCalendar/EconomicEventShimmer';
 import AIChatInterface, { AIChatInterfaceRef, QuestionTemplate } from '../../aiChat/AIChatInterface';
@@ -59,6 +60,7 @@ import EconomicEventDetailDialog
   from '../../economicCalendar/EconomicEventDetailDialog';
 import NoteEditorDialog from '../../notes/NoteEditorDialog';
 import RemindersPanel from '../../aiChat/RemindersPanel';
+import MemoryLogsPanel from '../../aiChat/MemoryLogsPanel';
 import { Note, SLASH_COMMAND_TAG, GUIDELINE_TAG } from '../../../types/note';
 import * as notesService from '../../../services/notesService';
 import { ConversationRepository }
@@ -193,6 +195,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   // Local UI state
   const [showHistoryView, setShowHistoryView] = useState(false);
   const [showRemindersView, setShowRemindersView] = useState(false);
+  const [showMemoryLogsView, setShowMemoryLogsView] = useState(false);
 
   // Dismiss any open slash/mention popup in the chat input when sliding to the
   // history view, opening the reminders overlay, or when the chat panel itself
@@ -200,10 +203,10 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   // renders into a portal, so it outlives any visibility change to the chat
   // content unless we close it explicitly.
   useEffect(() => {
-    if (showHistoryView || showRemindersView || !isActive) {
+    if (showHistoryView || showRemindersView || showMemoryLogsView || !isActive) {
       chatInterfaceRef.current?.closeMention?.();
     }
-  }, [showHistoryView, showRemindersView, isActive]);
+  }, [showHistoryView, showRemindersView, showMemoryLogsView, isActive]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] =
     useState<string | null>(null);
@@ -542,13 +545,14 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
             {/* First slot morphs: shows "+" on chat view, "back arrow" when
                 we're inside history or reminders so users have a clear
                 single way back to chat. */}
-            {showHistoryView || showRemindersView ? (
+            {showHistoryView || showRemindersView || showMemoryLogsView ? (
               <Tooltip title="Back to Chat">
                 <IconButton
                   size="small"
                   onClick={() => {
                     setShowHistoryView(false);
                     setShowRemindersView(false);
+                    setShowMemoryLogsView(false);
                   }}
                   aria-label="Back to Chat"
                   sx={{
@@ -613,6 +617,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                 onClick={() => {
                   setShowRemindersView(prev => !prev);
                   setShowHistoryView(false);
+                  setShowMemoryLogsView(false);
                 }}
                 aria-label="Reminders"
                 sx={{
@@ -627,6 +632,30 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                 }}
               >
                 <AlarmIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Memory Logs">
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setShowMemoryLogsView(prev => !prev);
+                  setShowHistoryView(false);
+                  setShowRemindersView(false);
+                }}
+                aria-label="Memory Logs"
+                sx={{
+                  color: showMemoryLogsView
+                    ? 'primary.main'
+                    : 'text.secondary',
+                  '&:hover': {
+                    backgroundColor: alpha(
+                      theme.palette.primary.main, 0.08
+                    )
+                  }
+                }}
+              >
+                <ManageSearchIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </Box>
@@ -1082,6 +1111,21 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                 void handleNavigateFromReminder(conversationId);
               }}
             />
+          </Box>
+        )}
+
+        {/* Memory Logs View — overlay. Mutually exclusive with history and reminders. */}
+        {showMemoryLogsView && (
+          <Box sx={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: theme.palette.background.default,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            zIndex: 1
+          }}>
+            <MemoryLogsPanel calendarId={calendar?.id} />
           </Box>
         )}
       </Box>
