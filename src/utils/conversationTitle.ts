@@ -28,10 +28,14 @@ export function generateConversationTitle(rawFirstUserMessage: string | null | u
 
   // Bare: stripping all blocks leaves nothing typed → label by block kind.
   if (!stripped.trim()) {
-    const cmdCount = (raw.match(/\[Referenced command:/g) || []).length;
+    const cmdCount = (raw.match(/\[Referenced command(?:\s+"[^"]*")?:/g) || []).length;
     const noteCount = (raw.match(/\[Referenced note:/g) || []).length;
     if (cmdCount > 0 && noteCount === 0) {
-      return cmdCount === 1 ? 'Slash Command' : 'Slash Commands';
+      if (cmdCount === 1) {
+        const titleMatch = raw.match(/\[Referenced command "([^"]+)":/);
+        return titleMatch ? `Slash Command: ${titleMatch[1]}` : 'Slash Command';
+      }
+      return 'Slash Commands';
     }
     if (noteCount > 0 && cmdCount === 0) {
       return noteCount === 1 ? 'Referenced Note' : 'Referenced Notes';

@@ -34,8 +34,8 @@ export const BLOCK_LABEL_COMMAND = 'command';
 export const BLOCK_LABEL_NOTE = 'note';
 export const BLOCK_SEPARATOR = '\n\n';
 
-const buildBlock = (label: string, body: string) =>
-  `${BLOCK_OPEN_PREFIX}${label}${BLOCK_OPEN_SUFFIX}${body}${BLOCK_CLOSE}`;
+const buildBlock = (label: string, body: string, title?: string) =>
+  `${BLOCK_OPEN_PREFIX}${label}${title ? ` "${title}"` : ''}${BLOCK_OPEN_SUFFIX}${body}${BLOCK_CLOSE}`;
 
 export type MentionKind = 'slash' | 'at';
 
@@ -128,7 +128,7 @@ export function expandMentionsForSend(
     s => s.type === 'text' && s.value.trim() !== ''
   );
 
-  type ExpandedBlock = { label: string; body: string };
+  type ExpandedBlock = { label: string; body: string; title: string };
   const expanded: ExpandedBlock[] = [];
   for (const seg of mentions) {
     const note = notesById.get(seg.noteId);
@@ -140,10 +140,14 @@ export function expandMentionsForSend(
       ? note.content.slice(0, MAX_REFERENCED_NOTE_CHARS) +
         `\n…[truncated: ${note.content.length - MAX_REFERENCED_NOTE_CHARS} more chars]`
       : note.content;
-    expanded.push({ label, body });
+    expanded.push({ label, body, title: note.title });
   }
 
-  const contextBlocks = expanded.map(b => buildBlock(b.label, b.body));
+  // Include the note title in the block header for slash commands so the
+  // conversation title generator can produce "Slash Command: Weekly Outlook".
+  const contextBlocks = expanded.map(b =>
+    buildBlock(b.label, b.body, b.label === BLOCK_LABEL_COMMAND ? b.title : undefined)
+  );
 
   // Bare = no user-typed text AND every resolved mention is a SlashCommand.
   // Emit blocks-only so frameBareSlashCommand() in the edge function can
@@ -190,6 +194,7 @@ const STRIP_BLOCK_REGEX = (() => {
   const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const open = escape(BLOCK_OPEN_PREFIX) +
     `(?:${escape(BLOCK_LABEL_COMMAND)}|${escape(BLOCK_LABEL_NOTE)})` +
+    `(?: "[^"]*")?` + // optional quoted title e.g. `command "Weekly Outlook"`
     escape(BLOCK_OPEN_SUFFIX);
   const close = escape(BLOCK_CLOSE);
   const sepLookahead = escape(BLOCK_SEPARATOR) + escape(BLOCK_OPEN_PREFIX);

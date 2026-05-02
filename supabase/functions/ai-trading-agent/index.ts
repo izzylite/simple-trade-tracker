@@ -271,15 +271,14 @@ function createSSEEvent(event: SSEEventType, data: any): string {
 /**
  * Frame a bare slash-command turn with an explicit execute directive.
  *
- * Client-side expansion always emits a `[Referenced command:\n<body>\n]`
- * block, optionally preceded by a single-line title from the chip. When the
- * user's entire message body is nothing but that block (bare command
- * invocation), wrap it so Gemini treats the block content as the primary
- * directive:
+ * Client-side expansion emits a `[Referenced command "Title":\n<body>\n]`
+ * block (title is optional; old clients may omit it). When the user's entire
+ * message body is nothing but that block (bare command invocation), wrap it
+ * so Gemini treats the block content as the primary directive:
  *
  *   The user wants you to execute this command:
  *
- *   [Referenced command:
+ *   [Referenced command "Weekly Outlook":
  *   <body>
  *   ]
  *
@@ -303,10 +302,10 @@ function frameBareSlashCommand(message: string): string {
   // etc). If you change them there, update this regex too.
   const trimmed = message.trim();
   const bareRe =
-    /^(\[Referenced command:\n(?:(?!\n\n\[Referenced ).)*?\n\](?:\n\n\[Referenced command:\n(?:(?!\n\n\[Referenced ).)*?\n\])*)$/s;
+    /^(\[Referenced command(?:\s+"[^"]*")?:\n(?:(?!\n\n\[Referenced ).)*?\n\](?:\n\n\[Referenced command(?:\s+"[^"]*")?:\n(?:(?!\n\n\[Referenced ).)*?\n\])*)$/s;
   const m = bareRe.exec(trimmed);
   if (!m) return message;
-  const isMulti = m[1].includes('\n\n[Referenced command:');
+  const isMulti = /\n\n\[Referenced command/.test(m[1]);
   const directive = isMulti
     ? 'The user wants you to execute these commands in order:'
     : 'The user wants you to execute this command:';
