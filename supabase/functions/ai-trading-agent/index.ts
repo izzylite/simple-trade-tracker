@@ -1806,6 +1806,102 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
 }
 
 /**
+ * Persist the user's message at turn start.
+ *
+ * On first turn of a new conversation the row may not exist yet — UPSERT it
+ * with `ignoreDuplicates: true` so subsequent turns are a no-op. Then append
+ * the message via the same atomic `message_count < 50` guard the reminder
+ * fire path uses, so two-tab races can't blow past the cap.
+ *
+ * Returns one of:
+ *   { ok: true, conversationId }            — message persisted
+ *   { ok: false, code: 'message_limit_reached' }
+ *   { ok: false, code: 'forbidden' }        — row exists but belongs to another user
+ *   { ok: false, code: 'unknown', message } — DB error
+ */
+async function appendUserMessage(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  params: {
+    conversationId: string;
+    userId: string;
+    calendarId: string | null;
+    tradeId?: string | null;
+    userMessage: { id: string; role: 'user'; content: string; timestamp: string; status?: string };
+    titleFallback: string;
+  }
+): Promise<
+  | { ok: true; conversationId: string }
+  | { ok: false; code: 'message_limit_reached' | 'forbidden' | 'unknown'; message?: string }
+> {
+  const { conversationId, userId, calendarId, tradeId, userMessage, titleFallback } = params;
+
+  // Step A: upsert the row. ignoreDuplicates means we never overwrite an
+  // existing row's title/messages — only insert when the id is new.
+  const { error: upsertErr } = await serviceClient
+    .from('ai_conversations')
+    .upsert(
+      {
+        id: conversationId,
+        user_id: userId,
+        calendar_id: calendarId,
+        trade_id: tradeId ?? null,
+        title: titleFallback.slice(0, 100),
+        messages: [],
+        message_count: 0,
+      },
+      { onConflict: 'id', ignoreDuplicates: true }
+    );
+  if (upsertErr) {
+    log('appendUserMessage upsert failed', 'error', { conversationId, error: upsertErr.message });
+    return { ok: false, code: 'unknown', message: upsertErr.message };
+  }
+
+  // Step B: read the row to confirm ownership and get the current messages.
+  const { data: convo, error: readErr } = await serviceClient
+    .from('ai_conversations')
+    .select('id, user_id, messages, message_count')
+    .eq('id', conversationId)
+    .single();
+  if (readErr || !convo) {
+    return { ok: false, code: 'unknown', message: readErr?.message ?? 'convo not found after upsert' };
+  }
+  if (convo.user_id !== userId) {
+    log('appendUserMessage cross-tenant attempt blocked', 'warn', {
+      conversationId,
+      rowUserId: convo.user_id,
+      callerUserId: userId,
+    });
+    return { ok: false, code: 'forbidden' };
+  }
+
+  // Step C: atomic append guarded by `message_count < 50`. If a parallel turn
+  // raced us to the cap, this UPDATE matches 0 rows and we return the cap
+  // error — the optimistic row in the client gets rolled back.
+  const existing = Array.isArray(convo.messages) ? convo.messages : [];
+  const nextMessages = [...existing, userMessage];
+
+  const { data: updated, error: updateErr } = await serviceClient
+    .from('ai_conversations')
+    .update({
+      messages: nextMessages,
+      message_count: nextMessages.length,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', conversationId)
+    .eq('user_id', userId)
+    .lt('message_count', 50)
+    .select('id');
+  if (updateErr) {
+    return { ok: false, code: 'unknown', message: updateErr.message };
+  }
+  if (!updated || updated.length === 0) {
+    return { ok: false, code: 'message_limit_reached' };
+  }
+
+  return { ok: true, conversationId };
+}
+
+/**
  * Main edge function handler
  */
 Deno.serve(async (req: Request) => {
