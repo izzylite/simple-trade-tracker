@@ -73,7 +73,7 @@ const ReminderListItem: React.FC<ReminderListItemProps> = ({
         p: 1.5,
         borderRadius: 2,
         cursor: 'pointer',
-        '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.6) },
+        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
         '&:focus-visible': {
           outline: `2px solid ${theme.palette.primary.main}`,
           outlineOffset: 2,

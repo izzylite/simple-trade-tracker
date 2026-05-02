@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Box, CircularProgress, Stack, Typography } from '@mui/material';
+import { Box, Stack, Typography } from '@mui/material';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   getReminders,
@@ -22,6 +22,7 @@ import {
 import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
 import { logger } from '../../utils/logger';
 import ReminderListItem from './ReminderListItem';
+import EconomicEventShimmer from '../economicCalendar/EconomicEventShimmer';
 
 interface RemindersPanelProps {
   onNavigateToConversation: (conversationId: string) => void;
@@ -110,11 +111,7 @@ const RemindersPanel: React.FC<RemindersPanelProps> = ({
   );
 
   if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" p={4}>
-        <CircularProgress size={24} />
-      </Box>
-    );
+    return <EconomicEventShimmer count={6} />;
   }
 
   if (reminders.length === 0) {

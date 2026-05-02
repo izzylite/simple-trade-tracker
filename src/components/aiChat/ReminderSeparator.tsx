@@ -28,14 +28,14 @@ const ReminderSeparator: React.FC<ReminderSeparatorProps> = ({ description }) =>
         py: 0.75,
         borderRadius: 999,
         alignSelf: 'flex-start',
-        bgcolor: alpha(theme.palette.action.hover, 0.6),
-        color: theme.palette.text.secondary,
+        bgcolor: alpha(theme.palette.primary.main, 0.12),
+        color: theme.palette.primary.main,
         fontSize: 12,
         width: 'fit-content',
       }}
     >
       <AlarmIcon aria-hidden sx={{ fontSize: 14 }} />
-      <Typography variant="caption" sx={{ fontSize: 12 }}>
+      <Typography variant="caption" sx={{ fontSize: 12, color: 'inherit' }}>
         Reminder{description ? `: ${description}` : ''}
       </Typography>
     </Box>
