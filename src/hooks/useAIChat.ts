@@ -324,49 +324,15 @@ export function useAIChat({
   ]);
 
   /**
-   * Save current conversation
-   * If trade is provided, saves as trade-specific conversation
-   * Otherwise saves as calendar-level conversation
-   */
-  const saveCurrentConversation = useCallback(async (updatedMessages: ChatMessageType[]) => {
-    if (!userId || updatedMessages.length === 0 || !autoSaveConversation) return;
-
-    try {
-      const storageCalendarId = saveAsUserLevel ? null : (calendar?.id || null);
-      const result = await conversationRepo.saveConversation(
-        currentConversationId,
-        storageCalendarId,
-        userId,
-        updatedMessages,
-        undefined, // title - auto-generated
-        trade?.id || null // tradeId - null for calendar/user-level
-      );
-
-      if (result.success && result.data) {
-        setCurrentConversationId(result.data.id);
-        logger.log('Conversation saved:', result.data.id,
-          trade?.id ? '(trade)' : calendar?.id ? '(calendar)' : '(user-level)');
-        await loadConversations();
-      }
-    } catch (error) {
-      logger.error('Error saving conversation:', error);
-    }
-  }, [userId, calendar?.id, trade?.id, currentConversationId, autoSaveConversation, conversationRepo, loadConversations]);
-
-  /**
    * Start a new chat
    */
   const startNewChat = useCallback(async () => {
-    const msgs = messages;  
     setMessages([]);
     setCurrentConversationId(null);
     setIsAtMessageLimit(false);
     setEditingMessageId(null);
-     if (msgs.length > 0) {
-      await saveCurrentConversation(msgs);
-    }
-    logger.log('Started new conversation');
-  }, [messages, saveCurrentConversation]);
+    logger.log('Started new conversation (local reset)');
+  }, []);
 
   /**
    * Select a conversation from history
@@ -731,9 +697,6 @@ export function useAIChat({
         setMessages(prev => [...prev, finalMessage]);
       }
 
-      const conversationMessages = [...baseHistory, userMessage, finalMessage];
-      await saveCurrentConversation(conversationMessages);
-
     } catch (error) {
       const isAbortError =
         typeof error === 'object' &&
@@ -783,7 +746,7 @@ export function useAIChat({
       setIsTyping(false);
       setToolExecutionStatus('');
     }
-  }, [userId, calendar, trade, messages, editingMessageId, isLoading, saveCurrentConversation]);
+  }, [userId, calendar, trade, messages, editingMessageId, isLoading]);
 
   /**
    * Set up message for editing and return its content and images
