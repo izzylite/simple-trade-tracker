@@ -536,6 +536,15 @@ export function useAIChat({
     setIsTyping(true);
     setToolExecutionStatus('');
 
+    // Generate the conversation id on the very first send. Backend uses this
+    // for the turn-start upsert and tools (set_reminder, etc.) use it for
+    // ownership checks.
+    let activeConversationId = currentConversationId;
+    if (!activeConversationId) {
+      activeConversationId = uuidv4();
+      setCurrentConversationId(activeConversationId);
+    }
+
     const aiMessageId = uuidv4();
     let aiMessageAdded = false;
 
@@ -566,7 +575,8 @@ export function useAIChat({
         baseHistory,
         abortController.signal,
         trade?.id,
-        images
+        images,
+        activeConversationId,
       )) {
         switch (event.type) {
           case 'text_chunk':
