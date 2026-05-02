@@ -234,8 +234,13 @@ export interface AgentRequest {
   // editingMessageId: when present, backend truncates the persisted messages
   //   array at this id (inclusive) before appending. Mirrors the frontend's
   //   slice-on-edit behavior so the DB doesn't accumulate orphan turns.
+  // titleHint: pre-stripped title for the conversation row, computed
+  //   client-side via generateConversationTitle so slash-command framing
+  //   doesn't leak into the History sidebar. Only used on first-send
+  //   (subsequent sends hit `ignoreDuplicates: true` and don't overwrite).
   userMessageId?: string;
   editingMessageId?: string;
+  titleHint?: string;
 }
 
 export interface ConversationMessage {

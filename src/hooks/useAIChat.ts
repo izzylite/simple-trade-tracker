@@ -14,6 +14,7 @@ import {
 import { Calendar } from '../types/calendar';
 import { Trade } from '../types/trade';
 import { supabaseAIChatService } from '../services/supabaseAIChatService';
+import { generateConversationTitle } from '../utils/conversationTitle';
 import {
   ConversationRepository,
   ConversationPaginationOptions
@@ -591,6 +592,17 @@ export function useAIChat({
       let toolCallsInProgress: string[] = [];
       const toolCallHistory: Array<{ name: string; label: string }> = [];
 
+      // Title hint is only meaningful on the very first send of a new
+      // conversation (the backend's upsert uses `ignoreDuplicates: true`,
+      // so subsequent sends won't overwrite an existing title). Computed
+      // from the user message content with slash-command and note-reference
+      // framing stripped, so the History sidebar reads naturally instead
+      // of "[Referenced command: ...]".
+      const isFirstSend = baseHistory.length === 0;
+      const titleHint = isFirstSend
+        ? generateConversationTitle(userMessage.content)
+        : undefined;
+
       for await (const event of supabaseAIChatService.sendMessageStreaming(
         trimmedMessage,
         userId,
@@ -602,6 +614,7 @@ export function useAIChat({
         activeConversationId,
         userMessage.id,
         editTargetId ?? undefined,
+        titleHint,
       )) {
         switch (event.type) {
           case 'text_chunk':

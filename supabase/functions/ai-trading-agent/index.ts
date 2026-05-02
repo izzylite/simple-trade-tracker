@@ -1920,7 +1920,9 @@ Deno.serve(async (req: Request) => {
       calendarId: calendarId ?? null,
       tradeId: focusedTradeId ?? null,
       userMessage: userMessageRecord,
-      titleFallback: (message ?? 'New conversation').slice(0, 60),
+      // Prefer the client-computed title (which strips slash-command and
+      // note-reference framing). Fall back to a raw slice for older clients.
+      titleFallback: body.titleHint ?? (message ?? 'New conversation').slice(0, 60),
       editingMessageId: body.editingMessageId,
     });
 
