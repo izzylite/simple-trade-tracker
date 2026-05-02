@@ -121,10 +121,10 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
         borderRadius: '10px',
         cursor: 'pointer',
         border: `1px solid ${isError
-            ? alpha(theme.palette.error.main, 0.45)
-            : result.is_read
-              ? theme.palette.divider
-              : alpha(theme.palette.primary.main, 0.3)
+          ? alpha(theme.palette.error.main, 0.45)
+          : result.is_read
+            ? theme.palette.divider
+            : alpha(theme.palette.primary.main, 0.3)
           }`,
         backgroundColor: isError
           ? alpha(theme.palette.error.main, 0.05)
@@ -183,7 +183,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
                 size="small"
                 sx={{
                   fontSize: '0.65rem',
-                    minWidth: '80px',
+                  minWidth: '80px',
                   height: 20,
                   fontWeight: 700,
                   backgroundColor: alpha(
@@ -275,9 +275,9 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
               onNoteClick={
                 canOpenDialogs
                   ? (noteId) => {
-                      const note = embeddedNotes?.[noteId];
-                      if (note) setSelectedNote(note);
-                    }
+                    const note = embeddedNotes?.[noteId];
+                    if (note) setSelectedNote(note);
+                  }
                   : undefined
               }
             />
