@@ -16,7 +16,7 @@ function log(message: string, level: LogLevel = "info"): void {
 }
 
 // Must stay in sync with the public.memory_audit_op enum.
-export type MemoryAuditOp = "UPDATE" | "REMOVE" | "COMPACT" | "REPLACE_SECTION";
+export type MemoryAuditOp = "ADD" | "UPDATE" | "REMOVE" | "COMPACT" | "REPLACE_SECTION";
 
 export interface AuditEntry {
   user_id: string;

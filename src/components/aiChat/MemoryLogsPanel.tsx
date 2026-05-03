@@ -40,7 +40,8 @@ function formatAgo(isoTime: string): string {
   return `${days}d ago`;
 }
 
-const OP_COLORS: Record<MemoryAuditRow['op'], 'warning' | 'error' | 'default' | 'primary'> = {
+const OP_COLORS: Record<MemoryAuditRow['op'], 'warning' | 'error' | 'default' | 'primary' | 'success'> = {
+  ADD: 'success',
   UPDATE: 'warning',
   REMOVE: 'error',
   COMPACT: 'default',

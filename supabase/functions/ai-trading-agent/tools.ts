@@ -2938,6 +2938,7 @@ export async function executeCustomTool(
         return await applyRuleChange(supabase, userId, calendarId, {
           event_type: args.event_type as EpisodicEventType,
           summary: typeof args.summary === "string" ? args.summary : "",
+          metadata: { conversation_id: context.conversationId },
           memory_op: (typeof args.memory_op === "string"
             ? args.memory_op
             : "ADD") as MemoryOp,
@@ -2970,7 +2971,10 @@ export async function executeCustomTool(
           event_type: args.event_type as EpisodicEventType,
           summary: args.summary as string,
           tags: args.tags as string[] | undefined,
-          metadata: args.metadata as Record<string, unknown> | undefined,
+          metadata: {
+            conversation_id: context.conversationId,
+            ...(args.metadata as Record<string, unknown> | undefined),
+          },
         });
       }
 

@@ -254,12 +254,17 @@ function applyAdd(
   const deduped = deduplicateInsights(merged);
   const next = { ...sections, [section]: deduped };
   const added = deduped.length - before.length;
+  // deduplicateInsights preserves input order, so the genuinely-new bullets
+  // are the tail of `deduped` past the original section length.
+  const addedBullets = deduped.slice(before.length);
   return {
     ok: true,
     result: {
       sections: next,
       beforeText: null,
-      afterText: null,
+      afterText: addedBullets.length > 0
+        ? addedBullets.map((b) => `- ${b}`).join("\n")
+        : null,
       matchScore: null,
       summary:
         `ADD: appended ${added} insight(s) to ${section} (${insights.length - added} dedup'd).`,
@@ -602,7 +607,7 @@ export async function updateMemory(
       await writeAuditEntry(supabase, {
         user_id: userId,
         calendar_id: calendarId,
-        op: op as "UPDATE" | "REMOVE" | "REPLACE_SECTION",
+        op: op as "ADD" | "UPDATE" | "REMOVE" | "REPLACE_SECTION",
         section,
         before_text: beforeText,
         after_text: afterText,
@@ -647,6 +652,7 @@ export async function updateMemory(
 export interface ApplyRuleChangeParams {
   event_type: EpisodicEventType;
   summary: string;
+  metadata?: Record<string, unknown>;
   // Memory side. memory_op + memory_section are required; the rest depend
   // on the op (mirrors UpdateMemoryParams).
   memory_op: MemoryOp;
@@ -674,6 +680,7 @@ export async function applyRuleChange(
   const eventResult = await recordEvent(supabase, userId, calendarId, {
     event_type: params.event_type,
     summary: params.summary,
+    metadata: params.metadata,
   });
 
   // Step 2: core memory. Even if step 1 returned an error string, we still

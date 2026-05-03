@@ -3,7 +3,7 @@ import { AGENT_MEMORY_TAG } from '../types/note';
 
 export interface MemoryAuditRow {
   id: string;
-  op: 'UPDATE' | 'REMOVE' | 'COMPACT' | 'REPLACE_SECTION';
+  op: 'ADD' | 'UPDATE' | 'REMOVE' | 'COMPACT' | 'REPLACE_SECTION';
   section: string;
   before_text: string | null;
   after_text: string | null;

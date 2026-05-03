@@ -38,13 +38,15 @@ export const MEMORY_PER_SECTION_CAP = 25;
 // =============================================================================
 
 // Must stay in sync with the Postgres ENUM public.memory_audit_op defined in
-// migrations/20260426000000_memory_v2_episodic_and_audit.sql, plus the ADD
-// flavour which doesn't get audited (additive ops are recoverable from the
-// note's prior content).
+// migrations/20260426000000_memory_v2_episodic_and_audit.sql (ADD value
+// added in 20260503000000_memory_audit_include_add.sql).
 export type MemoryOp = "ADD" | "UPDATE" | "REMOVE" | "REPLACE_SECTION";
 
-// Ops that should write a memory_audit row when executed (destructive).
+// Ops that should write a memory_audit row when executed.
+// ADD is included so the Memory Logs panel surfaces every mutation —
+// otherwise appended bullets accumulate silently with no audit trail.
 export const AUDITED_MEMORY_OPS: Set<MemoryOp> = new Set([
+  "ADD",
   "UPDATE",
   "REMOVE",
   "REPLACE_SECTION",
