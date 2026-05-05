@@ -81,7 +81,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const internalChatState = useAIChat({
     userId: user?.uid,
     calendar,
-    messageLimit: 50,
+    messageLimit: 100,
     autoSaveConversation: true,
   });
   const effectiveChatState = sharedChatState ?? internalChatState;

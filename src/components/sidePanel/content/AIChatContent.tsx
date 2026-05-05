@@ -163,7 +163,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     userId: user?.uid,
     calendar,
     trade: focusedTrade,
-    messageLimit: 50,
+    messageLimit: 100,
     autoSaveConversation: true
   });
 
@@ -737,7 +737,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                 }
               }}
               isReadOnly={isReadOnly}
-              messageLimit={50}
+              messageLimit={100}
               systemCommands={systemCommands}
               onSystemCommand={handleSystemCommand}
             />

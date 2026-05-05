@@ -96,7 +96,7 @@ export interface UseAIChatReturn {
   getWelcomeMessage: () => ChatMessageType;
 }
 
-const MESSAGE_LIMIT_DEFAULT = 50;
+const MESSAGE_LIMIT_DEFAULT = 100;
 
 export function useAIChat({
   userId,

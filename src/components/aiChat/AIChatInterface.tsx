@@ -155,7 +155,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   isReadOnly = false,
   showTemplates: showTemplatesProp,
   autoScroll = true,
-  messageLimit = 50,
+  messageLimit = 100,
   questionTemplates = defaultQuestionTemplates,
   systemCommands,
   onSystemCommand,

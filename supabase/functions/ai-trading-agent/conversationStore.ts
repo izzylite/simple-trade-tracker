@@ -23,7 +23,7 @@ export type AppendUserMessageResult =
  *
  * On first turn of a new conversation the row may not exist yet — UPSERT it
  * with `ignoreDuplicates: true` so subsequent turns are a no-op. Then append
- * the message via the same atomic `message_count < 50` guard the reminder
+ * the message via the same atomic `message_count < 100` guard the reminder
  * fire path uses, so two-tab races can't blow past the cap.
  *
  * On edit-resend, the existing messages array is truncated at `editingMessageId`
@@ -92,7 +92,7 @@ export async function appendUserMessage(
 
   // Step C: build the next messages array. On edit-resend, truncate at the
   // edited message's id so old turns are dropped server-side. Otherwise just
-  // append. Atomic UPDATE guarded by `message_count < 50` so two-tab races
+  // append. Atomic UPDATE guarded by `message_count < 100` so two-tab races
   // can't blow past the cap; if a parallel turn raced us to the cap this
   // UPDATE matches 0 rows and we return the cap error.
   const existingRaw = Array.isArray(convo.messages) ? convo.messages : [];
@@ -116,7 +116,7 @@ export async function appendUserMessage(
     })
     .eq('id', conversationId)
     .eq('user_id', userId)
-    .lt('message_count', 50)
+    .lt('message_count', 100)
     .select('id')
     .maybeSingle();
   if (updateErr) {
@@ -135,7 +135,7 @@ export async function appendUserMessage(
  * Always UPDATE (never UPSERT) — if the user hit /clear mid-turn and deleted
  * the row, this becomes a no-op rather than resurrecting it. We don't enforce
  * the message_count cap here: the user-message append already gated entry to
- * the turn, so worst case we land at count = 51 (cap + assistant), which is
+ * the turn, so worst case we land at count = 101 (cap + assistant), which is
  * acceptable.
  */
 export async function appendAssistantMessage(

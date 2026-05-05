@@ -116,7 +116,7 @@ const HomeInner: React.FC<HomeProps> = ({
   const sharedChatState = useAIChat({
     userId: user?.uid,
     calendar: aiChatCalendar,
-    messageLimit: 50,
+    messageLimit: 100,
     autoSaveConversation: true,
     saveAsUserLevel: true,
   });
