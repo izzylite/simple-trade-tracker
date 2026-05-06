@@ -326,20 +326,7 @@ const HomeInner: React.FC<HomeProps> = ({
 
     setIsEditing(true);
     try {
-      await onUpdateCalendar(calendarToEdit.id, {
-        name: data.name,
-        account_balance: data.account_balance,
-        max_daily_drawdown: data.max_daily_drawdown,
-        weekly_target: data.weekly_target,
-        monthly_target: data.monthly_target,
-        yearly_target: data.yearly_target,
-        risk_per_trade: data.risk_per_trade,
-        dynamic_risk_enabled: data.dynamic_risk_enabled,
-        increased_risk_percentage: data.increased_risk_percentage,
-        profit_threshold_percentage: data.profit_threshold_percentage,
-        hero_image_url: data.hero_image_url,
-        hero_image_attribution: data.hero_image_attribution
-      });
+      await onUpdateCalendar(calendarToEdit.id, { ...data });
       setIsEditDialogOpen(false);
       setCalendarToEdit(null);
     } catch (error) {

@@ -43,6 +43,7 @@ import {
   Flag as TargetIcon,
   EventNote as GamePlanIcon,
   HelpOutline as HelpOutlineIcon,
+  DeleteOutline as TrashIcon,
 } from '@mui/icons-material';
 import {
   format,
@@ -81,6 +82,7 @@ import {
 
 } from '../components/StyledComponents';
 import { useNavigate, useParams } from 'react-router-dom';
+import { mutate as swrMutate } from 'swr';
 
 import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
 
@@ -93,6 +95,8 @@ import AccountStats from '../components/AccountStats';
 import TradeFormDialog, { createEditTradeData } from '../components/trades/TradeFormDialog';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
+import { DuplicateCalendarDialog } from '../components/dialogs/DuplicateCalendarDialog';
+import { CalendarLinkDialog } from '../components/dialogs/CalendarLinkDialog';
 import PinnedTradesDrawer from '../components/PinnedTradesDrawer';
 import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ShareButton from '../components/sharing/ShareButton';
@@ -146,6 +150,8 @@ import SearchContent from '../components/sidePanel/content/SearchContent';
 import PinnedContent from '../components/sidePanel/content/PinnedContent';
 import TagManagementContent from '../components/sidePanel/content/TagManagementContent';
 import DayTradesContent from '../components/sidePanel/content/DayTradesContent';
+import CalendarsListContent from '../components/sidePanel/content/CalendarsListContent';
+import CalendarsListDrawer from '../components/calendars/CalendarsListDrawer';
 
 interface TradeCalendarProps {
   // Trade CRUD operations now handled internally via useCalendarTrades hook
@@ -158,6 +164,11 @@ interface TradeCalendarProps {
   mode: 'light' | 'dark';
   // Read-only mode for shared calendars
   isReadOnly?: boolean;
+  // Optional management callbacks for the calendars-list panel/drawer.
+  // When omitted, "more options" actions are hidden.
+  onDuplicateCalendar?: (sourceCalendarId: string, newName: string, includeContent?: boolean) => Promise<void> | void;
+  onDeleteCalendar?: (id: string) => Promise<void> | void;
+  onUpdateCalendar?: (id: string, updates: Partial<Calendar>) => Promise<void> | void;
 }
 
 
@@ -553,7 +564,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setLoading,
     onToggleTheme,
     mode,
-    isReadOnly = false
+    isReadOnly = false,
+    onDuplicateCalendar,
+    onDeleteCalendar,
+    onUpdateCalendar,
   } = props;
 
 
@@ -746,6 +760,21 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   // FAQ drawer state
   const [isFAQDrawerOpen, setIsFAQDrawerOpen] = useState(false);
 
+  // Calendars list drawer state (<lg fallback for 'calendars-list' panel)
+  const [isCalendarsListDrawerOpen, setIsCalendarsListDrawerOpen] = useState(false);
+
+  // Calendar management dialog state for actions originating from the
+  // calendars-list panel/drawer (edit/duplicate/link/delete on OTHER calendars).
+  // Distinct from isCalendarEditOpen which targets the currently-active calendar.
+  const [panelCalendarToEdit, setPanelCalendarToEdit] = useState<Calendar | null>(null);
+  const [isPanelEditSubmitting, setIsPanelEditSubmitting] = useState(false);
+  const [panelCalendarToDuplicate, setPanelCalendarToDuplicate] = useState<Calendar | null>(null);
+  const [isPanelDuplicating, setIsPanelDuplicating] = useState(false);
+  const [panelCalendarToLink, setPanelCalendarToLink] = useState<Calendar | null>(null);
+  const [isPanelLinking, setIsPanelLinking] = useState(false);
+  const [panelCalendarToDelete, setPanelCalendarToDelete] = useState<string | null>(null);
+  const [isPanelDeleting, setIsPanelDeleting] = useState(false);
+
   // Week note state
   const [weekNoteKeys, setWeekNoteKeys] = useState<Set<string>>(new Set());
   const [weekNoteDialog, setWeekNoteDialog] = useState<{
@@ -771,25 +800,26 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const [userCalendars, setUserCalendars] = useState<Calendar[]>([]);
 
   // Fetch user's calendars for breadcrumb dropdown
-  useEffect(() => {
-    const loadUserCalendars = async () => {
-      if (!calendar?.user_id) return;
+  const loadUserCalendars = useCallback(async () => {
+    if (!calendar?.user_id) return;
 
-      try {
-        const calendarRepo = new CalendarRepository();
-        const calendars = await calendarRepo.findByUserId(calendar.user_id);
-        setUserCalendars(calendars);
-      } catch (error) {
-        logger.error('Error loading user calendars for dropdown:', error);
-      }
-    };
-
-    loadUserCalendars();
+    try {
+      const calendarRepo = new CalendarRepository();
+      const calendars = await calendarRepo.findByUserId(calendar.user_id);
+      setUserCalendars(calendars);
+    } catch (error) {
+      logger.error('Error loading user calendars for dropdown:', error);
+    }
   }, [calendar?.user_id]);
+
+  useEffect(() => {
+    loadUserCalendars();
+  }, [loadUserCalendars]);
 
   const theme = useTheme();
   const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
+  const navigate = useNavigate();
 
   // Side panel context (provided by SidePanelProvider wrapper)
   const {
@@ -800,6 +830,24 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     resetPanel,
     setOpen: setPanelOpen,
   } = useSidePanel();
+
+  // Open the calendars list panel (lg+) or drawer (<lg)
+  const handleViewAllCalendars = useCallback(() => {
+    if (isLgUp) {
+      replacePanel({ id: 'calendars-list' });
+      setPanelOpen(true);
+    } else {
+      setIsCalendarsListDrawerOpen(true);
+    }
+  }, [isLgUp, replacePanel, setPanelOpen]);
+
+  // Select a calendar from the list panel/drawer by navigating to its route
+  const handleSelectCalendar = useCallback((id: string) => {
+    setIsCalendarsListDrawerOpen(false);
+    setPanelOpen(false);
+    resetPanel();
+    navigate(`/calendar/${id}`);
+  }, [navigate, setPanelOpen, resetPanel]);
 
   // Ref for main content scroll container (used by floating nav scroll detection)
   const mainContentRef = useRef<HTMLDivElement>(null);
@@ -816,6 +864,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       setIsTagManagementDrawerOpen(false);
       setIsEconomicCalendarOpen(false);
       setIsFAQDrawerOpen(false);
+      setIsCalendarsListDrawerOpen(false);
       setSelectedDate(null);
     };
 
@@ -841,6 +890,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         case 'faq':
           setIsFAQDrawerOpen(true);
           break;
+        case 'calendars-list':
+          setIsCalendarsListDrawerOpen(true);
+          break;
         case 'day-trades': {
           const dayView = currentView as DayTradesView;
           setSelectedDate(dayView.date);
@@ -848,9 +900,12 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         }
       }
     } else if (!prevIsLgUp.current && isLgUp) {
-      // <lg → lg+: if FAQ drawer was open, hand off to panel; then close all drawers
+      // <lg → lg+: hand off open drawer to panel; then close all drawers
       if (isFAQDrawerOpen) {
         replacePanel({ id: 'faq' });
+        setPanelOpen(true);
+      } else if (isCalendarsListDrawerOpen) {
+        replacePanel({ id: 'calendars-list' });
         setPanelOpen(true);
       }
       closeAllDrawers();
@@ -861,10 +916,20 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   // Breadcrumb items
   const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => {
-    // Create dropdown items from user calendars, overlaying live data for the
-    // active calendar so name/totals reflect in-session updates (renames, new
-    // trades) instead of the snapshot taken when the list was first loaded.
-    const dropdownItems: DropdownItem[] = userCalendars.map(cal => {
+    // Recent calendars: filter trash, sort by updated_at desc, top 3.
+    // Always include the active calendar even if it's not in top 3 so the
+    // dropdown reflects current selection.
+    const sortedRecent = [...userCalendars]
+      .filter(c => !c.deleted_at)
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    const top3 = sortedRecent.slice(0, 3);
+    const includesActive = top3.some(c => c.id === calendarId);
+    const activeCal = !includesActive ? sortedRecent.find(c => c.id === calendarId) : undefined;
+    const dropdownSource = activeCal ? [activeCal, ...top3] : top3;
+
+    // Overlay live data for the active calendar so name/totals reflect
+    // in-session updates (renames, new trades) instead of the snapshot.
+    const dropdownItems: DropdownItem[] = dropdownSource.map(cal => {
       const isActive = cal.id === calendarId;
       const source = isActive ? calendar : cal;
       return {
@@ -882,10 +947,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       {
         label: calendarName || 'Calendar',
         path: `/calendar/${calendarId}`,
-        dropdown: dropdownItems.length > 0 ? dropdownItems : undefined
+        dropdown: dropdownItems.length > 0 ? dropdownItems : undefined,
+        dropdownTitle: dropdownItems.length > 0 ? 'Calendars' : undefined,
+        onViewAll: dropdownItems.length > 0 ? handleViewAllCalendars : undefined,
+        viewAllLabel: 'View all'
       }
     ];
-  }, [calendarName, calendarId, userCalendars, calendar]);
+  }, [calendarName, calendarId, userCalendars, calendar, handleViewAllCalendars]);
 
   // Use optimized hook for high-impact economic events
   const { highImpactEventDates: monthlyHighImpactEvents } = useHighImpactEvents({
@@ -1006,21 +1074,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
     setIsCalendarEditSubmitting(true);
     try {
-      await onUpdateCalendarProperty(calendarId, (cal) => ({
-        ...cal,
-        name: formData.name,
-        account_balance: formData.account_balance,
-        max_daily_drawdown: formData.max_daily_drawdown,
-        weekly_target: formData.weekly_target,
-        monthly_target: formData.monthly_target,
-        yearly_target: formData.yearly_target,
-        risk_per_trade: formData.risk_per_trade,
-        dynamic_risk_enabled: formData.dynamic_risk_enabled,
-        increased_risk_percentage: formData.increased_risk_percentage,
-        profit_threshold_percentage: formData.profit_threshold_percentage,
-        hero_image_url: formData.hero_image_url,
-        hero_image_attribution: formData.hero_image_attribution,
-      }));
+      await onUpdateCalendarProperty(calendarId, (cal) => ({ ...cal, ...formData }));
       // Update userCalendars state to reflect name change in breadcrumb dropdown
       setUserCalendars(prev => prev.map(cal =>
         cal.id === calendarId ? { ...cal, name: formData.name } : cal
@@ -1034,6 +1088,121 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       setIsCalendarEditSubmitting(false);
     }
   };
+
+  // Refresh both the local userCalendars (dropdown) and SWR caches used by
+  // CalendarsListContent (panel/drawer). Mutating App-level state alone
+  // doesn't touch SWR, so the panel/drawer would otherwise show stale data.
+  const refreshCalendarSources = useCallback(async () => {
+    const userId = calendar?.user_id;
+    await Promise.all([
+      loadUserCalendars(),
+      userId ? swrMutate(['calendars', userId]) : Promise.resolve(),
+      userId ? swrMutate(['trash-calendars', userId]) : Promise.resolve(),
+    ]);
+  }, [calendar?.user_id, loadUserCalendars]);
+
+  // --- Calendars-list panel/drawer action handlers ---
+  const handlePanelEditSubmit = async (formData: CalendarFormData) => {
+    if (!panelCalendarToEdit || !onUpdateCalendar) return;
+
+    setIsPanelEditSubmitting(true);
+    try {
+      await onUpdateCalendar(panelCalendarToEdit.id, { ...formData });
+      await refreshCalendarSources();
+      setPanelCalendarToEdit(null);
+      showSnackbar('Calendar updated successfully', 'success');
+    } catch (error) {
+      logger.error('Error updating calendar:', error);
+      showSnackbar('Failed to update calendar', 'error');
+    } finally {
+      setIsPanelEditSubmitting(false);
+    }
+  };
+
+  const handlePanelDuplicateSubmit = async (withContent: boolean) => {
+    if (!panelCalendarToDuplicate || !onDuplicateCalendar) return;
+
+    setIsPanelDuplicating(true);
+    try {
+      const newName = `${panelCalendarToDuplicate.name} (Copy)`;
+      await onDuplicateCalendar(panelCalendarToDuplicate.id, newName, withContent);
+      await refreshCalendarSources();
+      setPanelCalendarToDuplicate(null);
+      showSnackbar('Calendar duplicated successfully', 'success');
+    } catch (error) {
+      logger.error('Error duplicating calendar:', error);
+      showSnackbar('Failed to duplicate calendar', 'error');
+    } finally {
+      setIsPanelDuplicating(false);
+    }
+  };
+
+  const handlePanelLinkSubmit = async (targetCalendarId: string) => {
+    if (!panelCalendarToLink) return;
+
+    setIsPanelLinking(true);
+    try {
+      await calendarService.linkCalendar(panelCalendarToLink.id, targetCalendarId);
+      await refreshCalendarSources();
+      setPanelCalendarToLink(null);
+    } catch (error) {
+      logger.error('Error linking calendar:', error);
+      throw error;
+    } finally {
+      setIsPanelLinking(false);
+    }
+  };
+
+  const handlePanelUnlinkSubmit = async () => {
+    if (!panelCalendarToLink) return;
+
+    setIsPanelLinking(true);
+    try {
+      await calendarService.unlinkCalendar(panelCalendarToLink.id);
+      await refreshCalendarSources();
+      setPanelCalendarToLink(null);
+    } catch (error) {
+      logger.error('Error unlinking calendar:', error);
+      throw error;
+    } finally {
+      setIsPanelLinking(false);
+    }
+  };
+
+  const handlePanelDeleteConfirm = async () => {
+    if (!panelCalendarToDelete || !onDeleteCalendar) return;
+
+    setIsPanelDeleting(true);
+    try {
+      await onDeleteCalendar(panelCalendarToDelete);
+      await refreshCalendarSources();
+      setPanelCalendarToDelete(null);
+      showSnackbar('Calendar moved to trash', 'success');
+    } catch (error) {
+      logger.error('Error deleting calendar:', error);
+      showSnackbar('Failed to delete calendar', 'error');
+    } finally {
+      setIsPanelDeleting(false);
+    }
+  };
+
+  const handlePanelRestoreCalendar = useCallback(async (id: string) => {
+    try {
+      await calendarService.restoreCalendar(id);
+      await refreshCalendarSources();
+    } catch (error) {
+      logger.error('Error restoring calendar:', error);
+    }
+  }, [refreshCalendarSources]);
+
+  const handlePanelPermanentDeleteCalendar = useCallback(async (id: string) => {
+    try {
+      await calendarService.permanentlyDeleteCalendar(id);
+      await refreshCalendarSources();
+    } catch (error) {
+      logger.error('Error permanently deleting calendar:', error);
+    }
+  }, [refreshCalendarSources]);
 
   // Generic panel/drawer toggle — reused by Notes, Events, Pinned, Filter, Tags
   const togglePanel = useCallback((
@@ -1729,6 +1898,32 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             ),
           };
         }
+        case 'calendars-list': {
+          const isTrash = (view as { isTrash?: boolean }).isTrash;
+          return {
+            title: isTrash ? 'Trash' : 'All Calendars',
+            icon: isTrash
+              ? <TrashIcon fontSize="small" />
+              : <CalendarIcon fontSize="small" />,
+            component: (
+              <CalendarsListContent
+                isActive={
+                  isPanelOpen && currentView.id === 'calendars-list'
+                }
+                initialTab={isTrash ? 1 : 0}
+                activeCalendarId={calendarId}
+                onCalendarClick={handleSelectCalendar}
+                onEditCalendar={onUpdateCalendar ? setPanelCalendarToEdit : undefined}
+                onDuplicateCalendar={onDuplicateCalendar ? setPanelCalendarToDuplicate : undefined}
+                onLinkCalendar={setPanelCalendarToLink}
+                onDeleteCalendar={onDeleteCalendar ? setPanelCalendarToDelete : undefined}
+                onUpdateCalendarProperty={onUpdateCalendarProperty}
+                onRestoreCalendar={handlePanelRestoreCalendar}
+                onPermanentDeleteCalendar={handlePanelPermanentDeleteCalendar}
+              />
+            ),
+          };
+        }
         case 'day-trades': {
           const dayView = view as DayTradesView;
           const dayTrades = getTradesForDate(dayView.date);
@@ -1810,6 +2005,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       requiredTagGroups, onUpdateCalendarProperty,
       getTradesForDate, weeklyStatsMap, accountBalance,
       pushPanel, replacePanel, setNewTrade, setShowAddForm,
+      handleSelectCalendar,
+      onUpdateCalendar, onDuplicateCalendar, onDeleteCalendar,
+      handlePanelRestoreCalendar, handlePanelPermanentDeleteCalendar,
     ]
   );
 
@@ -2886,6 +3084,48 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           submitButtonText="Save"
         />
 
+        {/* Panel-action dialogs (for OTHER calendars from the calendars-list panel) */}
+        <CalendarFormDialog
+          open={Boolean(panelCalendarToEdit)}
+          onClose={() => setPanelCalendarToEdit(null)}
+          onSubmit={handlePanelEditSubmit}
+          initialData={panelCalendarToEdit || undefined}
+          isSubmitting={isPanelEditSubmitting}
+          mode="edit"
+          title="Edit Calendar"
+          submitButtonText="Save"
+        />
+
+        <DuplicateCalendarDialog
+          open={Boolean(panelCalendarToDuplicate)}
+          calendar={panelCalendarToDuplicate}
+          isDuplicating={isPanelDuplicating}
+          onClose={() => setPanelCalendarToDuplicate(null)}
+          onDuplicate={handlePanelDuplicateSubmit}
+        />
+
+        <CalendarLinkDialog
+          open={Boolean(panelCalendarToLink)}
+          calendar={panelCalendarToLink}
+          calendars={userCalendars}
+          isLoading={isPanelLinking}
+          onClose={() => setPanelCalendarToLink(null)}
+          onLink={handlePanelLinkSubmit}
+          onUnlink={handlePanelUnlinkSubmit}
+        />
+
+        <ConfirmationDialog
+          open={Boolean(panelCalendarToDelete)}
+          onCancel={() => setPanelCalendarToDelete(null)}
+          onConfirm={handlePanelDeleteConfirm}
+          title="Delete Calendar"
+          message="Move this calendar to trash? You can restore it within 30 days."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isSubmitting={isPanelDeleting}
+          confirmColor="error"
+        />
+
       {/* Economic Calendar Drawer — only rendered on <lg (panel handles it on lg+) */}
       {!isLgUp && (
         <EconomicCalendarDrawer
@@ -2927,6 +3167,23 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         <FAQDrawer
           open={isFAQDrawerOpen}
           onClose={() => setIsFAQDrawerOpen(false)}
+        />
+      )}
+
+      {/* Calendars List Drawer — <lg only (lg+ uses SidePanel) */}
+      {!isLgUp && (
+        <CalendarsListDrawer
+          open={isCalendarsListDrawerOpen}
+          onClose={() => setIsCalendarsListDrawerOpen(false)}
+          activeCalendarId={calendarId}
+          onCalendarClick={handleSelectCalendar}
+          onEditCalendar={onUpdateCalendar ? setPanelCalendarToEdit : undefined}
+          onDuplicateCalendar={onDuplicateCalendar ? setPanelCalendarToDuplicate : undefined}
+          onLinkCalendar={setPanelCalendarToLink}
+          onDeleteCalendar={onDeleteCalendar ? setPanelCalendarToDelete : undefined}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
+          onRestoreCalendar={handlePanelRestoreCalendar}
+          onPermanentDeleteCalendar={handlePanelPermanentDeleteCalendar}
         />
       )}
 

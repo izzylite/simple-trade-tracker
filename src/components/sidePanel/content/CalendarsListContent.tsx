@@ -74,6 +74,7 @@ const getDaysUntilDeletion = (
 export interface CalendarsListContentProps {
   isActive?: boolean;
   initialTab?: number;
+  activeCalendarId?: string;
   onCalendarClick: (calendarId: string) => void;
   onEditCalendar?: (calendar: Calendar) => void;
   onDuplicateCalendar?: (calendar: Calendar) => void;
@@ -91,6 +92,7 @@ export interface CalendarsListContentProps {
 
 interface CalendarItemProps {
   calendar: Calendar;
+  isSelected?: boolean;
   onClick: () => void;
   onEdit?: () => void;
   onDuplicate?: () => void;
@@ -104,6 +106,7 @@ interface CalendarItemProps {
 
 const CalendarItem: React.FC<CalendarItemProps> = ({
   calendar,
+  isSelected = false,
   onClick,
   onEdit,
   onDuplicate,
@@ -124,18 +127,22 @@ const CalendarItem: React.FC<CalendarItemProps> = ({
     <Box
       sx={{
         borderRadius: 1,
-        bgcolor:
-          theme.palette.mode === 'dark'
+        position: 'relative',
+        bgcolor: isSelected
+          ? alpha(theme.palette.primary.main, 0.12)
+          : theme.palette.mode === 'dark'
             ? alpha(theme.palette.background.paper, 0.4)
             : alpha(theme.palette.background.default, 0.6),
-        border: `1px solid ${alpha(
-          theme.palette.divider,
-          0.1
-        )}`,
+        border: `1px solid ${
+          isSelected
+            ? alpha(theme.palette.primary.main, 0.5)
+            : alpha(theme.palette.divider, 0.1)
+        }`,
         transition: 'all 0.2s',
         '&:hover': {
-          bgcolor:
-            theme.palette.mode === 'dark'
+          bgcolor: isSelected
+            ? alpha(theme.palette.primary.main, 0.16)
+            : theme.palette.mode === 'dark'
               ? alpha(theme.palette.background.paper, 0.6)
               : alpha(
                   theme.palette.background.default,
@@ -143,9 +150,21 @@ const CalendarItem: React.FC<CalendarItemProps> = ({
                 ),
           borderColor: alpha(
             theme.palette.primary.main,
-            0.3
+            isSelected ? 0.7 : 0.3
           ),
         },
+        '&::before': isSelected
+          ? {
+              content: '""',
+              position: 'absolute',
+              left: 0,
+              top: 8,
+              bottom: 8,
+              width: 3,
+              borderRadius: '0 2px 2px 0',
+              bgcolor: theme.palette.primary.main,
+            }
+          : undefined,
       }}
     >
       {/* Header row */}
@@ -946,6 +965,7 @@ const CalendarsListContent: React.FC<
 > = ({
   isActive = true,
   initialTab = 0,
+  activeCalendarId,
   onCalendarClick,
   onEditCalendar,
   onDuplicateCalendar,
@@ -1100,6 +1120,7 @@ const CalendarsListContent: React.FC<
                 <CalendarItem
                   key={cal.id}
                   calendar={cal}
+                  isSelected={cal.id === activeCalendarId}
                   onClick={() => onCalendarClick(cal.id)}
                   onEdit={() => onEditCalendar?.(cal)}
                   onDuplicate={() =>

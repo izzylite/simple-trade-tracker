@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Breadcrumbs as MuiBreadcrumbs, Link, Typography, useTheme, alpha, IconButton, Tooltip, Menu, MenuItem, Stack } from '@mui/material';
+import { Box, Breadcrumbs as MuiBreadcrumbs, Link, Typography, useTheme, alpha, IconButton, Tooltip, Menu, MenuItem, Stack, Button, Divider } from '@mui/material';
 import { NavigateNext as NavigateNextIcon, KeyboardArrowDown as ArrowDownIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -16,6 +16,9 @@ export interface BreadcrumbItem {
   path?: string;
   icon?: React.ReactNode;
   dropdown?: DropdownItem[]; // Optional dropdown items for this breadcrumb
+  dropdownTitle?: string; // Optional header label rendered above dropdown items
+  onViewAll?: () => void; // Optional "View all" action rendered in dropdown header
+  viewAllLabel?: string; // Custom label for the view-all button (default: "View all")
 }
 
 export interface BreadcrumbButton {
@@ -203,9 +206,9 @@ const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, buttons, rightContent 
             paper: {
               sx: {
                 mt: 0.5,
-                minWidth: 200,
-                maxWidth: 350,
-                maxHeight: 400,
+                minWidth: 240,
+                maxWidth: 380,
+                maxHeight: 420,
                 bgcolor: theme.palette.background.paper,
                 border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                 boxShadow: theme.shadows[8]
@@ -215,6 +218,57 @@ const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, buttons, rightContent 
           transformOrigin={{ horizontal: 'left', vertical: 'top' }}
           anchorOrigin={{ horizontal: 'left', vertical: 'bottom' }}
         >
+          {(items[dropdownItemIndex].dropdownTitle || items[dropdownItemIndex].onViewAll) && [
+            <Box
+              key="dropdown-header"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1,
+                px: 2,
+                py: 1,
+              }}
+            >
+              {items[dropdownItemIndex].dropdownTitle && (
+                <Typography
+                  variant="overline"
+                  sx={{
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    letterSpacing: '0.05em',
+                    color: 'text.secondary',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {items[dropdownItemIndex].dropdownTitle}
+                </Typography>
+              )}
+              {items[dropdownItemIndex].onViewAll && (
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const action = items[dropdownItemIndex!].onViewAll;
+                    handleMenuClose();
+                    action?.();
+                  }}
+                  sx={{
+                    textTransform: 'none',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    minWidth: 0,
+                    px: 1,
+                    py: 0.25,
+                  }}
+                >
+                  {items[dropdownItemIndex].viewAllLabel || 'View all'}
+                </Button>
+              )}
+            </Box>,
+            <Divider key="dropdown-header-divider" sx={{ my: 0 }} />,
+          ]}
           {items[dropdownItemIndex].dropdown!.map((dropdownItem) => {
             const hasPnl = dropdownItem.pnl !== undefined;
             const isPositive = (dropdownItem.pnl ?? 0) >= 0;
