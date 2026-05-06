@@ -21,6 +21,7 @@ import { useCalendars } from '../hooks/useCalendars';
 import { Calendar } from '../types/calendar';
 import PerformanceCharts from '../components/PerformanceCharts';
 import { formatCurrency } from '../utils/formatters';
+import CalendarLockedOverlay from '../components/calendars/CalendarLockedOverlay';
 
 const STORAGE_KEY = 'perf_selected_calendar_id';
 const SWITCH_SPINNER_MS = 350;
@@ -28,6 +29,8 @@ const SWITCH_SPINNER_MS = 350;
 interface PerformancePageProps {
   /** Plumbed from App.tsx so calendar-property edits made from this page persist. */
   onUpdateCalendar?: (id: string, updates: Partial<Calendar>) => Promise<void> | void;
+  /** Triggers the Create Calendar dialog when the lock overlay's CTA is clicked. */
+  onCreateCalendar?: () => void;
 }
 
 /**
@@ -39,6 +42,7 @@ interface PerformancePageProps {
  */
 const PerformancePage: React.FC<PerformancePageProps> = ({
   onUpdateCalendar,
+  onCreateCalendar,
 }) => {
   const theme = useTheme();
   const { user } = useAuthState();
@@ -256,7 +260,12 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
       {isLoading ? (
         <CenteredSpinner label="Loading calendars" />
       ) : activeCalendars.length === 0 ? (
-        <EmptyState />
+        <Box sx={{ position: 'relative', minHeight: 400 }}>
+          <CalendarLockedOverlay
+            onCreateCalendar={onCreateCalendar}
+            subtitle="Create a calendar to start tracking trades and unlock performance analytics."
+          />
+        </Box>
       ) : isSwitching || !selectedCalendar ? (
         <CenteredSpinner label="Switching calendar" />
       ) : (
@@ -297,20 +306,6 @@ const CenteredSpinner: React.FC<{ label: string }> = ({ label }) => (
     <CircularProgress size={32} />
     <Typography variant="body2" color="text.secondary">
       {label}…
-    </Typography>
-  </Box>
-);
-
-const EmptyState: React.FC = () => (
-  <Box sx={{ textAlign: 'center', py: 12 }}>
-    <PerformanceIcon
-      sx={{ fontSize: 56, color: 'text.disabled', mb: 2 }}
-    />
-    <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
-      No calendars yet
-    </Typography>
-    <Typography variant="body2" color="text.secondary">
-      Create a calendar to view performance analytics.
     </Typography>
   </Box>
 );
