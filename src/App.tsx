@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, Box, useMediaQuery } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
@@ -24,6 +24,7 @@ import AppLoadingProgress from './components/AppLoadingProgress';
 
 import AppHeader from './components/common/AppHeader';
 import AppLayout from './components/layout/AppLayout';
+import CalendarFormDialog, { CalendarFormData } from './components/CalendarFormDialog';
 
 // Lazy load page components from pages directory
 const Home = lazy(() => import('./pages/HomePage'));
@@ -90,7 +91,42 @@ function AppContent() {
 
   const { user } = useAuthState();
   const location = useLocation();
+  const navigate = useNavigate();
   const isLandingPage = !user && location.pathname === '/';
+
+  // Global Create Calendar dialog — triggered from side nav "+ New", lock
+  // overlays, and any future entry point. Lifted to App.tsx so a single
+  // dialog instance serves every route.
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreatingCalendar, setIsCreatingCalendar] = useState(false);
+
+  const openCreateCalendarDialog = () => setIsCreateDialogOpen(true);
+
+  const handleCreateCalendarSubmit = async (data: CalendarFormData) => {
+    setIsCreatingCalendar(true);
+    try {
+      const newCalendar = await handleCreateCalendar(
+        data.name,
+        data.account_balance,
+        data.max_daily_drawdown,
+        data.weekly_target,
+        data.monthly_target,
+        data.yearly_target,
+        data.risk_per_trade,
+        data.dynamic_risk_enabled,
+        data.increased_risk_percentage,
+        data.profit_threshold_percentage,
+        data.hero_image_url,
+        data.hero_image_attribution
+      );
+      setIsCreateDialogOpen(false);
+      navigate(`/calendar/${newCalendar.id}`);
+    } catch (err) {
+      logger.error('Error creating calendar from global dialog:', err);
+    } finally {
+      setIsCreatingCalendar(false);
+    }
+  };
 
 
   // Use SWR to fetch calendars with automatic focus revalidation
@@ -258,7 +294,7 @@ function AppContent() {
               path="/"
               element={
                 user ? (
-                  <AppLayout>
+                  <AppLayout onNewCalendar={openCreateCalendarDialog}>
                     <Home
                       calendars={calendars}
                       onToggleTheme={toggleColorMode}
@@ -278,7 +314,7 @@ function AppContent() {
             <Route
               path="/dashboard"
               element={
-                <AppLayout>
+                <AppLayout onNewCalendar={openCreateCalendarDialog}>
                   <Home
                     calendars={calendars}
                     onToggleTheme={toggleColorMode}
@@ -299,7 +335,7 @@ function AppContent() {
                   title="Access Your Trading Calendar"
                   subtitle="Sign in to view and manage your trades"
                 >
-                  <AppLayout>
+                  <AppLayout onNewCalendar={openCreateCalendarDialog}>
                     <CalendarRoute
                       calendars={calendars}
                       onToggleTheme={toggleColorMode}
@@ -320,8 +356,11 @@ function AppContent() {
                   title="View Performance"
                   subtitle="Sign in to view your trading performance"
                 >
-                  <AppLayout>
-                    <PerformancePage onUpdateCalendar={handleUpdateCalendar} />
+                  <AppLayout onNewCalendar={openCreateCalendarDialog}>
+                    <PerformancePage
+                      onUpdateCalendar={handleUpdateCalendar}
+                      onCreateCalendar={openCreateCalendarDialog}
+                    />
                   </AppLayout>
                 </ProtectedRoute>
               }
@@ -333,7 +372,7 @@ function AppContent() {
                   title="Chat with Orion"
                   subtitle="Sign in to use the assistant"
                 >
-                  <AppLayout>
+                  <AppLayout onNewCalendar={openCreateCalendarDialog}>
                     <AssistantPage />
                   </AppLayout>
                 </ProtectedRoute>
@@ -346,7 +385,7 @@ function AppContent() {
                   title="View Notes"
                   subtitle="Sign in to access your notes"
                 >
-                  <AppLayout>
+                  <AppLayout onNewCalendar={openCreateCalendarDialog}>
                     <NotesPage />
                   </AppLayout>
                 </ProtectedRoute>
@@ -396,6 +435,20 @@ function AppContent() {
           </Routes>
         </Box>
       </Box>
+
+      {/* Global Create Calendar dialog — opened by side nav "+ New" and any
+          calendar lock overlay. Single instance shared across routes. */}
+      {user && (
+        <CalendarFormDialog
+          open={isCreateDialogOpen}
+          onClose={() => setIsCreateDialogOpen(false)}
+          onSubmit={handleCreateCalendarSubmit}
+          isSubmitting={isCreatingCalendar}
+          mode="create"
+          title="Create Calendar"
+          submitButtonText="Create"
+        />
+      )}
     </ThemeProvider>
   );
 }
