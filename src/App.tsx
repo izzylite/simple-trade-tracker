@@ -25,6 +25,7 @@ import AppLoadingProgress from './components/AppLoadingProgress';
 import AppHeader from './components/common/AppHeader';
 import AppLayout from './components/layout/AppLayout';
 import CalendarFormDialog, { CalendarFormData } from './components/CalendarFormDialog';
+import CalendarLockedOverlay from './components/calendars/CalendarLockedOverlay';
 
 // Lazy load page components from pages directory
 const Home = lazy(() => import('./pages/HomePage'));
@@ -47,6 +48,11 @@ const NotesPage = lazy(() => import('./pages/NotesPage'));
 
 // Loading component for Suspense
 const LoadingFallback = () => <AppLoadingProgress />;
+
+// Persists the last calendar the user opened so the / resolver can route
+// them back to it across sessions. CalendarRoute writes; HomeRouteResolver
+// reads.
+const LAST_ACTIVE_CALENDAR_KEY = 'last_active_calendar_id';
 
 /**
  * Shared interface for calendar management props
@@ -294,38 +300,14 @@ function AppContent() {
               path="/"
               element={
                 user ? (
-                  <AppLayout onNewCalendar={openCreateCalendarDialog}>
-                    <Home
-                      calendars={calendars}
-                      onToggleTheme={toggleColorMode}
-                      mode={mode}
-                      isLoading={isLoadingCalendars}
-                      onCreateCalendar={handleCreateCalendar}
-                      onDuplicateCalendar={handleDuplicateCalendar}
-                      onDeleteCalendar={handleDeleteCalendar}
-                      onUpdateCalendar={handleUpdateCalendar}
-                    />
-                  </AppLayout>
+                  <HomeRouteResolver
+                    calendars={calendars}
+                    isLoadingCalendars={isLoadingCalendars}
+                    onCreateCalendar={openCreateCalendarDialog}
+                  />
                 ) : (
                   <LandingPage />
                 )
-              }
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <AppLayout onNewCalendar={openCreateCalendarDialog}>
-                  <Home
-                    calendars={calendars}
-                    onToggleTheme={toggleColorMode}
-                    mode={mode}
-                    isLoading={isLoadingCalendars}
-                    onCreateCalendar={handleCreateCalendar}
-                    onDuplicateCalendar={handleDuplicateCalendar}
-                    onDeleteCalendar={handleDeleteCalendar}
-                    onUpdateCalendar={handleUpdateCalendar}
-                  />
-                </AppLayout>
               }
             />
             <Route
@@ -464,6 +446,72 @@ const ScrollToTop: React.FC = () => {
   return null;
 };
 
+interface HomeRouteResolverProps {
+  calendars: Calendar[];
+  isLoadingCalendars: boolean;
+  onCreateCalendar: () => void;
+}
+
+/**
+ * Auth landing for "/". Routes the user to the most appropriate calendar:
+ *  - prefers the last calendar they opened (localStorage)
+ *  - falls back to the most recently updated non-trashed calendar
+ *  - if zero calendars exist, renders the AppLayout shell with the lock
+ *    overlay so the user can create one without leaving "/"
+ *
+ * Phase 8 replaces the previous "/ -> HomePage" wiring; HomePage itself
+ * goes away in phase 9.
+ */
+const HomeRouteResolver: React.FC<HomeRouteResolverProps> = ({
+  calendars,
+  isLoadingCalendars,
+  onCreateCalendar,
+}) => {
+  const activeCalendars = useMemo(
+    () => calendars.filter((c) => !c.deleted_at),
+    [calendars]
+  );
+
+  // Wait until calendars actually arrive before deciding. Without this we'd
+  // briefly render the lock overlay (or wrong-calendar redirect) on every
+  // cold load.
+  if (isLoadingCalendars && activeCalendars.length === 0) {
+    return <LoadingFallback />;
+  }
+
+  if (activeCalendars.length === 0) {
+    return (
+      <AppLayout onNewCalendar={onCreateCalendar}>
+        <Box sx={{ position: 'relative', minHeight: 'calc(100vh - 64px)' }}>
+          <CalendarLockedOverlay
+            onCreateCalendar={onCreateCalendar}
+            subtitle="Create a calendar to start tracking trades. The Home, Performance and Assistant sections unlock once one exists."
+          />
+        </Box>
+      </AppLayout>
+    );
+  }
+
+  let targetId: string | undefined;
+  try {
+    const stored = localStorage.getItem(LAST_ACTIVE_CALENDAR_KEY) || '';
+    if (stored && activeCalendars.some((c) => c.id === stored)) {
+      targetId = stored;
+    }
+  } catch {
+    // ignore disabled storage
+  }
+
+  if (!targetId) {
+    targetId = [...activeCalendars].sort(
+      (a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    )[0].id;
+  }
+
+  return <Navigate to={`/calendar/${targetId}`} replace />;
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -509,6 +557,18 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [calendarId]);
+
+  // Remember the last calendar the user actually opened so the / resolver
+  // can route them back here on subsequent visits.
+  useEffect(() => {
+    if (calendar?.id) {
+      try {
+        localStorage.setItem(LAST_ACTIVE_CALENDAR_KEY, calendar.id);
+      } catch {
+        // ignore storage failures
+      }
+    }
+  }, [calendar?.id]);
 
   if (!calendar) {
     // Active calendar is gone (deleted, soft-trashed, or URL points to a
