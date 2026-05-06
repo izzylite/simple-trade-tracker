@@ -22,10 +22,30 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 export const SIDE_NAV_WIDTH = 84;
 const APP_HEADER_HEIGHT = 64;
+const LAST_ACTIVE_CALENDAR_KEY = 'last_active_calendar_id';
+
+/**
+ * Resolve the destination for the Home nav item. CalendarRoute writes
+ * last_active_calendar_id whenever the user opens a calendar, so we can
+ * usually navigate straight there and avoid the "/ -> resolver -> Navigate"
+ * hop, which briefly unmounts TradeCalendarPage. If nothing is stored yet
+ * (or storage is disabled) fall back to "/" — the resolver picks the right
+ * calendar from there.
+ */
+const resolveHomePath = (): string => {
+  try {
+    const stored = localStorage.getItem(LAST_ACTIVE_CALENDAR_KEY);
+    if (stored) return `/calendar/${stored}`;
+  } catch {
+    // ignore
+  }
+  return '/';
+};
 
 interface NavItem {
   label: string;
-  path: string;
+  /** Static path, OR a function evaluated at click time (used by Home). */
+  path: string | (() => string);
   icon: React.ReactNode;
   /**
    * Match function — when provided, used instead of strict `path === pathname`.
@@ -37,7 +57,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   {
     label: 'Home',
-    path: '/',
+    path: resolveHomePath,
     icon: <HomeIcon />,
     match: (p) => p === '/' || p.startsWith('/calendar/') || p === '/dashboard',
   },
@@ -65,10 +85,13 @@ const SideNav: React.FC<SideNavProps> = ({
   const location = useLocation();
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
 
+  const resolvePath = (item: NavItem) =>
+    typeof item.path === 'function' ? item.path() : item.path;
+
   const isActive = (item: NavItem) =>
     item.match
       ? item.match(location.pathname)
-      : location.pathname === item.path;
+      : location.pathname === resolvePath(item);
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -160,9 +183,12 @@ const SideNav: React.FC<SideNavProps> = ({
     >
       <Stack spacing={0.25} sx={{ flex: 1, py: 1.5, px: 1 }}>
         {NAV_ITEMS.map((item) =>
-          renderItem(item.label, item.icon, () => handleNavigate(item.path), {
-            active: isActive(item),
-          })
+          renderItem(
+            item.label,
+            item.icon,
+            () => handleNavigate(resolvePath(item)),
+            { active: isActive(item) }
+          )
         )}
       </Stack>
 
