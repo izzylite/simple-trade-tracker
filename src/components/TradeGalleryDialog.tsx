@@ -45,7 +45,7 @@ import AIChatInterface, { QuestionTemplate } from './aiChat/AIChatInterface';
 import { useAuthState } from '../contexts/AuthStateContext';
 import Shimmer from './Shimmer';
 import EconomicEventDetailDialog from './economicCalendar/EconomicEventDetailDialog';
-import NoteEditorDialog from './notes/NoteEditorDialog';
+import NoteViewerPanel from './notes/NoteViewerPanel';
 import { logger } from '../utils/logger';
 import { Z_INDEX } from '../styles/zIndex';
 import { getTradeRepository } from '../services/calendarService';
@@ -290,9 +290,21 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
   const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
 
-  // Note editor dialog state
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
-  const [noteEditorOpen, setNoteEditorOpen] = useState(false);
+  // Note viewer panel state — replaces nested dialogs to avoid
+  // z-index conflicts with this gallery dialog.
+  const [viewerNote, setViewerNote] = useState<Note | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+
+  const handleOpenNote = useCallback((note: Note) => {
+    setViewerNote(note);
+    setViewerOpen(true);
+  }, []);
+
+  const handleCloseNoteViewer = useCallback(() => {
+    setViewerOpen(false);
+    // Clear note after slide-out animation finishes
+    window.setTimeout(() => setViewerNote(null), 300);
+  }, []);
 
   // Immersive mode state
   const [immersiveMode, setImmersiveMode] = useState(false);
@@ -307,7 +319,20 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   useEffect(() => {
     setActiveTab(aiOnlyMode ? 1 : 0);
     setShowHistoryView(false);
+    // Close note viewer panel — its content was tied to the
+    // previous trade's game plan / chat references.
+    setViewerOpen(false);
+    setViewerNote(null);
   }, [safeCurrentIndex, aiOnlyMode]);
+
+  // Clear panel state whenever the dialog closes so it doesn't
+  // re-appear stale on the next open with a different trade.
+  useEffect(() => {
+    if (!open) {
+      setViewerOpen(false);
+      setViewerNote(null);
+    }
+  }, [open]);
 
   // Initialize AI chat with trade-scoped context
   const aiChat = useAIChat({
@@ -554,7 +579,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           display: 'flex',
           flexDirection: 'column',
           backgroundColor: theme.palette.background.default,
-          overflow: 'hidden'
+          overflow: 'hidden',
+          position: 'relative'
         }
       }}
     >
@@ -760,14 +786,33 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         </IconButton>
       </Box>
 
+      {/* Body: flex row with main content (left) + slide-in note panel (right).
+          Header stays above this row at full width. */}
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'row',
+        flex: 1,
+        minHeight: 0,
+        overflow: 'hidden'
+      }}>
+      {/* Main content column — shrinks when note panel opens */}
+      <Box sx={{
+        flex: 1,
+        minWidth: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
+
       {/* Tab Content */}
       {/* Trade Details */}
-      <TabPanel value={activeTab} index={0}>
+      <TabPanel value={activeTab} index={0} fullHeight>
         <Box
           ref={scrollContainerRef}
           sx={{
+            flex: 1,
+            minHeight: 0,
             overflow: 'auto',
-            maxHeight: 'calc(90vh - 180px)',
             ...scrollbarStyles(theme)
           }}
         >
@@ -909,16 +954,18 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 onOpenGalleryMode: undefined
               }}
               showAIButton={false}
+              onOpenNote={handleOpenNote}
             />
           ) : null}
         </Box>
       </TabPanel>
 
-      <TabPanel value={activeTab} index={1}>
+      <TabPanel value={activeTab} index={1} fullHeight>
         {/* AI Assistant - Sliding Pager (Chat + History) */}
         <Box
           sx={{
-            height: 'calc(90vh - 180px)',
+            flex: 1,
+            minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -969,8 +1016,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 onNoteClick={(noteId, note) => {
                   logger.log('Note clicked:', noteId);
                   if (note) {
-                    setSelectedNote(note);
-                    setNoteEditorOpen(true);
+                    handleOpenNote(note);
                   } else {
                     logger.warn('Note not found in embedded notes:', noteId);
                   }
@@ -1132,6 +1178,16 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           </Box>
         </Box>
       </TabPanel>
+      </Box>{/* /Main content column */}
+
+      {/* Inline Note Viewer Panel — slides in from the right and
+          shrinks the main content. Read-only. */}
+      <NoteViewerPanel
+        open={viewerOpen}
+        onClose={handleCloseNoteViewer}
+        note={viewerNote}
+      />
+      </Box>{/* /Flex row */}
 
       {/* Economic Event Detail Dialog */}
       {selectedEvent && calendar && (
@@ -1374,54 +1430,6 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         </Box>
       )}
 
-      {/* Note Editor Dialog */}
-      {noteEditorOpen && selectedNote && calendarId && (
-        <NoteEditorDialog
-          open={noteEditorOpen}
-          onClose={() => {
-            setNoteEditorOpen(false);
-            setSelectedNote(null);
-          }}
-          note={selectedNote}
-          calendarId={calendarId}
-          availableTradeTags={calendar?.tags || []}
-          calendarNotes={calendar?.notes}
-          onSave={(updatedNote) => {
-            // Update the note in embedded notes across all messages
-            aiChat.setMessages(prevMessages =>
-              prevMessages.map(msg => {
-                if (msg.embeddedNotes && msg.embeddedNotes[updatedNote.id]) {
-                  return {
-                    ...msg,
-                    embeddedNotes: {
-                      ...msg.embeddedNotes,
-                      [updatedNote.id]: updatedNote
-                    }
-                  };
-                }
-                return msg;
-              })
-            );
-          }}
-          onDelete={(noteId) => {
-            // Remove the note from embedded notes across all messages
-            aiChat.setMessages(prevMessages =>
-              prevMessages.map(msg => {
-                if (msg.embeddedNotes && msg.embeddedNotes[noteId]) {
-                  const { [noteId]: _, ...remainingNotes } = msg.embeddedNotes;
-                  return {
-                    ...msg,
-                    embeddedNotes: remainingNotes
-                  };
-                }
-                return msg;
-              })
-            );
-            setNoteEditorOpen(false);
-            setSelectedNote(null);
-          }}
-        />
-      )}
     </Dialog>
   );
 };

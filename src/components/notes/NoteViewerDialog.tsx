@@ -1,6 +1,9 @@
 /**
  * NoteViewerDialog Component
- * Read-only dialog for viewing notes in shared calendars
+ * Read-only dialog for viewing notes. Used when the viewer must
+ * appear as a modal (e.g. from DayTradesContent's TradeDetailExpanded).
+ * For viewers nested inside other dialogs (e.g. TradeGalleryDialog),
+ * use NoteViewerPanel to avoid z-index stacking issues.
  */
 
 import React from 'react';
@@ -8,7 +11,6 @@ import {
   Dialog,
   DialogContent,
   IconButton,
-  Box,
   useTheme,
   alpha,
   Toolbar,
@@ -26,9 +28,7 @@ import {
 import { Note } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
-import { getTagDisplayLabel } from './NoteEditorDialog';
-import RichTextViewer from '../common/RichTextEditor/RichTextViewer';
-import { format } from 'date-fns';
+import NoteViewerContent from './NoteViewerContent';
 
 interface NoteViewerDialogProps {
   open: boolean;
@@ -46,12 +46,6 @@ const NoteViewerDialog: React.FC<NoteViewerDialogProps> = ({
 
   if (!note) return null;
 
-  const formattedDate = note.updated_at
-    ? format(new Date(note.updated_at), 'MMM d, yyyy')
-    : note.created_at
-      ? format(new Date(note.created_at), 'MMM d, yyyy')
-      : '';
-
   return (
     <Dialog
       open={open}
@@ -68,7 +62,6 @@ const NoteViewerDialog: React.FC<NoteViewerDialogProps> = ({
         },
       }}
     >
-      {/* Toolbar with title and close */}
       <Toolbar
         sx={{
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
@@ -111,79 +104,7 @@ const NoteViewerDialog: React.FC<NoteViewerDialogProps> = ({
           ...(scrollbarStyles(theme) as any),
         }}
       >
-        {/* Cover Image */}
-        {note.cover_image && (
-          <Box
-            sx={{
-              width: '100%',
-              height: 220,
-              backgroundImage: `url(${note.cover_image})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            }}
-          />
-        )}
-
-        {/* Content Area */}
-        <Box
-          sx={{
-            maxWidth: 800,
-            margin: '0 auto',
-            px: { xs: 2, md: 5 },
-            py: 4,
-          }}
-        >
-          {/* Tags */}
-          {note.tags && note.tags.length > 0 && (
-            <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mb: 2 }}>
-              {note.tags.map((tag) => (
-                <Chip
-                  key={tag}
-                  label={getTagDisplayLabel(tag)}
-                  size="small"
-                  sx={{
-                    bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                    color: 'secondary.main',
-                    fontWeight: 500,
-                    fontSize: '0.75rem',
-                    height: 24,
-                  }}
-                />
-              ))}
-            </Stack>
-          )}
-
-          {/* Title */}
-          <Typography
-            variant="h3"
-            sx={{
-              fontWeight: 700,
-              lineHeight: 1.2,
-              mb: 2,
-              wordBreak: 'break-word',
-            }}
-          >
-            {note.title || 'Untitled'}
-          </Typography>
-
-          {/* Date */}
-          {formattedDate && (
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 3, display: 'block' }}>
-              {note.updated_at ? 'Updated' : 'Created'} {formattedDate}
-            </Typography>
-          )}
-
-          {/* Content */}
-          <Box sx={{ mt: 3 }}>
-            {note.content ? (
-              <RichTextViewer content={note.content} />
-            ) : (
-              <Typography variant="body1" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                No content
-              </Typography>
-            )}
-          </Box>
-        </Box>
+        <NoteViewerContent note={note} />
       </DialogContent>
     </Dialog>
   );

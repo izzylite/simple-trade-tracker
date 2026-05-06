@@ -125,6 +125,9 @@ export function useBriefingEmbedded(
     Promise.all([tradesP, eventsP, notesP])
       .then(([tradeEntries, eventEntries, noteEntries]) => {
         if (cancelled) return;
+        logger.log('[useBriefingEmbedded] fetch result', {
+          tradeIds, tradeEntries: tradeEntries.map(e => e ? e[0] : null),
+        });
         if (tradeIds.length > 0) {
           setEmbeddedTrades(Object.fromEntries(tradeEntries.filter(Boolean) as Array<readonly [string, Trade]>));
         }

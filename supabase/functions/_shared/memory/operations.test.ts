@@ -323,6 +323,24 @@ Deno.test("ADD: appends and dedups against existing bullets", async () => {
   assertStringIncludes(client.store.notes[0].content, "72% wr on 15 trades");
 });
 
+Deno.test("ADD: full-dedup is signalled as NO-OP and skips audit row", async () => {
+  const client = new FakeClient();
+  seedMemory(client, "u1", "c1", {
+    PERFORMANCE_PATTERNS: ["London session: 72% wr on 15 trades [High] [2026-04]"],
+  });
+  const result = await updateMemory(asClient(client), "u1", "c1", {
+    op: "ADD",
+    section: "PERFORMANCE_PATTERNS",
+    new_insights: ["London 72% wr [High] [2026-04]"], // near-dup of seeded bullet
+  });
+  // Loud no-op signal so Gemini doesn't tell the user "I logged that".
+  assertStringIncludes(result, "NO-OP");
+  assertStringIncludes(result, "Memory unchanged");
+  // The phantom audit row would mislead the Memory Logs panel — verify
+  // we suppressed it.
+  assertEquals(client.store.audit.length, 0);
+});
+
 Deno.test("ADD: validation rejects empty new_insights", async () => {
   const client = new FakeClient();
   seedMemory(client, "u1", "c1", {});

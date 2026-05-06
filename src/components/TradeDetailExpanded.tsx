@@ -82,6 +82,13 @@ interface TradeDetailExpandedProps {
   trades?: Array<{ id: string;[key: string]: any }>;
   tradeOperations: TradeOperationsProps;
   showAIButton?: boolean;
+  /**
+   * When provided, game-plan note clicks bubble up to the parent
+   * instead of opening a local NoteViewerDialog. Used by
+   * TradeGalleryDialog so the parent can render an inline panel
+   * (avoiding nested-dialog z-index conflicts).
+   */
+  onOpenNote?: (note: Note) => void;
 }
 
 // Define shimmer animation
@@ -124,7 +131,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   animate,
   trades,
   tradeOperations,
-  showAIButton = true
+  showAIButton = true,
+  onOpenNote
 }) => {
   // Destructure from tradeOperations directly
   const {
@@ -364,14 +372,19 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     }
   };
 
-  // Open game plan note viewer dialog
+  // Open game plan note viewer — defers to parent (panel) when
+  // onOpenNote is provided, otherwise falls back to the local dialog.
   const handleOpenGamePlan = async () => {
     let notes = gamePlanNotes;
     if (notes.length === 0 && !loadingGamePlan) {
       notes = await fetchGamePlanNotes();
     }
     if (notes.length > 0) {
-      setGamePlanViewNote(notes[0]);
+      if (onOpenNote) {
+        onOpenNote(notes[0]);
+      } else {
+        setGamePlanViewNote(notes[0]);
+      }
     }
   };
 
@@ -1484,11 +1497,13 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   return (
     <>
       {content}
-      <NoteViewerDialog
-        open={!!gamePlanViewNote}
-        onClose={() => setGamePlanViewNote(null)}
-        note={gamePlanViewNote}
-      />
+      {!onOpenNote && (
+        <NoteViewerDialog
+          open={!!gamePlanViewNote}
+          onClose={() => setGamePlanViewNote(null)}
+          note={gamePlanViewNote}
+        />
+      )}
     </>
   );
 };

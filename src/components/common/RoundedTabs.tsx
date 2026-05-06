@@ -20,18 +20,47 @@ interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
+  /**
+   * When true, the active panel becomes a flex-column that fills its
+   * parent's remaining height. Children can use `flex: 1` to take all
+   * available space (useful inside flex-constrained dialogs/panels).
+   * Opt-in to avoid affecting existing block-layout call sites.
+   */
+  fullHeight?: boolean;
 }
 
-export const TabPanel: React.FC<TabPanelProps> = ({ children, value, index, ...other }) => {
+export const TabPanel: React.FC<TabPanelProps> = ({
+  children,
+  value,
+  index,
+  fullHeight = false,
+  ...other
+}) => {
+  const active = value === index;
   return (
     <div
       role="tabpanel"
-      hidden={value !== index}
+      hidden={!active}
       id={`rounded-tabpanel-${index}`}
       aria-labelledby={`rounded-tab-${index}`}
+      style={
+        active && fullHeight
+          ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }
+          : undefined
+      }
       {...other}
     >
-      {value === index && <Box>{children}</Box>}
+      {active && (
+        <Box
+          sx={
+            fullHeight
+              ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }
+              : undefined
+          }
+        >
+          {children}
+        </Box>
+      )}
     </div>
   );
 };

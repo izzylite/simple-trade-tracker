@@ -30,6 +30,14 @@ import {
   recordEvent,
   updateMemory,
 } from "../_shared/memory/index.ts";
+import {
+  INSTRUMENT_CATALOG,
+  type InstrumentCatalogEntry,
+  isBriefingCurrency,
+  matchInstrumentCatalog,
+  resolveInstrumentInput,
+  VALID_BRIEFING_CURRENCIES,
+} from "../_shared/instruments.ts";
 
 /**
  * Per-call context passed by edge-function entrypoints into the tool
@@ -736,10 +744,34 @@ Results include: title, significance (low/medium/high), task type, plain-text bo
           'Optional filter by task type. Use when the user asks about a specific type, e.g. "what did you tell me in the weekly review".',
         enum: ["market_research", "daily_analysis", "weekly_review", "monthly_rollup"],
       },
+      instrument: {
+        type: "string",
+        description:
+          'Optional filter — only applies to market_research briefings. ' +
+          'Daily/weekly/monthly briefings lack instrument metadata and are ' +
+          'silently excluded when this is set, so do NOT use this with ' +
+          'task_type="daily_analysis"/"weekly_review"/"monthly_rollup".\n\n' +
+          'Pass ANY of:\n' +
+          '- A 3-letter currency code: "EUR", "USD", "GBP", "JPY"… → broad match across every briefing exposed to that currency.\n' +
+          '- A natural instrument name: "DXY", "gold", "EUR/USD", "Bitcoin", "S&P 500" → narrow match to that specific instrument.\n' +
+          '- A Yahoo Finance symbol: "DX-Y.NYB", "GC=F", "EURUSD=X", "BTC-USD" → exact symbol match.\n' +
+          '- An informal alias: "yen"→JPY, "pound"/"sterling"→GBP, "euro"→EUR, "dollar"/"buck"→USD, "swissie"→CHF, "loonie"→CAD, "aussie"→AUD, "kiwi"→NZD, "spx"/"es"→S&P 500, "nq"/"ndx"→Nasdaq, "ym"→Dow, "rty"→Russell, "cable"→GBP/USD, "10y"/"2y"/"30y"→US Treasury yields.\n\n' +
+          'The tool routes the input internally — currency-broad vs instrument-specific is automatic. Use the form the user actually said. Match is case-insensitive.',
+      },
       since_hours: {
         type: "number",
         description:
-          "Optional: only return briefings from the last N hours. E.g. 24 for today, 168 for the past week. Default is 72 (past 3 days).",
+          "Optional: only return briefings from the last N hours. E.g. 2 for the past 2 hours, 24 for today. Default is 72 (past 3 days). Ignored when since_date is provided.",
+      },
+      since_date: {
+        type: "string",
+        description:
+          'Optional ISO date string (YYYY-MM-DD). Return briefings on or after this date. Use when the user references a specific historical date, e.g. "Monday two weeks ago". Takes precedence over since_hours when provided.',
+      },
+      until_date: {
+        type: "string",
+        description:
+          'Optional ISO date string (YYYY-MM-DD). Return briefings strictly before this date. Pair with since_date to target a single day, e.g. since_date:"2026-04-20", until_date:"2026-04-21".',
       },
       limit: {
         type: "number",
@@ -1916,10 +1948,52 @@ export async function getRecentOrionBriefings(
   taskType?: string,
   sinceHours: number = 72,
   limit: number = 10,
+  sinceDate?: string,
+  untilDate?: string,
+  instrument?: string,
 ): Promise<string> {
   try {
     const boundedLimit = Math.max(1, Math.min(30, Math.floor(limit)));
-    const sinceIso = new Date(Date.now() - sinceHours * 3600 * 1000).toISOString();
+    // Date strings take precedence over sinceHours when provided.
+    const sinceIso = sinceDate
+      ? new Date(sinceDate).toISOString()
+      : new Date(Date.now() - sinceHours * 3600 * 1000).toISOString();
+
+    // Route the single `instrument` filter to currency-broad or
+    // instrument-specific matching. Currency codes take the broad path (DB
+    // filter on metadata.currencies); everything else resolves through the
+    // YAHOO_SYMBOL_CATALOG mirror to one or more exact symbols, which are
+    // then DB-filtered against metadata.symbols.
+    type FilterMode = "currency" | "instrument";
+    let filterMode: FilterMode | undefined;
+    let normalizedCurrency: string | undefined;
+    let instrumentMatches: InstrumentCatalogEntry[] = [];
+
+    if (instrument) {
+      // Expand informal aliases ("yen" → "JPY", "ES" → "^GSPC", etc.) before
+      // routing so the alias survives both the currency check and catalog
+      // match. Inputs without an alias pass through unchanged.
+      const resolved = resolveInstrumentInput(instrument);
+      if (isBriefingCurrency(resolved)) {
+        filterMode = "currency";
+        normalizedCurrency = resolved.toUpperCase();
+      } else {
+        instrumentMatches = matchInstrumentCatalog(resolved);
+        if (instrumentMatches.length === 0) {
+          const validCurrencies = Array.from(VALID_BRIEFING_CURRENCIES).join(", ");
+          const sample = INSTRUMENT_CATALOG.slice(0, 10)
+            .map((e) => `${e.label} (${e.symbol})`)
+            .join(", ");
+          return (
+            `Unknown instrument "${instrument}". Pass either a currency code ` +
+            `(${validCurrencies}) for broad matching, a natural name ` +
+            `("DXY", "gold", "EUR/USD", "Bitcoin"), or a Yahoo symbol ` +
+            `("DX-Y.NYB", "GC=F", "EURUSD=X"). Examples: ${sample}.`
+          );
+        }
+        filterMode = "instrument";
+      }
+    }
 
     let query = supabase
       .from("orion_task_results")
@@ -1935,8 +2009,41 @@ export async function getRecentOrionBriefings(
       .order("created_at", { ascending: false })
       .limit(boundedLimit);
 
+    if (untilDate) {
+      query = query.lt("created_at", new Date(untilDate).toISOString());
+    }
+
     if (taskType) {
       query = query.eq("task_type", taskType);
+    }
+
+    if (filterMode === "currency" && normalizedCurrency) {
+      // metadata->currencies is a JSONB array; @> checks containment.
+      query = query.filter(
+        "metadata",
+        "cs",
+        JSON.stringify({ currencies: [normalizedCurrency] }),
+      );
+    }
+
+    if (filterMode === "instrument") {
+      // matchInstrumentCatalog already resolved input to exact catalog entries,
+      // so we have specific symbol strings — no substring matching needed.
+      // Single match: one cs filter. Multiple matches: OR them together.
+      // Single-element JSON arrays have no commas, so the values are safe in
+      // PostgREST's or-expression syntax without extra quoting.
+      if (instrumentMatches.length === 1) {
+        query = query.filter(
+          "metadata",
+          "cs",
+          JSON.stringify({ symbols: [instrumentMatches[0].symbol] }),
+        );
+      } else {
+        const orParts = instrumentMatches.map(
+          (m) => `metadata.cs.${JSON.stringify({ symbols: [m.symbol] })}`,
+        );
+        query = query.or(orParts.join(","));
+      }
     }
 
     const { data, error } = await query;
@@ -1947,8 +2054,25 @@ export async function getRecentOrionBriefings(
     }
 
     const rows = data ?? [];
+
     if (rows.length === 0) {
-      return `No Orion briefings found in the last ${sinceHours} hours${
+      const rangeDesc = sinceDate
+        ? `between ${sinceDate}${untilDate ? ` and ${untilDate}` : " and now"}`
+        : `in the last ${sinceHours} hours`;
+
+      if (filterMode === "currency") {
+        return `No market research briefings found exposing currency "${normalizedCurrency}" ${rangeDesc}. Try widening the date range.`;
+      }
+
+      if (filterMode === "instrument") {
+        const matchSummary = instrumentMatches
+          .slice(0, 5)
+          .map((m) => `${m.label} (${m.symbol})`)
+          .join(", ");
+        return `No market research briefings found covering "${instrument}" ${rangeDesc}. Recognized as: ${matchSummary}. The user may not have had this instrument in their watchlist when briefings ran — try widening the date range or omitting the instrument filter.`;
+      }
+
+      return `No Orion briefings found ${rangeDesc}${
         taskType ? ` for task type "${taskType}"` : ""
       }.`;
     }
@@ -2826,12 +2950,18 @@ export async function executeCustomTool(
           ? args.since_hours
           : 72;
         const limit = typeof args.limit === "number" ? args.limit : 10;
+        const sinceDate = typeof args.since_date === "string" ? args.since_date : undefined;
+        const untilDate = typeof args.until_date === "string" ? args.until_date : undefined;
+        const instrument = typeof args.instrument === "string" ? args.instrument : undefined;
         return await getRecentOrionBriefings(
           supabase,
           userId,
           taskType,
           sinceHours,
           limit,
+          sinceDate,
+          untilDate,
+          instrument,
         );
       }
 

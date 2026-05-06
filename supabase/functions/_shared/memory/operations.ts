@@ -257,17 +257,35 @@ function applyAdd(
   // deduplicateInsights preserves input order, so the genuinely-new bullets
   // are the tail of `deduped` past the original section length.
   const addedBullets = deduped.slice(before.length);
+  // No-op path: every supplied insight was a near-duplicate of an existing
+  // bullet (or of an earlier insight in the same call). Memory is unchanged.
+  // We make this loud in the summary so the model doesn't tell the user
+  // "I logged that" — and we suppress the audit row downstream so the
+  // Memory Logs panel doesn't show a phantom ADD with no after_text.
+  if (added === 0) {
+    return {
+      ok: true,
+      result: {
+        sections: next,
+        beforeText: null,
+        afterText: null,
+        matchScore: null,
+        summary:
+          `ADD: NO-OP — all ${insights.length} insight(s) were near-duplicates of existing bullets in ${section}. Memory unchanged. If you intended to revise an existing bullet, use op="UPDATE" with target_text instead.`,
+      },
+    };
+  }
   return {
     ok: true,
     result: {
       sections: next,
       beforeText: null,
-      afterText: addedBullets.length > 0
-        ? addedBullets.map((b) => `- ${b}`).join("\n")
-        : null,
+      afterText: addedBullets.map((b) => `- ${b}`).join("\n"),
       matchScore: null,
       summary:
-        `ADD: appended ${added} insight(s) to ${section} (${insights.length - added} dedup'd).`,
+        `ADD: appended ${added} insight(s) to ${section}${
+          insights.length - added > 0 ? ` (${insights.length - added} dedup'd)` : ""
+        }.`,
     },
   };
 }
@@ -602,8 +620,13 @@ export async function updateMemory(
       return `Memory update aborted: another session modified memory while this op was being applied. Re-read memory and try again with the current state.`;
     }
 
-    // -------- 8. Audit (destructive ops only, best-effort) --------
-    if (AUDITED_MEMORY_OPS.has(op)) {
+    // -------- 8. Audit (best-effort) --------
+    // Skip when the op was a no-op against the underlying memory note —
+    // applyAdd signals this by returning afterText=null when every supplied
+    // insight was deduplicated. A phantom audit row would mislead the
+    // Memory Logs panel into showing an ADD that never changed anything.
+    const isNoOpAdd = op === "ADD" && afterText === null;
+    if (AUDITED_MEMORY_OPS.has(op) && !isNoOpAdd) {
       await writeAuditEntry(supabase, {
         user_id: userId,
         calendar_id: calendarId,

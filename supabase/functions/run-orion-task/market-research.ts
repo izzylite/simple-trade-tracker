@@ -257,6 +257,18 @@ export async function handleMarketResearch(
     result.metadata = { ...result.metadata, citations };
   }
 
+  // currencies (derived) keeps powering economic-event matching. symbols/
+  // instruments preserve instrument-level identity so Orion can answer "what
+  // happened to DXY/gold/EUR-USD on date X" — the currency derivation alone
+  // collapses many distinct instruments into the same currency bucket.
+  const currencies = userSymbols.length > 0 ? symbolsToCurrencies(userSymbols) : ['USD'];
+  result.metadata = {
+    ...result.metadata,
+    currencies,
+    symbols: userSymbols,
+    instruments: userSymbols.length > 0 ? symbolsToReadableNames(userSymbols) : [],
+  };
+
   return result;
 }
 
