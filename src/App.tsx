@@ -23,6 +23,7 @@ import AppLoadingProgress from './components/AppLoadingProgress';
 
 
 import AppHeader from './components/common/AppHeader';
+import AppLayout from './components/layout/AppLayout';
 
 // Lazy load page components from pages directory
 const Home = lazy(() => import('./pages/HomePage'));
@@ -37,6 +38,9 @@ const SharedNotePage = lazy(
 const AuthCallback = lazy(() => import('./pages/AuthCallbackPage'));
 const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
+const PerformancePage = lazy(() => import('./pages/PerformancePage'));
+const AssistantPage = lazy(() => import('./pages/AssistantPage'));
+const NotesPage = lazy(() => import('./pages/NotesPage'));
 // const SupabaseAuthTest = lazy(() => import('./components/auth/SupabaseAuthTest')); // Commented out - for testing only
 
 
@@ -254,6 +258,27 @@ function AppContent() {
               path="/"
               element={
                 user ? (
+                  <AppLayout>
+                    <Home
+                      calendars={calendars}
+                      onToggleTheme={toggleColorMode}
+                      mode={mode}
+                      isLoading={isLoadingCalendars}
+                      onCreateCalendar={handleCreateCalendar}
+                      onDuplicateCalendar={handleDuplicateCalendar}
+                      onDeleteCalendar={handleDeleteCalendar}
+                      onUpdateCalendar={handleUpdateCalendar}
+                    />
+                  </AppLayout>
+                ) : (
+                  <LandingPage />
+                )
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <AppLayout>
                   <Home
                     calendars={calendars}
                     onToggleTheme={toggleColorMode}
@@ -264,24 +289,7 @@ function AppContent() {
                     onDeleteCalendar={handleDeleteCalendar}
                     onUpdateCalendar={handleUpdateCalendar}
                   />
-                ) : (
-                  <LandingPage />
-                )
-              }
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <Home
-                  calendars={calendars}
-                  onToggleTheme={toggleColorMode}
-                  mode={mode}
-                  isLoading={isLoadingCalendars}
-                  onCreateCalendar={handleCreateCalendar}
-                  onDuplicateCalendar={handleDuplicateCalendar}
-                  onDeleteCalendar={handleDeleteCalendar}
-                  onUpdateCalendar={handleUpdateCalendar}
-                />
+                </AppLayout>
               }
             />
             <Route
@@ -291,15 +299,56 @@ function AppContent() {
                   title="Access Your Trading Calendar"
                   subtitle="Sign in to view and manage your trades"
                 >
-                  <CalendarRoute
-                    calendars={calendars}
-                    onToggleTheme={toggleColorMode}
-                    mode={mode}
-                    setLoading={setLoading}
-                    onDuplicateCalendar={handleDuplicateCalendar}
-                    onDeleteCalendar={handleDeleteCalendar}
-                    onUpdateCalendar={handleUpdateCalendar}
-                  />
+                  <AppLayout>
+                    <CalendarRoute
+                      calendars={calendars}
+                      onToggleTheme={toggleColorMode}
+                      mode={mode}
+                      setLoading={setLoading}
+                      onDuplicateCalendar={handleDuplicateCalendar}
+                      onDeleteCalendar={handleDeleteCalendar}
+                      onUpdateCalendar={handleUpdateCalendar}
+                    />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/performance"
+              element={
+                <ProtectedRoute
+                  title="View Performance"
+                  subtitle="Sign in to view your trading performance"
+                >
+                  <AppLayout>
+                    <PerformancePage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/assistant"
+              element={
+                <ProtectedRoute
+                  title="Chat with Orion"
+                  subtitle="Sign in to use the assistant"
+                >
+                  <AppLayout>
+                    <AssistantPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notes"
+              element={
+                <ProtectedRoute
+                  title="View Notes"
+                  subtitle="Sign in to access your notes"
+                >
+                  <AppLayout>
+                    <NotesPage />
+                  </AppLayout>
                 </ProtectedRoute>
               }
             />
