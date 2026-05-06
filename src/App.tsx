@@ -266,83 +266,83 @@ function AppContent() {
           />
           <Routes>
             <Route path="/about" element={<AboutPage />} />
-            <Route
-              path="/"
-              element={
-                user ? (
-                  <HomeRouteResolver
-                    calendars={calendars}
-                    isLoadingCalendars={isLoadingCalendars}
-                    onCreateCalendar={openCreateCalendarDialog}
-                  />
-                ) : (
-                  <LandingPage />
-                )
-              }
-            />
-            <Route
-              path="/calendar/:calendarId"
-              element={
-                <ProtectedRoute
-                  title="Access Your Trading Calendar"
-                  subtitle="Sign in to view and manage your trades"
-                >
-                  <AppLayout onNewCalendar={openCreateCalendarDialog}>
-                    <CalendarRoute
+            {/* Auth-gated routes share a persistent AppLayout via a layout
+                route — AppLayout (and its SideNav) stay mounted across
+                navigation between Home / Performance / Assistant / Notes,
+                preventing the shell from blanking on each click. */}
+            {user ? (
+              <Route
+                element={<AppLayout onNewCalendar={openCreateCalendarDialog} />}
+              >
+                <Route
+                  path="/"
+                  element={
+                    <HomeRouteResolver
                       calendars={calendars}
-                      onToggleTheme={toggleColorMode}
-                      mode={mode}
-                      setLoading={setLoading}
-                      onDuplicateCalendar={handleDuplicateCalendar}
-                      onDeleteCalendar={handleDeleteCalendar}
-                      onUpdateCalendar={handleUpdateCalendar}
-                    />
-                  </AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/performance"
-              element={
-                <ProtectedRoute
-                  title="View Performance"
-                  subtitle="Sign in to view your trading performance"
-                >
-                  <AppLayout onNewCalendar={openCreateCalendarDialog}>
-                    <PerformancePage
-                      onUpdateCalendar={handleUpdateCalendar}
+                      isLoadingCalendars={isLoadingCalendars}
                       onCreateCalendar={openCreateCalendarDialog}
                     />
-                  </AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/assistant"
-              element={
-                <ProtectedRoute
-                  title="Chat with Orion"
-                  subtitle="Sign in to use the assistant"
-                >
-                  <AppLayout onNewCalendar={openCreateCalendarDialog}>
-                    <AssistantPage />
-                  </AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/notes"
-              element={
-                <ProtectedRoute
-                  title="View Notes"
-                  subtitle="Sign in to access your notes"
-                >
-                  <AppLayout onNewCalendar={openCreateCalendarDialog}>
-                    <NotesPage />
-                  </AppLayout>
-                </ProtectedRoute>
-              }
-            />
+                  }
+                />
+                <Route
+                  path="/calendar/:calendarId"
+                  element={
+                    <ProtectedRoute
+                      title="Access Your Trading Calendar"
+                      subtitle="Sign in to view and manage your trades"
+                    >
+                      <CalendarRoute
+                        calendars={calendars}
+                        onToggleTheme={toggleColorMode}
+                        mode={mode}
+                        setLoading={setLoading}
+                        onDuplicateCalendar={handleDuplicateCalendar}
+                        onDeleteCalendar={handleDeleteCalendar}
+                        onUpdateCalendar={handleUpdateCalendar}
+                      />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/performance"
+                  element={
+                    <ProtectedRoute
+                      title="View Performance"
+                      subtitle="Sign in to view your trading performance"
+                    >
+                      <PerformancePage
+                        onUpdateCalendar={handleUpdateCalendar}
+                        onCreateCalendar={openCreateCalendarDialog}
+                      />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/assistant"
+                  element={
+                    <ProtectedRoute
+                      title="Chat with Orion"
+                      subtitle="Sign in to use the assistant"
+                    >
+                      <AssistantPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/notes"
+                  element={
+                    <ProtectedRoute
+                      title="View Notes"
+                      subtitle="Sign in to access your notes"
+                    >
+                      <NotesPage />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
+            ) : (
+              <Route path="/" element={<LandingPage />} />
+            )}
             <Route
               path="/shared/:shareId"
               element={<SharedTradePage />}
@@ -451,14 +451,12 @@ const HomeRouteResolver: React.FC<HomeRouteResolverProps> = ({
 
   if (activeCalendars.length === 0) {
     return (
-      <AppLayout onNewCalendar={onCreateCalendar}>
-        <Box sx={{ position: 'relative', minHeight: 'calc(100vh - 64px)' }}>
-          <CalendarLockedOverlay
-            onCreateCalendar={onCreateCalendar}
-            subtitle="Create a calendar to start tracking trades. The Home, Performance and Assistant sections unlock once one exists."
-          />
-        </Box>
-      </AppLayout>
+      <Box sx={{ position: 'relative', minHeight: 'calc(100vh - 64px)' }}>
+        <CalendarLockedOverlay
+          onCreateCalendar={onCreateCalendar}
+          subtitle="Create a calendar to start tracking trades. The Home, Performance and Assistant sections unlock once one exists."
+        />
+      </Box>
     );
   }
 

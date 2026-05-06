@@ -1,10 +1,40 @@
-import React, { useState } from 'react';
-import { Box, IconButton, useTheme, useMediaQuery } from '@mui/material';
+import React, { useState, Suspense } from 'react';
+import {
+  Box,
+  IconButton,
+  CircularProgress,
+  useTheme,
+  useMediaQuery,
+} from '@mui/material';
 import { Menu as MenuIcon } from '@mui/icons-material';
+import { Outlet } from 'react-router-dom';
 import SideNav, { SIDE_NAV_WIDTH } from './SideNav';
 
+/**
+ * Inline loading state for the route content area only. Renders inside
+ * AppLayout's main slot so AppHeader + SideNav stay visible while a lazy
+ * page chunk loads.
+ */
+const RouteSuspenseFallback: React.FC = () => (
+  <Box
+    sx={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 'calc(100vh - 64px)',
+    }}
+  >
+    <CircularProgress size={28} />
+  </Box>
+);
+
 interface AppLayoutProps {
-  children: React.ReactNode;
+  /**
+   * Optional explicit content. When omitted, AppLayout renders the active
+   * nested route via <Outlet />, which is the preferred pattern — it lets
+   * the layout (and its SideNav) stay mounted across route changes.
+   */
+  children?: React.ReactNode;
   /** Forwarded to SideNav. Phase 7 wires this. */
   onNewCalendar?: () => void;
 }
@@ -59,7 +89,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
           width: { lg: `calc(100% - ${SIDE_NAV_WIDTH}px)` },
         }}
       >
-        {children}
+        {children ?? (
+          <Suspense fallback={<RouteSuspenseFallback />}>
+            <Outlet />
+          </Suspense>
+        )}
       </Box>
     </Box>
   );
