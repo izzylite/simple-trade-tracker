@@ -28,7 +28,6 @@ import CalendarFormDialog, { CalendarFormData } from './components/CalendarFormD
 import CalendarLockedOverlay from './components/calendars/CalendarLockedOverlay';
 
 // Lazy load page components from pages directory
-const Home = lazy(() => import('./pages/HomePage'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const TradeCalendar = lazy(() => import('./pages/TradeCalendarPage').then(module => ({ default: module.TradeCalendar })));
@@ -53,35 +52,6 @@ const LoadingFallback = () => <AppLoadingProgress />;
 // them back to it across sessions. CalendarRoute writes; HomeRouteResolver
 // reads.
 const LAST_ACTIVE_CALENDAR_KEY = 'last_active_calendar_id';
-
-/**
- * Shared interface for calendar management props
- * Used by HomePage
- */
-export interface CalendarManagementProps {
-  calendars: Calendar[];
-  onCreateCalendar: (
-    name: string,
-    account_balance: number,
-    max_daily_drawdown: number,
-    weeklyTarget?: number,
-    monthlyTarget?: number,
-    yearlyTarget?: number,
-    riskPerTrade?: number,
-    dynamic_risk_enabled?: boolean,
-    increased_risk_percentage?: number,
-    profit_threshold_percentage?: number,
-    heroImageUrl?: string,
-    heroImageAttribution?: any,
-    heroImagePosition?: string
-  ) => Promise<Calendar>;
-  onDuplicateCalendar: (sourceCalendarId: string, newName: string, includeContent?: boolean) => void;
-  onDeleteCalendar: (id: string) => void;
-  onUpdateCalendar: (id: string, updates: Partial<Calendar>) => void;
-  onToggleTheme: () => void;
-  mode: 'light' | 'dark';
-  isLoading?: boolean;
-}
 
 function AppContent() {
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
