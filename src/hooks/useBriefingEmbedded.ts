@@ -63,6 +63,7 @@ export function useBriefingEmbedded(
   const fetchedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    logger.log('[useBriefingEmbedded]', { enabled, tradeIds, eventIds, noteIds, htmlLen: html.length });
     if (!enabled) return;
 
     const hasRefs =
