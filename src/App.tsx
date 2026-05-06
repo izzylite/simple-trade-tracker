@@ -321,7 +321,7 @@ function AppContent() {
                   subtitle="Sign in to view your trading performance"
                 >
                   <AppLayout>
-                    <PerformancePage />
+                    <PerformancePage onUpdateCalendar={handleUpdateCalendar} />
                   </AppLayout>
                 </ProtectedRoute>
               }
