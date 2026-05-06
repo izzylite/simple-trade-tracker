@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation, useNavigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, Box, useMediaQuery } from '@mui/material';
+import { ThemeProvider, CssBaseline, Box } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { v4 as uuidv4 } from 'uuid';
-import { Trade, Calendar } from './types/dualWrite';
+import { Calendar } from './types/dualWrite';
 import { AuthProvider } from './contexts/SupabaseAuthContext';
 import { useAuthState, AuthStateProvider } from './contexts/AuthStateContext';
 import { TradeSyncProvider } from './contexts/TradeSyncContext';
@@ -13,10 +12,8 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
 import TradeLoadingIndicator from './components/TradeLoadingIndicator';
-import { useRealtimeSubscription } from './hooks/useRealtimeSubscription';
 import { useCalendars } from './hooks/useCalendars';
 import { logger } from './utils/logger';
-import { supabaseAuthService } from './services/supabaseAuthService';
 
 
 import AppLoadingProgress from './components/AppLoadingProgress';
@@ -54,8 +51,6 @@ const LoadingFallback = () => <AppLoadingProgress />;
 const LAST_ACTIVE_CALENDAR_KEY = 'last_active_calendar_id';
 
 function AppContent() {
-  const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
-
   // Initialize theme from localStorage or system preference
   const [mode, setMode] = useState<'light' | 'dark'>(() => {
     const savedMode = localStorage.getItem('themeMode');
