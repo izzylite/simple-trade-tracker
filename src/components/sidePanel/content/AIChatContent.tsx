@@ -754,7 +754,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            zIndex: 1
+            // Above the in-chat scroll-to-bottom button (zIndex 10) so it
+            // doesn't leak through this overlay.
+            zIndex: 20
           }}>
             {/* Search Bar with inline filter dropdown */}
             <Box sx={{ p: 2, pb: 1 }}>
@@ -1105,7 +1107,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
             backgroundColor: theme.palette.background.default,
             overflow: 'auto',
             ...scrollbarStyles(theme),
-            zIndex: 1
+            // Above the in-chat scroll-to-bottom button (zIndex 10) so it
+            // doesn't leak through this overlay.
+            zIndex: 20
           }}>
             <RemindersPanel
               onNavigateToConversation={(conversationId) => {
@@ -1124,7 +1128,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            zIndex: 1
+            // Above the in-chat scroll-to-bottom button (zIndex 10) so it
+            // doesn't leak through this overlay.
+            zIndex: 20
           }}>
             <MemoryLogsPanel calendarId={calendar?.id} />
           </Box>

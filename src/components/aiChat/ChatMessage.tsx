@@ -383,7 +383,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           >
             {showTimestamp && (
               <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>
-                {format(message.timestamp, 'HH:mm')}
+                {format(message.timestamp, 'h:mm aaa')}
               </Typography>
             )}
             {getStatusIcon()}
@@ -537,7 +537,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         >
           {showTimestamp && (
             <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>
-              {format(message.timestamp, 'HH:mm')}
+              {format(message.timestamp, 'h:mm aaa')}
             </Typography>
           )}
           {getStatusIcon()}

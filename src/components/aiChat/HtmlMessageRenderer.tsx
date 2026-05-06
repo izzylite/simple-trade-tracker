@@ -1,13 +1,20 @@
 /**
  * HTML Message Renderer Component
- * Safely renders HTML-formatted messages with proper styling
- * Supports inline trade, event, and note cards via HTML tags: <trade-ref id="xxx"/>, <event-ref id="xxx"/>, <note-ref id="xxx"/>
+ * Safely renders HTML-formatted messages with proper styling.
+ *
+ * Inline references (<trade-ref/>, <event-ref/>, <note-ref/>, <tag-chip>) are
+ * converted to placeholder <span data-orion-ref-*> elements before sanitize,
+ * the whole HTML is rendered once via dangerouslySetInnerHTML, and React
+ * chips are mounted into those spans via createPortal. This preserves true
+ * inline flow — a chip mid-paragraph stays mid-paragraph, with surrounding
+ * punctuation untouched. The previous "split at chip → emit a block per
+ * slice" approach broke paragraphs whenever a chip appeared inline.
  */
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Box,
-  Typography,
   Chip,
   useTheme,
   alpha
@@ -24,57 +31,57 @@ import type { EconomicEvent } from '../../types/economicCalendar';
 import type { Note } from '../../types/note';
 import { getTagChipStyles } from '../../utils/tagColors';
 
-// Parse <tag-chip>TagName</tag-chip> from an HTML string into inline sub-segments.
-// Pure function — no component dependencies.
-const parseTagChips = (htmlContent: string): Array<
-  { type: 'html-text'; content: string }
-  | { type: 'tag-chip'; tagName: string }
-> => {
-  const tagChipPattern = /<tag-chip>([\s\S]*?)<\/tag-chip>/g;
-  const subSegments: Array<
-    { type: 'html-text'; content: string }
-    | { type: 'tag-chip'; tagName: string }
-  > = [];
-  let lastIdx = 0;
-  let tagMatch;
+// Convert inline reference tags to placeholder <span> elements that survive
+// DOMPurify and can host React chips via createPortal. Spans render as
+// inline (zero width when empty) so they sit naturally between surrounding
+// prose words — chips appear exactly where Orion placed them.
+const escapeAttr = (s: string) =>
+  s.replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 
-  while ((tagMatch = tagChipPattern.exec(htmlContent)) !== null) {
-    if (tagMatch.index > lastIdx) {
-      subSegments.push({
-        type: 'html-text',
-        content: htmlContent.substring(lastIdx, tagMatch.index)
-      });
-    }
-
-    subSegments.push({
-      type: 'tag-chip',
-      tagName: tagMatch[1].trim()
-    });
-
-    lastIdx = tagMatch.index + tagMatch[0].length;
-  }
-
-  if (lastIdx < htmlContent.length) {
-    subSegments.push({
-      type: 'html-text',
-      content: htmlContent.substring(lastIdx)
-    });
-  }
-
-  return subSegments;
+const preprocessRefs = (html: string): string => {
+  return html
+    .replace(
+      /<trade-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/trade-ref>)?/g,
+      (_, id) => `<span data-orion-ref-type="trade" data-orion-ref-id="${escapeAttr(id)}"></span>`
+    )
+    .replace(
+      /<event-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/event-ref>)?/g,
+      (_, id) => `<span data-orion-ref-type="event" data-orion-ref-id="${escapeAttr(id)}"></span>`
+    )
+    .replace(
+      /<note-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/note-ref>)?/g,
+      (_, id) => `<span data-orion-ref-type="note" data-orion-ref-id="${escapeAttr(id)}"></span>`
+    )
+    .replace(
+      /<tag-chip>([\s\S]*?)<\/tag-chip>/g,
+      (_, name) => {
+        const tagName = name.replace(/<[^>]*>/g, '').trim();
+        if (!tagName) return '';
+        return `<span data-orion-ref-type="tag" data-orion-ref-name="${escapeAttr(tagName)}"></span>`;
+      }
+    );
 };
+
+interface PlaceholderInfo {
+  el: HTMLElement;
+  type: 'trade' | 'event' | 'note' | 'tag';
+  id?: string;
+  name?: string;
+}
 
 interface HtmlMessageRendererProps {
   html: string;
   textColor?: string;
-  // Embedded data for inline card replacement
   embeddedTrades?: Record<string, Trade>;
   embeddedEvents?: Record<string, EconomicEvent>;
   embeddedNotes?: Record<string, Note>;
   onTradeClick?: (tradeId: string, contextTrades: Trade[]) => void;
   onEventClick?: (event: EconomicEvent) => void;
   onNoteClick?: (noteId: string) => void;
-  trades?: Trade[]; // All trades for calculating event trade counts
+  trades?: Trade[];
 }
 
 const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
@@ -88,187 +95,101 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
   onNoteClick,
   trades = []
 }) => {
-  // Defensive default: briefings saved before content_html was made non-null
-  // (or any optimistic-update path that drops the field) would otherwise
-  // throw "Cannot read properties of undefined (reading 'replace')" inside
-  // the segment-parsing memo below. Treat a missing body as empty.
+  // Defensive default for legacy briefings saved before content_html was
+  // made non-null (otherwise this throws inside replace()).
   const safeHtml = typeof html === 'string' ? html : '';
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const [imageZoomProp, setImageZoomProp] = useState<ImageZoomProp | null>(null);
+  const [placeholders, setPlaceholders] = useState<PlaceholderInfo[]>([]);
 
-  // Create a map of live trades for O(1) lookup
+  // Live trades take precedence over embedded snapshots so chips reflect edits.
   const liveTradesMap = useMemo(() => {
     const map = new Map<string, Trade>();
-    trades.forEach(trade => {
-      map.set(trade.id, trade);
-    });
+    trades.forEach(trade => map.set(trade.id, trade));
     return map;
   }, [trades]);
 
-  // Merge embedded trades with live data - live data takes precedence
-  // This ensures trade cards update when trades are edited
   const mergedEmbeddedTrades = useMemo(() => {
     if (!embeddedTrades) return undefined;
-
     const merged: Record<string, Trade> = {};
     Object.entries(embeddedTrades).forEach(([tradeId, embeddedTrade]) => {
-      // Use live trade data if available, otherwise fall back to embedded snapshot
       const liveTrade = liveTradesMap.get(tradeId);
       merged[tradeId] = liveTrade || embeddedTrade;
     });
     return merged;
   }, [embeddedTrades, liveTradesMap]);
 
-
-
-  // Parse HTML into segments with inline cards
-  const contentSegments = useMemo(() => {
-    if (!embeddedTrades && !embeddedEvents && !embeddedNotes) {
-      // No inline cards needed, return single HTML segment
-      return [{ type: 'html' as const, content: safeHtml }];
-    }
-
-    const segments: Array<{ type: 'html' | 'trade' | 'event' | 'note'; content: string; id?: string }> = [];
-    let lastIndex = 0;
-    let workingHtml = safeHtml;
-
-    // Find all inline references (HTML tags: <trade-ref id="xxx"/>, <event-ref id="xxx"/>, <note-ref id="xxx"/>)
-    const references: Array<{ type: 'trade' | 'event' | 'note'; id: string; index: number; length: number }> = [];
-
-    // Find trade reference tags (self-closing or with closing tag)
-    const tradePattern = /<trade-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/trade-ref>)?/g;
-    let match;
-    while ((match = tradePattern.exec(workingHtml)) !== null) {
-      const tradeId = match[1];
-      if (embeddedTrades?.[tradeId]) {
-        references.push({
-          type: 'trade',
-          id: tradeId,
-          index: match.index,
-          length: match[0].length
-        });
-      }
-    }
-
-    // Find event reference tags
-    const eventPattern = /<event-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/event-ref>)?/g;
-    while ((match = eventPattern.exec(workingHtml)) !== null) {
-      const eventId = match[1];
-      if (embeddedEvents?.[eventId]) {
-        references.push({
-          type: 'event',
-          id: eventId,
-          index: match.index,
-          length: match[0].length
-        });
-      }
-    }
-
-    // Find note reference tags
-    const notePattern = /<note-ref\s+id="([a-zA-Z0-9-_]+)"(?:\s*\/)?>(?:<\/note-ref>)?/g;
-    while ((match = notePattern.exec(workingHtml)) !== null) {
-      const noteId = match[1];
-      if (embeddedNotes?.[noteId]) {
-        references.push({
-          type: 'note',
-          id: noteId,
-          index: match.index,
-          length: match[0].length
-        });
-      }
-    }
-
-    // Sort references by index
-    references.sort((a, b) => a.index - b.index);
-
-    // Build segments
-    references.forEach(ref => {
-      // Add HTML before this reference
-      if (ref.index > lastIndex) {
-        const htmlSegment = workingHtml.substring(lastIndex, ref.index);
-        if (htmlSegment.trim()) {
-          segments.push({ type: 'html', content: htmlSegment });
-        }
-      }
-
-      // Add card segment
-      segments.push({
-        type: ref.type,
-        content: '',
-        id: ref.id
-      });
-
-      lastIndex = ref.index + ref.length;
-    });
-
-    // Add remaining HTML
-    if (lastIndex < workingHtml.length) {
-      const htmlSegment = workingHtml.substring(lastIndex);
-      if (htmlSegment.trim()) {
-        segments.push({ type: 'html', content: htmlSegment });
-      }
-    }
-
-    return segments.length > 0 ? segments : [{ type: 'html' as const, content: safeHtml }];
-  }, [safeHtml, embeddedTrades, embeddedEvents, embeddedNotes]);
-
-  // Sanitize HTML segments.
-  // Note: <tag-chip> is intentionally absent from ALLOWED_TAGS — it is parsed
-  // out by parseTagChips() before sanitization runs.
-  const sanitizeHtml = (htmlContent: string) => {
+  // Preprocess refs → sanitize once. This single string is the rendered HTML.
+  // ADD_ATTR (vs ALLOWED_ATTR) extends the default allowlist instead of
+  // replacing it, and ALLOW_DATA_ATTR is set explicitly so the data-* attrs
+  // on our placeholder spans aren't stripped under any DOMPurify defaults.
+  const sanitizedHtml = useMemo(() => {
     const purify = DOMPurify(window);
-    return purify.sanitize(htmlContent, {
+    return purify.sanitize(preprocessRefs(safeHtml), {
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'span', 'div', 'img',
-        // Tables — needed for monthly rollup instrument rankings and any chat
-        // response that presents tabular data. Without these, the rows and
-        // cells get flattened into unreadable concatenated text.
         'table', 'thead', 'tbody', 'tr', 'th', 'td', 'caption'
       ],
-      ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style', 'src', 'alt', 'width', 'height'],
+      ADD_ATTR: ['data-orion-ref-type', 'data-orion-ref-id', 'data-orion-ref-name'],
+      ALLOW_DATA_ATTR: true,
       KEEP_CONTENT: true
     });
-  };
+  }, [safeHtml]);
 
-  // Extract image URLs for all HTML segments
-  const sanitizedHtml = useMemo(() => {
-    return contentSegments
-      .filter(seg => seg.type === 'html')
-      .map(seg => sanitizeHtml(seg.content))
-      .join('');
-  }, [contentSegments]);
+  // Stable object so React's dangerouslySetInnerHTML doesn't re-apply
+  // innerHTML when only `placeholders` state changes — re-application
+  // would destroy the placeholder DOM nodes our portals are mounted into.
+  const dangerousHtml = useMemo(
+    () => ({ __html: sanitizedHtml }),
+    [sanitizedHtml]
+  );
 
-  // Extract image URLs from sanitized HTML
+  // After every html change, re-find placeholder spans so portals can mount
+  // into the freshly inserted DOM. dangerouslySetInnerHTML replaces the
+  // subtree, so old placeholder refs are stale — we have to re-query.
+  // useLayoutEffect runs synchronously after DOM mutation but before paint,
+  // which avoids any flicker between the spans appearing and chips mounting.
+  useLayoutEffect(() => {
+    if (!containerRef.current) {
+      setPlaceholders([]);
+      return;
+    }
+    const els = containerRef.current.querySelectorAll<HTMLElement>(
+      '[data-orion-ref-type]'
+    );
+    const found: PlaceholderInfo[] = Array.from(els).map(el => ({
+      el,
+      type: el.getAttribute('data-orion-ref-type') as PlaceholderInfo['type'],
+      id: el.getAttribute('data-orion-ref-id') ?? undefined,
+      name: el.getAttribute('data-orion-ref-name') ?? undefined,
+    }));
+    setPlaceholders(found);
+  }, [sanitizedHtml]);
+
+  // Image URLs for the zoom dialog — parse from the same sanitized output
+  // so the indexes stay aligned with the DOM the user clicks.
   const imageUrls = useMemo(() => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(sanitizedHtml, 'text/html');
     const images = doc.querySelectorAll('img');
-    const urls = Array.from(images).map(img => img.src);
-    return urls;
+    return Array.from(images).map(img => img.src);
   }, [sanitizedHtml]);
 
-  // Use event delegation - attach ONE handler to container instead of individual images
-  // This way the handler persists even when images are re-rendered
+  // Image-click delegation. One handler on the container survives image
+  // re-renders; we walk imageUrls by index to find which one was clicked.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
-    // Handler attached to container that delegates to images
     const handleContainerClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-
-      // Check if clicked element is an image
       if (target.tagName === 'IMG') {
         e.preventDefault();
         e.stopPropagation();
-
-        // Find the index of this image
         const images = container.querySelectorAll('img');
         const index = Array.from(images).indexOf(target as HTMLImageElement);
-
         if (index !== -1) {
           const isAIChart = imageUrls[index]?.includes('quickchart.io');
           setImageZoomProp({
@@ -280,298 +201,168 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
         }
       }
     };
-
-    // Attach single handler to container
     container.addEventListener('click', handleContainerClick);
+    return () => container.removeEventListener('click', handleContainerClick);
+  }, [imageUrls]);
 
-    // Cleanup - remove handler when component unmounts
-    return () => {
-      container.removeEventListener('click', handleContainerClick);
-    };
-  }, [imageUrls]); // Only re-attach if imageUrls change
-
-  // Style images with cursor pointer
+  // Pointer/select styling on rendered images.
   useEffect(() => {
     if (!containerRef.current) return;
-
     const timeoutId = setTimeout(() => {
       if (!containerRef.current) return;
-
       const images = containerRef.current.querySelectorAll('img');
-      images.forEach((img) => {
+      images.forEach(img => {
         (img as HTMLImageElement).style.cursor = 'pointer';
         (img as HTMLImageElement).style.userSelect = 'none';
       });
     }, 100);
-
     return () => clearTimeout(timeoutId);
   }, [sanitizedHtml]);
 
-  // Render an HTML segment that may contain inline <tag-chip> tags
-  const renderHtmlWithTagChips = (
-    htmlContent: string,
-    segmentKey: string
-  ): React.ReactNode => {
-    const subSegments = parseTagChips(htmlContent);
+  // Build the chip element for a placeholder. Returns null when the
+  // referenced data isn't embedded (matches the previous behaviour where
+  // missing refs simply rendered nothing).
+  const renderChipFor = (p: PlaceholderInfo): React.ReactNode => {
+    if (p.type === 'trade' && p.id && mergedEmbeddedTrades?.[p.id]) {
+      const trade = mergedEmbeddedTrades[p.id];
+      const contextTrades = Object.values(mergedEmbeddedTrades);
+      const isWin = trade.trade_type === 'win';
+      const isLoss = trade.trade_type === 'loss';
+      const pnlColor = isWin ? '#4caf50' : isLoss ? '#f44336' : theme.palette.text.secondary;
+      const bgColor = isWin
+        ? alpha('#4caf50', 0.15)
+        : isLoss
+          ? alpha('#f44336', 0.15)
+          : alpha(theme.palette.text.primary, 0.08);
 
-    // No tag chips found — render as before
-    if (
-      subSegments.length === 1
-      && subSegments[0].type === 'html-text'
-    ) {
       return (
-        <Typography
-          key={segmentKey}
-          component="div"
+        <Chip
+          icon={isWin
+            ? <TrendingUpIcon sx={{ fontSize: '0.85rem !important', color: `${pnlColor} !important` }} />
+            : isLoss
+              ? <TrendingDownIcon sx={{ fontSize: '0.85rem !important', color: `${pnlColor} !important` }} />
+              : undefined}
+          label={`${trade.name || 'Trade'} ${isLoss ? '-' : '+'}$${Math.abs(trade.amount).toLocaleString()}`}
+          size="small"
+          onClick={() => onTradeClick?.(trade.id, contextTrades)}
           sx={{
-            color: textColor,
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            overflowWrap: 'anywhere'
-          }}
-          dangerouslySetInnerHTML={{
-            __html: sanitizeHtml(subSegments[0].content)
+            display: 'inline-flex',
+            verticalAlign: 'middle',
+            height: 22,
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            mx: 0.25,
+            backgroundColor: bgColor,
+            color: pnlColor,
+            cursor: 'pointer',
+            '&:hover': {
+              backgroundColor: isWin
+                ? alpha('#4caf50', 0.25)
+                : isLoss
+                  ? alpha('#f44336', 0.25)
+                  : alpha(theme.palette.text.primary, 0.15),
+            },
+            '& .MuiChip-icon': {
+              marginLeft: '4px',
+            },
           }}
         />
       );
     }
 
-    // Mixed content — render inline sub-segments
-    return (
-      <Typography
-        key={segmentKey}
-        component="div"
-        sx={{
-          color: textColor,
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
-          overflowWrap: 'anywhere'
-        }}
-      >
-        {subSegments.map((sub, subIdx) => {
-          if (sub.type === 'tag-chip') {
-            return (
-              <Chip
-                key={`${segmentKey}-chip-${subIdx}`}
-                label={sub.tagName}
-                size="small"
-                sx={{
-                  ...getTagChipStyles(sub.tagName, theme),
-                  display: 'inline-flex',
-                  verticalAlign: 'middle',
-                  height: 20,
-                  fontSize: '0.75rem',
-                  mx: 0.25,
-                  cursor: 'default',
-                }}
-              />
-            );
+    if (p.type === 'event' && p.id && embeddedEvents?.[p.id]) {
+      const event = embeddedEvents[p.id];
+      const impactColor = event.impact === 'High'
+        ? '#f44336'
+        : event.impact === 'Medium'
+          ? '#ff9800'
+          : '#4caf50';
+      return (
+        <Chip
+          label={
+            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+              {event.flag_url && (
+                <img
+                  src={event.flag_url}
+                  alt={event.currency}
+                  className="event-chip-flag"
+                  style={{
+                    width: 14,
+                    height: 10,
+                    minHeight: 'unset',
+                    maxHeight: 10,
+                    borderRadius: 1,
+                    objectFit: 'cover',
+                    display: 'inline-block',
+                    backgroundColor: 'transparent',
+                  }}
+                />
+              )}
+              <span>{event.event_name}</span>
+            </Box>
           }
+          size="small"
+          onClick={() => onEventClick?.(event)}
+          sx={{
+            display: 'inline-flex',
+            verticalAlign: 'middle',
+            height: 22,
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            mx: 0.25,
+            backgroundColor: alpha(impactColor, 0.12),
+            color: impactColor,
+            cursor: 'pointer',
+            '&:hover': { backgroundColor: alpha(impactColor, 0.22) },
+          }}
+        />
+      );
+    }
 
-          return (
-            <span
-              key={`${segmentKey}-text-${subIdx}`}
-              dangerouslySetInnerHTML={{
-                __html: sanitizeHtml(sub.content)
-              }}
-            />
-          );
-        })}
-      </Typography>
-    );
-  };
+    if (p.type === 'note' && p.id && embeddedNotes?.[p.id]) {
+      const note = embeddedNotes[p.id];
+      return (
+        <Chip
+          icon={<NoteIcon sx={{ fontSize: '0.85rem !important', color: 'inherit !important' }} />}
+          label={note.title || 'Note'}
+          size="small"
+          onClick={() => onNoteClick?.(p.id!)}
+          sx={{
+            display: 'inline-flex',
+            verticalAlign: 'middle',
+            height: 22,
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            mx: 0.25,
+            backgroundColor: alpha(theme.palette.info.main, 0.12),
+            color: theme.palette.info.main,
+            cursor: 'pointer',
+            '&:hover': { backgroundColor: alpha(theme.palette.info.main, 0.22) },
+            '& .MuiChip-icon': { marginLeft: '4px' },
+          }}
+        />
+      );
+    }
 
-  const renderContentSegments = () => {
-    const nodes: React.ReactNode[] = [];
-    let currentTradeNodes: React.ReactNode[] = [];
+    if (p.type === 'tag' && p.name) {
+      return (
+        <Chip
+          label={p.name}
+          size="small"
+          sx={{
+            ...getTagChipStyles(p.name, theme),
+            display: 'inline-flex',
+            verticalAlign: 'middle',
+            height: 20,
+            fontSize: '0.75rem',
+            mx: 0.25,
+            cursor: 'default',
+          }}
+        />
+      );
+    }
 
-    const flushTrades = () => {
-      if (currentTradeNodes.length === 0) return;
-
-      // Render trade chips inline
-      currentTradeNodes.forEach(node => nodes.push(node));
-      currentTradeNodes = [];
-    };
-
-    const hasTextContent = (htmlSegment: string) => {
-      const textOnly = htmlSegment
-        .replace(/<[^>]*>/g, '')
-        .replace(/&nbsp;/gi, ' ')
-        .trim();
-      return textOnly.length > 0;
-    };
-
-    contentSegments.forEach((segment, index) => {
-      if (segment.type === 'trade' && segment.id && mergedEmbeddedTrades?.[segment.id]) {
-        const trade = mergedEmbeddedTrades[segment.id];
-        const contextTrades = Object.values(mergedEmbeddedTrades);
-        const isWin = trade.trade_type === 'win';
-        const isLoss = trade.trade_type === 'loss';
-        const pnlColor = isWin ? '#4caf50' : isLoss ? '#f44336' : theme.palette.text.secondary;
-        const bgColor = isWin
-          ? alpha('#4caf50', 0.15)
-          : isLoss
-            ? alpha('#f44336', 0.15)
-            : alpha(theme.palette.text.primary, 0.08);
-
-        currentTradeNodes.push(
-          <Chip
-            key={`trade-${index}`}
-            icon={isWin
-              ? <TrendingUpIcon sx={{ fontSize: '0.85rem !important', color: `${pnlColor} !important` }} />
-              : isLoss
-                ? <TrendingDownIcon sx={{ fontSize: '0.85rem !important', color: `${pnlColor} !important` }} />
-                : undefined}
-            label={`${trade.name || 'Trade'} ${isLoss ? '-' : '+'}$${Math.abs(trade.amount).toLocaleString()}`}
-            size="small"
-            onClick={() => onTradeClick?.(trade.id, contextTrades)}
-            sx={{
-              display: 'inline-flex',
-              verticalAlign: 'middle',
-              height: 22,
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              mx: 0.25,
-              my: 0.25,
-              backgroundColor: bgColor,
-              color: pnlColor,
-              cursor: 'pointer',
-              '&:hover': {
-                backgroundColor: isWin
-                  ? alpha('#4caf50', 0.25)
-                  : isLoss
-                    ? alpha('#f44336', 0.25)
-                    : alpha(theme.palette.text.primary, 0.15),
-              },
-              '& .MuiChip-icon': {
-                marginLeft: '4px',
-              },
-            }}
-          />
-        );
-
-        return;
-      }
-
-      if (segment.type === 'html') {
-        const hasText = hasTextContent(segment.content);
-
-        // Only flush trades when this HTML has actual text content (e.g. section headers).
-        // Decorative HTML like <br> or empty <p> tags should not split trade groups.
-        if (hasText) {
-          flushTrades();
-        }
-
-        // Skip rendering segments that have no visible text content to avoid
-        // large blank gaps between sections.
-        if (!hasText) {
-          return;
-        }
-
-        nodes.push(
-          renderHtmlWithTagChips(segment.content, `html-${index}`)
-        );
-        return;
-      }
-
-      if (segment.type === 'event' && segment.id && embeddedEvents?.[segment.id]) {
-        flushTrades();
-
-        const event = embeddedEvents[segment.id];
-        const impactColor = event.impact === 'High'
-          ? '#f44336'
-          : event.impact === 'Medium'
-            ? '#ff9800'
-            : '#4caf50';
-
-        nodes.push(
-          <Chip
-            key={`event-${index}`}
-            label={
-              <Box component="span" sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 0.5,
-              }}>
-                {event.flag_url && (
-                  <img
-                    src={event.flag_url}
-                    alt={event.currency}
-                    className="event-chip-flag"
-                    style={{
-                      width: 14,
-                      height: 10,
-                      minHeight: 'unset',
-                      maxHeight: 10,
-                      borderRadius: 1,
-                      objectFit: 'cover',
-                      display: 'inline-block',
-                      backgroundColor: 'transparent',
-                    }}
-                  />
-                )}
-                <span>{event.event_name}</span>
-              </Box>
-            }
-            size="small"
-            onClick={() => onEventClick?.(event)}
-            sx={{
-              display: 'inline-flex',
-              verticalAlign: 'middle',
-              height: 22,
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              mx: 0.25,
-              my: 0.25,
-              backgroundColor: alpha(impactColor, 0.12),
-              color: impactColor,
-              cursor: 'pointer',
-              '&:hover': {
-                backgroundColor: alpha(impactColor, 0.22),
-              },
-            }}
-          />
-        );
-      }
-
-      if (segment.type === 'note' && segment.id && embeddedNotes?.[segment.id]) {
-        flushTrades();
-
-        const note = embeddedNotes[segment.id];
-        nodes.push(
-          <Chip
-            key={`note-${index}`}
-            icon={<NoteIcon sx={{ fontSize: '0.85rem !important', color: 'inherit !important' }} />}
-            label={note.title || 'Note'}
-            size="small"
-            onClick={() => onNoteClick?.(segment.id!)}
-            sx={{
-              display: 'inline-flex',
-              verticalAlign: 'middle',
-              height: 22,
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              mx: 0.25,
-              my: 0.25,
-              backgroundColor: alpha(theme.palette.info.main, 0.12),
-              color: theme.palette.info.main,
-              cursor: 'pointer',
-              '&:hover': {
-                backgroundColor: alpha(theme.palette.info.main, 0.22),
-              },
-              '& .MuiChip-icon': {
-                marginLeft: '4px',
-              },
-            }}
-          />
-        );
-      }
-    });
-
-    // Flush any remaining trades at the end
-    flushTrades();
-
-    return nodes;
+    return null;
   };
 
   return (
@@ -581,16 +372,15 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
         sx={{
           fontSize: '0.92rem',
           lineHeight: 1.8,
+          color: textColor,
+          wordBreak: 'break-word',
+          overflowWrap: 'anywhere',
           '& p': {
             margin: '0.75rem 0',
             lineHeight: 1.8
           },
-          '& strong': {
-            fontWeight: 600
-          },
-          '& em': {
-            fontStyle: 'italic'
-          },
+          '& strong': { fontWeight: 600 },
+          '& em': { fontStyle: 'italic' },
           '& h1, & h2, & h3, & h4, & h5, & h6': {
             margin: '1rem 0 0.5rem 0',
             fontWeight: 600
@@ -637,9 +427,7 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
             color: 'primary.main',
             textDecoration: 'underline',
             cursor: 'pointer',
-            '&:hover': {
-              opacity: 0.8
-            }
+            '&:hover': { opacity: 0.8 }
           },
           '& img:not(.event-chip-flag)': {
             maxWidth: '100%',
@@ -662,9 +450,6 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
             fontSize: '0.8em',
             verticalAlign: 'super'
           },
-          // Tables — used by monthly rollups for instrument rankings and by
-          // chat whenever Orion presents tabular data. Keep the styling tight
-          // so a table doesn't dominate a dense briefing/chat card.
           '& table': {
             width: '100%',
             borderCollapse: 'collapse',
@@ -680,14 +465,25 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
           '& th': {
             fontWeight: 600,
             backgroundColor: alpha(theme.palette.text.primary, 0.04)
+          },
+          // Empty placeholder spans should be inline & take no space until
+          // the React chip portal mounts inside them.
+          '& span[data-orion-ref-type]': {
+            display: 'inline'
           }
         }}
-      >
-        {/* Render segments (HTML and cards mixed) */}
-        {renderContentSegments()}
-      </Box>
+        dangerouslySetInnerHTML={dangerousHtml}
+      />
 
-      {/* Image Zoom Dialog */}
+      {/* Mount each chip into its placeholder span via portal so the chip
+          sits inside the original paragraph and stays inline with the
+          surrounding text. */}
+      {placeholders.map((p, i) => {
+        const chip = renderChipFor(p);
+        if (!chip) return null;
+        return <React.Fragment key={`portal-${i}`}>{createPortal(chip, p.el)}</React.Fragment>;
+      })}
+
       {imageZoomProp && (
         <ImageZoomDialog
           open={imageZoomOpen}
@@ -700,4 +496,3 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
 };
 
 export default HtmlMessageRenderer;
-
