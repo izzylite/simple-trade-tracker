@@ -32,6 +32,8 @@ import {
   Close as CloseIcon,
   PushPin as PinIcon,
   SmartToy as AIIcon,
+  StickyNote2 as EmptyIcon,
+  ErrorOutline as NotFoundIcon,
 } from '@mui/icons-material';
 
 import { Note } from '../../types/note';
@@ -50,8 +52,9 @@ interface NoteViewerPanelProps {
   /** Force the shimmer state — useful when caller is fetching from a
    *  non-id source (e.g. day-based game-plan query). */
   loading?: boolean;
-  /** Message rendered when the panel is open but has no content
-   *  (e.g. "No game plan available for this day"). */
+  /** Title for the empty-state placeholder. */
+  emptyTitle?: string;
+  /** Description rendered under the empty-state title. */
   emptyMessage?: string;
 }
 
@@ -61,6 +64,41 @@ interface NoteViewerPanelProps {
 // without content reflowing during the transition.
 const PANEL_WIDTH = { xs: '100%', sm: 'min(45%, 380px)' } as const;
 const INNER_WIDTH = { xs: '100%', sm: 'min(45vw, 380px)' } as const;
+
+interface PanelPlaceholderProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}
+
+const PanelPlaceholder: React.FC<PanelPlaceholderProps> = ({
+  icon,
+  title,
+  description,
+}) => (
+  <Box
+    sx={{
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      px: 4,
+      py: 6,
+      gap: 1.5,
+      color: 'text.secondary',
+    }}
+  >
+    <Box sx={{ opacity: 0.6, color: 'text.disabled' }}>{icon}</Box>
+    <Typography variant="subtitle1" sx={{ fontWeight: 600, color: 'text.primary' }}>
+      {title}
+    </Typography>
+    <Typography variant="body2" sx={{ maxWidth: 280 }}>
+      {description}
+    </Typography>
+  </Box>
+);
 
 const NoteViewerPanelShimmer: React.FC = () => (
   <Box>
@@ -97,6 +135,7 @@ const NoteViewerPanel: React.FC<NoteViewerPanelProps> = ({
   note,
   noteId,
   loading = false,
+  emptyTitle = 'Nothing to show',
   emptyMessage = 'No content available.',
 }) => {
   const theme = useTheme();
@@ -235,19 +274,19 @@ const NoteViewerPanel: React.FC<NoteViewerPanelProps> = ({
           {showShimmer ? (
             <NoteViewerPanelShimmer />
           ) : notFound ? (
-            <Box sx={{ p: 4, textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">
-                This note is unavailable. It may have been deleted.
-              </Typography>
-            </Box>
+            <PanelPlaceholder
+              icon={<NotFoundIcon sx={{ fontSize: 48 }} />}
+              title="Note unavailable"
+              description="This note may have been deleted or you no longer have access."
+            />
           ) : renderedNote ? (
             <NoteViewerContent note={renderedNote} />
           ) : (
-            <Box sx={{ p: 4, textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">
-                {emptyMessage}
-              </Typography>
-            </Box>
+            <PanelPlaceholder
+              icon={<EmptyIcon sx={{ fontSize: 48 }} />}
+              title={emptyTitle}
+              description={emptyMessage}
+            />
           )}
         </Box>
       </Box>

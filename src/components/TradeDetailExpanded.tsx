@@ -97,11 +97,11 @@ interface TradeDetailExpandedProps {
    * can open in a loading/shimmer state immediately. Pairs with
    * `onOpenNote`, which delivers the resolved note (or `null` if the
    * fetch finds nothing).
-   *
-   * @param emptyMessage - shown by the panel if the fetch resolves to
-   *                       no note (e.g. day has no game plan).
    */
-  onOpenNoteLoading?: (emptyMessage?: string) => void;
+  onOpenNoteLoading?: (opts?: {
+    emptyTitle?: string;
+    emptyMessage?: string;
+  }) => void;
 }
 
 // Define shimmer animation
@@ -397,7 +397,10 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
     // If we already have cached notes, skip the loading state.
     if (usePanel && cached.length === 0 && onOpenNoteLoading) {
-      onOpenNoteLoading('No game plan available for this day.');
+      onOpenNoteLoading({
+        emptyTitle: 'No game plan',
+        emptyMessage: 'No game plan available for this day.',
+      });
     }
 
     let notes = cached;

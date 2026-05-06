@@ -296,6 +296,9 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   const [viewerNoteId, setViewerNoteId] = useState<string | null>(null);
   const [viewerLoading, setViewerLoading] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerEmptyTitle, setViewerEmptyTitle] = useState<string>(
+    'Nothing to show'
+  );
   const [viewerEmptyMessage, setViewerEmptyMessage] = useState<string>(
     'No content available.'
   );
@@ -326,13 +329,17 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   // handleOpenNote when its async work completes (e.g. game plan
   // day-based query, where we don't know the id up front). The
   // optional emptyMessage is shown if the caller resolves to no note.
-  const handleOpenNoteLoading = useCallback((emptyMessage?: string) => {
-    setViewerNote(null);
-    setViewerNoteId(null);
-    setViewerLoading(true);
-    setViewerOpen(true);
-    if (emptyMessage) setViewerEmptyMessage(emptyMessage);
-  }, []);
+  const handleOpenNoteLoading = useCallback(
+    (opts?: { emptyTitle?: string; emptyMessage?: string }) => {
+      setViewerNote(null);
+      setViewerNoteId(null);
+      setViewerLoading(true);
+      setViewerOpen(true);
+      if (opts?.emptyTitle) setViewerEmptyTitle(opts.emptyTitle);
+      if (opts?.emptyMessage) setViewerEmptyMessage(opts.emptyMessage);
+    },
+    []
+  );
 
   const handleCloseNoteViewer = useCallback(() => {
     setViewerOpen(false);
@@ -1238,6 +1245,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         note={viewerNote}
         noteId={viewerNoteId}
         loading={viewerLoading}
+        emptyTitle={viewerEmptyTitle}
         emptyMessage={viewerEmptyMessage}
       />
       </Box>{/* /Flex row */}
