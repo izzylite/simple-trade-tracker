@@ -223,15 +223,6 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
   // referenced data isn't embedded (matches the previous behaviour where
   // missing refs simply rendered nothing).
   const renderChipFor = (p: PlaceholderInfo): React.ReactNode => {
-    if (p.type === 'trade') {
-      // eslint-disable-next-line no-console
-      console.log('[renderChipFor trade]', {
-        id: p.id,
-        hasMerged: !!mergedEmbeddedTrades,
-        hasEntry: !!(p.id && mergedEmbeddedTrades?.[p.id]),
-        embeddedKeys: mergedEmbeddedTrades ? Object.keys(mergedEmbeddedTrades) : null,
-      });
-    }
     if (p.type === 'trade' && p.id && mergedEmbeddedTrades?.[p.id]) {
       const trade = mergedEmbeddedTrades[p.id];
       const contextTrades = Object.values(mergedEmbeddedTrades);

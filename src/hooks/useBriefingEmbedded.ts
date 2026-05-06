@@ -63,7 +63,6 @@ export function useBriefingEmbedded(
   const fetchedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    logger.log('[useBriefingEmbedded]', { enabled, tradeIds, eventIds, noteIds, htmlLen: html.length });
     if (!enabled) return;
 
     const hasRefs =
@@ -72,14 +71,16 @@ export function useBriefingEmbedded(
 
     // Skip if we've already fetched the same set of IDs. The key intentionally
     // ignores order — new entries force a re-fetch, but re-mounting with the
-    // same IDs won't.
+    // same IDs won't. We mark the key as fetched only after the fetch
+    // resolves; setting it pre-fetch races with StrictMode's mount→unmount→
+    // remount cycle (first run sets the key + cancels its own promise, second
+    // run sees the matching key and skips entirely → state never updates).
     const key = [
       tradeIds.slice().sort().join(','),
       eventIds.slice().sort().join(','),
       noteIds.slice().sort().join(','),
     ].join('|');
     if (fetchedKeyRef.current === key) return;
-    fetchedKeyRef.current = key;
 
     let cancelled = false;
     setLoading(true);
@@ -125,9 +126,6 @@ export function useBriefingEmbedded(
     Promise.all([tradesP, eventsP, notesP])
       .then(([tradeEntries, eventEntries, noteEntries]) => {
         if (cancelled) return;
-        logger.log('[useBriefingEmbedded] fetch result', {
-          tradeIds, tradeEntries: tradeEntries.map(e => e ? e[0] : null),
-        });
         if (tradeIds.length > 0) {
           setEmbeddedTrades(Object.fromEntries(tradeEntries.filter(Boolean) as Array<readonly [string, Trade]>));
         }
@@ -137,6 +135,7 @@ export function useBriefingEmbedded(
         if (noteIds.length > 0) {
           setEmbeddedNotes(Object.fromEntries(noteEntries.filter(Boolean) as Array<readonly [string, Note]>));
         }
+        fetchedKeyRef.current = key;
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
