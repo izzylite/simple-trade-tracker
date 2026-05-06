@@ -87,8 +87,21 @@ interface TradeDetailExpandedProps {
    * instead of opening a local NoteViewerDialog. Used by
    * TradeGalleryDialog so the parent can render an inline panel
    * (avoiding nested-dialog z-index conflicts).
+   *
+   * Pass `null` to indicate loading completed without finding a note —
+   * the parent should close the loading panel.
    */
-  onOpenNote?: (note: Note) => void;
+  onOpenNote?: (note: Note | null) => void;
+  /**
+   * Called *before* the game-plan fetch resolves so the parent panel
+   * can open in a loading/shimmer state immediately. Pairs with
+   * `onOpenNote`, which delivers the resolved note (or `null` if the
+   * fetch finds nothing).
+   *
+   * @param emptyMessage - shown by the panel if the fetch resolves to
+   *                       no note (e.g. day has no game plan).
+   */
+  onOpenNoteLoading?: (emptyMessage?: string) => void;
 }
 
 // Define shimmer animation
@@ -132,7 +145,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   trades,
   tradeOperations,
   showAIButton = true,
-  onOpenNote
+  onOpenNote,
+  onOpenNoteLoading
 }) => {
   // Destructure from tradeOperations directly
   const {
@@ -374,17 +388,33 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
   // Open game plan note viewer — defers to parent (panel) when
   // onOpenNote is provided, otherwise falls back to the local dialog.
+  // When the parent supports a loading state, open the panel
+  // immediately with shimmer and populate once the day-based fetch
+  // resolves.
   const handleOpenGamePlan = async () => {
-    let notes = gamePlanNotes;
+    const usePanel = !!onOpenNote;
+    const cached = gamePlanNotes;
+
+    // If we already have cached notes, skip the loading state.
+    if (usePanel && cached.length === 0 && onOpenNoteLoading) {
+      onOpenNoteLoading('No game plan available for this day.');
+    }
+
+    let notes = cached;
     if (notes.length === 0 && !loadingGamePlan) {
       notes = await fetchGamePlanNotes();
     }
+
     if (notes.length > 0) {
       if (onOpenNote) {
         onOpenNote(notes[0]);
       } else {
         setGamePlanViewNote(notes[0]);
       }
+    } else if (onOpenNote) {
+      // No notes for this day — signal the parent to close the
+      // loading panel (otherwise it would shimmer indefinitely).
+      onOpenNote(null);
     }
   };
 

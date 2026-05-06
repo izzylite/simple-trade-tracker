@@ -293,17 +293,55 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   // Note viewer panel state — replaces nested dialogs to avoid
   // z-index conflicts with this gallery dialog.
   const [viewerNote, setViewerNote] = useState<Note | null>(null);
+  const [viewerNoteId, setViewerNoteId] = useState<string | null>(null);
+  const [viewerLoading, setViewerLoading] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerEmptyMessage, setViewerEmptyMessage] = useState<string>(
+    'No content available.'
+  );
 
-  const handleOpenNote = useCallback((note: Note) => {
+  // Open with a fully-loaded note (used by AI chat when embeddedNotes
+  // are present and by game plan once notes are fetched).
+  // Passing `null` means "loading completed with no result" — keep
+  // the panel open and show an empty state so the user gets explicit
+  // feedback instead of a flash-and-close.
+  const handleOpenNote = useCallback((note: Note | null) => {
     setViewerNote(note);
+    setViewerNoteId(null);
+    setViewerLoading(false);
     setViewerOpen(true);
+  }, []);
+
+  // Open immediately with shimmer; the panel fetches by id internally.
+  // Used for AI chat references whose embedded payload was lost (e.g.
+  // history-loaded conversations).
+  const handleOpenNoteById = useCallback((noteId: string) => {
+    setViewerNote(null);
+    setViewerNoteId(noteId);
+    setViewerLoading(false);
+    setViewerOpen(true);
+  }, []);
+
+  // Open immediately with shimmer; caller will populate via
+  // handleOpenNote when its async work completes (e.g. game plan
+  // day-based query, where we don't know the id up front). The
+  // optional emptyMessage is shown if the caller resolves to no note.
+  const handleOpenNoteLoading = useCallback((emptyMessage?: string) => {
+    setViewerNote(null);
+    setViewerNoteId(null);
+    setViewerLoading(true);
+    setViewerOpen(true);
+    if (emptyMessage) setViewerEmptyMessage(emptyMessage);
   }, []);
 
   const handleCloseNoteViewer = useCallback(() => {
     setViewerOpen(false);
-    // Clear note after slide-out animation finishes
-    window.setTimeout(() => setViewerNote(null), 300);
+    setViewerLoading(false);
+    // Clear note/id after slide-out animation finishes
+    window.setTimeout(() => {
+      setViewerNote(null);
+      setViewerNoteId(null);
+    }, 300);
   }, []);
 
   // Immersive mode state
@@ -323,6 +361,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     // previous trade's game plan / chat references.
     setViewerOpen(false);
     setViewerNote(null);
+    setViewerNoteId(null);
+    setViewerLoading(false);
   }, [safeCurrentIndex, aiOnlyMode]);
 
   // Clear panel state whenever the dialog closes so it doesn't
@@ -331,6 +371,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     if (!open) {
       setViewerOpen(false);
       setViewerNote(null);
+      setViewerNoteId(null);
+      setViewerLoading(false);
     }
   }, [open]);
 
@@ -575,6 +617,11 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       }}
       PaperProps={{
         sx: {
+          // Lock to a stable height range so the dialog doesn't
+          // collapse when the active tab has minimal content
+          // (e.g. an empty AI chat).
+          height: '90vh',
+          minHeight: { xs: '85vh', sm: 600 },
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
@@ -955,6 +1002,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
               }}
               showAIButton={false}
               onOpenNote={handleOpenNote}
+              onOpenNoteLoading={handleOpenNoteLoading}
             />
           ) : null}
         </Box>
@@ -1018,7 +1066,9 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   if (note) {
                     handleOpenNote(note);
                   } else {
-                    logger.warn('Note not found in embedded notes:', noteId);
+                    // Conversations loaded from history don't carry
+                    // embeddedNotes — let the panel fetch and shimmer.
+                    handleOpenNoteById(noteId);
                   }
                 }}
                 isReadOnly={isReadOnly}
@@ -1186,6 +1236,9 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         open={viewerOpen}
         onClose={handleCloseNoteViewer}
         note={viewerNote}
+        noteId={viewerNoteId}
+        loading={viewerLoading}
+        emptyMessage={viewerEmptyMessage}
       />
       </Box>{/* /Flex row */}
 
