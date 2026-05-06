@@ -511,6 +511,20 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
   }, [calendarId]);
 
   if (!calendar) {
+    // Active calendar is gone (deleted, soft-trashed, or URL points to a
+    // calendar the user no longer has). Prefer hopping to the most recently
+    // updated remaining calendar so the user stays in the calendar surface.
+    // Only fall back to "/" when there's nothing left.
+    const fallbackCalendar = [...calendars]
+      .filter((c) => !c.deleted_at)
+      .sort(
+        (a, b) =>
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      )[0];
+
+    if (fallbackCalendar) {
+      return <Navigate to={`/calendar/${fallbackCalendar.id}`} replace />;
+    }
     return <Navigate to="/" replace />;
   }
 
