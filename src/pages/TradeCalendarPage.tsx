@@ -1286,9 +1286,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const monthlyCumulativeChartData = useMemo(() => {
     const monthTrades = filteredTrades
       .filter(t => isSameMonth(new Date(t.trade_date), currentDate))
-      .sort((a, b) =>
-        new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime()
-      );
+      .sort((a, b) => {
+        const dt = new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime();
+        if (dt !== 0) return dt;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
     if (monthTrades.length === 0) return [];
 
     const byDate = new Map<string, { pnl: number; trades: Trade[]; fullDate: Date }>();

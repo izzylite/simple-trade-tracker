@@ -317,3 +317,29 @@ export function getSessionForTimestamp(timeUtc: string): TradingSession | null {
 
   return match;
 }
+
+/**
+ * Returns a UTC timestamp on `selectedDate` that falls inside `session`'s window,
+ * so `trade_date` and `session` stay consistent. Asia uses 00:00 UTC (not the
+ * true 22:00/23:00 start) to avoid shifting the trade onto the previous calendar day.
+ */
+export function deriveTradeDateForSession(
+  selectedDate: Date,
+  session: TradingSession | LegacySession | string | null | undefined
+): Date {
+  const y = selectedDate.getFullYear();
+  const m = selectedDate.getMonth();
+  const d = selectedDate.getDate();
+
+  if (!session) {
+    return new Date(Date.UTC(y, m, d, 0, 0, 0));
+  }
+
+  const normalized = normalizeSessionName(session as TradingSession | LegacySession);
+
+  if (normalized === 'Asia') {
+    return new Date(Date.UTC(y, m, d, 0, 0, 0));
+  }
+
+  return getSessionTimeRange(normalized, selectedDate).start;
+}

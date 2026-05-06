@@ -566,10 +566,12 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         "Recalculating ALL trades based on risk to reward to show potential...",
       );
 
-      // Sort trades by date to calculate cumulative P&L correctly
-      const sortedTrades = [...allTrades].sort((a, b) =>
-        new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime()
-      );
+      // Sort trades by date to calculate cumulative P&L correctly.
+      const sortedTrades = [...allTrades].sort((a, b) => {
+        const dt = new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime();
+        if (dt !== 0) return dt;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
 
       // Define dynamic risk settings once outside the loop
       const dynamicRiskSettings: DynamicRiskSettings = {

@@ -28,6 +28,7 @@ import { validateFiles, FILE_SIZE_LIMITS } from '../../utils/fileValidation';
 import { formatTagsWithCapitalizedGroups } from '../../utils/tagColors';
 import { Z_INDEX } from '../../styles/zIndex';
 import { TradeRepository } from '../../services/repository/repositories/TradeRepository';
+import { deriveTradeDateForSession } from '../../utils/sessionTimeUtils';
 
 interface FormDialogProps {
   open: boolean;
@@ -483,8 +484,6 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       finalTags.push('Partials:Yes');
     }
 
-    const currentDate = new Date();
-
     // Use the trade's date if it exists (when editing), otherwise use the provided date
     const tradeDate = newTrade.trade_date || trade_date;
 
@@ -494,8 +493,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     return {
       id: newTrade.id || uuidv4(),
       is_temporary: newTrade.is_temporary,
-      trade_date: new Date(tradeDate.getFullYear(), tradeDate.getMonth(), tradeDate.getDate(),
-        currentDate.getHours(), currentDate.getMinutes(), currentDate.getSeconds()),
+      trade_date: deriveTradeDateForSession(tradeDate, newTrade.session),
       trade_type: newTrade.trade_type,
       amount: finalAmount,
       ...(newTrade.name && { name: newTrade.name }),
@@ -699,8 +697,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         (tradeid: string) => {
           // setIsCreatingEmptyTrade(true);
           // Create a temporary trade object if it doesnt exist
-          // Note: Economic events will be added later via async update 
-          const currentDate = new Date();
+          // Note: Economic events will be added later via async update
           const tradeDate = newTrade!.trade_date || trade_date;
           const finalAmount = calculateFinalAmount(newTrade!);
           let finalTags = processTagsForSubmission([...newTrade!.tags]);
@@ -713,8 +710,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
           return {
             id: tradeid,
             is_temporary: true,
-            trade_date: new Date(tradeDate.getFullYear(), tradeDate.getMonth(), tradeDate.getDate(),
-              currentDate.getHours(), currentDate.getMinutes(), currentDate.getSeconds()),
+            trade_date: deriveTradeDateForSession(tradeDate, newTrade!.session),
             trade_type: newTrade!.trade_type,
             amount: finalAmount,
             name: newTrade!.name || 'New Trade',

@@ -1,4 +1,4 @@
-import { getSessionForTimestamp } from '../sessionTimeUtils';
+import { deriveTradeDateForSession, getSessionForTimestamp } from '../sessionTimeUtils';
 
 describe('getSessionForTimestamp', () => {
   // DST active (July) — EU DST: Asia 22-07, London 07-12, NY AM 12-17, NY PM 17-21
@@ -80,6 +80,107 @@ describe('getSessionForTimestamp', () => {
 
     it('returns null for time in gap (22:30 UTC non-DST winter)', () => {
       expect(getSessionForTimestamp('2026-01-15T22:30:00Z')).toBeNull();
+    });
+  });
+});
+
+describe('deriveTradeDateForSession', () => {
+  // Round-trip property: every value the deriver returns must classify as
+  // the same session via getSessionForTimestamp. If this ever fails, the
+  // trade_date / session column will diverge and Orion will see ghost
+  // discrepancies again.
+  const roundTrip = (selectedDate: Date, session: string) => {
+    const derived = deriveTradeDateForSession(selectedDate, session);
+    return getSessionForTimestamp(derived.toISOString());
+  };
+
+  describe('during DST (summer)', () => {
+    const day = new Date(2026, 6, 15); // July 15 in local TZ
+
+    it('London → 07:00 UTC and round-trips to London', () => {
+      const d = deriveTradeDateForSession(day, 'London');
+      expect(d.toISOString()).toBe('2026-07-15T07:00:00.000Z');
+      expect(roundTrip(day, 'London')).toBe('London');
+    });
+
+    it('NY AM → 12:00 UTC and round-trips to NY AM', () => {
+      const d = deriveTradeDateForSession(day, 'NY AM');
+      expect(d.toISOString()).toBe('2026-07-15T12:00:00.000Z');
+      expect(roundTrip(day, 'NY AM')).toBe('NY AM');
+    });
+
+    it('NY PM → 17:00 UTC and round-trips to NY PM', () => {
+      const d = deriveTradeDateForSession(day, 'NY PM');
+      expect(d.toISOString()).toBe('2026-07-15T17:00:00.000Z');
+      expect(roundTrip(day, 'NY PM')).toBe('NY PM');
+    });
+
+    it('Asia → 00:00 UTC of selected day (stays on user-picked calendar day)', () => {
+      const d = deriveTradeDateForSession(day, 'Asia');
+      expect(d.toISOString()).toBe('2026-07-15T00:00:00.000Z');
+      expect(roundTrip(day, 'Asia')).toBe('Asia');
+    });
+  });
+
+  describe('during non-DST (winter)', () => {
+    const day = new Date(2026, 0, 15); // January 15 in local TZ
+
+    it('London → 08:00 UTC (GMT, no BST)', () => {
+      expect(deriveTradeDateForSession(day, 'London').toISOString())
+        .toBe('2026-01-15T08:00:00.000Z');
+      expect(roundTrip(day, 'London')).toBe('London');
+    });
+
+    it('NY AM → 13:00 UTC (EST, no EDT)', () => {
+      expect(deriveTradeDateForSession(day, 'NY AM').toISOString())
+        .toBe('2026-01-15T13:00:00.000Z');
+      expect(roundTrip(day, 'NY AM')).toBe('NY AM');
+    });
+
+    it('Asia → 00:00 UTC even in winter (still inside Asia 23:00→08:00 window)', () => {
+      expect(deriveTradeDateForSession(day, 'Asia').toISOString())
+        .toBe('2026-01-15T00:00:00.000Z');
+      expect(roundTrip(day, 'Asia')).toBe('Asia');
+    });
+  });
+
+  describe('legacy session names', () => {
+    const day = new Date(2026, 6, 15);
+
+    it('lowercase "london" normalises to London', () => {
+      expect(deriveTradeDateForSession(day, 'london').toISOString())
+        .toBe('2026-07-15T07:00:00.000Z');
+    });
+
+    it('"new-york" normalises to NY AM', () => {
+      expect(deriveTradeDateForSession(day, 'new-york').toISOString())
+        .toBe('2026-07-15T12:00:00.000Z');
+    });
+
+    it('"tokyo" / "sydney" normalise to Asia', () => {
+      expect(deriveTradeDateForSession(day, 'tokyo').toISOString())
+        .toBe('2026-07-15T00:00:00.000Z');
+      expect(deriveTradeDateForSession(day, 'sydney').toISOString())
+        .toBe('2026-07-15T00:00:00.000Z');
+    });
+  });
+
+  describe('empty / unrecognised session', () => {
+    const day = new Date(2026, 6, 15);
+
+    it('empty string falls back to 00:00 UTC of selected day', () => {
+      expect(deriveTradeDateForSession(day, '').toISOString())
+        .toBe('2026-07-15T00:00:00.000Z');
+    });
+
+    it('null falls back to 00:00 UTC of selected day', () => {
+      expect(deriveTradeDateForSession(day, null).toISOString())
+        .toBe('2026-07-15T00:00:00.000Z');
+    });
+
+    it('undefined falls back to 00:00 UTC of selected day', () => {
+      expect(deriveTradeDateForSession(day, undefined).toISOString())
+        .toBe('2026-07-15T00:00:00.000Z');
     });
   });
 });
