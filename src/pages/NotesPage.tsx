@@ -1,20 +1,26 @@
 import React from 'react';
-import { Box, Typography, Stack } from '@mui/material';
-import { Notes as NotesIcon } from '@mui/icons-material';
+import { Box } from '@mui/material';
+import NotesContent from '../components/sidePanel/content/NotesContent';
 
-/** Phase 5 fills this in. Stub for now so the route resolves. */
+const APP_HEADER_HEIGHT = 64;
+
+/**
+ * Cross-calendar notes aggregation. Reuses NotesContent with
+ * showCalendarPicker so the user can filter by calendar (or view all).
+ * Behaviour mirrors HomePage's existing implementation but as a full
+ * page rather than a side-panel view.
+ */
 const NotesPage: React.FC = () => {
   return (
-    <Box sx={{ p: { xs: 3, md: 5 }, maxWidth: 900, mx: 'auto' }}>
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
-        <NotesIcon color="primary" />
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>
-          Notes
-        </Typography>
-      </Stack>
-      <Typography variant="body1" color="text.secondary">
-        Cross-calendar notes. Coming soon.
-      </Typography>
+    <Box
+      sx={{
+        height: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: 'background.default',
+      }}
+    >
+      <NotesContent showCalendarPicker isActive />
     </Box>
   );
 };
