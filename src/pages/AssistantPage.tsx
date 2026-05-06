@@ -1,20 +1,160 @@
-import React from 'react';
-import { Box, Typography, Stack } from '@mui/material';
-import { SmartToy as AssistantIcon } from '@mui/icons-material';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import {
+  Box,
+  CircularProgress,
+  Typography,
+  alpha,
+  useTheme,
+} from '@mui/material';
+import { useAuthState } from '../contexts/AuthStateContext';
+import { useCalendars } from '../hooks/useCalendars';
+import { useAIChat } from '../hooks/useAIChat';
+import AIChatContent from '../components/sidePanel/content/AIChatContent';
+import { Trade } from '../types/dualWrite';
 
-/** Phase 4 fills this in. Stub for now so the route resolves. */
+const STORAGE_KEY = 'assistant_selected_calendar_id';
+const SWITCH_SPINNER_MS = 350;
+const APP_HEADER_HEIGHT = 64;
+
+/**
+ * Cross-calendar Orion entry point. Defaults to "All Calendars" — chat
+ * conversations save at user level (saveAsUserLevel) so they persist
+ * regardless of which calendar context is selected for AI grounding.
+ *
+ * The dropdown for calendar context lives inside AIChatContent's own header;
+ * we feed it via availableCalendars/selectedCalendarId/onCalendarChange and
+ * surface a brief spinner overlay during the switch so context changes feel
+ * intentional.
+ */
 const AssistantPage: React.FC = () => {
+  const theme = useTheme();
+  const { user } = useAuthState();
+  const { calendars } = useCalendars(user?.uid);
+
+  const activeCalendars = useMemo(
+    () => (calendars || []).filter((c) => !c.deleted_at),
+    [calendars]
+  );
+
+  const [selectedCalendarId, setSelectedCalendarId] = useState<string>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
+  const [isSwitching, setIsSwitching] = useState(false);
+  const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Drop a stale stored ID when its calendar is gone (deleted/trashed).
+  // Empty string means "All Calendars" and is always valid.
+  useEffect(() => {
+    if (!selectedCalendarId) return;
+    const exists = activeCalendars.some((c) => c.id === selectedCalendarId);
+    if (!exists && activeCalendars.length > 0) {
+      setSelectedCalendarId('');
+      try {
+        localStorage.setItem(STORAGE_KEY, '');
+      } catch {
+        // ignore
+      }
+    }
+  }, [activeCalendars, selectedCalendarId]);
+
+  useEffect(() => {
+    return () => {
+      if (switchTimerRef.current) clearTimeout(switchTimerRef.current);
+    };
+  }, []);
+
+  const handleCalendarChange = useCallback((id: string) => {
+    setSelectedCalendarId((prev) => (prev === id ? prev : id));
+    setIsSwitching(true);
+    try {
+      localStorage.setItem(STORAGE_KEY, id);
+    } catch {
+      // ignore
+    }
+    if (switchTimerRef.current) clearTimeout(switchTimerRef.current);
+    switchTimerRef.current = setTimeout(
+      () => setIsSwitching(false),
+      SWITCH_SPINNER_MS
+    );
+  }, []);
+
+  const selectedCalendar = useMemo(
+    () => activeCalendars.find((c) => c.id === selectedCalendarId),
+    [activeCalendars, selectedCalendarId]
+  );
+
+  // Conversations save at the user level so they persist across calendar
+  // context changes (mirrors HomePage's existing pattern).
+  const sharedChatState = useAIChat({
+    userId: user?.uid,
+    calendar: selectedCalendar,
+    messageLimit: 100,
+    autoSaveConversation: true,
+    saveAsUserLevel: true,
+  });
+
+  // Stub operations — Assistant page does not host trade-edit flows; users
+  // open the calendar to edit trades. Image zoom is a no-op here for now.
+  const stubTradeOperations = useMemo(
+    () => ({
+      onOpenGalleryMode: () => {},
+      onUpdateTradeProperty: () =>
+        Promise.resolve(undefined as Trade | undefined),
+      onEditTrade: () => {},
+      onDeleteTrade: () => Promise.resolve(),
+      onDeleteMultipleTrades: () => {},
+      onZoomImage: () => {},
+      isTradeUpdating: () => false,
+      onUpdateCalendarProperty: () => Promise.resolve(undefined),
+    }),
+    []
+  );
+
   return (
-    <Box sx={{ p: { xs: 3, md: 5 }, maxWidth: 900, mx: 'auto' }}>
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
-        <AssistantIcon color="primary" />
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>
-          Assistant
-        </Typography>
-      </Stack>
-      <Typography variant="body1" color="text.secondary">
-        Cross-calendar AI assistant. Coming soon.
-      </Typography>
+    <Box
+      sx={{
+        position: 'relative',
+        height: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: 'background.default',
+      }}
+    >
+      <AIChatContent
+        tradeOperations={stubTradeOperations}
+        isActive
+        sharedChatState={sharedChatState}
+        availableCalendars={activeCalendars}
+        selectedCalendarId={selectedCalendarId}
+        onCalendarChange={handleCalendarChange}
+      />
+
+      {isSwitching && (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1.5,
+            bgcolor: alpha(theme.palette.background.default, 0.7),
+            backdropFilter: 'blur(2px)',
+            zIndex: 10,
+            pointerEvents: 'auto',
+          }}
+        >
+          <CircularProgress size={32} />
+          <Typography variant="body2" color="text.secondary">
+            Switching calendar context…
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 };
