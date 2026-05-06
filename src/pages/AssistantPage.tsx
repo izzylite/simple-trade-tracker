@@ -129,6 +129,7 @@ const AssistantPage: React.FC = () => {
       <AIChatContent
         tradeOperations={stubTradeOperations}
         isActive
+        calendar={selectedCalendar}
         sharedChatState={sharedChatState}
         availableCalendars={activeCalendars}
         selectedCalendarId={selectedCalendarId}
