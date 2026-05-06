@@ -20,6 +20,7 @@ import HtmlMessageRenderer from './HtmlMessageRenderer';
 import CitationsSection from './CitationsSection';
 import MarkdownRenderer from './MarkdownRenderer';
 import ToolUsageChip from './ToolUsageChip';
+import { useBriefingEmbedded } from '../../hooks/useBriefingEmbedded';
 import {
   ContentCopy as CopyIcon,
   CheckCircle as CheckIcon,
@@ -75,6 +76,20 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const isDark = theme.palette.mode === 'dark';
+
+  // Streamed messages arrive with embeddedTrades/Events/Notes inline, but
+  // persisted messages reload from DB without them — chips would render empty.
+  // Lazy-fetch when missing so revisited conversations show chips again.
+  const hasStreamedEmbeds = !!(
+    message.embeddedTrades || message.embeddedEvents || message.embeddedNotes
+  );
+  const lazyEmbedded = useBriefingEmbedded(
+    message.messageHtml ?? '',
+    isAssistant && !hasStreamedEmbeds
+  );
+  const effectiveEmbeddedTrades = message.embeddedTrades ?? lazyEmbedded.embeddedTrades;
+  const effectiveEmbeddedEvents = message.embeddedEvents ?? lazyEmbedded.embeddedEvents;
+  const effectiveEmbeddedNotes = message.embeddedNotes ?? lazyEmbedded.embeddedNotes;
 
   // Render a note-mention as a simple title chip — matches the editor's
   // NoteMentionEntity styling so the chip in the transcript looks identical
@@ -230,9 +245,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       {message.messageHtml ? (
         <HtmlMessageRenderer
           html={message.messageHtml}
-          embeddedTrades={message.embeddedTrades}
-          embeddedEvents={message.embeddedEvents}
-          embeddedNotes={message.embeddedNotes}
+          embeddedTrades={effectiveEmbeddedTrades}
+          embeddedEvents={effectiveEmbeddedEvents}
+          embeddedNotes={effectiveEmbeddedNotes}
           onTradeClick={onTradeClick}
           onEventClick={onEventClick}
           onNoteClick={onNoteClick}
