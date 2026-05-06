@@ -87,14 +87,16 @@ const AssistantPage: React.FC = () => {
     [activeCalendars, selectedCalendarId]
   );
 
-  // Conversations save at the user level so they persist across calendar
-  // context changes (mirrors HomePage's existing pattern).
+  // Conversation history follows the selected calendar:
+  //  - calendar selected: loads/saves under that calendar_id
+  //  - "All Calendars" (selectedCalendar = undefined): loads/saves user-level
+  // (saveAsUserLevel intentionally omitted — that flag forces user-level
+  // regardless of calendar and breaks per-calendar history switching.)
   const sharedChatState = useAIChat({
     userId: user?.uid,
     calendar: selectedCalendar,
     messageLimit: 100,
     autoSaveConversation: true,
-    saveAsUserLevel: true,
   });
 
   // Stub operations — Assistant page does not host trade-edit flows; users

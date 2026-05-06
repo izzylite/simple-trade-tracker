@@ -273,9 +273,11 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     return () => clearTimeout(timer);
   }, [seedMessage, onSeedMessageConsumed]);
 
-  // Load conversations when content becomes active
+  // Load conversations when content becomes active or calendar context changes.
+  // Calendar is intentionally optional — when undefined (e.g. AssistantPage's
+  // "All Calendars" mode), useAIChat falls back to user-level conversations.
   useEffect(() => {
-    if (isActive && calendar?.id && user) {
+    if (isActive && user) {
       loadConversations();
     }
   }, [isActive, calendar?.id, user, loadConversations]);
