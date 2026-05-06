@@ -82,7 +82,6 @@ import {
 
 } from '../components/StyledComponents';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mutate as swrMutate } from 'swr';
 
 import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
 
@@ -95,8 +94,8 @@ import AccountStats from '../components/AccountStats';
 import TradeFormDialog, { createEditTradeData } from '../components/trades/TradeFormDialog';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
-import { DuplicateCalendarDialog } from '../components/dialogs/DuplicateCalendarDialog';
-import { CalendarLinkDialog } from '../components/dialogs/CalendarLinkDialog';
+import CalendarManagementDialogs from '../components/calendars/CalendarManagementDialogs';
+import { useCalendarPanelActions } from '../hooks/useCalendarPanelActions';
 import PinnedTradesDrawer from '../components/PinnedTradesDrawer';
 import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ShareButton from '../components/sharing/ShareButton';
@@ -707,6 +706,16 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'warning' | 'error'>('warning');
+
+  // Snackbar utility — defined early so hooks below can depend on it.
+  const showSnackbar = useCallback(
+    (message: string, severity: 'success' | 'warning' | 'error' = 'warning') => {
+      setSnackbarMessage(message);
+      setSnackbarSeverity(severity);
+      setSnackbarOpen(true);
+    },
+    []
+  );
   const [showFloatingMonthNav, setShowFloatingMonthNav] = useState(false);
   const [pinnedTradesDrawerOpen, setPinnedTradesDrawerOpen] = useState(false);
   const [galleryMode, setGalleryMode] = useState<{
@@ -763,17 +772,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   // Calendars list drawer state (<lg fallback for 'calendars-list' panel)
   const [isCalendarsListDrawerOpen, setIsCalendarsListDrawerOpen] = useState(false);
 
-  // Calendar management dialog state for actions originating from the
-  // calendars-list panel/drawer (edit/duplicate/link/delete on OTHER calendars).
-  // Distinct from isCalendarEditOpen which targets the currently-active calendar.
-  const [panelCalendarToEdit, setPanelCalendarToEdit] = useState<Calendar | null>(null);
-  const [isPanelEditSubmitting, setIsPanelEditSubmitting] = useState(false);
-  const [panelCalendarToDuplicate, setPanelCalendarToDuplicate] = useState<Calendar | null>(null);
-  const [isPanelDuplicating, setIsPanelDuplicating] = useState(false);
-  const [panelCalendarToLink, setPanelCalendarToLink] = useState<Calendar | null>(null);
-  const [isPanelLinking, setIsPanelLinking] = useState(false);
-  const [panelCalendarToDelete, setPanelCalendarToDelete] = useState<string | null>(null);
-  const [isPanelDeleting, setIsPanelDeleting] = useState(false);
 
   // Week note state
   const [weekNoteKeys, setWeekNoteKeys] = useState<Set<string>>(new Set());
@@ -1089,120 +1087,16 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     }
   };
 
-  // Refresh both the local userCalendars (dropdown) and SWR caches used by
-  // CalendarsListContent (panel/drawer). Mutating App-level state alone
-  // doesn't touch SWR, so the panel/drawer would otherwise show stale data.
-  const refreshCalendarSources = useCallback(async () => {
-    const userId = calendar?.user_id;
-    await Promise.all([
-      loadUserCalendars(),
-      userId ? swrMutate(['calendars', userId]) : Promise.resolve(),
-      userId ? swrMutate(['trash-calendars', userId]) : Promise.resolve(),
-    ]);
-  }, [calendar?.user_id, loadUserCalendars]);
-
-  // --- Calendars-list panel/drawer action handlers ---
-  const handlePanelEditSubmit = async (formData: CalendarFormData) => {
-    if (!panelCalendarToEdit || !onUpdateCalendar) return;
-
-    setIsPanelEditSubmitting(true);
-    try {
-      await onUpdateCalendar(panelCalendarToEdit.id, { ...formData });
-      await refreshCalendarSources();
-      setPanelCalendarToEdit(null);
-      showSnackbar('Calendar updated successfully', 'success');
-    } catch (error) {
-      logger.error('Error updating calendar:', error);
-      showSnackbar('Failed to update calendar', 'error');
-    } finally {
-      setIsPanelEditSubmitting(false);
-    }
-  };
-
-  const handlePanelDuplicateSubmit = async (withContent: boolean) => {
-    if (!panelCalendarToDuplicate || !onDuplicateCalendar) return;
-
-    setIsPanelDuplicating(true);
-    try {
-      const newName = `${panelCalendarToDuplicate.name} (Copy)`;
-      await onDuplicateCalendar(panelCalendarToDuplicate.id, newName, withContent);
-      await refreshCalendarSources();
-      setPanelCalendarToDuplicate(null);
-      showSnackbar('Calendar duplicated successfully', 'success');
-    } catch (error) {
-      logger.error('Error duplicating calendar:', error);
-      showSnackbar('Failed to duplicate calendar', 'error');
-    } finally {
-      setIsPanelDuplicating(false);
-    }
-  };
-
-  const handlePanelLinkSubmit = async (targetCalendarId: string) => {
-    if (!panelCalendarToLink) return;
-
-    setIsPanelLinking(true);
-    try {
-      await calendarService.linkCalendar(panelCalendarToLink.id, targetCalendarId);
-      await refreshCalendarSources();
-      setPanelCalendarToLink(null);
-    } catch (error) {
-      logger.error('Error linking calendar:', error);
-      throw error;
-    } finally {
-      setIsPanelLinking(false);
-    }
-  };
-
-  const handlePanelUnlinkSubmit = async () => {
-    if (!panelCalendarToLink) return;
-
-    setIsPanelLinking(true);
-    try {
-      await calendarService.unlinkCalendar(panelCalendarToLink.id);
-      await refreshCalendarSources();
-      setPanelCalendarToLink(null);
-    } catch (error) {
-      logger.error('Error unlinking calendar:', error);
-      throw error;
-    } finally {
-      setIsPanelLinking(false);
-    }
-  };
-
-  const handlePanelDeleteConfirm = async () => {
-    if (!panelCalendarToDelete || !onDeleteCalendar) return;
-
-    setIsPanelDeleting(true);
-    try {
-      await onDeleteCalendar(panelCalendarToDelete);
-      await refreshCalendarSources();
-      setPanelCalendarToDelete(null);
-      showSnackbar('Calendar moved to trash', 'success');
-    } catch (error) {
-      logger.error('Error deleting calendar:', error);
-      showSnackbar('Failed to delete calendar', 'error');
-    } finally {
-      setIsPanelDeleting(false);
-    }
-  };
-
-  const handlePanelRestoreCalendar = useCallback(async (id: string) => {
-    try {
-      await calendarService.restoreCalendar(id);
-      await refreshCalendarSources();
-    } catch (error) {
-      logger.error('Error restoring calendar:', error);
-    }
-  }, [refreshCalendarSources]);
-
-  const handlePanelPermanentDeleteCalendar = useCallback(async (id: string) => {
-    try {
-      await calendarService.permanentlyDeleteCalendar(id);
-      await refreshCalendarSources();
-    } catch (error) {
-      logger.error('Error permanently deleting calendar:', error);
-    }
-  }, [refreshCalendarSources]);
+  // All calendars-list panel/drawer action state + handlers (edit/duplicate/
+  // link/delete/restore/permanent-delete) live here. See useCalendarPanelActions.
+  const panelActions = useCalendarPanelActions({
+    userId: calendar?.user_id,
+    loadUserCalendars,
+    showSnackbar,
+    onUpdateCalendar,
+    onDuplicateCalendar,
+    onDeleteCalendar,
+  });
 
   // Generic panel/drawer toggle — reused by Notes, Events, Pinned, Filter, Tags
   const togglePanel = useCallback((
@@ -1676,13 +1570,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setSnackbarOpen(false);
   };
 
-  // Utility function to show snackbar messages
-  const showSnackbar = (message: string, severity: 'success' | 'warning' | 'error' = 'warning') => {
-    setSnackbarMessage(message);
-    setSnackbarSeverity(severity);
-    setSnackbarOpen(true);
-  };
-
   // Retry failed deletion
   const retryDeletion = async () => {
     if (deleteError && tradesToDelete.length > 0) {
@@ -1913,13 +1800,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 initialTab={isTrash ? 1 : 0}
                 activeCalendarId={calendarId}
                 onCalendarClick={handleSelectCalendar}
-                onEditCalendar={onUpdateCalendar ? setPanelCalendarToEdit : undefined}
-                onDuplicateCalendar={onDuplicateCalendar ? setPanelCalendarToDuplicate : undefined}
-                onLinkCalendar={setPanelCalendarToLink}
-                onDeleteCalendar={onDeleteCalendar ? setPanelCalendarToDelete : undefined}
+                onEditCalendar={onUpdateCalendar ? panelActions.setEditTarget : undefined}
+                onDuplicateCalendar={onDuplicateCalendar ? panelActions.setDuplicateTarget : undefined}
+                onLinkCalendar={panelActions.setLinkTarget}
+                onDeleteCalendar={onDeleteCalendar ? panelActions.setDeleteTarget : undefined}
                 onUpdateCalendarProperty={onUpdateCalendarProperty}
-                onRestoreCalendar={handlePanelRestoreCalendar}
-                onPermanentDeleteCalendar={handlePanelPermanentDeleteCalendar}
+                onRestoreCalendar={panelActions.restoreCalendar}
+                onPermanentDeleteCalendar={panelActions.permanentDeleteCalendar}
               />
             ),
           };
@@ -2007,7 +1894,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       pushPanel, replacePanel, setNewTrade, setShowAddForm,
       handleSelectCalendar,
       onUpdateCalendar, onDuplicateCalendar, onDeleteCalendar,
-      handlePanelRestoreCalendar, handlePanelPermanentDeleteCalendar,
+      panelActions,
     ]
   );
 
@@ -3085,45 +2972,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         />
 
         {/* Panel-action dialogs (for OTHER calendars from the calendars-list panel) */}
-        <CalendarFormDialog
-          open={Boolean(panelCalendarToEdit)}
-          onClose={() => setPanelCalendarToEdit(null)}
-          onSubmit={handlePanelEditSubmit}
-          initialData={panelCalendarToEdit || undefined}
-          isSubmitting={isPanelEditSubmitting}
-          mode="edit"
-          title="Edit Calendar"
-          submitButtonText="Save"
-        />
-
-        <DuplicateCalendarDialog
-          open={Boolean(panelCalendarToDuplicate)}
-          calendar={panelCalendarToDuplicate}
-          isDuplicating={isPanelDuplicating}
-          onClose={() => setPanelCalendarToDuplicate(null)}
-          onDuplicate={handlePanelDuplicateSubmit}
-        />
-
-        <CalendarLinkDialog
-          open={Boolean(panelCalendarToLink)}
-          calendar={panelCalendarToLink}
-          calendars={userCalendars}
-          isLoading={isPanelLinking}
-          onClose={() => setPanelCalendarToLink(null)}
-          onLink={handlePanelLinkSubmit}
-          onUnlink={handlePanelUnlinkSubmit}
-        />
-
-        <ConfirmationDialog
-          open={Boolean(panelCalendarToDelete)}
-          onCancel={() => setPanelCalendarToDelete(null)}
-          onConfirm={handlePanelDeleteConfirm}
-          title="Delete Calendar"
-          message="Move this calendar to trash? You can restore it within 30 days."
-          confirmText="Delete"
-          cancelText="Cancel"
-          isSubmitting={isPanelDeleting}
-          confirmColor="error"
+        <CalendarManagementDialogs
+          actions={panelActions}
+          userCalendars={userCalendars}
         />
 
       {/* Economic Calendar Drawer — only rendered on <lg (panel handles it on lg+) */}
@@ -3177,13 +3028,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           onClose={() => setIsCalendarsListDrawerOpen(false)}
           activeCalendarId={calendarId}
           onCalendarClick={handleSelectCalendar}
-          onEditCalendar={onUpdateCalendar ? setPanelCalendarToEdit : undefined}
-          onDuplicateCalendar={onDuplicateCalendar ? setPanelCalendarToDuplicate : undefined}
-          onLinkCalendar={setPanelCalendarToLink}
-          onDeleteCalendar={onDeleteCalendar ? setPanelCalendarToDelete : undefined}
+          onEditCalendar={onUpdateCalendar ? panelActions.setEditTarget : undefined}
+          onDuplicateCalendar={onDuplicateCalendar ? panelActions.setDuplicateTarget : undefined}
+          onLinkCalendar={panelActions.setLinkTarget}
+          onDeleteCalendar={onDeleteCalendar ? panelActions.setDeleteTarget : undefined}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
-          onRestoreCalendar={handlePanelRestoreCalendar}
-          onPermanentDeleteCalendar={handlePanelPermanentDeleteCalendar}
+          onRestoreCalendar={panelActions.restoreCalendar}
+          onPermanentDeleteCalendar={panelActions.permanentDeleteCalendar}
         />
       )}
 
