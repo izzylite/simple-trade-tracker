@@ -44,6 +44,7 @@ import {
   EventNote as GamePlanIcon,
   HelpOutline as HelpOutlineIcon,
   DeleteOutline as TrashIcon,
+  Insights as InsightsIcon,
 } from '@mui/icons-material';
 import {
   format,
@@ -89,8 +90,6 @@ import CalendarSelectorBar, { CalendarSelectorItem } from '../components/common/
 import { NewTradeForm, TradeImage } from '../components/trades/TradeForm';
 import { Calendar } from '../types/calendar';
 import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
-import MonthlyStats from '../components/MonthlyStats';
-import AccountStats from '../components/AccountStats';
 import TradeFormDialog, { createEditTradeData } from '../components/trades/TradeFormDialog';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
@@ -151,6 +150,8 @@ import TagManagementContent from '../components/sidePanel/content/TagManagementC
 import DayTradesContent from '../components/sidePanel/content/DayTradesContent';
 import CalendarsListContent from '../components/sidePanel/content/CalendarsListContent';
 import CalendarsListDrawer from '../components/calendars/CalendarsListDrawer';
+import StatsContent from '../components/sidePanel/content/StatsContent';
+import StatsDrawer from '../components/StatsDrawer';
 
 interface TradeCalendarProps {
   // Trade CRUD operations now handled internally via useCalendarTrades hook
@@ -772,6 +773,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   // Calendars list drawer state (<lg fallback for 'calendars-list' panel)
   const [isCalendarsListDrawerOpen, setIsCalendarsListDrawerOpen] = useState(false);
 
+  // Stats drawer state (<lg fallback for 'stats' panel)
+  const [isStatsDrawerOpen, setIsStatsDrawerOpen] = useState(false);
+
 
   // Week note state
   const [weekNoteKeys, setWeekNoteKeys] = useState<Set<string>>(new Set());
@@ -863,6 +867,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       setIsEconomicCalendarOpen(false);
       setIsFAQDrawerOpen(false);
       setIsCalendarsListDrawerOpen(false);
+      setIsStatsDrawerOpen(false);
       setSelectedDate(null);
     };
 
@@ -891,6 +896,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         case 'calendars-list':
           setIsCalendarsListDrawerOpen(true);
           break;
+        case 'stats':
+          setIsStatsDrawerOpen(true);
+          break;
         case 'day-trades': {
           const dayView = currentView as DayTradesView;
           setSelectedDate(dayView.date);
@@ -904,6 +912,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         setPanelOpen(true);
       } else if (isCalendarsListDrawerOpen) {
         replacePanel({ id: 'calendars-list' });
+        setPanelOpen(true);
+      } else if (isStatsDrawerOpen) {
+        replacePanel({ id: 'stats' });
         setPanelOpen(true);
       }
       closeAllDrawers();
@@ -1785,6 +1796,49 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             ),
           };
         }
+        case 'stats': {
+          return {
+            title: 'Stats',
+            icon: <InsightsIcon fontSize="small" />,
+            component: (
+              <StatsContent
+                balance={accountBalance}
+                totalProfit={totalProfit}
+                trades={trades}
+                filteredTrades={filteredTrades}
+                riskPerTrade={dynamicRiskSettings?.risk_per_trade}
+                dynamicRiskSettings={dynamicRiskSettings}
+                onToggleDynamicRisk={(useActualAmounts) => {
+                  setIsDynamicRiskToggled(useActualAmounts);
+                  handleToggleDynamicRisk(useActualAmounts);
+                }}
+                isDynamicRiskToggled={isDynamicRiskToggled}
+                isReadOnly={isReadOnly}
+                maxDailyDrawdown={maxDailyDrawdown}
+                currentDate={currentDate}
+                monthlyTarget={monthly_target}
+                calendarId={calendarId}
+                scoreSettings={scoreSettings}
+                calendar={calendar}
+                pnlBeforeMonth={pnlBeforeMonth}
+                isPnlLoading={isPnlLoading}
+                onImportTrades={handleImportTrades}
+                onDeleteTrade={handleDeleteClick}
+                onClearMonthTrades={handleClearMonthTrades}
+                onOpenGalleryMode={openGalleryMode}
+                onUpdateTradeProperty={handleUpdateTradeProperty}
+                onUpdateCalendarProperty={onUpdateCalendarProperty}
+                onEditTrade={handleEditTrade}
+                economicFilter={(_calendarId) =>
+                  calendar?.economic_calendar_filters ||
+                  DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
+                }
+                openPerformanceDialog={openPerfDialog}
+                onPerformanceDialogClose={() => setOpenPerfDialog(false)}
+              />
+            ),
+          };
+        }
         case 'calendars-list': {
           const isTrash = (view as { isTrash?: boolean }).isTrash;
           return {
@@ -1926,6 +1980,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     ? isPanelOpen && currentView.id === 'faq'
     : isFAQDrawerOpen;
 
+  const isStatsActive = isLgUp
+    ? isPanelOpen && currentView.id === 'stats'
+    : isStatsDrawerOpen;
+
   const breadcrumbRightContent = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
 
@@ -2050,12 +2108,32 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         </Box>
       )}
 
-      {/* Breadcrumbs */}
+      {/* Header bar */}
       <CalendarSelectorBar
         active={activeSelectorItem}
         recent={recentCalendarItems}
         onViewAll={handleViewAllCalendars}
         onSelect={handleSelectCalendar}
+        inlineActions={
+          <Button
+            size="small"
+            variant={isStatsActive ? 'contained' : 'outlined'}
+            color="primary"
+            startIcon={<InsightsIcon sx={{ fontSize: 16 }} />}
+            onClick={() => togglePanel('stats', setIsStatsDrawerOpen)}
+            sx={{
+              textTransform: 'none',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              minWidth: 0,
+            }}
+          >
+            Stats
+          </Button>
+        }
         rightContent={breadcrumbRightContent}
       />
 
@@ -2092,66 +2170,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           width: '100%',
           position: 'relative'
         }}>
-
-          {/* Stats Cards Section with Enhanced Layout */}
-          <Box sx={{
-            display: 'flex',
-            gap: { xs: 2, md: 3 },
-            flexDirection: { xs: 'column', lg: 'row' },
-            justifyContent: 'center',
-            alignItems: 'stretch',
-            width: '100%'
-          }}>
-
-            <Box sx={{ flex: 1, height: '100%' }}>
-              <AccountStats
-                balance={accountBalance}
-                totalProfit={totalProfit}
-                trades={filteredTrades}
-                risk_per_trade={dynamicRiskSettings?.risk_per_trade}
-                dynamicRiskSettings={dynamicRiskSettings}
-                onToggleDynamicRisk={(useActualAmounts) => {
-                  setIsDynamicRiskToggled(useActualAmounts);
-                  handleToggleDynamicRisk(useActualAmounts);
-                }}
-                isDynamicRiskToggled={isDynamicRiskToggled}
-                isReadOnly={isReadOnly}
-                max_daily_drawdown={maxDailyDrawdown}
-              />
-            </Box>
-
-            <Box sx={{ flex: 1, height: '100%' }}>
-
-              <MonthlyStats
-                trades={filteredTrades}
-                accountBalance={accountBalance}
-                onImportTrades={handleImportTrades}
-                onDeleteTrade={handleDeleteClick}
-                currentDate={currentDate}
-                monthlyTarget={monthly_target}
-                onClearMonthTrades={handleClearMonthTrades}
-                isReadOnly={isReadOnly}
-                onOpenGalleryMode={openGalleryMode}
-                calendarId={calendarId!!}
-                scoreSettings={scoreSettings}
-                dynamicRiskSettings={dynamicRiskSettings}
-                onUpdateTradeProperty={handleUpdateTradeProperty}
-                onUpdateCalendarProperty={onUpdateCalendarProperty}
-                onEditTrade={handleEditTrade}
-                economicFilter={(_calendarId) => calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS}
-                maxDailyDrawdown={maxDailyDrawdown}
-                pnlBeforeMonth={pnlBeforeMonth}
-                isPnlLoading={isPnlLoading}
-                calendar={calendar}
-                openPerformanceDialog={openPerfDialog}
-                onPerformanceDialogClose={() => setOpenPerfDialog(false)}
-              />
-
-            </Box>
-
-
-          </Box>
-
 
           {/* Calendar Navigation Header */}
           <Box sx={{
@@ -3039,6 +3057,46 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           onUpdateCalendarProperty={onUpdateCalendarProperty}
           onRestoreCalendar={panelActions.restoreCalendar}
           onPermanentDeleteCalendar={panelActions.permanentDeleteCalendar}
+        />
+      )}
+
+      {/* Stats Drawer — <lg only (lg+ uses SidePanel) */}
+      {!isLgUp && (
+        <StatsDrawer
+          open={isStatsDrawerOpen}
+          onClose={() => setIsStatsDrawerOpen(false)}
+          balance={accountBalance}
+          totalProfit={totalProfit}
+          trades={trades}
+          filteredTrades={filteredTrades}
+          riskPerTrade={dynamicRiskSettings?.risk_per_trade}
+          dynamicRiskSettings={dynamicRiskSettings}
+          onToggleDynamicRisk={(useActualAmounts) => {
+            setIsDynamicRiskToggled(useActualAmounts);
+            handleToggleDynamicRisk(useActualAmounts);
+          }}
+          isDynamicRiskToggled={isDynamicRiskToggled}
+          isReadOnly={isReadOnly}
+          maxDailyDrawdown={maxDailyDrawdown}
+          currentDate={currentDate}
+          monthlyTarget={monthly_target}
+          calendarId={calendarId}
+          scoreSettings={scoreSettings}
+          calendar={calendar}
+          pnlBeforeMonth={pnlBeforeMonth}
+          isPnlLoading={isPnlLoading}
+          onImportTrades={handleImportTrades}
+          onDeleteTrade={handleDeleteClick}
+          onClearMonthTrades={handleClearMonthTrades}
+          onOpenGalleryMode={openGalleryMode}
+          onUpdateTradeProperty={handleUpdateTradeProperty}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
+          onEditTrade={handleEditTrade}
+          economicFilter={(_calendarId) =>
+            calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
+          }
+          openPerformanceDialog={openPerfDialog}
+          onPerformanceDialogClose={() => setOpenPerfDialog(false)}
         />
       )}
 

@@ -40,6 +40,10 @@ interface CalendarSelectorBarProps {
   onSelect: (id: string) => void;
   /** Right-aligned content (edit, share, FAQ buttons, etc.) */
   rightContent?: React.ReactNode;
+  /** Inline content rendered immediately to the right of the trigger.
+   *  Use this for actions that read as part of the calendar context (Stats,
+   *  share-link toggles, etc.). Use `rightContent` for page-level chrome. */
+  inlineActions?: React.ReactNode;
   /** Optional small icon buttons rendered between trigger and rightContent. */
   buttons?: Array<{
     key: string;
@@ -75,6 +79,7 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
   onViewAll,
   onSelect,
   rightContent,
+  inlineActions,
   buttons,
 }) => {
   const theme = useTheme();
@@ -183,6 +188,13 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
             }}
           />
         </ButtonBase>
+
+        {/* Inline actions next to the trigger */}
+        {inlineActions && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mr: 'auto', ml: 1 }}>
+            {inlineActions}
+          </Box>
+        )}
 
         {/* Right actions */}
         {(safeButtons.length > 0 || rightContent) && (
