@@ -85,7 +85,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
 
-import Breadcrumbs, { BreadcrumbItem, BreadcrumbButton, DropdownItem } from '../components/common/Breadcrumbs';
+import CalendarSelectorBar, { CalendarSelectorItem } from '../components/common/CalendarSelectorBar';
 import { NewTradeForm, TradeImage } from '../components/trades/TradeForm';
 import { Calendar } from '../types/calendar';
 import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
@@ -912,46 +912,46 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     prevIsLgUp.current = isLgUp;
   }, [isLgUp]);
 
-  // Breadcrumb items
-  const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => {
-    // Recent calendars: filter trash, sort by updated_at desc, top 3.
-    // Always include the active calendar even if it's not in top 3 so the
-    // dropdown reflects current selection.
+  // Recent-calendars dropdown: trash-filtered, sorted by updated_at desc,
+  // top 3. Always include the active calendar even if it's not in top 3.
+  const recentCalendarItems = useMemo<CalendarSelectorItem[]>(() => {
     const sortedRecent = [...userCalendars]
       .filter(c => !c.deleted_at)
-      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      .sort(
+        (a, b) =>
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      );
     const top3 = sortedRecent.slice(0, 3);
     const includesActive = top3.some(c => c.id === calendarId);
-    const activeCal = !includesActive ? sortedRecent.find(c => c.id === calendarId) : undefined;
-    const dropdownSource = activeCal ? [activeCal, ...top3] : top3;
+    const activeCal = !includesActive
+      ? sortedRecent.find(c => c.id === calendarId)
+      : undefined;
+    const source = activeCal ? [activeCal, ...top3] : top3;
 
     // Overlay live data for the active calendar so name/totals reflect
-    // in-session updates (renames, new trades) instead of the snapshot.
-    const dropdownItems: DropdownItem[] = dropdownSource.map(cal => {
+    // in-session edits (renames, new trades) instead of the snapshot.
+    return source.map(cal => {
       const isActive = cal.id === calendarId;
-      const source = isActive ? calendar : cal;
+      const live = isActive ? calendar : cal;
       return {
-        label: source.name,
-        path: `/calendar/${cal.id}`,
+        id: cal.id,
+        name: live.name,
+        totalTrades: live.total_trades,
+        pnl: live.total_pnl,
+        hero_image_url: live.hero_image_url,
         active: isActive,
-        totalTrades: source.total_trades,
-        pnl: source.total_pnl
       };
     });
+  }, [calendarName, calendarId, userCalendars, calendar]);
 
-    return [
-      { label: 'Home', path: '/', icon: <HomeIcon sx={{ fontSize: 18 }} /> },
-      { label: 'Calendars', path: '/dashboard', icon: <CalendarIcon sx={{ fontSize: 18 }} /> },
-      {
-        label: calendarName || 'Calendar',
-        path: `/calendar/${calendarId}`,
-        dropdown: dropdownItems.length > 0 ? dropdownItems : undefined,
-        dropdownTitle: dropdownItems.length > 0 ? 'Calendars' : undefined,
-        onViewAll: dropdownItems.length > 0 ? handleViewAllCalendars : undefined,
-        viewAllLabel: 'View all'
-      }
-    ];
-  }, [calendarName, calendarId, userCalendars, calendar, handleViewAllCalendars]);
+  const activeSelectorItem = useMemo<CalendarSelectorItem>(
+    () => ({
+      id: calendarId || '',
+      name: calendarName || 'Calendar',
+      hero_image_url: calendar?.hero_image_url,
+    }),
+    [calendarId, calendarName, calendar?.hero_image_url]
+  );
 
   // Use optimized hook for high-impact economic events
   const { highImpactEventDates: monthlyHighImpactEvents } = useHighImpactEvents({
@@ -1922,8 +1922,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
      handleDismissReminder, isReadOnly]
   );
 
-  const breadcrumbButtons = useMemo<BreadcrumbButton[]>(() => [], []);
-
   const isFAQActive = isLgUp
     ? isPanelOpen && currentView.id === 'faq'
     : isFAQDrawerOpen;
@@ -2053,7 +2051,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       )}
 
       {/* Breadcrumbs */}
-      <Breadcrumbs items={breadcrumbItems} buttons={breadcrumbButtons} rightContent={breadcrumbRightContent} />
+      <CalendarSelectorBar
+        active={activeSelectorItem}
+        recent={recentCalendarItems}
+        onViewAll={handleViewAllCalendars}
+        onSelect={handleSelectCalendar}
+        rightContent={breadcrumbRightContent}
+      />
 
 
 
