@@ -3,28 +3,24 @@ import {
   Box,
   Typography,
   Stack,
-  FormControl,
-  Select,
-  MenuItem,
   CircularProgress,
-  Avatar,
-  alpha,
-  useTheme,
-  SelectChangeEvent,
 } from '@mui/material';
 import {
-  ShowChart as PerformanceIcon,
-  CalendarToday as CalendarIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
 } from '@mui/icons-material';
 import { useAuthState } from '../contexts/AuthStateContext';
 import { useCalendars } from '../hooks/useCalendars';
 import { Calendar } from '../types/calendar';
 import PerformanceCharts from '../components/PerformanceCharts';
-import { formatCurrency } from '../utils/formatters';
 import CalendarLockedOverlay from '../components/calendars/CalendarLockedOverlay';
+import CalendarSelectorBar, {
+  CalendarSelectorItem,
+} from '../components/common/CalendarSelectorBar';
 
 const STORAGE_KEY = 'perf_selected_calendar_id';
 const SWITCH_SPINNER_MS = 350;
+const APP_HEADER_HEIGHT = 64;
 
 interface PerformancePageProps {
   /** Plumbed from App.tsx so calendar-property edits made from this page persist. */
@@ -34,17 +30,16 @@ interface PerformancePageProps {
 }
 
 /**
- * Cross-calendar entry point for performance analytics. Picks one calendar at
- * a time via local dropdown (no global active-calendar sync) and renders the
- * existing PerformanceCharts component for it. Selection persists in
- * localStorage; switching shows a brief spinner so the transition feels
- * intentional.
+ * Cross-calendar entry point for performance analytics. The active calendar
+ * for this page is selected via the CalendarSelectorBar header (same trigger
+ * pattern as Home, for cohesion). Selection is local to this page and
+ * persists in localStorage; switching shows a brief spinner overlay so the
+ * PerformanceCharts remount feels intentional rather than abrupt.
  */
 const PerformancePage: React.FC<PerformancePageProps> = ({
   onUpdateCalendar,
   onCreateCalendar,
 }) => {
-  const theme = useTheme();
   const { user } = useAuthState();
   const { calendars, isLoading } = useCalendars(user?.uid);
 
@@ -85,8 +80,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
     };
   }, []);
 
-  const handleChange = (event: SelectChangeEvent<string>) => {
-    const id = event.target.value;
+  const handleSelect = (id: string) => {
     if (id === selectedId) return;
     setIsSwitching(true);
     setSelectedId(id);
@@ -120,194 +114,217 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
     };
   }, [onUpdateCalendar, selectedCalendar, activeCalendars]);
 
-  return (
-    <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1400, mx: 'auto' }}>
-      {/* Header */}
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={{ xs: 2, sm: 3 }}
-        alignItems={{ xs: 'flex-start', sm: 'center' }}
-        justifyContent="space-between"
-        sx={{ mb: { xs: 2, sm: 3 } }}
-      >
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: 2,
-              bgcolor: alpha(theme.palette.primary.main, 0.12),
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <PerformanceIcon sx={{ color: 'primary.main' }} />
-          </Box>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-              Performance
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Detailed analytics for a single calendar
-            </Typography>
-          </Box>
-        </Stack>
+  // Recent-calendars dropdown items for the header selector
+  const recentItems = useMemo<CalendarSelectorItem[]>(() => {
+    const sorted = [...activeCalendars].sort(
+      (a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    );
+    const top3 = sorted.slice(0, 3);
+    const includesActive = top3.some((c) => c.id === selectedId);
+    const activeCal = !includesActive
+      ? sorted.find((c) => c.id === selectedId)
+      : undefined;
+    const source = activeCal ? [activeCal, ...top3] : top3;
+    return source.map((cal) => ({
+      id: cal.id,
+      name: cal.name,
+      totalTrades: cal.total_trades,
+      pnl: cal.total_pnl,
+      hero_image_url: cal.hero_image_url,
+      active: cal.id === selectedId,
+    }));
+  }, [activeCalendars, selectedId]);
 
-        {/* Calendar selector */}
-        {activeCalendars.length > 0 && (
-          <FormControl size="small" sx={{ minWidth: 240 }}>
-            <Select
-              value={selectedId}
-              onChange={handleChange}
-              displayEmpty
-              renderValue={(value) => {
-                const cal = activeCalendars.find((c) => c.id === value);
-                if (!cal) return <em>Select a calendar</em>;
-                return (
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Avatar
-                      src={cal.hero_image_url || undefined}
-                      variant="rounded"
-                      sx={{
-                        width: 24,
-                        height: 24,
-                        bgcolor: alpha(theme.palette.primary.main, 0.1),
-                      }}
-                    >
-                      <CalendarIcon sx={{ fontSize: 14, color: 'primary.main' }} />
-                    </Avatar>
-                    <Typography
-                      sx={{
-                        fontSize: '0.875rem',
-                        fontWeight: 500,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {cal.name}
-                    </Typography>
-                  </Stack>
-                );
-              }}
-            >
-              {activeCalendars.map((cal) => {
-                const pnl = cal.total_pnl || 0;
-                const isPositive = pnl >= 0;
-                return (
-                  <MenuItem key={cal.id} value={cal.id}>
-                    <Stack
-                      direction="row"
-                      spacing={1.5}
-                      alignItems="center"
-                      sx={{ width: '100%' }}
-                    >
-                      <Avatar
-                        src={cal.hero_image_url || undefined}
-                        variant="rounded"
-                        sx={{
-                          width: 28,
-                          height: 28,
-                          bgcolor: alpha(theme.palette.primary.main, 0.1),
-                        }}
-                      >
-                        <CalendarIcon sx={{ fontSize: 16, color: 'primary.main' }} />
-                      </Avatar>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography
-                          sx={{
-                            fontSize: '0.875rem',
-                            fontWeight: 500,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {cal.name}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: isPositive ? 'success.main' : 'error.main',
-                            fontSize: '0.6875rem',
-                            fontWeight: 600,
-                          }}
-                        >
-                          {isPositive ? '+' : ''}
-                          {formatCurrency(pnl)}
-                          {' · '}
-                          <Typography
-                            component="span"
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ fontSize: '0.6875rem' }}
-                          >
-                            {cal.total_trades || 0} trades
-                          </Typography>
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </MenuItem>
-                );
-              })}
-            </Select>
-          </FormControl>
-        )}
-      </Stack>
+  const activeSelectorItem = useMemo<CalendarSelectorItem>(() => {
+    if (selectedCalendar) {
+      return {
+        id: selectedCalendar.id,
+        name: selectedCalendar.name,
+        hero_image_url: selectedCalendar.hero_image_url,
+      };
+    }
+    return { id: '', name: 'Select calendar' };
+  }, [selectedCalendar]);
+
+  // ---- Render ----
+
+  if (isLoading && activeCalendars.length === 0) {
+    return (
+      <Box
+        sx={{
+          height: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <CircularProgress size={32} />
+      </Box>
+    );
+  }
+
+  if (activeCalendars.length === 0) {
+    return (
+      <Box
+        sx={{
+          position: 'relative',
+          minHeight: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
+        }}
+      >
+        <CalendarLockedOverlay
+          onCreateCalendar={onCreateCalendar}
+          subtitle="Create a calendar to start tracking trades and unlock performance analytics."
+        />
+      </Box>
+    );
+  }
+
+  const pnl = selectedCalendar?.total_pnl ?? 0;
+  const isPositive = pnl >= 0;
+  const totalTrades = selectedCalendar?.total_trades ?? 0;
+
+  return (
+    <Box>
+      {/* Header */}
+      <CalendarSelectorBar
+        active={activeSelectorItem}
+        recent={recentItems}
+        onSelect={handleSelect}
+        rightContent={
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ pl: 2 }}>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography
+                sx={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  color: 'text.secondary',
+                  lineHeight: 1.1,
+                }}
+              >
+                Trades
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: '0.9375rem',
+                  fontWeight: 700,
+                  fontFeatureSettings: "'tnum' on, 'lnum' on",
+                  color: 'text.primary',
+                  mt: 0.25,
+                  lineHeight: 1.1,
+                }}
+              >
+                {totalTrades.toLocaleString()}
+              </Typography>
+            </Box>
+
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography
+                sx={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  color: 'text.secondary',
+                  lineHeight: 1.1,
+                }}
+              >
+                Total P&amp;L
+              </Typography>
+              <Stack
+                direction="row"
+                spacing={0.5}
+                alignItems="center"
+                justifyContent="flex-end"
+                sx={{ mt: 0.25 }}
+              >
+                {isPositive ? (
+                  <TrendingUpIcon
+                    sx={{ fontSize: 14, color: 'success.main' }}
+                  />
+                ) : (
+                  <TrendingDownIcon
+                    sx={{ fontSize: 14, color: 'error.main' }}
+                  />
+                )}
+                <Typography
+                  sx={{
+                    fontSize: '0.9375rem',
+                    fontWeight: 700,
+                    fontFeatureSettings: "'tnum' on, 'lnum' on",
+                    color: isPositive ? 'success.main' : 'error.main',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {isPositive ? '+' : '-'}$
+                  {Math.abs(pnl).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </Typography>
+              </Stack>
+            </Box>
+          </Stack>
+        }
+      />
 
       {/* Body */}
-      {isLoading ? (
-        <CenteredSpinner label="Loading calendars" />
-      ) : activeCalendars.length === 0 ? (
-        <Box sx={{ position: 'relative', minHeight: 400 }}>
-          <CalendarLockedOverlay
-            onCreateCalendar={onCreateCalendar}
-            subtitle="Create a calendar to start tracking trades and unlock performance analytics."
+      <Box
+        sx={{
+          position: 'relative',
+          px: { xs: 2, sm: 3, md: 4 },
+          py: { xs: 2, sm: 3 },
+          maxWidth: 1600,
+          mx: 'auto',
+        }}
+      >
+        {isSwitching || !selectedCalendar ? (
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              py: 12,
+              gap: 2,
+            }}
+          >
+            <CircularProgress size={28} />
+            <Typography
+              sx={{
+                fontSize: '0.8125rem',
+                color: 'text.secondary',
+                letterSpacing: '0.02em',
+              }}
+            >
+              Switching calendar
+            </Typography>
+          </Box>
+        ) : (
+          <PerformanceCharts
+            key={selectedCalendar.id}
+            calendarId={selectedCalendar.id}
+            calendar={selectedCalendar}
+            accountBalance={selectedCalendar.account_balance}
+            maxDailyDrawdown={selectedCalendar.max_daily_drawdown}
+            monthlyTarget={selectedCalendar.monthly_target}
+            scoreSettings={selectedCalendar.score_settings}
+            dynamicRiskSettings={{
+              account_balance: selectedCalendar.account_balance,
+              risk_per_trade: selectedCalendar.risk_per_trade,
+              dynamic_risk_enabled: selectedCalendar.dynamic_risk_enabled,
+              increased_risk_percentage: selectedCalendar.increased_risk_percentage,
+              profit_threshold_percentage: selectedCalendar.profit_threshold_percentage,
+            }}
+            onUpdateCalendarProperty={onUpdateCalendarProperty}
+            isReadOnly
           />
-        </Box>
-      ) : isSwitching || !selectedCalendar ? (
-        <CenteredSpinner label="Switching calendar" />
-      ) : (
-        <PerformanceCharts
-          key={selectedCalendar.id}
-          calendarId={selectedCalendar.id}
-          calendar={selectedCalendar}
-          accountBalance={selectedCalendar.account_balance}
-          maxDailyDrawdown={selectedCalendar.max_daily_drawdown}
-          monthlyTarget={selectedCalendar.monthly_target}
-          scoreSettings={selectedCalendar.score_settings}
-          dynamicRiskSettings={{
-            account_balance: selectedCalendar.account_balance,
-            risk_per_trade: selectedCalendar.risk_per_trade,
-            dynamic_risk_enabled: selectedCalendar.dynamic_risk_enabled,
-            increased_risk_percentage: selectedCalendar.increased_risk_percentage,
-            profit_threshold_percentage: selectedCalendar.profit_threshold_percentage,
-          }}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
-          isReadOnly
-        />
-      )}
+        )}
+      </Box>
     </Box>
   );
 };
-
-const CenteredSpinner: React.FC<{ label: string }> = ({ label }) => (
-  <Box
-    sx={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      py: 12,
-      gap: 2,
-    }}
-  >
-    <CircularProgress size={32} />
-    <Typography variant="body2" color="text.secondary">
-      {label}…
-    </Typography>
-  </Box>
-);
 
 export default PerformancePage;
