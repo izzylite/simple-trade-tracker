@@ -227,7 +227,16 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                       color: (session.pnlPercentage ?? 0) > 0 ? theme.palette.success.main : theme.palette.error.main
                     }}
                   >
-                    {(session.pnlPercentage ?? 0).toFixed(2)}%
+                    {(() => {
+                      const pct = session.pnlPercentage ?? 0;
+                      if (Math.abs(pct) >= 1000) {
+                        return `${(pct / 100).toFixed(1)}×`;
+                      }
+                      return `${pct.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}%`;
+                    })()}
                   </Typography>
                 </Box>
 

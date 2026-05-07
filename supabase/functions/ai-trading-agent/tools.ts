@@ -2467,6 +2467,7 @@ export const setReminderTool: GeminiFunctionDeclaration = {
     "The response posts as an assistant message into this conversation, marked with a small 'Reminder' label. " +
     "ALWAYS resolve the trigger time first — for an economic release, query the economic_events table " +
     "via execute_sql (SELECT event_date, time_utc FROM economic_events WHERE event_name ILIKE '%X%' AND event_date >= CURRENT_DATE ORDER BY event_date LIMIT 1). " +
+    "IMPORTANT for economic releases: set trigger_at = time_utc + 20 seconds (NOT time_utc exactly). Actual values are scraped after release and need a short buffer to land in the DB; firing at release time gives stale/null actuals. " +
     "For 'in N hours/days', compute trigger_at relative to current time. Confirm the resolved trigger time back to the user. " +
     "Returns JSON: {success: true, id, trigger_at, description} on success, or {success: false, error_code, error} on failure. " +
     "Possible error_codes: past_trigger_at (trigger is now or earlier), too_far_future (>1 year out), " +

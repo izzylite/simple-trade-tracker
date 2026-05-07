@@ -124,8 +124,6 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
   const [groupEvents, setGroupEvents] = useState<boolean>(false);
 
   // Async calculation states
-  const [losingTradeCorrelations, setLosingTradeCorrelations] = useState<any[]>([]);
-  const [winningTradeCorrelations, setWinningTradeCorrelations] = useState<any[]>([]);
   const [correlationStats, setCorrelationStats] = useState<any>({
     totalLosingTrades: 0,
     totalWinningTrades: 0,
@@ -189,8 +187,6 @@ const CURRENCY_OPTIONS = [
   // Use pre-calculated economic correlations from server (instant switching between impact levels!)
   useEffect(() => {
     if (!economicCorrelations) {
-      setLosingTradeCorrelations([]);
-      setWinningTradeCorrelations([]);
       setCorrelationStats({});
       return;
     }
@@ -201,34 +197,40 @@ const CURRENCY_OPTIONS = [
       : economicCorrelations.medium;
 
     if (!impactData) {
-      setLosingTradeCorrelations([]);
-      setWinningTradeCorrelations([]);
       setCorrelationStats({});
       return;
     }
 
-    // Filter by currency if needed (client-side filtering of pre-calculated data)
-    const filterByCurrency = (correlations: any[]) => {
-      if (selectedCurrency === 'ALL') return correlations;
-
-      return correlations
-        .map(correlation => ({
-          ...correlation,
-          economic_events: correlation.economic_events?.filter(
-            (event: any) => event.currency === selectedCurrency
-          ) || []
-        }))
-        .filter(correlation => correlation.economic_events.length > 0);
-    };
-
-    setLosingTradeCorrelations(filterByCurrency(impactData.losingTradeCorrelations || []));
-    setWinningTradeCorrelations(filterByCurrency(impactData.winningTradeCorrelations || []));
-
     // Post-filter mostCommonEventTypes: only keep trades whose session
-    // matches the session derived from the event's time_utc
+    // matches the session derived from the event's time_utc.
+    //
+    // Server emits losing_trade_ids/winning_trade_ids (UUID arrays) instead of
+    // full trade rows to keep the payload small. We rehydrate from the
+    // top-level `trades` prop here. Old payload shape (losingTrades / winningTrades
+    // as Trade arrays) still accepted as fallback for transitional deploys.
+    const tradesById = new Map<string, Trade>();
+    trades.forEach((t) => {
+      if (t?.id) tradesById.set(String(t.id), t);
+    });
+    const rehydrate = (eventType: any, key: 'losing' | 'winning'): Trade[] => {
+      const idsKey = key === 'losing' ? 'losing_trade_ids' : 'winning_trade_ids';
+      const fullKey = key === 'losing' ? 'losingTrades' : 'winningTrades';
+      const ids: any[] | undefined = eventType?.[idsKey];
+      if (Array.isArray(ids)) {
+        const out: Trade[] = [];
+        for (const id of ids) {
+          const t = tradesById.get(String(id));
+          if (t) out.push(t);
+        }
+        return out;
+      }
+      return Array.isArray(eventType?.[fullKey]) ? eventType[fullKey] : [];
+    };
     const stats = { ...(impactData.correlationStats || {}) };
     if (stats.mostCommonEventTypes) {
       stats.mostCommonEventTypes = stats.mostCommonEventTypes.map((eventType: any) => {
+        const losingHydrated  = rehydrate(eventType, 'losing');
+        const winningHydrated = rehydrate(eventType, 'winning');
         const filterTradesBySession = (trades: any[]) => {
           if (!trades) return [];
           return trades.filter((trade: any) => {
@@ -255,8 +257,8 @@ const CURRENCY_OPTIONS = [
           });
         };
 
-        const filteredLosing = filterTradesBySession(eventType.losingTrades);
-        const filteredWinning = filterTradesBySession(eventType.winningTrades);
+        const filteredLosing = filterTradesBySession(losingHydrated);
+        const filteredWinning = filterTradesBySession(winningHydrated);
         const losingCount = filteredLosing.length;
         const winningCount = filteredWinning.length;
         const totalCount = losingCount + winningCount;
@@ -281,7 +283,7 @@ const CURRENCY_OPTIONS = [
       }).filter((eventType: any) => eventType.count > 0);
     }
     setCorrelationStats(stats);
-  }, [economicCorrelations, selectedImpact, selectedCurrency]);
+  }, [economicCorrelations, selectedImpact, selectedCurrency, trades]);
 
   // Get losing and winning trades (kept for legacy compatibility)
   const losingTrades = useMemo(() => {
