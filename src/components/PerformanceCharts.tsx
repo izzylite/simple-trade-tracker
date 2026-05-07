@@ -16,11 +16,9 @@ import { supabase } from '../config/supabase';
 import { EconomicCalendarFilterSettings, DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from './economicCalendar/EconomicCalendarDrawer';
 import { TradeOperationsProps } from '../types/tradeOperations';
 import PnLChartsWrapper from './charts/PnLChartsWrapper';
-import WinLossDistribution from './charts/WinLossDistribution';
 import WinLossStats from './charts/WinLossStats';
 import TagPerformanceAnalysis from './charts/TagPerformanceAnalysis';
 import TagDayOfWeekAnalysis from './charts/TagDayOfWeekAnalysis';
-import DailySummaryTable from './charts/DailySummaryTable';
 import SessionPerformanceAnalysis from './charts/SessionPerformanceAnalysis';
 import TradesListDialog from './charts/TradesListDialog';
 import RiskRewardChart from './charts/RiskRewardChart';
@@ -70,6 +68,9 @@ interface PerformanceChartsProps {
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
   calendar?: Calendar;
   isReadOnly?: boolean;
+  /** When true, hide the Basic/Advanced toggle and render only the Basic tab.
+   *  Used by the Stats panel which has limited width and shows a focused view. */
+  basicOnly?: boolean;
 }
 
 const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
@@ -93,7 +94,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   onOpenGalleryMode,
   economicFilter,
   calendar,
-  isReadOnly = false
+  isReadOnly = false,
+  basicOnly = false
 }) => {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
@@ -227,6 +229,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       return;
     }
 
+    const ac = new AbortController();
+
     const loadAllData = async () => {
       setIsLoadingData(true);
       setCalculationError(null);
@@ -234,13 +238,22 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       try {
         // 1. Fetch chart data AND trades in single RPC call
         const dateAtNoonUTC = getNormalizedDate(selectedDate);
-        const { data: rpcResult, error: chartError } = await supabase.rpc('calculate_chart_data', {
-          p_calendar_id: calendarId,
-          p_time_period: timePeriod,
-          p_selected_date: dateAtNoonUTC.toISOString()
-        });
+        const { data: rpcResult, error: chartError } = await supabase
+          .rpc('calculate_chart_data', {
+            p_calendar_id: calendarId,
+            p_time_period: timePeriod,
+            p_selected_date: dateAtNoonUTC.toISOString()
+          })
+          .abortSignal(ac.signal);
+
+        if (ac.signal.aborted) return;
 
         if (chartError) {
+          // Aborted RPC surfaces as PostgrestError with name 'AbortError'
+          // or message containing 'aborted' depending on supabase-js version.
+          if (chartError.name === 'AbortError' || /abort/i.test(chartError.message || '')) {
+            return;
+          }
           logger.error('Error calling calculate_chart_data RPC:', chartError);
           throw chartError;
         }
@@ -264,6 +277,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
           allTags: [],
           winLossData: []
         };
+
+        if (ac.signal.aborted) return;
 
         setInternalTrades(fetchedTrades);
 
@@ -307,6 +322,12 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         setEconomicCorrelations(economicCorrelations);
 
       } catch (error) {
+        if (ac.signal.aborted) return;
+        const name = (error as any)?.name;
+        const msg = (error as any)?.message;
+        if (name === 'AbortError' || (typeof msg === 'string' && /abort/i.test(msg))) {
+          return;
+        }
         logger.error('Error loading data:', error);
         setCalculationError(error instanceof Error ? error.message : 'Failed to load data');
         setInternalTrades([]);
@@ -314,11 +335,17 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         setPerformanceData(null);
         setEconomicCorrelations(null);
       } finally {
-        setIsLoadingData(false);
+        if (!ac.signal.aborted) {
+          setIsLoadingData(false);
+        }
       }
     };
 
     loadAllData();
+
+    return () => {
+      ac.abort();
+    };
   }, [calendarId, selectedDate, timePeriod, accountBalance]);
 
   // Handle trade sync events from other components (e.g., useCalendarTrades)
@@ -440,12 +467,6 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     breakevens: { total: 0, avgAmount: 0 }
   };
 
-  // Get win/loss distribution data from async calculations
-  const winLossData = performanceData?.winLossData || [];
-
-  // Get daily summary data from async calculations
-  const dailySummaryData = performanceData?.dailySummaryData || [];
-
   // Get tag statistics from async calculations
   const tagStats = performanceData?.tagStats || [];
 
@@ -500,51 +521,6 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
 
 
-  // Handle pie chart click to show trades - wrapped in useCallback
-  const handlePieClick = useCallback((category: string) => {
-
-    let categoryTrades: Trade[] = [];
-    let dialogTitle = '';
-
-    // Check if we're clicking on a win/loss category or a tag
-    if (category === 'Wins' || category === 'Losses') {
-      // Filter trades based on the clicked category (Wins or Losses)
-      categoryTrades = filteredTrades.filter(trade =>
-        (category === 'Wins' && trade.trade_type === 'win') ||
-        (category === 'Losses' && trade.trade_type === 'loss')
-      );
-
-      // Format the date range for the dialog title
-      let dateText;
-      if (timePeriod === 'month') {
-        dateText = format(selectedDate, 'MMMM yyyy');
-      } else if (timePeriod === 'year') {
-        dateText = format(selectedDate, 'yyyy');
-      } else {
-        dateText = 'All Time';
-      }
-
-      dialogTitle = `${category} for ${dateText}`;
-    } else {
-      // We're clicking on a tag in the tag distribution chart
-      // Filter trades that have this tag
-      categoryTrades = filteredTrades.filter(trade =>
-        trade.tags?.includes(category)
-      );
-
-      dialogTitle = `Trades with tag: ${category}`;
-    }
-
-    if (categoryTrades.length > 0) {
-      // Open the dialog with the filtered trades
-      setTradesDialog({
-        open: true,
-        trades: categoryTrades,
-        title: dialogTitle,
-        expandedTradeId: categoryTrades.length === 1 ? categoryTrades[0].id : null
-      });
-    }
-  }, [filteredTrades, timePeriod, selectedDate]);
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 }, minHeight: { xs: 'auto', sm: 500 } }}>
@@ -596,14 +572,16 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       </Box>
 
       {/* Basic/Advanced Tab Selection */}
-      <Box sx={{ mb: 2 }}>
-        <RoundedTabs
-          tabs={PERFORMANCE_TABS}
-          fullWidth={true}
-          activeTab={performanceTab === 'basic' ? 0 : 1}
-          onTabChange={(_, newIndex) => setPerformanceTab(newIndex === 0 ? 'basic' : 'advanced')} 
-        />
-      </Box>
+      {!basicOnly && (
+        <Box sx={{ mb: 2 }}>
+          <RoundedTabs
+            tabs={PERFORMANCE_TABS}
+            fullWidth={true}
+            activeTab={performanceTab === 'basic' ? 0 : 1}
+            onTabChange={(_, newIndex) => setPerformanceTab(newIndex === 0 ? 'basic' : 'advanced')}
+          />
+        </Box>
+      )}
 
       {/* Loading State */}
       {isLoadingData && (
@@ -649,6 +627,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
                 winLossStats={winLossStats}
                 trades={filteredTrades}
                 onTradeClick={handleTradeExpand}
+                compact={basicOnly}
               />
 
               {/* P&L Charts with Tabs (Heatmap, Cumulative, Daily) */}
@@ -663,43 +642,24 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
                 selectedDate={selectedDate}
               />
 
-              {/* Win/Loss Distribution and Daily Summary - Stack on mobile */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: { xs: 'column', md: 'row' },
-                gap: { xs: 2, md: 3 },
-                mb: 3,
-                height: { xs: 'auto', md: chartHeights.pair }
-              }}>
-                <Box sx={{
-                  flex: 1,
-                  width: { xs: '100%', md: '50%' },
-                  height: { xs: chartHeights.large, md: '100%' }
-                }}>
-                  {/* Win/Loss Distribution */}
-                  <WinLossDistribution
-                    winLossData={winLossData}
-                    onPieClick={handlePieClick}
-                  />
-                </Box>
-                <Box sx={{
-                  flex: 1,
-                  width: { xs: '100%', md: '50%' },
-                  height: { xs: chartHeights.large, md: '100%' }
-                }}>
-                  {/* Daily Summary Table */}
-                  <DailySummaryTable
-                    dailySummaryData={dailySummaryData}
-                    trades={trades}
-                    setMultipleTradesDialog={setTradesDialog}
-                  />
-                </Box>
+              {/* Session Performance Analysis */}
+              <Box sx={{ mb: 3 }}>
+                <SessionPerformanceAnalysis
+                  sessionStats={sessionStats}
+                  trades={trades}
+                  selectedDate={selectedDate}
+                  timePeriod={timePeriod}
+                  setMultipleTradesDialog={setTradesDialog}
+                  chartData={chartData}
+                  targetValue={targetValue}
+                  monthly_target={monthlyTarget}
+                />
               </Box>
             </>
           )}
 
           {/* Advanced Tab Content */}
-          {(performanceTab === 'advanced' || advancedTabVisited) && (
+          {!basicOnly && (performanceTab === 'advanced' || advancedTabVisited) && (
             <Box sx={{ display: performanceTab === 'advanced' ? 'block' : 'none' }}>
            {/* Trading Score Section */}
             <ScoreSection
@@ -777,18 +737,6 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               />
             )}
           </Paper>
-
-           {/* Session Performance Analysis */}
-          <SessionPerformanceAnalysis
-            sessionStats={sessionStats}
-            trades={trades}
-            selectedDate={selectedDate}
-            timePeriod={timePeriod}
-            setMultipleTradesDialog={setTradesDialog}
-            chartData={chartData}
-            targetValue={targetValue}
-            monthly_target={monthlyTarget}
-          />
 
             {/* Economic Event Correlation Analysis */}
             <EconomicEventCorrelationAnalysis

@@ -26,7 +26,7 @@ const StatsDrawer: React.FC<StatsDrawerProps> = ({
       onClose={onClose}
       title="Stats"
       icon={<StatsIcon />}
-      width={{ xs: '100%', sm: 480 }}
+      width={{ xs: '100%', sm: 540 }}
       keepMounted={false}
       contentSx={{
         overflow: 'hidden',

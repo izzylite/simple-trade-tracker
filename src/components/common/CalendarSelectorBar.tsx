@@ -141,7 +141,7 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
             borderRadius: 1,
             transition: 'background 150ms cubic-bezier(0.4, 0, 0.2, 1)',
             '&:hover': {
-              bgcolor: alpha(theme.palette.action.hover, 1),
+              bgcolor: theme.palette.action.hover,
             },
             '&:focus-visible': {
               outline: 'none',
@@ -233,7 +233,6 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
               maxWidth: 380,
               maxHeight: 420,
               borderRadius: 1.5,
-              border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
               boxShadow:
                 theme.palette.mode === 'dark'
                   ? '0 4px 16px rgba(0,0,0,0.4)'
@@ -310,20 +309,8 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
                   '&:hover': {
                     bgcolor: isActive
                       ? alpha(theme.palette.primary.main, 0.16)
-                      : alpha(theme.palette.action.hover, 1),
+                      : theme.palette.action.hover,
                   },
-                  '&::before': isActive
-                    ? {
-                        content: '""',
-                        position: 'absolute',
-                        left: 0,
-                        top: 8,
-                        bottom: 8,
-                        width: 3,
-                        borderRadius: '0 2px 2px 0',
-                        bgcolor: 'primary.main',
-                      }
-                    : undefined,
                 }}
               >
                 <Stack

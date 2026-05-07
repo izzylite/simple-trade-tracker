@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
   Box,
@@ -6,61 +7,32 @@ import {
   IconButton,
   Paper,
   alpha,
-  Button,
   Tooltip,
-  Snackbar,
-  Alert,
-  AlertColor,
-  DialogContent,
-  DialogActions,
-  DialogTitle,
-  Dialog,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
   useTheme,
   useMediaQuery,
   Skeleton
 } from '@mui/material';
 import {
   TrendingUp,
-  FileDownload,
-  FileUpload,
   EmojiEvents,
   CalendarMonth,
   Analytics,
-  TrendingDown,
-  ShowChart,
-  Balance,
-  MoreVert,
-  Delete,
   ViewCarousel as GalleryIcon,
-  Close as CloseIcon,
-  ChevronLeft,
-  ChevronRight
 } from '@mui/icons-material';
 import { Trade, Calendar } from '../types/dualWrite';
-import { exportTrades } from '../utils/tradeExportImport';
 import { formatCurrency } from '../utils/formatters';
 
 import { calculateTargetProgress } from '../utils/statsUtils';
 import { error } from '../utils/logger';
-import { ImportMappingDialog } from './import/ImportMappingDialog';
-import PerformanceCharts, { TimePeriod, TIME_PERIOD_TABS } from './PerformanceCharts';
-import RoundedTabs from './common/RoundedTabs';
-import { scrollbarStyles } from '../styles/scrollbarStyles';
 
 
 
 interface MonthlyStatsProps {
   trades: Trade[];
   accountBalance: number;
-  onImportTrades?: (trades: Partial<Trade>[]) => Promise<void>;
   onDeleteTrade?: (id: string) => void;
   currentDate?: Date;
   monthlyTarget?: number;
-  onClearMonthTrades?: (month: number, year: number) => void;
   // Read-only mode for shared calendars
   isReadOnly?: boolean;
   // Gallery mode handler
@@ -77,20 +49,15 @@ interface MonthlyStatsProps {
   pnlBeforeMonth?: number;
   isPnlLoading?: boolean;
   calendar?: Calendar;
-  /** When true, opens the performance dialog from outside */
-  openPerformanceDialog?: boolean;
-  onPerformanceDialogClose?: () => void;
 }
 
 
 const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   trades,
   accountBalance,
-  onImportTrades,
   onDeleteTrade,
   currentDate = new Date(),
   monthlyTarget,
-  onClearMonthTrades,
   isReadOnly = false,
   onOpenGalleryMode,
   calendarId,
@@ -104,51 +71,22 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   pnlBeforeMonth,
   isPnlLoading = false,
   calendar,
-  openPerformanceDialog = false,
-  onPerformanceDialogClose,
 }) => {
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const menuOpen = Boolean(menuAnchorEl);
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
+  const navigate = useNavigate();
 
-  // Allow external trigger to open the performance dialog
-  useEffect(() => {
-    if (openPerformanceDialog) {
-      setPerformanceDate(currentDate);
-      setIsPerformanceDialogOpen(true);
+  const handleOpenPerformancePage = () => {
+    if (calendarId) {
+      try {
+        localStorage.setItem('perf_selected_calendar_id', calendarId);
+      } catch {
+        // ignore quota / disabled storage
+      }
     }
-  }, [openPerformanceDialog]);
-
-  // Notify parent when dialog closes (so it can reset its trigger)
-  const handlePerformanceDialogClose = () => {
-    setIsPerformanceDialogOpen(false);
-    onPerformanceDialogClose?.();
-  };
-  const [performanceTimePeriod, setPerformanceTimePeriod] = useState<TimePeriod>('month');
-  const [performanceDate, setPerformanceDate] = useState<Date>(currentDate);
-
-  const navigateYear = (delta: number) => {
-    setPerformanceDate(prev => {
-      const d = new Date(prev);
-      d.setFullYear(d.getFullYear() + delta);
-      return d;
-    });
-  };
-
-  const navigateMonth = (delta: number) => {
-    setPerformanceDate(prev => {
-      const d = new Date(prev);
-      d.setMonth(d.getMonth() + delta);
-      return d;
-    });
+    navigate('/performance');
   };
 
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
-
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const monthTrades = trades.filter(trade =>
     new Date(trade.trade_date).getMonth() === currentDate.getMonth() &&
@@ -219,78 +157,6 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   const targetProgress = targetProgressValue.toFixed(0);
   const isTargetMet = monthlyTarget ? parseFloat(growthPercentage) >= monthlyTarget : false;
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setMenuAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setMenuAnchorEl(null);
-  };
-
-  const handleExport = (format: 'xlsx' | 'csv') => {
-    if (monthTrades.length === 0) {
-      return;
-    }
-    exportTrades(trades, accountBalance, format);
-    handleMenuClose();
-  };
-
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState<AlertColor>('success');
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !onImportTrades) return;
-
-    handleMenuClose();
-    setSelectedFile(file);
-    setShowImportDialog(true);
-
-    // Reset the input
-    event.target.value = '';
-  };
-
-  const handleImportComplete = async (importedTrades: Partial<Trade>[]) => {
-    if (!onImportTrades) return;
-
-    try {
-      // Wait for import to complete before closing dialog
-      await onImportTrades(importedTrades);
-
-      // Show success message
-      setSnackbarMessage(`Successfully imported ${importedTrades.length} trades`);
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
-
-      // Close dialog only after import completes
-      setShowImportDialog(false);
-      setSelectedFile(null);
-    } catch (error) {
-      // Show error message if import fails
-      setSnackbarMessage('Failed to import trades. Please try again.');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
-    }
-  };
-
-  const handleClearClick = () => {
-    handleMenuClose();
-    setShowClearConfirm(true);
-  };
-
-  const handleClearConfirm = () => {
-    if (onClearMonthTrades) {
-      onClearMonthTrades(currentDate.getMonth(), currentDate.getFullYear());
-    }
-    setShowClearConfirm(false);
-  };
-
-  // Handle snackbar close
-  const handleSnackbarClose = () => {
-    setSnackbarOpen(false);
-  };
-
   // Handle gallery mode
   const handleMonthlyGalleryMode = () => {
     if (monthTrades.length > 0 && onOpenGalleryMode) {
@@ -311,8 +177,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           width: '100%',
           pb: { xs: 4, sm: 2.5 },
           overflow: 'hidden',
-          height: '100%',
-          minHeight: { xs: '280px', sm: '320px' },
+          height: '100%', 
           bgcolor: 'background.paper',
           boxShadow: theme => theme.palette.mode === 'dark'
             ? '0 2px 8px rgba(0,0,0,0.3)'
@@ -324,7 +189,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-          <Typography variant={isXs ? 'subtitle1' : 'h6'} sx={{ mb: { xs: 1, sm: 2 }, fontWeight: 600, pl: 0.5 }}>
+          <Typography sx={{ mb: { xs: 0.5, sm: 1 }, fontWeight: 600, pl: 0.5, fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}>
             Monthly Performance
           </Typography>
 
@@ -338,21 +203,11 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
             flex: 1,
             alignItems: 'center'
           }}>
-            <input
-              type="file"
-              accept=".xlsx,.csv"
-              style={{ display: 'none' }}
-              id="import-file"
-              onChange={handleFileSelect}
-            />
             {/* View Details Stats Button */}
             {calendarId && (
-              <Tooltip title="View detailed performance analytics" arrow>
+              <Tooltip title="Open performance page" arrow>
                 <IconButton
-                  onClick={() => {
-                    setPerformanceDate(currentDate);
-                    setIsPerformanceDialogOpen(true);
-                  }}
+                  onClick={handleOpenPerformancePage}
                   size="small"
                   sx={{
                     color: 'primary.main',
@@ -392,77 +247,6 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
                 </IconButton>
               </Tooltip>
             )}
-            <Tooltip title="More options">
-              <IconButton
-                onClick={handleMenuOpen}
-                size="small"
-                sx={{
-                  color: 'text.secondary',
-                  bgcolor: 'background.paper',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  '&:hover': {
-                    bgcolor: 'action.hover',
-                    color: 'text.primary',
-                    borderColor: 'text.primary'
-                  }
-                }}
-              >
-                <MoreVert />
-              </IconButton>
-            </Tooltip>
-            <Menu
-              anchorEl={menuAnchorEl}
-              open={menuOpen}
-              onClose={handleMenuClose}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'right',
-              }}
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-            >
-              {!isReadOnly && (
-                <MenuItem onClick={() => document.getElementById('import-file')?.click()}>
-                  <ListItemIcon>
-                    <FileUpload fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText>Import Trades</ListItemText>
-                </MenuItem>
-              )}
-              <MenuItem
-                onClick={() => handleExport('xlsx')}
-                disabled={monthTrades.length === 0}
-              >
-                <ListItemIcon>
-                  <FileDownload fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Export XLSX</ListItemText>
-              </MenuItem>
-              <MenuItem
-                onClick={() => handleExport('csv')}
-                disabled={monthTrades.length === 0}
-              >
-                <ListItemIcon>
-                  <FileDownload fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Export CSV</ListItemText>
-              </MenuItem>
-              {!isReadOnly && (
-                <MenuItem
-                  onClick={handleClearClick}
-                  disabled={monthTrades.length === 0}
-                  sx={{ color: 'error.main' }}
-                >
-                  <ListItemIcon>
-                    <Delete fontSize="small" sx={{ color: 'error.main' }} />
-                  </ListItemIcon>
-                  <ListItemText>Clear Month</ListItemText>
-                </MenuItem>
-              )}
-            </Menu>
           </Box>
         </Box>
 
@@ -473,38 +257,38 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
         }}>
           {/* Monthly P&L Card */}
           <Box sx={{
-            p: { xs: 1.25, sm: 2 },
+            p: { xs: 1, sm: 1.25 },
             borderRadius: '8px',
             bgcolor: 'background.default',
             display: 'flex',
             flexDirection: 'column',
-            gap: { xs: 0.25, sm: 0.5 }
+            gap: 0.25
           }}>
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1,
-              mb: 0.5
+              gap: 0.75,
+              mb: 0.25
             }}>
-              <TrendingUp sx={{ fontSize: { xs: '1rem', sm: '1.2rem' }, color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.secondary' }} />
-              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: { xs: '0.9rem', sm: '1rem' } }}>
+              <TrendingUp sx={{ fontSize: '0.95rem', color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.secondary' }} />
+              <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.75rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
                 Monthly P&L
-
               </Typography>
             </Box>
             <Typography
-              variant={isXs ? 'h6' : 'h5'}
               sx={{
                 fontWeight: 700,
+                fontSize: '1.125rem',
                 color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.primary',
                 display: 'flex',
                 alignItems: 'baseline',
-                gap: { xs: 0.25, sm: 0.5 }
+                gap: 0.5,
+                fontFeatureSettings: "'tnum' on, 'lnum' on",
               }}
             >
               {formatCurrency(netAmountForThisMonth)}
               {isPnlLoading ? (
-                <Skeleton variant="text" width={60} sx={{ fontSize: '1rem', display: 'inline-block', ml: 0.5 }} />
+                <Skeleton variant="text" width={50} sx={{ fontSize: '0.75rem', display: 'inline-block', ml: 0.25 }} />
               ) : (
                 <Tooltip
                   title={`Percentage based on account value at start of ${format(currentDate, 'MMMM')}: ${formatCurrency(accountValueAtStartOfMonth)}`}
@@ -513,7 +297,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
                   <Typography
                     component="span"
                     sx={{
-                      fontSize: { xs: '0.875rem', sm: '1rem' },
+                      fontSize: '0.75rem',
                       color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.primary',
                       fontWeight: 600,
                       cursor: 'help'
@@ -526,27 +310,28 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
             </Typography>
 
             {monthlyTarget && (
-              <Box sx={{ width: '100%', mt: 1.5 }}>
+              <Box sx={{ width: '100%', mt: 1 }}>
                 <Box sx={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  mb: 0.5
+                  mb: 0.25
                 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+                  <Typography sx={{ fontWeight: 500, color: 'text.secondary', fontSize: '0.6875rem' }}>
                     Target Progress
                   </Typography>
-                  <Typography variant="body2" sx={{
+                  <Typography sx={{
                     fontWeight: 600,
-                    color: isTargetMet ? 'success.main' : 'primary.main'
+                    color: isTargetMet ? 'success.main' : 'primary.main',
+                    fontSize: '0.6875rem'
                   }}>
                     {targetProgress}%
                   </Typography>
                 </Box>
                 <Box sx={{
                   width: '100%',
-                  height: { xs: '6px', sm: '8px' },
+                  height: '5px',
                   bgcolor: theme => alpha(theme.palette.divider, 0.5),
-                  borderRadius: '4px',
+                  borderRadius: '3px',
                   overflow: 'hidden'
                 }}>
                   <Box sx={{
@@ -562,46 +347,46 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
           {/* Win Rate Card */}
           <Box sx={{
-            p: { xs: 1.25, sm: 2 },
+            p: { xs: 1, sm: 1.25 },
             borderRadius: '8px',
             bgcolor: 'background.default',
             display: 'flex',
             flexDirection: 'column',
-            gap: { xs: 0.25, sm: 0.5 }
+            gap: 0.25
           }}>
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1,
-              mb: 0.5
+              gap: 0.75,
+              mb: 0.25
             }}>
-              <EmojiEvents sx={{ fontSize: { xs: '1rem', sm: '1.2rem' }, color: parseFloat(winRate) > 50 ? 'success.main' : 'text.secondary' }} />
-              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: { xs: '0.9rem', sm: '1rem' } }}>
+              <EmojiEvents sx={{ fontSize: '0.95rem', color: parseFloat(winRate) > 50 ? 'success.main' : 'text.secondary' }} />
+              <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.75rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
                 Win Rate
               </Typography>
             </Box>
-            <Typography variant={isXs ? 'h6' : 'h5'} sx={{ fontWeight: 700, color: parseFloat(winRate) > 50 ? 'success.main' : 'text.primary' }}>
+            <Typography sx={{ fontWeight: 700, fontSize: '1.125rem', color: parseFloat(winRate) > 50 ? 'success.main' : 'text.primary', fontFeatureSettings: "'tnum' on, 'lnum' on" }}>
               {winRate}%
             </Typography>
-            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary', mt: 0.5, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+            <Typography sx={{ fontWeight: 500, color: 'text.secondary', mt: 0.25, fontSize: '0.75rem' }}>
               {winCount} Wins / {lossCount} Losses
             </Typography>
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              mt: 1,
-              gap: 1
+              mt: 0.75,
+              gap: 0.5
             }}>
               <Box sx={{
-                height: { xs: '6px', sm: '10px' },
+                height: '5px',
                 bgcolor: 'success.main',
-                borderRadius: '5px',
+                borderRadius: '3px',
                 flex: winCount || 1
               }} />
               <Box sx={{
-                height: { xs: '6px', sm: '10px' },
+                height: '5px',
                 bgcolor: 'error.main',
-                borderRadius: '5px',
+                borderRadius: '3px',
                 flex: lossCount || 1
               }} />
             </Box>
@@ -609,48 +394,48 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
           {/* Total Trades Card */}
           <Box sx={{
-            p: { xs: 1.25, sm: 2 },
-            borderRadius: '8px',
-            bgcolor: 'background.default',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: { xs: 0.25, sm: 0.5 }
-          }}>
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,
-              mb: 0.5
-            }}>
-              <CalendarMonth sx={{ fontSize: { xs: '1rem', sm: '1.2rem' }, color: 'text.secondary' }} />
-              <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: { xs: '0.9rem', sm: '1rem' } }}>
-                Trading Activity
-              </Typography>
-            </Box>
-            <Typography variant={isXs ? 'h6' : 'h5'} sx={{ fontWeight: 700, color: 'text.primary' }}>
-              {monthTrades.length} Trade{monthTrades.length === 1 ? '' : 's'}
-            </Typography>
-            <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.secondary', mt: 0.5, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-              {monthTrades.length > 0 ? (monthTrades.length / 30 * 100).toFixed(0) : 0}% of Month Active
-            </Typography>
-          </Box>
-
-          {/* Starting Capital Card */}
-          <Box sx={{
-            p: { xs: 1, sm: 1.5 },
+            p: { xs: 1, sm: 1.25 },
             borderRadius: '8px',
             bgcolor: 'background.default',
             display: 'flex',
             flexDirection: 'column',
             gap: 0.25
           }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.75rem' }}>
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+              mb: 0.25
+            }}>
+              <CalendarMonth sx={{ fontSize: '0.95rem', color: 'text.secondary' }} />
+              <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.75rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+                Trading Activity
+              </Typography>
+            </Box>
+            <Typography sx={{ fontWeight: 700, fontSize: '1.125rem', color: 'text.primary', fontFeatureSettings: "'tnum' on, 'lnum' on" }}>
+              {monthTrades.length} Trade{monthTrades.length === 1 ? '' : 's'}
+            </Typography>
+            <Typography sx={{ fontWeight: 500, color: 'text.secondary', mt: 0.25, fontSize: '0.75rem' }}>
+              {monthTrades.length > 0 ? (monthTrades.length / 30 * 100).toFixed(0) : 0}% of Month Active
+            </Typography>
+          </Box>
+
+          {/* Starting Capital Card */}
+          <Box sx={{
+            p: { xs: 0.875, sm: 1 },
+            borderRadius: '8px',
+            bgcolor: 'background.default',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0.125
+          }}>
+            <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.6875rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
               Started With
             </Typography>
             {isPnlLoading ? (
-              <Skeleton variant="text" width={120} sx={{ fontSize: '1rem' }} />
+              <Skeleton variant="text" width={100} sx={{ fontSize: '0.9375rem' }} />
             ) : (
-              <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '1rem' }}>
+              <Typography sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.9375rem', fontFeatureSettings: "'tnum' on, 'lnum' on" }}>
                 {formatCurrency(accountValueAtStartOfMonth)}
               </Typography>
             )}
@@ -658,38 +443,38 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
           {/* Best Day Card */}
           <Box sx={{
-            p: { xs: 1, sm: 1.5 },
+            p: { xs: 0.875, sm: 1 },
             borderRadius: '8px',
             bgcolor: 'background.default',
             display: 'flex',
             flexDirection: 'column',
-            gap: 0.25
+            gap: 0.125
           }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.75rem' }}>
+            <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.6875rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
               Best Day {bestDayDate && (
-                <Typography component="span" sx={{ color: 'secondary.main', fontWeight: 700, fontSize: '0.65rem' }}>
+                <Typography component="span" sx={{ color: 'secondary.main', fontWeight: 700, fontSize: '0.625rem' }}>
                   {bestDayDate}
                 </Typography>
               )}
             </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: 'success.main', fontSize: '1rem' }}>
+            <Typography sx={{ fontWeight: 700, color: 'success.main', fontSize: '0.9375rem', fontFeatureSettings: "'tnum' on, 'lnum' on" }}>
               {bestDay > 0 ? formatCurrency(bestDay) : 'No trades'}
             </Typography>
           </Box>
 
           {/* Profit Factor Card */}
           <Box sx={{
-            p: { xs: 1, sm: 1.5 },
+            p: { xs: 0.875, sm: 1 },
             borderRadius: '8px',
             bgcolor: 'background.default',
             display: 'flex',
             flexDirection: 'column',
-            gap: 0.25
+            gap: 0.125
           }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.75rem' }}>
+            <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.6875rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
               Profit Factor
             </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: parseFloat(profitFactor) > 1 ? 'success.main' : 'text.primary', fontSize: '1rem' }}>
+            <Typography sx={{ fontWeight: 700, color: parseFloat(profitFactor) > 1 ? 'success.main' : 'text.primary', fontSize: '0.9375rem', fontFeatureSettings: "'tnum' on, 'lnum' on" }}>
               {profitFactor}
             </Typography>
           </Box>
@@ -697,140 +482,6 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
       </Paper>
 
-
-      <Dialog
-        open={showClearConfirm}
-        onClose={() => setShowClearConfirm(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Clear Trades</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to clear all trades? This action cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowClearConfirm(false)}>Cancel</Button>
-          <Button onClick={handleClearConfirm} color="error">Clear</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Snackbar for import notifications */}
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={snackbarSeverity === 'success' ? 3000 : 6000}
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={handleSnackbarClose}
-          severity={snackbarSeverity}
-          variant="filled"
-          sx={{ width: '100%' }}
-        >
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
-
-      <ImportMappingDialog
-        open={showImportDialog}
-        onClose={() => {
-          setShowImportDialog(false);
-          setSelectedFile(null);
-        }}
-        onImport={handleImportComplete}
-        file={selectedFile}
-      />
-
-      {/* Performance Details Dialog */}
-      {calendarId && (
-        <Dialog
-          open={isPerformanceDialogOpen}
-          onClose={handlePerformanceDialogClose}
-          maxWidth="lg"
-          fullWidth
-          fullScreen={isXs}
-          sx={{
-            '& .MuiDialog-paper': {
-              borderRadius: 2,
-              boxShadow: 'none',
-              border: `1px solid ${theme.palette.divider}`,
-              maxHeight: '90vh',
-              overflow: 'hidden'
-            },
-            '& .MuiDialogContent-root': {
-              ...scrollbarStyles(theme)
-            }
-          }}
-        >
-          <DialogTitle sx={{ pb: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {performanceTimePeriod !== 'all' && (
-                  <IconButton
-                    size="small"
-                    onClick={() => performanceTimePeriod === 'year'
-                      ? navigateYear(-1) : navigateMonth(-1)}
-                  >
-                    <ChevronLeft fontSize="small" />
-                  </IconButton>
-                )}
-                <Typography variant="h6" sx={{ userSelect: 'none' }}>
-                  {performanceTimePeriod === 'month'
-                    ? format(performanceDate, 'MMMM yyyy')
-                    : performanceTimePeriod === 'year'
-                      ? format(performanceDate, 'yyyy')
-                      : 'All Time'
-                  }
-                </Typography>
-                {performanceTimePeriod !== 'all' && (
-                  <IconButton
-                    size="small"
-                    onClick={() => performanceTimePeriod === 'year'
-                      ? navigateYear(1) : navigateMonth(1)}
-                  >
-                    <ChevronRight fontSize="small" />
-                  </IconButton>
-                )}
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <RoundedTabs
-                  tabs={TIME_PERIOD_TABS}
-                  activeTab={TIME_PERIOD_TABS.findIndex(t => t.value === performanceTimePeriod)}
-                  onTabChange={(_, index) => setPerformanceTimePeriod(TIME_PERIOD_TABS[index].value)}
-                  size="small"
-                />
-                <IconButton onClick={handlePerformanceDialogClose} size="small">
-                  <CloseIcon />
-                </IconButton>
-              </Box>
-            </Box>
-          </DialogTitle>
-          <DialogContent sx={{ p: 0 }}>
-            <PerformanceCharts
-              selectedDate={performanceDate}
-              accountBalance={accountBalance}
-              maxDailyDrawdown={maxDailyDrawdown || 0}
-              monthlyTarget={monthlyTarget}
-              calendarId={calendarId}
-              scoreSettings={scoreSettings}
-              dynamicRiskSettings={dynamicRiskSettings}
-              timePeriod={performanceTimePeriod}
-              onTimePeriodChange={setPerformanceTimePeriod}
-              hideTimePeriodTabs={true}
-              onEditTrade={onEditTrade}
-              onDeleteTrade={onDeleteTrade}
-              onUpdateTradeProperty={onUpdateTradeProperty}
-              onUpdateCalendarProperty={onUpdateCalendarProperty}
-              onOpenGalleryMode={onOpenGalleryMode}
-              economicFilter={economicFilter}
-              isReadOnly={isReadOnly}
-              calendar={calendar}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
     </>
   );
 };

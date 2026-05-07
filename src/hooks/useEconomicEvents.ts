@@ -42,6 +42,45 @@ interface UseEconomicEventsResult {
 }
 
 /**
+ * Module-level cache shared across hook instances. Survives unmount, so
+ * navigating Home → Performance → Home no longer triggers a fresh fetch +
+ * shimmer for the same params. Real-time `postgres_changes` subscription
+ * keeps cached entries in sync while the user is in the app.
+ */
+type EconomicEventsCacheEntry = {
+  events: EconomicEvent[];
+  hasMore: boolean;
+  offset: number;
+};
+const economicEventsCache = new Map<string, EconomicEventsCacheEntry>();
+const ECONOMIC_EVENTS_CACHE_MAX = 16;
+const economicEventsCacheOrder: string[] = [];
+
+function touchCacheKey(key: string): void {
+  const idx = economicEventsCacheOrder.indexOf(key);
+  if (idx > -1) economicEventsCacheOrder.splice(idx, 1);
+  economicEventsCacheOrder.push(key);
+  while (economicEventsCacheOrder.length > ECONOMIC_EVENTS_CACHE_MAX) {
+    const stale = economicEventsCacheOrder.shift();
+    if (stale) economicEventsCache.delete(stale);
+  }
+}
+
+function makeCacheKey(
+  viewType: ViewType,
+  currentDate: Date,
+  customDateRange: { start: string | null; end: string | null } | undefined,
+  currencies: Currency[],
+  impacts: ImpactLevel[],
+  onlyUpcoming: boolean,
+): string {
+  const range = calculateDateRange(viewType, currentDate, customDateRange);
+  const currencyKey = [...currencies].sort().join(',');
+  const impactKey = [...impacts].sort().join(',');
+  return `${range.start}|${range.end}|${currencyKey}|${impactKey}|${onlyUpcoming}`;
+}
+
+/**
  * Calculate date range based on view type and current date
  */
 function calculateDateRange(
@@ -94,19 +133,32 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
     customDateRange,
   } = options;
 
+  // Hydrate from module cache on first render so navigating back to a page
+  // with the same params shows data instantly instead of a shimmer.
+  const initialCacheEntry = (() => {
+    const key = makeCacheKey(viewType, currentDate, customDateRange, currencies, impacts, onlyUpcoming);
+    return economicEventsCache.get(key) ?? null;
+  })();
+
   // State
-  const [events, setEvents] = useState<EconomicEvent[]>([]);
+  const [events, setEvents] = useState<EconomicEvent[]>(initialCacheEntry?.events ?? []);
   const [loading, setLoading] = useState(false);
-  const [hasCompletedFetch, setHasCompletedFetch] = useState(false);
+  const [hasCompletedFetch, setHasCompletedFetch] = useState(initialCacheEntry != null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(initialCacheEntry?.hasMore ?? false);
+  const [offset, setOffset] = useState(initialCacheEntry?.offset ?? 0);
 
   // Refs for stable callbacks and caching
   const fetchingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastFetchedParamsRef = useRef<string | null>(null);
+  // Mirror of `events` for fetchEvents to assemble loadMore concatenations
+  // without forcing the callback to depend on (and re-create on) every events change.
+  const eventsRef = useRef<EconomicEvent[]>(initialCacheEntry?.events ?? []);
+  useEffect(() => {
+    eventsRef.current = events;
+  }, [events]);
 
   // Memoize date range to prevent unnecessary recalculations
   const dateRange = useMemo(
@@ -144,7 +196,11 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
       const currentOffset = isLoadMore ? offset : 0;
 
       if (!isLoadMore) {
-        setLoading(true);
+        // Silent revalidate when cached events are already on screen — only
+        // flip the shimmer when we have nothing to display yet.
+        if (eventsRef.current.length === 0) {
+          setLoading(true);
+        }
         setError(null);
       } else {
         setLoadingMore(true);
@@ -165,14 +221,30 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
           return;
         }
 
-        if (isLoadMore) {
-          setEvents(prev => [...prev, ...result.events]);
-        } else {
-          setEvents(result.events);
-        }
+        const newEvents = isLoadMore
+          ? [...eventsRef.current, ...result.events]
+          : result.events;
+        const newOffset = result.offset || currentOffset + pageSize;
 
+        setEvents(newEvents);
         setHasMore(result.hasMore);
-        setOffset(result.offset || currentOffset + pageSize);
+        setOffset(newOffset);
+
+        // Persist into module cache so future remounts hydrate instantly.
+        const cacheKey = makeCacheKey(
+          viewType,
+          currentDate,
+          customDateRange,
+          currencies,
+          impacts,
+          onlyUpcoming,
+        );
+        economicEventsCache.set(cacheKey, {
+          events: newEvents,
+          hasMore: result.hasMore,
+          offset: newOffset,
+        });
+        touchCacheKey(cacheKey);
       } catch (err) {
         if ((err as Error).name === 'AbortError') {
           return;
@@ -212,7 +284,9 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
   }, [fetchEvents]);
 
   /**
-   * Update a single event in the list (for real-time updates)
+   * Update a single event in the list (for real-time updates).
+   * Also patches the module cache entry for the current params so a remount
+   * with the same params shows the freshest data instantly.
    */
   const updateEvent = useCallback((eventId: string, updates: Partial<EconomicEvent>) => {
     setEvents(prev => {
@@ -221,9 +295,23 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
 
       const newEvents = [...prev];
       newEvents[index] = { ...newEvents[index], ...updates };
+
+      const cacheKey = makeCacheKey(
+        viewType,
+        currentDate,
+        customDateRange,
+        currencies,
+        impacts,
+        onlyUpcoming,
+      );
+      const existing = economicEventsCache.get(cacheKey);
+      if (existing) {
+        economicEventsCache.set(cacheKey, { ...existing, events: newEvents });
+      }
+
       return newEvents;
     });
-  }, []);
+  }, [viewType, currentDate, customDateRange, currencies, impacts, onlyUpcoming]);
 
   // Fetch on mount and when filters/date change (but NOT just when drawer opens)
   useEffect(() => {
@@ -237,8 +325,12 @@ export function useEconomicEvents(options: UseEconomicEventsOptions): UseEconomi
       return;
     }
 
-    // Reset so shimmer shows until the upcoming fetch completes.
-    setHasCompletedFetch(false);
+    // Only show shimmer when we don't already have cached data for these params.
+    // Cache hits hydrate via useState init; the network fetch still runs as a
+    // background revalidate, but the user shouldn't see a loading flash.
+    if (!economicEventsCache.has(currentParamsKey)) {
+      setHasCompletedFetch(false);
+    }
 
     lastFetchedParamsRef.current = currentParamsKey;
 

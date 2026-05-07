@@ -65,7 +65,24 @@ export const useHighImpactEvents = ({
   currencies = DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS.currencies,
   enabled = true
 }: UseHighImpactEventsProps): UseHighImpactEventsReturn => {
-  const [highImpactEventDates, setHighImpactEventDates] = useState<Map<string, boolean>>(new Map());
+  // Lazy-init from the existing localStorage cache so the first paint after
+  // a remount already has the map populated — no empty-frame flash before the
+  // fetch effect runs.
+  const [highImpactEventDates, setHighImpactEventDates] = useState<Map<string, boolean>>(
+    () => {
+      if (!enabled || !calendarId) return new Map();
+      try {
+        const monthKey = format(currentDate, 'yyyy-MM');
+        const currenciesHash = [...currencies].sort().join('-');
+        const cacheKey = `${CACHE_PREFIX}_${monthKey}_${calendarId}_${currenciesHash}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (!cached) return new Map();
+        return new Map<string, boolean>(JSON.parse(cached));
+      } catch {
+        return new Map();
+      }
+    }
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);

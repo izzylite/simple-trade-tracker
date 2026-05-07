@@ -68,6 +68,36 @@ export interface UseNotesResult {
 }
 
 /**
+ * Module-level cache for notes lists, keyed by the same filter combination
+ * that triggers a refetch. Survives unmount so re-opening the notes panel
+ * (or remounting via route nav) hydrates instantly.
+ */
+type NotesCacheEntry = {
+  notes: Note[];
+  hasMore: boolean;
+  total: number;
+  offset: number;
+};
+const notesCache = new Map<string, NotesCacheEntry>();
+function makeNotesKey(
+  userId: string | undefined,
+  calendarId: string | undefined,
+  activeTab: 'all' | 'pinned' | 'archived',
+  selectedCalendarFilter: string,
+  creatorFilter: 'assistant' | 'me',
+  searchQuery: string | null | undefined,
+): string {
+  return [
+    userId ?? '',
+    calendarId ?? '',
+    activeTab,
+    selectedCalendarFilter,
+    creatorFilter,
+    (searchQuery ?? '').trim(),
+  ].join('|');
+}
+
+/**
  * Custom hook for loading and managing notes with optimized loading behavior
  */
 export function useNotes(options: UseNotesOptions): UseNotesResult {
@@ -82,14 +112,32 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
     notesPerPage = 20,
   } = options;
 
-  const [notes, setNotes] = useState<Note[]>([]);
+  // Hydrate from module cache on first render — re-opening the panel or
+  // remounting via route nav reuses the previously-loaded list instantly.
+  const initialKey = makeNotesKey(
+    userId,
+    calendarId,
+    activeTab,
+    selectedCalendarFilter,
+    creatorFilter,
+    searchQuery,
+  );
+  const initialCache = notesCache.get(initialKey);
+
+  const [notes, setNotes] = useState<Note[]>(initialCache?.notes ?? []);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false);
+  const [total, setTotal] = useState(initialCache?.total ?? 0);
 
   // Use ref for offset to avoid it being in dependency array
-  const offsetRef = useRef(0);
+  const offsetRef = useRef(initialCache?.offset ?? 0);
+  // Mirror of `notes` so loadMore (which has wide deps) can read the current
+  // list without forcing loadNotes to depend on every notes mutation.
+  const notesRef = useRef<Note[]>(notes);
+  useEffect(() => {
+    notesRef.current = notes;
+  }, [notes]);
 
   // Track if we've loaded notes for the current open session
   const hasLoadedRef = useRef(false);
@@ -107,7 +155,18 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
       if (!userId) return;
       try {
         if (reset) {
-          setLoading(true);
+          // Silent revalidate when cache already populated for this combo.
+          const revalidateKey = makeNotesKey(
+            userId,
+            calendarId,
+            activeTab,
+            selectedCalendarFilter,
+            creatorFilter,
+            searchQuery,
+          );
+          if (!notesCache.has(revalidateKey)) {
+            setLoading(true);
+          }
           offsetRef.current = 0;
         } else {
           setLoadingMore(true);
@@ -155,16 +214,34 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
           result = await notesService.queryUserNotes(userId, queryOptions);
         }
 
-        // Update state
+        // Update state + module cache
+        let nextNotes: Note[];
         if (reset) {
-          setNotes(result.notes);
+          nextNotes = result.notes;
           offsetRef.current = result.notes.length;
+          setNotes(nextNotes);
         } else {
-          setNotes((prev) => [...prev, ...result.notes]);
+          nextNotes = [...notesRef.current, ...result.notes];
           offsetRef.current += result.notes.length;
+          setNotes(nextNotes);
         }
         setHasMore(result.hasMore);
         setTotal(result.total);
+
+        const writeKey = makeNotesKey(
+          userId,
+          calendarId,
+          activeTab,
+          selectedCalendarFilter,
+          creatorFilter,
+          searchQuery,
+        );
+        notesCache.set(writeKey, {
+          notes: nextNotes,
+          hasMore: result.hasMore,
+          total: result.total,
+          offset: offsetRef.current,
+        });
       } catch (error) {
         logger.error('Error loading notes:', error);
         setNotes([]);
@@ -243,19 +320,50 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
     loadNotes(false);
   }, [loadNotes]);
 
+  const writeListToCache = useCallback(
+    (list: Note[]) => {
+      const key = makeNotesKey(
+        userId,
+        calendarId,
+        activeTab,
+        selectedCalendarFilter,
+        creatorFilter,
+        searchQuery,
+      );
+      const existing = notesCache.get(key);
+      notesCache.set(key, {
+        notes: list,
+        hasMore: existing?.hasMore ?? hasMore,
+        total: existing?.total ?? total,
+        offset: existing?.offset ?? offsetRef.current,
+      });
+    },
+    [userId, calendarId, activeTab, selectedCalendarFilter, creatorFilter, searchQuery, hasMore, total],
+  );
+
   const updateNote = useCallback((noteId: string, updates: Partial<Note>) => {
-    setNotes((prev) =>
-      prev.map((n) => (n.id === noteId ? { ...n, ...updates } : n))
-    );
-  }, []);
+    setNotes((prev) => {
+      const next = prev.map((n) => (n.id === noteId ? { ...n, ...updates } : n));
+      writeListToCache(next);
+      return next;
+    });
+  }, [writeListToCache]);
 
   const removeNote = useCallback((noteId: string) => {
-    setNotes((prev) => prev.filter((n) => n.id !== noteId));
-  }, []);
+    setNotes((prev) => {
+      const next = prev.filter((n) => n.id !== noteId);
+      writeListToCache(next);
+      return next;
+    });
+  }, [writeListToCache]);
 
   const addNote = useCallback((note: Note) => {
-    setNotes((prev) => [note, ...prev]);
-  }, []);
+    setNotes((prev) => {
+      const next = [note, ...prev];
+      writeListToCache(next);
+      return next;
+    });
+  }, [writeListToCache]);
 
   // Real-time updates via postgres_changes
   const channelIdRef = useRef(

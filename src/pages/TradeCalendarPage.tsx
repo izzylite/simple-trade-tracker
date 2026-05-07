@@ -183,7 +183,12 @@ interface TradeCalendarProps {
   onUpdateCalendar?: (id: string, updates: Partial<Calendar>) => Promise<void> | void;
 }
 
-
+/**
+ * Module-level caches that survive route remounts so Home → Performance →
+ * Home doesn't repeat work. Realtime / write paths invalidate as needed.
+ */
+const gamePlanNotesCache = new Map<string, Map<string, Note>>();
+const pnlBeforeMonthCache = new Map<string, number>();
 
 interface WeeklyPnLProps {
   trade_date: Date;
@@ -839,7 +844,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     day: DayAbbreviation;
     existingNote: Note | null;
   } | null>(null);
-  const [gamePlanNotes, setGamePlanNotes] = useState<Map<string, Note>>(new Map());
+  const [gamePlanNotes, setGamePlanNotes] = useState<Map<string, Note>>(
+    () => calendarId ? gamePlanNotesCache.get(calendarId) ?? new Map() : new Map()
+  );
 
   // Economic event notification state
   // Notification stack state (moved from App.tsx)
@@ -1266,14 +1273,22 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   }, [filteredTrades, selectedTags, totalPnL]);
 
 
-  // Fetch cumulative PnL before the viewed month for accurate start-of-month value
-  // Always uses unfiltered data (tag filtering is a view concern, not an account value concern)
-  const [pnlBeforeMonth, setPnlBeforeMonth] = useState<number>(0);
+  // Fetch cumulative PnL before the viewed month for accurate start-of-month value.
+  // Always uses unfiltered data (tag filtering is a view concern, not an account value concern).
+  // Past-month results are cached at module scope (`pnlBeforeMonthCache`) so a
+  // route remount doesn't refetch for months that don't change.
+  const [pnlBeforeMonth, setPnlBeforeMonth] = useState<number>(() => {
+    if (!calendarId) return 0;
+    const monthKey = format(startOfMonth(currentDate), 'yyyy-MM');
+    return pnlBeforeMonthCache.get(`${calendarId}|${monthKey}`) ?? 0;
+  });
   const [isPnlLoading, setIsPnlLoading] = useState(false);
   useEffect(() => {
     if (!calendarId) return;
     let cancelled = false;
     const monthStart = startOfMonth(currentDate);
+    const monthKey = format(monthStart, 'yyyy-MM');
+    const cacheKey = `${calendarId}|${monthKey}`;
     const now = new Date();
     const isCurrentRealMonth = currentDate.getFullYear() === now.getFullYear()
       && currentDate.getMonth() === now.getMonth();
@@ -1283,14 +1298,26 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       const monthPnL = trades
         .filter(t => new Date(t.trade_date) >= monthStart)
         .reduce((sum, t) => sum + t.amount, 0);
-      setPnlBeforeMonth(totalPnL - monthPnL);
+      const value = totalPnL - monthPnL;
+      setPnlBeforeMonth(value);
+      pnlBeforeMonthCache.set(cacheKey, value);
       setIsPnlLoading(false);
     } else {
-      // For past months, query DB (always unfiltered)
-      setIsPnlLoading(true);
+      // Past month: hydrate from cache instantly if present, then revalidate.
+      const cached = pnlBeforeMonthCache.get(cacheKey);
+      if (cached !== undefined) {
+        setPnlBeforeMonth(cached);
+        setIsPnlLoading(false);
+      } else {
+        setIsPnlLoading(true);
+      }
       calendarService.getCumulativePnlBeforeDate(calendarId, monthStart)
         .then(val => {
-          if (!cancelled) { setPnlBeforeMonth(val); setIsPnlLoading(false); }
+          if (!cancelled) {
+            setPnlBeforeMonth(val);
+            pnlBeforeMonthCache.set(cacheKey, val);
+            setIsPnlLoading(false);
+          }
         })
         .catch(() => {
           if (!cancelled) { setPnlBeforeMonth(0); setIsPnlLoading(false); }
@@ -1386,10 +1413,15 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     notesService.getWeekNoteKeys(calendarId).then(setWeekNoteKeys);
   }, [calendarId, currentDate]);
 
-  // Load game plan notes for day indicators and instant viewing
+  // Load game plan notes for day indicators and instant viewing.
+  // Cached at module scope (`gamePlanNotesCache`) so navigating Home →
+  // Performance → Home doesn't lose the day indicators while the fetch runs.
   useEffect(() => {
     if (!calendarId) return;
-    notesService.getGamePlanNotesByDay(calendarId).then(setGamePlanNotes);
+    notesService.getGamePlanNotesByDay(calendarId).then((next) => {
+      setGamePlanNotes(next);
+      gamePlanNotesCache.set(calendarId, next);
+    });
   }, [calendarId]);
 
   const clearDaySelection = () => {
