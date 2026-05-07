@@ -23,13 +23,13 @@ const LandingPage: React.FC = () => {
     }, [searchParams, navigate]);
 
     const handleGetStarted = () => {
-        if (user) navigate('/dashboard');
+        if (user) navigate('/');
         else setShowLoginDialog(true);
     };
 
     return (
         <>
-            <Box sx={{ bgcolor: '#000', minHeight: '100vh', color: '#fff', overflowX: 'hidden' }}>
+            <Box sx={{ bgcolor: '#080808', minHeight: '100vh', color: '#f1f5f9', overflowX: 'hidden' }}>
                 <LandingNav
                     onGetStarted={handleGetStarted}
                     onLogin={() => setShowLoginDialog(true)}

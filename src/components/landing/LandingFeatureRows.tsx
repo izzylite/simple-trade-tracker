@@ -41,7 +41,7 @@ const FeatureRow: React.FC<FeatureRowProps> = ({
                         <Typography sx={{
                             fontSize: { xs: '1.75rem', md: '2.35rem' },
                             fontWeight: 800,
-                            color: '#fff',
+                            color: '#f1f5f9',
                             letterSpacing: '-0.03em',
                             lineHeight: 1.18,
                             mb: 2.5,
@@ -120,7 +120,7 @@ const FEATURES: FeatureRowProps[] = [
 
 const LandingFeatureRows: React.FC<{ onGetStarted: () => void }> = ({ onGetStarted }) => {
     return (
-        <Box sx={{ bgcolor: '#000' }}>
+        <Box sx={{ bgcolor: '#080808' }}>
             {FEATURES.map((feature, i) => (
                 <Box key={i} sx={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                     <FeatureRow {...feature} />
@@ -134,7 +134,7 @@ const LandingFeatureRows: React.FC<{ onGetStarted: () => void }> = ({ onGetStart
                         <Typography sx={{
                             fontSize: { xs: '2.25rem', md: '3.75rem' },
                             fontWeight: 900,
-                            color: '#fff',
+                            color: '#f1f5f9',
                             letterSpacing: '-0.04em',
                             lineHeight: 1.08,
                             mb: 3,
@@ -172,8 +172,8 @@ const LandingFeatureRows: React.FC<{ onGetStarted: () => void }> = ({ onGetStart
                             onClick={onGetStarted}
                             endIcon={<ArrowForwardIcon />}
                             sx={{
-                                bgcolor: '#fff',
-                                color: '#000',
+                                bgcolor: '#f1f5f9',
+                                color: '#080808',
                                 fontWeight: 700,
                                 fontSize: '1.05rem',
                                 px: 5,
@@ -209,7 +209,7 @@ const LandingFeatureRows: React.FC<{ onGetStarted: () => void }> = ({ onGetStart
                                 background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                             }}>
-                                <ShowChartIcon sx={{ fontSize: 16, color: '#fff' }} />
+                                <ShowChartIcon sx={{ fontSize: 16, color: '#f1f5f9' }} />
                             </Box>
                             <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: 'rgba(255,255,255,0.65)' }}>
                                 JournoTrades

@@ -43,7 +43,7 @@ const BentoCard: React.FC<BentoCardProps> = ({
             <Typography sx={{
                 fontSize: '1.05rem',
                 fontWeight: 700,
-                color: '#fff',
+                color: '#f1f5f9',
                 mb: 0.75,
                 lineHeight: 1.3,
                 letterSpacing: '-0.01em',
@@ -86,14 +86,14 @@ const BentoCard: React.FC<BentoCardProps> = ({
 
 const LandingBento: React.FC = () => {
     return (
-        <Box sx={{ py: { xs: 10}, bgcolor: '#000' }}>
+        <Box sx={{ py: { xs: 10}, bgcolor: '#080808' }}>
             <Container maxWidth="lg">
                 {/* Section header */}
                 <Box sx={{ textAlign: 'center', mb: 8 }}>
                     <Typography sx={{
                         fontSize: { xs: '1.9rem', md: '2.75rem' },
                         fontWeight: 800,
-                        color: '#fff',
+                        color: '#f1f5f9',
                         letterSpacing: '-0.04em',
                         lineHeight: 1.12,
                         mb: 2,
