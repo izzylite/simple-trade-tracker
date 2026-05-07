@@ -1,0 +1,207 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-07T00:00:00.000Z",
+  "title": "Design System: JournoTrades",
+  "extensions": {
+    "colorMeta": {
+      "violet-primary": {
+        "role": "primary",
+        "displayName": "Trader Violet",
+        "canonical": "oklch(54.94% 0.243 290.85)",
+        "tonalRamp": [
+          "oklch(20% 0.10 290)",
+          "oklch(28% 0.14 290)",
+          "oklch(36% 0.18 290)",
+          "oklch(44% 0.21 290)",
+          "oklch(55% 0.24 291)",
+          "oklch(65% 0.20 291)",
+          "oklch(78% 0.13 291)",
+          "oklch(92% 0.05 291)"
+        ]
+      },
+      "violet-soft": {
+        "role": "primary",
+        "displayName": "Violet Soft",
+        "canonical": "oklch(72% 0.16 291)"
+      },
+      "violet-deep": {
+        "role": "primary",
+        "displayName": "Violet Deep",
+        "canonical": "oklch(40% 0.20 290)"
+      },
+      "win-green-dark": {
+        "role": "tertiary",
+        "displayName": "Win Green (dark mode)",
+        "canonical": "oklch(72% 0.20 145)"
+      },
+      "win-green-light": {
+        "role": "tertiary",
+        "displayName": "Win Green (light mode)",
+        "canonical": "oklch(60% 0.18 145)"
+      },
+      "loss-red-dark": {
+        "role": "tertiary",
+        "displayName": "Loss Red (dark mode)",
+        "canonical": "oklch(64% 0.23 25)"
+      },
+      "loss-red-light": {
+        "role": "tertiary",
+        "displayName": "Loss Red (light mode)",
+        "canonical": "oklch(54% 0.22 25)"
+      },
+      "ink-near-black": {
+        "role": "neutral",
+        "displayName": "Ink Near-Black",
+        "canonical": "oklch(8% 0.005 270)",
+        "tonalRamp": [
+          "oklch(8% 0.005 270)",
+          "oklch(12% 0.005 270)",
+          "oklch(18% 0.006 270)",
+          "oklch(24% 0.007 270)",
+          "oklch(36% 0.008 270)",
+          "oklch(50% 0.009 270)",
+          "oklch(70% 0.008 270)",
+          "oklch(96% 0.005 270)"
+        ]
+      },
+      "ink-paper-dark": {
+        "role": "neutral",
+        "displayName": "Ink Paper (dark surface)",
+        "canonical": "oklch(15% 0.005 270)"
+      },
+      "page-light": {
+        "role": "neutral",
+        "displayName": "Page Light",
+        "canonical": "oklch(94% 0.012 252)"
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page-level titles. One per page maximum." },
+      "headline": { "displayName": "Headline", "purpose": "Primary card titles, hero metrics." },
+      "title": { "displayName": "Title", "purpose": "Card subheaders, dialog titles." },
+      "body": { "displayName": "Body", "purpose": "Reading text, cap at 65–75ch for prose." },
+      "label": { "displayName": "Label", "purpose": "Uppercase microcopy: side-nav, dropdown headers." },
+      "numeric": { "displayName": "Numeric (tabular)", "purpose": "Any P&L, balance, percent readout. Tabular figures mandatory." }
+    },
+    "shadows": [
+      { "name": "subtle-dark",   "value": "0 1px 2px rgba(0,0,0,0.3)",                                "purpose": "Resting state of primary buttons in dark mode." },
+      { "name": "subtle-light",  "value": "0 1px 2px rgba(0,0,0,0.05)",                               "purpose": "Resting state of primary buttons in light mode." },
+      { "name": "card-dark",     "value": "0 2px 8px rgba(0,0,0,0.3)",                                "purpose": "Cards and panels in dark mode." },
+      { "name": "card-light",    "value": "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)",   "purpose": "Cards and panels in light mode." },
+      { "name": "floating-dark", "value": "0 4px 16px rgba(0,0,0,0.4)",                               "purpose": "Popovers, dropdowns, hover-lifted cards (dark)." },
+      { "name": "floating-light","value": "0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04)",  "purpose": "Popovers, dropdowns, hover-lifted cards (light)." },
+      { "name": "modal-dark",    "value": "0 8px 24px rgba(0,0,0,0.5)",                               "purpose": "Dialogs and drawers (dark)." },
+      { "name": "modal-light",   "value": "0 8px 24px rgba(0,0,0,0.1)",                               "purpose": "Dialogs and drawers (light)." }
+    ],
+    "motion": [
+      { "name": "ease-standard",  "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default state transition for color, opacity, transform." },
+      { "name": "ease-out-quart", "value": "cubic-bezier(0.25, 1, 0.5, 1)", "purpose": "Hover lift and dropdown open." },
+      { "name": "duration-fast",  "value": "150ms", "purpose": "Hover and focus transitions." },
+      { "name": "duration-medium","value": "250ms", "purpose": "Drawer and dialog open/close." }
+    ],
+    "breakpoints": [
+      { "name": "xs", "value": "0px" },
+      { "name": "sm", "value": "600px" },
+      { "name": "md", "value": "900px" },
+      { "name": "lg", "value": "1200px" },
+      { "name": "xl", "value": "1536px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary call-to-action. Trader Violet fill, white text, 8 px corners.",
+      "html": "<button class=\"ds-btn-primary\">Create Calendar</button>",
+      "css": ".ds-btn-primary { background: #7c3aed; color: #ffffff; padding: 8px 20px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 0.875rem; line-height: 1.55; letter-spacing: 0; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.3); transition: background 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: #5b21b6; box-shadow: 0 2px 8px rgba(0,0,0,0.3); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(124,58,237,0.25); }"
+    },
+    {
+      "name": "Outlined Button",
+      "kind": "button",
+      "refersTo": "button-outlined",
+      "description": "Secondary action. Transparent body, violet text and border.",
+      "html": "<button class=\"ds-btn-outlined\">View all</button>",
+      "css": ".ds-btn-outlined { background: transparent; color: #7c3aed; padding: 8px 20px; border: 1px solid #7c3aed; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 0.875rem; cursor: pointer; transition: background 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-outlined:hover { background: rgba(124,58,237,0.08); } .ds-btn-outlined:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(124,58,237,0.25); }"
+    },
+    {
+      "name": "Side-Nav Item",
+      "kind": "nav",
+      "refersTo": "side-nav-item",
+      "description": "Vertical icon-rail item: 22 px icon over an 11 px uppercase label.",
+      "html": "<button class=\"ds-nav-item ds-nav-item--active\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"currentColor\"><path d=\"M12 3l9 8h-3v9h-4v-6h-4v6H6v-9H3z\"/></svg><span>HOME</span></button>",
+      "css": ".ds-nav-item { width: 100%; padding: 8px 4px; border: 0; background: transparent; color: #94a3b8; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; transition: color 150ms cubic-bezier(0.4,0,0.2,1), background 150ms cubic-bezier(0.4,0,0.2,1); } .ds-nav-item:hover { background: rgba(255,255,255,0.04); color: #f1f5f9; } .ds-nav-item--active { background: rgba(124,58,237,0.12); color: #7c3aed; } .ds-nav-item span { font-family: 'DM Sans', sans-serif; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; line-height: 1.1; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Container surface for grouped content. Flat by default, lifts subtly on hover.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card__title\">Account Balance</div><div class=\"ds-card__numeric\">$20,000.00</div></div>",
+      "css": ".ds-card { background: #131313; color: #f1f5f9; padding: 16px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: box-shadow 150ms cubic-bezier(0.4,0,0.2,1), transform 150ms cubic-bezier(0.4,0,0.2,1); } .ds-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.4); transform: translateY(-2px); } .ds-card__title { font-family: 'DM Sans', sans-serif; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px; } .ds-card__numeric { font-family: 'DM Sans', sans-serif; font-size: 1.75rem; font-weight: 700; line-height: 1.1; font-feature-settings: 'tnum' on, 'lnum' on; }"
+    },
+    {
+      "name": "Calendar Dropdown Item",
+      "kind": "custom",
+      "refersTo": "calendar-dropdown-item",
+      "description": "Recent-calendar entry inside the Home dropdown. Selected state uses a left accent bar via ::before, not a side border.",
+      "html": "<div class=\"ds-cal-item ds-cal-item--selected\"><div class=\"ds-cal-item__avatar\">SD</div><div class=\"ds-cal-item__meta\"><div class=\"ds-cal-item__name\">Strategy Dataset</div><div class=\"ds-cal-item__sub\">476 trades</div></div><div class=\"ds-cal-item__pnl\">+$6,814,311.00</div></div>",
+      "css": ".ds-cal-item { position: relative; display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 8px; cursor: pointer; background: transparent; transition: background 150ms cubic-bezier(0.4,0,0.2,1); } .ds-cal-item:hover { background: rgba(255,255,255,0.04); } .ds-cal-item--selected { background: rgba(124,58,237,0.12); } .ds-cal-item--selected::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 2px 2px 0; background: #7c3aed; } .ds-cal-item__avatar { width: 32px; height: 32px; border-radius: 6px; background: rgba(124,58,237,0.18); color: #a78bfa; display: flex; align-items: center; justify-content: center; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 700; } .ds-cal-item__name { font-family: 'DM Sans', sans-serif; font-size: 0.875rem; font-weight: 500; color: #f1f5f9; } .ds-cal-item__sub { font-family: 'DM Sans', sans-serif; font-size: 0.6875rem; color: #94a3b8; } .ds-cal-item__pnl { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.8125rem; color: #22c55e; font-feature-settings: 'tnum' on, 'lnum' on; }"
+    },
+    {
+      "name": "Tag Chip",
+      "kind": "chip",
+      "refersTo": "chip-filled",
+      "description": "Tag, status, or filter chip. 6 px corners, label typography.",
+      "html": "<span class=\"ds-chip\">SETUP A</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; padding: 2px 8px; background: #7c3aed; color: #f8fafc; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard text input. 8 px corners, paper background, violet focus glow.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search trades\">",
+      "css": ".ds-input { background: #131313; color: #f1f5f9; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; font-family: 'DM Sans', sans-serif; font-size: 0.875rem; line-height: 1.55; transition: border-color 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1); } .ds-input::placeholder { color: #64748b; } .ds-input:focus { outline: none; border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.15); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Trader's Logbook",
+    "overview": "JournoTrades looks and behaves like a digital descendant of an analog trading logbook. Pages of structured ledgers, columns of figures, marginal notes in a steady hand. Not a marketing site, not a casino app, not a Bloomberg terminal. The system rejects the visual noise that has become a fintech reflex: no purple-to-pink gradient washes, no celebration animations, no skeuomorphic broker chrome, no terminal-style information avalanche. Hierarchy comes from spacing and weight contrast, not decorative elevation. Dark mode is the default surface, tuned for hours of staring on a second monitor in dim or mixed light.",
+    "keyCharacteristics": [
+      "Numbers carry the page; chrome stays out of the way.",
+      "Tabular numerals and calm spacing over flashy emphasis.",
+      "One purple, used sparingly. The accent is a signal, not a wallpaper.",
+      "Crisp 8/12 px corners. Nothing fully rounded except pills used as labels.",
+      "Motion is calm and exponential, defaulting to instant under reduced-motion."
+    ],
+    "rules": [
+      { "name": "The One Purple Rule", "body": "Trader Violet appears at most on ~10% of any screen surface. If a redesign starts to need violet on multiple structural surfaces, the layout is wrong, not the color.", "section": "colors" },
+      { "name": "The Win/Loss Triple-Encoding Rule", "body": "Profit and loss are never expressed by color alone. The pair (color + glyph + sign) is mandatory. No green text without an up-arrow and +. No red text without a down-arrow and -.", "section": "colors" },
+      { "name": "The Pure-Pixel Rule", "body": "Pure white is permitted only on the light-mode paper surface. Page backdrop, all neutrals, and any tinted area must be off-white to keep the system from looking sterile.", "section": "colors" },
+      { "name": "The Tabular-Number Rule", "body": "Any cell, list, or readout that renders a count, percent, or currency must use font-feature-settings: 'tnum' on, 'lnum' on. Proportional figures in P&L tables are forbidden.", "section": "typography" },
+      { "name": "The Single-Display Rule", "body": "A page may have one Display-size headline at most. Multiple display sizes flatten the hierarchy back into noise.", "section": "typography" },
+      { "name": "The No-Glass Rule", "body": "No backdrop-filter: blur decoration on cards, navs, or panels. The single permitted use is the lock-overlay backdrop and the calendar-switching spinner overlay.", "section": "elevation" },
+      { "name": "The Hover Lift Rule", "body": "Cards may translate at most -2 px on hover, paired with the next shadow step up. No scale transforms, no rotation, no shadow expansion beyond one tier.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do lead with numbers. Tabular figures, calm labels, generous space around totals.",
+      "Do keep Trader Violet rare. One element on a screen is usually enough.",
+      "Do pair every win/loss color with both an arrow icon and the sign character.",
+      "Do vary spacing for rhythm: page-level sections at 32–48 px apart, related elements at 8–16 px.",
+      "Do write copy in trader voice. \"476 trades, +$6,814,311.00\", not \"Your amazing trading journey\".",
+      "Do keep AppHeader and SideNav mounted across navigation; loading states render below the chrome."
+    ],
+    "donts": [
+      "Don't use generic SaaS purple gradients. Trader Violet is solid; it never gradients into pink, blue, or itself.",
+      "Don't clip text in a gradient with background-clip: text. Solid color, weight or size for emphasis.",
+      "Don't chase Bloomberg terminal density. Information without rhythm is noise.",
+      "Don't add Robinhood-style gamification: no confetti on green trades, no balloons, no celebration sounds, no oversized streak counters.",
+      "Don't mimic MetaTrader or legacy broker chrome: no skeuomorphic panels, no beveled buttons, no tiny system fonts, no gray-on-gray.",
+      "Don't wrap the entire interface in cards. Cards are an affordance, not a container reflex.",
+      "Don't use a border-left greater than 1 px as a colored accent stripe. The selected calendar item's 3 px accent bar uses ::before, not a side border.",
+      "Don't introduce glassmorphism (frosted blurs) as decoration. Reserve backdrop-filter for the lock and switch overlays.",
+      "Don't use #000 or #fff anywhere except the documented light-mode paper. Off-black #080808 and tinted paper are the system's true neutrals."
+    ]
+  }
+}
