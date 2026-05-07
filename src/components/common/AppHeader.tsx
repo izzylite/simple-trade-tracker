@@ -27,6 +27,7 @@ import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { error } from '../../utils/logger';
 import DebugPanel from './DebugPanel';
 import LoginDialog from '../auth/LoginDialog';
+import NotificationsBell from '../notifications/NotificationsBell';
 
 // Discord icon component
 const DiscordIcon = (props: any) => (
@@ -247,6 +248,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
             >
               <DiscordIcon fontSize="small" />
             </IconButton>
+
+            {/* Notifications — auth only */}
+            {user && <NotificationsBell />}
 
             {/* Theme Toggle */}
             <IconButton

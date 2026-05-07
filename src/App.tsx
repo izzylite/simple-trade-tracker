@@ -8,6 +8,7 @@ import { Calendar } from './types/dualWrite';
 import { AuthProvider } from './contexts/SupabaseAuthContext';
 import { useAuthState, AuthStateProvider } from './contexts/AuthStateContext';
 import { TradeSyncProvider } from './contexts/TradeSyncContext';
+import { NotificationsProvider } from './contexts/NotificationsContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
@@ -479,16 +480,18 @@ function App() {
   return (
     <AuthProvider>
       <AuthStateProvider>
-        <TradeSyncProvider>
-          <LocalizationProvider dateAdapter={AdapterDateFns}>
-            <Router>
-              <ScrollToTop />
-              <Suspense fallback={<LoadingFallback />}>
-                <AppContent />
-              </Suspense>
-            </Router>
-          </LocalizationProvider>
-        </TradeSyncProvider>
+        <NotificationsProvider>
+          <TradeSyncProvider>
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <Router>
+                <ScrollToTop />
+                <Suspense fallback={<LoadingFallback />}>
+                  <AppContent />
+                </Suspense>
+              </Router>
+            </LocalizationProvider>
+          </TradeSyncProvider>
+        </NotificationsProvider>
       </AuthStateProvider>
     </AuthProvider>
   );

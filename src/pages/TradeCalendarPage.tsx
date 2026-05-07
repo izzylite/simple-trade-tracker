@@ -21,6 +21,10 @@ import {
   Fade,
   LinearProgress,
   Badge,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -45,6 +49,9 @@ import {
   HelpOutline as HelpOutlineIcon,
   DeleteOutline as TrashIcon,
   Insights as InsightsIcon,
+  MoreVert as MoreVertIcon,
+  FileUpload as FileUploadIcon,
+  FileDownload as FileDownloadIcon,
 } from '@mui/icons-material';
 import {
   format,
@@ -82,7 +89,7 @@ import {
   TradeCount,
 
 } from '../components/StyledComponents';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
 
@@ -98,8 +105,15 @@ import { useCalendarPanelActions } from '../hooks/useCalendarPanelActions';
 import PinnedTradesDrawer from '../components/PinnedTradesDrawer';
 import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ShareButton from '../components/sharing/ShareButton';
+import { exportTrades } from '../utils/tradeExportImport';
+import { ImportMappingDialog } from '../components/import/ImportMappingDialog';
 
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
+import { useNotifications } from '../contexts/NotificationsContext';
+import {
+  isOrionTaskResultPayload,
+  isReminderFiredPayload,
+} from '../types/notification';
 import OrionIcon from '../components/aiChat/OrionIcon';
 import NotesDrawer from '../components/notes/NotesDrawer';
 import FAQDrawer from '../components/faq/FAQDrawer';
@@ -120,7 +134,6 @@ import { Z_INDEX } from '../styles/zIndex';
 
 import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
 import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
-import { calculateSessionStats } from '../utils/chartDataUtils';
 import EconomicCalendarDrawer, { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
 import EconomicCalendarPanel from '../components/economicCalendar/EconomicCalendarPanel';
 import { useEconomicEventWatcher, useEconomicEventsUpdates } from '../hooks/useEconomicEventWatcher';
@@ -132,7 +145,6 @@ import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
 import { useCalendarTrades } from '../hooks/useCalendarTrades';
 import { useOrionTasks } from '../hooks/useOrionTasks';
-import { SessionPerformanceAnalysis, TradesListDialog } from '../components/charts';
 import {
   SidePanelProvider,
   useSidePanel,
@@ -588,7 +600,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     handleToggleDynamicRisk,
     handleImportTrades: hookHandleImportTrades,
     handleAccountBalanceChange,
-    handleClearMonthTrades,
     handleUpdateCalendarProperty,
     notification,
     clearNotification,
@@ -681,19 +692,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const [deletingTradeIds, setDeletingTradeIds] = useState<string[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Session statistics dialog state - stores trade IDs, trades computed via useMemo
-  const [sessionTradesDialog, setSessionTradesDialog] = useState<{
-    open: boolean;
-    tradeIds: string[];
-    title: string;
-    expandedTradeId: string | null;
-  }>({
-    open: false,
-    tradeIds: [],
-    title: '',
-    expandedTradeId: null
-  });
-
   // Custom function to handle setting zoomed image and related state
   const setZoomedImage = useCallback((url: string, allImages?: string[], initialIndex?: number) => {
     setZoomedImagesState({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
@@ -740,9 +738,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   const [isCalendarEditSubmitting, setIsCalendarEditSubmitting] = useState(false);
 
-  // Trigger to open performance dialog (hosted in MonthlyStats)
-  const [openPerfDialog, setOpenPerfDialog] = useState(false);
-
   // Economic calendar drawer state (<lg only — panel handles lg+)
   const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(false);
 
@@ -760,6 +755,55 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+  const [aiChatDeepLink, setAiChatDeepLink] = useState<{
+    conversationId: string;
+    messageId?: string;
+  } | null>(null);
+  const [aiChatRequestedTab, setAiChatRequestedTab] = useState<number | null>(null);
+
+  // Local-route handler: intercept notification clicks while this calendar is
+  // mounted.
+  //  - reminder_fired (same calendar) → open drawer on Chat tab with deep-link
+  //  - orion_task_result (any calendar) → open drawer on Tasks tab; tasks are
+  //    user-scoped, so any calendar surface is a valid host
+  // Other cases fall through (handler returns false) so the bell's URL
+  // fallback runs.
+  const { registerRouteHandler } = useNotifications();
+  useEffect(() => {
+    if (!calendar?.id) return;
+    return registerRouteHandler((n) => {
+      if (isReminderFiredPayload(n)) {
+        if (n.payload.calendarId !== calendar.id) return false;
+        setAiChatDeepLink({
+          conversationId: n.payload.conversationId,
+          messageId: n.payload.messageId,
+        });
+        setAiChatRequestedTab(0);
+        setIsAIChatOpen(true);
+        return true;
+      }
+      if (isOrionTaskResultPayload(n)) {
+        setAiChatRequestedTab(1);
+        setIsAIChatOpen(true);
+        return true;
+      }
+      return false;
+    });
+  }, [calendar?.id, registerRouteHandler]);
+
+  // URL deep-link: ?openTasks=1 lands here when a task notification was
+  // clicked from a surface that couldn't host the drawer (bell on a non-
+  // calendar route fell back to URL navigation). Open drawer on Tasks tab,
+  // then strip the param so refresh doesn't re-trigger.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('openTasks') !== '1') return;
+    setAiChatRequestedTab(1);
+    setIsAIChatOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('openTasks');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const aiTasks = useOrionTasks(calendar?.user_id, calendar?.id);
   const taskUnreadCount = aiTasks.unreadCount;
@@ -769,6 +813,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   // FAQ drawer state
   const [isFAQDrawerOpen, setIsFAQDrawerOpen] = useState(false);
+
+  // Header overflow menu (Import / Export) state
+  const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   // Calendars list drawer state (<lg fallback for 'calendars-list' panel)
   const [isCalendarsListDrawerOpen, setIsCalendarsListDrawerOpen] = useState(false);
@@ -1206,14 +1255,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     return tradesByDay.get(dateKey) || [];
   }, [selectedDate, tradesByDay]);
 
-  // Compute session dialog trades from IDs - ensures trades update when underlying data changes
-  const sessionDialogTrades = useMemo(() => {
-    if (!sessionTradesDialog.tradeIds.length) return [];
-    return sessionTradesDialog.tradeIds
-      .map(id => filteredTrades.find(t => t.id === id))
-      .filter((t): t is Trade => t !== undefined);
-  }, [sessionTradesDialog.tradeIds, filteredTrades]);
-
   // Calculate total profit based on filtered trades or use pre-calculated value
   const totalProfit = useMemo(() => {
     // If no tag filtering is applied and pre-calculated totalPnL is available, use it
@@ -1350,59 +1391,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     if (!calendarId) return;
     notesService.getGamePlanNotesByDay(calendarId).then(setGamePlanNotes);
   }, [calendarId]);
-
-  // Calculate session statistics for the monthly statistics section
-  const sessionStats = useMemo(() => {
-    return calculateSessionStats(filteredTrades, currentDate, 'month', accountBalance);
-  }, [filteredTrades, currentDate, accountBalance]);
-
-  // Compute cumulative PnL chart data for the current month
-  const monthlyCumulativeChartData = useMemo(() => {
-    const monthTrades = filteredTrades
-      .filter(t => isSameMonth(new Date(t.trade_date), currentDate))
-      .sort((a, b) => {
-        const dt = new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime();
-        if (dt !== 0) return dt;
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-    if (monthTrades.length === 0) return [];
-
-    const byDate = new Map<string, { pnl: number; trades: Trade[]; fullDate: Date }>();
-    monthTrades.forEach(t => {
-      const d = new Date(t.trade_date);
-      const key = format(d, 'MM/dd');
-      const existing = byDate.get(key);
-      if (existing) {
-        existing.pnl += t.amount;
-        existing.trades.push(t);
-      } else {
-        byDate.set(key, { pnl: t.amount, trades: [t], fullDate: d });
-      }
-    });
-
-    let cumulative = 0;
-    return Array.from(byDate.entries()).map(([date, { pnl, trades: dayTrades, fullDate }]) => {
-      const prev = cumulative;
-      cumulative += pnl;
-      return {
-        date,
-        pnl,
-        cumulativePnL: cumulative,
-        dailyChange: cumulative - prev,
-        trades: dayTrades,
-        fullDate,
-        isWin: pnl > 0,
-        isLoss: pnl < 0,
-        isIncreasing: cumulative > prev,
-        isDecreasing: cumulative < prev,
-      };
-    });
-  }, [filteredTrades, currentDate]);
-
-  const monthlyTargetValue = useMemo(() => {
-    if (!monthly_target || accountBalance <= 0) return null;
-    return (monthly_target / 100) * accountBalance;
-  }, [monthly_target, accountBalance]);
 
   const clearDaySelection = () => {
     setSelectedDate(null);
@@ -1822,9 +1810,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 calendar={calendar}
                 pnlBeforeMonth={pnlBeforeMonth}
                 isPnlLoading={isPnlLoading}
-                onImportTrades={handleImportTrades}
                 onDeleteTrade={handleDeleteClick}
-                onClearMonthTrades={handleClearMonthTrades}
                 onOpenGalleryMode={openGalleryMode}
                 onUpdateTradeProperty={handleUpdateTradeProperty}
                 onUpdateCalendarProperty={onUpdateCalendarProperty}
@@ -1833,8 +1819,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                   calendar?.economic_calendar_filters ||
                   DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
                 }
-                openPerformanceDialog={openPerfDialog}
-                onPerformanceDialogClose={() => setOpenPerfDialog(false)}
               />
             ),
           };
@@ -1984,6 +1968,27 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     ? isPanelOpen && currentView.id === 'stats'
     : isStatsDrawerOpen;
 
+  const handleHeaderFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setMoreMenuAnchor(null);
+    setImportFile(file);
+    setShowImportDialog(true);
+    event.target.value = '';
+  };
+
+  const handleHeaderImportComplete = async (importedTrades: Partial<Trade>[]) => {
+    await handleImportTrades(importedTrades);
+    setShowImportDialog(false);
+    setImportFile(null);
+  };
+
+  const handleHeaderExport = (fileFormat: 'xlsx' | 'csv') => {
+    if (trades.length === 0) return;
+    exportTrades(trades, accountBalance, fileFormat);
+    setMoreMenuAnchor(null);
+  };
+
   const breadcrumbRightContent = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
 
@@ -2020,6 +2025,45 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           <HelpOutlineIcon fontSize="small" />
         </IconButton>
       </Tooltip>
+
+      <input
+        type="file"
+        accept=".xlsx,.csv"
+        style={{ display: 'none' }}
+        id="header-import-file"
+        onChange={handleHeaderFileSelect}
+      />
+      <Tooltip title="Import / Export trades">
+        <IconButton
+          size="small"
+          onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
+          sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+        >
+          <MoreVertIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <Menu
+        anchorEl={moreMenuAnchor}
+        open={Boolean(moreMenuAnchor)}
+        onClose={() => setMoreMenuAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        {!isReadOnly && (
+          <MenuItem onClick={() => document.getElementById('header-import-file')?.click()}>
+            <ListItemIcon><FileUploadIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Import Trades</ListItemText>
+          </MenuItem>
+        )}
+        <MenuItem onClick={() => handleHeaderExport('xlsx')} disabled={trades.length === 0}>
+          <ListItemIcon><FileDownloadIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Export XLSX</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleHeaderExport('csv')} disabled={trades.length === 0}>
+          <ListItemIcon><FileDownloadIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Export CSV</ListItemText>
+        </MenuItem>
+      </Menu>
     </Box>
   );
 
@@ -2117,8 +2161,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         inlineActions={
           <Button
             size="small"
-            variant={isStatsActive ? 'contained' : 'outlined'}
-            color="primary"
+            variant="outlined"
             startIcon={<InsightsIcon sx={{ fontSize: 16 }} />}
             onClick={() => togglePanel('stats', setIsStatsDrawerOpen)}
             sx={{
@@ -2129,6 +2172,19 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               py: 0.5,
               borderRadius: 1,
               minWidth: 0,
+              color: isStatsActive ? 'primary.main' : 'text.secondary',
+              borderColor: isStatsActive
+                ? 'primary.main'
+                : (theme: Theme) => theme.palette.divider,
+              bgcolor: isStatsActive
+                ? (theme: Theme) => alpha(theme.palette.primary.main, 0.08)
+                : 'transparent',
+              '&:hover': {
+                borderColor: isStatsActive ? 'primary.dark' : 'text.primary',
+                bgcolor: isStatsActive
+                  ? (theme: Theme) => alpha(theme.palette.primary.main, 0.12)
+                  : (theme: Theme) => theme.palette.action.hover,
+              },
             }}
           >
             Stats
@@ -2627,42 +2683,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           </Box>
 
 
-          {/*Current Monthly Statistics Section */}
-          {/* Session Performance - Only shown on desktop */}
-          {!isMdDown && (
-            <SessionPerformanceAnalysis
-              sessionStats={sessionStats}
-              trades={filteredTrades}
-              selectedDate={currentDate}
-              timePeriod="month"
-              setMultipleTradesDialog={setSessionTradesDialog}
-              chartData={monthlyCumulativeChartData}
-              targetValue={monthlyTargetValue}
-              monthly_target={monthly_target}
-              onOpenPerformanceDetail={() => setOpenPerfDialog(true)}
-            />
-          )}
-
-          {/* Session Trades List Dialog - conditionally rendered to prevent unnecessary effects */}
-          {sessionTradesDialog.open && (
-            <TradesListDialog
-              open={sessionTradesDialog.open}
-              onClose={() => setSessionTradesDialog(prev => ({ ...prev, open: false }))}
-              trades={sessionDialogTrades}
-              title={sessionTradesDialog.title}
-              expandedTradeId={sessionTradesDialog.expandedTradeId}
-              onTradeExpand={(tradeId) =>
-                setSessionTradesDialog(prev => ({
-                  ...prev,
-                  expandedTradeId: prev.expandedTradeId === tradeId ? null : tradeId
-                }))
-              }
-              account_balance={accountBalance}
-              tradeOperations={tradeOperations}
-            />
-          )}
-
-
         </Box>
 
       </Box>{/* end main content container */}
@@ -2993,6 +3013,17 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           submitButtonText="Save"
         />
 
+        {/* Header Import Trades Dialog */}
+        <ImportMappingDialog
+          open={showImportDialog}
+          onClose={() => {
+            setShowImportDialog(false);
+            setImportFile(null);
+          }}
+          onImport={handleHeaderImportComplete}
+          file={importFile}
+        />
+
         {/* Panel-action dialogs (for OTHER calendars from the calendars-list panel) */}
         <CalendarManagementDialogs
           actions={panelActions}
@@ -3021,6 +3052,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         isReadOnly={isReadOnly}
         tradeOperations={tradeOperations}
         aiTasks={aiTasks}
+        pendingDeepLink={aiChatDeepLink}
+        onDeepLinkConsumed={() => setAiChatDeepLink(null)}
+        requestActiveTab={aiChatRequestedTab}
+        onTabRequestConsumed={() => setAiChatRequestedTab(null)}
       />
 
       {/* Notes Drawer — <lg only */}
@@ -3085,9 +3120,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           calendar={calendar}
           pnlBeforeMonth={pnlBeforeMonth}
           isPnlLoading={isPnlLoading}
-          onImportTrades={handleImportTrades}
           onDeleteTrade={handleDeleteClick}
-          onClearMonthTrades={handleClearMonthTrades}
           onOpenGalleryMode={openGalleryMode}
           onUpdateTradeProperty={handleUpdateTradeProperty}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
@@ -3095,8 +3128,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           economicFilter={(_calendarId) =>
             calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
           }
-          openPerformanceDialog={openPerfDialog}
-          onPerformanceDialogClose={() => setOpenPerfDialog(false)}
         />
       )}
 

@@ -91,6 +91,16 @@ export interface AIChatContentProps {
   /** Called after seedMessage has been injected into the input so the parent
    *  can clear it (otherwise it would re-inject on every re-render). */
   onSeedMessageConsumed?: () => void;
+  /** One-shot deep-link target. Scrolls the matching message into view and
+   *  briefly highlights it. */
+  scrollToMessageId?: string | null;
+  /** Cleared by the chat surface after the scroll completes. */
+  onScrolledToMessage?: () => void;
+  /** When true, the "New chat" button morphs into a back-arrow that returns
+   *  the surface to the conversation that was active before a notification
+   *  deep-link swapped it out. */
+  canReturnToPrevious?: boolean;
+  onReturnToPrevious?: () => void;
 }
 
 const AIChatContent: React.FC<AIChatContentProps> = ({
@@ -106,6 +116,10 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   onCalendarChange,
   seedMessage = '',
   onSeedMessageConsumed,
+  scrollToMessageId,
+  onScrolledToMessage,
+  canReturnToPrevious = false,
+  onReturnToPrevious,
 }) => {
   const { onOpenGalleryMode } = tradeOperations;
   const theme = useTheme();
@@ -544,9 +558,10 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
 
         {user && (
           <Box sx={{ display: 'flex', gap: 0.5, ml: 'auto' }}>
-            {/* First slot morphs: shows "+" on chat view, "back arrow" when
-                we're inside history or reminders so users have a clear
-                single way back to chat. */}
+            {/* First slot morphs in priority order:
+                1. inside history / reminders / memory  → back-to-Chat
+                2. notification deep-link is active     → back-to-previous-conversation
+                3. default                              → "+" new chat */}
             {showHistoryView || showRemindersView || showMemoryLogsView ? (
               <Tooltip title="Back to Chat">
                 <IconButton
@@ -557,6 +572,24 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                     setShowMemoryLogsView(false);
                   }}
                   aria-label="Back to Chat"
+                  sx={{
+                    color: 'primary.main',
+                    '&:hover': {
+                      backgroundColor: alpha(
+                        theme.palette.primary.main, 0.1
+                      )
+                    }
+                  }}
+                >
+                  <ArrowBackIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            ) : canReturnToPrevious ? (
+              <Tooltip title="Back to previous conversation">
+                <IconButton
+                  size="small"
+                  onClick={() => onReturnToPrevious?.()}
+                  aria-label="Back to previous conversation"
                   sx={{
                     color: 'primary.main',
                     '&:hover': {
@@ -701,6 +734,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
               userId={user?.uid}
               calendar={calendar}
               trades={trades}
+              currentConversationId={currentConversationId}
+              scrollToMessageId={scrollToMessageId}
+              onScrolledToMessage={onScrolledToMessage}
               {...(tradeQuestionTemplates && {
                 questionTemplates: tradeQuestionTemplates,
               })}

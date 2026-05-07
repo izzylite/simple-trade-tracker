@@ -27,6 +27,8 @@ import {
 } from '@mui/icons-material';
 import ChatMessage from './ChatMessage';
 import ReminderSeparator from './ReminderSeparator';
+import CrossSessionReminderCard from '../notifications/CrossSessionReminderCard';
+import { useNotificationsOptional } from '../../contexts/NotificationsContext';
 import AIChatMentionInput from './AIChatMentionInput';
 import type { AIChatMentionInputHandle, SystemCommand } from './AIChatMentionInput';
 import { ChatMessage as ChatMessageType, AttachedImage } from '../../types/aiChat';
@@ -124,6 +126,17 @@ export interface AIChatInterfaceProps {
   // — these are NOT sent to Orion.
   systemCommands?: SystemCommand[];
   onSystemCommand?: (id: string) => void;
+
+  // Conversation id of the rendered messages. Used to filter cross-session
+  // notification cards (only show notifications whose origin conversation
+  // is NOT the one currently open).
+  currentConversationId?: string | null;
+
+  // One-shot scroll target. When set, the interface scrolls the matching
+  // message into view and briefly highlights it. Caller is responsible for
+  // clearing the target afterwards via onScrolledToMessage.
+  scrollToMessageId?: string | null;
+  onScrolledToMessage?: () => void;
 }
 
 export interface AIChatInterfaceRef {
@@ -159,8 +172,26 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   questionTemplates = defaultQuestionTemplates,
   systemCommands,
   onSystemCommand,
+  currentConversationId,
+  scrollToMessageId,
+  onScrolledToMessage,
 }, ref) => {
   const theme = useTheme();
+  const notificationsCtx = useNotificationsOptional();
+  const crossSessionCards = useMemo(
+    () =>
+      notificationsCtx
+        ? notificationsCtx.crossSessionFor(currentConversationId ?? null)
+        : [],
+    [notificationsCtx, currentConversationId]
+  );
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  // Tracks which scrollToMessageId we already highlighted so a later
+  // realtime message arrival doesn't re-fire the scroll/highlight on the
+  // same target. The dep array still includes `messages` so the first scroll
+  // can wait for the target to render — once we've successfully scrolled,
+  // this ref short-circuits subsequent runs.
+  const lastScrolledMessageIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<AIChatMentionInputHandle | null>(null);
@@ -212,6 +243,41 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
       scrollToBottom();
     }
   }, [messages, scrollToBottom, autoScroll]);
+
+  // Reset the per-target dedup ref whenever a fresh scroll request comes in.
+  useEffect(() => {
+    if (scrollToMessageId && lastScrolledMessageIdRef.current !== scrollToMessageId) {
+      lastScrolledMessageIdRef.current = null;
+    }
+  }, [scrollToMessageId]);
+
+  // Deep-link: scroll to a specific message and highlight it briefly.
+  // Honours prefers-reduced-motion: jumps instantly without easing or fade.
+  useEffect(() => {
+    if (!scrollToMessageId) return;
+    if (lastScrolledMessageIdRef.current === scrollToMessageId) return;
+    const container = messagesAreaRef.current;
+    if (!container) return;
+    const target = container.querySelector(
+      `[data-message-id="${scrollToMessageId}"]`
+    ) as HTMLElement | null;
+    if (!target) return;
+
+    lastScrolledMessageIdRef.current = scrollToMessageId;
+    const reducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({
+      behavior: reducedMotion ? 'auto' : 'smooth',
+      block: 'center',
+    });
+    setHighlightedMessageId(scrollToMessageId);
+    const timeout = window.setTimeout(() => {
+      setHighlightedMessageId(null);
+      onScrolledToMessage?.();
+    }, 1400);
+    return () => window.clearTimeout(timeout);
+  }, [scrollToMessageId, messages, onScrolledToMessage]);
 
   // Track scroll position to show/hide the scroll-to-bottom button
   const handleMessagesScroll = useCallback(() => {
@@ -496,23 +562,44 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
           ...scrollbarStyles(theme)
         }}
       >
-        {displayMessages.map((message, index) => (
-          <React.Fragment key={message.id}>
-            {message.metadata?.triggered_by?.startsWith('reminder:') && (
-              <ReminderSeparator description={message.metadata.reminder_description} />
-            )}
-            <ChatMessage
-              message={message}
-              showTimestamp={true}
-              isLatestMessage={index === displayMessages.length - 1}
-              onTradeClick={handleTradeClick}
-              onEventClick={handleEventClick}
-              onNoteClick={handleNoteClick}
-              onEdit={handleEditMessage}
-              trades={trades}
-              availableTags={availableTagsMemo}
-            />
-          </React.Fragment>
+        {displayMessages.map((message, index) => {
+          const isHighlighted = highlightedMessageId === message.id;
+          return (
+            <Box
+              key={message.id}
+              data-message-id={message.id}
+              sx={{
+                borderRadius: 1.5,
+                transition: 'background-color 600ms cubic-bezier(0.22, 1, 0.36, 1)',
+                backgroundColor: isHighlighted
+                  ? alpha(theme.palette.primary.main, 0.12)
+                  : 'transparent',
+              }}
+            >
+              {message.metadata?.triggered_by?.startsWith('reminder:') && (
+                <ReminderSeparator description={message.metadata.reminder_description} />
+              )}
+              <ChatMessage
+                message={message}
+                showTimestamp={true}
+                isLatestMessage={index === displayMessages.length - 1}
+                onTradeClick={handleTradeClick}
+                onEventClick={handleEventClick}
+                onNoteClick={handleNoteClick}
+                onEdit={handleEditMessage}
+                trades={trades}
+                availableTags={availableTagsMemo}
+              />
+            </Box>
+          );
+        })}
+
+        {/* Cross-session reminder cards: rendered after the message list at
+            the chronologically-most-recent end. Each card represents a
+            reminder that fired in a DIFFERENT conversation while the user
+            was here. UI-only — Orion never sees these. */}
+        {crossSessionCards.map((n) => (
+          <CrossSessionReminderCard key={n.id} notification={n} />
         ))}
 
         {/* Question Templates - Only show when no conversation started */}

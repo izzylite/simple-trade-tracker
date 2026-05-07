@@ -6,11 +6,14 @@ import {
   alpha,
   useTheme,
 } from '@mui/material';
+import { useSearchParams } from 'react-router-dom';
 import { useAuthState } from '../contexts/AuthStateContext';
 import { useCalendars } from '../hooks/useCalendars';
 import { useAIChat } from '../hooks/useAIChat';
 import AIChatContent from '../components/sidePanel/content/AIChatContent';
 import { Trade } from '../types/dualWrite';
+import { ConversationRepository } from '../services/repository/repositories/ConversationRepository';
+import { logger } from '../utils/logger';
 
 const STORAGE_KEY = 'assistant_selected_calendar_id';
 const SWITCH_SPINNER_MS = 350;
@@ -45,6 +48,9 @@ const AssistantPage: React.FC = () => {
   });
   const [isSwitching, setIsSwitching] = useState(false);
   const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
+  const conversationRepoRef = useRef(new ConversationRepository());
 
   // Drop a stale stored ID when its calendar is gone (deleted/trashed).
   // Empty string means "All Calendars" and is always valid.
@@ -99,6 +105,50 @@ const AssistantPage: React.FC = () => {
     autoSaveConversation: true,
   });
 
+  // Deep-link handler: ?calendarId=&conversationId=&messageId=
+  // Triggered when the user clicks a notification (from the bell or an
+  // in-stream card). Sets the calendar context, loads the target
+  // conversation, and queues a scroll-to-message highlight. Params are
+  // cleared after consumption so a refresh doesn't re-trigger.
+  useEffect(() => {
+    const calIdParam = searchParams.get('calendarId');
+    const convoIdParam = searchParams.get('conversationId');
+    const msgIdParam = searchParams.get('messageId');
+    if (!convoIdParam) return;
+
+    const nextCalId = calIdParam ?? '';
+    setSelectedCalendarId(nextCalId);
+    try {
+      localStorage.setItem(STORAGE_KEY, nextCalId);
+    } catch {
+      // ignore
+    }
+
+    let cancelled = false;
+    conversationRepoRef.current
+      .findById(convoIdParam)
+      .then((convo) => {
+        if (cancelled) return;
+        if (!convo) {
+          logger.warn(
+            'Notification deep-link: conversation not found',
+            convoIdParam
+          );
+          return;
+        }
+        sharedChatState.selectConversation(convo);
+        if (msgIdParam) setScrollToMessageId(msgIdParam);
+      })
+      .catch((err) => {
+        logger.error('Notification deep-link load failed', err);
+      });
+
+    setSearchParams(new URLSearchParams(), { replace: true });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, sharedChatState.selectConversation, setSearchParams]);
+
   // Stub operations — Assistant page does not host trade-edit flows; users
   // open the calendar to edit trades. Image zoom is a no-op here for now.
   const stubTradeOperations = useMemo(
@@ -134,6 +184,8 @@ const AssistantPage: React.FC = () => {
         availableCalendars={activeCalendars}
         selectedCalendarId={selectedCalendarId}
         onCalendarChange={handleCalendarChange}
+        scrollToMessageId={scrollToMessageId}
+        onScrolledToMessage={() => setScrollToMessageId(null)}
       />
 
       {isSwitching && (

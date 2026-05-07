@@ -1831,6 +1831,47 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
     });
   }
 
+  // ---- 3j. Insert notification row ----
+  // The notification surfaces this fire in the user's inbox bell + powers
+  // the in-stream "FROM ANOTHER SESSION" card if the user is reading a
+  // different conversation. Failures here MUST NOT propagate — the fire
+  // already succeeded; missing a notification row degrades discoverability
+  // but does not lose the assistant reply (it's already in messages).
+  try {
+    const previewSource = (finalText || '').replace(/\s+/g, ' ').trim();
+    const preview = previewSource.length > 120
+      ? previewSource.slice(0, 117) + '…'
+      : previewSource;
+    const fallbackTitle = (claimed.instructions || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    const title = (claimed.description?.trim() || fallbackTitle || 'Reminder fired').slice(0, 200);
+
+    const { error: notifErr } = await serviceClient
+      .from('notifications')
+      .insert({
+        user_id: userId,
+        type: 'reminder_fired',
+        title,
+        payload: {
+          calendarId: calendarId ?? null,
+          conversationId,
+          reminderId,
+          messageId: newMessage.id,
+          preview,
+        },
+      });
+    if (notifErr) {
+      log('Notification insert failed (non-fatal)', 'warn', {
+        reminderId,
+        error: notifErr.message,
+      });
+    }
+  } catch (notifThrow) {
+    log('Notification insert threw (non-fatal)', 'warn', {
+      reminderId,
+      error: notifThrow instanceof Error ? notifThrow.message : String(notifThrow),
+    });
+  }
+
   return successResponse(
     { claimed: true, fired: true, reminderId, conversationId },
     'Reminder fired'
