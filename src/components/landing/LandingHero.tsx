@@ -123,7 +123,7 @@ const LandingHero: React.FC<Props> = ({ onGetStarted }) => {
                         mb: 3,
                         fontFamily: "'DM Sans', sans-serif",
                         fontWeight: 900,
-                        color: '#fff',
+                        color: '#f1f5f9',
                         animation: 'hfadeUp 0.8s cubic-bezier(0.16,1,0.3,1)',
                         '@keyframes hfadeUp': {
                             from: { opacity: 0, transform: 'translateY(24px)' },
@@ -176,8 +176,8 @@ const LandingHero: React.FC<Props> = ({ onGetStarted }) => {
                         onClick={onGetStarted}
                         endIcon={<ArrowForwardIcon />}
                         sx={{
-                            bgcolor: '#fff',
-                            color: '#000',
+                            bgcolor: '#f1f5f9',
+                            color: '#080808',
                             fontWeight: 700,
                             fontSize: '1rem',
                             px: 4,
@@ -206,7 +206,7 @@ const LandingHero: React.FC<Props> = ({ onGetStarted }) => {
                             border: '1px solid rgba(255,255,255,0.12)',
                             '&:hover': {
                                 bgcolor: 'rgba(255,255,255,0.05)',
-                                color: '#fff',
+                                color: '#f1f5f9',
                                 border: '1px solid rgba(255,255,255,0.22)',
                             },
                             transition: 'all 0.2s ease',
@@ -245,7 +245,7 @@ const LandingHero: React.FC<Props> = ({ onGetStarted }) => {
                             <Typography sx={{
                                 fontSize: { xs: '1.75rem', md: '2.25rem' },
                                 fontWeight: 800,
-                                color: '#fff',
+                                color: '#f1f5f9',
                                 letterSpacing: '-0.04em',
                                 lineHeight: 1,
                                 mb: 0.5,

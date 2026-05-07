@@ -27,6 +27,7 @@ import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { error } from '../../utils/logger';
 import DebugPanel from './DebugPanel';
 import LoginDialog from '../auth/LoginDialog';
+import NotificationsBell from '../notifications/NotificationsBell';
 
 // Discord icon component
 const DiscordIcon = (props: any) => (
@@ -164,52 +165,55 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
 
           {/* Right Section: Navigation + Actions */}
           <Stack direction="row" spacing={{ xs: 1, sm: 2 }} alignItems="center">
-            {/* Navigation */}
-            <Stack
-              component="nav"
-              direction="row"
-              spacing={0.5}
-              sx={{ mr: { xs: 0, sm: 1 } }}
-            >
-              {NAV_ITEMS.map((item) => {
-                const active = isActive(item.path);
-                return (
-                  <Button
-                    key={item.path}
-                    onClick={() => handleNavClick(item.path)}
-                    size="small"
-                    sx={{
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-                      fontWeight: active ? 600 : 500,
-                      color: active ? 'text.primary' : 'text.secondary',
-                      bgcolor: active
-                        ? (theme) =>
-                            alpha(
-                              theme.palette.primary.main,
-                              theme.palette.mode === 'dark' ? 0.12 : 0.08
-                            )
-                        : 'transparent',
-                      textTransform: 'none',
-                      transition: 'all 0.15s ease',
-                      '&:hover': {
+            {/* Top nav — only for unauthenticated users. Authenticated users
+                navigate via the left side nav. */}
+            {!user && (
+              <Stack
+                component="nav"
+                direction="row"
+                spacing={0.5}
+                sx={{ mr: { xs: 0, sm: 1 } }}
+              >
+                {NAV_ITEMS.map((item) => {
+                  const active = isActive(item.path);
+                  return (
+                    <Button
+                      key={item.path}
+                      onClick={() => handleNavClick(item.path)}
+                      size="small"
+                      sx={{
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                        fontWeight: active ? 600 : 500,
+                        color: active ? 'text.primary' : 'text.secondary',
                         bgcolor: active
                           ? (theme) =>
                               alpha(
                                 theme.palette.primary.main,
-                                theme.palette.mode === 'dark' ? 0.18 : 0.12
+                                theme.palette.mode === 'dark' ? 0.12 : 0.08
                               )
-                          : alpha(theme.palette.action.hover, 0.08),
-                        color: 'text.primary'
-                      }
-                    }}
-                  >
-                    {item.label}
-                  </Button>
-                );
-              })}
-            </Stack>
+                          : 'transparent',
+                        textTransform: 'none',
+                        transition: 'all 0.15s ease',
+                        '&:hover': {
+                          bgcolor: active
+                            ? (theme) =>
+                                alpha(
+                                  theme.palette.primary.main,
+                                  theme.palette.mode === 'dark' ? 0.18 : 0.12
+                                )
+                            : alpha(theme.palette.action.hover, 0.08),
+                          color: 'text.primary'
+                        }
+                      }}
+                    >
+                      {item.label}
+                    </Button>
+                  );
+                })}
+              </Stack>
+            )}
             {/* Debug Button - Admin only */}
             {isDebugAuthorized && (
               <IconButton
@@ -245,6 +249,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
               <DiscordIcon fontSize="small" />
             </IconButton>
 
+            {/* Notifications — auth only */}
+            {user && <NotificationsBell />}
+
             {/* Theme Toggle */}
             <IconButton
               onClick={onToggleTheme}
@@ -277,14 +284,13 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
                     width: 32,
                     height: 32,
                     cursor: 'pointer',
-                    bgcolor: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
-                    background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+                    bgcolor: theme.palette.primary.main,
+                    color: theme.palette.common.white,
                     fontSize: '0.875rem',
                     fontWeight: 600,
-                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    transition: 'box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {
-                      transform: 'scale(1.05)',
-                      boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.3)}`
+                      boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}`
                     }
                   }}
                 >

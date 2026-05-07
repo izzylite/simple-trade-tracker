@@ -21,6 +21,10 @@ import {
   Fade,
   LinearProgress,
   Badge,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -44,6 +48,10 @@ import {
   EventNote as GamePlanIcon,
   HelpOutline as HelpOutlineIcon,
   DeleteOutline as TrashIcon,
+  Insights as InsightsIcon,
+  MoreVert as MoreVertIcon,
+  FileUpload as FileUploadIcon,
+  FileDownload as FileDownloadIcon,
 } from '@mui/icons-material';
 import {
   format,
@@ -81,27 +89,31 @@ import {
   TradeCount,
 
 } from '../components/StyledComponents';
-import { useNavigate, useParams } from 'react-router-dom';
-import { mutate as swrMutate } from 'swr';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
 
-import Breadcrumbs, { BreadcrumbItem, BreadcrumbButton, DropdownItem } from '../components/common/Breadcrumbs';
+import CalendarSelectorBar, { CalendarSelectorItem } from '../components/common/CalendarSelectorBar';
 import { NewTradeForm, TradeImage } from '../components/trades/TradeForm';
 import { Calendar } from '../types/calendar';
 import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
-import MonthlyStats from '../components/MonthlyStats';
-import AccountStats from '../components/AccountStats';
 import TradeFormDialog, { createEditTradeData } from '../components/trades/TradeFormDialog';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
-import { DuplicateCalendarDialog } from '../components/dialogs/DuplicateCalendarDialog';
-import { CalendarLinkDialog } from '../components/dialogs/CalendarLinkDialog';
+import CalendarManagementDialogs from '../components/calendars/CalendarManagementDialogs';
+import { useCalendarPanelActions } from '../hooks/useCalendarPanelActions';
 import PinnedTradesDrawer from '../components/PinnedTradesDrawer';
 import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ShareButton from '../components/sharing/ShareButton';
+import { exportTrades } from '../utils/tradeExportImport';
+import { ImportMappingDialog } from '../components/import/ImportMappingDialog';
 
 import AIChatDrawer from '../components/aiChat/AIChatDrawer';
+import { useNotifications } from '../contexts/NotificationsContext';
+import {
+  isOrionTaskResultPayload,
+  isReminderFiredPayload,
+} from '../types/notification';
 import OrionIcon from '../components/aiChat/OrionIcon';
 import NotesDrawer from '../components/notes/NotesDrawer';
 import FAQDrawer from '../components/faq/FAQDrawer';
@@ -122,7 +134,6 @@ import { Z_INDEX } from '../styles/zIndex';
 
 import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
 import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
-import { calculateSessionStats } from '../utils/chartDataUtils';
 import EconomicCalendarDrawer, { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
 import EconomicCalendarPanel from '../components/economicCalendar/EconomicCalendarPanel';
 import { useEconomicEventWatcher, useEconomicEventsUpdates } from '../hooks/useEconomicEventWatcher';
@@ -134,7 +145,6 @@ import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
 import { useCalendarTrades } from '../hooks/useCalendarTrades';
 import { useOrionTasks } from '../hooks/useOrionTasks';
-import { SessionPerformanceAnalysis, TradesListDialog } from '../components/charts';
 import {
   SidePanelProvider,
   useSidePanel,
@@ -152,6 +162,8 @@ import TagManagementContent from '../components/sidePanel/content/TagManagementC
 import DayTradesContent from '../components/sidePanel/content/DayTradesContent';
 import CalendarsListContent from '../components/sidePanel/content/CalendarsListContent';
 import CalendarsListDrawer from '../components/calendars/CalendarsListDrawer';
+import StatsContent from '../components/sidePanel/content/StatsContent';
+import StatsDrawer from '../components/StatsDrawer';
 
 interface TradeCalendarProps {
   // Trade CRUD operations now handled internally via useCalendarTrades hook
@@ -588,7 +600,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     handleToggleDynamicRisk,
     handleImportTrades: hookHandleImportTrades,
     handleAccountBalanceChange,
-    handleClearMonthTrades,
     handleUpdateCalendarProperty,
     notification,
     clearNotification,
@@ -681,19 +692,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const [deletingTradeIds, setDeletingTradeIds] = useState<string[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Session statistics dialog state - stores trade IDs, trades computed via useMemo
-  const [sessionTradesDialog, setSessionTradesDialog] = useState<{
-    open: boolean;
-    tradeIds: string[];
-    title: string;
-    expandedTradeId: string | null;
-  }>({
-    open: false,
-    tradeIds: [],
-    title: '',
-    expandedTradeId: null
-  });
-
   // Custom function to handle setting zoomed image and related state
   const setZoomedImage = useCallback((url: string, allImages?: string[], initialIndex?: number) => {
     setZoomedImagesState({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
@@ -707,6 +705,16 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'warning' | 'error'>('warning');
+
+  // Snackbar utility — defined early so hooks below can depend on it.
+  const showSnackbar = useCallback(
+    (message: string, severity: 'success' | 'warning' | 'error' = 'warning') => {
+      setSnackbarMessage(message);
+      setSnackbarSeverity(severity);
+      setSnackbarOpen(true);
+    },
+    []
+  );
   const [showFloatingMonthNav, setShowFloatingMonthNav] = useState(false);
   const [pinnedTradesDrawerOpen, setPinnedTradesDrawerOpen] = useState(false);
   const [galleryMode, setGalleryMode] = useState<{
@@ -730,9 +738,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   const [isCalendarEditSubmitting, setIsCalendarEditSubmitting] = useState(false);
 
-  // Trigger to open performance dialog (hosted in MonthlyStats)
-  const [openPerfDialog, setOpenPerfDialog] = useState(false);
-
   // Economic calendar drawer state (<lg only — panel handles lg+)
   const [isEconomicCalendarOpen, setIsEconomicCalendarOpen] = useState(false);
 
@@ -750,6 +755,55 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   // AI Chat drawer state
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+  const [aiChatDeepLink, setAiChatDeepLink] = useState<{
+    conversationId: string;
+    messageId?: string;
+  } | null>(null);
+  const [aiChatRequestedTab, setAiChatRequestedTab] = useState<number | null>(null);
+
+  // Local-route handler: intercept notification clicks while this calendar is
+  // mounted.
+  //  - reminder_fired (same calendar) → open drawer on Chat tab with deep-link
+  //  - orion_task_result (any calendar) → open drawer on Tasks tab; tasks are
+  //    user-scoped, so any calendar surface is a valid host
+  // Other cases fall through (handler returns false) so the bell's URL
+  // fallback runs.
+  const { registerRouteHandler } = useNotifications();
+  useEffect(() => {
+    if (!calendar?.id) return;
+    return registerRouteHandler((n) => {
+      if (isReminderFiredPayload(n)) {
+        if (n.payload.calendarId !== calendar.id) return false;
+        setAiChatDeepLink({
+          conversationId: n.payload.conversationId,
+          messageId: n.payload.messageId,
+        });
+        setAiChatRequestedTab(0);
+        setIsAIChatOpen(true);
+        return true;
+      }
+      if (isOrionTaskResultPayload(n)) {
+        setAiChatRequestedTab(1);
+        setIsAIChatOpen(true);
+        return true;
+      }
+      return false;
+    });
+  }, [calendar?.id, registerRouteHandler]);
+
+  // URL deep-link: ?openTasks=1 lands here when a task notification was
+  // clicked from a surface that couldn't host the drawer (bell on a non-
+  // calendar route fell back to URL navigation). Open drawer on Tasks tab,
+  // then strip the param so refresh doesn't re-trigger.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('openTasks') !== '1') return;
+    setAiChatRequestedTab(1);
+    setIsAIChatOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('openTasks');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const aiTasks = useOrionTasks(calendar?.user_id, calendar?.id);
   const taskUnreadCount = aiTasks.unreadCount;
@@ -760,20 +814,17 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   // FAQ drawer state
   const [isFAQDrawerOpen, setIsFAQDrawerOpen] = useState(false);
 
+  // Header overflow menu (Import / Export) state
+  const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+
   // Calendars list drawer state (<lg fallback for 'calendars-list' panel)
   const [isCalendarsListDrawerOpen, setIsCalendarsListDrawerOpen] = useState(false);
 
-  // Calendar management dialog state for actions originating from the
-  // calendars-list panel/drawer (edit/duplicate/link/delete on OTHER calendars).
-  // Distinct from isCalendarEditOpen which targets the currently-active calendar.
-  const [panelCalendarToEdit, setPanelCalendarToEdit] = useState<Calendar | null>(null);
-  const [isPanelEditSubmitting, setIsPanelEditSubmitting] = useState(false);
-  const [panelCalendarToDuplicate, setPanelCalendarToDuplicate] = useState<Calendar | null>(null);
-  const [isPanelDuplicating, setIsPanelDuplicating] = useState(false);
-  const [panelCalendarToLink, setPanelCalendarToLink] = useState<Calendar | null>(null);
-  const [isPanelLinking, setIsPanelLinking] = useState(false);
-  const [panelCalendarToDelete, setPanelCalendarToDelete] = useState<string | null>(null);
-  const [isPanelDeleting, setIsPanelDeleting] = useState(false);
+  // Stats drawer state (<lg fallback for 'stats' panel)
+  const [isStatsDrawerOpen, setIsStatsDrawerOpen] = useState(false);
+
 
   // Week note state
   const [weekNoteKeys, setWeekNoteKeys] = useState<Set<string>>(new Set());
@@ -865,6 +916,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       setIsEconomicCalendarOpen(false);
       setIsFAQDrawerOpen(false);
       setIsCalendarsListDrawerOpen(false);
+      setIsStatsDrawerOpen(false);
       setSelectedDate(null);
     };
 
@@ -893,6 +945,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         case 'calendars-list':
           setIsCalendarsListDrawerOpen(true);
           break;
+        case 'stats':
+          setIsStatsDrawerOpen(true);
+          break;
         case 'day-trades': {
           const dayView = currentView as DayTradesView;
           setSelectedDate(dayView.date);
@@ -907,6 +962,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       } else if (isCalendarsListDrawerOpen) {
         replacePanel({ id: 'calendars-list' });
         setPanelOpen(true);
+      } else if (isStatsDrawerOpen) {
+        replacePanel({ id: 'stats' });
+        setPanelOpen(true);
       }
       closeAllDrawers();
     }
@@ -914,46 +972,46 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     prevIsLgUp.current = isLgUp;
   }, [isLgUp]);
 
-  // Breadcrumb items
-  const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => {
-    // Recent calendars: filter trash, sort by updated_at desc, top 3.
-    // Always include the active calendar even if it's not in top 3 so the
-    // dropdown reflects current selection.
+  // Recent-calendars dropdown: trash-filtered, sorted by updated_at desc,
+  // top 3. Always include the active calendar even if it's not in top 3.
+  const recentCalendarItems = useMemo<CalendarSelectorItem[]>(() => {
     const sortedRecent = [...userCalendars]
       .filter(c => !c.deleted_at)
-      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      .sort(
+        (a, b) =>
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      );
     const top3 = sortedRecent.slice(0, 3);
     const includesActive = top3.some(c => c.id === calendarId);
-    const activeCal = !includesActive ? sortedRecent.find(c => c.id === calendarId) : undefined;
-    const dropdownSource = activeCal ? [activeCal, ...top3] : top3;
+    const activeCal = !includesActive
+      ? sortedRecent.find(c => c.id === calendarId)
+      : undefined;
+    const source = activeCal ? [activeCal, ...top3] : top3;
 
     // Overlay live data for the active calendar so name/totals reflect
-    // in-session updates (renames, new trades) instead of the snapshot.
-    const dropdownItems: DropdownItem[] = dropdownSource.map(cal => {
+    // in-session edits (renames, new trades) instead of the snapshot.
+    return source.map(cal => {
       const isActive = cal.id === calendarId;
-      const source = isActive ? calendar : cal;
+      const live = isActive ? calendar : cal;
       return {
-        label: source.name,
-        path: `/calendar/${cal.id}`,
+        id: cal.id,
+        name: live.name,
+        totalTrades: live.total_trades,
+        pnl: live.total_pnl,
+        hero_image_url: live.hero_image_url,
         active: isActive,
-        totalTrades: source.total_trades,
-        pnl: source.total_pnl
       };
     });
+  }, [calendarName, calendarId, userCalendars, calendar]);
 
-    return [
-      { label: 'Home', path: '/', icon: <HomeIcon sx={{ fontSize: 18 }} /> },
-      { label: 'Calendars', path: '/dashboard', icon: <CalendarIcon sx={{ fontSize: 18 }} /> },
-      {
-        label: calendarName || 'Calendar',
-        path: `/calendar/${calendarId}`,
-        dropdown: dropdownItems.length > 0 ? dropdownItems : undefined,
-        dropdownTitle: dropdownItems.length > 0 ? 'Calendars' : undefined,
-        onViewAll: dropdownItems.length > 0 ? handleViewAllCalendars : undefined,
-        viewAllLabel: 'View all'
-      }
-    ];
-  }, [calendarName, calendarId, userCalendars, calendar, handleViewAllCalendars]);
+  const activeSelectorItem = useMemo<CalendarSelectorItem>(
+    () => ({
+      id: calendarId || '',
+      name: calendarName || 'Calendar',
+      hero_image_url: calendar?.hero_image_url,
+    }),
+    [calendarId, calendarName, calendar?.hero_image_url]
+  );
 
   // Use optimized hook for high-impact economic events
   const { highImpactEventDates: monthlyHighImpactEvents } = useHighImpactEvents({
@@ -1089,120 +1147,16 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     }
   };
 
-  // Refresh both the local userCalendars (dropdown) and SWR caches used by
-  // CalendarsListContent (panel/drawer). Mutating App-level state alone
-  // doesn't touch SWR, so the panel/drawer would otherwise show stale data.
-  const refreshCalendarSources = useCallback(async () => {
-    const userId = calendar?.user_id;
-    await Promise.all([
-      loadUserCalendars(),
-      userId ? swrMutate(['calendars', userId]) : Promise.resolve(),
-      userId ? swrMutate(['trash-calendars', userId]) : Promise.resolve(),
-    ]);
-  }, [calendar?.user_id, loadUserCalendars]);
-
-  // --- Calendars-list panel/drawer action handlers ---
-  const handlePanelEditSubmit = async (formData: CalendarFormData) => {
-    if (!panelCalendarToEdit || !onUpdateCalendar) return;
-
-    setIsPanelEditSubmitting(true);
-    try {
-      await onUpdateCalendar(panelCalendarToEdit.id, { ...formData });
-      await refreshCalendarSources();
-      setPanelCalendarToEdit(null);
-      showSnackbar('Calendar updated successfully', 'success');
-    } catch (error) {
-      logger.error('Error updating calendar:', error);
-      showSnackbar('Failed to update calendar', 'error');
-    } finally {
-      setIsPanelEditSubmitting(false);
-    }
-  };
-
-  const handlePanelDuplicateSubmit = async (withContent: boolean) => {
-    if (!panelCalendarToDuplicate || !onDuplicateCalendar) return;
-
-    setIsPanelDuplicating(true);
-    try {
-      const newName = `${panelCalendarToDuplicate.name} (Copy)`;
-      await onDuplicateCalendar(panelCalendarToDuplicate.id, newName, withContent);
-      await refreshCalendarSources();
-      setPanelCalendarToDuplicate(null);
-      showSnackbar('Calendar duplicated successfully', 'success');
-    } catch (error) {
-      logger.error('Error duplicating calendar:', error);
-      showSnackbar('Failed to duplicate calendar', 'error');
-    } finally {
-      setIsPanelDuplicating(false);
-    }
-  };
-
-  const handlePanelLinkSubmit = async (targetCalendarId: string) => {
-    if (!panelCalendarToLink) return;
-
-    setIsPanelLinking(true);
-    try {
-      await calendarService.linkCalendar(panelCalendarToLink.id, targetCalendarId);
-      await refreshCalendarSources();
-      setPanelCalendarToLink(null);
-    } catch (error) {
-      logger.error('Error linking calendar:', error);
-      throw error;
-    } finally {
-      setIsPanelLinking(false);
-    }
-  };
-
-  const handlePanelUnlinkSubmit = async () => {
-    if (!panelCalendarToLink) return;
-
-    setIsPanelLinking(true);
-    try {
-      await calendarService.unlinkCalendar(panelCalendarToLink.id);
-      await refreshCalendarSources();
-      setPanelCalendarToLink(null);
-    } catch (error) {
-      logger.error('Error unlinking calendar:', error);
-      throw error;
-    } finally {
-      setIsPanelLinking(false);
-    }
-  };
-
-  const handlePanelDeleteConfirm = async () => {
-    if (!panelCalendarToDelete || !onDeleteCalendar) return;
-
-    setIsPanelDeleting(true);
-    try {
-      await onDeleteCalendar(panelCalendarToDelete);
-      await refreshCalendarSources();
-      setPanelCalendarToDelete(null);
-      showSnackbar('Calendar moved to trash', 'success');
-    } catch (error) {
-      logger.error('Error deleting calendar:', error);
-      showSnackbar('Failed to delete calendar', 'error');
-    } finally {
-      setIsPanelDeleting(false);
-    }
-  };
-
-  const handlePanelRestoreCalendar = useCallback(async (id: string) => {
-    try {
-      await calendarService.restoreCalendar(id);
-      await refreshCalendarSources();
-    } catch (error) {
-      logger.error('Error restoring calendar:', error);
-    }
-  }, [refreshCalendarSources]);
-
-  const handlePanelPermanentDeleteCalendar = useCallback(async (id: string) => {
-    try {
-      await calendarService.permanentlyDeleteCalendar(id);
-      await refreshCalendarSources();
-    } catch (error) {
-      logger.error('Error permanently deleting calendar:', error);
-    }
-  }, [refreshCalendarSources]);
+  // All calendars-list panel/drawer action state + handlers (edit/duplicate/
+  // link/delete/restore/permanent-delete) live here. See useCalendarPanelActions.
+  const panelActions = useCalendarPanelActions({
+    userId: calendar?.user_id,
+    loadUserCalendars,
+    showSnackbar,
+    onUpdateCalendar,
+    onDuplicateCalendar,
+    onDeleteCalendar,
+  });
 
   // Generic panel/drawer toggle — reused by Notes, Events, Pinned, Filter, Tags
   const togglePanel = useCallback((
@@ -1300,14 +1254,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     return tradesByDay.get(dateKey) || [];
   }, [selectedDate, tradesByDay]);
-
-  // Compute session dialog trades from IDs - ensures trades update when underlying data changes
-  const sessionDialogTrades = useMemo(() => {
-    if (!sessionTradesDialog.tradeIds.length) return [];
-    return sessionTradesDialog.tradeIds
-      .map(id => filteredTrades.find(t => t.id === id))
-      .filter((t): t is Trade => t !== undefined);
-  }, [sessionTradesDialog.tradeIds, filteredTrades]);
 
   // Calculate total profit based on filtered trades or use pre-calculated value
   const totalProfit = useMemo(() => {
@@ -1445,59 +1391,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     if (!calendarId) return;
     notesService.getGamePlanNotesByDay(calendarId).then(setGamePlanNotes);
   }, [calendarId]);
-
-  // Calculate session statistics for the monthly statistics section
-  const sessionStats = useMemo(() => {
-    return calculateSessionStats(filteredTrades, currentDate, 'month', accountBalance);
-  }, [filteredTrades, currentDate, accountBalance]);
-
-  // Compute cumulative PnL chart data for the current month
-  const monthlyCumulativeChartData = useMemo(() => {
-    const monthTrades = filteredTrades
-      .filter(t => isSameMonth(new Date(t.trade_date), currentDate))
-      .sort((a, b) => {
-        const dt = new Date(a.trade_date).getTime() - new Date(b.trade_date).getTime();
-        if (dt !== 0) return dt;
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-    if (monthTrades.length === 0) return [];
-
-    const byDate = new Map<string, { pnl: number; trades: Trade[]; fullDate: Date }>();
-    monthTrades.forEach(t => {
-      const d = new Date(t.trade_date);
-      const key = format(d, 'MM/dd');
-      const existing = byDate.get(key);
-      if (existing) {
-        existing.pnl += t.amount;
-        existing.trades.push(t);
-      } else {
-        byDate.set(key, { pnl: t.amount, trades: [t], fullDate: d });
-      }
-    });
-
-    let cumulative = 0;
-    return Array.from(byDate.entries()).map(([date, { pnl, trades: dayTrades, fullDate }]) => {
-      const prev = cumulative;
-      cumulative += pnl;
-      return {
-        date,
-        pnl,
-        cumulativePnL: cumulative,
-        dailyChange: cumulative - prev,
-        trades: dayTrades,
-        fullDate,
-        isWin: pnl > 0,
-        isLoss: pnl < 0,
-        isIncreasing: cumulative > prev,
-        isDecreasing: cumulative < prev,
-      };
-    });
-  }, [filteredTrades, currentDate]);
-
-  const monthlyTargetValue = useMemo(() => {
-    if (!monthly_target || accountBalance <= 0) return null;
-    return (monthly_target / 100) * accountBalance;
-  }, [monthly_target, accountBalance]);
 
   const clearDaySelection = () => {
     setSelectedDate(null);
@@ -1674,13 +1567,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   const handleSnackbarClose = () => {
     setSnackbarOpen(false);
-  };
-
-  // Utility function to show snackbar messages
-  const showSnackbar = (message: string, severity: 'success' | 'warning' | 'error' = 'warning') => {
-    setSnackbarMessage(message);
-    setSnackbarSeverity(severity);
-    setSnackbarOpen(true);
   };
 
   // Retry failed deletion
@@ -1898,6 +1784,45 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             ),
           };
         }
+        case 'stats': {
+          return {
+            title: 'Stats',
+            icon: <InsightsIcon fontSize="small" />,
+            component: (
+              <StatsContent
+                balance={accountBalance}
+                totalProfit={totalProfit}
+                trades={trades}
+                filteredTrades={filteredTrades}
+                riskPerTrade={dynamicRiskSettings?.risk_per_trade}
+                dynamicRiskSettings={dynamicRiskSettings}
+                onToggleDynamicRisk={(useActualAmounts) => {
+                  setIsDynamicRiskToggled(useActualAmounts);
+                  handleToggleDynamicRisk(useActualAmounts);
+                }}
+                isDynamicRiskToggled={isDynamicRiskToggled}
+                isReadOnly={isReadOnly}
+                maxDailyDrawdown={maxDailyDrawdown}
+                currentDate={currentDate}
+                monthlyTarget={monthly_target}
+                calendarId={calendarId}
+                scoreSettings={scoreSettings}
+                calendar={calendar}
+                pnlBeforeMonth={pnlBeforeMonth}
+                isPnlLoading={isPnlLoading}
+                onDeleteTrade={handleDeleteClick}
+                onOpenGalleryMode={openGalleryMode}
+                onUpdateTradeProperty={handleUpdateTradeProperty}
+                onUpdateCalendarProperty={onUpdateCalendarProperty}
+                onEditTrade={handleEditTrade}
+                economicFilter={(_calendarId) =>
+                  calendar?.economic_calendar_filters ||
+                  DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
+                }
+              />
+            ),
+          };
+        }
         case 'calendars-list': {
           const isTrash = (view as { isTrash?: boolean }).isTrash;
           return {
@@ -1913,13 +1838,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 initialTab={isTrash ? 1 : 0}
                 activeCalendarId={calendarId}
                 onCalendarClick={handleSelectCalendar}
-                onEditCalendar={onUpdateCalendar ? setPanelCalendarToEdit : undefined}
-                onDuplicateCalendar={onDuplicateCalendar ? setPanelCalendarToDuplicate : undefined}
-                onLinkCalendar={setPanelCalendarToLink}
-                onDeleteCalendar={onDeleteCalendar ? setPanelCalendarToDelete : undefined}
+                onEditCalendar={onUpdateCalendar ? panelActions.setEditTarget : undefined}
+                onDuplicateCalendar={onDuplicateCalendar ? panelActions.setDuplicateTarget : undefined}
+                onLinkCalendar={panelActions.setLinkTarget}
+                onDeleteCalendar={onDeleteCalendar ? panelActions.setDeleteTarget : undefined}
                 onUpdateCalendarProperty={onUpdateCalendarProperty}
-                onRestoreCalendar={handlePanelRestoreCalendar}
-                onPermanentDeleteCalendar={handlePanelPermanentDeleteCalendar}
+                onRestoreCalendar={panelActions.restoreCalendar}
+                onPermanentDeleteCalendar={panelActions.permanentDeleteCalendar}
               />
             ),
           };
@@ -2007,7 +1932,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       pushPanel, replacePanel, setNewTrade, setShowAddForm,
       handleSelectCalendar,
       onUpdateCalendar, onDuplicateCalendar, onDeleteCalendar,
-      handlePanelRestoreCalendar, handlePanelPermanentDeleteCalendar,
+      panelActions,
     ]
   );
 
@@ -2035,11 +1960,34 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
      handleDismissReminder, isReadOnly]
   );
 
-  const breadcrumbButtons = useMemo<BreadcrumbButton[]>(() => [], []);
-
   const isFAQActive = isLgUp
     ? isPanelOpen && currentView.id === 'faq'
     : isFAQDrawerOpen;
+
+  const isStatsActive = isLgUp
+    ? isPanelOpen && currentView.id === 'stats'
+    : isStatsDrawerOpen;
+
+  const handleHeaderFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setMoreMenuAnchor(null);
+    setImportFile(file);
+    setShowImportDialog(true);
+    event.target.value = '';
+  };
+
+  const handleHeaderImportComplete = async (importedTrades: Partial<Trade>[]) => {
+    await handleImportTrades(importedTrades);
+    setShowImportDialog(false);
+    setImportFile(null);
+  };
+
+  const handleHeaderExport = (fileFormat: 'xlsx' | 'csv') => {
+    if (trades.length === 0) return;
+    exportTrades(trades, accountBalance, fileFormat);
+    setMoreMenuAnchor(null);
+  };
 
   const breadcrumbRightContent = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -2077,6 +2025,45 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           <HelpOutlineIcon fontSize="small" />
         </IconButton>
       </Tooltip>
+
+      <input
+        type="file"
+        accept=".xlsx,.csv"
+        style={{ display: 'none' }}
+        id="header-import-file"
+        onChange={handleHeaderFileSelect}
+      />
+      <Tooltip title="Import / Export trades">
+        <IconButton
+          size="small"
+          onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
+          sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+        >
+          <MoreVertIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <Menu
+        anchorEl={moreMenuAnchor}
+        open={Boolean(moreMenuAnchor)}
+        onClose={() => setMoreMenuAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        {!isReadOnly && (
+          <MenuItem onClick={() => document.getElementById('header-import-file')?.click()}>
+            <ListItemIcon><FileUploadIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Import Trades</ListItemText>
+          </MenuItem>
+        )}
+        <MenuItem onClick={() => handleHeaderExport('xlsx')} disabled={trades.length === 0}>
+          <ListItemIcon><FileDownloadIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Export XLSX</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleHeaderExport('csv')} disabled={trades.length === 0}>
+          <ListItemIcon><FileDownloadIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Export CSV</ListItemText>
+        </MenuItem>
+      </Menu>
     </Box>
   );
 
@@ -2165,8 +2152,46 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         </Box>
       )}
 
-      {/* Breadcrumbs */}
-      <Breadcrumbs items={breadcrumbItems} buttons={breadcrumbButtons} rightContent={breadcrumbRightContent} />
+      {/* Header bar */}
+      <CalendarSelectorBar
+        active={activeSelectorItem}
+        recent={recentCalendarItems}
+        onViewAll={handleViewAllCalendars}
+        onSelect={handleSelectCalendar}
+        inlineActions={
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<InsightsIcon sx={{ fontSize: 16 }} />}
+            onClick={() => togglePanel('stats', setIsStatsDrawerOpen)}
+            sx={{
+              textTransform: 'none',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              minWidth: 0,
+              color: isStatsActive ? 'primary.main' : 'text.secondary',
+              borderColor: isStatsActive
+                ? 'primary.main'
+                : (theme: Theme) => theme.palette.divider,
+              bgcolor: isStatsActive
+                ? (theme: Theme) => alpha(theme.palette.primary.main, 0.08)
+                : 'transparent',
+              '&:hover': {
+                borderColor: isStatsActive ? 'primary.dark' : 'text.primary',
+                bgcolor: isStatsActive
+                  ? (theme: Theme) => alpha(theme.palette.primary.main, 0.12)
+                  : (theme: Theme) => theme.palette.action.hover,
+              },
+            }}
+          >
+            Stats
+          </Button>
+        }
+        rightContent={breadcrumbRightContent}
+      />
 
 
 
@@ -2201,66 +2226,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           width: '100%',
           position: 'relative'
         }}>
-
-          {/* Stats Cards Section with Enhanced Layout */}
-          <Box sx={{
-            display: 'flex',
-            gap: { xs: 2, md: 3 },
-            flexDirection: { xs: 'column', lg: 'row' },
-            justifyContent: 'center',
-            alignItems: 'stretch',
-            width: '100%'
-          }}>
-
-            <Box sx={{ flex: 1, height: '100%' }}>
-              <AccountStats
-                balance={accountBalance}
-                totalProfit={totalProfit}
-                trades={filteredTrades}
-                risk_per_trade={dynamicRiskSettings?.risk_per_trade}
-                dynamicRiskSettings={dynamicRiskSettings}
-                onToggleDynamicRisk={(useActualAmounts) => {
-                  setIsDynamicRiskToggled(useActualAmounts);
-                  handleToggleDynamicRisk(useActualAmounts);
-                }}
-                isDynamicRiskToggled={isDynamicRiskToggled}
-                isReadOnly={isReadOnly}
-                max_daily_drawdown={maxDailyDrawdown}
-              />
-            </Box>
-
-            <Box sx={{ flex: 1, height: '100%' }}>
-
-              <MonthlyStats
-                trades={filteredTrades}
-                accountBalance={accountBalance}
-                onImportTrades={handleImportTrades}
-                onDeleteTrade={handleDeleteClick}
-                currentDate={currentDate}
-                monthlyTarget={monthly_target}
-                onClearMonthTrades={handleClearMonthTrades}
-                isReadOnly={isReadOnly}
-                onOpenGalleryMode={openGalleryMode}
-                calendarId={calendarId!!}
-                scoreSettings={scoreSettings}
-                dynamicRiskSettings={dynamicRiskSettings}
-                onUpdateTradeProperty={handleUpdateTradeProperty}
-                onUpdateCalendarProperty={onUpdateCalendarProperty}
-                onEditTrade={handleEditTrade}
-                economicFilter={(_calendarId) => calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS}
-                maxDailyDrawdown={maxDailyDrawdown}
-                pnlBeforeMonth={pnlBeforeMonth}
-                isPnlLoading={isPnlLoading}
-                calendar={calendar}
-                openPerformanceDialog={openPerfDialog}
-                onPerformanceDialogClose={() => setOpenPerfDialog(false)}
-              />
-
-            </Box>
-
-
-          </Box>
-
 
           {/* Calendar Navigation Header */}
           <Box sx={{
@@ -2718,42 +2683,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           </Box>
 
 
-          {/*Current Monthly Statistics Section */}
-          {/* Session Performance - Only shown on desktop */}
-          {!isMdDown && (
-            <SessionPerformanceAnalysis
-              sessionStats={sessionStats}
-              trades={filteredTrades}
-              selectedDate={currentDate}
-              timePeriod="month"
-              setMultipleTradesDialog={setSessionTradesDialog}
-              chartData={monthlyCumulativeChartData}
-              targetValue={monthlyTargetValue}
-              monthly_target={monthly_target}
-              onOpenPerformanceDetail={() => setOpenPerfDialog(true)}
-            />
-          )}
-
-          {/* Session Trades List Dialog - conditionally rendered to prevent unnecessary effects */}
-          {sessionTradesDialog.open && (
-            <TradesListDialog
-              open={sessionTradesDialog.open}
-              onClose={() => setSessionTradesDialog(prev => ({ ...prev, open: false }))}
-              trades={sessionDialogTrades}
-              title={sessionTradesDialog.title}
-              expandedTradeId={sessionTradesDialog.expandedTradeId}
-              onTradeExpand={(tradeId) =>
-                setSessionTradesDialog(prev => ({
-                  ...prev,
-                  expandedTradeId: prev.expandedTradeId === tradeId ? null : tradeId
-                }))
-              }
-              account_balance={accountBalance}
-              tradeOperations={tradeOperations}
-            />
-          )}
-
-
         </Box>
 
       </Box>{/* end main content container */}
@@ -3084,46 +3013,21 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           submitButtonText="Save"
         />
 
+        {/* Header Import Trades Dialog */}
+        <ImportMappingDialog
+          open={showImportDialog}
+          onClose={() => {
+            setShowImportDialog(false);
+            setImportFile(null);
+          }}
+          onImport={handleHeaderImportComplete}
+          file={importFile}
+        />
+
         {/* Panel-action dialogs (for OTHER calendars from the calendars-list panel) */}
-        <CalendarFormDialog
-          open={Boolean(panelCalendarToEdit)}
-          onClose={() => setPanelCalendarToEdit(null)}
-          onSubmit={handlePanelEditSubmit}
-          initialData={panelCalendarToEdit || undefined}
-          isSubmitting={isPanelEditSubmitting}
-          mode="edit"
-          title="Edit Calendar"
-          submitButtonText="Save"
-        />
-
-        <DuplicateCalendarDialog
-          open={Boolean(panelCalendarToDuplicate)}
-          calendar={panelCalendarToDuplicate}
-          isDuplicating={isPanelDuplicating}
-          onClose={() => setPanelCalendarToDuplicate(null)}
-          onDuplicate={handlePanelDuplicateSubmit}
-        />
-
-        <CalendarLinkDialog
-          open={Boolean(panelCalendarToLink)}
-          calendar={panelCalendarToLink}
-          calendars={userCalendars}
-          isLoading={isPanelLinking}
-          onClose={() => setPanelCalendarToLink(null)}
-          onLink={handlePanelLinkSubmit}
-          onUnlink={handlePanelUnlinkSubmit}
-        />
-
-        <ConfirmationDialog
-          open={Boolean(panelCalendarToDelete)}
-          onCancel={() => setPanelCalendarToDelete(null)}
-          onConfirm={handlePanelDeleteConfirm}
-          title="Delete Calendar"
-          message="Move this calendar to trash? You can restore it within 30 days."
-          confirmText="Delete"
-          cancelText="Cancel"
-          isSubmitting={isPanelDeleting}
-          confirmColor="error"
+        <CalendarManagementDialogs
+          actions={panelActions}
+          userCalendars={userCalendars}
         />
 
       {/* Economic Calendar Drawer — only rendered on <lg (panel handles it on lg+) */}
@@ -3148,6 +3052,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         isReadOnly={isReadOnly}
         tradeOperations={tradeOperations}
         aiTasks={aiTasks}
+        pendingDeepLink={aiChatDeepLink}
+        onDeepLinkConsumed={() => setAiChatDeepLink(null)}
+        requestActiveTab={aiChatRequestedTab}
+        onTabRequestConsumed={() => setAiChatRequestedTab(null)}
       />
 
       {/* Notes Drawer — <lg only */}
@@ -3177,13 +3085,49 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           onClose={() => setIsCalendarsListDrawerOpen(false)}
           activeCalendarId={calendarId}
           onCalendarClick={handleSelectCalendar}
-          onEditCalendar={onUpdateCalendar ? setPanelCalendarToEdit : undefined}
-          onDuplicateCalendar={onDuplicateCalendar ? setPanelCalendarToDuplicate : undefined}
-          onLinkCalendar={setPanelCalendarToLink}
-          onDeleteCalendar={onDeleteCalendar ? setPanelCalendarToDelete : undefined}
+          onEditCalendar={onUpdateCalendar ? panelActions.setEditTarget : undefined}
+          onDuplicateCalendar={onDuplicateCalendar ? panelActions.setDuplicateTarget : undefined}
+          onLinkCalendar={panelActions.setLinkTarget}
+          onDeleteCalendar={onDeleteCalendar ? panelActions.setDeleteTarget : undefined}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
-          onRestoreCalendar={handlePanelRestoreCalendar}
-          onPermanentDeleteCalendar={handlePanelPermanentDeleteCalendar}
+          onRestoreCalendar={panelActions.restoreCalendar}
+          onPermanentDeleteCalendar={panelActions.permanentDeleteCalendar}
+        />
+      )}
+
+      {/* Stats Drawer — <lg only (lg+ uses SidePanel) */}
+      {!isLgUp && (
+        <StatsDrawer
+          open={isStatsDrawerOpen}
+          onClose={() => setIsStatsDrawerOpen(false)}
+          balance={accountBalance}
+          totalProfit={totalProfit}
+          trades={trades}
+          filteredTrades={filteredTrades}
+          riskPerTrade={dynamicRiskSettings?.risk_per_trade}
+          dynamicRiskSettings={dynamicRiskSettings}
+          onToggleDynamicRisk={(useActualAmounts) => {
+            setIsDynamicRiskToggled(useActualAmounts);
+            handleToggleDynamicRisk(useActualAmounts);
+          }}
+          isDynamicRiskToggled={isDynamicRiskToggled}
+          isReadOnly={isReadOnly}
+          maxDailyDrawdown={maxDailyDrawdown}
+          currentDate={currentDate}
+          monthlyTarget={monthly_target}
+          calendarId={calendarId}
+          scoreSettings={scoreSettings}
+          calendar={calendar}
+          pnlBeforeMonth={pnlBeforeMonth}
+          isPnlLoading={isPnlLoading}
+          onDeleteTrade={handleDeleteClick}
+          onOpenGalleryMode={openGalleryMode}
+          onUpdateTradeProperty={handleUpdateTradeProperty}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
+          onEditTrade={handleEditTrade}
+          economicFilter={(_calendarId) =>
+            calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
+          }
         />
       )}
 

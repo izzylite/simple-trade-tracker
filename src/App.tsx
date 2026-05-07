@@ -1,31 +1,31 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, Box, useMediaQuery } from '@mui/material';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation, useNavigate } from 'react-router-dom';
+import { ThemeProvider, CssBaseline, Box } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { v4 as uuidv4 } from 'uuid';
-import { Trade, Calendar } from './types/dualWrite';
+import { Calendar } from './types/dualWrite';
 import { AuthProvider } from './contexts/SupabaseAuthContext';
 import { useAuthState, AuthStateProvider } from './contexts/AuthStateContext';
 import { TradeSyncProvider } from './contexts/TradeSyncContext';
+import { NotificationsProvider } from './contexts/NotificationsContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
 import TradeLoadingIndicator from './components/TradeLoadingIndicator';
-import { useRealtimeSubscription } from './hooks/useRealtimeSubscription';
 import { useCalendars } from './hooks/useCalendars';
 import { logger } from './utils/logger';
-import { supabaseAuthService } from './services/supabaseAuthService';
 
 
 import AppLoadingProgress from './components/AppLoadingProgress';
 
 
 import AppHeader from './components/common/AppHeader';
+import AppLayout from './components/layout/AppLayout';
+import CalendarFormDialog, { CalendarFormData } from './components/CalendarFormDialog';
+import CalendarLockedOverlay from './components/calendars/CalendarLockedOverlay';
 
 // Lazy load page components from pages directory
-const Home = lazy(() => import('./pages/HomePage'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const TradeCalendar = lazy(() => import('./pages/TradeCalendarPage').then(module => ({ default: module.TradeCalendar })));
@@ -37,44 +37,21 @@ const SharedNotePage = lazy(
 const AuthCallback = lazy(() => import('./pages/AuthCallbackPage'));
 const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
+const PerformancePage = lazy(() => import('./pages/PerformancePage'));
+const AssistantPage = lazy(() => import('./pages/AssistantPage'));
+const NotesPage = lazy(() => import('./pages/NotesPage'));
 // const SupabaseAuthTest = lazy(() => import('./components/auth/SupabaseAuthTest')); // Commented out - for testing only
 
 
 // Loading component for Suspense
 const LoadingFallback = () => <AppLoadingProgress />;
 
-/**
- * Shared interface for calendar management props
- * Used by HomePage
- */
-export interface CalendarManagementProps {
-  calendars: Calendar[];
-  onCreateCalendar: (
-    name: string,
-    account_balance: number,
-    max_daily_drawdown: number,
-    weeklyTarget?: number,
-    monthlyTarget?: number,
-    yearlyTarget?: number,
-    riskPerTrade?: number,
-    dynamic_risk_enabled?: boolean,
-    increased_risk_percentage?: number,
-    profit_threshold_percentage?: number,
-    heroImageUrl?: string,
-    heroImageAttribution?: any,
-    heroImagePosition?: string
-  ) => Promise<Calendar>;
-  onDuplicateCalendar: (sourceCalendarId: string, newName: string, includeContent?: boolean) => void;
-  onDeleteCalendar: (id: string) => void;
-  onUpdateCalendar: (id: string, updates: Partial<Calendar>) => void;
-  onToggleTheme: () => void;
-  mode: 'light' | 'dark';
-  isLoading?: boolean;
-}
+// Persists the last calendar the user opened so the / resolver can route
+// them back to it across sessions. CalendarRoute writes; HomeRouteResolver
+// reads.
+const LAST_ACTIVE_CALENDAR_KEY = 'last_active_calendar_id';
 
 function AppContent() {
-  const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
-
   // Initialize theme from localStorage or system preference
   const [mode, setMode] = useState<'light' | 'dark'>(() => {
     const savedMode = localStorage.getItem('themeMode');
@@ -86,7 +63,42 @@ function AppContent() {
 
   const { user } = useAuthState();
   const location = useLocation();
+  const navigate = useNavigate();
   const isLandingPage = !user && location.pathname === '/';
+
+  // Global Create Calendar dialog — triggered from side nav "+ New", lock
+  // overlays, and any future entry point. Lifted to App.tsx so a single
+  // dialog instance serves every route.
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreatingCalendar, setIsCreatingCalendar] = useState(false);
+
+  const openCreateCalendarDialog = () => setIsCreateDialogOpen(true);
+
+  const handleCreateCalendarSubmit = async (data: CalendarFormData) => {
+    setIsCreatingCalendar(true);
+    try {
+      const newCalendar = await handleCreateCalendar(
+        data.name,
+        data.account_balance,
+        data.max_daily_drawdown,
+        data.weekly_target,
+        data.monthly_target,
+        data.yearly_target,
+        data.risk_per_trade,
+        data.dynamic_risk_enabled,
+        data.increased_risk_percentage,
+        data.profit_threshold_percentage,
+        data.hero_image_url,
+        data.hero_image_attribution
+      );
+      setIsCreateDialogOpen(false);
+      navigate(`/calendar/${newCalendar.id}`);
+    } catch (err) {
+      logger.error('Error creating calendar from global dialog:', err);
+    } finally {
+      setIsCreatingCalendar(false);
+    }
+  };
 
 
   // Use SWR to fetch calendars with automatic focus revalidation
@@ -250,59 +262,83 @@ function AppContent() {
           />
           <Routes>
             <Route path="/about" element={<AboutPage />} />
-            <Route
-              path="/"
-              element={
-                user ? (
-                  <Home
-                    calendars={calendars}
-                    onToggleTheme={toggleColorMode}
-                    mode={mode}
-                    isLoading={isLoadingCalendars}
-                    onCreateCalendar={handleCreateCalendar}
-                    onDuplicateCalendar={handleDuplicateCalendar}
-                    onDeleteCalendar={handleDeleteCalendar}
-                    onUpdateCalendar={handleUpdateCalendar}
-                  />
-                ) : (
-                  <LandingPage />
-                )
-              }
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <Home
-                  calendars={calendars}
-                  onToggleTheme={toggleColorMode}
-                  mode={mode}
-                  isLoading={isLoadingCalendars}
-                  onCreateCalendar={handleCreateCalendar}
-                  onDuplicateCalendar={handleDuplicateCalendar}
-                  onDeleteCalendar={handleDeleteCalendar}
-                  onUpdateCalendar={handleUpdateCalendar}
+            {/* Auth-gated routes share a persistent AppLayout via a layout
+                route — AppLayout (and its SideNav) stay mounted across
+                navigation between Home / Performance / Assistant / Notes,
+                preventing the shell from blanking on each click. */}
+            {user ? (
+              <Route
+                element={<AppLayout onNewCalendar={openCreateCalendarDialog} />}
+              >
+                <Route
+                  path="/"
+                  element={
+                    <HomeRouteResolver
+                      calendars={calendars}
+                      isLoadingCalendars={isLoadingCalendars}
+                      onCreateCalendar={openCreateCalendarDialog}
+                    />
+                  }
                 />
-              }
-            />
-            <Route
-              path="/calendar/:calendarId"
-              element={
-                <ProtectedRoute
-                  title="Access Your Trading Calendar"
-                  subtitle="Sign in to view and manage your trades"
-                >
-                  <CalendarRoute
-                    calendars={calendars}
-                    onToggleTheme={toggleColorMode}
-                    mode={mode}
-                    setLoading={setLoading}
-                    onDuplicateCalendar={handleDuplicateCalendar}
-                    onDeleteCalendar={handleDeleteCalendar}
-                    onUpdateCalendar={handleUpdateCalendar}
-                  />
-                </ProtectedRoute>
-              }
-            />
+                <Route
+                  path="/calendar/:calendarId"
+                  element={
+                    <ProtectedRoute
+                      title="Access Your Trading Calendar"
+                      subtitle="Sign in to view and manage your trades"
+                    >
+                      <CalendarRoute
+                        calendars={calendars}
+                        onToggleTheme={toggleColorMode}
+                        mode={mode}
+                        setLoading={setLoading}
+                        onDuplicateCalendar={handleDuplicateCalendar}
+                        onDeleteCalendar={handleDeleteCalendar}
+                        onUpdateCalendar={handleUpdateCalendar}
+                      />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/performance"
+                  element={
+                    <ProtectedRoute
+                      title="View Performance"
+                      subtitle="Sign in to view your trading performance"
+                    >
+                      <PerformancePage
+                        onUpdateCalendar={handleUpdateCalendar}
+                        onCreateCalendar={openCreateCalendarDialog}
+                      />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/assistant"
+                  element={
+                    <ProtectedRoute
+                      title="Chat with Orion"
+                      subtitle="Sign in to use the assistant"
+                    >
+                      <AssistantPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/notes"
+                  element={
+                    <ProtectedRoute
+                      title="View Notes"
+                      subtitle="Sign in to access your notes"
+                    >
+                      <NotesPage />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
+            ) : (
+              <Route path="/" element={<LandingPage />} />
+            )}
             <Route
               path="/shared/:shareId"
               element={<SharedTradePage />}
@@ -347,6 +383,20 @@ function AppContent() {
           </Routes>
         </Box>
       </Box>
+
+      {/* Global Create Calendar dialog — opened by side nav "+ New" and any
+          calendar lock overlay. Single instance shared across routes. */}
+      {user && (
+        <CalendarFormDialog
+          open={isCreateDialogOpen}
+          onClose={() => setIsCreateDialogOpen(false)}
+          onSubmit={handleCreateCalendarSubmit}
+          isSubmitting={isCreatingCalendar}
+          mode="create"
+          title="Create Calendar"
+          submitButtonText="Create"
+        />
+      )}
     </ThemeProvider>
   );
 }
@@ -362,20 +412,86 @@ const ScrollToTop: React.FC = () => {
   return null;
 };
 
+interface HomeRouteResolverProps {
+  calendars: Calendar[];
+  isLoadingCalendars: boolean;
+  onCreateCalendar: () => void;
+}
+
+/**
+ * Auth landing for "/". Routes the user to the most appropriate calendar:
+ *  - prefers the last calendar they opened (localStorage)
+ *  - falls back to the most recently updated non-trashed calendar
+ *  - if zero calendars exist, renders the AppLayout shell with the lock
+ *    overlay so the user can create one without leaving "/"
+ *
+ * Phase 8 replaces the previous "/ -> HomePage" wiring; HomePage itself
+ * goes away in phase 9.
+ */
+const HomeRouteResolver: React.FC<HomeRouteResolverProps> = ({
+  calendars,
+  isLoadingCalendars,
+  onCreateCalendar,
+}) => {
+  const activeCalendars = useMemo(
+    () => calendars.filter((c) => !c.deleted_at),
+    [calendars]
+  );
+
+  // Wait until calendars actually arrive before deciding. Without this we'd
+  // briefly render the lock overlay (or wrong-calendar redirect) on every
+  // cold load.
+  if (isLoadingCalendars && activeCalendars.length === 0) {
+    return <LoadingFallback />;
+  }
+
+  if (activeCalendars.length === 0) {
+    return (
+      <Box sx={{ position: 'relative', minHeight: 'calc(100vh - 64px)' }}>
+        <CalendarLockedOverlay
+          onCreateCalendar={onCreateCalendar}
+          subtitle="Create a calendar to start tracking trades. The Home, Performance and Assistant sections unlock once one exists."
+        />
+      </Box>
+    );
+  }
+
+  let targetId: string | undefined;
+  try {
+    const stored = localStorage.getItem(LAST_ACTIVE_CALENDAR_KEY) || '';
+    if (stored && activeCalendars.some((c) => c.id === stored)) {
+      targetId = stored;
+    }
+  } catch {
+    // ignore disabled storage
+  }
+
+  if (!targetId) {
+    targetId = [...activeCalendars].sort(
+      (a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    )[0].id;
+  }
+
+  return <Navigate to={`/calendar/${targetId}`} replace />;
+};
+
 function App() {
   return (
     <AuthProvider>
       <AuthStateProvider>
-        <TradeSyncProvider>
-          <LocalizationProvider dateAdapter={AdapterDateFns}>
-            <Router>
-              <ScrollToTop />
-              <Suspense fallback={<LoadingFallback />}>
-                <AppContent />
-              </Suspense>
-            </Router>
-          </LocalizationProvider>
-        </TradeSyncProvider>
+        <NotificationsProvider>
+          <TradeSyncProvider>
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <Router>
+                <ScrollToTop />
+                <Suspense fallback={<LoadingFallback />}>
+                  <AppContent />
+                </Suspense>
+              </Router>
+            </LocalizationProvider>
+          </TradeSyncProvider>
+        </NotificationsProvider>
       </AuthStateProvider>
     </AuthProvider>
   );
@@ -408,7 +524,33 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [calendarId]);
 
+  // Remember the last calendar the user actually opened so the / resolver
+  // can route them back here on subsequent visits.
+  useEffect(() => {
+    if (calendar?.id) {
+      try {
+        localStorage.setItem(LAST_ACTIVE_CALENDAR_KEY, calendar.id);
+      } catch {
+        // ignore storage failures
+      }
+    }
+  }, [calendar?.id]);
+
   if (!calendar) {
+    // Active calendar is gone (deleted, soft-trashed, or URL points to a
+    // calendar the user no longer has). Prefer hopping to the most recently
+    // updated remaining calendar so the user stays in the calendar surface.
+    // Only fall back to "/" when there's nothing left.
+    const fallbackCalendar = [...calendars]
+      .filter((c) => !c.deleted_at)
+      .sort(
+        (a, b) =>
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      )[0];
+
+    if (fallbackCalendar) {
+      return <Navigate to={`/calendar/${fallbackCalendar.id}`} replace />;
+    }
     return <Navigate to="/" replace />;
   }
 

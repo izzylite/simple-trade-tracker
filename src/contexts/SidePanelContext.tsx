@@ -50,6 +50,10 @@ export interface FAQView {
   id: 'faq';
 }
 
+export interface StatsView {
+  id: 'stats';
+}
+
 export type SidePanelView =
   | EconomicCalendarView
   | NotesView
@@ -60,7 +64,8 @@ export type SidePanelView =
   | AIAnalysisView
   | AIChatView
   | CalendarsListView
-  | FAQView;
+  | FAQView
+  | StatsView;
 
 const MAX_STACK_DEPTH = 3;
 

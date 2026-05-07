@@ -43,12 +43,12 @@ const LandingNav: React.FC<Props> = ({ onGetStarted, onLogin }) => {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     boxShadow: '0 0 20px rgba(124,58,237,0.45)',
                 }}>
-                    <ShowChartIcon sx={{ fontSize: 18, color: '#fff' }} />
+                    <ShowChartIcon sx={{ fontSize: 18, color: '#f1f5f9' }} />
                 </Box>
                 <Typography sx={{
                     fontWeight: 700,
                     fontSize: '1rem',
-                    color: '#fff',
+                    color: '#f1f5f9',
                     letterSpacing: '-0.3px',
                     fontFamily: "'DM Sans', sans-serif",
                 }}>
@@ -65,7 +65,7 @@ const LandingNav: React.FC<Props> = ({ onGetStarted, onLogin }) => {
                         fontSize: '0.9rem',
                         borderRadius: 2,
                         px: 2,
-                        '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' },
+                        '&:hover': { color: '#f1f5f9', bgcolor: 'rgba(255,255,255,0.06)' },
                     }}
                 >
                     Log in
@@ -73,8 +73,8 @@ const LandingNav: React.FC<Props> = ({ onGetStarted, onLogin }) => {
                 <Button
                     onClick={onGetStarted}
                     sx={{
-                        bgcolor: '#fff',
-                        color: '#000',
+                        bgcolor: '#f1f5f9',
+                        color: '#080808',
                         fontWeight: 700,
                         fontSize: '0.875rem',
                         px: 2.5,

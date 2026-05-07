@@ -7,12 +7,30 @@ import {
 import { getHandler } from './handlers.ts';
 import type { OrionTask, TaskResult } from './types.ts';
 
+const TASK_TYPE_LABELS: Record<string, string> = {
+  market_research: 'Market Research',
+  daily_analysis: 'Daily Analysis',
+  weekly_review: 'Weekly Review',
+  monthly_rollup: 'Monthly Rollup',
+};
+
+function prettyTaskType(taskType: string): string {
+  if (TASK_TYPE_LABELS[taskType]) return TASK_TYPE_LABELS[taskType];
+  // Fallback: snake_case → Title Case so unknown task types still read
+  // cleanly without the server having to ship a complete label map.
+  return taskType
+    .split('_')
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ''))
+    .join(' ')
+    .trim() || 'Orion Task';
+}
+
 async function storeResult(
   serviceClient: ReturnType<typeof createServiceClient>,
   task: OrionTask,
   result: TaskResult
-) {
-  const { error: insertError } = await serviceClient
+): Promise<{ ok: boolean; resultId?: string }> {
+  const { data: insertedRow, error: insertError } = await serviceClient
     .from('orion_task_results')
     .insert({
       task_id: task.id,
@@ -23,13 +41,58 @@ async function storeResult(
       significance: result.significance,
       metadata: result.metadata,
       group_date: new Date().toISOString().split('T')[0],
-    });
+    })
+    .select('id')
+    .single();
 
-  if (insertError) {
+  if (insertError || !insertedRow) {
     log('Failed to store task result', 'error', insertError);
-    return false;
+    return { ok: false };
   }
-  return true;
+
+  // Surface the task result in the user's notification inbox. Failures are
+  // non-fatal: the task result is already persisted and will appear in the
+  // Tasks tab on its own; missing the inbox row degrades discoverability
+  // but doesn't lose data.
+  try {
+    const isError = (result.metadata as { error?: boolean } | null)?.error === true;
+    const previewSource = (result.content_plain || '').replace(/\s+/g, ' ').trim();
+    const preview = previewSource.length > 120
+      ? previewSource.slice(0, 117) + '…'
+      : previewSource;
+    const metaTitle = (result.metadata as { title?: string } | null)?.title?.trim();
+    const baseTitle = metaTitle || prettyTaskType(task.task_type);
+    const title = (isError ? `${baseTitle} — failed` : baseTitle).slice(0, 200);
+
+    const { error: notifErr } = await serviceClient
+      .from('notifications')
+      .insert({
+        user_id: task.user_id,
+        type: 'orion_task_result',
+        title,
+        payload: {
+          taskId: task.id,
+          resultId: insertedRow.id,
+          taskType: task.task_type,
+          significance: result.significance ?? null,
+          isError,
+          preview,
+        },
+      });
+    if (notifErr) {
+      log('Notification insert (task_result) failed (non-fatal)', 'warn', {
+        taskId: task.id,
+        error: notifErr.message,
+      });
+    }
+  } catch (notifThrow) {
+    log('Notification insert (task_result) threw (non-fatal)', 'warn', {
+      taskId: task.id,
+      error: notifThrow instanceof Error ? notifThrow.message : String(notifThrow),
+    });
+  }
+
+  return { ok: true, resultId: insertedRow.id };
 }
 
 // Reset failure counters after a successful (or suppressed) run.
@@ -145,6 +208,8 @@ Deno.serve(async (req) => {
       };
       await storeResult(serviceClient, orionTask, failureResult);
       await markTaskFailure(serviceClient, orionTask.id, message);
+      // storeResult-side notification covers the inbox surface; no extra
+      // work needed here even on failure.
 
       return new Response(
         JSON.stringify({ success: false, error: message }),
@@ -168,7 +233,7 @@ Deno.serve(async (req) => {
     }
 
     const stored = await storeResult(serviceClient, orionTask, result);
-    if (!stored) {
+    if (!stored.ok) {
       return new Response(
         JSON.stringify({ success: false, error: 'Failed to store result' }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }

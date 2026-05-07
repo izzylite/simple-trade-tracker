@@ -99,6 +99,41 @@ const MemoryLogsPanel: React.FC<MemoryLogsPanelProps> = ({ calendarId }) => {
     });
   };
 
+  // Memory + audit log are scoped to a single calendar. When the panel opens
+  // without one (e.g. Assistant page in "All Calendars" mode), guide the user
+  // to pick one rather than rendering blank tabs.
+  if (!calendarId) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          p: 4,
+          gap: 1.5,
+          textAlign: 'center',
+        }}
+      >
+        <PsychologyIcon
+          sx={{ fontSize: 44, color: alpha(theme.palette.text.secondary, 0.4) }}
+        />
+        <Typography variant="subtitle2" color="text.secondary">
+          Memory is per-calendar
+        </Typography>
+        <Typography
+          variant="body2"
+          color="text.disabled"
+          sx={{ maxWidth: 280 }}
+        >
+          Pick a specific calendar from the dropdown above to view its memory
+          and audit log.
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Tabs

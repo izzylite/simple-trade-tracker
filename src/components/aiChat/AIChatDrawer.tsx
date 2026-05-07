@@ -24,6 +24,8 @@ import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
 import AIChatContent from '../sidePanel/content/AIChatContent';
 import { UseAIChatReturn, useAIChat } from '../../hooks/useAIChat';
+import { ConversationRepository } from '../../services/repository/repositories/ConversationRepository';
+import { logger } from '../../utils/logger';
 import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
 import OrionTasksContent from '../orionTasks/OrionTasksContent';
 import type { AITasksBundle, OrionTaskResult } from '../../types/orionTask';
@@ -49,6 +51,21 @@ interface AIChatDrawerProps {
   /** Orion Tasks state + actions, typically from `useOrionTasks`. When omitted
    *  the Tasks tab renders in empty/disabled form. */
   aiTasks?: AITasksBundle;
+  /**
+   * One-shot deep-link target. When set, the drawer fetches the conversation,
+   * loads it into the chat surface, and queues a scroll-to-message highlight.
+   * Caller must clear via `onDeepLinkConsumed` after the effect runs.
+   */
+  pendingDeepLink?: { conversationId: string; messageId?: string } | null;
+  onDeepLinkConsumed?: () => void;
+  /**
+   * One-shot tab switch request (0 = Chat, 1 = Tasks). Used by callers that
+   * need the drawer to land on a specific tab — e.g. a task notification
+   * click should drop the user on the Tasks tab regardless of which tab was
+   * last active. Caller clears via `onTabRequestConsumed`.
+   */
+  requestActiveTab?: number | null;
+  onTabRequestConsumed?: () => void;
 }
 
 // Bottom sheet heights
@@ -68,6 +85,10 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   selectedCalendarId,
   onCalendarChange,
   aiTasks,
+  pendingDeepLink,
+  onDeepLinkConsumed,
+  requestActiveTab,
+  onTabRequestConsumed,
 }) => {
   const theme = useTheme();
   const { user } = useAuth();
@@ -85,6 +106,109 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     autoSaveConversation: true,
   });
   const effectiveChatState = sharedChatState ?? internalChatState;
+  const conversationRepoRef = React.useRef(new ConversationRepository());
+  const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
+  // When a notification deep-link lands, capture where the user was before
+  // the swap so the chat header can swap "+" for a back-arrow that restores
+  // exactly that state. The capture is a wrapper object (not just a string)
+  // so we can distinguish three states:
+  //   - undefined  : no deep-link active → render "+"
+  //   - { id: X }  : came from conversation X → back swaps to X
+  //   - { id: null}: came from a new/empty chat → back returns to new chat
+  const [deepLinkOrigin, setDeepLinkOrigin] = useState<
+    { conversationId: string | null } | null
+  >(null);
+
+  // Deep-link consumption: when the parent passes a pending target (typically
+  // from a notification click), load the conversation into the chat surface
+  // and queue the scroll. Switch to the Chat tab so the user lands on the
+  // message rather than the Tasks tab.
+  useEffect(() => {
+    if (!open || !pendingDeepLink) return;
+    let cancelled = false;
+    setActiveTab(0);
+    // Capture the active id BEFORE swapping so the back-arrow can restore it.
+    // Skip if it's the same conversation (no-op deep-link) or already null
+    // (fresh chat — nothing meaningful to return to).
+    const priorId = effectiveChatState.currentConversationId;
+    conversationRepoRef.current
+      .findById(pendingDeepLink.conversationId)
+      .then((convo) => {
+        if (cancelled) return;
+        if (!convo) {
+          logger.warn(
+            'AIChatDrawer deep-link: conversation not found',
+            pendingDeepLink.conversationId
+          );
+          onDeepLinkConsumed?.();
+          return;
+        }
+        // Capture origin unconditionally — including the empty-chat case
+        // (priorId === null). The back-arrow appears in both cases; the
+        // handler picks the right restore action based on the captured id.
+        setDeepLinkOrigin({ conversationId: priorId ?? null });
+        effectiveChatState.selectConversation(convo);
+        setScrollToMessageId(pendingDeepLink.messageId ?? null);
+        onDeepLinkConsumed?.();
+      })
+      .catch((err) => {
+        logger.error('AIChatDrawer deep-link load failed', err);
+        onDeepLinkConsumed?.();
+      });
+    return () => {
+      cancelled = true;
+    };
+    // selectConversation is stable across messageLimit changes; intentionally
+    // listing the primitive identity-driving fields only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pendingDeepLink?.conversationId, pendingDeepLink?.messageId]);
+
+  // Closing the drawer abandons the deep-link trail. Without this, reopening
+  // later would still show a back-arrow pointing at a long-stale state.
+  useEffect(() => {
+    if (!open) setDeepLinkOrigin(null);
+  }, [open]);
+
+  // One-shot tab switch consumer. Triggered by external callers that want
+  // the drawer to land on a specific tab on open (task notifications → Tasks).
+  useEffect(() => {
+    if (!open || requestActiveTab == null) return;
+    setActiveTab(requestActiveTab);
+    onTabRequestConsumed?.();
+  }, [open, requestActiveTab, onTabRequestConsumed]);
+
+  const handleReturnToPrevious = React.useCallback(() => {
+    const origin = deepLinkOrigin;
+    if (!origin) return;
+    // Clear state up front — one-way return. If the refetch fails, the user
+    // stays on the deep-linked convo (nothing destroyed; History remains).
+    setDeepLinkOrigin(null);
+    setScrollToMessageId(null);
+
+    // Empty-chat origin: back means "drop me into a new chat".
+    if (origin.conversationId === null) {
+      void effectiveChatState.startNewChat();
+      return;
+    }
+
+    conversationRepoRef.current
+      .findById(origin.conversationId)
+      .then((convo) => {
+        if (convo) {
+          effectiveChatState.selectConversation(convo);
+        } else {
+          logger.warn(
+            'AIChatDrawer return-to-previous: conversation not found',
+            origin.conversationId
+          );
+        }
+      })
+      .catch((err) => {
+        logger.error('AIChatDrawer return-to-previous failed', err);
+      });
+    // selectConversation / startNewChat identities are stable per useAIChat.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkOrigin]);
 
   const handleSaveNote = async (result: OrionTaskResult) => {
     if (!user?.uid) return;
@@ -290,6 +414,10 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 onCalendarChange={onCalendarChange}
                 seedMessage={chatSeedMessage}
                 onSeedMessageConsumed={() => setChatSeedMessage('')}
+                scrollToMessageId={scrollToMessageId}
+                onScrolledToMessage={() => setScrollToMessageId(null)}
+                canReturnToPrevious={!!deepLinkOrigin}
+                onReturnToPrevious={handleReturnToPrevious}
               />
             </TabPanel>
 
