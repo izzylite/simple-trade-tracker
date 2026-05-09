@@ -320,7 +320,7 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
           >
             Notes
           </Typography>
-          <Tooltip title={canCreateNote ? 'New note' : 'Create a calendar first'} placement="left">
+          <Tooltip title={canCreateNote ? 'New note' : 'Pick a specific calendar first'} placement="left">
             <span>
               <IconButton
                 size="small"

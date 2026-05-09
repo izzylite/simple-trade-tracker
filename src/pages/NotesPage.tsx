@@ -98,14 +98,14 @@ const NotesPage: React.FC = () => {
     setIsEditing(false);
   }, []);
 
-  // Calendar id for new notes: use picker selection if specific, else first calendar
-  const calendarIdForNew =
-    selectedCalendar !== 'all' ? selectedCalendar : (calendars[0]?.id ?? '');
+  // New notes require an explicit calendar selection from the picker —
+  // "All Calendars" is ambiguous (which calendar would the note belong to?).
+  const calendarIdForNew = selectedCalendar !== 'all' ? selectedCalendar : '';
   const canCreateNote = calendarIdForNew !== '';
 
   const handleNewNote = useCallback(() => {
     if (!canCreateNote) {
-      setSnackbarMsg('Create a calendar first to add notes');
+      setSnackbarMsg('Pick a calendar from the dropdown to add a note');
       return;
     }
     setSelectedNote(null);
@@ -264,10 +264,13 @@ const NotesPage: React.FC = () => {
       <Box
         sx={{
           display: 'grid',
+          // minmax(0, 1fr) lets the center cell shrink below the editor's
+          // intrinsic content width — without it, the /tag mention picker
+          // bar pushes the page wider than the viewport.
           gridTemplateColumns: {
-            xs: '1fr',
-            sm: '260px 1fr',
-            lg: '280px 1fr 300px',
+            xs: 'minmax(0, 1fr)',
+            sm: '260px minmax(0, 1fr)',
+            lg: '280px minmax(0, 1fr) 300px',
           },
           minHeight: 0,
           overflow: 'hidden',

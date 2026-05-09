@@ -34,12 +34,14 @@ import {
   Chip,
   Divider,
   Collapse,
-  Autocomplete,
   Popover,
   Switch,
   FormControlLabel,
   Tooltip,
   Snackbar,
+  MenuList,
+  MenuItem,
+  ListItemText,
 } from '@mui/material';
 import {
   pink,
@@ -587,6 +589,11 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
       flexDirection: 'column',
       height: '100%',
       minHeight: 0,
+      // minWidth: 0 + overflow: hidden so the mention picker bar's wide
+      // chip strip can scroll horizontally instead of forcing the parent
+      // (page) wider than the viewport.
+      minWidth: 0,
+      overflow: 'hidden',
       bgcolor: 'background.default',
       // Isolate stacking context — EditorToolbar uses z-index 1900 (sized for
       // dialog use), which would otherwise float above the app shell when the
@@ -657,7 +664,9 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
         />
       )}
 
-      {/* Picker bar — mention/note/event */}
+      {/* Picker bar — mention/note/event. minWidth: 0 + width: 100% so the
+          chip strip scrolls horizontally inside the bar instead of pushing
+          the bar (and the page) wider than the viewport. */}
       <Box
         sx={{
           display: 'flex',
@@ -668,6 +677,8 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
           height: 36,
           minHeight: 36,
           maxHeight: 36,
+          width: '100%',
+          minWidth: 0,
           overflowX: 'auto',
           overflowY: 'hidden',
           flexShrink: 0,
@@ -1167,14 +1178,25 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
         </Box>
       </Box>
 
-      {/* Tag picker popover — anchored to "+ Add tag" pill above title */}
+      {/* Tag picker popover — predefined tags only. Click to add. */}
       <Popover
         open={Boolean(tagPopoverAnchor)}
         anchorEl={tagPopoverAnchor}
-        onClose={() => { setTagPopoverAnchor(null); setNewTagInput(''); }}
+        onClose={() => setTagPopoverAnchor(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
         transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-        slotProps={{ paper: { sx: { mt: 0.5, width: 320, p: 1.5 } } }}
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 0.5,
+              width: 320,
+              maxHeight: 360,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          },
+        }}
         sx={{ zIndex: (t) => t.zIndex.modal + 200 }}
       >
         <Typography
@@ -1184,66 +1206,58 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
             color: 'text.disabled',
-            mb: 1,
-            px: 0.5,
+            px: 1.5,
+            py: 1,
+            borderBottom: `1px solid ${theme.palette.divider}`,
           }}
         >
           Add Tag
         </Typography>
-        <Autocomplete
-          size="small"
-          open
-          disablePortal
-          options={defaultTags.filter(t => {
+        {(() => {
+          const available = defaultTags.filter(t => {
             if (tags.includes(t)) return false;
             if (t === GUIDELINE_TAG && hasExistingGuideline) return false;
             return true;
-          })}
-          getOptionLabel={(option) => getTagDisplayLabel(option)}
-          value={null}
-          inputValue={newTagInput}
-          onInputChange={(_, value, reason) => { if (reason !== 'reset') setNewTagInput(value); }}
-          onChange={(_, value) => {
-            if (value && typeof value === 'string') {
-              handleAddTag(value);
-            }
-            setNewTagInput('');
-            setTagPopoverAnchor(null);
-          }}
-          renderOption={(props, option) => (
-            <li {...props} style={{ display: 'block' }}>
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>{getTagDisplayLabel(option)}</Typography>
-                <Typography variant="caption" color="text.secondary">{getTagSubtitle(option)}</Typography>
+          });
+          if (available.length === 0) {
+            return (
+              <Box sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="body2" color="text.secondary">
+                  All tags applied
+                </Typography>
               </Box>
-            </li>
-          )}
-          ListboxProps={{ sx: { ...scrollbarStyles(theme), maxHeight: 280 } }}
-          freeSolo
-          autoHighlight
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && newTagInput.trim()) {
-              e.preventDefault();
-              handleAddTag(newTagInput.trim());
-              setTagPopoverAnchor(null);
-            }
-            if (e.key === 'Escape') {
-              setTagPopoverAnchor(null);
-              setNewTagInput('');
-            }
-          }}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              autoFocus
-              placeholder="Search or type a custom tag…"
-              InputProps={{
-                ...params.InputProps,
-                sx: { borderRadius: 2, fontSize: '0.85rem' },
+            );
+          }
+          return (
+            <MenuList
+              dense
+              sx={{
+                flex: 1,
+                overflowY: 'auto',
+                py: 0.5,
+                ...scrollbarStyles(theme),
               }}
-            />
-          )}
-        />
+            >
+              {available.map(option => (
+                <MenuItem
+                  key={option}
+                  onClick={() => {
+                    handleAddTag(option);
+                    setTagPopoverAnchor(null);
+                  }}
+                  sx={{ py: 1, px: 1.5 }}
+                >
+                  <ListItemText
+                    primary={getTagDisplayLabel(option)}
+                    secondary={getTagSubtitle(option)}
+                    primaryTypographyProps={{ fontWeight: 500, fontSize: '0.875rem' }}
+                    secondaryTypographyProps={{ fontSize: '0.72rem' }}
+                  />
+                </MenuItem>
+              ))}
+            </MenuList>
+          );
+        })()}
       </Popover>
 
       <Snackbar
