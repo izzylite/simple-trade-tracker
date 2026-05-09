@@ -9,6 +9,8 @@ import { AuthProvider } from './contexts/SupabaseAuthContext';
 import { useAuthState, AuthStateProvider } from './contexts/AuthStateContext';
 import { TradeSyncProvider } from './contexts/TradeSyncContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
+import { UserPinnedEventsProvider } from './contexts/UserPinnedEventsContext';
+import { UserEconomicFiltersProvider } from './contexts/UserEconomicFiltersContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
@@ -40,6 +42,7 @@ const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const PerformancePage = lazy(() => import('./pages/PerformancePage'));
 const AssistantPage = lazy(() => import('./pages/AssistantPage'));
 const NotesPage = lazy(() => import('./pages/NotesPage'));
+const EconomicEventsPage = lazy(() => import('./pages/EconomicEventsPage'));
 // const SupabaseAuthTest = lazy(() => import('./components/auth/SupabaseAuthTest')); // Commented out - for testing only
 
 
@@ -65,6 +68,11 @@ function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const isLandingPage = !user && location.pathname === '/';
+  // Routes that lock to viewport and own their own bottom spacing — App
+  // outer pb would otherwise leave a visible gap below the page chrome.
+  const isViewportLockedPage =
+    location.pathname.startsWith('/events') ||
+    location.pathname.startsWith('/notes');
 
   // Global Create Calendar dialog — triggered from side nav "+ New", lock
   // overlays, and any future entry point. Lifted to App.tsx so a single
@@ -249,7 +257,7 @@ function AppContent() {
             minHeight: '100vh',
             bgcolor: isLandingPage ? '#000' : 'custom.pageBackground',
             position: 'relative',
-            pb: isLandingPage ? 0 : 4,
+            pb: isLandingPage || isViewportLockedPage ? 0 : 4,
             pt: isLandingPage ? 0 : 8, // Add top padding to account for fixed AppBar
             transition: theme.transitions.create(['margin', 'width'], {
               duration: theme.transitions.duration.shorter,
@@ -261,11 +269,13 @@ function AppContent() {
             action={loadingAction}
           />
           <Routes>
-            <Route path="/about" element={<AboutPage />} />
             {/* Auth-gated routes share a persistent AppLayout via a layout
                 route — AppLayout (and its SideNav) stay mounted across
                 navigation between Home / Performance / Assistant / Notes,
-                preventing the shell from blanking on each click. */}
+                preventing the shell from blanking on each click. About lives
+                inside this layout so its side-nav slot can show the active
+                state; for signed-out visitors it falls back to a public
+                route below that renders without the shell. */}
             {user ? (
               <Route
                 element={<AppLayout onNewCalendar={openCreateCalendarDialog} />}
@@ -335,9 +345,24 @@ function AppContent() {
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="/events"
+                  element={
+                    <ProtectedRoute
+                      title="View Economic Events"
+                      subtitle="Sign in to view the economic events calendar"
+                    >
+                      <EconomicEventsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/about" element={<AboutPage />} />
               </Route>
             ) : (
-              <Route path="/" element={<LandingPage />} />
+              <>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/about" element={<AboutPage />} />
+              </>
             )}
             <Route
               path="/shared/:shareId"
@@ -480,18 +505,22 @@ function App() {
   return (
     <AuthProvider>
       <AuthStateProvider>
-        <NotificationsProvider>
-          <TradeSyncProvider>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <Router>
-                <ScrollToTop />
-                <Suspense fallback={<LoadingFallback />}>
-                  <AppContent />
-                </Suspense>
-              </Router>
-            </LocalizationProvider>
-          </TradeSyncProvider>
-        </NotificationsProvider>
+        <UserPinnedEventsProvider>
+         <UserEconomicFiltersProvider>
+          <NotificationsProvider>
+            <TradeSyncProvider>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <Router>
+                  <ScrollToTop />
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AppContent />
+                  </Suspense>
+                </Router>
+              </LocalizationProvider>
+            </TradeSyncProvider>
+          </NotificationsProvider>
+         </UserEconomicFiltersProvider>
+        </UserPinnedEventsProvider>
       </AuthStateProvider>
     </AuthProvider>
   );
