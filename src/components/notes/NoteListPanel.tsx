@@ -208,53 +208,46 @@ const NoteItem: React.FC<NoteItemProps> = ({ note, isActive, onClick }) => {
         </Typography>
       )}
 
-      {/* Row 3: tags — display labels via getTagDisplayLabel, tooltip shows
-          full subtitle for system tags, raw tag for custom. */}
+      {/* Row 3: tags — display labels via getTagDisplayLabel */}
       {(colorTags.length > 0 || otherTags.length > 0) && (
         <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
           {colorTags.map(t => {
             const variant = TAG_VARIANT[t];
-            const tip = getTagSubtitle(t) || getTagDisplayLabel(t);
             return (
-              <Tooltip key={t} title={tip} arrow placement="top">
-                <Box
-                  sx={{
-                    fontSize: '0.62rem',
-                    px: 0.75,
-                    py: 0.25,
-                    borderRadius: '999px',
-                    bgcolor: tagBg[variant],
-                    color: tagColor[variant],
-                    fontWeight: 600,
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  {getTagDisplayLabel(t).toUpperCase()}
-                </Box>
-              </Tooltip>
+              <Box
+                key={t}
+                sx={{
+                  fontSize: '0.62rem',
+                  px: 0.75,
+                  py: 0.25,
+                  borderRadius: '999px',
+                  bgcolor: tagBg[variant],
+                  color: tagColor[variant],
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {getTagDisplayLabel(t).toUpperCase()}
+              </Box>
             );
           })}
-          {otherTags.map(t => {
-            const tip = getTagSubtitle(t) || getTagDisplayLabel(t);
-            return (
-              <Tooltip key={t} title={tip} arrow placement="top">
-                <Box
-                  sx={{
-                    fontSize: '0.62rem',
-                    px: 0.75,
-                    py: 0.25,
-                    borderRadius: '999px',
-                    bgcolor: alpha(isDark ? '#fff' : '#000', 0.05),
-                    color: 'text.secondary',
-                    fontWeight: 600,
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  {getTagDisplayLabel(t).toUpperCase()}
-                </Box>
-              </Tooltip>
-            );
-          })}
+          {otherTags.map(t => (
+            <Box
+              key={t}
+              sx={{
+                fontSize: '0.62rem',
+                px: 0.75,
+                py: 0.25,
+                borderRadius: '999px',
+                bgcolor: alpha(isDark ? '#fff' : '#000', 0.05),
+                color: 'text.secondary',
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+              }}
+            >
+              {getTagDisplayLabel(t).toUpperCase()}
+            </Box>
+          ))}
         </Box>
       )}
     </Box>
@@ -407,34 +400,38 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
         >
           {(['all', ...availableTagPills]).map(key => {
             const active = pill === key;
+            const tip = key === 'all'
+              ? 'Show notes with any tag'
+              : (getTagSubtitle(key) || getTagDisplayLabel(key));
             return (
-              <Box
-                key={key}
-                component="button"
-                onClick={() => onPillChange(key)}
-                sx={{
-                  background: active ? alpha(theme.palette.primary.main, 0.16) : 'transparent',
-                  border: `1px solid ${active
-                    ? alpha(theme.palette.primary.main, 0.32)
-                    : theme.palette.divider}`,
-                  color: active ? theme.palette.primary.light : 'text.secondary',
-                  borderRadius: '999px',
-                  px: 1.25,
-                  py: 0.5,
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                  transition: 'all 150ms',
-                  '&:hover': {
-                    color: active ? theme.palette.primary.light : 'text.primary',
-                  },
-                }}
-              >
-                {key === 'all' ? 'All' : getTagDisplayLabel(key)}
-              </Box>
+              <Tooltip key={key} title={tip} arrow placement="top">
+                <Box
+                  component="button"
+                  onClick={() => onPillChange(key)}
+                  sx={{
+                    background: active ? alpha(theme.palette.primary.main, 0.16) : 'transparent',
+                    border: `1px solid ${active
+                      ? alpha(theme.palette.primary.main, 0.32)
+                      : theme.palette.divider}`,
+                    color: active ? theme.palette.primary.light : 'text.secondary',
+                    borderRadius: '999px',
+                    px: 1.25,
+                    py: 0.5,
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    transition: 'all 150ms',
+                    '&:hover': {
+                      color: active ? theme.palette.primary.light : 'text.primary',
+                    },
+                  }}
+                >
+                  {key === 'all' ? 'All' : getTagDisplayLabel(key)}
+                </Box>
+              </Tooltip>
             );
           })}
         </Box>
