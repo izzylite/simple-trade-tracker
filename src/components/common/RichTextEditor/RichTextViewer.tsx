@@ -17,16 +17,26 @@ import { TEXT_COLORS, BACKGROUND_COLORS } from './constants/colors';
 interface RichTextViewerProps {
   content: string;
   minHeight?: number | string;
+  /**
+   * Optional handler for shared-trade link clicks. When omitted,
+   * LinkComponent falls back to navigating to /shared/{id}. Provide this
+   * to intercept clicks and show an inline preview (e.g. TradeGalleryDialog).
+   */
+  onSharedTradeClick?: (shareId: string, tradeId: string) => void;
 }
 
 const RichTextViewer: React.FC<RichTextViewerProps> = ({
   content,
   minHeight = 100,
+  onSharedTradeClick,
 }) => {
   const theme = useTheme();
 
   // Create decorator for links/entities
-  const decorator = useMemo(() => createDecorator(), []);
+  const decorator = useMemo(
+    () => createDecorator(undefined, undefined, undefined, undefined, undefined, onSharedTradeClick),
+    [onSharedTradeClick]
+  );
 
   // Create editor state from content
   const editorState = useMemo(() => {

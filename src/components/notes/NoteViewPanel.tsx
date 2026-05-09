@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Box,
   Typography,
@@ -22,9 +22,14 @@ import {
 import { formatDistanceToNow, format } from 'date-fns';
 
 import { Note } from '../../types/note';
+import { Trade } from '../../types/dualWrite';
 import { getTagDisplayLabel } from './NoteEditorDialog';
 import RichTextViewer from '../common/RichTextEditor/RichTextViewer';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import { getSharedTrade } from '../../services/sharingService';
+import { logger } from '../../utils/logger';
+import TradeGalleryDialog from '../TradeGalleryDialog';
+import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 
 interface NoteViewPanelProps {
   note: Note | null;
@@ -43,6 +48,26 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
 }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+
+  // Inline trade preview — replaces the default /shared/{id} navigation
+  // when the user clicks a trade embed inside a note's body.
+  const [previewTrade, setPreviewTrade] = useState<Trade | null>(null);
+  const [tradePreviewOpen, setTradePreviewOpen] = useState(false);
+  const [tradePreviewLoading, setTradePreviewLoading] = useState(false);
+  const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
+
+  const handleSharedTradeClick = useCallback(async (shareId: string) => {
+    setTradePreviewOpen(true);
+    setTradePreviewLoading(true);
+    try {
+      const data = await getSharedTrade(shareId);
+      if (data?.trade) setPreviewTrade(data.trade);
+    } catch (err) {
+      logger.error('Error loading shared trade:', err);
+    } finally {
+      setTradePreviewLoading(false);
+    }
+  }, []);
 
   if (!note) {
     return (
@@ -278,7 +303,10 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
                 },
               }}
             >
-              <RichTextViewer content={note.content} />
+              <RichTextViewer
+                content={note.content}
+                onSharedTradeClick={handleSharedTradeClick}
+              />
             </Box>
           ) : (
             <Typography
@@ -290,6 +318,52 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
           )}
         </Box>
       </Box>
+
+      {/* Inline trade preview — opens when a trade embed is clicked.
+          Replaces the default navigation to /shared/{id}. */}
+      {tradePreviewOpen && (
+        <TradeGalleryDialog
+          open={tradePreviewOpen}
+          onClose={() => {
+            setTradePreviewOpen(false);
+            setPreviewTrade(null);
+          }}
+          trades={previewTrade ? [previewTrade] : []}
+          initialTradeId={previewTrade?.id}
+          loading={tradePreviewLoading}
+          setZoomedImage={(url, allImages, initialIndex) => {
+            setZoomedImages({
+              selectetdImageIndex: initialIndex || 0,
+              allImages: allImages || [url],
+            });
+          }}
+          title={previewTrade?.name || 'Trade Preview'}
+          isReadOnly
+          tradeOperations={{
+            onZoomImage: (url, allImages, initialIndex) => {
+              setZoomedImages({
+                selectetdImageIndex: initialIndex || 0,
+                allImages: allImages || [url],
+              });
+            },
+            onUpdateTradeProperty: undefined,
+            calendarId: undefined,
+            onOpenGalleryMode: undefined,
+            economicFilter: undefined,
+            onOpenAIChat: undefined,
+            isTradeUpdating: undefined,
+            isReadOnly: true,
+          }}
+        />
+      )}
+
+      {zoomedImages && (
+        <ImageZoomDialog
+          open={!!zoomedImages}
+          onClose={() => setZoomedImages(null)}
+          imageProp={zoomedImages}
+        />
+      )}
     </Box>
   );
 };
