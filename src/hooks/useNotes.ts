@@ -370,6 +370,26 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
     `notes-drawer-pg-${Math.random().toString(36).slice(2, 8)}`
   );
 
+  // Subscription opens once per userId, but the INSERT predicate needs the
+  // current filters. Refs let the handler read live values without forcing
+  // resubscribe on every filter change.
+  const filterRef = useRef({
+    calendarId,
+    activeTab,
+    selectedCalendarFilter,
+    creatorFilter,
+    searchQuery,
+  });
+  useEffect(() => {
+    filterRef.current = {
+      calendarId,
+      activeTab,
+      selectedCalendarFilter,
+      creatorFilter,
+      searchQuery,
+    };
+  }, [calendarId, activeTab, selectedCalendarFilter, creatorFilter, searchQuery]);
+
   useEffect(() => {
     if (!userId) return;
 
@@ -394,10 +414,38 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
             });
           } else if (eventType === 'DELETE' && oldNote?.id) {
             setNotes((prev) => prev.filter((n) => n.id !== oldNote.id));
+            setTotal((t) => Math.max(0, t - 1));
+          } else if (eventType === 'INSERT' && newNote) {
+            // Reject inserts that don't match the current view's filters.
+            // Skip during active search — the next debounce will refetch.
+            const f = filterRef.current;
+            if (newNote.user_id !== userId) return;
+            if (f.searchQuery && f.searchQuery.trim() !== '') return;
+
+            // Creator
+            if (f.creatorFilter === 'me' && newNote.by_assistant) return;
+            if (f.creatorFilter === 'assistant' && !newNote.by_assistant) return;
+
+            // Tab (lifecycle)
+            if (f.activeTab === 'pinned' && !newNote.is_pinned) return;
+            if (f.activeTab === 'archived' && !newNote.is_archived) return;
+            if (f.activeTab === 'all' && newNote.is_archived) return;
+
+            // Calendar scope: explicit calendarId prop wins; else picker
+            // dropdown ('all' = no scope, '' or specific = scope to id).
+            const effectiveCalId =
+              f.calendarId ||
+              (f.selectedCalendarFilter && f.selectedCalendarFilter !== 'all'
+                ? f.selectedCalendarFilter
+                : undefined);
+            if (effectiveCalId && newNote.calendar_id !== effectiveCalId) return;
+
+            setNotes((prev) => {
+              if (prev.some((n) => n.id === newNote.id)) return prev;
+              return [newNote, ...prev];
+            });
+            setTotal((t) => t + 1);
           }
-          // INSERT: skip — complex filters make it hard to know
-          // if the new note belongs in the current view.
-          // The user will see it on next open/filter change.
         }
       )
       .subscribe((status: string) => {
