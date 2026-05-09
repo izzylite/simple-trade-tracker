@@ -24,7 +24,7 @@ import { format, startOfWeek, subWeeks } from 'date-fns';
 import { Note, GAME_PLAN_TAG, LESSON_LEARNED_TAG, INSIGHT_TAG } from '../../types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import RoundedTabs from '../common/RoundedTabs';
-import { getTagDisplayLabel } from './NoteEditorDialogTags';
+import { getTagDisplayLabel, getTagSubtitle } from './NoteEditorDialogTags';
 
 /** Lifecycle tab — mutually exclusive, drives useNotes activeTab. */
 export type NotesTab = 'all' | 'pinned' | 'archived';
@@ -208,46 +208,53 @@ const NoteItem: React.FC<NoteItemProps> = ({ note, isActive, onClick }) => {
         </Typography>
       )}
 
-      {/* Row 3: tags — display labels via getTagDisplayLabel */}
+      {/* Row 3: tags — display labels via getTagDisplayLabel, tooltip shows
+          full subtitle for system tags, raw tag for custom. */}
       {(colorTags.length > 0 || otherTags.length > 0) && (
         <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
           {colorTags.map(t => {
             const variant = TAG_VARIANT[t];
+            const tip = getTagSubtitle(t) || getTagDisplayLabel(t);
             return (
-              <Box
-                key={t}
-                sx={{
-                  fontSize: '0.62rem',
-                  px: 0.75,
-                  py: 0.25,
-                  borderRadius: '999px',
-                  bgcolor: tagBg[variant],
-                  color: tagColor[variant],
-                  fontWeight: 600,
-                  letterSpacing: '0.04em',
-                }}
-              >
-                {getTagDisplayLabel(t).toUpperCase()}
-              </Box>
+              <Tooltip key={t} title={tip} arrow placement="top">
+                <Box
+                  sx={{
+                    fontSize: '0.62rem',
+                    px: 0.75,
+                    py: 0.25,
+                    borderRadius: '999px',
+                    bgcolor: tagBg[variant],
+                    color: tagColor[variant],
+                    fontWeight: 600,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  {getTagDisplayLabel(t).toUpperCase()}
+                </Box>
+              </Tooltip>
             );
           })}
-          {otherTags.map(t => (
-            <Box
-              key={t}
-              sx={{
-                fontSize: '0.62rem',
-                px: 0.75,
-                py: 0.25,
-                borderRadius: '999px',
-                bgcolor: alpha(isDark ? '#fff' : '#000', 0.05),
-                color: 'text.secondary',
-                fontWeight: 600,
-                letterSpacing: '0.04em',
-              }}
-            >
-              {getTagDisplayLabel(t).toUpperCase()}
-            </Box>
-          ))}
+          {otherTags.map(t => {
+            const tip = getTagSubtitle(t) || getTagDisplayLabel(t);
+            return (
+              <Tooltip key={t} title={tip} arrow placement="top">
+                <Box
+                  sx={{
+                    fontSize: '0.62rem',
+                    px: 0.75,
+                    py: 0.25,
+                    borderRadius: '999px',
+                    bgcolor: alpha(isDark ? '#fff' : '#000', 0.05),
+                    color: 'text.secondary',
+                    fontWeight: 600,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  {getTagDisplayLabel(t).toUpperCase()}
+                </Box>
+              </Tooltip>
+            );
+          })}
         </Box>
       )}
     </Box>

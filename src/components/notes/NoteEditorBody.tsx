@@ -232,6 +232,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   const [tags, setTags] = useState<string[]>([]);
   const [newTagInput, setNewTagInput] = useState('');
   const [hasExistingGuideline, setHasExistingGuideline] = useState(false);
+  const [tagPopoverAnchor, setTagPopoverAnchor] = useState<HTMLElement | null>(null);
 
   // Global note (null calendar_id = visible in all calendars)
   const [isGlobal, setIsGlobal] = useState(false);
@@ -323,13 +324,24 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   }, [isActive, initialNote, gamePlanDay, weekKey, initialTags]);
 
   // ─── Save / dirty checks ──────────────────────────────────────────────────
+  // Refs mirror state used inside the unmount-flush closure. Without these,
+  // setNote(created) scheduled inside saveNote can be lost when the parent
+  // unmounts the body before the state commit (e.g. Done → handleExitEdit
+  // batches both updates), causing the cleanup to re-create the same note.
+  const noteRef = useRef<Note | null>(null);
+  const savingRef = useRef(false);
+  useEffect(() => { noteRef.current = note; }, [note]);
+
   const saveNote = useCallback(async (): Promise<void> => {
+    if (savingRef.current) return; // dedupe concurrent saves
     if (!user?.uid) return;
     if (!title.trim() || !content.trim()) return;
 
+    savingRef.current = true;
     try {
       setSaving(true);
-      if (note) {
+      const liveNote = noteRef.current;
+      if (liveNote) {
         const updates: any = {
           title,
           content,
@@ -341,10 +353,11 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
           color: noteColor ?? null,
           calendar_id: isGlobal ? null : calendarId,
         };
-        if (!note.by_assistant) updates.tags = tags;
-        await notesService.updateNote(note.id, updates);
-        const fresh = await notesService.getNote(note.id);
+        if (!liveNote.by_assistant) updates.tags = tags;
+        await notesService.updateNote(liveNote.id, updates);
+        const fresh = await notesService.getNote(liveNote.id);
         if (fresh) {
+          noteRef.current = fresh;
           setNote(fresh);
           setSavedAt(new Date(fresh.updated_at));
           if (onSave) onSave(fresh, false);
@@ -364,6 +377,10 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
           tags,
           week_key: weekKey ?? null,
         });
+        // Sync ref BEFORE setNote — guarantees a follow-up saveNote sees
+        // the persisted row even if the React state update gets dropped
+        // (e.g. parent unmounts the body before commit).
+        noteRef.current = created;
         setNote(created);
         setSavedAt(new Date(created.updated_at));
         if (onSave) onSave(created, true);
@@ -372,11 +389,13 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
       logger.error('Error saving note:', err);
     } finally {
       setSaving(false);
+      savingRef.current = false;
     }
-  }, [user?.uid, note, title, content, coverImage, reminderType, reminderDate, reminderDays, isReminderActive, noteColor, isGlobal, calendarId, weekKey, tags, onSave]);
+  }, [user?.uid, title, content, coverImage, reminderType, reminderDate, reminderDays, isReminderActive, noteColor, isGlobal, calendarId, weekKey, tags, onSave]);
 
   const hasChanges = useCallback((): boolean => {
-    if (!note) {
+    const liveNote = noteRef.current;
+    if (!liveNote) {
       const hasNonEmptyTitle = title && title.trim() !== '';
       const hasNonEmptyContent = content && content.trim() !== '';
       const hasCoverImage = coverImage !== null;
@@ -385,19 +404,19 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
       const hasColor = noteColor !== undefined;
       return Boolean(hasNonEmptyTitle || hasNonEmptyContent || hasCoverImage || hasReminder || hasTags || hasColor);
     }
-    const titleChanged = title !== note.title;
-    const contentChanged = content !== note.content;
-    const coverImageChanged = coverImage !== note.cover_image;
-    const reminderTypeChanged = reminderType !== (note.reminder_type || 'none');
-    const reminderDateChanged = reminderDate !== (note.reminder_date || null);
-    const reminderDaysChanged = JSON.stringify(reminderDays) !== JSON.stringify(note.reminder_days || []);
-    const reminderActiveChanged = isReminderActive !== (note.is_reminder_active || false);
-    const tagsChanged = JSON.stringify(tags) !== JSON.stringify(note.tags || []);
-    const colorChanged = noteColor !== note.color;
-    const globalChanged = isGlobal !== (note.calendar_id === null);
+    const titleChanged = title !== liveNote.title;
+    const contentChanged = content !== liveNote.content;
+    const coverImageChanged = coverImage !== liveNote.cover_image;
+    const reminderTypeChanged = reminderType !== (liveNote.reminder_type || 'none');
+    const reminderDateChanged = reminderDate !== (liveNote.reminder_date || null);
+    const reminderDaysChanged = JSON.stringify(reminderDays) !== JSON.stringify(liveNote.reminder_days || []);
+    const reminderActiveChanged = isReminderActive !== (liveNote.is_reminder_active || false);
+    const tagsChanged = JSON.stringify(tags) !== JSON.stringify(liveNote.tags || []);
+    const colorChanged = noteColor !== liveNote.color;
+    const globalChanged = isGlobal !== (liveNote.calendar_id === null);
     return titleChanged || contentChanged || coverImageChanged || reminderTypeChanged ||
       reminderDateChanged || reminderDaysChanged || reminderActiveChanged || tagsChanged || colorChanged || globalChanged;
-  }, [note, title, content, coverImage, reminderType, reminderDate, reminderDays, isReminderActive, tags, noteColor, isGlobal]);
+  }, [title, content, coverImage, reminderType, reminderDate, reminderDays, isReminderActive, tags, noteColor, isGlobal]);
 
   const saveIfDirty = useCallback(async () => {
     if (hasChanges()) await saveNote();
@@ -1036,47 +1055,9 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
               </>
             )}
 
-            {/* Tags — autocomplete only; chips render above title */}
-            <Divider sx={{ my: 2 }} />
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-              <TagIcon sx={{ color: 'text.secondary', fontSize: '1.1rem' }} />
-              <Typography variant="subtitle2" fontWeight={600} color="text.secondary">Add tag</Typography>
-              {note?.by_assistant && <Typography variant="caption" color="text.disabled">(read-only)</Typography>}
-            </Box>
-
-            {isTagEditingAllowed ? (
-              <Autocomplete
-                size="small"
-                options={defaultTags.filter(t => {
-                  if (tags.includes(t)) return false;
-                  if (t === GUIDELINE_TAG && hasExistingGuideline) return false;
-                  return true;
-                })}
-                getOptionLabel={(option) => getTagDisplayLabel(option)}
-                value={null}
-                inputValue={newTagInput}
-                onInputChange={(_, value, reason) => { if (reason !== 'reset') setNewTagInput(value); }}
-                onChange={(_, value) => {
-                  if (value && typeof value === 'string') handleAddTag(value);
-                  setNewTagInput('');
-                }}
-                renderOption={(props, option) => (
-                  <li {...props} style={{ display: 'block' }}>
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>{getTagDisplayLabel(option)}</Typography>
-                      <Typography variant="caption" color="text.secondary">{getTagSubtitle(option)}</Typography>
-                    </Box>
-                  </li>
-                )}
-                ListboxProps={{ sx: { ...scrollbarStyles(theme), maxHeight: 250 } }}
-                slotProps={{ popper: { sx: { zIndex: (t) => t.zIndex.modal + 200 } } }}
-                renderInput={(params) => (
-                  <TextField {...params} placeholder="Add a tag..." InputProps={{ ...params.InputProps, sx: { borderRadius: 2 } }} />
-                )}
-              />
-            ) : (
-              tags.length === 0 && <Typography variant="body2" color="text.secondary">No tags on this note.</Typography>
-            )}
+            {/* Tag editing moved to a popover anchored to the "+ Add tag"
+                pill above the title. The collapse only owns reminder /
+                color / global toggle now. */}
           </Box>
         </Collapse>
 
@@ -1118,7 +1099,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
               {isTagEditingAllowed && (
                 <Box
                   component="button"
-                  onClick={() => setIsReminderExpanded(true)}
+                  onClick={(e) => setTagPopoverAnchor(e.currentTarget)}
                   sx={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1185,6 +1166,85 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
           />
         </Box>
       </Box>
+
+      {/* Tag picker popover — anchored to "+ Add tag" pill above title */}
+      <Popover
+        open={Boolean(tagPopoverAnchor)}
+        anchorEl={tagPopoverAnchor}
+        onClose={() => { setTagPopoverAnchor(null); setNewTagInput(''); }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        slotProps={{ paper: { sx: { mt: 0.5, width: 320, p: 1.5 } } }}
+        sx={{ zIndex: (t) => t.zIndex.modal + 200 }}
+      >
+        <Typography
+          sx={{
+            fontSize: '0.65rem',
+            fontWeight: 600,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: 'text.disabled',
+            mb: 1,
+            px: 0.5,
+          }}
+        >
+          Add Tag
+        </Typography>
+        <Autocomplete
+          size="small"
+          open
+          disablePortal
+          options={defaultTags.filter(t => {
+            if (tags.includes(t)) return false;
+            if (t === GUIDELINE_TAG && hasExistingGuideline) return false;
+            return true;
+          })}
+          getOptionLabel={(option) => getTagDisplayLabel(option)}
+          value={null}
+          inputValue={newTagInput}
+          onInputChange={(_, value, reason) => { if (reason !== 'reset') setNewTagInput(value); }}
+          onChange={(_, value) => {
+            if (value && typeof value === 'string') {
+              handleAddTag(value);
+            }
+            setNewTagInput('');
+            setTagPopoverAnchor(null);
+          }}
+          renderOption={(props, option) => (
+            <li {...props} style={{ display: 'block' }}>
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>{getTagDisplayLabel(option)}</Typography>
+                <Typography variant="caption" color="text.secondary">{getTagSubtitle(option)}</Typography>
+              </Box>
+            </li>
+          )}
+          ListboxProps={{ sx: { ...scrollbarStyles(theme), maxHeight: 280 } }}
+          freeSolo
+          autoHighlight
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && newTagInput.trim()) {
+              e.preventDefault();
+              handleAddTag(newTagInput.trim());
+              setTagPopoverAnchor(null);
+            }
+            if (e.key === 'Escape') {
+              setTagPopoverAnchor(null);
+              setNewTagInput('');
+            }
+          }}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              autoFocus
+              placeholder="Search or type a custom tag…"
+              InputProps={{
+                ...params.InputProps,
+                sx: { borderRadius: 2, fontSize: '0.85rem' },
+              }}
+            />
+          )}
+        />
+      </Popover>
 
       <Snackbar
         open={!!shareSnackbar}
