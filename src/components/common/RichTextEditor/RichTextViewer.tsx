@@ -48,6 +48,17 @@ const RichTextViewer: React.FC<RichTextViewerProps> = ({
     return null;
   };
 
+  // Wrap blockStyleFn to tag header blocks with a per-key anchor class so
+  // outlines can scroll into view via `.note-anchor-${blockKey}` selector.
+  const anchoredBlockStyleFn = (block: any): string => {
+    const base = blockStyleFn(block);
+    const type = block.getType();
+    if (type === 'header-one' || type === 'header-two' || type === 'header-three') {
+      return `${base} note-anchor-${block.getKey()}`.trim();
+    }
+    return base;
+  };
+
   return (
     <Box
       sx={{
@@ -118,7 +129,7 @@ const RichTextViewer: React.FC<RichTextViewerProps> = ({
         onChange={() => {}} // No-op for read-only
         readOnly={true}
         customStyleMap={styleMap}
-        blockStyleFn={blockStyleFn}
+        blockStyleFn={anchoredBlockStyleFn}
         blockRendererFn={blockRendererFn}
       />
     </Box>
