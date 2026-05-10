@@ -134,11 +134,15 @@ const NotesPage: React.FC = () => {
   const handleInlineSaved = useCallback((note: Note, isCreated?: boolean) => {
     if (isCreated) {
       addNote(note);
-      setSelectedNote(note);
+      // If the user has navigated to a different note while the background
+      // save was in flight, don't yank them back. Only auto-select when
+      // there's nothing currently selected (i.e. this was the active draft).
+      setSelectedNote(prev => prev ?? note);
       setIsNewDraft(false);
     } else {
       updateNote(note.id, note);
-      setSelectedNote(note);
+      // Refresh selection only if the user is still viewing this note.
+      setSelectedNote(prev => (prev?.id === note.id ? note : prev));
     }
   }, [addNote, updateNote]);
 

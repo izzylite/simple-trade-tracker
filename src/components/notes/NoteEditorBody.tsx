@@ -332,16 +332,31 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   // batches both updates), causing the cleanup to re-create the same note.
   const noteRef = useRef<Note | null>(null);
   const savingRef = useRef(false);
+  // mountedRef gates React state updates inside the async save path so we
+  // don't call setNote/setSavedAt on an unmounted component (silent no-op
+  // + dev warning) when the user navigates away mid-save.
+  const mountedRef = useRef(true);
   useEffect(() => { noteRef.current = note; }, [note]);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const saveNote = useCallback(async (): Promise<void> => {
     if (savingRef.current) return; // dedupe concurrent saves
     if (!user?.uid) return;
-    if (!title.trim() || !content.trim()) return;
+    // Persist partial drafts — title or content alone is enough. Reject only
+    // if both are empty AND nothing else (cover, reminder, tags, color) has
+    // been set, to avoid creating an entirely blank row.
+    const hasTitle = title.trim() !== '';
+    const hasContent = content.trim() !== '';
+    const hasOtherSignal =
+      coverImage !== null ||
+      tags.length > 0 ||
+      noteColor !== undefined ||
+      (reminderType !== 'none' && isReminderActive);
+    if (!hasTitle && !hasContent && !hasOtherSignal) return;
 
     savingRef.current = true;
     try {
-      setSaving(true);
+      if (mountedRef.current) setSaving(true);
       const liveNote = noteRef.current;
       if (liveNote) {
         const updates: any = {
@@ -360,8 +375,12 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
         const fresh = await notesService.getNote(liveNote.id);
         if (fresh) {
           noteRef.current = fresh;
-          setNote(fresh);
-          setSavedAt(new Date(fresh.updated_at));
+          if (mountedRef.current) {
+            setNote(fresh);
+            setSavedAt(new Date(fresh.updated_at));
+          }
+          // Always notify the parent — it caches the list and reconciles
+          // selectedNote on its own, even after this body has unmounted.
           if (onSave) onSave(fresh, false);
         }
       } else {
@@ -383,14 +402,16 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
         // the persisted row even if the React state update gets dropped
         // (e.g. parent unmounts the body before commit).
         noteRef.current = created;
-        setNote(created);
-        setSavedAt(new Date(created.updated_at));
+        if (mountedRef.current) {
+          setNote(created);
+          setSavedAt(new Date(created.updated_at));
+        }
         if (onSave) onSave(created, true);
       }
     } catch (err) {
       logger.error('Error saving note:', err);
     } finally {
-      setSaving(false);
+      if (mountedRef.current) setSaving(false);
       savingRef.current = false;
     }
   }, [user?.uid, title, content, coverImage, reminderType, reminderDate, reminderDays, isReminderActive, noteColor, isGlobal, calendarId, weekKey, tags, onSave]);
