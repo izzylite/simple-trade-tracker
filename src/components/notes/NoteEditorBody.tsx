@@ -210,34 +210,40 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
     }
   }, [isActive]);
 
-  const [note, setNote] = useState<Note | null>(null);
-  const [title, setTitle] = useState<string>('');
-  const [content, setContent] = useState('');
-  const [coverImage, setCoverImage] = useState<string | null>(null);
+  // Initialize state from initialNote synchronously on first render. The
+  // alternative (init via useEffect) leaves a window where note state and
+  // noteRef are null while saveNote could fire — that window caused the
+  // editor to take the CREATE branch on existing notes and duplicate them.
+  const [note, setNote] = useState<Note | null>(initialNote ?? null);
+  const [title, setTitle] = useState<string>(initialNote?.title ?? (weekKey ? `Week of ${weekKey}` : ''));
+  const [content, setContent] = useState<string>(initialNote?.content ?? '');
+  const [coverImage, setCoverImage] = useState<string | null>(initialNote?.cover_image ?? null);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [savedAt, setSavedAt] = useState<Date | null>(
+    initialNote ? new Date(initialNote.updated_at) : null
+  );
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   // Reminder states
-  const [reminderType, setReminderType] = useState<ReminderType>('none');
-  const [reminderDate, setReminderDate] = useState<Date | null>(null);
-  const [reminderDays, setReminderDays] = useState<DayAbbreviation[]>([]);
-  const [isReminderActive, setIsReminderActive] = useState(false);
+  const [reminderType, setReminderType] = useState<ReminderType>(initialNote?.reminder_type || 'none');
+  const [reminderDate, setReminderDate] = useState<Date | null>(initialNote?.reminder_date ?? null);
+  const [reminderDays, setReminderDays] = useState<DayAbbreviation[]>(initialNote?.reminder_days ?? []);
+  const [isReminderActive, setIsReminderActive] = useState(initialNote?.is_reminder_active ?? false);
   const [isReminderExpanded, setIsReminderExpanded] = useState(!initialNote);
   // Color
   const [noteColor, setNoteColor] = useState(initialNote?.color);
   const [colorMenuAnchor, setColorMenuAnchor] = useState<null | HTMLElement>(null);
 
   // Tags
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>(initialNote?.tags ?? initialTags ?? []);
   const [newTagInput, setNewTagInput] = useState('');
   const [hasExistingGuideline, setHasExistingGuideline] = useState(false);
   const [tagPopoverAnchor, setTagPopoverAnchor] = useState<HTMLElement | null>(null);
 
   // Global note (null calendar_id = visible in all calendars)
-  const [isGlobal, setIsGlobal] = useState(false);
+  const [isGlobal, setIsGlobal] = useState(initialNote?.calendar_id === null);
 
   // Mention re-render counter
   const [, setMentionVersion] = useState(0);
@@ -333,7 +339,11 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   // setNote(created) scheduled inside saveNote can be lost when the parent
   // unmounts the body before the state commit (e.g. Done → handleExitEdit
   // batches both updates), causing the cleanup to re-create the same note.
-  const noteRef = useRef<Note | null>(null);
+  // Seed the ref with initialNote on first render — eliminates the gap
+  // between mount and the noteRef sync effect where saveNote would
+  // otherwise see noteRef.current = null and CREATE a duplicate row for
+  // an existing note.
+  const noteRef = useRef<Note | null>(initialNote ?? null);
   const savingRef = useRef(false);
   // mountedRef gates React state updates inside the async save path so we
   // don't call setNote/setSavedAt on an unmounted component (silent no-op
