@@ -91,6 +91,19 @@ const NotesPage: React.FC = () => {
     if (fresh) setSelectedNote(fresh);
   }, [notes]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ─── Auto-select most recently updated note on first load ────────────────
+  // Notes from useNotes are already sorted by updated_at desc, so notes[0]
+  // is the freshest. Skip when user is mid-draft or already viewing a note.
+  const didAutoSelectRef = useRef(false);
+  useEffect(() => {
+    if (didAutoSelectRef.current) return;
+    if (loading) return;
+    if (selectedNote || isNewDraft || isEditing) return;
+    if (notes.length === 0) return;
+    didAutoSelectRef.current = true;
+    setSelectedNote(notes[0]);
+  }, [loading, notes, selectedNote, isNewDraft, isEditing]);
+
   // ─── Handlers ─────────────────────────────────────────────────────────────
   const handleNoteClick = useCallback((note: Note) => {
     setSelectedNote(note);
@@ -347,7 +360,11 @@ const NotesPage: React.FC = () => {
 
         {/* Right rail: outline + stats (hidden below lg) */}
         <Box sx={{ display: { xs: 'none', lg: 'block' }, minHeight: 0, overflow: 'hidden' }}>
-          <NoteMetaPanel note={selectedNote} />
+          <NoteMetaPanel
+            note={selectedNote}
+            notes={notes}
+            onSelectNote={handleNoteClick}
+          />
         </Box>
       </Box>
 

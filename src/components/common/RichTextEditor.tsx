@@ -1042,7 +1042,14 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             onChange={handleEditorChange}
             placeholder={placeholder}
             customStyleMap={styleMap}
-            blockStyleFn={blockStyleFn}
+            blockStyleFn={(block: any) => {
+              const base = blockStyleFn(block);
+              const type = block.getType();
+              if (type === 'header-one' || type === 'header-two' || type === 'header-three') {
+                return `${base} note-anchor-${block.getKey()}`.trim();
+              }
+              return base;
+            }}
             blockRendererFn={blockRendererFn}
             handleKeyCommand={handleKeyCommandWrapper}
             handleReturn={handleReturn}
