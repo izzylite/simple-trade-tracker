@@ -292,6 +292,8 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
       setTags(initialNote.tags || []);
       setIsGlobal(initialNote.calendar_id === null);
       setSavedAt(new Date(initialNote.updated_at));
+      // Reset snapshot — fresh note loaded, no save in this session yet.
+      lastSavedRef.current = null;
     } else {
       setNote(null);
       if (gamePlanDay) {
@@ -322,6 +324,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
       setNewTagInput('');
       setIsGlobal(false);
       setSavedAt(null);
+      lastSavedRef.current = null;
     }
   }, [isActive, initialNote, gamePlanDay, weekKey, initialTags]);
 
@@ -336,6 +339,23 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   // don't call setNote/setSavedAt on an unmounted component (silent no-op
   // + dev warning) when the user navigates away mid-save.
   const mountedRef = useRef(true);
+  // Snapshot of values last sent to the server. hasChanges compares the live
+  // state to THIS, not to the server-coerced row (which may differ — empty
+  // title becomes "Untitled"). Without it, a fresh save would always look
+  // dirty afterward and the unmount-flush would issue a redundant UPDATE.
+  type SavedSnapshot = {
+    title: string;
+    content: string;
+    coverImage: string | null;
+    reminderType: ReminderType;
+    reminderDate: Date | null;
+    reminderDays: DayAbbreviation[];
+    isReminderActive: boolean;
+    tags: string[];
+    noteColor: string | undefined;
+    isGlobal: boolean;
+  };
+  const lastSavedRef = useRef<SavedSnapshot | null>(null);
   useEffect(() => { noteRef.current = note; }, [note]);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
@@ -355,6 +375,13 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
     if (!hasTitle && !hasContent && !hasOtherSignal) return;
 
     savingRef.current = true;
+    // Snapshot the values being sent NOW. After save we'll commit this to
+    // lastSavedRef so subsequent hasChanges calls compare against what we
+    // actually shipped, not against the server-coerced row.
+    const sentSnapshot: SavedSnapshot = {
+      title, content, coverImage, reminderType, reminderDate, reminderDays,
+      isReminderActive, tags, noteColor, isGlobal,
+    };
     try {
       if (mountedRef.current) setSaving(true);
       const liveNote = noteRef.current;
@@ -375,6 +402,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
         const fresh = await notesService.getNote(liveNote.id);
         if (fresh) {
           noteRef.current = fresh;
+          lastSavedRef.current = sentSnapshot;
           if (mountedRef.current) {
             setNote(fresh);
             setSavedAt(new Date(fresh.updated_at));
@@ -398,10 +426,13 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
           tags,
           week_key: weekKey ?? null,
         });
-        // Sync ref BEFORE setNote — guarantees a follow-up saveNote sees
+        // Sync refs BEFORE setNote — guarantees a follow-up saveNote sees
         // the persisted row even if the React state update gets dropped
-        // (e.g. parent unmounts the body before commit).
+        // (e.g. parent unmounts the body before commit). lastSavedRef
+        // captures what we sent, so the unmount-flush hasChanges sees no
+        // diff and skips the redundant UPDATE.
         noteRef.current = created;
+        lastSavedRef.current = sentSnapshot;
         if (mountedRef.current) {
           setNote(created);
           setSavedAt(new Date(created.updated_at));
@@ -417,6 +448,27 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   }, [user?.uid, title, content, coverImage, reminderType, reminderDate, reminderDays, isReminderActive, noteColor, isGlobal, calendarId, weekKey, tags, onSave]);
 
   const hasChanges = useCallback((): boolean => {
+    // Once a save has happened in this session, compare to the snapshot of
+    // what we last shipped — this is the only authoritative "clean" state.
+    // Comparing to noteRef.current.title would falsely flag a save's empty
+    // title as dirty because the server coerces it to "Untitled".
+    const snap = lastSavedRef.current;
+    if (snap) {
+      return (
+        title !== snap.title ||
+        content !== snap.content ||
+        coverImage !== snap.coverImage ||
+        reminderType !== snap.reminderType ||
+        reminderDate !== snap.reminderDate ||
+        JSON.stringify(reminderDays) !== JSON.stringify(snap.reminderDays) ||
+        isReminderActive !== snap.isReminderActive ||
+        JSON.stringify(tags) !== JSON.stringify(snap.tags) ||
+        noteColor !== snap.noteColor ||
+        isGlobal !== snap.isGlobal
+      );
+    }
+
+    // No snapshot yet — either a fresh existing-note edit or a new draft.
     const liveNote = noteRef.current;
     if (!liveNote) {
       const hasNonEmptyTitle = title && title.trim() !== '';
