@@ -13,9 +13,10 @@ import {
 import {
   Home as HomeIcon,
   BarChart as PerformanceIcon,
-  SmartToy as AssistantIcon,
   Notes as NotesIcon,
+  EventNote as EventsIcon,
   Add as AddIcon,
+  InfoOutlined as AboutIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -62,8 +63,17 @@ const NAV_ITEMS: NavItem[] = [
     match: (p) => p === '/' || p.startsWith('/calendar/') || p === '/dashboard',
   },
   { label: 'Performance', path: '/performance', icon: <PerformanceIcon /> },
-  { label: 'Assistant', path: '/assistant', icon: <AssistantIcon /> },
   { label: 'Notes', path: '/notes', icon: <NotesIcon /> },
+  { label: 'Events', path: '/events', icon: <EventsIcon /> },
+];
+
+/**
+ * Utility-tier items live at the bottom of the rail under a hairline divider.
+ * Calendar is canonical (Design Principle 4) — utility surfaces sit visibly
+ * but visually demoted so the primary NAV_ITEMS keep their weight.
+ */
+const UTILITY_ITEMS: NavItem[] = [
+  { label: 'About', path: '/about', icon: <AboutIcon /> },
 ];
 
 interface SideNavProps {
@@ -260,6 +270,26 @@ const SideNav: React.FC<SideNavProps> = ({
 
       <Stack spacing={0.25} sx={{ flex: 1, py: 1, px: 1 }}>
         {NAV_ITEMS.map((item) =>
+          renderItem(
+            item.label,
+            item.icon,
+            () => handleNavigate(resolvePath(item)),
+            { active: isActive(item) }
+          )
+        )}
+      </Stack>
+
+      {/* Utility tier — hairline divider above marks the demotion in
+          hierarchy without adding chrome. */}
+      <Box
+        sx={{
+          mx: 2,
+          height: '1px',
+          bgcolor: theme.palette.divider,
+        }}
+      />
+      <Stack spacing={0.25} sx={{ py: 1, px: 1, pb: 1.5 }}>
+        {UTILITY_ITEMS.map((item) =>
           renderItem(
             item.label,
             item.icon,

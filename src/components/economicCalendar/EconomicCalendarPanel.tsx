@@ -41,6 +41,7 @@ import { formatCount } from '../../utils/formatters';
 import EconomicCalendarFilters from './EconomicCalendarFilters';
 import EconomicEventDetailDialog from './EconomicEventDetailDialog';
 import EconomicCalendarEventList from './EconomicCalendarEventList';
+import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
 
 // Group events by date
 const groupEventsByDate = (events: EconomicEvent[]) => {
@@ -89,9 +90,8 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
   const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
   const [isViewingSpecificDate, setIsViewingSpecificDate] = useState(!!initialDate);
 
-  const { pinningEventId, handlePinEvent, handleUnpinEvent } = useEventPinning({
-    calendar, onUpdateCalendarProperty,
-  });
+  const { pinningEventId, handlePinEvent, handleUnpinEvent } = useEventPinning();
+  const { pins: userPinnedEvents } = useUserPinnedEvents();
 
   const {
     appliedFilters, pendingFilters, viewType, notificationsEnabled, filtersModified,
@@ -406,7 +406,7 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
         groupedEvents={groupedEvents}
         hasMore={hasMore}
         loadingMore={loadingMore}
-        pinnedEvents={calendar?.pinned_events || []}
+        pinnedEvents={userPinnedEvents}
         pinningEventId={pinningEventId}
         eventTradeCountMap={eventTradeCountMap}
         currentTime={currentTime}

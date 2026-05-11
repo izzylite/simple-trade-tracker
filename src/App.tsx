@@ -40,7 +40,6 @@ const AuthCallback = lazy(() => import('./pages/AuthCallbackPage'));
 const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const PerformancePage = lazy(() => import('./pages/PerformancePage'));
-const AssistantPage = lazy(() => import('./pages/AssistantPage'));
 const NotesPage = lazy(() => import('./pages/NotesPage'));
 const EconomicEventsPage = lazy(() => import('./pages/EconomicEventsPage'));
 // const SupabaseAuthTest = lazy(() => import('./components/auth/SupabaseAuthTest')); // Commented out - for testing only
@@ -271,7 +270,7 @@ function AppContent() {
           <Routes>
             {/* Auth-gated routes share a persistent AppLayout via a layout
                 route — AppLayout (and its SideNav) stay mounted across
-                navigation between Home / Performance / Assistant / Notes,
+                navigation between Home / Performance / Notes,
                 preventing the shell from blanking on each click. About lives
                 inside this layout so its side-nav slot can show the active
                 state; for signed-out visitors it falls back to a public
@@ -320,17 +319,6 @@ function AppContent() {
                         onUpdateCalendar={handleUpdateCalendar}
                         onCreateCalendar={openCreateCalendarDialog}
                       />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/assistant"
-                  element={
-                    <ProtectedRoute
-                      title="Chat with Orion"
-                      subtitle="Sign in to use the assistant"
-                    >
-                      <AssistantPage />
                     </ProtectedRoute>
                   }
                 />
@@ -475,7 +463,7 @@ const HomeRouteResolver: React.FC<HomeRouteResolverProps> = ({
       <Box sx={{ position: 'relative', minHeight: 'calc(100vh - 64px)' }}>
         <CalendarLockedOverlay
           onCreateCalendar={onCreateCalendar}
-          subtitle="Create a calendar to start tracking trades. The Home, Performance and Assistant sections unlock once one exists."
+          subtitle="Create a calendar to start tracking trades. The Home, Performance and Notes sections unlock once one exists."
         />
       </Box>
     );

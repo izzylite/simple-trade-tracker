@@ -1,0 +1,5 @@
+/* DM Sans — loaded from Google Fonts.
+   The repo theme uses DM Sans only ("'DM Sans', sans-serif"); we mirror that.
+   If self-hosting is needed, replace with @font-face declarations pointing to
+   ../fonts/dm-sans/*.woff2. */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,900&display=swap');

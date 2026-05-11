@@ -145,6 +145,7 @@ import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
 import { useCalendarTrades } from '../hooks/useCalendarTrades';
 import { useOrionTasks } from '../hooks/useOrionTasks';
+import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
 import {
   SidePanelProvider,
   useSidePanel,
@@ -592,6 +593,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const { calendarId: calendarIdFromParams } = useParams();
   // Use calendarId from URL params, or fall back to calendar prop ID (for shared calendars)
   const calendarId = calendarIdFromParams || selectedCalendar?.id;
+
+  // Pinned events live on the user (replaces per-calendar pin storage).
+  const { pins: userPinnedEvents } = useUserPinnedEvents();
 
   // Fetch trades using custom hook - this now handles all trade CRUD operations
   const {
@@ -1728,7 +1732,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                   isPanelOpen && currentView.id === 'notes'
                 }
                 availableTradeTags={allTags}
-                pinnedEvents={calendar?.pinned_events}
+                pinnedEvents={userPinnedEvents}
               />
             ),
           };
@@ -3098,7 +3102,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           calendarId={calendarId}
           isReadOnly={isReadOnly}
           availableTradeTags={allTags}
-          pinnedEvents={calendar.pinned_events}
+          pinnedEvents={userPinnedEvents}
         />
       )}
 
@@ -3173,7 +3177,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           weekKey={weekNoteDialog.weekKey}
           availableTradeTags={allTags}
           calendarNotes={calendar.notes}
-          pinnedEvents={calendar.pinned_events}
+          pinnedEvents={userPinnedEvents}
           onSave={(savedNote, isCreated) => {
             if (isCreated && savedNote.week_key) {
               setWeekNoteKeys(prev => {
@@ -3233,7 +3237,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           gamePlanDay={gamePlanDialog.day}
           availableTradeTags={allTags}
           calendarNotes={calendar.notes}
-          pinnedEvents={calendar.pinned_events}
+          pinnedEvents={userPinnedEvents}
           onSave={() => {
             setGamePlanDialog(null);
             if (calendarId) {

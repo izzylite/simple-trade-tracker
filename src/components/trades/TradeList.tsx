@@ -34,7 +34,7 @@ import {
   MoreVert as MoreVertIcon,
   EventBusyOutlined as EmptyDayIcon
 } from '@mui/icons-material';
-import { Trade } from '../../types/dualWrite';
+import { Trade, Calendar } from '../../types/dualWrite';
 import { TradeListItem, TradeInfo, TradeActions } from '../StyledComponents';
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { useTheme } from '@mui/material/styles';
@@ -204,6 +204,14 @@ interface TradeListProps {
   initialPageSize?: number;
   pageSize?: number;
 
+  /**
+   * Optional lookup of calendar metadata. When provided, each trade row shows
+   * a calendar-name chip resolved via `trade.calendar_id`. Used by
+   * cross-calendar surfaces (e.g. user-level Events page) so the trader can
+   * tell which calendar each trade belongs to.
+   */
+  calendarsById?: Map<string, Calendar>;
+
   // Trade operations - required
   tradeOperations: TradeOperationsProps;
 }
@@ -217,6 +225,7 @@ const TradeList: React.FC<TradeListProps> = ({
   sx,
   initialPageSize = 20,
   pageSize = 20,
+  calendarsById,
   tradeOperations
 }) => {
   // Destructure from tradeOperations
@@ -458,6 +467,22 @@ const TradeList: React.FC<TradeListProps> = ({
                             {trade.is_temporary ? trade.name : `📈 ${trade.name.replace(/^📈 /, '')}`}
                           </Typography>
 
+                        </Box>
+                      )}
+                      {calendarsById && calendarsById.get(trade.calendar_id) && (
+                        <Box sx={{ mb: 0.5 }}>
+                          <Chip
+                            label={calendarsById.get(trade.calendar_id)!.name}
+                            size="small"
+                            sx={{
+                              height: 18,
+                              fontSize: '0.65rem',
+                              fontWeight: 600,
+                              bgcolor: (t) => t.palette.action.selected,
+                              color: 'text.secondary',
+                              '& .MuiChip-label': { px: 0.875 },
+                            }}
+                          />
                         </Box>
                       )}
                       <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>

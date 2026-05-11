@@ -21,7 +21,7 @@ const RouteSuspenseFallback: React.FC = () => (
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: 'calc(100vh - 64px)',
+      minHeight: 'calc(100vh - 96px)',
     }}
   >
     <CircularProgress size={28} />
@@ -53,7 +53,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 64px)', position: 'relative' }}>
+    // min-height accounts for AppHeader (64px) + App outer Box pb (32px).
+    // Old value (100vh - 64px) caused 32px body overflow on viewport-locked
+    // pages because AppLayout would extend past App outer's content area.
+    <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 96px)', position: 'relative' }}>
       <SideNav
         onNewCalendar={onNewCalendar}
         mobileOpen={mobileNavOpen}

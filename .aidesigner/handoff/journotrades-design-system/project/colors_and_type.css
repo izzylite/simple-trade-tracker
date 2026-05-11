@@ -1,0 +1,365 @@
+/* ============================================================
+   JournoTrades — Colors & Type
+   ============================================================
+   The single source of CSS truth for the brand. Mirrors the
+   tokens in /_source/theme.ts (MUI) and DESIGN.md.
+
+   Two themes: dark (default) and light. Apply
+       <html data-theme="dark">  or  data-theme="light"
+   to switch. CSS-vars resolve to the right palette.
+
+   The palette is intentionally narrow:
+   - one violet (the accent, used sparingly)
+   - a slate scale for typographic neutrals
+   - a green/red pair reserved for win/loss
+
+   FONT: DM Sans is the only family. Loaded from Google Fonts
+   in fonts/DMSans.css. No serif, no mono — DM Sans with
+   tabular numerals carries the numeric layouts.
+   ============================================================ */
+
+/* Font stack. Keep the import lightweight: DM Sans 400/500/600/700/900. */
+@import url('./fonts/DMSans.css');
+
+:root,
+[data-theme="dark"] {
+  /* ---------- Brand ---------- */
+  --violet-primary: #7c3aed;   /* Trader Violet — the only saturated brand color */
+  --violet-soft:    #a78bfa;   /* Legible violet on tinted backgrounds */
+  --violet-deep:    #5b21b6;   /* MUI primary.dark — toggle borders, side-nav active hover */
+  --violet-hover:   #6d28d9;   /* Single-Hover-Hex Rule — primary CTA :hover only */
+
+  /* ---------- Win / Loss (semantic only) ---------- */
+  --win-green:      #22c55e;   /* dark mode */
+  --loss-red:       #ef4444;   /* dark mode */
+
+  /* ---------- Surfaces ---------- */
+  --bg-page:        #080808;   /* off-black; reads as paper, not as void */
+  --bg-paper:       #131313;   /* one tonal step up from the page */
+  --bg-paper-2:     #1a1a1a;   /* nested surfaces (rare) */
+  --bg-tint-violet: rgba(124, 58, 237, 0.12);  /* "Create" tile, selected items */
+  --bg-tint-violet-hover: rgba(124, 58, 237, 0.18);
+
+  /* ---------- Text ---------- */
+  --fg-primary:     #f1f5f9;   /* slate-100 */
+  --fg-secondary:   #94a3b8;   /* slate-400 */
+  --fg-tertiary:    #64748b;   /* slate-500 — captions, timestamps */
+  --fg-on-violet:   #ffffff;   /* on solid Trader Violet */
+
+  /* ---------- Lines ---------- */
+  --divider:        rgba(255, 255, 255, 0.08);
+  --hairline:       rgba(255, 255, 255, 0.14);
+
+  /* ---------- Slate scale (use directly when needed) ---------- */
+  --slate-50:  #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+
+  /* ---------- Shadows (dark) ---------- */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.30);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.30);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.40);
+  --shadow-xl: 0 8px 24px rgba(0,0,0,0.50);
+
+  --focus-ring: 0 0 0 3px rgba(124, 58, 237, 0.15);
+  --focus-ring-strong: 0 0 0 3px rgba(124, 58, 237, 0.25);
+}
+
+[data-theme="light"] {
+  --win-green:      #16a34a;
+  --loss-red:       #dc2626;
+
+  --bg-page:        #e8edf4;   /* tinted slate; never pure white */
+  --bg-paper:       #ffffff;   /* the only permitted #fff — paper only */
+  --bg-paper-2:     #f8fafc;
+  --bg-tint-violet: rgba(124, 58, 237, 0.10);
+  --bg-tint-violet-hover: rgba(124, 58, 237, 0.16);
+
+  --fg-primary:     #0f172a;   /* slate-900 */
+  --fg-secondary:   #64748b;   /* slate-500 */
+  --fg-tertiary:    #94a3b8;
+  --fg-on-violet:   #ffffff;
+
+  --divider:        #e2e8f0;   /* slate-200 */
+  --hairline:       #cbd5e1;   /* slate-300 — light-mode card border */
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-xl: 0 8px 24px rgba(0,0,0,0.10);
+}
+
+/* ============================================================
+   SPACING / RADII — DESIGN.md scale
+   ============================================================ */
+:root {
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  32px;
+  --space-2xl: 48px;
+
+  --radius-xs: 4px;   /* chips */
+  --radius-sm: 6px;   /* small chips, tooltips */
+  --radius-md: 8px;   /* buttons, inputs */
+  --radius-lg: 12px;  /* cards, dialogs */
+  --radius-xl: 16px;  /* nav-tile */
+  --radius-2xl: 24px; /* lock-overlay card (3 × 8) */
+  --radius-pill: 999px;
+
+  /* Motion */
+  --easing: cubic-bezier(0.22, 1, 0.36, 1);          /* ease-out-quart, the rail's choice */
+  --easing-base: ease-out;
+  --duration-fast: 150ms;
+  --duration-base: 180ms;
+  --duration-slow: 240ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}
+
+/* ============================================================
+   TYPOGRAPHY — base + semantic
+   ============================================================
+   One family. Tabular figures wherever numbers stack.
+   Negative letter-spacing pulls display sizes into a structured block.
+   ============================================================ */
+
+:root {
+  --font-sans: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-numeric: 'DM Sans', system-ui, sans-serif;
+
+  /* Type scale */
+  --type-display-size:   2.125rem;   /* 34px */
+  --type-display-weight: 700;
+  --type-display-lh:     1.2;
+  --type-display-track:  -0.025em;
+
+  --type-headline-size:   1.5rem;    /* 24px */
+  --type-headline-weight: 700;
+  --type-headline-lh:     1.3;
+  --type-headline-track:  -0.025em;
+
+  --type-title-size:   1.125rem;     /* 18px */
+  --type-title-weight: 600;
+  --type-title-lh:     1.4;
+  --type-title-track:  -0.015em;
+
+  --type-body-size:   0.875rem;      /* 14px */
+  --type-body-weight: 400;
+  --type-body-lh:     1.55;
+
+  --type-label-size:   0.6875rem;    /* 11px */
+  --type-label-weight: 600;
+  --type-label-track:  0.05em;
+
+  --type-numeric-size:   1.75rem;    /* 28px */
+  --type-numeric-weight: 700;
+  --type-numeric-lh:     1.1;
+}
+
+/* ---------- Page defaults ---------- */
+html, body {
+  background: var(--bg-page);
+  color: var(--fg-primary);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---------- Semantic typographic classes ----------
+   The actual MUI app uses Typography component variants,
+   but these classes mirror them for raw HTML and slides. */
+
+.t-display {
+  font-family: var(--font-sans);
+  font-size: var(--type-display-size);
+  font-weight: var(--type-display-weight);
+  line-height: var(--type-display-lh);
+  letter-spacing: var(--type-display-track);
+}
+
+.t-headline {
+  font-family: var(--font-sans);
+  font-size: var(--type-headline-size);
+  font-weight: var(--type-headline-weight);
+  line-height: var(--type-headline-lh);
+  letter-spacing: var(--type-headline-track);
+}
+
+.t-title {
+  font-family: var(--font-sans);
+  font-size: var(--type-title-size);
+  font-weight: var(--type-title-weight);
+  line-height: var(--type-title-lh);
+  letter-spacing: var(--type-title-track);
+}
+
+.t-body {
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-lh);
+}
+
+.t-label {
+  /* Used as eyebrows, side-nav captions, calendar dropdown header */
+  font-family: var(--font-sans);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-track);
+  text-transform: uppercase;
+  color: var(--fg-secondary);
+}
+
+.t-numeric {
+  font-family: var(--font-numeric);
+  font-size: var(--type-numeric-size);
+  font-weight: var(--type-numeric-weight);
+  line-height: var(--type-numeric-lh);
+  font-feature-settings: 'tnum' on, 'lnum' on; /* Tabular-Number Rule */
+  letter-spacing: -0.015em;
+}
+
+/* The single semantic rule for prose blocks: cap line length. */
+.prose { max-width: 65ch; }
+.prose p + p { margin-top: 1em; }
+
+/* Win/loss helpers — color is never the only encoding (always pair with arrow + sign). */
+.is-win  { color: var(--win-green); }
+.is-loss { color: var(--loss-red); }
+
+/* HTML element defaults (helpful for slide HTML and previews) */
+h1 { font: var(--type-display-weight) var(--type-display-size)/var(--type-display-lh) var(--font-sans); letter-spacing: var(--type-display-track); margin: 0 0 var(--space-md); }
+h2 { font: var(--type-headline-weight) var(--type-headline-size)/var(--type-headline-lh) var(--font-sans); letter-spacing: var(--type-headline-track); margin: 0 0 var(--space-md); }
+h3 { font: var(--type-title-weight) var(--type-title-size)/var(--type-title-lh) var(--font-sans); letter-spacing: var(--type-title-track); margin: 0 0 var(--space-sm); }
+p, li { font-size: var(--type-body-size); line-height: var(--type-body-lh); }
+small { font-size: var(--type-label-size); letter-spacing: var(--type-label-track); text-transform: uppercase; color: var(--fg-secondary); }
+code, kbd { font-family: var(--font-sans); font-feature-settings: 'tnum' on, 'lnum' on; }
+
+/* ============================================================
+   COMMON CONTROL STYLES
+   ============================================================ */
+
+.btn {
+  /* Base button — used by primary/outlined/pill modifiers */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: 600;
+  line-height: 1;
+  padding: 8px 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--easing-base),
+              color var(--duration-fast) var(--easing-base),
+              box-shadow var(--duration-fast) var(--easing-base),
+              transform var(--duration-fast) var(--easing-base);
+  user-select: none;
+  text-decoration: none;
+}
+.btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+.btn-primary {
+  background: var(--violet-primary);
+  color: var(--fg-on-violet);
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover { background: var(--violet-hover); box-shadow: var(--shadow-md); }
+.btn-primary:active { transform: scale(0.98); }
+
+.btn-outlined {
+  background: transparent;
+  color: var(--violet-primary);
+  border-color: var(--violet-primary);
+}
+.btn-outlined:hover { background: rgba(124, 58, 237, 0.08); }
+
+.btn-pill { border-radius: var(--radius-pill); padding: 8px 24px; }
+
+/* ============================================================
+   CARDS
+   ============================================================ */
+.card {
+  background: var(--bg-paper);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-md);
+  transition: box-shadow var(--duration-fast) var(--easing-base),
+              transform var(--duration-fast) var(--easing-base);
+}
+[data-theme="light"] .card { border: 1px solid var(--hairline); }
+.card-hover:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+
+/* ============================================================
+   CHIPS
+   ============================================================ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  background: var(--bg-tint-violet);
+  color: var(--fg-primary);
+}
+.chip-filled {
+  background: var(--violet-primary);
+  color: var(--slate-50);
+}
+
+/* ============================================================
+   INPUTS
+   ============================================================ */
+.input {
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  background: var(--bg-paper);
+  color: var(--fg-primary);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color var(--duration-fast) var(--easing-base),
+              box-shadow var(--duration-fast) var(--easing-base);
+}
+.input:focus {
+  border-color: var(--violet-primary);
+  box-shadow: var(--focus-ring);
+}
+
+/* ============================================================
+   PNL — the canonical win/loss readout
+   ============================================================
+   Always color + arrow glyph + sign character together.
+   Use as: <span class="pnl is-win">↑ +$1,247.50</span>
+   ============================================================ */
+.pnl {
+  font-family: var(--font-sans);
+  font-feature-settings: 'tnum' on, 'lnum' on;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  gap: 4px;
+  align-items: baseline;
+}

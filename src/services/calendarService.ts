@@ -376,6 +376,19 @@ export const getAllTrades = async (calendarId: string): Promise<Trade[]> => {
 };
 
 /**
+ * Get a trade by ID without requiring the calendar ID.
+ * Use when the caller only has a tradeId (e.g. cross-calendar contexts).
+ */
+export const getTradeById = async (tradeId: string): Promise<Trade | null> => {
+  try {
+    return await tradeRepository.findById(tradeId);
+  } catch (error) {
+    logger.error('Error getting trade by ID:', error);
+    return null;
+  }
+};
+
+/**
  * Get a specific trade by ID
  */
 export const getTrade = async (calendarId: string, tradeId: string): Promise<Trade | null> => {

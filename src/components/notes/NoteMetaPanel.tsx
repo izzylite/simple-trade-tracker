@@ -276,6 +276,14 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
     >
       <Box sx={{ px: 2.75, py: 3, display: 'flex', flexDirection: 'column', gap: 3.25 }}>
 
+         {/* Reminders — persists across note selection */}
+        {hasReminders && (
+          <Box>
+            <Typography sx={sectionLabelSx}>Reminders</Typography>
+            <ReminderCardStack notes={reminderNotes} onSelect={handleSelect} />
+          </Box>
+        )}
+
         {/* Stats */}
         {showStats && (
           <Box>
@@ -397,13 +405,7 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
           </Box>
         )}
 
-        {/* Reminders — persists across note selection */}
-        {hasReminders && (
-          <Box>
-            <Typography sx={sectionLabelSx}>Reminders</Typography>
-            <ReminderCardStack notes={reminderNotes} onSelect={handleSelect} />
-          </Box>
-        )}
+       
 
       </Box>
     </Box>

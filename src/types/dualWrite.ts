@@ -196,7 +196,6 @@ export interface Calendar extends BaseEntity {
   // Settings
   score_settings?: ScoreSettings;
   economic_calendar_filters?: EconomicCalendarFilterSettings;
-  pinned_events?: PinnedEvent[];
 
   // Pre-calculated year statistics
   // Structure: { "2024": YearStats, "2025": YearStats, ... }

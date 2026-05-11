@@ -24,6 +24,7 @@ import type { Theme } from '@mui/material';
 import { Note } from '../../types/note';
 import { Calendar } from '../../types/calendar';
 import NotesBottomSheet from './NotesBottomSheet';
+import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
 
 export interface StickyReminderCardsProps {
   notes: Note[];
@@ -94,6 +95,7 @@ const StickyReminderCards: React.FC<StickyReminderCardsProps> = ({
 }) => {
   const theme = useTheme();
   const colorMap = getColorMap(theme);
+  const { pins: userPinnedEvents } = useUserPinnedEvents();
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
   const [initialNoteIndex, setInitialNoteIndex] = useState(0);
   // Tracks which front card is mid-exit so its slide-up + fade animation
@@ -262,7 +264,7 @@ const StickyReminderCards: React.FC<StickyReminderCardsProps> = ({
         onNoteSaved={onNoteSaved}
         onNoteDeleted={onNoteDeleted}
         availableTradeTags={calendar.tags}
-        pinnedEvents={calendar.pinned_events}
+        pinnedEvents={userPinnedEvents}
       />
     </>
   );

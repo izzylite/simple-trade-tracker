@@ -1,0 +1,87 @@
+/* preview/_card.css — shared shell for every preview card.
+   Cards are 700×<auto> design widgets. Background dark by default
+   to match the brand's primary surface. */
+
+@import url('../colors_and_type.css');
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-page);
+  color: var(--fg-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The card itself fills the iframe. Padding is the design padding. */
+.card-frame {
+  width: 100%;
+  min-height: 100vh;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: var(--bg-page);
+}
+
+.card-frame.paper { background: var(--bg-paper); }
+
+/* Light variant (used by light-mode swatches). */
+.card-frame.light {
+  background: #e8edf4;
+  color: #0f172a;
+}
+.card-frame.light-paper {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+}
+
+/* Common helpers used inside cards */
+.row { display: flex; align-items: center; gap: 12px; }
+.col { display: flex; flex-direction: column; gap: 12px; }
+.between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.muted { color: var(--fg-secondary); }
+.tnum { font-feature-settings: 'tnum' on, 'lnum' on; }
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-secondary);
+}
+.eyebrow.violet { color: var(--violet-primary); }
+.hairline { height: 1px; background: var(--hairline); width: 100%; }
+.divider { height: 1px; background: var(--divider); width: 100%; }
+
+.swatch {
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 10px 12px;
+  gap: 2px;
+  min-height: 80px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.swatch .hex {
+  font-family: var(--font-sans);
+  font-feature-settings: 'tnum' on, 'lnum' on;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.7;
+  font-weight: 500;
+}
+
+.tile {
+  background: var(--bg-paper);
+  border-radius: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--divider);
+}
+[data-theme="light"] .tile { border-color: var(--hairline); background: #fff; }

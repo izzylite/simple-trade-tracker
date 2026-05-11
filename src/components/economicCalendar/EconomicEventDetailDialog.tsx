@@ -28,10 +28,12 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { EconomicEvent } from '../../types/economicCalendar';
 import { Trade } from '../../types/dualWrite';
-import { Calendar } from '../../types/calendar';
 import { BaseDialog } from '../common';
 import TradeList from '../trades/TradeList';
 import { cleanEventNameForPinning, eventMatchV1 } from '../../utils/eventNameUtils';
+import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
+import { useAuthState } from '../../contexts/AuthStateContext';
+import { useCalendars } from '../../hooks/useCalendars';
 import { getSessionForTimestamp, SESSION_COLORS } from '../../utils/sessionTimeUtils';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
@@ -43,7 +45,12 @@ interface EconomicEventDetailDialogProps {
   open: boolean;
   onClose: () => void;
   event: EconomicEvent;
-  calendarId: string;
+  /**
+   * Calendar context for trade fetching + per-calendar AI analysis. Optional
+   * because the user-scoped Events page surfaces this dialog without binding
+   * to any one calendar. Pin/notes still work — they live on the user.
+   */
+  calendarId?: string;
   tradeOperations: TradeOperationsProps;
   isReadOnly?: boolean;
 }
@@ -58,14 +65,34 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
 }) => {
   const {
     onOpenGalleryMode,
-    calendar,
-    onUpdateCalendarProperty
   } = tradeOperations;
   const theme = useTheme();
+  const { user } = useAuthState();
+  const userId = user?.id ?? null;
+  // Cross-calendar mode: load calendars once so the trade list can show a
+  // small calendar-name chip per trade. SWR-cached, so the list will reuse
+  // the result if other surfaces already loaded it.
+  const isCrossCalendar = !calendarId && !!userId;
+  const { calendars: userCalendars } = useCalendars(
+    isCrossCalendar ? userId ?? undefined : undefined
+  );
+  const calendarsById = useMemo(() => {
+    if (!isCrossCalendar || !userCalendars) return undefined;
+    const map = new Map<string, typeof userCalendars[number]>();
+    for (const c of userCalendars) map.set(c.id, c);
+    return map;
+  }, [isCrossCalendar, userCalendars]);
+  const {
+    pins: userPins,
+    pin: userPin,
+    unpin: userUnpin,
+    updateNotes: userUpdateNotes,
+    pinningEventId,
+  } = useUserPinnedEvents();
   const [expandedTradeId, setExpandedTradeId] = React.useState<string | null>(null);
   const [notesText, setNotesText] = useState('');
-  const [pinning, setPinning] = useState(false);
   const initialNotesRef = useRef<string>('');
+  const pinning = pinningEventId === event.id;
 
   // AI Analysis State
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
@@ -83,12 +110,13 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     [event.time_utc, event.is_all_day]
   );
 
-  // Fetch trades for this event when dialog opens
+  // Fetch trades for this event when dialog opens. Prefers calendar-scoped
+  // fetch when a calendarId is provided; falls back to a user-scoped query
+  // (across all the user's calendars) for the user-level Events page.
   useEffect(() => {
     const fetchEventTrades = async () => {
-      if (!open || !calendarId) {
+      if (!open || (!calendarId && !userId)) {
         setEventTrades([]);
-        // Don't reset AI analysis here, we'll handle it via cache or trades update
         return;
       }
 
@@ -97,14 +125,23 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
       try {
         const calendarServiceModule = await import('../../services/calendarService');
         const cleanedName = cleanEventNameForPinning(event.event_name);
+        const repo = calendarServiceModule.getTradeRepository();
 
-        const trades = await calendarServiceModule.getTradeRepository().fetchTradesByEvent(
-          calendarId,
-          cleanedName,
-          event.currency,
-          event.impact,
-          eventSession ?? undefined
-        );
+        const trades = calendarId
+          ? await repo.fetchTradesByEvent(
+              calendarId,
+              cleanedName,
+              event.currency,
+              event.impact,
+              eventSession ?? undefined
+            )
+          : await repo.fetchUserTradesByEvent(
+              userId as string,
+              cleanedName,
+              event.currency,
+              event.impact,
+              eventSession ?? undefined
+            );
         setEventTrades(trades);
       } catch (error) {
         console.error('Error fetching trades for event:', error);
@@ -116,16 +153,17 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     };
 
     fetchEventTrades();
-  }, [open, calendarId, event.event_name, event.currency, event.impact, eventSession]);
+  }, [open, calendarId, userId, event.event_name, event.currency, event.impact, eventSession]);
 
   // Load cached AI analysis when trades are loaded
   useEffect(() => {
     if (!open) return; // Don't check cache if dialog is closed (prevent clearing on close)
-    if (!calendarId || !event.id) return;
+    if ((!calendarId && !userId) || !event.id) return;
     if (isLoadingTrades) return; // Don't check while loading
     if (!hasInitialLoad.current) return; // Don't check before initial load completes
     const cleanedName = cleanEventNameForPinning(event.event_name);
-    const cacheKey = `ai_analysis_${calendarId}_${cleanedName}`;
+    const scope = calendarId ?? `user_${userId}`;
+    const cacheKey = `ai_analysis_${scope}_${cleanedName}`;
     const cachedData = localStorage.getItem(cacheKey);
 
     if (cachedData) {
@@ -152,19 +190,14 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     } else {
       setAiAnalysis('');
     }
-  }, [calendarId, event.id, eventTrades.length, open, isLoadingTrades]); // Depend on trade count to invalidate/reload
+  }, [calendarId, userId, event.id, eventTrades.length, open, isLoadingTrades]); // Depend on trade count to invalidate/reload
 
-  // Check if event is pinned and get pinned event data
+  // Check if event is pinned and get pinned event data (user-level)
   const pinnedEventData = useMemo(() => {
-    if (!calendar || !('pinned_events' in calendar) || !calendar.pinned_events) {
-      return null;
-    }
-
-    // First try to match by event_id (exact match), then fallback to name matching
-    return calendar.pinned_events.find(pe =>
+    return userPins.find(pe =>
       pe.event_id ? pe.event_id === event.id : eventMatchV1(event, pe)
     ) || null;
-  }, [calendar, event.id, event.event_name]);
+  }, [userPins, event]);
 
   const isPinned = !!pinnedEventData;
 
@@ -175,77 +208,22 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     initialNotesRef.current = notes;
   }, [pinnedEventData]);
 
-  // Handle pin/unpin with progress indicator
+  // Handle pin/unpin via user-level context.
   const handleTogglePin = async () => {
-    if (!calendar || !('id' in calendar) || !('pinned_events' in calendar) || !calendarId || !onUpdateCalendarProperty) {
-      return;
-    }
-
-    const cleanedEventName = cleanEventNameForPinning(event.event_name);
-
-    try {
-      setPinning(true);
-      await onUpdateCalendarProperty(calendarId, (cal: Calendar) => {
-        const currentPinned = cal.pinned_events || [];
-
-        if (isPinned) {
-          // Unpin - use event_id for exact matching if available
-          return {
-            ...cal,
-            pinned_events: currentPinned.filter(pe =>
-              pe.event_id ? pe.event_id !== event.id : !eventMatchV1(event, pe)
-            )
-          };
-        } else {
-          // Pin - include event_id, flag_url, and country
-          return {
-            ...cal,
-            pinned_events: [...currentPinned, {
-              event: cleanedEventName,
-              event_id: event.id,
-              notes: '',
-              impact: event.impact,
-              currency: event.currency,
-              flag_url: event.flag_url,
-              country: event.country
-            }]
-          };
-        }
-      });
-    } finally {
-      setPinning(false);
+    if (isPinned) {
+      await userUnpin(event);
+    } else {
+      await userPin(event);
     }
   };
 
   // Check if notes have been modified
   const hasNotesChanged = notesText !== initialNotesRef.current;
 
-  // Save notes to calendar (only called on close if changed)
+  // Save notes through user-level context (only when pinned and changed).
   const saveNotesIfChanged = async () => {
-    if (!hasNotesChanged || !calendar || !('id' in calendar) || !('pinned_events' in calendar) || !calendarId || !onUpdateCalendarProperty || !isPinned) {
-      return;
-    }
-
-    await onUpdateCalendarProperty(calendarId, (cal: Calendar) => {
-      const currentPinned = cal.pinned_events || [];
-      const existingIndex = currentPinned.findIndex(pe =>
-        pe.event_id ? pe.event_id === event.id : eventMatchV1(event, pe)
-      );
-
-      if (existingIndex >= 0) {
-        const updated = [...currentPinned];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          notes: notesText.trim() || undefined
-        };
-        return {
-          ...cal,
-          pinned_events: updated
-        };
-      }
-
-      return cal;
-    });
+    if (!hasNotesChanged || !isPinned) return;
+    await userUpdateNotes(event.id, notesText.trim());
   };
 
   // Handle dialog close - save notes if changed
@@ -325,7 +303,7 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
       const response = await supabaseAIChatService.sendMessage(
         prompt,
         session.user.id,
-        calendar as Calendar, // Cast if calendar is available, though it might be Partial
+        undefined, // No calendar context — pinning + AI now run user-scoped
         [], // No conversation history context needed for this one-shot query
       );
 
@@ -336,7 +314,8 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
         // Cache the successful response
         try {
           const cleanedName = cleanEventNameForPinning(event.event_name);
-          const cacheKey = `ai_analysis_${calendarId}_${cleanedName}`;
+          const scope = calendarId ?? `user_${userId}`;
+          const cacheKey = `ai_analysis_${scope}_${cleanedName}`;
           const cacheData = {
             // timestamp: Date.now(), // No longer needed
             tradeCount: stats.total, // Use stats.total which comes from eventTrades.length
@@ -443,7 +422,7 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
                   }}
                 />
               )}
-              {calendar && 'pinned_events' in calendar && onUpdateCalendarProperty && !isReadOnly && (
+              {!isReadOnly && (
                 <Tooltip title={isPinned ? "Unpin event" : "Pin event"}>
                   <span>
                     <IconButton
@@ -665,6 +644,7 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
                 expandedTradeId={expandedTradeId}
                 onTradeClick={(id) => setExpandedTradeId(prev => prev === id ? null : id)}
                 hideActions={isReadOnly}
+                calendarsById={calendarsById}
                 tradeOperations={tradeOperations}
               />
             )}

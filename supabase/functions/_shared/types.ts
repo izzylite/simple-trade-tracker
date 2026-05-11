@@ -77,7 +77,6 @@ export interface Calendar {
   hero_image_attribution?: Record<string, unknown>
   score_settings?: Record<string, unknown>
   economic_calendar_filters?: Record<string, unknown>
-  pinned_events?: Record<string, unknown>[]
   year_stats?: Record<string, YearStats>
   win_rate: number
   profit_factor: number

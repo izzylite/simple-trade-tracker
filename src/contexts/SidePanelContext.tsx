@@ -1,6 +1,7 @@
 // src/contexts/SidePanelContext.tsx
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import { Trade } from '../types/dualWrite';
+import { EconomicEvent } from '../types/economicCalendar';
 
 // -- Types --
 
@@ -54,6 +55,33 @@ export interface StatsView {
   id: 'stats';
 }
 
+/**
+ * Cross-calendar event detail panel — used by the user-level Events page
+ * (`/events`). Holds the EconomicEvent so the panel re-renders with the
+ * correct context when the user clicks a different row.
+ */
+export interface EventDetailView {
+  id: 'event-detail';
+  event: EconomicEvent;
+}
+
+/**
+ * Cross-calendar all-pinned-events list — used by the user-level Events
+ * page when the user clicks "View all" on the pinned events card.
+ */
+export interface AllPinnedEventsView {
+  id: 'all-pinned-events';
+}
+
+/**
+ * Default empty view for the Events page when nothing is selected. Renders
+ * an empty placeholder so the panel slot still exists in the layout but no
+ * panel content is shown.
+ */
+export interface EventsHomeView {
+  id: 'events-home';
+}
+
 export type SidePanelView =
   | EconomicCalendarView
   | NotesView
@@ -65,7 +93,10 @@ export type SidePanelView =
   | AIChatView
   | CalendarsListView
   | FAQView
-  | StatsView;
+  | StatsView
+  | EventDetailView
+  | AllPinnedEventsView
+  | EventsHomeView;
 
 const MAX_STACK_DEPTH = 3;
 
@@ -90,15 +121,17 @@ const SidePanelContext = createContext<SidePanelContextValue | null>(null);
 
 interface SidePanelProviderProps {
   defaultView: SidePanelView;
+  defaultOpen?: boolean;
   children: ReactNode;
 }
 
 export const SidePanelProvider: React.FC<SidePanelProviderProps> = ({
   defaultView,
+  defaultOpen = true,
   children,
 }) => {
   const [stack, setStack] = useState<SidePanelView[]>([defaultView]);
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const pushPanel = useCallback((view: SidePanelView) => {
     setStack(prev => {
