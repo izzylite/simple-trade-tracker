@@ -112,8 +112,6 @@ import {
 } from '../types/notification';
 import OrionIcon from '../components/aiChat/OrionIcon';
 import NotesDrawer from '../components/notes/NotesDrawer';
-import FAQDrawer from '../components/faq/FAQDrawer';
-import FAQContent from '../components/faq/FAQContent';
 import NoteEditorDialog from '../components/notes/NoteEditorDialog';
 import {
   StackedNotesWidget,
@@ -171,6 +169,9 @@ interface TradeCalendarProps {
   mode: 'light' | 'dark';
   // Read-only mode for shared calendars
   isReadOnly?: boolean;
+  /** Dispatches to the app-level SidePanelProvider (outside this page's local
+   *  one). Used for panels migrated to the global registry. */
+  openGlobalPanel?: (view: SidePanelView) => void;
 }
 
 /**
@@ -572,6 +573,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     onToggleTheme,
     mode,
     isReadOnly = false,
+    openGlobalPanel,
   } = props;
 
 
@@ -806,9 +808,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
 
-  // FAQ drawer state
-  const [isFAQDrawerOpen, setIsFAQDrawerOpen] = useState(false);
-
   // Header overflow menu (Import / Export) state
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -870,7 +869,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       setPinnedTradesDrawerOpen(false);
       setIsTagManagementDrawerOpen(false);
       setIsEconomicCalendarOpen(false);
-      setIsFAQDrawerOpen(false);
       setIsStatsDrawerOpen(false);
       setSelectedDate(null);
     };
@@ -894,9 +892,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         case 'economic-calendar':
           setIsEconomicCalendarOpen(true);
           break;
-        case 'faq':
-          setIsFAQDrawerOpen(true);
-          break;
         case 'stats':
           setIsStatsDrawerOpen(true);
           break;
@@ -908,10 +903,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       }
     } else if (!prevIsLgUp.current && isLgUp) {
       // <lg → lg+: hand off open drawer to panel; then close all drawers
-      if (isFAQDrawerOpen) {
-        replacePanel({ id: 'faq' });
-        setPanelOpen(true);
-      } else if (isStatsDrawerOpen) {
+      if (isStatsDrawerOpen) {
         replacePanel({ id: 'stats' });
         setPanelOpen(true);
       }
@@ -1677,12 +1669,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               />
             ),
           };
-        case 'faq':
-          return {
-            title: 'FAQs',
-            icon: <HelpOutlineIcon fontSize="small" />,
-            component: <FAQContent />,
-          };
         case 'ai-analysis': {
           const aiView = view as AIAnalysisView;
           return {
@@ -1849,10 +1835,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
      handleDismissReminder, isReadOnly]
   );
 
-  const isFAQActive = isLgUp
-    ? isPanelOpen && currentView.id === 'faq'
-    : isFAQDrawerOpen;
-
   const isStatsActive = isLgUp
     ? isPanelOpen && currentView.id === 'stats'
     : isStatsDrawerOpen;
@@ -1905,10 +1887,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       <Tooltip title="FAQs">
         <IconButton
           size="small"
-          onClick={() => togglePanel('faq', setIsFAQDrawerOpen)}
+          onClick={() => openGlobalPanel?.({ id: 'faq' })}
           sx={{
-            color: isFAQActive ? 'primary.main' : 'text.secondary',
-            '&:hover': { color: isFAQActive ? 'primary.main' : 'text.primary' },
+            color: 'text.secondary',
+            '&:hover': { color: 'text.primary' },
           }}
         >
           <HelpOutlineIcon fontSize="small" />
@@ -2942,14 +2924,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           isReadOnly={isReadOnly}
           availableTradeTags={allTags}
           pinnedEvents={userPinnedEvents}
-        />
-      )}
-
-      {/* FAQ Drawer — <lg only (lg+ uses SidePanel) */}
-      {!isLgUp && (
-        <FAQDrawer
-          open={isFAQDrawerOpen}
-          onClose={() => setIsFAQDrawerOpen(false)}
         />
       )}
 

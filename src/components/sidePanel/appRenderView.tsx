@@ -1,5 +1,9 @@
 import React from 'react';
+import {
+  HelpOutline as HelpOutlineIcon,
+} from '@mui/icons-material';
 import { SidePanelView } from '../../contexts/SidePanelContext';
+import FAQContent from '../faq/FAQContent';
 
 export interface SidePanelViewConfig {
   title: string;
@@ -18,7 +22,13 @@ export interface SidePanelViewConfig {
  */
 export const appRenderView = (view: SidePanelView): SidePanelViewConfig | null => {
   switch (view.id) {
-    // TODO: each case added in its own task — see plan Task 5+.
+    case 'faq':
+      return {
+        title: 'Help & FAQ',
+        icon: <HelpOutlineIcon />,
+        component: <FAQContent />,
+      };
+
     default:
       return null;
   }

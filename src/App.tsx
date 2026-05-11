@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, Box, Snackbar, Alert } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
@@ -33,7 +33,8 @@ import {
   CalendarsListPanelProvider,
   CalendarsListPanelActions,
 } from './contexts/CalendarsListPanelContext';
-import { SidePanelProvider } from './contexts/SidePanelContext';
+import { SidePanelProvider, useSidePanel } from './contexts/SidePanelContext';
+import type { SidePanelView } from './contexts/SidePanelContext';
 import { TradesProvider } from './contexts/TradesContext';
 
 // Lazy load page components from pages directory
@@ -622,6 +623,19 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     if (calendar?.id) setCalendarId(calendar.id);
   }, [calendar?.id, setCalendarId]);
 
+  // Dispatch to the app-level SidePanelProvider — CalendarRoute lives outside
+  // TradeCalendarPage's local provider, so `useSidePanel()` here resolves to
+  // the global one. Page-level panels migrated to the global registry open
+  // through this callback.
+  const { replacePanel, setOpen: setSidePanelOpen } = useSidePanel();
+  const openGlobalPanel = useCallback(
+    (view: SidePanelView) => {
+      replacePanel(view);
+      setSidePanelOpen(true);
+    },
+    [replacePanel, setSidePanelOpen]
+  );
+
   if (!calendar) {
     // Active calendar is gone (deleted, soft-trashed, or URL points to a
     // calendar the user no longer has). Prefer hopping to the most recently
@@ -646,6 +660,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       setLoading={setLoading}
       onToggleTheme={onToggleTheme}
       mode={mode}
+      openGlobalPanel={openGlobalPanel}
     />
   );
 };
