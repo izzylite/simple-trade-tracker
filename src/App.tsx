@@ -36,6 +36,7 @@ import {
 import { SidePanelProvider, useSidePanel } from './contexts/SidePanelContext';
 import type { SidePanelView } from './contexts/SidePanelContext';
 import { TradesProvider } from './contexts/TradesContext';
+import { TradeUIProvider } from './contexts/TradeUIContext';
 
 // Lazy load page components from pages directory
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -294,6 +295,7 @@ function AppContent() {
       <SelectedCalendarProvider>
       <CalendarsListPanelProvider actions={calendarsListActions}>
       <TradesProvider calendars={calendars} setLoading={setLoading}>
+      <TradeUIProvider>
       <SidePanelProvider defaultView={{ id: 'faq' }} defaultOpen={false}>
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* App Header — hidden on landing page (has its own nav) */}
@@ -459,6 +461,7 @@ function AppContent() {
         />
       )}
       </SidePanelProvider>
+      </TradeUIProvider>
       </TradesProvider>
       </CalendarsListPanelProvider>
       </SelectedCalendarProvider>
