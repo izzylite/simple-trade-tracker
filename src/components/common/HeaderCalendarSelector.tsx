@@ -4,27 +4,23 @@ import { useNavigate, useMatch } from 'react-router-dom';
 import { useAuthState } from '../../contexts/AuthStateContext';
 import { useCalendars } from '../../hooks/useCalendars';
 import { useSelectedCalendar } from '../../contexts/SelectedCalendarContext';
+import { useCalendarsListPanelOptional } from '../../contexts/CalendarsListPanelContext';
 import CalendarSelectorBar, { CalendarSelectorItem } from './CalendarSelectorBar';
-
-interface HeaderCalendarSelectorProps {
-  /** Opens the app-level CalendarsListDrawer with full management UI. */
-  onOpenCalendarsList?: () => void;
-}
 
 /**
  * Header-mounted calendar selector. Drives the global SelectedCalendarContext
  * and, when the user is on `/calendar/:calendarId`, navigates to the newly
- * selected calendar so the URL stays canonical.
+ * selected calendar so the URL stays canonical. "View all calendars" opens
+ * the app-level CalendarsListPanel via context.
  *
  * Returns null when there are no active calendars (lock-overlay surface
  * already prompts the user to create one).
  */
-const HeaderCalendarSelector: React.FC<HeaderCalendarSelectorProps> = ({
-  onOpenCalendarsList,
-}) => {
+const HeaderCalendarSelector: React.FC = () => {
   const { user } = useAuthState();
   const { calendars } = useCalendars(user?.uid);
   const { calendarId, setCalendarId } = useSelectedCalendar();
+  const calendarsListPanel = useCalendarsListPanelOptional();
   const navigate = useNavigate();
   const calendarRouteMatch = useMatch('/calendar/:calendarId');
 
@@ -79,7 +75,7 @@ const HeaderCalendarSelector: React.FC<HeaderCalendarSelectorProps> = ({
       active={active}
       recent={recent}
       onSelect={handleSelect}
-      onViewAll={onOpenCalendarsList}
+      onViewAll={calendarsListPanel?.openPanel}
     />
   );
 };

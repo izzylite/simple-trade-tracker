@@ -3,12 +3,25 @@ import {
   Box,
   IconButton,
   CircularProgress,
+  Typography,
+  Divider,
+  alpha,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
-import { Menu as MenuIcon } from '@mui/icons-material';
+import {
+  Menu as MenuIcon,
+  Close as CloseIcon,
+  CalendarToday as CalendarIcon,
+} from '@mui/icons-material';
 import { Outlet } from 'react-router-dom';
 import SideNav, { SIDE_NAV_WIDTH } from './SideNav';
+import { useCalendarsListPanel } from '../../contexts/CalendarsListPanelContext';
+import CalendarsListContent from '../sidePanel/content/CalendarsListContent';
+import CalendarsListDrawer from '../calendars/CalendarsListDrawer';
+import { useSelectedCalendar } from '../../contexts/SelectedCalendarContext';
+
+const CALENDARS_PANEL_WIDTH = 'clamp(360px, 36vw, 580px)';
 
 /**
  * Inline loading state for the route content area only. Renders inside
@@ -46,11 +59,20 @@ interface AppLayoutProps {
  *
  * Renders a small floating menu trigger on <lg until a hamburger is added to
  * AppHeader in a later phase.
+ *
+ * Also hosts the global CalendarsList surface: an inline right-side panel on
+ * lg+ and a UnifiedDrawer fallback on smaller viewports. The panel state and
+ * actions are provided by CalendarsListPanelContext at App level.
  */
 const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
   const theme = useTheme();
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const { open: isCalendarsListOpen, closePanel, actions } = useCalendarsListPanel();
+  const { calendarId } = useSelectedCalendar();
+
+  const inlinePanelOpen = isLgUp && isCalendarsListOpen;
 
   return (
     // min-height accounts for AppHeader (64px) + App outer Box pb (32px).
@@ -89,7 +111,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
         sx={{
           flex: 1,
           minWidth: 0,
-          width: { lg: `calc(100% - ${SIDE_NAV_WIDTH}px)` },
+          // When the calendars-list inline panel is open at lg+, shrink the
+          // main column to make room (mirrors SidePanel's space-sharing).
+          width: {
+            lg: inlinePanelOpen
+              ? `calc(100% - ${SIDE_NAV_WIDTH}px - ${CALENDARS_PANEL_WIDTH})`
+              : `calc(100% - ${SIDE_NAV_WIDTH}px)`,
+          },
+          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
         {children ?? (
@@ -98,6 +127,117 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
           </Suspense>
         )}
       </Box>
+
+      {/* Inline calendars-list panel — lg+ only. <lg uses the drawer below. */}
+      {isLgUp && (
+        <Box
+          sx={{
+            width: inlinePanelOpen ? CALENDARS_PANEL_WIDTH : 0,
+            overflow: 'hidden',
+            transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            flexShrink: 0,
+            borderLeft: inlinePanelOpen
+              ? `1px solid ${alpha(theme.palette.divider, 0.08)}`
+              : 'none',
+            bgcolor: theme.palette.mode === 'dark'
+              ? alpha(theme.palette.background.paper, 0.4)
+              : alpha(theme.palette.background.paper, 0.7),
+          }}
+        >
+          {inlinePanelOpen && (
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
+                minWidth: CALENDARS_PANEL_WIDTH,
+                overflow: 'hidden',
+              }}
+            >
+              {/* Panel header — matches SidePanelHeader's spacing/typography so
+                  the surface reads as one of the app's familiar side panels. */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.25,
+                  px: 2,
+                  py: 1.5,
+                  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+                }}
+              >
+                <CalendarIcon
+                  sx={{ fontSize: 18, color: 'text.secondary' }}
+                />
+                <Typography
+                  sx={{
+                    fontSize: '0.9375rem',
+                    fontWeight: 600,
+                    color: 'text.primary',
+                    flex: 1,
+                  }}
+                >
+                  Calendars
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={closePanel}
+                  aria-label="close calendars panel"
+                  sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Box>
+              <Divider sx={{ my: 0 }} />
+              <Box
+                sx={{
+                  flex: 1,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: 0,
+                }}
+              >
+                <CalendarsListContent
+                  isActive={inlinePanelOpen}
+                  activeCalendarId={calendarId || undefined}
+                  onCalendarClick={(id) => {
+                    actions.onCalendarClick(id);
+                    closePanel();
+                  }}
+                  onEditCalendar={actions.onEditCalendar}
+                  onDuplicateCalendar={actions.onDuplicateCalendar}
+                  onLinkCalendar={actions.onLinkCalendar}
+                  onDeleteCalendar={actions.onDeleteCalendar}
+                  onUpdateCalendarProperty={actions.onUpdateCalendarProperty}
+                  onRestoreCalendar={actions.onRestoreCalendar}
+                  onPermanentDeleteCalendar={actions.onPermanentDeleteCalendar}
+                />
+              </Box>
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {/* Drawer fallback — <lg only. */}
+      {!isLgUp && (
+        <CalendarsListDrawer
+          open={isCalendarsListOpen}
+          onClose={closePanel}
+          activeCalendarId={calendarId || undefined}
+          onCalendarClick={(id) => {
+            actions.onCalendarClick(id);
+            closePanel();
+          }}
+          onEditCalendar={actions.onEditCalendar}
+          onDuplicateCalendar={actions.onDuplicateCalendar}
+          onLinkCalendar={actions.onLinkCalendar}
+          onDeleteCalendar={actions.onDeleteCalendar}
+          onUpdateCalendarProperty={actions.onUpdateCalendarProperty}
+          onRestoreCalendar={actions.onRestoreCalendar}
+          onPermanentDeleteCalendar={actions.onPermanentDeleteCalendar}
+        />
+      )}
     </Box>
   );
 };

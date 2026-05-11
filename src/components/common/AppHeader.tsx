@@ -40,8 +40,6 @@ const DiscordIcon = (props: any) => (
 interface AppHeaderProps {
   onToggleTheme: () => void;
   mode: 'light' | 'dark';
-  /** Opens the app-level CalendarsListDrawer (View all in selector dropdown). */
-  onOpenCalendarsList?: () => void;
 }
 
 interface NavItem {
@@ -55,7 +53,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'About', path: '/about' }
 ];
 
-const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode, onOpenCalendarsList }) => {
+const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -168,7 +166,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode, onOpenCalend
               empty state. */}
           {user && (
             <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-              <HeaderCalendarSelector onOpenCalendarsList={onOpenCalendarsList} />
+              <HeaderCalendarSelector />
             </Box>
           )}
 

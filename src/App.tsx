@@ -26,10 +26,13 @@ import AppHeader from './components/common/AppHeader';
 import AppLayout from './components/layout/AppLayout';
 import CalendarFormDialog, { CalendarFormData } from './components/CalendarFormDialog';
 import CalendarLockedOverlay from './components/calendars/CalendarLockedOverlay';
-import CalendarsListDrawer from './components/calendars/CalendarsListDrawer';
 import CalendarManagementDialogs from './components/calendars/CalendarManagementDialogs';
 import { useCalendarPanelActions } from './hooks/useCalendarPanelActions';
 import { SelectedCalendarProvider, useSelectedCalendar } from './contexts/SelectedCalendarContext';
+import {
+  CalendarsListPanelProvider,
+  CalendarsListPanelActions,
+} from './contexts/CalendarsListPanelContext';
 
 // Lazy load page components from pages directory
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -77,10 +80,6 @@ function AppContent() {
   // dialog instance serves every route.
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreatingCalendar, setIsCreatingCalendar] = useState(false);
-
-  // Global "View all calendars" drawer — opened from the AppHeader selector's
-  // dropdown footer. Hosts CalendarsListContent with full management actions.
-  const [isCalendarsListOpen, setIsCalendarsListOpen] = useState(false);
 
   // Simple feedback snackbar used by the calendars-list panel actions.
   const [snackbar, setSnackbar] = useState<{
@@ -248,13 +247,28 @@ function AppContent() {
     onDeleteCalendar: handleDeleteCalendar,
   });
 
-  const handleOpenCalendarsList = () => setIsCalendarsListOpen(true);
-  const handleCloseCalendarsList = () => setIsCalendarsListOpen(false);
-
-  const handleCalendarsListSelect = (id: string) => {
-    setIsCalendarsListOpen(false);
-    navigate(`/calendar/${id}`);
-  };
+  // Actions for the global calendars-list panel (inline at lg+, drawer <lg).
+  // The provider owns open/close state — AppLayout consumes it for rendering
+  // and HeaderCalendarSelector for opening from the dropdown footer.
+  const calendarsListActions = useMemo<CalendarsListPanelActions>(
+    () => ({
+      onCalendarClick: (id: string) => navigate(`/calendar/${id}`),
+      onEditCalendar: panelActions.setEditTarget,
+      onDuplicateCalendar: panelActions.setDuplicateTarget,
+      onLinkCalendar: panelActions.setLinkTarget,
+      onDeleteCalendar: panelActions.setDeleteTarget,
+      onUpdateCalendarProperty: async (id, updateCallback) => {
+        const target = calendars.find((c) => c.id === id);
+        if (!target) return undefined;
+        const updated = updateCallback(target);
+        await handleUpdateCalendar(id, updated);
+        return updated;
+      },
+      onRestoreCalendar: panelActions.restoreCalendar,
+      onPermanentDeleteCalendar: panelActions.permanentDeleteCalendar,
+    }),
+    [navigate, panelActions, calendars]
+  );
 
   const toggleColorMode = () => {
     setMode(prevMode => {
@@ -275,13 +289,13 @@ function AppContent() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <SelectedCalendarProvider>
+      <CalendarsListPanelProvider actions={calendarsListActions}>
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* App Header — hidden on landing page (has its own nav) */}
         {!isLandingPage && (
           <AppHeader
             onToggleTheme={toggleColorMode}
             mode={mode}
-            onOpenCalendarsList={user ? handleOpenCalendarsList : undefined}
           />
         )}
 
@@ -433,35 +447,16 @@ function AppContent() {
         </Box>
       </Box>
 
-      {/* Global Calendars List drawer — opened from the AppHeader selector's
-          "View all calendars" link. Hosts management actions (edit, duplicate,
-          link, delete, restore) for every calendar, reachable from any route. */}
+      {/* Calendars-list edit/duplicate/link/delete dialogs — driven by
+          useCalendarPanelActions targets. Render once at App level so they
+          work from the inline panel and the mobile drawer alike. */}
       {user && (
-        <>
-          <CalendarsListDrawer
-            open={isCalendarsListOpen}
-            onClose={handleCloseCalendarsList}
-            onCalendarClick={handleCalendarsListSelect}
-            onEditCalendar={panelActions.setEditTarget}
-            onDuplicateCalendar={panelActions.setDuplicateTarget}
-            onLinkCalendar={panelActions.setLinkTarget}
-            onDeleteCalendar={panelActions.setDeleteTarget}
-            onUpdateCalendarProperty={async (id, updateCallback) => {
-              const target = calendars.find((c) => c.id === id);
-              if (!target) return undefined;
-              const updated = updateCallback(target);
-              await handleUpdateCalendar(id, updated);
-              return updated;
-            }}
-            onRestoreCalendar={panelActions.restoreCalendar}
-            onPermanentDeleteCalendar={panelActions.permanentDeleteCalendar}
-          />
-          <CalendarManagementDialogs
-            actions={panelActions}
-            userCalendars={calendars}
-          />
-        </>
+        <CalendarManagementDialogs
+          actions={panelActions}
+          userCalendars={calendars}
+        />
       )}
+      </CalendarsListPanelProvider>
       </SelectedCalendarProvider>
 
       {/* Global Create Calendar dialog — opened by side nav "+ New" and any
