@@ -6,6 +6,7 @@ import {
   Menu,
   MenuItem,
   Stack,
+  Button,
   Divider,
   ButtonBase,
   alpha,
@@ -34,6 +35,9 @@ interface CalendarSelectorBarProps {
   recent: CalendarSelectorItem[];
   /** Selecting an item from the dropdown. */
   onSelect: (id: string) => void;
+  /** Optional "View all" link in the dropdown footer — opens the full
+   *  CalendarsList drawer at the app level. Hidden when omitted. */
+  onViewAll?: () => void;
 }
 
 const formatPnl = (pnl: number | undefined): string => {
@@ -54,6 +58,7 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
   active,
   recent,
   onSelect,
+  onViewAll,
 }) => {
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
@@ -69,6 +74,11 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
     handleClose();
     if (id === active.id) return;
     onSelect(id);
+  };
+
+  const handleViewAll = () => {
+    handleClose();
+    onViewAll?.();
   };
 
   return (
@@ -285,6 +295,31 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
             );
           })}
         </Box>
+
+        {onViewAll && (
+          <>
+            <Divider sx={{ my: 0 }} />
+            <Box sx={{ px: 1.25, py: 0.5 }}>
+              <Button
+                fullWidth
+                size="small"
+                variant="text"
+                onClick={handleViewAll}
+                sx={{
+                  textTransform: 'none',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                  py: 0.75,
+                  borderRadius: 1,
+                  color: 'primary.main',
+                  justifyContent: 'center',
+                }}
+              >
+                View all calendars
+              </Button>
+            </Box>
+          </>
+        )}
       </Menu>
     </>
   );

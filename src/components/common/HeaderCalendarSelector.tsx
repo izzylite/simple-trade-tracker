@@ -6,6 +6,11 @@ import { useCalendars } from '../../hooks/useCalendars';
 import { useSelectedCalendar } from '../../contexts/SelectedCalendarContext';
 import CalendarSelectorBar, { CalendarSelectorItem } from './CalendarSelectorBar';
 
+interface HeaderCalendarSelectorProps {
+  /** Opens the app-level CalendarsListDrawer with full management UI. */
+  onOpenCalendarsList?: () => void;
+}
+
 /**
  * Header-mounted calendar selector. Drives the global SelectedCalendarContext
  * and, when the user is on `/calendar/:calendarId`, navigates to the newly
@@ -14,7 +19,9 @@ import CalendarSelectorBar, { CalendarSelectorItem } from './CalendarSelectorBar
  * Returns null when there are no active calendars (lock-overlay surface
  * already prompts the user to create one).
  */
-const HeaderCalendarSelector: React.FC = () => {
+const HeaderCalendarSelector: React.FC<HeaderCalendarSelectorProps> = ({
+  onOpenCalendarsList,
+}) => {
   const { user } = useAuthState();
   const { calendars } = useCalendars(user?.uid);
   const { calendarId, setCalendarId } = useSelectedCalendar();
@@ -72,6 +79,7 @@ const HeaderCalendarSelector: React.FC = () => {
       active={active}
       recent={recent}
       onSelect={handleSelect}
+      onViewAll={onOpenCalendarsList}
     />
   );
 };
