@@ -2,19 +2,13 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Box,
   Typography,
-  Stack,
   CircularProgress,
 } from '@mui/material';
-import {
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-} from '@mui/icons-material';
 import { useAuthState } from '../contexts/AuthStateContext';
 import { useCalendars } from '../hooks/useCalendars';
 import { Calendar } from '../types/calendar';
 import PerformanceCharts from '../components/PerformanceCharts';
 import CalendarLockedOverlay from '../components/calendars/CalendarLockedOverlay';
-import PageActionBar from '../components/common/PageActionBar';
 import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
 
 const SWITCH_SPINNER_MS = 350;
@@ -30,9 +24,8 @@ interface PerformancePageProps {
 /**
  * Cross-calendar entry point for performance analytics. The active calendar
  * is driven by the global SelectedCalendarContext (selected via the
- * AppHeader). This page renders a PageActionBar sub-header with Trades and
- * Total P&L cards and shows a brief spinner overlay on calendar change so
- * the PerformanceCharts remount feels intentional rather than abrupt.
+ * AppHeader). Shows a brief spinner overlay on calendar change so the
+ * PerformanceCharts remount feels intentional rather than abrupt.
  */
 const PerformancePage: React.FC<PerformancePageProps> = ({
   onUpdateCalendar,
@@ -150,146 +143,58 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
     );
   }
 
-  const pnl = selectedCalendar?.total_pnl ?? 0;
-  const isPositive = pnl >= 0;
-  const totalTrades = selectedCalendar?.total_trades ?? 0;
-
   return (
-    <Box>
-      {/* Header */}
-      <PageActionBar
-        rightContent={
-          <Stack direction="row" spacing={2} alignItems="center" sx={{ pl: 2 }}>
-            <Box sx={{ textAlign: 'right' }}>
-              <Typography
-                sx={{
-                  fontSize: '0.6875rem',
-                  fontWeight: 600,
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase',
-                  color: 'text.secondary',
-                  lineHeight: 1.1,
-                }}
-              >
-                Trades
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '0.9375rem',
-                  fontWeight: 700,
-                  fontFeatureSettings: "'tnum' on, 'lnum' on",
-                  color: 'text.primary',
-                  mt: 0.25,
-                  lineHeight: 1.1,
-                }}
-              >
-                {totalTrades.toLocaleString()}
-              </Typography>
-            </Box>
-
-            <Box sx={{ textAlign: 'right' }}>
-              <Typography
-                sx={{
-                  fontSize: '0.6875rem',
-                  fontWeight: 600,
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase',
-                  color: 'text.secondary',
-                  lineHeight: 1.1,
-                }}
-              >
-                Total P&amp;L
-              </Typography>
-              <Stack
-                direction="row"
-                spacing={0.5}
-                alignItems="center"
-                justifyContent="flex-end"
-                sx={{ mt: 0.25 }}
-              >
-                {isPositive ? (
-                  <TrendingUpIcon
-                    sx={{ fontSize: 14, color: 'success.main' }}
-                  />
-                ) : (
-                  <TrendingDownIcon
-                    sx={{ fontSize: 14, color: 'error.main' }}
-                  />
-                )}
-                <Typography
-                  sx={{
-                    fontSize: '0.9375rem',
-                    fontWeight: 700,
-                    fontFeatureSettings: "'tnum' on, 'lnum' on",
-                    color: isPositive ? 'success.main' : 'error.main',
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {isPositive ? '+' : '-'}$
-                  {Math.abs(pnl).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </Typography>
-              </Stack>
-            </Box>
-          </Stack>
-        }
-      />
-
-      {/* Body */}
-      <Box
-        sx={{
-          position: 'relative',
-          px: { xs: 2, sm: 3, md: 4 },
-          py: { xs: 2, sm: 3 },
-          maxWidth: 1600,
-          mx: 'auto',
-        }}
-      >
-        {isSwitching || !selectedCalendar ? (
-          <Box
+    <Box
+      sx={{
+        position: 'relative',
+        px: { xs: 2, sm: 3, md: 4 },
+        py: { xs: 2, sm: 3 },
+        maxWidth: 1600,
+        mx: 'auto',
+      }}
+    >
+      {isSwitching || !selectedCalendar ? (
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            py: 12,
+            gap: 2,
+          }}
+        >
+          <CircularProgress size={28} />
+          <Typography
             sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              py: 12,
-              gap: 2,
+              fontSize: '0.8125rem',
+              color: 'text.secondary',
+              letterSpacing: '0.02em',
             }}
           >
-            <CircularProgress size={28} />
-            <Typography
-              sx={{
-                fontSize: '0.8125rem',
-                color: 'text.secondary',
-                letterSpacing: '0.02em',
-              }}
-            >
-              Switching calendar
-            </Typography>
-          </Box>
-        ) : (
-          <PerformanceCharts
-            key={selectedCalendar.id}
-            calendarId={selectedCalendar.id}
-            calendar={selectedCalendar}
-            accountBalance={selectedCalendar.account_balance}
-            maxDailyDrawdown={selectedCalendar.max_daily_drawdown}
-            monthlyTarget={selectedCalendar.monthly_target}
-            scoreSettings={selectedCalendar.score_settings}
-            dynamicRiskSettings={{
-              account_balance: selectedCalendar.account_balance,
-              risk_per_trade: selectedCalendar.risk_per_trade,
-              dynamic_risk_enabled: selectedCalendar.dynamic_risk_enabled,
-              increased_risk_percentage: selectedCalendar.increased_risk_percentage,
-              profit_threshold_percentage: selectedCalendar.profit_threshold_percentage,
-            }}
-            onUpdateCalendarProperty={onUpdateCalendarProperty}
-            isReadOnly
-          />
-        )}
-      </Box>
+            Switching calendar
+          </Typography>
+        </Box>
+      ) : (
+        <PerformanceCharts
+          key={selectedCalendar.id}
+          calendarId={selectedCalendar.id}
+          calendar={selectedCalendar}
+          accountBalance={selectedCalendar.account_balance}
+          maxDailyDrawdown={selectedCalendar.max_daily_drawdown}
+          monthlyTarget={selectedCalendar.monthly_target}
+          scoreSettings={selectedCalendar.score_settings}
+          dynamicRiskSettings={{
+            account_balance: selectedCalendar.account_balance,
+            risk_per_trade: selectedCalendar.risk_per_trade,
+            dynamic_risk_enabled: selectedCalendar.dynamic_risk_enabled,
+            increased_risk_percentage: selectedCalendar.increased_risk_percentage,
+            profit_threshold_percentage: selectedCalendar.profit_threshold_percentage,
+          }}
+          onUpdateCalendarProperty={onUpdateCalendarProperty}
+          isReadOnly
+        />
+      )}
     </Box>
   );
 };
