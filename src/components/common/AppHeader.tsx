@@ -161,11 +161,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
             </Typography>
           </Box>
 
-          {/* Calendar selector — auth-only, hidden on landing/about/auth/shared.
-              HeaderCalendarSelector returns null when the user has no calendars,
-              so it self-hides on the empty state. */}
+          {/* Calendar selector — auth-only. HeaderCalendarSelector returns
+              null when the user has no calendars, so it self-hides on the
+              empty state. */}
           {user && (
-            <Box sx={{ ml: { xs: 1, sm: 2 }, display: 'flex', alignItems: 'center', minWidth: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
               <HeaderCalendarSelector />
             </Box>
           )}
