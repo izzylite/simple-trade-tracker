@@ -2,10 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Button,
-  FormControl,
-  MenuItem,
-  Select,
-  Typography,
   Snackbar,
   alpha,
   useTheme,
@@ -16,6 +12,7 @@ import { Note } from '../types/note';
 import { Calendar } from '../types/calendar';
 import { useAuthState } from '../contexts/AuthStateContext';
 import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
+import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
 import { useNotes } from '../hooks/useNotes';
 import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
 import { logger } from '../utils/logger';
@@ -51,9 +48,9 @@ const NotesPage: React.FC = () => {
   // Imperative handle on the inline editor — used by Done to flush save
   const editorBodyRef = useRef<NoteEditorBodyHandle>(null);
 
-  // ─── Calendar picker ─────────────────────────────────────────────────────
+  // ─── Calendar picker (now driven by global selection) ────────────────────
   const [calendars, setCalendars] = useState<Calendar[]>([]);
-  const [selectedCalendar, setSelectedCalendar] = useState<string>('all');
+  const { calendarId: selectedCalendar, setCalendarId } = useSelectedCalendar();
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -62,6 +59,21 @@ const NotesPage: React.FC = () => {
       .then(setCalendars)
       .catch(err => logger.error('Failed to load calendars', err));
   }, [user?.uid]);
+
+  // Fall back to the most recently updated calendar when the global context
+  // is empty. Keeps useNotes scoped to a real calendar so /notes never
+  // silently shows cross-calendar notes on cold load.
+  useEffect(() => {
+    if (selectedCalendar) return;
+    if (calendars.length === 0) return;
+    const fallback = [...calendars]
+      .filter((c) => !c.deleted_at)
+      .sort(
+        (a, b) =>
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      )[0];
+    if (fallback) setCalendarId(fallback.id);
+  }, [selectedCalendar, calendars, setCalendarId]);
 
   // ─── Notes data ───────────────────────────────────────────────────────────
   const {
@@ -78,9 +90,7 @@ const NotesPage: React.FC = () => {
 
   // Tag tags for slash-command embedding — derived from selected note's calendar
   // (or the calendar picker) so /tag suggestions match the note's calendar.
-  const noteCalendarId = selectedNote?.calendar_id ?? (
-    selectedCalendar !== 'all' ? selectedCalendar : (calendars[0]?.id ?? '')
-  );
+  const noteCalendarId = selectedNote?.calendar_id ?? selectedCalendar ?? (calendars[0]?.id ?? '');
   const noteCalendar = calendars.find(c => c.id === noteCalendarId);
   const availableTradeTags = noteCalendar?.tags ?? [];
 
@@ -111,14 +121,13 @@ const NotesPage: React.FC = () => {
     setIsEditing(false);
   }, []);
 
-  // New notes require an explicit calendar selection from the picker —
-  // "All Calendars" is ambiguous (which calendar would the note belong to?).
-  const calendarIdForNew = selectedCalendar !== 'all' ? selectedCalendar : '';
+  // New notes always belong to the currently selected calendar.
+  const calendarIdForNew = selectedCalendar || '';
   const canCreateNote = calendarIdForNew !== '';
 
   const handleNewNote = useCallback(() => {
     if (!canCreateNote) {
-      setSnackbarMsg('Pick a calendar from the dropdown to add a note');
+      setSnackbarMsg('Pick a calendar from the header to add a note');
       return;
     }
     setSelectedNote(null);
@@ -198,7 +207,7 @@ const NotesPage: React.FC = () => {
         overflow: 'hidden',
       }}
     >
-      {/* ── Page sub-header: calendar picker ── */}
+      {/* ── Page sub-header: creator toggle only ── */}
       <Box
         sx={{
           px: 3,
@@ -207,46 +216,10 @@ const NotesPage: React.FC = () => {
           bgcolor: 'background.paper',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'flex-end',
           gap: 2,
         }}
       >
-        <Typography
-          sx={{
-            fontSize: '0.65rem',
-            fontWeight: 600,
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            color: 'text.disabled',
-            flexShrink: 0,
-          }}
-        >
-          Calendar
-        </Typography>
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <Select
-            value={selectedCalendar}
-            onChange={e => setSelectedCalendar(e.target.value)}
-            displayEmpty
-            sx={{
-              borderRadius: 1.5,
-              fontSize: '0.85rem',
-              bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.03 : 0),
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
-            }}
-          >
-            <MenuItem value="all">
-              <Typography variant="body2" color="text.secondary">All Calendars</Typography>
-            </MenuItem>
-            {calendars.map(c => (
-              <MenuItem key={c.id} value={c.id}>
-                <Typography variant="body2">{c.name}</Typography>
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <Box sx={{ flex: 1 }} />
-
         {/* Creator toggle: My Notes / Orion */}
         <Box sx={{ display: 'flex', gap: 0.5, p: 0.5, bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.03 : 0.6), borderRadius: '999px', border: `1px solid ${theme.palette.divider}` }}>
           {(['me', 'assistant'] as const).map(c => {
