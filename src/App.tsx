@@ -26,6 +26,7 @@ import AppHeader from './components/common/AppHeader';
 import AppLayout from './components/layout/AppLayout';
 import CalendarFormDialog, { CalendarFormData } from './components/CalendarFormDialog';
 import CalendarLockedOverlay from './components/calendars/CalendarLockedOverlay';
+import { SelectedCalendarProvider, useSelectedCalendar } from './contexts/SelectedCalendarContext';
 
 // Lazy load page components from pages directory
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -47,11 +48,6 @@ const EconomicEventsPage = lazy(() => import('./pages/EconomicEventsPage'));
 
 // Loading component for Suspense
 const LoadingFallback = () => <AppLoadingProgress />;
-
-// Persists the last calendar the user opened so the / resolver can route
-// them back to it across sessions. CalendarRoute writes; HomeRouteResolver
-// reads.
-const LAST_ACTIVE_CALENDAR_KEY = 'last_active_calendar_id';
 
 function AppContent() {
   // Initialize theme from localStorage or system preference
@@ -240,6 +236,7 @@ function AppContent() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <SelectedCalendarProvider>
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* App Header — hidden on landing page (has its own nav) */}
         {!isLandingPage && (
@@ -396,6 +393,7 @@ function AppContent() {
           </Routes>
         </Box>
       </Box>
+      </SelectedCalendarProvider>
 
       {/* Global Create Calendar dialog — opened by side nav "+ New" and any
           calendar lock overlay. Single instance shared across routes. */}
@@ -446,6 +444,7 @@ const HomeRouteResolver: React.FC<HomeRouteResolverProps> = ({
   isLoadingCalendars,
   onCreateCalendar,
 }) => {
+  const { calendarId: storedCalendarId } = useSelectedCalendar();
   const activeCalendars = useMemo(
     () => calendars.filter((c) => !c.deleted_at),
     [calendars]
@@ -470,13 +469,8 @@ const HomeRouteResolver: React.FC<HomeRouteResolverProps> = ({
   }
 
   let targetId: string | undefined;
-  try {
-    const stored = localStorage.getItem(LAST_ACTIVE_CALENDAR_KEY) || '';
-    if (stored && activeCalendars.some((c) => c.id === stored)) {
-      targetId = stored;
-    }
-  } catch {
-    // ignore disabled storage
+  if (storedCalendarId && activeCalendars.some((c) => c.id === storedCalendarId)) {
+    targetId = storedCalendarId;
   }
 
   if (!targetId) {
@@ -541,17 +535,13 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [calendarId]);
 
-  // Remember the last calendar the user actually opened so the / resolver
-  // can route them back here on subsequent visits.
+  // Sync URL → global calendar context so other pages (Performance, Notes)
+  // and the AppHeader selector all reflect the calendar the user is viewing.
+  // The context provider persists to localStorage internally.
+  const { setCalendarId } = useSelectedCalendar();
   useEffect(() => {
-    if (calendar?.id) {
-      try {
-        localStorage.setItem(LAST_ACTIVE_CALENDAR_KEY, calendar.id);
-      } catch {
-        // ignore storage failures
-      }
-    }
-  }, [calendar?.id]);
+    if (calendar?.id) setCalendarId(calendar.id);
+  }, [calendar?.id, setCalendarId]);
 
   if (!calendar) {
     // Active calendar is gone (deleted, soft-trashed, or URL points to a
