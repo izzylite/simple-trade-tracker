@@ -19,11 +19,11 @@ import {
   InfoOutlined as AboutIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { SELECTED_CALENDAR_STORAGE_KEY } from '../../contexts/SelectedCalendarContext';
 
 export const SIDE_NAV_WIDTH = 92;
 const APP_HEADER_HEIGHT = 64;
 const TILE_SIZE = 44;
-const LAST_ACTIVE_CALENDAR_KEY = 'last_active_calendar_id';
 
 /**
  * Resolve the destination for the Home nav item. CalendarRoute writes
@@ -35,7 +35,7 @@ const LAST_ACTIVE_CALENDAR_KEY = 'last_active_calendar_id';
  */
 const resolveHomePath = (): string => {
   try {
-    const stored = localStorage.getItem(LAST_ACTIVE_CALENDAR_KEY);
+    const stored = localStorage.getItem(SELECTED_CALENDAR_STORAGE_KEY);
     if (stored) return `/calendar/${stored}`;
   } catch {
     // ignore

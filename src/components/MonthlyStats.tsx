@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
 import { format } from 'date-fns';
 import {
   Box,
@@ -73,15 +74,10 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   calendar,
 }) => {
   const navigate = useNavigate();
+  const { setCalendarId } = useSelectedCalendar();
 
   const handleOpenPerformancePage = () => {
-    if (calendarId) {
-      try {
-        localStorage.setItem('perf_selected_calendar_id', calendarId);
-      } catch {
-        // ignore quota / disabled storage
-      }
-    }
+    if (calendarId) setCalendarId(calendarId);
     navigate('/performance');
   };
 

@@ -9,8 +9,7 @@ import {
   isReminderFiredPayload,
 } from '../../types/notification';
 import NotificationsPopover from './NotificationsPopover';
-
-const LAST_ACTIVE_CALENDAR_KEY = 'last_active_calendar_id';
+import { SELECTED_CALENDAR_STORAGE_KEY } from '../../contexts/SelectedCalendarContext';
 
 const NotificationsBell: React.FC = () => {
   const theme = useTheme();
@@ -51,7 +50,7 @@ const NotificationsBell: React.FC = () => {
         // ?openTasks=1 hint; the calendar page consumes it on mount.
         let lastCalendarId: string | null = null;
         try {
-          lastCalendarId = localStorage.getItem(LAST_ACTIVE_CALENDAR_KEY);
+          lastCalendarId = localStorage.getItem(SELECTED_CALENDAR_STORAGE_KEY);
         } catch {
           // localStorage disabled — fall through to /assistant as a last resort
         }
