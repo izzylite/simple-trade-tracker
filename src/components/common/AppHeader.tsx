@@ -28,6 +28,7 @@ import { error } from '../../utils/logger';
 import DebugPanel from './DebugPanel';
 import LoginDialog from '../auth/LoginDialog';
 import NotificationsBell from '../notifications/NotificationsBell';
+import HeaderCalendarSelector from './HeaderCalendarSelector';
 
 // Discord icon component
 const DiscordIcon = (props: any) => (
@@ -159,6 +160,15 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
               <span style={{ color: '#7c3aed' }}>Trades</span>
             </Typography>
           </Box>
+
+          {/* Calendar selector — auth-only, hidden on landing/about/auth/shared.
+              HeaderCalendarSelector returns null when the user has no calendars,
+              so it self-hides on the empty state. */}
+          {user && (
+            <Box sx={{ ml: { xs: 1, sm: 2 }, display: 'flex', alignItems: 'center', minWidth: 0 }}>
+              <HeaderCalendarSelector />
+            </Box>
+          )}
 
           {/* Spacer */}
           <Box sx={{ flexGrow: 1 }} />
