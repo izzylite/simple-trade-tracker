@@ -20,8 +20,14 @@ import { useCalendarsListPanel } from '../../contexts/CalendarsListPanelContext'
 import CalendarsListContent from '../sidePanel/content/CalendarsListContent';
 import CalendarsListDrawer from '../calendars/CalendarsListDrawer';
 import { useSelectedCalendar } from '../../contexts/SelectedCalendarContext';
+import SidePanel from '../sidePanel/SidePanel';
+import { useSidePanel } from '../../contexts/SidePanelContext';
+import { appRenderView } from '../sidePanel/appRenderView';
+import UnifiedDrawer from '../common/UnifiedDrawer';
 
-const CALENDARS_PANEL_WIDTH = 'clamp(360px, 36vw, 580px)';
+const PANEL_WIDTH = 'clamp(360px, 36vw, 580px)';
+// Kept as an alias so existing readers see the legacy name in this file.
+const CALENDARS_PANEL_WIDTH = PANEL_WIDTH;
 
 /**
  * Inline loading state for the route content area only. Renders inside
@@ -71,8 +77,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
 
   const { open: isCalendarsListOpen, closePanel, actions } = useCalendarsListPanel();
   const { calendarId } = useSelectedCalendar();
+  const {
+    isOpen: isSidePanelOpen,
+    currentView,
+    setOpen: setSidePanelOpen,
+  } = useSidePanel();
 
   const inlinePanelOpen = isLgUp && isCalendarsListOpen;
+  // The provider's defaultView is `faq` so `currentView.id === 'faq'` could
+  // mean either "user opened FAQ" or "nothing was ever pushed". Until FAQ is
+  // migrated to the global panel (Task 5), gate the inline render so the
+  // panel only takes layout space when the user has explicitly opened it.
+  const inlineSidePanelOpen =
+    isLgUp && isSidePanelOpen && currentView.id !== 'faq';
+  const sidePanelConfig = appRenderView(currentView);
 
   return (
     // min-height accounts for AppHeader (64px) + App outer Box pb (32px).
@@ -111,12 +129,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
         sx={{
           flex: 1,
           minWidth: 0,
-          // When the calendars-list inline panel is open at lg+, shrink the
-          // main column to make room (mirrors SidePanel's space-sharing).
+          // When the calendars-list inline panel and/or the global side
+          // panel are open at lg+, shrink the main column to make room.
+          // Only one of the two is typically open at once today, but the
+          // math tolerates both being open.
           width: {
-            lg: inlinePanelOpen
-              ? `calc(100% - ${SIDE_NAV_WIDTH}px - ${CALENDARS_PANEL_WIDTH})`
-              : `calc(100% - ${SIDE_NAV_WIDTH}px)`,
+            lg: (() => {
+              const subtract: string[] = [`${SIDE_NAV_WIDTH}px`];
+              if (inlinePanelOpen) subtract.push(CALENDARS_PANEL_WIDTH);
+              if (inlineSidePanelOpen) subtract.push(PANEL_WIDTH);
+              return `calc(100% - ${subtract.join(' - ')})`;
+            })(),
           },
           transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
@@ -219,6 +242,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
         </Box>
       )}
 
+      {/* Global app-level side panel — inline at lg+. The panel is always
+          mounted so its width transition runs; SidePanel itself collapses
+          to width 0 when `isOpen` is false. */}
+      {isLgUp && <SidePanel renderView={appRenderView} />}
+
       {/* Drawer fallback — <lg only. */}
       {!isLgUp && (
         <CalendarsListDrawer
@@ -237,6 +265,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
           onRestoreCalendar={actions.onRestoreCalendar}
           onPermanentDeleteCalendar={actions.onPermanentDeleteCalendar}
         />
+      )}
+
+      {/* Global app-level side panel — drawer fallback at <lg. */}
+      {!isLgUp && (
+        <UnifiedDrawer
+          open={isSidePanelOpen}
+          onClose={() => setSidePanelOpen(false)}
+          title={sidePanelConfig?.title ?? ''}
+          icon={sidePanelConfig?.icon}
+          width={{ xs: '100%', sm: 450 }}
+          contentSx={{
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <SidePanel renderView={appRenderView} />
+        </UnifiedDrawer>
       )}
     </Box>
   );

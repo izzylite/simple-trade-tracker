@@ -33,6 +33,7 @@ import {
   CalendarsListPanelProvider,
   CalendarsListPanelActions,
 } from './contexts/CalendarsListPanelContext';
+import { SidePanelProvider } from './contexts/SidePanelContext';
 
 // Lazy load page components from pages directory
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -290,6 +291,7 @@ function AppContent() {
       <CssBaseline />
       <SelectedCalendarProvider>
       <CalendarsListPanelProvider actions={calendarsListActions}>
+      <SidePanelProvider defaultView={{ id: 'faq' }} defaultOpen={false}>
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* App Header — hidden on landing page (has its own nav) */}
         {!isLandingPage && (
@@ -453,6 +455,7 @@ function AppContent() {
           userCalendars={calendars}
         />
       )}
+      </SidePanelProvider>
       </CalendarsListPanelProvider>
       </SelectedCalendarProvider>
 
