@@ -14,11 +14,9 @@ import { useCalendars } from '../hooks/useCalendars';
 import { Calendar } from '../types/calendar';
 import PerformanceCharts from '../components/PerformanceCharts';
 import CalendarLockedOverlay from '../components/calendars/CalendarLockedOverlay';
-import CalendarSelectorBar, {
-  CalendarSelectorItem,
-} from '../components/common/CalendarSelectorBar';
+import PageActionBar from '../components/common/PageActionBar';
+import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
 
-const STORAGE_KEY = 'perf_selected_calendar_id';
 const SWITCH_SPINNER_MS = 350;
 const APP_HEADER_HEIGHT = 64;
 
@@ -31,10 +29,10 @@ interface PerformancePageProps {
 
 /**
  * Cross-calendar entry point for performance analytics. The active calendar
- * for this page is selected via the CalendarSelectorBar header (same trigger
- * pattern as Home, for cohesion). Selection is local to this page and
- * persists in localStorage; switching shows a brief spinner overlay so the
- * PerformanceCharts remount feels intentional rather than abrupt.
+ * is driven by the global SelectedCalendarContext (selected via the
+ * AppHeader). This page renders a PageActionBar sub-header with Trades and
+ * Total P&L cards and shows a brief spinner overlay on calendar change so
+ * the PerformanceCharts remount feels intentional rather than abrupt.
  */
 const PerformancePage: React.FC<PerformancePageProps> = ({
   onUpdateCalendar,
@@ -48,30 +46,39 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
     [calendars]
   );
 
-  const [selectedId, setSelectedId] = useState<string>(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY) || '';
-    } catch {
-      return '';
-    }
-  });
+  const { calendarId: selectedId, setCalendarId } = useSelectedCalendar();
   const [isSwitching, setIsSwitching] = useState(false);
   const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Default to first calendar once data loads (or fall back if stored ID is gone)
+  // One-shot migrate the legacy `perf_selected_calendar_id` key into the
+  // global context. Runs only when the context is empty (first load post-
+  // migration) and clears the legacy key so it doesn't override future
+  // context updates.
+  useEffect(() => {
+    if (selectedId) return;
+    try {
+      const legacy = localStorage.getItem('perf_selected_calendar_id');
+      if (legacy) {
+        setCalendarId(legacy);
+        localStorage.removeItem('perf_selected_calendar_id');
+      }
+    } catch {
+      // ignore
+    }
+  }, [selectedId, setCalendarId]);
+
+  // Fall back to the most recently updated calendar when the context value
+  // is empty or points to a deleted calendar.
   useEffect(() => {
     if (activeCalendars.length === 0) return;
     const stillExists = activeCalendars.some((c) => c.id === selectedId);
     if (!stillExists) {
-      const fallback = activeCalendars[0].id;
-      setSelectedId(fallback);
-      try {
-        localStorage.setItem(STORAGE_KEY, fallback);
-      } catch {
-        // ignore quota / disabled storage
-      }
+      const fallback = [...activeCalendars].sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      )[0].id;
+      setCalendarId(fallback);
     }
-  }, [activeCalendars, selectedId]);
+  }, [activeCalendars, selectedId, setCalendarId]);
 
   // Cleanup the switch timer on unmount
   useEffect(() => {
@@ -80,21 +87,17 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
     };
   }, []);
 
-  const handleSelect = (id: string) => {
-    if (id === selectedId) return;
+  // Brief spinner overlay on calendar change so PerformanceCharts remount
+  // feels intentional. Triggered by context updates from the AppHeader
+  // selector (or from this page's fallback effect above).
+  const prevSelectedIdRef = useRef<string>(selectedId);
+  useEffect(() => {
+    if (prevSelectedIdRef.current === selectedId) return;
+    prevSelectedIdRef.current = selectedId;
     setIsSwitching(true);
-    setSelectedId(id);
-    try {
-      localStorage.setItem(STORAGE_KEY, id);
-    } catch {
-      // ignore
-    }
     if (switchTimerRef.current) clearTimeout(switchTimerRef.current);
-    switchTimerRef.current = setTimeout(
-      () => setIsSwitching(false),
-      SWITCH_SPINNER_MS
-    );
-  };
+    switchTimerRef.current = setTimeout(() => setIsSwitching(false), SWITCH_SPINNER_MS);
+  }, [selectedId]);
 
   const selectedCalendar = activeCalendars.find((c) => c.id === selectedId);
 
@@ -113,39 +116,6 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
       return updated;
     };
   }, [onUpdateCalendar, selectedCalendar, activeCalendars]);
-
-  // Recent-calendars dropdown items for the header selector
-  const recentItems = useMemo<CalendarSelectorItem[]>(() => {
-    const sorted = [...activeCalendars].sort(
-      (a, b) =>
-        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-    );
-    const top3 = sorted.slice(0, 3);
-    const includesActive = top3.some((c) => c.id === selectedId);
-    const activeCal = !includesActive
-      ? sorted.find((c) => c.id === selectedId)
-      : undefined;
-    const source = activeCal ? [activeCal, ...top3] : top3;
-    return source.map((cal) => ({
-      id: cal.id,
-      name: cal.name,
-      totalTrades: cal.total_trades,
-      pnl: cal.total_pnl,
-      hero_image_url: cal.hero_image_url,
-      active: cal.id === selectedId,
-    }));
-  }, [activeCalendars, selectedId]);
-
-  const activeSelectorItem = useMemo<CalendarSelectorItem>(() => {
-    if (selectedCalendar) {
-      return {
-        id: selectedCalendar.id,
-        name: selectedCalendar.name,
-        hero_image_url: selectedCalendar.hero_image_url,
-      };
-    }
-    return { id: '', name: 'Select calendar' };
-  }, [selectedCalendar]);
 
   // ---- Render ----
 
@@ -187,10 +157,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
   return (
     <Box>
       {/* Header */}
-      <CalendarSelectorBar
-        active={activeSelectorItem}
-        recent={recentItems}
-        onSelect={handleSelect}
+      <PageActionBar
         rightContent={
           <Stack direction="row" spacing={2} alignItems="center" sx={{ pl: 2 }}>
             <Box sx={{ textAlign: 'right' }}>
