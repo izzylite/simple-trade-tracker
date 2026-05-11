@@ -49,6 +49,7 @@ import {
   SidePanelView,
   EventDetailView,
 } from '../contexts/SidePanelContext';
+import { usePublishPageSidePanelCloser } from '../contexts/PanelMutexContext';
 import SidePanel from '../components/sidePanel/SidePanel';
 import { Currency, EconomicEvent, ImpactLevel } from '../types/economicCalendar';
 import { isEventPinned } from '../utils/eventNameUtils';
@@ -236,10 +237,30 @@ const formatRelativeTime = (timeUtc: string, now: Date): string => {
  * historical edge from user's trades). Pinning + edge stats both run
  * user-level — no calendar binding required.
  */
-const EconomicEventsPageInner: React.FC = () => {
+interface EconomicEventsPageInnerProps {
+  /** Mutex partner — collapses the app-level SidePanel when a local panel
+   *  opens on this page. */
+  closeGlobalPanel: () => void;
+}
+
+const EconomicEventsPageInner: React.FC<EconomicEventsPageInnerProps> = ({
+  closeGlobalPanel,
+}) => {
   const theme = useTheme();
   const isLargeScreen = useMediaQuery(theme.breakpoints.up('lg'));
   const { pushPanel, currentView, setOpen, isOpen: isPanelOpen } = useSidePanel();
+
+  // Panel mutex: publish a local-closer + close the global panel when this
+  // page's local panel opens. See PanelMutexContext.
+  const closeLocalPanel = useCallback(() => setOpen(false), [setOpen]);
+  usePublishPageSidePanelCloser(closeLocalPanel);
+  const prevLocalOpenRef = React.useRef(isPanelOpen);
+  useEffect(() => {
+    if (isPanelOpen && !prevLocalOpenRef.current) {
+      closeGlobalPanel();
+    }
+    prevLocalOpenRef.current = isPanelOpen;
+  }, [isPanelOpen, closeGlobalPanel]);
 
   // Week navigation
   const [weekStart, setWeekStart] = useState<Date>(() =>
@@ -841,11 +862,20 @@ const EconomicEventsPageInner: React.FC = () => {
   );
 };
 
-const EconomicEventsPage: React.FC = () => (
-  <SidePanelProvider defaultView={{ id: 'events-home' }} defaultOpen={false}>
-    <EconomicEventsPageInner />
-  </SidePanelProvider>
-);
+const EconomicEventsPage: React.FC = () => {
+  // Resolves to the GLOBAL SidePanelProvider — the local one is declared
+  // inside the JSX below, so this body sits outside it.
+  const { setOpen: setGlobalSidePanelOpen } = useSidePanel();
+  const closeGlobalPanel = useCallback(
+    () => setGlobalSidePanelOpen(false),
+    [setGlobalSidePanelOpen]
+  );
+  return (
+    <SidePanelProvider defaultView={{ id: 'events-home' }} defaultOpen={false}>
+      <EconomicEventsPageInner closeGlobalPanel={closeGlobalPanel} />
+    </SidePanelProvider>
+  );
+};
 
 // ──────────────────────────────────────────────
 // Filter pill — High / Med / Low / All

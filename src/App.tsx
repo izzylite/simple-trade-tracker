@@ -35,8 +35,8 @@ import {
 } from './contexts/CalendarsListPanelContext';
 import { SidePanelProvider, useSidePanel } from './contexts/SidePanelContext';
 import type { SidePanelView } from './contexts/SidePanelContext';
-import { TradesProvider } from './contexts/TradesContext';
 import { TradeUIProvider } from './contexts/TradeUIContext';
+import { PanelMutexProvider } from './contexts/PanelMutexContext';
 
 // Lazy load page components from pages directory
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -294,9 +294,9 @@ function AppContent() {
       <CssBaseline />
       <SelectedCalendarProvider>
       <CalendarsListPanelProvider actions={calendarsListActions}>
-      <TradesProvider calendars={calendars} setLoading={setLoading}>
       <TradeUIProvider>
       <SidePanelProvider defaultView={{ id: 'faq' }} defaultOpen={false}>
+      <PanelMutexProvider>
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* App Header — hidden on landing page (has its own nav) */}
         {!isLandingPage && (
@@ -460,9 +460,9 @@ function AppContent() {
           userCalendars={calendars}
         />
       )}
+      </PanelMutexProvider>
       </SidePanelProvider>
       </TradeUIProvider>
-      </TradesProvider>
       </CalendarsListPanelProvider>
       </SelectedCalendarProvider>
 
@@ -638,6 +638,12 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     },
     [replacePanel, setSidePanelOpen]
   );
+  // Mutex partner: TradeCalendarPage's local panel opening calls this to
+  // collapse the global panel. (The other direction is handled by
+  // PanelMutexProvider firing the page's published closer.)
+  const closeGlobalPanel = useCallback(() => {
+    setSidePanelOpen(false);
+  }, [setSidePanelOpen]);
 
   if (!calendar) {
     // Active calendar is gone (deleted, soft-trashed, or URL points to a
@@ -664,6 +670,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       onToggleTheme={onToggleTheme}
       mode={mode}
       openGlobalPanel={openGlobalPanel}
+      closeGlobalPanel={closeGlobalPanel}
     />
   );
 };
