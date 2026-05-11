@@ -351,9 +351,6 @@ function AppContent() {
                         onToggleTheme={toggleColorMode}
                         mode={mode}
                         setLoading={setLoading}
-                        onDuplicateCalendar={handleDuplicateCalendar}
-                        onDeleteCalendar={handleDeleteCalendar}
-                        onUpdateCalendar={handleUpdateCalendar}
                       />
                     </ProtectedRoute>
                   }
@@ -595,9 +592,6 @@ interface CalendarRouteProps {
   onToggleTheme: () => void;
   mode: 'light' | 'dark';
   setLoading: (loading: boolean, loadingAction?: "loading" | "importing" | "exporting") => void;
-  onDuplicateCalendar?: (sourceCalendarId: string, newName: string, includeContent?: boolean) => Promise<void> | void;
-  onDeleteCalendar?: (id: string) => Promise<void> | void;
-  onUpdateCalendar?: (id: string, updates: Partial<Calendar>) => Promise<void> | void;
 }
 
 const CalendarRoute: React.FC<CalendarRouteProps> = ({
@@ -605,9 +599,6 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
   onToggleTheme,
   mode,
   setLoading,
-  onDuplicateCalendar,
-  onDeleteCalendar,
-  onUpdateCalendar,
 }) => {
   const { calendarId } = useParams<{ calendarId: string }>();
   const calendar = calendars.find((c: Calendar) => c.id === calendarId);
@@ -649,9 +640,6 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       setLoading={setLoading}
       onToggleTheme={onToggleTheme}
       mode={mode}
-      onDuplicateCalendar={onDuplicateCalendar}
-      onDeleteCalendar={onDeleteCalendar}
-      onUpdateCalendar={onUpdateCalendar}
     />
   );
 };

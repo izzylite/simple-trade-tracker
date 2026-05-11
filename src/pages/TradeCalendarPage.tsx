@@ -171,11 +171,6 @@ interface TradeCalendarProps {
   mode: 'light' | 'dark';
   // Read-only mode for shared calendars
   isReadOnly?: boolean;
-  // Optional management callbacks for the calendars-list panel/drawer.
-  // When omitted, "more options" actions are hidden.
-  onDuplicateCalendar?: (sourceCalendarId: string, newName: string, includeContent?: boolean) => Promise<void> | void;
-  onDeleteCalendar?: (id: string) => Promise<void> | void;
-  onUpdateCalendar?: (id: string, updates: Partial<Calendar>) => Promise<void> | void;
 }
 
 /**
@@ -577,9 +572,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     onToggleTheme,
     mode,
     isReadOnly = false,
-    onDuplicateCalendar,
-    onDeleteCalendar,
-    onUpdateCalendar,
   } = props;
 
 
@@ -849,26 +841,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const [removingNotifications, setRemovingNotifications] = useState<Set<string>>(new Set());
   const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null>(null);
 
-  // User calendars for breadcrumb dropdown
-  const [userCalendars, setUserCalendars] = useState<Calendar[]>([]);
-
-  // Fetch user's calendars for breadcrumb dropdown
-  const loadUserCalendars = useCallback(async () => {
-    if (!calendar?.user_id) return;
-
-    try {
-      const calendarRepo = new CalendarRepository();
-      const calendars = await calendarRepo.findByUserId(calendar.user_id);
-      setUserCalendars(calendars);
-    } catch (error) {
-      logger.error('Error loading user calendars for dropdown:', error);
-    }
-  }, [calendar?.user_id]);
-
-  useEffect(() => {
-    loadUserCalendars();
-  }, [loadUserCalendars]);
-
   const theme = useTheme();
   const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
@@ -1069,10 +1041,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setIsCalendarEditSubmitting(true);
     try {
       await onUpdateCalendarProperty(calendarId, (cal) => ({ ...cal, ...formData }));
-      // Update userCalendars state to reflect name change in breadcrumb dropdown
-      setUserCalendars(prev => prev.map(cal =>
-        cal.id === calendarId ? { ...cal, name: formData.name } : cal
-      ));
       setIsCalendarEditOpen(false);
       showSnackbar('Calendar updated successfully', 'success');
     } catch (error) {
