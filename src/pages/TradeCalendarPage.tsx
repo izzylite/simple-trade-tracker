@@ -41,13 +41,11 @@ import {
   Event as EventIcon,
   SmartToy as AIIcon,
   Home as HomeIcon,
-  CalendarToday as CalendarIcon,
   Notes as NotesIcon,
   Edit as EditIcon,
   Flag as TargetIcon,
   EventNote as GamePlanIcon,
   HelpOutline as HelpOutlineIcon,
-  DeleteOutline as TrashIcon,
   Insights as InsightsIcon,
   MoreVert as MoreVertIcon,
   FileUpload as FileUploadIcon,
@@ -100,8 +98,6 @@ import { CalendarRepository } from '../services/repository/repositories/Calendar
 import TradeFormDialog, { createEditTradeData } from '../components/trades/TradeFormDialog';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
-import CalendarManagementDialogs from '../components/calendars/CalendarManagementDialogs';
-import { useCalendarPanelActions } from '../hooks/useCalendarPanelActions';
 import PinnedTradesDrawer from '../components/PinnedTradesDrawer';
 import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ShareButton from '../components/sharing/ShareButton';
@@ -161,8 +157,6 @@ import SearchContent from '../components/sidePanel/content/SearchContent';
 import PinnedContent from '../components/sidePanel/content/PinnedContent';
 import TagManagementContent from '../components/sidePanel/content/TagManagementContent';
 import DayTradesContent from '../components/sidePanel/content/DayTradesContent';
-import CalendarsListContent from '../components/sidePanel/content/CalendarsListContent';
-import CalendarsListDrawer from '../components/calendars/CalendarsListDrawer';
 import StatsContent from '../components/sidePanel/content/StatsContent';
 import StatsDrawer from '../components/StatsDrawer';
 
@@ -828,9 +822,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const [importFile, setImportFile] = useState<File | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
 
-  // Calendars list drawer state (<lg fallback for 'calendars-list' panel)
-  const [isCalendarsListDrawerOpen, setIsCalendarsListDrawerOpen] = useState(false);
-
   // Stats drawer state (<lg fallback for 'stats' panel)
   const [isStatsDrawerOpen, setIsStatsDrawerOpen] = useState(false);
 
@@ -893,14 +884,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setOpen: setPanelOpen,
   } = useSidePanel();
 
-  // Select a calendar from the list panel/drawer by navigating to its route
-  const handleSelectCalendar = useCallback((id: string) => {
-    setIsCalendarsListDrawerOpen(false);
-    setPanelOpen(false);
-    resetPanel();
-    navigate(`/calendar/${id}`);
-  }, [navigate, setPanelOpen, resetPanel]);
-
   // Ref for main content scroll container (used by floating nav scroll detection)
   const mainContentRef = useRef<HTMLDivElement>(null);
 
@@ -916,7 +899,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       setIsTagManagementDrawerOpen(false);
       setIsEconomicCalendarOpen(false);
       setIsFAQDrawerOpen(false);
-      setIsCalendarsListDrawerOpen(false);
       setIsStatsDrawerOpen(false);
       setSelectedDate(null);
     };
@@ -943,9 +925,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         case 'faq':
           setIsFAQDrawerOpen(true);
           break;
-        case 'calendars-list':
-          setIsCalendarsListDrawerOpen(true);
-          break;
         case 'stats':
           setIsStatsDrawerOpen(true);
           break;
@@ -959,9 +938,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       // <lg → lg+: hand off open drawer to panel; then close all drawers
       if (isFAQDrawerOpen) {
         replacePanel({ id: 'faq' });
-        setPanelOpen(true);
-      } else if (isCalendarsListDrawerOpen) {
-        replacePanel({ id: 'calendars-list' });
         setPanelOpen(true);
       } else if (isStatsDrawerOpen) {
         replacePanel({ id: 'stats' });
@@ -1106,17 +1082,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       setIsCalendarEditSubmitting(false);
     }
   };
-
-  // All calendars-list panel/drawer action state + handlers (edit/duplicate/
-  // link/delete/restore/permanent-delete) live here. See useCalendarPanelActions.
-  const panelActions = useCalendarPanelActions({
-    userId: calendar?.user_id,
-    loadUserCalendars,
-    showSnackbar,
-    onUpdateCalendar,
-    onDuplicateCalendar,
-    onDeleteCalendar,
-  });
 
   // Generic panel/drawer toggle — reused by Notes, Events, Pinned, Filter, Tags
   const togglePanel = useCallback((
@@ -1808,32 +1773,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             ),
           };
         }
-        case 'calendars-list': {
-          const isTrash = (view as { isTrash?: boolean }).isTrash;
-          return {
-            title: isTrash ? 'Trash' : 'All Calendars',
-            icon: isTrash
-              ? <TrashIcon fontSize="small" />
-              : <CalendarIcon fontSize="small" />,
-            component: (
-              <CalendarsListContent
-                isActive={
-                  isPanelOpen && currentView.id === 'calendars-list'
-                }
-                initialTab={isTrash ? 1 : 0}
-                activeCalendarId={calendarId}
-                onCalendarClick={handleSelectCalendar}
-                onEditCalendar={onUpdateCalendar ? panelActions.setEditTarget : undefined}
-                onDuplicateCalendar={onDuplicateCalendar ? panelActions.setDuplicateTarget : undefined}
-                onLinkCalendar={panelActions.setLinkTarget}
-                onDeleteCalendar={onDeleteCalendar ? panelActions.setDeleteTarget : undefined}
-                onUpdateCalendarProperty={onUpdateCalendarProperty}
-                onRestoreCalendar={panelActions.restoreCalendar}
-                onPermanentDeleteCalendar={panelActions.permanentDeleteCalendar}
-              />
-            ),
-          };
-        }
         case 'day-trades': {
           const dayView = view as DayTradesView;
           const dayTrades = getTradesForDate(dayView.date);
@@ -1915,9 +1854,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       requiredTagGroups, onUpdateCalendarProperty,
       getTradesForDate, weeklyStatsMap, accountBalance,
       pushPanel, replacePanel, setNewTrade, setShowAddForm,
-      handleSelectCalendar,
-      onUpdateCalendar, onDuplicateCalendar, onDeleteCalendar,
-      panelActions,
     ]
   );
 
@@ -3001,12 +2937,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           file={importFile}
         />
 
-        {/* Panel-action dialogs (for OTHER calendars from the calendars-list panel) */}
-        <CalendarManagementDialogs
-          actions={panelActions}
-          userCalendars={userCalendars}
-        />
-
       {/* Economic Calendar Drawer — only rendered on <lg (panel handles it on lg+) */}
       {!isLgUp && (
         <EconomicCalendarDrawer
@@ -3052,23 +2982,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         <FAQDrawer
           open={isFAQDrawerOpen}
           onClose={() => setIsFAQDrawerOpen(false)}
-        />
-      )}
-
-      {/* Calendars List Drawer — <lg only (lg+ uses SidePanel) */}
-      {!isLgUp && (
-        <CalendarsListDrawer
-          open={isCalendarsListDrawerOpen}
-          onClose={() => setIsCalendarsListDrawerOpen(false)}
-          activeCalendarId={calendarId}
-          onCalendarClick={handleSelectCalendar}
-          onEditCalendar={onUpdateCalendar ? panelActions.setEditTarget : undefined}
-          onDuplicateCalendar={onDuplicateCalendar ? panelActions.setDuplicateTarget : undefined}
-          onLinkCalendar={panelActions.setLinkTarget}
-          onDeleteCalendar={onDeleteCalendar ? panelActions.setDeleteTarget : undefined}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
-          onRestoreCalendar={panelActions.restoreCalendar}
-          onPermanentDeleteCalendar={panelActions.permanentDeleteCalendar}
         />
       )}
 

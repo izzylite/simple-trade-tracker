@@ -42,11 +42,6 @@ export interface AIChatView {
   id: 'ai-chat';
 }
 
-export interface CalendarsListView {
-  id: 'calendars-list';
-  isTrash?: boolean;
-}
-
 export interface FAQView {
   id: 'faq';
 }
@@ -91,7 +86,6 @@ export type SidePanelView =
   | DayTradesView
   | AIAnalysisView
   | AIChatView
-  | CalendarsListView
   | FAQView
   | StatsView
   | EventDetailView
