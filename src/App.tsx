@@ -40,10 +40,12 @@ import { TradesProvider } from './contexts/TradesContext';
 import { AIChatProvider } from './contexts/AIChatContext';
 import { TradeViewerProvider } from './contexts/TradeViewerContext';
 import { TradeOperationsProvider } from './contexts/TradeOperationsContext';
+import { EventNotificationsProvider } from './contexts/EventNotificationsContext';
 import GlobalAIChat from './components/aiChat/GlobalAIChat';
 import GlobalAIChatFab from './components/aiChat/GlobalAIChatFab';
 import GlobalTradeViewer from './components/trades/GlobalTradeViewer';
 import GlobalTradeOperations from './components/trades/GlobalTradeOperations';
+import GlobalEventNotifications from './components/notifications/GlobalEventNotifications';
 import { PanelMutexProvider, usePanelMutexSlot } from './contexts/PanelMutexContext';
 import { useCalendarsListPanel } from './contexts/CalendarsListPanelContext';
 
@@ -300,6 +302,7 @@ function AppContent() {
       <CalendarsListPanelProvider actions={calendarsListActions}>
       <TradesProvider calendars={calendars} setLoading={setLoading}>
       <TradeOperationsProvider>
+      <EventNotificationsProvider>
       <TradeUIProvider>
       <TradeViewerProvider>
       <AIChatProvider>
@@ -311,6 +314,7 @@ function AppContent() {
       {user && <GlobalAIChatFab />}
       {user && <GlobalTradeViewer />}
       {user && <GlobalTradeOperations />}
+      {user && <GlobalEventNotifications />}
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* App Header — hidden on landing page (has its own nav) */}
         {!isLandingPage && (
@@ -484,6 +488,7 @@ function AppContent() {
       </AIChatProvider>
       </TradeViewerProvider>
       </TradeUIProvider>
+      </EventNotificationsProvider>
       </TradeOperationsProvider>
       </TradesProvider>
       </CalendarsListPanelProvider>
