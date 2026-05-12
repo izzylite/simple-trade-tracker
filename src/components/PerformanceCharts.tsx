@@ -4,10 +4,9 @@ import { Box, Typography, useTheme, useMediaQuery, Paper, Alert, Button, Circula
 import { Trade, Calendar } from '../types/dualWrite';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
-import ScoreSection from './scoring/ScoreSection';
+import TagPatternAnalysis from './TagPatternAnalysis';
 import RoundedTabs from './common/RoundedTabs';
 import KpiStrip from './performance/KpiStrip';
-import PerfPill from './performance/PerfPill';
 import WeekdayWinRate from './performance/WeekdayWinRate';
 import { perfTokens as perf } from './performance/performanceTokens';
 import { logger } from '../utils/logger';
@@ -42,13 +41,9 @@ export const TIME_PERIOD_TABS = [
 ];
 
 const TAG_ANALYSIS_TABS = [
+  { label: 'Pattern Insights' },
   { label: 'Tag Performance' },
   { label: 'Day of Week' }
-];
-
-const PERFORMANCE_TABS = [
-  { label: 'Basic', value: 'basic' as const },
-  { label: 'Advanced', value: 'advanced' as const }
 ];
 
 interface PerformanceChartsProps {
@@ -58,7 +53,6 @@ interface PerformanceChartsProps {
   maxDailyDrawdown?: number;
   tabSize?: 'large' | 'small';
   calendarId: string;
-  scoreSettings?: import('../types/score').ScoreSettings;
   timePeriod?: TimePeriod;
   onTimePeriodChange?: (period: TimePeriod) => void;
   hideTimePeriodTabs?: boolean;
@@ -84,7 +78,6 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   accountBalance: accountBalanceProp,
   maxDailyDrawdown: maxDailyDrawdownProp,
   calendarId,
-  scoreSettings: scoreSettingsProp,
   tabSize,
   timePeriod: timePeriodProp,
   onTimePeriodChange,
@@ -123,8 +116,6 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
     }
     onTimePeriodChange?.(period);
   }, [timePeriodProp, onTimePeriodChange]);
-  const [performanceTab, setPerformanceTab] = useState<'basic' | 'advanced'>('basic');
-  const [advancedTabVisited, setAdvancedTabVisited] = useState(false);
   const [tagAnalysisTab, setTagAnalysisTab] = useState<number>(0);
   const [primaryTags, setPrimaryTags] = useState<string[]>([]);
   const [secondaryTags, setSecondaryTags] = useState<string[]>([]);
@@ -143,24 +134,19 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   const accountBalance = accountBalanceProp ?? calendar?.account_balance ?? 0;
   const maxDailyDrawdown = maxDailyDrawdownProp ?? calendar?.max_daily_drawdown ?? 0;
   const monthlyTarget = monthlyTargetProp ?? calendar?.monthly_target;
-  const scoreSettings = scoreSettingsProp ?? calendar?.score_settings;
-  const dynamicRiskSettings = dynamicRiskSettingsProp ?? (calendar ? {
-    account_balance: calendar.account_balance,
-    risk_per_trade: calendar.risk_per_trade,
-    dynamic_risk_enabled: calendar.dynamic_risk_enabled,
-    increased_risk_percentage: calendar.increased_risk_percentage,
-    profit_threshold_percentage: calendar.profit_threshold_percentage
-  } : undefined);
+  const excludedPatternTags = useMemo(
+    () => calendar?.excluded_tags_from_patterns ?? [],
+    [calendar?.excluded_tags_from_patterns],
+  );
+  const handleExcludedPatternTagsChange = useCallback((tags: string[]) => {
+    onUpdateCalendarProperty?.(calendarId, (cal) => ({
+      ...cal,
+      excluded_tags_from_patterns: tags,
+    }));
+  }, [calendarId, onUpdateCalendarProperty]);
 
   // Economic filter function
   const economicFilterFn = economicFilter || (() => calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS);
-
-  // Track advanced tab visits for lazy rendering
-  useEffect(() => {
-    if (performanceTab === 'advanced') {
-      setAdvancedTabVisited(true);
-    }
-  }, [performanceTab]);
 
   const [tradesDialog, setTradesDialog] = useState<{
     open: boolean;
@@ -593,21 +579,9 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         <KpiStrip performanceData={performanceData} />
       )}
 
-      {/* Weekday win-rate breakdown — sits above the Basic/Advanced tabs */}
+      {/* Weekday win-rate breakdown */}
       {!basicOnly && !isLoadingData && filteredTrades.length > 0 && (
         <WeekdayWinRate trades={filteredTrades} />
-      )}
-
-      {/* Basic/Advanced Tab Selection */}
-      {!basicOnly && (
-        <Box sx={{ mb: 2 }}>
-          <PerfPill<'basic' | 'advanced'>
-            options={PERFORMANCE_TABS}
-            value={performanceTab}
-            onChange={setPerformanceTab}
-            fullWidth
-          />
-        </Box>
       )}
 
       {/* Loading State */}
@@ -652,9 +626,6 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
       {/* Main content */}
       {!isLoadingData && filteredTrades.length > 0 ? (
         <>
-          {/* Basic Tab Content */}
-          {performanceTab === 'basic' && (
-            <>
               {/* Risk to Reward Statistics Card */}
               <RiskRewardChart riskRewardStats={riskRewardStats} />
 
@@ -691,26 +662,10 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
                   monthly_target={monthlyTarget}
                 />
               </Box>
-            </>
-          )}
 
-          {/* Advanced Tab Content */}
-          {!basicOnly && (performanceTab === 'advanced' || advancedTabVisited) && (
-            <Box sx={{ display: performanceTab === 'advanced' ? 'block' : 'none' }}>
-           {/* Trading Score Section */}
-            <ScoreSection
-              trades={trades}
-              selectedDate={selectedDate}
-              calendarId={calendarId}
-              scoreSettings={scoreSettings}
-              onUpdateCalendarProperty={onUpdateCalendarProperty}
-              accountBalance={accountBalance}
-              dynamicRiskSettings={dynamicRiskSettings}
-              timePeriod={timePeriod}
-            />
-
+          {/* Tag & economic analysis — hidden in narrow side-panel mode */}
+          {!basicOnly && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            
 
                {/* Tag Performance Analysis with Tabs */}
           <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 2 }}>
@@ -731,8 +686,19 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               />
             </Box>
 
-            {/* Tab Panel 1: Tag Performance Analysis - Only render when active */}
+            {/* Tab Panel 0: Tag Pattern Insights — default tab (works on all tagged trades) */}
             {tagAnalysisTab === 0 && (
+              <TagPatternAnalysis
+                trades={filteredTrades}
+                selectedDate={selectedDate}
+                allTags={allTags}
+                excludedTags={excludedPatternTags}
+                onExcludedTagsChange={onUpdateCalendarProperty ? handleExcludedPatternTagsChange : undefined}
+              />
+            )}
+
+            {/* Tab Panel 1: Tag Performance Analysis - Only render when active */}
+            {tagAnalysisTab === 1 && (
               <TagPerformanceAnalysis
                 trades={trades}
                 selectedDate={selectedDate}
@@ -753,7 +719,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             )}
 
             {/* Tab Panel 2: Tag Performance by Day of Week Analysis - Only render when active */}
-            {tagAnalysisTab === 1 && (
+            {tagAnalysisTab === 2 && (
               <TagDayOfWeekAnalysis
                 trades={trades}
                 selectedDate={selectedDate}
@@ -784,9 +750,6 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
               economicCorrelations={economicCorrelations}
             />
           </Box>
-
-         
-            </Box>
           )}
         </>
       ) : !isLoadingData ? (

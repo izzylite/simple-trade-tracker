@@ -1,382 +1,597 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   Box,
-  Card,
-  CardContent,
+  Paper,
   Typography,
-  Alert,
-  Chip,
   Stack,
-  LinearProgress,
-  useTheme,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
+  Chip,
   Tooltip,
-  IconButton
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Skeleton,
+  Button,
+  TextField,
+  InputAdornment,
+  Divider,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
-  ExpandMore,
   TrendingUp,
   TrendingDown,
   Warning,
   Info,
-  HelpOutline
+  HelpOutline,
+  Tune,
+  Close,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import { Trade } from '../types/dualWrite';
-import { TagPatternInsight, ScoreSettings } from '../types/score';
+import { TagPatternInsight } from '../types/score';
 import { tagPatternService } from '../services/tagPatternService';
 import { getTagChipStyles, formatTagForDisplay } from '../utils/tagColors';
+import { scrollbarStyles } from '../styles/scrollbarStyles';
 
 interface TagPatternAnalysisProps {
   trades: Trade[];
   selectedDate?: Date;
-  settings?: ScoreSettings;
+  /** Calendar.tags — full known tag list for the exclude picker. */
+  allTags?: string[];
+  /** Tags currently excluded from pattern analysis (Calendar.excluded_tags_from_patterns). */
+  excludedTags?: string[];
+  /** Persist a new excluded-tags list (wired to the calendar). */
+  onExcludedTagsChange?: (tags: string[]) => void;
 }
 
+const MIN_TRADES = 10;
+
+/**
+ * Compact "tag patterns" panel for the Performance page. Surfaces the
+ * highest-conviction tag-combination insights, the top combinations as a
+ * proportion-bar list, and any combinations that are slipping — plus a
+ * settings affordance to exclude noisy tags from the analysis (persisted on
+ * `Calendar.excluded_tags_from_patterns`).
+ */
 const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
   trades,
   selectedDate = new Date(),
-  settings
+  allTags,
+  excludedTags,
+  onExcludedTagsChange,
 }) => {
   const theme = useTheme();
-  const [analysis, setAnalysis] = useState<Awaited<ReturnType<typeof tagPatternService.analyzeTagPatterns>> | null>(null);
+  const [analysis, setAnalysis] = useState<Awaited<
+    ReturnType<typeof tagPatternService.analyzeTagPatterns>
+  > | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [excludeOpen, setExcludeOpen] = useState(false);
 
-  // Calculate tag pattern analysis using async worker
+  const excluded = useMemo(() => excludedTags ?? [], [excludedTags]);
+
   useEffect(() => {
-    const calculateAnalysis = async () => {
-      if (trades.length < 10) {
-        setAnalysis(null);
+    let cancelled = false;
+    const run = async () => {
+      if (trades.length < MIN_TRADES) {
+        if (!cancelled) setAnalysis(null);
         return;
       }
-
-      setIsLoading(true);
+      // Only show skeleton on first compute. Subsequent re-runs (e.g. when
+      // toggling excluded tags) keep prior analysis visible to avoid the
+      // dialog flickering during re-mount.
+      if (!cancelled) setIsLoading((prev) => prev || analysis === null);
       try {
-        const result = await tagPatternService.analyzeTagPatterns(trades, selectedDate, settings);
-        setAnalysis(result);
-      } catch (error) {
-        console.error('Error analyzing tag patterns:', error);
-        setAnalysis(null);
+        const next = await tagPatternService.analyzeTagPatterns(trades, selectedDate, excluded);
+        if (!cancelled) setAnalysis(next);
+      } catch (err) {
+        console.error('Error analyzing tag patterns:', err);
+        if (!cancelled) setAnalysis(null);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
+    run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trades, selectedDate, excluded]);
 
-    calculateAnalysis();
-  }, [trades, selectedDate, settings]);
+  // ---- shared bits -----------------------------------------------------
 
-  const getInsightIcon = (type: TagPatternInsight['type']) => {
-    switch (type) {
-      case 'high_performance':
-        return <TrendingUp sx={{ color: theme.palette.success.main }} />;
-      case 'declining_pattern':
-        return <TrendingDown sx={{ color: theme.palette.error.main }} />;
-      case 'market_condition':
-        return <Warning sx={{ color: theme.palette.warning.main }} />;
-      default:
-        return <Info sx={{ color: theme.palette.info.main }} />;
-    }
+  const winRateColor = (wr: number) =>
+    wr >= 70 ? theme.palette.success.main : wr >= 50 ? theme.palette.warning.main : theme.palette.error.main;
+  const fmtPct = (wr: number) => `${wr.toFixed(1)}%`;
+  const fmtSigned = (v: number) =>
+    `${v > 0 ? '+' : ''}${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const tone = (type: TagPatternInsight['type']) =>
+    type === 'high_performance'
+      ? theme.palette.success.main
+      : type === 'declining_pattern'
+      ? theme.palette.error.main
+      : theme.palette.warning.main;
+  const insightIcon = (type: TagPatternInsight['type']) => {
+    const Icon = type === 'high_performance' ? TrendingUp : type === 'declining_pattern' ? TrendingDown : Warning;
+    return <Icon sx={{ fontSize: 18, color: tone(type) }} />;
   };
 
-  const getSeverityColor = (severity: TagPatternInsight['severity']) => {
-    switch (severity) {
-      case 'high':
-        return theme.palette.error.main;
-      case 'medium':
-        return theme.palette.warning.main;
-      case 'low':
-        return theme.palette.info.main;
-      default:
-        return theme.palette.text.secondary;
-    }
+  const tagChips = (tags: string[]) => (
+    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ minWidth: 0 }}>
+      {tags.map((t) => (
+        <Chip key={t} label={formatTagForDisplay(t)} size="small" sx={{ ...getTagChipStyles(t, theme), height: 22 }} />
+      ))}
+    </Stack>
+  );
+
+  const cardSx = {
+    p: { xs: 2, sm: 3 },
+    mb: 3,
+    borderRadius: 3,
+    boxShadow: 'none',
+    bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.common.white, 0.02) : theme.palette.background.paper,
+    border: `1px solid ${theme.palette.mode === 'dark' ? alpha(theme.palette.common.white, 0.08) : theme.palette.divider}`,
+  } as const;
+
+  const sectionLabelSx = { color: theme.palette.text.disabled, letterSpacing: 1 } as const;
+  const emptyBoxSx = {
+    py: 4,
+    textAlign: 'center' as const,
+    color: theme.palette.text.secondary,
+    border: `1px dashed ${alpha(theme.palette.divider, 0.6)}`,
+    borderRadius: 2,
   };
 
-  const getWinRateColor = (win_rate: number) => {
-    if (win_rate >= 70) return theme.palette.success.main;
-    if (win_rate >= 50) return theme.palette.warning.main;
-    return theme.palette.error.main;
-  };
-
-  const formatWinRate = (win_rate: number) => {
-    return `${win_rate.toFixed(1)}%`;
-  };
-
-  // Show loading state
-  if (isLoading) {
-    return (
-      <Card
-        sx={{
-          borderRadius: 3,
-          boxShadow: 'none',
-          border: `1px solid ${theme.palette.divider}`,
-          mb: 3
-        }}
-      >
-        <CardContent>
-          <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-            🔍 Tag Pattern Analysis
+  const Header = (
+    <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2.5}>
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <Box
+          sx={{
+            width: 28,
+            height: 28,
+            borderRadius: 1.5,
+            display: 'grid',
+            placeItems: 'center',
+            bgcolor: alpha(theme.palette.primary.main, 0.15),
+            color: theme.palette.primary.main,
+            fontSize: 16,
+          }}
+        >
+          🏷️
+        </Box>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+          Tag patterns
+        </Typography>
+        <Tooltip title="Combinations of tags that consistently win or lose, and patterns that are slipping recently">
+          <IconButton size="small" sx={{ color: theme.palette.text.disabled }}>
+            <HelpOutline sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+      <Stack direction="row" alignItems="center" spacing={1}>
+        {excluded.length > 0 && (
+          <Typography variant="caption" sx={{ color: theme.palette.text.disabled }}>
+            {excluded.length} excluded
           </Typography>
-          <Box sx={{ mt: 2 }}>
-            <LinearProgress />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Analyzing tag patterns with Web Worker...
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!analysis || trades.length < 10) {
-    return (
-      <Card
-        sx={{
-          borderRadius: 2,
-          boxShadow: theme.shadows[2],
-          border: `1px solid ${theme.palette.divider}`
-        }}
-      >
-        <CardContent sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            🏷️ Tag Pattern Analysis
-          </Typography>
-          <Alert severity="info">
-            Add more trades to see tag pattern analysis. We need at least 10 trades to identify meaningful patterns and trends.
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card
-      sx={{
-        borderRadius: 2,
-        boxShadow: theme.shadows[2],
-        border: `1px solid ${theme.palette.divider}`
-      }}
-    >
-      <CardContent sx={{ p: 3 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            🏷️ Tag Pattern Analysis
-          </Typography>
-          <Tooltip title="Analysis of tag combinations to identify high-performing patterns and declining trends">
-            <IconButton size="small">
-              <HelpOutline fontSize="small" />
+        )}
+        {onExcludedTagsChange && (
+          <Tooltip title="Exclude tags from this analysis">
+            <IconButton size="small" onClick={() => setExcludeOpen(true)} sx={{ color: theme.palette.text.secondary }}>
+              <Tune sx={{ fontSize: 18 }} />
             </IconButton>
           </Tooltip>
-        </Stack>
+        )}
+      </Stack>
+    </Stack>
+  );
 
-        {/* Key Insights */}
-        {analysis.insights.length > 0 && (
-          <Box mb={3}>
-            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
-              💡 Key Insights
+  const excludeDialog = onExcludedTagsChange && (
+    <ExcludeTagsDialog
+      open={excludeOpen}
+      onClose={() => setExcludeOpen(false)}
+      trades={trades}
+      allTags={allTags}
+      excluded={excluded}
+      onChange={onExcludedTagsChange}
+    />
+  );
+
+  // ---- states ----------------------------------------------------------
+
+  if (isLoading && !analysis) {
+    return (
+      <>
+        <Paper sx={cardSx}>
+          {Header}
+          <Stack spacing={1.5}>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} variant="rounded" height={44} sx={{ borderRadius: 2 }} />
+            ))}
+          </Stack>
+        </Paper>
+        {excludeDialog}
+      </>
+    );
+  }
+
+  if (!analysis || trades.length < MIN_TRADES) {
+    return (
+      <>
+        <Paper sx={cardSx}>
+          {Header}
+          <Box sx={emptyBoxSx}>
+            <Info sx={{ fontSize: 20, mb: 0.5, opacity: 0.6 }} />
+            <Typography variant="body2">Add at least {MIN_TRADES} trades to surface tag patterns.</Typography>
+          </Box>
+        </Paper>
+        {excludeDialog}
+      </>
+    );
+  }
+
+  const insights = analysis.insights.slice(0, 3);
+  const topCombos = analysis.topCombinations.slice(0, 5);
+  const declining = analysis.decliningCombinations.slice(0, 3);
+  const nothing = insights.length === 0 && topCombos.length === 0 && declining.length === 0;
+
+  return (
+    <>
+      <Paper sx={cardSx}>
+        {Header}
+
+      {nothing && (
+        <Box sx={emptyBoxSx}>
+          <Typography variant="body2">No clear tag patterns yet — keep logging trades with tags.</Typography>
+        </Box>
+      )}
+
+      {/* Insights */}
+      {insights.length > 0 && (
+        <Box mb={topCombos.length || declining.length ? 3 : 0}>
+          <Typography variant="overline" sx={sectionLabelSx}>
+            Key insights
+          </Typography>
+          <Stack spacing={1} mt={0.5}>
+            {insights.map((ins, i) => (
+              <Box
+                key={i}
+                sx={{
+                  p: 1.5,
+                  borderRadius: 2,
+                  bgcolor: alpha(tone(ins.type), 0.08),
+                  border: `1px solid ${alpha(tone(ins.type), 0.18)}`,
+                }}
+              >
+                <Stack direction="row" spacing={1} alignItems="flex-start">
+                  <Box sx={{ mt: '1px' }}>{insightIcon(ins.type)}</Box>
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {ins.title}
+                      </Typography>
+                      {tagChips(ins.tagCombination)}
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block', mt: 0.25 }}>
+                      {ins.recommendation}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      )}
+
+      {/* Top combinations — proportion-bar list */}
+      {topCombos.length > 0 && (
+        <Box mb={declining.length ? 3 : 0}>
+          <Stack direction="row" alignItems="baseline" justifyContent="space-between">
+            <Typography variant="overline" sx={sectionLabelSx}>
+              Top combinations
             </Typography>
-            <Stack spacing={2}>
-              {analysis.insights.slice(0, 3).map((insight, index) => (
-                <Alert
-                  key={index}
-                  severity={
-                    insight.type === 'high_performance' ? 'success' :
-                    insight.type === 'declining_pattern' ? 'error' : 'warning'
-                  }
-                  icon={getInsightIcon(insight.type)}
+            <Typography variant="caption" sx={{ color: theme.palette.text.disabled }}>
+              by win rate
+            </Typography>
+          </Stack>
+          <Stack spacing={1} mt={0.5}>
+            {topCombos.map((c, i) => {
+              const col = winRateColor(c.win_rate);
+              return (
+                <Box
+                  key={i}
                   sx={{
-                    backgroundColor: alpha(getSeverityColor(insight.severity), 0.1),
-                    border: `1px solid ${alpha(getSeverityColor(insight.severity), 0.2)}`,
-                    '& .MuiAlert-icon': {
-                      color: getSeverityColor(insight.severity)
-                    }
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr auto', sm: 'minmax(0,1fr) 120px auto' },
+                    alignItems: 'center',
+                    columnGap: 1.5,
+                    rowGap: 0.5,
+                    p: 1,
+                    borderRadius: 2,
+                    bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.02 : 0),
                   }}
                 >
-                  <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-                    {insight.title}
-                  </Typography>
-                  <Typography variant="body2" gutterBottom>
-                    {insight.description}
-                  </Typography>
-                  <Box sx={{ mt: 1, mb: 1 }}>
-                    <Stack direction="row" spacing={1} flexWrap="wrap">
-                      {insight.tagCombination.map(tag => (
-                        <Chip
-                          key={tag}
-                          label={formatTagForDisplay(tag)}
-                          size="small"
-                          sx={getTagChipStyles(tag, theme)}
-                        />
-                      ))}
-                    </Stack>
+                  <Box sx={{ minWidth: 0 }}>
+                    {tagChips(c.tags)}
+                    <Typography variant="caption" sx={{ color: theme.palette.text.disabled }}>
+                      {c.total_trades} trades · avg {fmtSigned(c.avgPnL)}
+                      {c.trend !== 'stable' && (
+                        <Box
+                          component="span"
+                          sx={{
+                            ml: 1,
+                            color: c.trend === 'improving' ? theme.palette.success.main : theme.palette.error.main,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {c.trend === 'improving' ? '▲ improving' : '▼ declining'}
+                        </Box>
+                      )}
+                    </Typography>
                   </Box>
-                  <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
-                    💡 {insight.recommendation}
+                  {/* bar */}
+                  <Box
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.06 : 0.1),
+                      overflow: 'hidden',
+                      order: { xs: 3, sm: 0 },
+                      gridColumn: { xs: '1 / -1', sm: 'auto' },
+                    }}
+                  >
+                    <Box sx={{ width: `${Math.max(2, Math.min(100, c.win_rate))}%`, height: '100%', bgcolor: col, borderRadius: 4 }} />
+                  </Box>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: col, textAlign: 'right', justifySelf: 'end' }}>
+                    {fmtPct(c.win_rate)}
                   </Typography>
-                </Alert>
-              ))}
+                </Box>
+              );
+            })}
+          </Stack>
+        </Box>
+      )}
+
+      {/* Declining */}
+      {declining.length > 0 && (
+        <Box>
+          <Typography variant="overline" sx={{ color: theme.palette.error.main, letterSpacing: 1, opacity: 0.85 }}>
+            Slipping
+          </Typography>
+          <Stack spacing={1} mt={0.5}>
+            {declining.map((c, i) => (
+              <Box
+                key={i}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  p: 1.25,
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.error.main, 0.06),
+                  border: `1px solid ${alpha(theme.palette.error.main, 0.18)}`,
+                }}
+              >
+                <TrendingDown sx={{ fontSize: 18, color: theme.palette.error.main }} />
+                <Box sx={{ minWidth: 0, flex: 1 }}>{tagChips(c.tags)}</Box>
+                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, whiteSpace: 'nowrap' }}>
+                  {fmtPct(c.historicalWinRate)} → {fmtPct(c.recentWinRate)}
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.error.main, whiteSpace: 'nowrap' }}>
+                  ▼{(c.historicalWinRate - c.recentWinRate).toFixed(1)}%
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      )}
+
+      </Paper>
+      {excludeDialog}
+    </>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Exclude-tags dialog: searchable list of every known tag with its trade
+// count. Excluded tags pinned to the top as removable chips; the rest are
+// clickable rows that exclude on tap. Changes persist immediately.
+// ---------------------------------------------------------------------------
+
+interface ExcludeTagsDialogProps {
+  open: boolean;
+  onClose: () => void;
+  trades: Trade[];
+  allTags?: string[];
+  excluded: string[];
+  onChange: (tags: string[]) => void;
+}
+
+const ExcludeTagsDialog: React.FC<ExcludeTagsDialogProps> = ({ open, onClose, trades, allTags, excluded, onChange }) => {
+  const theme = useTheme();
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (!open) setQuery('');
+  }, [open]);
+
+  // Trade count per tag (drives the "is this tag noise?" decision).
+  const tagCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    trades.forEach((t) => t.tags?.forEach((tag) => m.set(tag, (m.get(tag) ?? 0) + 1)));
+    return m;
+  }, [trades]);
+
+  // Prefer the calendar's tag list; fall back to tags seen on trades. Drop
+  // system tags (e.g. "Partials:*") — they're never part of pattern analysis.
+  const allKnown = useMemo(() => {
+    const set = new Set<string>(allTags ?? []);
+    if (set.size === 0) trades.forEach((t) => t.tags?.forEach((tag) => set.add(tag)));
+    return Array.from(set)
+      .filter((t) => !t.startsWith('Partials:'))
+      .sort((a, b) => (tagCounts.get(b) ?? 0) - (tagCounts.get(a) ?? 0) || formatTagForDisplay(a).localeCompare(formatTagForDisplay(b)));
+  }, [allTags, trades, tagCounts]);
+
+  const excludedSet = useMemo(() => new Set(excluded), [excluded]);
+  const q = query.trim().toLowerCase();
+  const matches = (tag: string) => !q || formatTagForDisplay(tag).toLowerCase().includes(q) || tag.toLowerCase().includes(q);
+
+  const excludedList = allKnown.filter((t) => excludedSet.has(t));
+  const availableList = allKnown.filter((t) => !excludedSet.has(t) && matches(t));
+
+  const setExcluded = (tag: string, on: boolean) => {
+    const next = new Set(excludedSet);
+    if (on) next.add(tag);
+    else next.delete(tag);
+    onChange(Array.from(next));
+  };
+
+  const countLabel = (tag: string) => {
+    const n = tagCounts.get(tag) ?? 0;
+    return `${n} trade${n === 1 ? '' : 's'}`;
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          bgcolor: theme.palette.background.paper,
+          backgroundImage: 'none',
+          boxShadow: 'none',
+          border: `1px solid ${theme.palette.divider}`,
+          maxHeight: '82vh',
+          overflow: 'hidden',
+        },
+      }}
+    >
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Tune sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            Exclude tags from analysis
+          </Typography>
+        </Stack>
+        <IconButton onClick={onClose} size="small">
+          <Close fontSize="small" />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent sx={{ ...scrollbarStyles(theme), pt: '4px !important' }}>
+        <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block', mb: 1.5 }}>
+          Excluded tags are skipped when finding tag-combination patterns. Good for noisy or one-off tags.
+        </Typography>
+
+        {/* Excluded — pinned to top */}
+        {excludedList.length > 0 && (
+          <Box
+            sx={{
+              mb: 2,
+              p: 1.5,
+              borderRadius: 2,
+              bgcolor: alpha(theme.palette.error.main, 0.06),
+              border: `1px solid ${alpha(theme.palette.error.main, 0.18)}`,
+            }}
+          >
+            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
+              <Typography variant="overline" sx={{ color: theme.palette.error.main, letterSpacing: 1, opacity: 0.9 }}>
+                Excluded · {excludedList.length}
+              </Typography>
+              <Button size="small" onClick={() => onChange([])} sx={{ textTransform: 'none', minWidth: 0, p: 0.25 }}>
+                Clear all
+              </Button>
             </Stack>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+              {excludedList.map((tag) => (
+                <Chip
+                  key={tag}
+                  label={formatTagForDisplay(tag)}
+                  size="small"
+                  onDelete={() => setExcluded(tag, false)}
+                  deleteIcon={<Close sx={{ fontSize: 14 }} />}
+                  sx={{
+                    height: 26,
+                    bgcolor: alpha(theme.palette.text.primary, 0.06),
+                    color: theme.palette.text.secondary,
+                    border: `1px dashed ${alpha(theme.palette.text.primary, 0.25)}`,
+                  }}
+                />
+              ))}
+            </Box>
           </Box>
         )}
 
-        {/* Top Performing Combinations */}
-        {analysis.topCombinations.length > 0 && (
-          <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMore />}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                🏆 Top Performing Tag Combinations
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Stack spacing={2}>
-                {analysis.topCombinations.slice(0, 5).map((combo, index) => (
-                  <Box
-                    key={index}
-                    sx={{
-                      p: 2,
-                      borderRadius: 2,
-                      backgroundColor: 'background.paper',
-                      border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
-                      <Stack direction="row" spacing={1} flexWrap="wrap">
-                        {combo.tags.map(tag => (
-                          <Chip
-                            key={tag}
-                            label={formatTagForDisplay(tag)}
-                            size="small"
-                            sx={getTagChipStyles(tag, theme)}
-                          />
-                        ))}
-                      </Stack>
-                      <Typography
-                        variant="h6"
-                        sx={{
-                          color: getWinRateColor(combo.win_rate),
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        {formatWinRate(combo.win_rate)}
-                      </Typography>
-                    </Stack>
-                    
-                    <LinearProgress
-                      variant="determinate"
-                      value={combo.win_rate}
-                      sx={{
-                        height: 6,
-                        borderRadius: 3,
-                        backgroundColor: theme.palette.mode === 'dark'
-                          ? alpha(theme.palette.common.white, 0.1)
-                          : theme.palette.grey[200],
-                        '& .MuiLinearProgress-bar': {
-                          backgroundColor: getWinRateColor(combo.win_rate),
-                          borderRadius: 3
-                        }
-                      }}
-                    />
-                    
-                    <Stack direction="row" spacing={3} mt={1}>
-                      <Typography variant="caption" color="text.secondary">
-                        <strong>Trades:</strong> {combo.total_trades}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        <strong>W/L:</strong> {combo.wins}/{combo.losses}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        <strong>Avg P&L:</strong> {combo.avgPnL > 0 ? '+' : ''}{combo.avgPnL.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </Typography>
-                      {combo.trend !== 'stable' && (
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: combo.trend === 'improving' 
-                              ? theme.palette.success.main 
-                              : theme.palette.error.main,
-                            fontWeight: 600
-                          }}
-                        >
-                          {combo.trend === 'improving' ? '📈 Improving' : '📉 Declining'}
-                        </Typography>
-                      )}
-                    </Stack>
-                  </Box>
-                ))}
-              </Stack>
-            </AccordionDetails>
-          </Accordion>
-        )}
+        {/* Search */}
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Search tags…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ fontSize: 18, color: theme.palette.text.disabled }} />
+              </InputAdornment>
+            ),
+            endAdornment: query ? (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => setQuery('')}>
+                  <Close sx={{ fontSize: 16 }} />
+                </IconButton>
+              </InputAdornment>
+            ) : undefined,
+            sx: { borderRadius: 2, bgcolor: alpha(theme.palette.text.primary, 0.04) },
+          }}
+          sx={{ mb: 1.5 }}
+        />
 
-        {/* Declining Patterns */}
-        {analysis.decliningCombinations.length > 0 && (
-          <Accordion sx={{ mt: 2 }}>
-            <AccordionSummary expandIcon={<ExpandMore />}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, color: theme.palette.error.main }}>
-                📉 Declining Patterns
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Stack spacing={2}>
-                {analysis.decliningCombinations.map((combo, index) => (
-                  <Box
-                    key={index}
-                    sx={{
-                      p: 2,
-                      borderRadius: 2,
-                      backgroundColor: alpha(theme.palette.error.main, 0.05),
-                      border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
-                      <Stack direction="row" spacing={1} flexWrap="wrap">
-                        {combo.tags.map(tag => (
-                          <Chip
-                            key={tag}
-                            label={formatTagForDisplay(tag)}
-                            size="small"
-                            sx={getTagChipStyles(tag, theme)}
-                          />
-                        ))}
-                      </Stack>
-                      <Stack alignItems="flex-end">
-                        <Typography variant="caption" color="text.secondary">
-                          {formatWinRate(combo.historicalWinRate)} → {formatWinRate(combo.recentWinRate)}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{ color: theme.palette.error.main, fontWeight: 600 }}
-                        >
-                          -{(combo.historicalWinRate - combo.recentWinRate).toFixed(1)}%
-                        </Typography>
-                      </Stack>
-                    </Stack>
-                    
-                    <Typography variant="body2" color="text.secondary">
-                      This combination has declined from {formatWinRate(combo.historicalWinRate)} to {formatWinRate(combo.recentWinRate)} win rate recently.
-                      Consider reviewing your approach or market conditions.
-                    </Typography>
-                  </Box>
-                ))}
-              </Stack>
-            </AccordionDetails>
-          </Accordion>
-        )}
+        <Divider sx={{ mb: 1, opacity: 0.5 }} />
 
-        {/* No significant patterns found */}
-        {analysis.insights.length === 0 && analysis.topCombinations.length === 0 && (
-          <Alert severity="info" sx={{ mt: 2 }}>
-            <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-              📊 Building Pattern Database
-            </Typography>
-            <Typography variant="body2">
-              Continue trading to build a larger dataset. More trades will help identify stronger patterns and trends in your tag combinations.
-            </Typography>
-          </Alert>
+        {/* Available tags */}
+        {allKnown.length === 0 ? (
+          <Typography variant="body2" sx={{ color: theme.palette.text.disabled, py: 3, textAlign: 'center' }}>
+            No tags yet — add tags to your trades first.
+          </Typography>
+        ) : availableList.length === 0 ? (
+          <Typography variant="body2" sx={{ color: theme.palette.text.disabled, py: 3, textAlign: 'center' }}>
+            {q ? 'No tags match your search.' : 'All tags are excluded.'}
+          </Typography>
+        ) : (
+          <Stack spacing={0.25} sx={{ maxHeight: 320, overflowY: 'auto', ...scrollbarStyles(theme), mx: -1, px: 1 }}>
+            {availableList.map((tag) => (
+              <Box
+                key={tag}
+                onClick={() => setExcluded(tag, true)}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1.5,
+                  px: 1,
+                  py: 0.75,
+                  borderRadius: 1.5,
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.05) },
+                }}
+              >
+                <Chip label={formatTagForDisplay(tag)} size="small" sx={{ ...getTagChipStyles(tag, theme), height: 24 }} />
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography variant="caption" sx={{ color: theme.palette.text.disabled, whiteSpace: 'nowrap' }}>
+                    {countLabel(tag)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: theme.palette.text.disabled }}>
+                    Exclude
+                  </Typography>
+                </Stack>
+              </Box>
+            ))}
+          </Stack>
         )}
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 };
 

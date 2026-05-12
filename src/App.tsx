@@ -214,21 +214,35 @@ function AppContent() {
   };
 
   const handleUpdateCalendar = async (id: string, updates: Partial<Calendar>) => {
+    // Optimistic SWR mutate — UI reflects instantly. Every `useCalendars`
+    // consumer (PerformancePage, HeaderCalendarSelector, CalendarListDialog,
+    // etc.) and the local-state sync useEffect picks this up.
+    refreshCalendars(
+      (prev) =>
+        (prev ?? [])
+          .map((cal) => (cal.id === id ? { ...cal, ...updates, updated_at: new Date() } : cal))
+          .sort(
+            (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+          ),
+      { revalidate: false },
+    );
     try {
       const updatedCalendar = await calendarService.updateCalendar(id, updates);
-      setCalendars(prev => {
-        const updated = prev.map(cal =>
-          cal.id === id
-            ? { ...cal, ...updatedCalendar, updated_at: new Date() }
-            : cal
-        );
-        // Re-sort by updated_at descending to match database order
-        return updated.sort((a, b) =>
-          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-        );
-      });
+      // Reconcile with server-truth (server-side timestamps, defaults, etc.)
+      // without a network revalidate — we already have the canonical row.
+      refreshCalendars(
+        (prev) =>
+          (prev ?? [])
+            .map((cal) => (cal.id === id ? { ...cal, ...updatedCalendar } : cal))
+            .sort(
+              (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+            ),
+        { revalidate: false },
+      );
     } catch (error) {
       console.error('Error updating calendar:', error);
+      // Roll back optimistic update by revalidating from server.
+      refreshCalendars();
     }
   };
 
