@@ -3,6 +3,7 @@ import TradeFormDialog from './TradeFormDialog';
 import ConfirmationDialog from '../common/ConfirmationDialog';
 import { useTradeOperations } from '../../contexts/TradeOperationsContext';
 import { useTradesContext } from '../../contexts/TradesContext';
+import { useTradeViewer } from '../../contexts/TradeViewerContext';
 import { formatCount } from '../../utils/formatters';
 import { DynamicRiskSettings } from '../../utils/dynamicRiskUtils';
 
@@ -17,6 +18,7 @@ import { DynamicRiskSettings } from '../../utils/dynamicRiskUtils';
  */
 const GlobalTradeOperations: React.FC = () => {
   const { calendar, hook } = useTradesContext();
+  const { openImageZoom } = useTradeViewer();
   const {
     formDialog,
     deleteDialog,
@@ -74,9 +76,7 @@ const GlobalTradeOperations: React.FC = () => {
         onTagUpdated={hook.onTagUpdated}
         onUpdateTradeProperty={hook.handleUpdateTradeProperty}
         onDeleteTrades={hook.deleteTrades}
-        setZoomedImage={() => {
-          /* Image zoom handled by GlobalTradeViewer / page-local zoom */
-        }}
+        setZoomedImage={openImageZoom}
         account_balance={calendar.account_balance}
         onAccountBalanceChange={hook.handleAccountBalanceChange}
         calendar={calendar}
