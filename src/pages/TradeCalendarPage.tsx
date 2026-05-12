@@ -118,13 +118,11 @@ import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
 import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
 import EconomicCalendarDrawer, { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
 import EconomicCalendarPanel from '../components/economicCalendar/EconomicCalendarPanel';
-import { useEconomicEventWatcher, useEconomicEventsUpdates } from '../hooks/useEconomicEventWatcher';
+import { useEconomicEventsUpdates } from '../hooks/useEconomicEventWatcher';
 import { TradeOperationsProps } from '../types/tradeOperations';
-import EconomicEventNotification from '../components/notifications/EconomicEventNotification';
 import { EconomicEvent } from '../types/economicCalendar';
 import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
-import { playNotificationSound } from '../utils/notificationSound';
 import { useTradesContext } from '../contexts/TradesContext';
 import { useTradeOperations } from '../contexts/TradeOperationsContext';
 import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
@@ -743,10 +741,8 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     () => calendarId ? gamePlanNotesCache.get(calendarId) ?? new Map() : new Map()
   );
 
-  // Economic event notification state
-  // Notification stack state (moved from App.tsx)
-  const [notifications, setNotifications] = useState<EconomicEvent[]>([]);
-  const [removingNotifications, setRemovingNotifications] = useState<Set<string>>(new Set());
+  // Drawer-update payload still lives here (page-local). Notification stack
+  // state moved to EventNotificationsProvider at App level.
   const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null>(null);
 
   const theme = useTheme();
@@ -839,12 +835,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     enabled: !!calendar?.economic_calendar_filters
   });
 
-  // Economic event watcher for real-time updates
-  const { watchingStatus } = useEconomicEventWatcher({
-    calendarId,
-    economic_calendar_filters: calendar?.economic_calendar_filters,
-    isActive: true // Always active when TradeCalendar is mounted
-  });
+  // Economic event watcher + notification firing now live at App level
+  // (EventNotificationsProvider). This page just listens for updates to
+  // refresh the still-page-local drawer (see useEconomicEventsUpdates below).
 
   // Load trades for visible calendar range when month changes
   // This ensures overflow days from adjacent months show their trades
@@ -861,87 +854,15 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     loadVisibleRangeTrades(visibleStart, visibleEnd);
   }, [currentDate, calendarId, loadVisibleRangeTrades]);
 
-  // Listen for multiple economic event updates (same release time)
+  // Page-local drawer still consumes event updates to refresh its content.
+  // Notification firing moved to EventNotificationsProvider (App level).
   useEconomicEventsUpdates((updatedEvents, allEvents, updatedCalendarId) => {
-    if (updatedCalendarId === calendarId) {
-      log(`📊 ${updatedEvents.length} economic events were updated simultaneously for this calendar`);
-
-      // Check if notifications are enabled before showing them
-      const notificationsEnabled = calendar?.economic_calendar_filters?.notificationsEnabled ?? true;
-
-      // 1. Show notification sliders for each event (leveraging stacking behavior) - only if enabled
-      if (notificationsEnabled) {
-        log(`🔔 Notifications enabled - showing ${updatedEvents.length} event notification(s)`);
-        updatedEvents.forEach(event => {
-          addNotification(event);
-        });
-      } else {
-        log(`🔕 Notifications disabled - skipping ${updatedEvents.length} event notification(s)`);
-      }
-
-      // 2. Pass events to Economic Calendar Drawer if it's open (always update drawer regardless of notification setting)
-      if (isEconomicCalendarOpen) {
-        // For multiple events, we'll pass the first event but include all events in the events array
-        setEconomicCalendarUpdatedEvent({
-          updatedEvents, // Primary events for display
-          allEvents // All updated events
-        });
-        // Clear the updated event after a short delay to prevent re-triggering
-        setTimeout(() => {
-          setEconomicCalendarUpdatedEvent(null);
-        }, 1000);
-      }
-    }
+    if (updatedCalendarId !== calendarId) return;
+    if (!isEconomicCalendarOpen) return;
+    log(`📊 ${updatedEvents.length} economic events updated — refreshing drawer payload`);
+    setEconomicCalendarUpdatedEvent({ updatedEvents, allEvents });
+    setTimeout(() => setEconomicCalendarUpdatedEvent(null), 1000);
   });
-
-
-  // Add a notification (call this when you want to show a new notification)
-  const addNotification = (event: EconomicEvent) => {
-    // Play notification sound
-    playNotificationSound().catch(error => {
-      logger.warn('Failed to play notification sound:', error);
-    });
-
-    setNotifications((prev) => {
-      // If we already have 3 notifications, mark the oldest one for removal
-      if (prev.length >= 3) {
-        const oldestNotification = prev[0];
-        setRemovingNotifications(prevRemoving => {
-          const newSet = new Set(prevRemoving);
-          newSet.add(oldestNotification.id);
-          return newSet;
-        });
-        // Remove the oldest notification after animation delay
-        setTimeout(() => {
-          setNotifications(current => current.filter(n => n.id !== oldestNotification.id));
-          setRemovingNotifications(current => {
-            const newSet = new Set(current);
-            newSet.delete(oldestNotification.id);
-            return newSet;
-          });
-        }, 300);
-      }
-      return [...prev, event];
-    });
-  };
-
-  // Close notification handler
-  const handleCloseNotification = (id: string) => {
-    setRemovingNotifications(prev => {
-      const newSet = new Set(prev);
-      newSet.add(id);
-      return newSet;
-    });
-    setTimeout(() => {
-      setNotifications((prev) => prev.filter(n => n.id !== id));
-      setRemovingNotifications(current => {
-        const newSet = new Set(current);
-        newSet.delete(id);
-        return newSet;
-      });
-    }, 300);
-  };
-
 
 
   // Calendar edit handler
@@ -2713,31 +2634,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         />
       )}
 
-      {/* Notification stack container (bottom left, global) */}
-      <Box
-        sx={{
-          position: 'fixed',
-          bottom: { xs: 16, sm: 24 },
-          left: { xs: 8, sm: 12 },
-          right: { xs: 8, sm: 'auto' },
-          zIndex: 1400,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: { xs: 1.5, sm: 2 },
-          pointerEvents: 'none',
-          maxWidth: { xs: 'calc(100% - 16px)', sm: '400px' }
-        }}
-      >
-        {notifications.map(event => (
-          <EconomicEventNotification
-            key={event.id}
-            event={event}
-            onClose={() => handleCloseNotification(event.id)}
-            autoHideDuration={30000}
-            isRemoving={removingNotifications.has(event.id)}
-          />
-        ))}
-      </Box>
     </Box>
   );
 };
