@@ -385,6 +385,7 @@ function AppContent() {
                     >
                       <CalendarRoute
                         calendars={calendars}
+                        hasFetchedCalendars={swrCalendars !== undefined}
                         onToggleTheme={toggleColorMode}
                         mode={mode}
                         setLoading={setLoading}
@@ -659,6 +660,11 @@ function App() {
 
 interface CalendarRouteProps {
   calendars: Calendar[];
+  /** True only after SWR returned (defined value). Without this, the
+   *  initial render with calendars=[] redirects to "/" → flashes the
+   *  HomeRouteResolver loading state and (in the past) lock overlay
+   *  before SWR resolves and lets us actually find the calendar. */
+  hasFetchedCalendars: boolean;
   onToggleTheme: () => void;
   mode: 'light' | 'dark';
   setLoading: (loading: boolean, loadingAction?: "loading" | "importing" | "exporting") => void;
@@ -666,6 +672,7 @@ interface CalendarRouteProps {
 
 const CalendarRoute: React.FC<CalendarRouteProps> = ({
   calendars,
+  hasFetchedCalendars,
   onToggleTheme,
   mode,
   setLoading,
@@ -698,6 +705,14 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     },
     [replacePanel, setSidePanelOpen]
   );
+
+  // Wait for SWR to actually return before deciding the calendar is gone.
+  // Without this, the very first render (calendars=[]) redirects to "/" on
+  // cold reload, which then bounces back here once SWR resolves — a visible
+  // flash of HomeRouteResolver (and previously the lock overlay) between.
+  if (!hasFetchedCalendars) {
+    return <LoadingFallback />;
+  }
 
   if (!calendar) {
     // Active calendar is gone (deleted, soft-trashed, or URL points to a

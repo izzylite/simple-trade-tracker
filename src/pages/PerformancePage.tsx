@@ -33,6 +33,10 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
 }) => {
   const { user } = useAuthState();
   const { calendars, isLoading } = useCalendars(user?.uid);
+  // SWR returns `undefined` until the first fetch resolves; an empty
+  // array means "fetched, zero calendars". Distinguish so the lock
+  // overlay never flashes during the loading-but-have-data interim.
+  const hasFetched = calendars !== undefined;
 
   const activeCalendars = useMemo(
     () => (calendars || []).filter((c) => !c.deleted_at),
@@ -112,7 +116,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
 
   // ---- Render ----
 
-  if (isLoading && activeCalendars.length === 0) {
+  if (!hasFetched || isLoading) {
     return (
       <Box
         sx={{
