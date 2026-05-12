@@ -19,7 +19,7 @@ interface TradesContextValue {
   hook: ReturnType<typeof useCalendarTrades>;
 }
 
-const TradesContext = createContext<TradesContextValue | null>(null);
+export const TradesContext = createContext<TradesContextValue | null>(null);
 
 interface TradesProviderProps {
   calendars: Calendar[];
