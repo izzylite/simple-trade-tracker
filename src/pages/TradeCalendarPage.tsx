@@ -126,7 +126,7 @@ import { EconomicEvent } from '../types/economicCalendar';
 import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
-import { useCalendarTrades } from '../hooks/useCalendarTrades';
+import { useTradesContext } from '../contexts/TradesContext';
 import { useTradeOperations } from '../contexts/TradeOperationsContext';
 import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
 import {
@@ -551,7 +551,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   // Pinned events live on the user (replaces per-calendar pin storage).
   const { pins: userPinnedEvents } = useUserPinnedEvents();
 
-  // Fetch trades using custom hook - this now handles all trade CRUD operations
+  // Trades + CRUD ops come from the app-level TradesContext (single
+  // useCalendarTrades subscription shared across routes). The hook keys on
+  // the active calendarId and disables realtime for shared/read-only
+  // calendars in the provider itself.
+  const { hook: tradesHook } = useTradesContext();
   const {
     trades,
     calendar: hookCalendar,
@@ -569,12 +573,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     isTradeUpdating,
     loadMonthTrades,
     loadVisibleRangeTrades,
-  } = useCalendarTrades({
-    calendarId,
-    selectedCalendar,
-    setLoading,
-    enableRealtime: !isReadOnly // Disable real-time for read-only mode
-  });
+  } = tradesHook;
 
   const globalTradeOps = useTradeOperations();
 

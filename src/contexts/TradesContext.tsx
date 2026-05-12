@@ -2,6 +2,7 @@ import React, { createContext, useContext, useMemo } from 'react';
 import { Calendar, Trade } from '../types/dualWrite';
 import { useCalendarTrades } from '../hooks/useCalendarTrades';
 import { useSelectedCalendar } from './SelectedCalendarContext';
+import { useAuthState } from './AuthStateContext';
 
 /**
  * App-level trades context — wraps `useCalendarTrades` so any route can read
@@ -36,14 +37,20 @@ export const TradesProvider: React.FC<TradesProviderProps> = ({
   children,
 }) => {
   const { calendarId } = useSelectedCalendar();
+  const { user } = useAuthState();
   const calendar = useMemo(
     () => calendars.find((c) => c.id === calendarId) ?? null,
     [calendars, calendarId]
   );
+  // Disable realtime when the active calendar isn't owned by the signed-in
+  // user (shared / read-only). Mirrors the gate TradeCalendarPage used to
+  // apply locally before it consumed this context.
+  const isReadOnly = !!calendar && !!user?.uid && calendar.user_id !== user.uid;
   const hook = useCalendarTrades({
     calendarId: calendarId || undefined,
     selectedCalendar: calendar,
     setLoading: (loading, action) => setLoading(loading, action ?? 'loading'),
+    enableRealtime: !isReadOnly,
   });
   const value = useMemo<TradesContextValue>(
     () => ({
