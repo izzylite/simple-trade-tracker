@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Button,
+  CircularProgress,
   Snackbar,
   alpha,
   useTheme,
@@ -101,6 +102,14 @@ const NotesPage: React.FC = () => {
     if (fresh) setSelectedNote(fresh);
   }, [notes]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // First-load gate. Once notes have hydrated once (loading flipped false),
+  // subsequent loading flips (search, tab change, calendar switch) don't
+  // re-blank the page — only the list panel shows its own loader.
+  const hasFetchedNotesRef = useRef(false);
+  useEffect(() => {
+    if (!loading) hasFetchedNotesRef.current = true;
+  }, [loading]);
+
   // ─── Auto-select most recently updated note on first load ────────────────
   // Notes from useNotes are already sorted by updated_at desc, so notes[0]
   // is the freshest. Skip when user is mid-draft or already viewing a note.
@@ -196,6 +205,24 @@ const NotesPage: React.FC = () => {
       logger.error('Error archiving note', err);
     }
   }, [removeNote, selectedNote]);
+
+  // Initial cold-load loader. While the first fetch is in flight we'd
+  // otherwise render the empty NoteViewPanel — which is the "create note"
+  // CTA — and that flashes before real notes arrive.
+  if (!hasFetchedNotesRef.current && loading) {
+    return (
+      <Box
+        sx={{
+          height: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <CircularProgress size={28} />
+      </Box>
+    );
+  }
 
   return (
     <Box
