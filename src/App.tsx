@@ -38,8 +38,10 @@ import type { SidePanelView } from './contexts/SidePanelContext';
 import { TradeUIProvider } from './contexts/TradeUIContext';
 import { TradesProvider } from './contexts/TradesContext';
 import { AIChatProvider } from './contexts/AIChatContext';
+import { TradeViewerProvider } from './contexts/TradeViewerContext';
 import GlobalAIChat from './components/aiChat/GlobalAIChat';
 import GlobalAIChatFab from './components/aiChat/GlobalAIChatFab';
+import GlobalTradeViewer from './components/trades/GlobalTradeViewer';
 import { PanelMutexProvider, usePanelMutexSlot } from './contexts/PanelMutexContext';
 import { useCalendarsListPanel } from './contexts/CalendarsListPanelContext';
 
@@ -301,6 +303,7 @@ function AppContent() {
       <CalendarsListPanelProvider actions={calendarsListActions}>
       <TradesProvider calendars={calendars} setLoading={setLoading}>
       <TradeUIProvider>
+      <TradeViewerProvider>
       <AIChatProvider>
       <SidePanelProvider defaultView={{ id: 'faq' }} defaultOpen={false}>
       <PanelMutexProvider>
@@ -308,6 +311,7 @@ function AppContent() {
       <CalendarsListMutexBridge />
       {user && <GlobalAIChat />}
       {user && <GlobalAIChatFab />}
+      {user && <GlobalTradeViewer />}
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* App Header — hidden on landing page (has its own nav) */}
         {!isLandingPage && (
@@ -474,6 +478,7 @@ function AppContent() {
       </PanelMutexProvider>
       </SidePanelProvider>
       </AIChatProvider>
+      </TradeViewerProvider>
       </TradeUIProvider>
       </TradesProvider>
       </CalendarsListPanelProvider>

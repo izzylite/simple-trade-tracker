@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import AIChatDrawer from './AIChatDrawer';
 import { useAIChat } from '../../contexts/AIChatContext';
 import { useTradesContext } from '../../contexts/TradesContext';
+import { useTradeViewer } from '../../contexts/TradeViewerContext';
 import { useNotifications } from '../../contexts/NotificationsContext';
 import { usePanelMutexSlot } from '../../contexts/PanelMutexContext';
 import {
@@ -33,6 +34,7 @@ import { TradeOperationsProps } from '../../types/tradeOperations';
 const GlobalAIChat: React.FC = () => {
   const { calendar, trades } = useTradesContext();
   const aiChat = useAIChat();
+  const tradeViewer = useTradeViewer();
   const { registerRouteHandler } = useNotifications();
   const aiTasks = aiChat.aiTasks;
 
@@ -83,18 +85,26 @@ const GlobalAIChat: React.FC = () => {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, openOnTab]);
 
-  // Minimal tradeOperations stub — pages with their own dialog stack
-  // (TradeCalendarPage) pass through richer ops. The global mount has no
-  // access to page-side dialogs, so edit/zoom/gallery handlers stay
-  // undefined and the corresponding bubble buttons render disabled.
+  // tradeOperations for the chat surface. Read-only ops (zoom image,
+  // open gallery) route through TradeViewerContext so trade clicks open
+  // the global gallery dialog instead of doing nothing on non-calendar
+  // routes. Mutating ops (edit / delete / update) stay undefined here —
+  // those still live on the page-local TradeCalendarPage dialog stack,
+  // and the gallery's mutating buttons gracefully disable.
   const tradeOperations = useMemo<TradeOperationsProps>(
     () => ({
       onUpdateTradeProperty: undefined,
       onEditTrade: undefined,
       onDeleteTrade: undefined,
       onDeleteMultipleTrades: undefined,
-      onZoomImage: undefined,
-      onOpenGalleryMode: undefined,
+      onZoomImage: tradeViewer.openImageZoom,
+      onOpenGalleryMode: (galleryTrades, initialTradeId, title, fetchYear) =>
+        tradeViewer.openGallery({
+          trades: galleryTrades,
+          initialTradeId,
+          title,
+          fetchYear,
+        }),
       onOpenAIChat: undefined,
       onUpdateCalendarProperty: undefined,
       isTradeUpdating: () => false,
@@ -103,7 +113,7 @@ const GlobalAIChat: React.FC = () => {
       calendar: calendar || undefined,
       isReadOnly: !calendar,
     }),
-    [calendar]
+    [calendar, tradeViewer]
   );
 
   // Consume initialTrade once the drawer mounts the prop — AIChatContent
