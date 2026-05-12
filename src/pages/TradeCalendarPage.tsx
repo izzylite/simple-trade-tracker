@@ -133,7 +133,6 @@ import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
 import { useCalendarTrades } from '../hooks/useCalendarTrades';
-import { useOrionTasks } from '../hooks/useOrionTasks';
 import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
 import {
   SidePanelProvider,
@@ -747,15 +746,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   }, []);
 
   // AI Chat drawer — dispatched through global AIChatContext. The drawer
-  // itself mounts once at App level (GlobalAIChat); this page just opens it.
+  // itself mounts once at App level (GlobalAIChat) along with the global
+  // FAB (GlobalAIChatFab); this page just opens it for in-trade actions.
   const globalAIChat = useAIChat();
-
-  // Orion tasks subscription is kept page-local solely to drive the FAB
-  // pulse + dot badge (`taskUnreadCount`). The drawer reads its own copy
-  // via GlobalAIChat — useOrionTasks shares a module-level cache so the
-  // two calls hydrate from the same data without refetching.
-  const aiTasks = useOrionTasks(calendar?.user_id, calendar?.id);
-  const taskUnreadCount = aiTasks.unreadCount;
 
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
@@ -1025,11 +1018,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     () => togglePanel('economic-calendar', setIsEconomicCalendarOpen),
     [togglePanel]
   );
-
-  // AI Chat toggle handler — opens the App-level GlobalAIChat drawer.
-  const handleToggleAIChat = useCallback(() => {
-    globalAIChat.open();
-  }, [globalAIChat]);
 
   // Scroll detection for floating month navigation with throttling
   // Listens on the main content container (not window) since content
@@ -2509,73 +2497,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         </Box>
 
       </Box>{/* end main content container */}
-
-      {/* Orion FAB — sticky to bottom-right of the left content area.
-          Shifts inward automatically when the economic calendar panel opens
-          because this element is bounded by the flex: 1 left Box. */}
-      {!isReadOnly && (
-        <Box
-          sx={{
-            position: 'sticky',
-            bottom: { xs: 16, sm: 24 },
-            display: 'flex',
-            justifyContent: 'flex-end',
-            pr: { xs: 2, sm: 3 },
-            pointerEvents: 'none',
-            zIndex: 50,
-          }}
-        >
-          <Tooltip title="Orion" placement="left">
-            <Fab
-              aria-label="open ai chat"
-              onClick={handleToggleAIChat}
-              color="secondary"
-              size="medium"
-              sx={{
-                pointerEvents: 'auto',
-                width: { xs: 48, sm: 56 },
-                height: { xs: 48, sm: 56 },
-                '&:hover': { transform: 'scale(1.08)' },
-                transition: 'transform 0.2s ease',
-                // When there's an unread briefing, pulse a soft ring around
-                // the fab. Uses box-shadow so it doesn't affect layout and
-                // doesn't fight the hover scale transform on the fab itself.
-                ...((taskUnreadCount ?? 0) > 0 && {
-                  animation: 'orionFabPulse 1.8s ease-out infinite',
-                  '@keyframes orionFabPulse': {
-                    '0%': {
-                      boxShadow: `0 0 0 0 ${alpha(theme.palette.secondary.main, 0.55)}`,
-                    },
-                    '70%': {
-                      boxShadow: `0 0 0 14px ${alpha(theme.palette.secondary.main, 0)}`,
-                    },
-                    '100%': {
-                      boxShadow: `0 0 0 0 ${alpha(theme.palette.secondary.main, 0)}`,
-                    },
-                  },
-                }),
-              }}
-            >
-              <Badge
-                variant="dot"
-                color="error"
-                invisible={taskUnreadCount === 0}
-                sx={{
-                  '& .MuiBadge-badge': {
-                    top: 4,
-                    right: 4,
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
-                  },
-                }}
-              >
-                <AIIcon />
-              </Badge>
-            </Fab>
-          </Tooltip>
-        </Box>
-      )}
 
       </Box>{/* end left side content */}
 

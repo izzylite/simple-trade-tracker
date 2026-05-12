@@ -39,6 +39,7 @@ import { TradeUIProvider } from './contexts/TradeUIContext';
 import { TradesProvider } from './contexts/TradesContext';
 import { AIChatProvider } from './contexts/AIChatContext';
 import GlobalAIChat from './components/aiChat/GlobalAIChat';
+import GlobalAIChatFab from './components/aiChat/GlobalAIChatFab';
 import { PanelMutexProvider, usePanelMutexSlot } from './contexts/PanelMutexContext';
 import { useCalendarsListPanel } from './contexts/CalendarsListPanelContext';
 
@@ -306,6 +307,7 @@ function AppContent() {
       <GlobalSidePanelMutexBridge />
       <CalendarsListMutexBridge />
       {user && <GlobalAIChat />}
+      {user && <GlobalAIChatFab />}
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* App Header — hidden on landing page (has its own nav) */}
         {!isLandingPage && (

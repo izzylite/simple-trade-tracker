@@ -103,6 +103,18 @@ const GlobalAIChat: React.FC = () => {
     [calendar]
   );
 
+  // Consume initialTrade once the drawer mounts the prop — AIChatContent
+  // reads `initialTradeId` on its own mount and resolves the trade from
+  // the `trades` array. After one open we clear the context state so the
+  // next open without an explicit trade doesn't re-seed.
+  useEffect(() => {
+    if (!aiChat.isOpen || !aiChat.initialTrade) return;
+    // Defer one tick so the drawer's mount effect picks up initialTradeId
+    // before we clear it.
+    const t = setTimeout(() => aiChat.consumeInitialTrade(), 0);
+    return () => clearTimeout(t);
+  }, [aiChat.isOpen, aiChat.initialTrade, aiChat.consumeInitialTrade]);
+
   return (
     <AIChatDrawer
       open={aiChat.isOpen}
@@ -116,6 +128,7 @@ const GlobalAIChat: React.FC = () => {
       onDeepLinkConsumed={aiChat.consumeDeepLink}
       requestActiveTab={aiChat.requestedTab}
       onTabRequestConsumed={aiChat.consumeTabRequest}
+      initialTradeId={aiChat.initialTrade?.id}
     />
   );
 };

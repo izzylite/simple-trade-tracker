@@ -66,6 +66,9 @@ interface AIChatDrawerProps {
    */
   requestActiveTab?: number | null;
   onTabRequestConsumed?: () => void;
+  /** Pre-select a specific trade in the chat surface — used by "AI chat
+   *  from this trade" entry points. Forwarded to AIChatContent. */
+  initialTradeId?: string;
 }
 
 // Bottom sheet heights
@@ -89,6 +92,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   onDeepLinkConsumed,
   requestActiveTab,
   onTabRequestConsumed,
+  initialTradeId,
 }) => {
   const theme = useTheme();
   const { user } = useAuth();
@@ -418,6 +422,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 onScrolledToMessage={() => setScrollToMessageId(null)}
                 canReturnToPrevious={!!deepLinkOrigin}
                 onReturnToPrevious={handleReturnToPrevious}
+                initialTradeId={initialTradeId}
               />
             </TabPanel>
 
