@@ -529,21 +529,14 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         // Broadcast delete to other components (e.g., PerformanceCharts)
         deletedTrades.forEach((trade) => tradeSync?.broadcastTradeDelete(trade));
 
-        setNotification({
-          message: `Deleted ${tradeIds.length} trade(s)`,
-          type: "success",
-        });
+        // Success/error snackbars for delete come from
+        // TradeOperationsContext (GlobalTradeOperations renders the
+        // retry-capable snackbar). Don't emit a duplicate here.
         // Real-time subscription will handle the update
       } catch (err) {
         // Revert optimistic update on error
         setTradesMap(previousMap);
         logger.error("Error deleting trades:", err);
-        setNotification({
-          message: err instanceof Error
-            ? err.message
-            : "Failed to delete trades",
-          type: "error",
-        });
         throw err;
       } finally {
         setUpdatingTradeIds((prev) => {
