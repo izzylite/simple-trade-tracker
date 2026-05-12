@@ -2,10 +2,9 @@ import React, { useEffect, useRef, useState, Suspense } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Box,
+  CircularProgress,
   IconButton,
   LinearProgress,
-  Skeleton,
-  Stack,
   Typography,
   Divider,
   alpha,
@@ -33,34 +32,20 @@ const PANEL_WIDTH = 'clamp(360px, 36vw, 580px)';
 const CALENDARS_PANEL_WIDTH = PANEL_WIDTH;
 
 /**
- * Inline loading state for the route content area. A top-anchored
- * LinearProgress signals the page is fetching/parsing without blanking
- * the column; a sparse skeleton scaffolds the typical page shape so the
- * shell never reflows when the real content paints. AppHeader + SideNav
- * remain mounted (Suspense fires inside the column only).
+ * Inline loading state for the route content area. Centered spinner
+ * inside the main column — AppHeader + SideNav stay mounted, only the
+ * page area renders the loader while the chunk fetches.
  */
 const RouteSuspenseFallback: React.FC = () => (
-  <Box sx={{ position: 'relative', height: '100%', minHeight: 'calc(100vh - 64px)' }}>
-    <LinearProgress
-      sx={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: 2,
-      }}
-    />
-    <Stack spacing={2} sx={{ p: { xs: 2, sm: 3 }, pt: { xs: 3, sm: 4 } }}>
-      <Skeleton variant="text" width="40%" height={36} />
-      <Skeleton variant="text" width="60%" height={20} />
-      <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 1.5 }} />
-      <Stack direction="row" spacing={2}>
-        <Skeleton variant="rectangular" height={80} sx={{ flex: 1, borderRadius: 1.5 }} />
-        <Skeleton variant="rectangular" height={80} sx={{ flex: 1, borderRadius: 1.5 }} />
-        <Skeleton variant="rectangular" height={80} sx={{ flex: 1, borderRadius: 1.5 }} />
-      </Stack>
-      <Skeleton variant="rectangular" height={240} sx={{ borderRadius: 1.5 }} />
-    </Stack>
+  <Box
+    sx={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 'calc(100vh - 64px)',
+    }}
+  >
+    <CircularProgress size={28} />
   </Box>
 );
 
