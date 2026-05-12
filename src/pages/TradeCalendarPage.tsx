@@ -148,7 +148,7 @@ import {
   EconomicCalendarView,
   AIAnalysisView,
 } from '../contexts/SidePanelContext';
-import { usePublishPageSidePanelCloser } from '../contexts/PanelMutexContext';
+import { usePanelMutexSlot } from '../contexts/PanelMutexContext';
 import SidePanel from '../components/sidePanel/SidePanel';
 import AIChatContent from '../components/sidePanel/content/AIChatContent';
 import NotesContent from '../components/sidePanel/content/NotesContent';
@@ -173,9 +173,6 @@ interface TradeCalendarProps {
   /** Dispatches to the app-level SidePanelProvider (outside this page's local
    *  one). Used for panels migrated to the global registry. */
   openGlobalPanel?: (view: SidePanelView) => void;
-  /** Mutex partner: closes the app-level SidePanel when a page-local panel
-   *  opens. Wired by CalendarRoute from the global SidePanel context. */
-  closeGlobalPanel?: () => void;
 }
 
 /**
@@ -578,7 +575,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     mode,
     isReadOnly = false,
     openGlobalPanel,
-    closeGlobalPanel,
   } = props;
 
 
@@ -861,22 +857,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   } = useSidePanel();
 
   // ── Panel mutex ─────────────────────────────────────────────────────────
-  // Coordinate exclusion with the app-level SidePanel (FAQ etc.). Publish a
-  // local-closer so the mutex provider can collapse this page's panel when
-  // a global one opens; in the other direction, close the global panel
-  // whenever this page's local panel transitions to open.
+  // Register this page's local panel as a mutex slot. The mutex broadcasts
+  // opens across all three surfaces (global SidePanel, CalendarsList panel,
+  // and this one) — only one can be open at a time.
   const closeLocalPanel = useCallback(() => {
     setPanelOpen(false);
   }, [setPanelOpen]);
-  usePublishPageSidePanelCloser(closeLocalPanel);
-
-  const prevLocalOpenRef = useRef(isPanelOpen);
-  useEffect(() => {
-    if (isPanelOpen && !prevLocalOpenRef.current) {
-      closeGlobalPanel?.();
-    }
-    prevLocalOpenRef.current = isPanelOpen;
-  }, [isPanelOpen, closeGlobalPanel]);
+  usePanelMutexSlot('page-side-panel', isPanelOpen, closeLocalPanel);
 
   // Ref for main content scroll container (used by floating nav scroll detection)
   const mainContentRef = useRef<HTMLDivElement>(null);

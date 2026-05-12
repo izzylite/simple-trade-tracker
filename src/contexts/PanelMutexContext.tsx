@@ -7,66 +7,67 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useSidePanel } from './SidePanelContext';
 
 /**
- * Coordinates mutual exclusion between the App-level SidePanel (FAQ, etc.)
- * and any page-level SidePanelProvider (TradeCalendarPage, EconomicEventsPage).
+ * Cross-panel exclusion. The app has three panel surfaces that can't be open
+ * at the same time:
+ *  - Global SidePanel (App-level, e.g. FAQ).
+ *  - CalendarsList panel (App-level, opened from header dropdown).
+ *  - Page-local SidePanel (TradeCalendarPage / EconomicEventsPage).
  *
- * Pattern:
- *  - Pages publish a "close my local panel" callback via usePublishPageSidePanelCloser.
- *  - When the global side panel transitions to open, the mutex fires the
- *    published closer so the page-local panel collapses.
- *  - The reverse direction (close global when local opens) is handled inside
- *    the page itself, which receives a `closeGlobalPanel` callback as a prop
- *    from CalendarRoute (outside the local SidePanelProvider, so it can read
- *    the global one).
+ * Each surface registers (sourceId, close) with the mutex and signals when it
+ * opens. The mutex fires every OTHER registered closer.
  *
- * The mutex provider must live INSIDE the global SidePanelProvider so it can
- * subscribe to its isOpen, and OUTSIDE any page-level SidePanelProvider so it
- * doesn't accidentally read the local one.
+ * Pages mount and unmount; their slot id `'page-side-panel'` is reused — only
+ * one page is mounted at a time, so collisions don't happen.
  */
+export type PanelSourceId =
+  | 'global-side-panel'
+  | 'calendars-list'
+  | 'page-side-panel';
+
 interface PanelMutexContextValue {
-  setPageCloser: (close: (() => void) | null) => void;
+  registerCloser: (id: PanelSourceId, close: () => void) => () => void;
+  signalOpened: (id: PanelSourceId) => void;
 }
 
 const PanelMutexContext = createContext<PanelMutexContextValue>({
-  setPageCloser: () => {
-    // No-op fallback. Components outside the provider can call the publish
-    // hook without throwing; the published callback just never fires.
-  },
+  registerCloser: () => () => {},
+  signalOpened: () => {},
 });
 
 export const PanelMutexProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [pageCloser, setPageCloserState] = useState<(() => void) | null>(null);
-  const { isOpen: globalIsOpen, currentView } = useSidePanel();
+  // Use a ref + version counter so registerCloser is stable across renders.
+  // Consumers call it inside effects; a churning identity would re-register
+  // every render and break the slot lifecycle.
+  const closersRef = useRef(new Map<PanelSourceId, () => void>());
 
-  const setPageCloser = useCallback((close: (() => void) | null) => {
-    setPageCloserState(() => close);
+  const registerCloser = useCallback(
+    (id: PanelSourceId, close: () => void) => {
+      closersRef.current.set(id, close);
+      return () => {
+        // Only unset if the entry is still the one we set — guards against
+        // late-unmount cleanups clobbering a fresh registration with the
+        // same id (e.g. page navigation re-uses 'page-side-panel').
+        if (closersRef.current.get(id) === close) {
+          closersRef.current.delete(id);
+        }
+      };
+    },
+    []
+  );
+
+  const signalOpened = useCallback((id: PanelSourceId) => {
+    closersRef.current.forEach((close, otherId) => {
+      if (otherId !== id) close();
+    });
   }, []);
 
-  // Fire the published closer when the global panel transitions from closed
-  // to open. We also re-fire when currentView changes while the panel is
-  // open, so navigating between global views (e.g. FAQ → some other future
-  // global view) still kicks the local panel.
-  const prevGlobalOpenRef = useRef(globalIsOpen);
-  const prevViewIdRef = useRef(currentView.id);
-  useEffect(() => {
-    const justOpened = globalIsOpen && !prevGlobalOpenRef.current;
-    const viewChangedWhileOpen =
-      globalIsOpen && currentView.id !== prevViewIdRef.current;
-    if (justOpened || viewChangedWhileOpen) {
-      pageCloser?.();
-    }
-    prevGlobalOpenRef.current = globalIsOpen;
-    prevViewIdRef.current = currentView.id;
-  }, [globalIsOpen, currentView.id, pageCloser]);
-
   const value = useMemo<PanelMutexContextValue>(
-    () => ({ setPageCloser }),
-    [setPageCloser]
+    () => ({ registerCloser, signalOpened }),
+    [registerCloser, signalOpened]
   );
 
   return (
@@ -77,16 +78,30 @@ export const PanelMutexProvider: React.FC<{ children: React.ReactNode }> = ({
 };
 
 /**
- * Publish the calling page's local-panel close callback. Re-runs whenever
- * `close` identity changes; the publisher should wrap it in useCallback so
- * registrations don't churn on every render.
+ * Single-call hook each panel surface uses to participate in the mutex.
+ *
+ * - Registers `close` while mounted.
+ * - Watches `isOpen` and signals on each closed→open transition.
+ *
+ * `close` must be stable (useCallback'd) so the registration doesn't churn.
  */
-export const usePublishPageSidePanelCloser = (
-  close: (() => void) | null
+export const usePanelMutexSlot = (
+  sourceId: PanelSourceId,
+  isOpen: boolean,
+  close: () => void
 ): void => {
-  const { setPageCloser } = useContext(PanelMutexContext);
+  const { registerCloser, signalOpened } = useContext(PanelMutexContext);
+
   useEffect(() => {
-    setPageCloser(close);
-    return () => setPageCloser(null);
-  }, [setPageCloser, close]);
+    const unregister = registerCloser(sourceId, close);
+    return unregister;
+  }, [registerCloser, sourceId, close]);
+
+  const prevOpenRef = useRef(isOpen);
+  useEffect(() => {
+    if (isOpen && !prevOpenRef.current) {
+      signalOpened(sourceId);
+    }
+    prevOpenRef.current = isOpen;
+  }, [isOpen, sourceId, signalOpened]);
 };

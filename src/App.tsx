@@ -36,7 +36,8 @@ import {
 import { SidePanelProvider, useSidePanel } from './contexts/SidePanelContext';
 import type { SidePanelView } from './contexts/SidePanelContext';
 import { TradeUIProvider } from './contexts/TradeUIContext';
-import { PanelMutexProvider } from './contexts/PanelMutexContext';
+import { PanelMutexProvider, usePanelMutexSlot } from './contexts/PanelMutexContext';
+import { useCalendarsListPanel } from './contexts/CalendarsListPanelContext';
 
 // Lazy load page components from pages directory
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -297,6 +298,8 @@ function AppContent() {
       <TradeUIProvider>
       <SidePanelProvider defaultView={{ id: 'faq' }} defaultOpen={false}>
       <PanelMutexProvider>
+      <GlobalSidePanelMutexBridge />
+      <CalendarsListMutexBridge />
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* App Header — hidden on landing page (has its own nav) */}
         {!isLandingPage && (
@@ -501,6 +504,23 @@ function AppContent() {
   );
 }
 
+// Mutex bridges — small headless components mounted inside the provider
+// stack so each panel surface registers a (id, close) slot with the mutex.
+// When any slot signals open, the mutex closes every other slot.
+
+const GlobalSidePanelMutexBridge: React.FC = () => {
+  const { isOpen, setOpen } = useSidePanel();
+  const close = useCallback(() => setOpen(false), [setOpen]);
+  usePanelMutexSlot('global-side-panel', isOpen, close);
+  return null;
+};
+
+const CalendarsListMutexBridge: React.FC = () => {
+  const { open, closePanel } = useCalendarsListPanel();
+  usePanelMutexSlot('calendars-list', open, closePanel);
+  return null;
+};
+
 // Scrolls to top when route changes
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
@@ -638,12 +658,6 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     },
     [replacePanel, setSidePanelOpen]
   );
-  // Mutex partner: TradeCalendarPage's local panel opening calls this to
-  // collapse the global panel. (The other direction is handled by
-  // PanelMutexProvider firing the page's published closer.)
-  const closeGlobalPanel = useCallback(() => {
-    setSidePanelOpen(false);
-  }, [setSidePanelOpen]);
 
   if (!calendar) {
     // Active calendar is gone (deleted, soft-trashed, or URL points to a
@@ -670,7 +684,6 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       onToggleTheme={onToggleTheme}
       mode={mode}
       openGlobalPanel={openGlobalPanel}
-      closeGlobalPanel={closeGlobalPanel}
     />
   );
 };
