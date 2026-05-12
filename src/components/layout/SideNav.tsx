@@ -63,7 +63,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: <HomeIcon />,
     match: (p) => p === '/' || p.startsWith('/calendar/') || p === '/dashboard',
   },
-  { label: 'Performance', path: '/performance', icon: <PerformanceIcon /> },
+  { label: 'Stats', path: '/performance', icon: <PerformanceIcon /> },
   { label: 'Notes', path: '/notes', icon: <NotesIcon /> },
   { label: 'Events', path: '/events', icon: <EventsIcon /> },
 ];

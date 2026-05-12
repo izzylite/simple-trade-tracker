@@ -7,7 +7,7 @@
 import { TradeImage } from '../components/trades/TradeForm';
 import { ScoreSettings } from './score';
 import { ImageAttribution } from '../components/heroImage';
-import { EconomicCalendarFilterSettings } from '../components/economicCalendar/EconomicCalendarDrawer';
+import { EconomicCalendarFilterSettings } from '../hooks/useEconomicCalendarFilters';
 import { ImpactLevel, Currency } from './economicCalendar';
 
 // =====================================================

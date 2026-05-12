@@ -43,10 +43,12 @@ import {
 import { useEconomicEvents } from '../hooks/useEconomicEvents';
 import { useEventCountdownTime } from '../hooks/useCurrentTime';
 import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
-import { useUserEconomicFilters } from '../contexts/UserEconomicFiltersContext';
 import { useTradesContext } from '../contexts/TradesContext';
 import { useTradeOperations } from '../contexts/TradeOperationsContext';
-import { useEconomicCalendarFilters } from '../hooks/useEconomicCalendarFilters';
+import {
+  DEFAULT_FILTER_SETTINGS,
+  EconomicCalendarFilterSettings,
+} from '../hooks/useEconomicCalendarFilters';
 import { useUserTradeEventCounts } from '../hooks/useUserTradeEventCounts';
 import {
   SidePanelProvider,
@@ -69,7 +71,6 @@ import { useEventPageTradeOps } from '../hooks/useEventPageTradeOps';
 import AllPinnedEventsContent from '../components/economicCalendar/AllPinnedEventsContent';
 import EconomicEventShimmer from '../components/economicCalendar/EconomicEventShimmer';
 import { Z_INDEX } from '../styles/zIndex';
-import { ImpactFilter } from '../services/userEconomicFiltersService';
 
 const APP_HEADER_HEIGHT = 64;
 // App.tsx sets pb: 0 for /events (isViewportLockedPage) so the page can
@@ -77,17 +78,18 @@ const APP_HEADER_HEIGHT = 64;
 // must be subtracted from 100vh.
 const APP_VIEWPORT_OFFSET = APP_HEADER_HEIGHT;
 
-type HubTab = 'calendar' | 'releases';
+type HubTab = 'all' | 'upcoming' | 'releases';
 
-const IMPACT_FILTERS: Array<{ value: ImpactFilter; label: string }> = [
+const IMPACT_LEVELS: Array<{ value: ImpactLevel; label: string }> = [
   { value: 'High', label: 'High' },
   { value: 'Medium', label: 'Med' },
   { value: 'Low', label: 'Low' },
-  { value: 'all', label: 'All' },
 ];
+const ALL_IMPACTS: ImpactLevel[] = ['High', 'Medium', 'Low'];
 
 const HUB_TABS: Array<{ value: HubTab; label: string }> = [
-  { value: 'calendar', label: 'Calendar' },
+  { value: 'all', label: 'All' },
+  { value: 'upcoming', label: 'Upcoming' },
   { value: 'releases', label: 'Releases' },
 ];
 
@@ -203,11 +205,9 @@ const getActualResultStyle = (
   }
 };
 
+/** A "release" is an event whose actual figure has already published. */
 const isReleaseEvent = (e: EconomicEvent): boolean =>
-  Boolean(
-    (e.forecast_value && e.forecast_value.trim() !== '') ||
-      (e.previous_value && e.previous_value.trim() !== '')
-  );
+  Boolean(e.actual_value && e.actual_value.trim() !== '');
 
 const formatRelativeTime = (timeUtc: string, now: Date): string => {
   try {
@@ -254,36 +254,62 @@ const EconomicEventsPageInner: React.FC = () => {
     startOfWeek(new Date(), { weekStartsOn: 0 })
   );
   const [selectedDay, setSelectedDay] = useState<Date>(() => new Date());
-  const {
-    impactFilter,
-    currencies: selectedCurrencies,
-    onlyUpcoming,
-    setImpactFilter,
-    toggleCurrency,
-    setOnlyUpcoming,
-  } = useUserEconomicFilters();
-
-  // Per-calendar notifications toggle. Lifted from EconomicCalendarPanel so it
-  // lives on the page header where users actually look for it. Reads/writes
-  // through the same `useEconomicCalendarFilters` hook the panel used.
+  // All filters live on the selected calendar (`calendars.economic_calendar_filters`)
+  // so Events page + Home page panel/drawer stay in sync. Read straight from
+  // the calendar row, write via onUpdateCalendarProperty — change here shows up
+  // immediately on home via the same calendar prop.
   const { calendar, isReadOnly: calendarIsReadOnly } = useTradesContext();
   const { onUpdateCalendarProperty } = useTradeOperations();
-  const { notificationsEnabled, setNotificationsEnabled } =
-    useEconomicCalendarFilters({ calendar, onUpdateCalendarProperty });
-  const [hubTab, setHubTab] = useState<HubTab>('calendar');
 
-  // Releases tab is only relevant for today — actuals print today, forecasts
-  // for past days are stale and future days haven't released yet. Force the
-  // tab back to Calendar whenever the user navigates off today.
-  const isSelectedDayToday = useMemo(
-    () => isSameDay(selectedDay, new Date()),
-    [selectedDay]
+  const filterSettings: EconomicCalendarFilterSettings =
+    calendar?.economic_calendar_filters || DEFAULT_FILTER_SETTINGS;
+  const selectedCurrencies = filterSettings.currencies;
+  const selectedImpacts = filterSettings.impacts;
+  const notificationsEnabled = filterSettings.notificationsEnabled;
+
+  const updateFilters = useCallback(
+    (patch: Partial<EconomicCalendarFilterSettings>) => {
+      if (!calendar?.id || !onUpdateCalendarProperty || calendarIsReadOnly) return;
+      void onUpdateCalendarProperty(calendar.id, (cal) => ({
+        ...cal,
+        economic_calendar_filters: {
+          ...(cal.economic_calendar_filters || DEFAULT_FILTER_SETTINGS),
+          ...patch,
+        },
+      }));
+    },
+    [calendar?.id, onUpdateCalendarProperty, calendarIsReadOnly]
   );
-  useEffect(() => {
-    if (!isSelectedDayToday && hubTab === 'releases') {
-      setHubTab('calendar');
-    }
-  }, [isSelectedDayToday, hubTab]);
+
+  const toggleCurrency = useCallback(
+    (c: Currency) => {
+      const next = selectedCurrencies.includes(c)
+        ? selectedCurrencies.filter((x) => x !== c)
+        : [...selectedCurrencies, c];
+      updateFilters({ currencies: next });
+    },
+    [selectedCurrencies, updateFilters]
+  );
+
+  const toggleImpact = useCallback(
+    (i: ImpactLevel) => {
+      const next = selectedImpacts.includes(i)
+        ? selectedImpacts.filter((x) => x !== i)
+        : [...selectedImpacts, i];
+      updateFilters({ impacts: next });
+    },
+    [selectedImpacts, updateFilters]
+  );
+
+  const setAllImpacts = useCallback(() => {
+    updateFilters({ impacts: ALL_IMPACTS });
+  }, [updateFilters]);
+
+  const setNotificationsEnabled = useCallback(
+    (v: boolean) => updateFilters({ notificationsEnabled: v }),
+    [updateFilters]
+  );
+  const [hubTab, setHubTab] = useState<HubTab>('all');
 
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
@@ -315,29 +341,38 @@ const EconomicEventsPageInner: React.FC = () => {
     setSelectedDay(d);
   };
 
-  const impactsForFetch: ImpactLevel[] = useMemo(() => {
-    if (impactFilter === 'all') return ['High', 'Medium', 'Low'];
-    return [impactFilter];
-  }, [impactFilter]);
-
   // pageSize bumped: a full week with All impacts can return 150+ events.
   // Default 50 was clipping the list to Mon/Tue only.
   const { events, loading, error } = useEconomicEvents({
     viewType: 'week',
     currentDate: weekStart,
     currencies: selectedCurrencies,
-    impacts: impactsForFetch,
-    onlyUpcoming,
+    impacts: selectedImpacts,
+    onlyUpcoming: false,
     enabled: true,
     pageSize: 300,
   });
 
-  // Apply hub-tab filter (Releases narrows to events with forecast/prior).
-  const visibleEvents = useMemo(() => {
-    return hubTab === 'releases' ? events.filter(isReleaseEvent) : events;
-  }, [events, hubTab]);
+  const { currentTime } = useEventCountdownTime(events, true);
 
-  const { currentTime } = useEventCountdownTime(visibleEvents, true);
+  // Tab-driven visible slice:
+  //   - all       → every event
+  //   - upcoming  → events still in the future
+  //   - releases  → events whose actual figure has printed
+  const visibleEvents = useMemo(() => {
+    if (hubTab === 'releases') return events.filter(isReleaseEvent);
+    if (hubTab === 'upcoming') {
+      const nowMs = currentTime.getTime();
+      return events.filter((e) => {
+        try {
+          return parseISO(e.time_utc).getTime() >= nowMs;
+        } catch {
+          return false;
+        }
+      });
+    }
+    return events;
+  }, [events, hubTab, currentTime]);
 
   const { pins: userPins, pin, unpin, pinningEventId } = useUserPinnedEvents();
   const { getCountForEvent } = useUserTradeEventCounts();
@@ -606,8 +641,9 @@ const EconomicEventsPageInner: React.FC = () => {
 
         <Stack direction="row" alignItems="center" spacing={1}>
           <FilterPill
-            value={impactFilter}
-            onChange={setImpactFilter}
+            selected={selectedImpacts}
+            onToggle={toggleImpact}
+            onSelectAll={setAllImpacts}
             theme={theme}
           />
           <Tooltip
@@ -658,12 +694,6 @@ const EconomicEventsPageInner: React.FC = () => {
           onToggle={toggleCurrency}
           theme={theme}
         />
-        <Box sx={{ flex: 1 }} />
-        <UpcomingToggle
-          value={onlyUpcoming}
-          onChange={setOnlyUpcoming}
-          theme={theme}
-        />
       </Stack>
 
       {/* Hub tabs + date controls */}
@@ -674,12 +704,7 @@ const EconomicEventsPageInner: React.FC = () => {
         flexWrap="wrap"
         sx={{ mb: 2.75, rowGap: 1 }}
       >
-        <HubTabs
-          value={hubTab}
-          onChange={setHubTab}
-          disabled={{ releases: !isSelectedDayToday }}
-          theme={theme}
-        />
+        <HubTabs value={hubTab} onChange={setHubTab} theme={theme} />
 
         <Box sx={{ flex: 1 }} />
 
@@ -890,56 +915,78 @@ const EconomicEventsPage: React.FC = () => (
 );
 
 // ──────────────────────────────────────────────
-// Filter pill — High / Med / Low / All
+// Filter pill — multi-select High / Med / Low + All shortcut
 // ──────────────────────────────────────────────
 const FilterPill: React.FC<{
-  value: ImpactFilter;
-  onChange: (v: ImpactFilter) => void;
+  selected: ImpactLevel[];
+  onToggle: (v: ImpactLevel) => void;
+  onSelectAll: () => void;
   theme: Theme;
-}> = ({ value, onChange, theme }) => (
-  <Stack
-    direction="row"
-    spacing={0.5}
-    sx={{
-      p: 0.5,
-      borderRadius: 1.25,
-      border: `1px solid ${theme.palette.divider}`,
-      bgcolor: alpha(theme.palette.background.paper, 0.4),
-    }}
-  >
-    {IMPACT_FILTERS.map((opt) => {
-      const active = opt.value === value;
-      return (
-        <ButtonBase
-          key={opt.value}
-          onClick={() => onChange(opt.value)}
-          sx={{
-            px: 1.5,
-            py: 0.75,
-            borderRadius: 0.875,
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            color: active
-              ? theme.palette.primary.contrastText
-              : theme.palette.text.secondary,
-            bgcolor: active ? 'primary.main' : 'transparent',
-            transition: 'background 150ms, color 150ms',
-            '&:hover': {
-              color: active
-                ? theme.palette.primary.contrastText
-                : theme.palette.text.primary,
-              bgcolor: active
-                ? theme.palette.primary.dark
-                : theme.palette.action.hover,
-            },
-          }}
-        >
-          {opt.label}
-        </ButtonBase>
-      );
-    })}
-  </Stack>
-);
+}> = ({ selected, onToggle, onSelectAll, theme }) => {
+  const allActive =
+    selected.length === ALL_IMPACTS.length &&
+    ALL_IMPACTS.every((i) => selected.includes(i));
+
+  const impactButtonSx = (active: boolean, color: string) => ({
+    px: 1.5,
+    py: 0.75,
+    borderRadius: 0.875,
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    color: active ? '#fff' : color,
+    bgcolor: active ? color : 'transparent',
+    transition: 'background 150ms, color 150ms',
+    '&:hover': {
+      color: active ? '#fff' : color,
+      bgcolor: active ? alpha(color, 0.85) : alpha(color, 0.12),
+    },
+  });
+
+  const allButtonSx = (active: boolean) => ({
+    px: 1.5,
+    py: 0.75,
+    borderRadius: 0.875,
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    color: active ? theme.palette.primary.contrastText : theme.palette.text.secondary,
+    bgcolor: active ? 'primary.main' : 'transparent',
+    transition: 'background 150ms, color 150ms',
+    '&:hover': {
+      color: active ? theme.palette.primary.contrastText : theme.palette.text.primary,
+      bgcolor: active ? theme.palette.primary.dark : theme.palette.action.hover,
+    },
+  });
+
+  return (
+    <Stack
+      direction="row"
+      spacing={0.5}
+      sx={{
+        p: 0.5,
+        borderRadius: 1.25,
+        border: `1px solid ${theme.palette.divider}`,
+        bgcolor: alpha(theme.palette.background.paper, 0.4),
+      }}
+    >
+      {IMPACT_LEVELS.map((opt) => {
+        const active = selected.includes(opt.value);
+        const color = impactColor(opt.value, theme);
+        return (
+          <ButtonBase
+            key={opt.value}
+            onClick={() => onToggle(opt.value)}
+            sx={impactButtonSx(active, color)}
+          >
+            {opt.label}
+          </ButtonBase>
+        );
+      })}
+      <ButtonBase onClick={onSelectAll} sx={allButtonSx(allActive)}>
+        All
+      </ButtonBase>
+    </Stack>
+  );
+};
 
 // ──────────────────────────────────────────────
 // Currency chips — multi-select, persisted to user
@@ -1017,55 +1064,7 @@ const CurrencyChips: React.FC<{
 };
 
 // ──────────────────────────────────────────────
-// Upcoming-only toggle
-// ──────────────────────────────────────────────
-const UpcomingToggle: React.FC<{
-  value: boolean;
-  onChange: (v: boolean) => void;
-  theme: Theme;
-}> = ({ value, onChange, theme }) => (
-  <ButtonBase
-    onClick={() => onChange(!value)}
-    sx={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 0.875,
-      px: 1.5,
-      py: 0.625,
-      borderRadius: 999,
-      border: `1px solid ${
-        value ? alpha(theme.palette.primary.main, 0.45) : theme.palette.divider
-      }`,
-      bgcolor: value ? alpha(theme.palette.primary.main, 0.16) : 'transparent',
-      color: value ? theme.palette.primary.main : theme.palette.text.secondary,
-      fontSize: '0.78rem',
-      fontWeight: 600,
-      transition: 'background 150ms, color 150ms, border-color 150ms',
-      '&:hover': {
-        color: theme.palette.text.primary,
-        borderColor: alpha(theme.palette.primary.main, 0.4),
-      },
-    }}
-    role="switch"
-    aria-checked={value}
-  >
-    <Box
-      sx={{
-        width: 8,
-        height: 8,
-        borderRadius: '50%',
-        bgcolor: value
-          ? theme.palette.primary.main
-          : alpha(theme.palette.text.primary, 0.2),
-        transition: 'background 150ms',
-      }}
-    />
-    Upcoming only
-  </ButtonBase>
-);
-
-// ──────────────────────────────────────────────
-// Hub tabs — Calendar / Releases
+// Hub tabs — All / Upcoming / Releases
 // ──────────────────────────────────────────────
 const HubTabs: React.FC<{
   value: HubTab;

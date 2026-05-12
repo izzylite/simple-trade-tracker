@@ -45,7 +45,7 @@ interface MonthlyStatsProps {
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: import('../types/dualWrite').Calendar) => import('../types/dualWrite').Calendar) => Promise<import('../types/dualWrite').Calendar | undefined>;
   onEditTrade?: (trade: Trade) => void;
-  economicFilter?: (calendarId: string) => import('./economicCalendar/EconomicCalendarDrawer').EconomicCalendarFilterSettings;
+  economicFilter?: (calendarId: string) => import('../hooks/useEconomicCalendarFilters').EconomicCalendarFilterSettings;
   maxDailyDrawdown?: number;
   pnlBeforeMonth?: number;
   isPnlLoading?: boolean;

@@ -13,7 +13,7 @@ import {
 } from '../services/performanceCalculationService';
 import ShimmerChartLoader from './common/ShimmerChartLoader';
 import { supabase } from '../config/supabase';
-import { EconomicCalendarFilterSettings, DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from './economicCalendar/EconomicCalendarDrawer';
+import { EconomicCalendarFilterSettings, DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../hooks/useEconomicCalendarFilters';
 import { TradeOperationsProps } from '../types/tradeOperations';
 import PnLChartsWrapper from './charts/PnLChartsWrapper';
 import WinLossStats from './charts/WinLossStats';

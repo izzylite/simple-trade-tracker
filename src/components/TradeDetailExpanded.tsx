@@ -53,7 +53,7 @@ import RichTextEditor from './common/RichTextEditor';
 import EconomicEventListItem from './economicCalendar/EconomicEventListItem';
 import { economicCalendarService } from '../services/economicCalendarService';
 import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
-import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS, EconomicCalendarFilterSettings } from './economicCalendar/EconomicCalendarDrawer';
+import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS, EconomicCalendarFilterSettings } from '../hooks/useEconomicCalendarFilters';
 import { logger } from '../utils/logger';
 import { formatCount } from '../utils/formatters';
 import { tradeEconomicEventService } from '../services/tradeEconomicEventService';

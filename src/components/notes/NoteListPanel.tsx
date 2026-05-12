@@ -41,13 +41,16 @@ interface NoteListPanelProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onNoteClick: (note: Note) => void;
-  onNewNote: () => void;
-  canCreateNote: boolean;
+  /** Omit to hide the "new note" affordance entirely (read/edit-only panel). */
+  onNewNote?: () => void;
+  canCreateNote?: boolean;
   tab: NotesTab;
   onTabChange: (t: NotesTab) => void;
   pill: NotesTagPill;
   onPillChange: (p: NotesTagPill) => void;
   total: number;
+  /** Hide the "Notes" title + entries count header. Default true. */
+  showHeader?: boolean;
 }
 
 const extractPreview = (content: string): string => {
@@ -273,6 +276,7 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
   pill,
   onPillChange,
   total,
+  showHeader = true,
 }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -306,37 +310,41 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
       }}
     >
       {/* Header */}
-      <Box sx={{ px: 2.25, pt: 2, pb: 0.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {showHeader && (
+        <Box sx={{ px: 2.25, pt: 2, pb: 0.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography
+              sx={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.015em' }}
+            >
+              Notes
+            </Typography>
+            {onNewNote && (
+              <Tooltip title={canCreateNote ? 'New note' : 'Pick a specific calendar first'} placement="left">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={onNewNote}
+                    disabled={!canCreateNote}
+                    sx={{ color: 'primary.main' }}
+                  >
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
+          </Box>
           <Typography
-            sx={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.015em' }}
+            variant="caption"
+            sx={{
+              color: 'text.disabled',
+              fontFeatureSettings: "'tnum' on",
+              fontSize: '0.72rem',
+            }}
           >
-            Notes
+            {total} {total === 1 ? 'entry' : 'entries'}
           </Typography>
-          <Tooltip title={canCreateNote ? 'New note' : 'Pick a specific calendar first'} placement="left">
-            <span>
-              <IconButton
-                size="small"
-                onClick={onNewNote}
-                disabled={!canCreateNote}
-                sx={{ color: 'primary.main' }}
-              >
-                <AddIcon fontSize="small" />
-              </IconButton>
-            </span>
-          </Tooltip>
         </Box>
-        <Typography
-          variant="caption"
-          sx={{
-            color: 'text.disabled',
-            fontFeatureSettings: "'tnum' on",
-            fontSize: '0.72rem',
-          }}
-        >
-          {total} {total === 1 ? 'entry' : 'entries'}
-        </Typography>
-      </Box>
+      )}
 
       {/* Search */}
       <Box sx={{ px: 1.75, pt: 1, pb: 1 }}>

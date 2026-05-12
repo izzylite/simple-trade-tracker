@@ -5,7 +5,7 @@ import MonthlyStats from '../../MonthlyStats';
 import PerformanceCharts from '../../PerformanceCharts';
 import { Trade, Calendar } from '../../../types/dualWrite';
 import { DynamicRiskSettings } from '../../../utils/dynamicRiskUtils';
-import { EconomicCalendarFilterSettings } from '../../economicCalendar/EconomicCalendarDrawer';
+import { EconomicCalendarFilterSettings } from '../../../hooks/useEconomicCalendarFilters';
 import { scrollbarStyles } from '../../../styles/scrollbarStyles';
 import { useTheme } from '@mui/material/styles';
 

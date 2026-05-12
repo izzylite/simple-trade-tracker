@@ -78,7 +78,7 @@ const NotesPage: React.FC = () => {
 
   // ─── Notes data ───────────────────────────────────────────────────────────
   const {
-    notes, loading, loadingMore, hasMore, total,
+    notes, loading, loadingMore, hasMore, total, hasLoaded,
     updateNote, removeNote, addNote, loadMore,
   } = useNotes({
     userId: user?.uid,
@@ -102,20 +102,10 @@ const NotesPage: React.FC = () => {
     if (fresh) setSelectedNote(fresh);
   }, [notes]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // First-load gate. useNotes starts with loading=false (it doesn't fetch
-  // until the effect kicks in), so we can't treat "loading went false" as
-  // "data arrived". Instead watch for the true→false transition: a real
-  // fetch cycle has completed. After that, subsequent loading flips
-  // (search/tab/calendar) keep the page rendered and the list panel
-  // shows its own inline loader.
-  const hasFetchedNotesRef = useRef(false);
-  const prevLoadingRef = useRef(loading);
-  useEffect(() => {
-    if (prevLoadingRef.current && !loading) {
-      hasFetchedNotesRef.current = true;
-    }
-    prevLoadingRef.current = loading;
-  }, [loading]);
+  // First-load gate. useNotes exposes hasLoaded once the initial fetch
+  // settles (success, error, OR silent cache-hit revalidate). Use that
+  // directly instead of trying to detect a loading true→false transition
+  // — cache hits skip setLoading(true) and would leave the gate stuck.
 
   // ─── Auto-select most recently updated note on first load ────────────────
   // Notes from useNotes are already sorted by updated_at desc, so notes[0]
@@ -218,7 +208,7 @@ const NotesPage: React.FC = () => {
   // note" CTA — and that flashes before real notes arrive. Covers both
   // the loading=true window and the pre-fetch initial render where
   // useNotes hasn't yet kicked off its first request.
-  if (!hasFetchedNotesRef.current) {
+  if (!hasLoaded) {
     return (
       <Box
         sx={{

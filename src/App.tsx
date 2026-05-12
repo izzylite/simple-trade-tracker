@@ -10,7 +10,6 @@ import { useAuthState, AuthStateProvider } from './contexts/AuthStateContext';
 import { TradeSyncProvider } from './contexts/TradeSyncContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import { UserPinnedEventsProvider } from './contexts/UserPinnedEventsContext';
-import { UserEconomicFiltersProvider } from './contexts/UserEconomicFiltersContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
@@ -638,7 +637,6 @@ function App() {
     <AuthProvider>
       <AuthStateProvider>
         <UserPinnedEventsProvider>
-         <UserEconomicFiltersProvider>
           <NotificationsProvider>
             <TradeSyncProvider>
               <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -651,7 +649,6 @@ function App() {
               </LocalizationProvider>
             </TradeSyncProvider>
           </NotificationsProvider>
-         </UserEconomicFiltersProvider>
         </UserPinnedEventsProvider>
       </AuthStateProvider>
     </AuthProvider>

@@ -60,6 +60,12 @@ export interface UseNotesResult {
   loadingMore: boolean;
   hasMore: boolean;
   total: number;
+  /**
+   * True once an initial fetch cycle has settled (success, error, or
+   * cache-hit silent revalidate). Lets pages gate full-page loaders
+   * without watching fragile loading-state transitions.
+   */
+  hasLoaded: boolean;
   loadNotes: (reset?: boolean) => Promise<void>;
   loadMore: () => void;
   updateNote: (noteId: string, updates: Partial<Note>) => void;
@@ -129,6 +135,8 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false);
   const [total, setTotal] = useState(initialCache?.total ?? 0);
+  // Cache hit on mount counts as already-loaded — no need to gate UI again.
+  const [hasLoaded, setHasLoaded] = useState<boolean>(!!initialCache);
 
   // Use ref for offset to avoid it being in dependency array
   const offsetRef = useRef(initialCache?.offset ?? 0);
@@ -248,6 +256,7 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
       } finally {
         setLoading(false);
         setLoadingMore(false);
+        setHasLoaded(true);
       }
     },
     [
@@ -463,6 +472,7 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
     loadingMore,
     hasMore,
     total,
+    hasLoaded,
     loadNotes,
     loadMore,
     updateNote,

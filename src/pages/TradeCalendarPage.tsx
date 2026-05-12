@@ -96,8 +96,9 @@ import { exportTrades } from '../utils/tradeExportImport';
 import { ImportMappingDialog } from '../components/import/ImportMappingDialog';
 
 import { useAIChat } from '../contexts/AIChatContext';
-import NotesDrawer from '../components/notes/NotesDrawer';
 import NoteEditorDialog from '../components/notes/NoteEditorDialog';
+import CalendarNotesPanel from '../components/notes/CalendarNotesPanel';
+import UnifiedDrawer from '../components/common/UnifiedDrawer';
 import {
   StackedNotesWidget,
   StickyReminderCards,
@@ -113,8 +114,8 @@ import { Z_INDEX } from '../styles/zIndex';
 
 import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
 import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
-import EconomicCalendarDrawer, { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
-import EconomicCalendarPanel from '../components/economicCalendar/EconomicCalendarPanel';
+import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../hooks/useEconomicCalendarFilters';
+import EconomicEventsView from '../components/economicCalendar/EconomicEventsView';
 import { useEconomicEventsUpdates } from '../hooks/useEconomicEventWatcher';
 import { TradeOperationsProps } from '../types/tradeOperations';
 import { EconomicEvent } from '../types/economicCalendar';
@@ -135,7 +136,6 @@ import {
 import { usePanelMutexSlot } from '../contexts/PanelMutexContext';
 import SidePanel from '../components/sidePanel/SidePanel';
 import AIChatContent from '../components/sidePanel/content/AIChatContent';
-import NotesContent from '../components/sidePanel/content/NotesContent';
 import SearchContent from '../components/sidePanel/content/SearchContent';
 import PinnedContent from '../components/sidePanel/content/PinnedContent';
 import TagManagementContent from '../components/sidePanel/content/TagManagementContent';
@@ -1279,14 +1279,14 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             title: 'Economic Calendar',
             icon: <EventIcon fontSize="small" />,
             component: (
-              <EconomicCalendarPanel
+              <EconomicEventsView
                 calendar={calendar!}
-                payload={economicCalendarUpdatedEvent}
                 isReadOnly={isReadOnly}
+                onUpdateCalendarProperty={onUpdateCalendarProperty}
                 tradeOperations={tradeOperations}
-                showHeader={false}
-                enabled={isPanelOpen}
+                enabled={isPanelOpen && currentView.id === 'economic-calendar'}
                 initialDate={ecView.initialDate}
+                variant="compact"
               />
             ),
           };
@@ -1296,7 +1296,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             title: 'Notes',
             icon: <NotesIcon fontSize="small" />,
             component: (
-              <NotesContent
+              <CalendarNotesPanel
                 calendarId={calendarId}
                 isReadOnly={isReadOnly}
                 isActive={
@@ -2435,15 +2435,24 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
       {/* Economic Calendar Drawer — only rendered on <lg (panel handles it on lg+) */}
       {!isLgUp && (
-        <EconomicCalendarDrawer
+        <UnifiedDrawer
           open={isEconomicCalendarOpen}
           onClose={() => setIsEconomicCalendarOpen(false)}
-          calendar={calendar!}
-          payload={economicCalendarUpdatedEvent}
-          isReadOnly={isReadOnly}
-          tradeOperations={tradeOperations}
-          enabled={isEconomicCalendarOpen}
-        />
+          title="Economic Calendar"
+          icon={<EventIcon />}
+          width={{ xs: '100%', sm: 450 }}
+          keepMounted
+          contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        >
+          <EconomicEventsView
+            calendar={calendar!}
+            isReadOnly={isReadOnly}
+            onUpdateCalendarProperty={onUpdateCalendarProperty}
+            tradeOperations={tradeOperations}
+            enabled={isEconomicCalendarOpen}
+            variant="compact"
+          />
+        </UnifiedDrawer>
       )}
 
       {/* AI Chat Drawer is mounted once at App level via GlobalAIChat —
@@ -2451,14 +2460,23 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
       {/* Notes Drawer — <lg only */}
       {!isLgUp && (
-        <NotesDrawer
+        <UnifiedDrawer
           open={isNotesDrawerOpen}
           onClose={() => setIsNotesDrawerOpen(false)}
-          calendarId={calendarId}
-          isReadOnly={isReadOnly}
-          availableTradeTags={allTags}
-          pinnedEvents={userPinnedEvents}
-        />
+          title="Notes"
+          icon={<NotesIcon />}
+          width={{ xs: '100%', sm: 450 }}
+          keepMounted
+          contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        >
+          <CalendarNotesPanel
+            calendarId={calendarId}
+            isActive={isNotesDrawerOpen}
+            isReadOnly={isReadOnly}
+            availableTradeTags={allTags}
+            pinnedEvents={userPinnedEvents}
+          />
+        </UnifiedDrawer>
       )}
 
       {/* Stats Drawer — <lg only (lg+ uses SidePanel) */}
