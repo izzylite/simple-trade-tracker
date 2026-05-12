@@ -266,7 +266,7 @@ const EconomicEventsPageInner: React.FC = () => {
   // Per-calendar notifications toggle. Lifted from EconomicCalendarPanel so it
   // lives on the page header where users actually look for it. Reads/writes
   // through the same `useEconomicCalendarFilters` hook the panel used.
-  const { calendar } = useTradesContext();
+  const { calendar, isReadOnly: calendarIsReadOnly } = useTradesContext();
   const { onUpdateCalendarProperty } = useTradeOperations();
   const { notificationsEnabled, setNotificationsEnabled } =
     useEconomicCalendarFilters({ calendar, onUpdateCalendarProperty });
@@ -612,7 +612,9 @@ const EconomicEventsPageInner: React.FC = () => {
           />
           <Tooltip
             title={
-              notificationsEnabled
+              calendarIsReadOnly
+                ? 'Notification settings are read-only for shared calendars'
+                : notificationsEnabled
                 ? 'Disable event notifications'
                 : 'Enable event notifications'
             }
@@ -622,7 +624,7 @@ const EconomicEventsPageInner: React.FC = () => {
               <IconButton
                 size="small"
                 onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-                disabled={!calendar}
+                disabled={calendarIsReadOnly}
                 sx={{
                   color: notificationsEnabled ? 'primary.main' : 'text.disabled',
                   transition: 'all 0.2s ease-in-out',
