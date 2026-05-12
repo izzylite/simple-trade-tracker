@@ -41,6 +41,12 @@ const GlobalAIChat: React.FC = () => {
 
   // Notification route handler — used to live on TradeCalendarPage. Now
   // mounted once globally so notifications work from any route.
+  //
+  // Deps are the stable open-callbacks (not the whole aiChat object) so
+  // this effect only re-runs when calendar identity or the notifications
+  // hook changes. Re-registering on every state transition would create a
+  // brief unregister/register gap where notifications could be missed.
+  const { openWithDeepLink, openOnTab } = aiChat;
   useEffect(() => {
     return registerRouteHandler((n) => {
       if (isReminderFiredPayload(n)) {
@@ -48,7 +54,7 @@ const GlobalAIChat: React.FC = () => {
         // link. If the user is on a different calendar (or none at all),
         // fall through to the URL navigation fallback.
         if (!calendar?.id || n.payload.calendarId !== calendar.id) return false;
-        aiChat.openWithDeepLink(
+        openWithDeepLink(
           {
             conversationId: n.payload.conversationId,
             messageId: n.payload.messageId,
@@ -58,12 +64,12 @@ const GlobalAIChat: React.FC = () => {
         return true;
       }
       if (isOrionTaskResultPayload(n)) {
-        aiChat.openOnTab(1);
+        openOnTab(1);
         return true;
       }
       return false;
     });
-  }, [calendar?.id, registerRouteHandler, aiChat]);
+  }, [calendar?.id, registerRouteHandler, openWithDeepLink, openOnTab]);
 
   // ?openTasks=1 fallback — bell notifications fired on a non-calendar
   // route navigate here. Open Tasks tab then strip the param so refresh
@@ -71,11 +77,11 @@ const GlobalAIChat: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     if (searchParams.get('openTasks') !== '1') return;
-    aiChat.openOnTab(1);
+    openOnTab(1);
     const next = new URLSearchParams(searchParams);
     next.delete('openTasks');
     setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams, aiChat]);
+  }, [searchParams, setSearchParams, openOnTab]);
 
   // Minimal tradeOperations stub — pages with their own dialog stack
   // (TradeCalendarPage) pass through richer ops. The global mount has no

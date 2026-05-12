@@ -14,7 +14,7 @@ import { useAIChat } from '../../contexts/AIChatContext';
  * useOrionTasks call owned by the provider) so the app keeps exactly one
  * subscription regardless of how many surfaces consume the bundle.
  */
-const HIDDEN_PREFIXES = ['/shared', '/auth', '/landing'];
+const HIDDEN_PREFIXES = ['/shared', '/auth'];
 
 const GlobalAIChatFab: React.FC = () => {
   const theme = useTheme();

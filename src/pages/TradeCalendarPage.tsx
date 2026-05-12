@@ -17,7 +17,6 @@ import {
   Toolbar,
   Snackbar,
   Alert,
-  Fab,
   Fade,
   LinearProgress,
   Badge,
@@ -39,7 +38,6 @@ import {
   LocalOffer as TagIcon,
   Search as SearchIcon,
   Event as EventIcon,
-  SmartToy as AIIcon,
   Home as HomeIcon,
   Notes as NotesIcon,
   Edit as EditIcon,
@@ -105,7 +103,6 @@ import { exportTrades } from '../utils/tradeExportImport';
 import { ImportMappingDialog } from '../components/import/ImportMappingDialog';
 
 import { useAIChat } from '../contexts/AIChatContext';
-import OrionIcon from '../components/aiChat/OrionIcon';
 import NotesDrawer from '../components/notes/NotesDrawer';
 import NoteEditorDialog from '../components/notes/NoteEditorDialog';
 import {

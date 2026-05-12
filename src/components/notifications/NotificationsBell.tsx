@@ -45,9 +45,9 @@ const NotificationsBell: React.FC = () => {
       }
 
       if (isOrionTaskResultPayload(n)) {
-        // Tasks live in the AIChatDrawer's Tasks tab, hosted by calendar
-        // routes. Drop the user on their last-active calendar with a
-        // ?openTasks=1 hint; the calendar page consumes it on mount.
+        // Tasks live in the global AIChatDrawer's Tasks tab. Drop the user
+        // on their last-active calendar with a ?openTasks=1 hint; GlobalAIChat
+        // consumes it on mount and opens the drawer on the Tasks tab.
         let lastCalendarId: string | null = null;
         try {
           lastCalendarId = localStorage.getItem(SELECTED_CALENDAR_STORAGE_KEY);
