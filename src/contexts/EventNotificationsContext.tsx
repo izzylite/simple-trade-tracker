@@ -48,61 +48,103 @@ export const EventNotificationsProvider: React.FC<{
 
   const [notifications, setNotifications] = useState<EconomicEvent[]>([]);
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
-  // Hold the latest notificationsEnabled flag in a ref so the
-  // useEconomicEventsUpdates callback (registered once) reads the live value
-  // without re-subscribing on every flag flip.
-  const notificationsEnabledRef = useRef<boolean>(true);
+  // Hold the latest notificationsEnabled flag + calendarId in refs so the
+  // useEconomicEventsUpdates callback (memoized once) reads live values
+  // without re-subscribing on every flag flip / calendar switch.
+  // Initialize with the current calendar setting so the very first event
+  // before the sync effect fires honors the saved state (not the literal
+  // `true` default).
+  const notificationsEnabledRef = useRef<boolean>(
+    calendar?.economic_calendar_filters?.notificationsEnabled ?? true
+  );
   useEffect(() => {
     notificationsEnabledRef.current =
       calendar?.economic_calendar_filters?.notificationsEnabled ?? true;
   }, [calendar?.economic_calendar_filters?.notificationsEnabled]);
+  const calendarIdRef = useRef<string>(calendarId);
+  useEffect(() => {
+    calendarIdRef.current = calendarId;
+  }, [calendarId]);
 
-  const pushNotification = useCallback((event: EconomicEvent) => {
-    playNotificationSound().catch(() => {
-      /* Sound failure is non-fatal */
-    });
-    setNotifications((prev) => {
-      if (prev.length >= 3) {
-        const oldest = prev[0];
-        setRemovingIds((curr) => {
-          const next = new Set(curr);
-          next.add(oldest.id);
-          return next;
-        });
-        setTimeout(() => {
-          setNotifications((cur) => cur.filter((n) => n.id !== oldest.id));
+  // Track timers so we can cancel them on unmount and avoid setState on
+  // a torn-down provider during the 300ms exit animations.
+  const timerRefs = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  useEffect(() => {
+    const timers = timerRefs.current;
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
+    };
+  }, []);
+  const scheduleRemoval = useCallback((cb: () => void) => {
+    const t = setTimeout(() => {
+      timerRefs.current.delete(t);
+      cb();
+    }, 300);
+    timerRefs.current.add(t);
+  }, []);
+
+  const pushNotification = useCallback(
+    (event: EconomicEvent) => {
+      playNotificationSound().catch(() => {
+        /* Sound failure is non-fatal */
+      });
+      setNotifications((prev) => {
+        if (prev.length >= 3) {
+          const oldest = prev[0];
           setRemovingIds((curr) => {
             const next = new Set(curr);
-            next.delete(oldest.id);
+            next.add(oldest.id);
             return next;
           });
-        }, 300);
-      }
-      return [...prev, event];
-    });
-  }, []);
+          scheduleRemoval(() => {
+            setNotifications((cur) => cur.filter((n) => n.id !== oldest.id));
+            setRemovingIds((curr) => {
+              const next = new Set(curr);
+              next.delete(oldest.id);
+              return next;
+            });
+          });
+        }
+        return [...prev, event];
+      });
+    },
+    [scheduleRemoval]
+  );
 
-  useEconomicEventsUpdates((updatedEvents, _allEvents, updatedCalendarId) => {
-    if (!calendarId || updatedCalendarId !== calendarId) return;
-    if (!notificationsEnabledRef.current) return;
-    updatedEvents.forEach(pushNotification);
-  });
+  const handleEventsUpdate = useCallback(
+    (
+      updatedEvents: EconomicEvent[],
+      _allEvents: EconomicEvent[],
+      updatedCalendarId: string
+    ) => {
+      const activeId = calendarIdRef.current;
+      if (!activeId || updatedCalendarId !== activeId) return;
+      if (!notificationsEnabledRef.current) return;
+      updatedEvents.forEach(pushNotification);
+    },
+    [pushNotification]
+  );
+  useEconomicEventsUpdates(handleEventsUpdate);
 
-  const closeNotification = useCallback((id: string) => {
-    setRemovingIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-    setTimeout(() => {
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
+  const closeNotification = useCallback(
+    (id: string) => {
       setRemovingIds((prev) => {
         const next = new Set(prev);
-        next.delete(id);
+        next.add(id);
         return next;
       });
-    }, 300);
-  }, []);
+      scheduleRemoval(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+        setRemovingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      });
+    },
+    [scheduleRemoval]
+  );
 
   const value = useMemo<EventNotificationsContextValue>(
     () => ({ notifications, removingIds, closeNotification }),
