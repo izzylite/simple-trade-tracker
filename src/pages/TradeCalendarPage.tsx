@@ -90,12 +90,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
 
 import PageActionBar from '../components/common/PageActionBar';
-import { NewTradeForm, TradeImage } from '../components/trades/TradeForm';
 import { Calendar } from '../types/calendar';
 import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
-import TradeFormDialog, { createEditTradeData, createNewTradeData } from '../components/trades/TradeFormDialog';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
-import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import PinnedTradesDrawer from '../components/PinnedTradesDrawer';
 import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ShareButton from '../components/sharing/ShareButton';
@@ -130,6 +127,7 @@ import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
 import { playNotificationSound } from '../utils/notificationSound';
 import { useCalendarTrades } from '../hooks/useCalendarTrades';
+import { useTradeOperations } from '../contexts/TradeOperationsContext';
 import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
 import {
   SidePanelProvider,
@@ -578,6 +576,8 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     enableRealtime: !isReadOnly // Disable real-time for read-only mode
   });
 
+  const globalTradeOps = useTradeOperations();
+
   // Prevent outer page scroll — this page uses a fixed-height flex layout
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -649,13 +649,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isMonthSelectorOpen, setIsMonthSelectorOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
-  const [showAddForm, setShowAddForm] = useState<{ open: boolean, trade_date: Date, editTrade?: Trade | null, createTempTrade?: boolean, showDayDialogWhenDone: boolean } | null>(null);
   const [zoomedImages, setZoomedImagesState] = useState<ImageZoomProp | null>(null);
-  const [tradesToDelete, setTradesToDelete] = useState<string[]>([]);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [deletingTradeIds, setDeletingTradeIds] = useState<string[]>([]);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Custom function to handle setting zoomed image and related state
   const setZoomedImage = useCallback((url: string, allImages?: string[], initialIndex?: number) => {
@@ -1245,61 +1239,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   };
 
 
-  // Handle single trade deletion
-  const handleDeleteClick = (tradeId: string) => {
-    setTradesToDelete([tradeId]);
-    setIsDeleteDialogOpen(true);
-    setDeleteError(null);
-  };
-
-  // Handle multiple trade deletion
-  const handleDeleteMultipleTrades = (tradeIds: string[]) => {
-    setTradesToDelete(tradeIds);
-    setIsDeleteDialogOpen(true);
-    setDeleteError(null);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (tradesToDelete.length === 0) return;
-
-    setIsDeleteDialogOpen(false);
-    setDeleteError(null);
-
-    // Add all trades to deleting list immediately for UI feedback
-    setDeletingTradeIds(prev => [...prev, ...tradesToDelete]);
-
-    try {
-      // Delete trades using the hook handler
-      await handleDeleteTrades(tradesToDelete);
-
-      // Show success message
-      const successMessage = tradesToDelete.length === 1
-        ? 'Trade deleted successfully.'
-        : `Successfully deleted ${formatCount(tradesToDelete.length)} trades.`;
-
-      showSnackbar(successMessage, 'success');
-    } catch (error) {
-      logger.error('Error deleting trades:', error);
-      const errorMessage = tradesToDelete.length === 1
-        ? 'Failed to delete trade. Please try again.'
-        : `Failed to delete some trades. Please try again.`;
-
-      setDeleteError(errorMessage);
-      showSnackbar(errorMessage, 'error');
-    } finally {
-      // Remove all trades from deleting list
-      setDeletingTradeIds(prev => prev.filter(id => !tradesToDelete.includes(id)));
-      setTradesToDelete([]);
-    }
-  };
-
-  const handleCancelDelete = () => {
-    setIsDeleteDialogOpen(false);
-    setTradesToDelete([]);
-    setDeleteError(null);
-  };
-
-
   const handleDayClick = useCallback((trade_date: Date) => {
     // In read-only mode, only allow viewing existing trades
     if (isReadOnly) {
@@ -1350,13 +1289,15 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     // When weekly target is set, always show DayDialog first (shows progress section)
     // When no weekly target, go directly to add trade form for empty days
     if (trades.length === 0 && !weeklyTarget) {
-      setNewTrade(createNewTradeData);
-      setShowAddForm({ open: true, trade_date: trade_date, showDayDialogWhenDone: true });
-    }
-    else {
+      globalTradeOps.openAddDialog({
+        trade_date,
+        showDayDialogWhenDone: true,
+        onAfterCancel: () => setSelectedDate(trade_date),
+      });
+    } else {
       setSelectedDate(trade_date);
     }
-  }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk, weeklyTarget, isLgUp, pushPanel, setPanelOpen]);
+  }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk, weeklyTarget, isLgUp, pushPanel, setPanelOpen, globalTradeOps]);
 
   const handleDayHeaderClick = useCallback((day: DayAbbreviation) => {
     if (isReadOnly || !calendarId) return;
@@ -1401,14 +1342,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setSnackbarOpen(false);
   };
 
-  // Retry failed deletion
-  const retryDeletion = async () => {
-    if (deleteError && tradesToDelete.length > 0) {
-      setDeleteError(null);
-      await handleConfirmDelete();
-    }
-  };
-
   // Gallery mode handlers
   const openGalleryMode = (trades: Trade[], initialTradeId?: string, title?: string, fetchYear?: number) => {
     setGalleryMode({
@@ -1443,46 +1376,29 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     });
   };
 
-  // Handler for editing a trade - used across multiple components
-  const handleEditTrade = useCallback((trade: Trade) => {
-    setNewTrade(() => (createEditTradeData(trade)));
-    setShowAddForm({
-      open: true,
-      trade_date: new Date(trade.trade_date),
-      editTrade: trade,
-      createTempTrade: false,
-      showDayDialogWhenDone: false
-    });
-  }, []);
-
-  // Create a unified tradeOperations object for all trade-related operations
   const tradeOperations: TradeOperationsProps = useMemo(() => ({
-    onUpdateTradeProperty: isReadOnly ? undefined : handleUpdateTradeProperty,
-    onEditTrade: isReadOnly ? undefined : handleEditTrade,
-    onDeleteTrade: isReadOnly ? undefined : handleDeleteClick,
-    onDeleteMultipleTrades: isReadOnly ? undefined : handleDeleteMultipleTrades,
+    onUpdateTradeProperty: isReadOnly ? undefined : globalTradeOps.onUpdateTradeProperty,
+    onEditTrade: isReadOnly ? undefined : globalTradeOps.onEditTrade,
+    onDeleteTrade: isReadOnly ? undefined : globalTradeOps.onDeleteTrade,
+    onDeleteMultipleTrades: isReadOnly ? undefined : globalTradeOps.onDeleteMultipleTrades,
     onZoomImage: setZoomedImage,
     onOpenGalleryMode: openGalleryMode,
     onOpenAIChat: isReadOnly ? undefined : (trade) => globalAIChat.openWithTrade(trade),
     onUpdateCalendarProperty: isReadOnly ? undefined : onUpdateCalendarProperty,
     isTradeUpdating,
-    deletingTradeIds,
+    deletingTradeIds: globalTradeOps.deletingTradeIds ?? [],
     calendarId: calendarId || undefined,
     calendar,
     isReadOnly,
     economicFilter: (_calendarId) => calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
   }), [
     isReadOnly,
-    handleUpdateTradeProperty,
-    handleEditTrade,
-    handleDeleteClick,
-    handleDeleteMultipleTrades,
+    globalTradeOps,
     setZoomedImage,
     openGalleryMode,
     globalAIChat,
     onUpdateCalendarProperty,
     isTradeUpdating,
-    deletingTradeIds,
     calendarId,
     calendar
   ]);
@@ -1635,11 +1551,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 calendar={calendar}
                 pnlBeforeMonth={pnlBeforeMonth}
                 isPnlLoading={isPnlLoading}
-                onDeleteTrade={handleDeleteClick}
+                onDeleteTrade={globalTradeOps.onDeleteTrade}
                 onOpenGalleryMode={openGalleryMode}
                 onUpdateTradeProperty={handleUpdateTradeProperty}
                 onUpdateCalendarProperty={onUpdateCalendarProperty}
-                onEditTrade={handleEditTrade}
+                onEditTrade={globalTradeOps.onEditTrade}
                 economicFilter={(_calendarId) =>
                   calendar?.economic_calendar_filters ||
                   DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
@@ -1671,21 +1587,14 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 }}
                 showAddForm={
                   isReadOnly ? () => {} : (trade) => {
-                    if (
-                      trade !== null &&
-                      trade !== undefined
-                    ) {
-                      setNewTrade(
-                        () => createEditTradeData(trade)
-                      );
+                    if (trade !== null && trade !== undefined) {
+                      globalTradeOps.onEditTrade?.(trade);
+                    } else {
+                      globalTradeOps.openAddDialog({
+                        trade_date: dayView.date,
+                        showDayDialogWhenDone: false,
+                      });
                     }
-                    setShowAddForm({
-                      open: true,
-                      trade_date: dayView.date,
-                      editTrade: trade,
-                      createTempTrade: trade === null,
-                      showDayDialogWhenDone: false,
-                    });
                   }
                 }
                 tradeOperations={tradeOperations}
@@ -1728,7 +1637,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       openGalleryMode, openGalleryModeAI, handleTagUpdated,
       requiredTagGroups, onUpdateCalendarProperty,
       getTradesForDate, weeklyStatsMap, accountBalance,
-      pushPanel, replacePanel, setNewTrade, setShowAddForm,
+      pushPanel, replacePanel, globalTradeOps,
     ]
   );
 
@@ -2502,15 +2411,19 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
         {!isLgUp && (
           <DayDialog
-            open={!!selectedDate && !showAddForm?.open}
+            open={!!selectedDate && !globalTradeOps.formDialog.open}
             onClose={() => {
               setSelectedDate(null);
             }}
             showAddForm={isReadOnly ? () => { } : (trade) => {
-              if (trade !== null) {
-                setNewTrade(() => (createEditTradeData(trade!!)));
+              if (trade !== null && trade !== undefined) {
+                globalTradeOps.onEditTrade?.(trade);
+              } else {
+                globalTradeOps.openAddDialog({
+                  trade_date: selectedDate!!,
+                  showDayDialogWhenDone: true,
+                });
               }
-              setShowAddForm({ open: true, trade_date: selectedDate!!, editTrade: trade, createTempTrade: trade === null, showDayDialogWhenDone: true });
             }}
             date={selectedDate || new Date()}
             trades={selectedDate ? tradesForSelectedDay : []}
@@ -2522,47 +2435,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               ? weeklyStatsMap.get(format(startOfWeek(selectedDate, { weekStartsOn: 0 }), 'yyyy-MM-dd'))?.weekTrades
               : undefined
             }
-          />
-        )}
-
-
-        {!isReadOnly && (
-          <TradeFormDialog
-            open={(!!showAddForm?.trade_date && showAddForm?.open) || false}
-            onClose={() => {
-              setSelectedDate(null);
-              setShowAddForm(null);
-              if (newTrade != null && newTrade.pending_images) {
-                // Release object URLs to avoid memory leaks
-                newTrade.pending_images.forEach(image => {
-                  URL.revokeObjectURL(image.preview);
-                });
-                setNewTrade(null);
-              }
-            }}
-            onCancel={() => {
-              if (showAddForm?.showDayDialogWhenDone) {
-                setSelectedDate(null);
-                setSelectedDate(showAddForm?.trade_date!!); // show the day dialog
-              }
-              setShowAddForm(null);
-            }}
-            showForm={{ open: showAddForm?.open || false, editTrade: showAddForm?.editTrade || null, createTempTrade: showAddForm?.createTempTrade || false }}
-            trade_date={showAddForm?.trade_date || new Date()}
-            onAddTrade={handleAddTrade}
-            newMainTrade={newTrade}
-            setNewMainTrade={prev => setNewTrade(prev(newTrade!!))}
-            onTagUpdated={handleTagUpdated}
-            onUpdateTradeProperty={handleUpdateTradeProperty}
-            onDeleteTrades={handleDeleteTrades}
-            setZoomedImage={setZoomedImage}
-            account_balance={accountBalance}
-            onAccountBalanceChange={handleAccountBalanceChange}
-            calendar={calendar}
-            tags={allTags}
-            dynamicRiskSettings={dynamicRiskSettings}
-            requiredTagGroups={requiredTagGroups}
-            onOpenGalleryMode={openGalleryMode}
           />
         )}
 
@@ -2616,26 +2488,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           onUpdateCalendarProperty={onUpdateCalendarProperty}
         />
 
-        {/* Confirmation Delete Dialog */}
-        <ConfirmationDialog
-          open={isDeleteDialogOpen}
-          title={tradesToDelete.length === 1 ? "Delete Trade" : `Delete ${formatCount(tradesToDelete.length)} Trades`}
-          message={
-            tradesToDelete.length === 1
-              ? "Are you sure you want to delete this trade? This action cannot be undone."
-              : `Are you sure you want to delete ${formatCount(tradesToDelete.length)} trades? This action cannot be undone.`
-          }
-          confirmText="Delete"
-          cancelText="Cancel"
-          onConfirm={handleConfirmDelete}
-          onCancel={handleCancelDelete}
-          confirmColor="error"
-          isSubmitting={deletingTradeIds.some(id => tradesToDelete.includes(id))}
-        />
-
         <Snackbar
           open={snackbarOpen}
-          autoHideDuration={snackbarSeverity === 'success' ? 3000 : deleteError ? 6000 : 4000}
+          autoHideDuration={snackbarSeverity === 'success' ? 3000 : 4000}
           onClose={handleSnackbarClose}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
           sx={{ zIndex: Z_INDEX.SNACKBAR }}
@@ -2645,21 +2500,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             severity={snackbarSeverity}
             variant="filled"
             sx={{ width: '100%' }}
-            action={
-              deleteError && tradesToDelete.length > 0 ? (
-                <Button
-                  color="inherit"
-                  size="small"
-                  onClick={() => {
-                    handleSnackbarClose();
-                    retryDeletion();
-                  }}
-                  sx={{ color: 'inherit' }}
-                >
-                  Retry
-                </Button>
-              ) : undefined
-            }
           >
             {snackbarMessage}
           </Alert>
@@ -2794,11 +2634,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           calendar={calendar}
           pnlBeforeMonth={pnlBeforeMonth}
           isPnlLoading={isPnlLoading}
-          onDeleteTrade={handleDeleteClick}
+          onDeleteTrade={globalTradeOps.onDeleteTrade}
           onOpenGalleryMode={openGalleryMode}
           onUpdateTradeProperty={handleUpdateTradeProperty}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
-          onEditTrade={handleEditTrade}
+          onEditTrade={globalTradeOps.onEditTrade}
           economicFilter={(_calendarId) =>
             calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
           }

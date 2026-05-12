@@ -28,6 +28,15 @@ import { formatTagsWithCapitalizedGroups } from '../../utils/tagColors';
 import { Z_INDEX } from '../../styles/zIndex';
 import { TradeRepository } from '../../services/repository/repositories/TradeRepository';
 import { deriveTradeDateForSession } from '../../utils/sessionTimeUtils';
+// Re-export pure helpers from the side-effect-free helper module so
+// callers can keep importing them from TradeFormDialog while
+// TradeOperationsContext (and tests) can import directly from
+// tradeFormHelpers without pulling the dialog's transitive deps.
+import {
+  createNewTradeData,
+  createEditTradeData,
+} from './tradeFormHelpers';
+export { createNewTradeData, createEditTradeData };
 
 interface FormDialogProps {
   open: boolean;
@@ -86,16 +95,6 @@ export const startOfNextDay = (trade_date: Date | string): Date => {
   nextDay.setDate(nextDay.getDate() + 1);
   return nextDay;
 }
-
-// Re-export pure helpers from the side-effect-free helper module so
-// callers can keep importing them from TradeFormDialog while
-// TradeOperationsContext (and tests) can import directly from
-// tradeFormHelpers without pulling the dialog's transitive deps.
-import {
-  createNewTradeData,
-  createEditTradeData,
-} from './tradeFormHelpers';
-export { createNewTradeData, createEditTradeData };
 
 const TradeFormDialog: React.FC<FormDialogProps> = ({
   open,
