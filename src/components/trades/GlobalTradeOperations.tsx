@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Snackbar, Alert, Button } from '@mui/material';
 import TradeFormDialog from './TradeFormDialog';
 import ConfirmationDialog from '../common/ConfirmationDialog';
 import { useTradeOperations } from '../../contexts/TradeOperationsContext';
@@ -6,6 +7,7 @@ import { useTradesContext } from '../../contexts/TradesContext';
 import { useTradeViewer } from '../../contexts/TradeViewerContext';
 import { formatCount } from '../../utils/formatters';
 import { DynamicRiskSettings } from '../../utils/dynamicRiskUtils';
+import { Z_INDEX } from '../../styles/zIndex';
 
 /**
  * App-level mount for the trade form + delete-confirm dialogs. State lives
@@ -27,8 +29,11 @@ const GlobalTradeOperations: React.FC = () => {
     closeFormDialog,
     confirmDelete,
     cancelDelete,
+    retryDelete,
     isReadOnly,
     deletingTradeIdsList,
+    notification,
+    clearNotification,
   } = useTradeOperations();
 
   const dynamicRiskSettings: DynamicRiskSettings = useMemo(
@@ -57,6 +62,8 @@ const GlobalTradeOperations: React.FC = () => {
   };
 
   if (isReadOnly || !calendar) return null;
+
+  const hasRetry = notification?.kind === 'error' && !!notification.retryIds?.length;
 
   return (
     <>
@@ -109,6 +116,39 @@ const GlobalTradeOperations: React.FC = () => {
           deleteDialog.tradeIds.includes(id)
         )}
       />
+
+      <Snackbar
+        open={!!notification}
+        autoHideDuration={
+          notification?.kind === 'success' ? 3000 : hasRetry ? 6000 : 4000
+        }
+        onClose={clearNotification}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        sx={{ zIndex: Z_INDEX.SNACKBAR }}
+      >
+        <Alert
+          onClose={clearNotification}
+          severity={notification?.kind === 'error' ? 'error' : 'success'}
+          variant="filled"
+          sx={{ width: '100%' }}
+          action={
+            hasRetry ? (
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => {
+                  void retryDelete();
+                }}
+                sx={{ color: 'inherit' }}
+              >
+                Retry
+              </Button>
+            ) : undefined
+          }
+        >
+          {notification?.message ?? ''}
+        </Alert>
+      </Snackbar>
     </>
   );
 };

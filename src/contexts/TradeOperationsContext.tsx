@@ -60,6 +60,17 @@ export interface OpenAddDialogArgs {
   onAfterCancel?: () => void;
 }
 
+/**
+ * Snackbar-style notification emitted after a delete attempt. `error` variants
+ * carry the failed `retryIds` so the consumer (GlobalTradeOperations) can
+ * surface a Retry action that re-runs the deletion without re-prompting.
+ */
+export interface OpNotification {
+  kind: 'success' | 'error';
+  message: string;
+  retryIds?: string[];
+}
+
 interface TradeOperationsContextValue extends TradeOperationsProps {
   openAddDialog: (args: OpenAddDialogArgs) => void;
   closeFormDialog: () => void;
@@ -69,7 +80,10 @@ interface TradeOperationsContextValue extends TradeOperationsProps {
   deleteDialog: DeleteDialogState;
   confirmDelete: () => Promise<void>;
   cancelDelete: () => void;
+  retryDelete: () => Promise<void>;
   deletingTradeIdsList: string[];
+  notification: OpNotification | null;
+  clearNotification: () => void;
 }
 
 const TradeOperationsContext =
@@ -87,6 +101,43 @@ export const TradeOperationsProvider: React.FC<{
     useState<DeleteDialogState>(EMPTY_DELETE);
   const [deletingTradeIdsList, setDeletingTradeIdsList] = useState<string[]>(
     []
+  );
+  const [notification, setNotification] = useState<OpNotification | null>(null);
+
+  const clearNotification = useCallback(() => setNotification(null), []);
+
+  const formatCountFor = (n: number): string =>
+    n === 1 ? '1 trade' : `${n} trades`;
+
+  const runDelete = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return;
+      setDeletingTradeIdsList((prev) => [...prev, ...ids]);
+      try {
+        await hook.deleteTrades(ids);
+        setNotification({
+          kind: 'success',
+          message:
+            ids.length === 1
+              ? 'Trade deleted.'
+              : `${formatCountFor(ids.length)} deleted.`,
+        });
+      } catch (err) {
+        setNotification({
+          kind: 'error',
+          message:
+            ids.length === 1
+              ? 'Failed to delete trade.'
+              : `Failed to delete ${formatCountFor(ids.length)}.`,
+          retryIds: ids,
+        });
+      } finally {
+        setDeletingTradeIdsList((prev) =>
+          prev.filter((id) => !ids.includes(id))
+        );
+      }
+    },
+    [hook]
   );
 
   const openAddDialog = useCallback((args: OpenAddDialogArgs) => {
@@ -142,17 +193,16 @@ export const TradeOperationsProvider: React.FC<{
   const confirmDelete = useCallback(async () => {
     const ids = deleteDialog.tradeIds;
     if (ids.length === 0) return;
-    setDeleteDialog((prev) => ({ ...prev, open: false }));
-    setDeletingTradeIdsList((prev) => [...prev, ...ids]);
-    try {
-      await hook.deleteTrades(ids);
-    } finally {
-      setDeletingTradeIdsList((prev) =>
-        prev.filter((id) => !ids.includes(id))
-      );
-      setDeleteDialog(EMPTY_DELETE);
-    }
-  }, [deleteDialog.tradeIds, hook]);
+    setDeleteDialog(EMPTY_DELETE);
+    await runDelete(ids);
+  }, [deleteDialog.tradeIds, runDelete]);
+
+  const retryDelete = useCallback(async () => {
+    const ids = notification?.retryIds;
+    if (!ids || ids.length === 0) return;
+    setNotification(null);
+    await runDelete(ids);
+  }, [notification, runDelete]);
 
   const onUpdateCalendarProperty = useCallback(
     async (
@@ -193,7 +243,10 @@ export const TradeOperationsProvider: React.FC<{
       deleteDialog,
       confirmDelete,
       cancelDelete,
+      retryDelete,
       deletingTradeIdsList,
+      notification,
+      clearNotification,
     }),
     [
       isReadOnly,
@@ -212,6 +265,9 @@ export const TradeOperationsProvider: React.FC<{
       deleteDialog,
       confirmDelete,
       cancelDelete,
+      retryDelete,
+      notification,
+      clearNotification,
     ]
   );
 
