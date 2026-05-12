@@ -80,10 +80,13 @@ function AppContent() {
   const [isLoadingTrades, setIsLoadingTrades] = useState<boolean>(false);
   const [loadingAction, setLoadingAction] = useState<'loading' | 'importing' | 'exporting'>('loading');
 
-  const { user } = useAuthState();
+  const { user, isAuthLoading } = useAuthState();
   const location = useLocation();
   const navigate = useNavigate();
-  const isLandingPage = !user && location.pathname === '/';
+  // Treat root as landing only after auth resolves. Otherwise the very
+  // first paint on cold load (before supabase returns getSession) shows
+  // the landing page for one frame even when the user is signed in.
+  const isLandingPage = !isAuthLoading && !user && location.pathname === '/';
 
   // Global Create Calendar dialog — triggered from side nav "+ New", lock
   // overlays, and any future entry point. Lifted to App.tsx so a single
@@ -347,6 +350,9 @@ function AppContent() {
             isLoading={isLoadingTrades}
             action={loadingAction}
           />
+          {isAuthLoading ? (
+            <LoadingFallback />
+          ) : (
           <Routes>
             {/* Auth-gated routes share a persistent AppLayout via a layout
                 route — AppLayout (and its SideNav) stay mounted across
@@ -365,6 +371,7 @@ function AppContent() {
                     <HomeRouteResolver
                       calendars={calendars}
                       isLoadingCalendars={isLoadingCalendars}
+                      hasFetchedCalendars={swrCalendars !== undefined}
                       onCreateCalendar={openCreateCalendarDialog}
                     />
                   }
@@ -471,6 +478,7 @@ function AppContent() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          )}
         </Box>
       </Box>
 
@@ -560,6 +568,12 @@ const ScrollToTop: React.FC = () => {
 interface HomeRouteResolverProps {
   calendars: Calendar[];
   isLoadingCalendars: boolean;
+  /** True only after SWR has returned a defined value (even an empty
+   *  array). Distinguishes "still fetching / awaiting first response"
+   *  from "fetched, no calendars exist". Without this, the lock overlay
+   *  flashes on every cold load between local state defaulting to [] and
+   *  the SWR result being mirrored into it. */
+  hasFetchedCalendars: boolean;
   onCreateCalendar: () => void;
 }
 
@@ -576,6 +590,7 @@ interface HomeRouteResolverProps {
 const HomeRouteResolver: React.FC<HomeRouteResolverProps> = ({
   calendars,
   isLoadingCalendars,
+  hasFetchedCalendars,
   onCreateCalendar,
 }) => {
   const { calendarId: storedCalendarId } = useSelectedCalendar();
@@ -584,10 +599,10 @@ const HomeRouteResolver: React.FC<HomeRouteResolverProps> = ({
     [calendars]
   );
 
-  // Wait until calendars actually arrive before deciding. Without this we'd
-  // briefly render the lock overlay (or wrong-calendar redirect) on every
-  // cold load.
-  if (isLoadingCalendars && activeCalendars.length === 0) {
+  // Wait until SWR has returned. Otherwise the local `calendars` state
+  // (which starts as []) makes us briefly render the lock overlay before
+  // the real fetch result lands.
+  if (!hasFetchedCalendars || isLoadingCalendars) {
     return <LoadingFallback />;
   }
 

@@ -26,6 +26,11 @@ import { supabaseAuthService, type SupabaseUser } from '../services/supabaseAuth
 
 interface AuthStateContextType {
   user: SupabaseUser | null;
+  /** True until supabase resolves the initial session check. Consumers
+   *  that decide between "signed-in shell" and "landing page" should
+   *  wait on this — otherwise the landing flashes for the first paint
+   *  before getSession() returns. */
+  isAuthLoading: boolean;
 }
 
 const AuthStateContext = createContext<AuthStateContextType | undefined>(undefined);
@@ -51,29 +56,31 @@ export const useAuthState = () => {
  * Note: This should be rendered INSIDE SupabaseAuthProvider to receive auth updates
  */
 export const AuthStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<SupabaseUser | null>(() =>
-    supabaseAuthService.getCurrentAuthState().user
-  );
+  const initial = supabaseAuthService.getCurrentAuthState();
+  const [user, setUser] = useState<SupabaseUser | null>(initial.user);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(initial.loading);
 
   useEffect(() => {
-    // Subscribe to auth state changes, but only track user (not loading)
+    // Subscribe to auth state changes, tracking both user identity changes
+    // and the loading flag so consumers can suppress "signed-out" UI until
+    // the initial session check resolves.
     const unsubscribe = supabaseAuthService.onAuthStateChange((newAuthState) => {
-      // Only update if user actually changed to prevent unnecessary re-renders
       setUser(prevUser => {
         const newUser = newAuthState.user;
-        // Deep equality check to avoid re-renders for same user
         if (prevUser?.id !== newUser?.id) {
           return newUser;
         }
         return prevUser;
       });
+      setIsAuthLoading((prev) =>
+        prev === newAuthState.loading ? prev : newAuthState.loading
+      );
     });
 
     return unsubscribe;
   }, []);
 
-  // Memoize the context value to prevent re-renders when user hasn't changed
-  const value = useMemo(() => ({ user }), [user]);
+  const value = useMemo(() => ({ user, isAuthLoading }), [user, isAuthLoading]);
 
   return (
     <AuthStateContext.Provider value={value}>
