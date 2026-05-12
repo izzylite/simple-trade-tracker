@@ -20,6 +20,7 @@ import {
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SELECTED_CALENDAR_STORAGE_KEY } from '../../contexts/SelectedCalendarContext';
+import { preloadRoute } from '../../utils/routePreload';
 
 export const SIDE_NAV_WIDTH = 92;
 const APP_HEADER_HEIGHT = 64;
@@ -135,12 +136,18 @@ const SideNav: React.FC<SideNavProps> = ({
       disabled?: boolean;
       tooltip?: string;
       variant?: 'nav' | 'create';
+      /** Route path to preload on hover/focus. Warms the lazy chunk so the
+       *  click resolves from cache instead of fetching the bundle live. */
+      preloadPath?: string;
     }
   ) => {
     const active = options?.active ?? false;
     const disabled = options?.disabled ?? false;
     const variant = options?.variant ?? 'nav';
     const isCreate = variant === 'create';
+    const preload = options?.preloadPath
+      ? () => preloadRoute(options.preloadPath!)
+      : undefined;
 
     // Tile colours
     const tileBg = isCreate
@@ -165,6 +172,9 @@ const SideNav: React.FC<SideNavProps> = ({
     const button = (
       <ButtonBase
         onClick={disabled ? undefined : onClick}
+        onMouseEnter={preload}
+        onFocus={preload}
+        onTouchStart={preload}
         disabled={disabled}
         focusRipple
         sx={{
@@ -274,7 +284,7 @@ const SideNav: React.FC<SideNavProps> = ({
             item.label,
             item.icon,
             () => handleNavigate(resolvePath(item)),
-            { active: isActive(item) }
+            { active: isActive(item), preloadPath: resolvePath(item) }
           )
         )}
       </Stack>
@@ -294,7 +304,7 @@ const SideNav: React.FC<SideNavProps> = ({
             item.label,
             item.icon,
             () => handleNavigate(resolvePath(item)),
-            { active: isActive(item) }
+            { active: isActive(item), preloadPath: resolvePath(item) }
           )
         )}
       </Stack>

@@ -1,8 +1,11 @@
-import React, { useState, Suspense } from 'react';
+import React, { useEffect, useRef, useState, Suspense } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   IconButton,
-  CircularProgress,
+  LinearProgress,
+  Skeleton,
+  Stack,
   Typography,
   Divider,
   alpha,
@@ -30,20 +33,34 @@ const PANEL_WIDTH = 'clamp(360px, 36vw, 580px)';
 const CALENDARS_PANEL_WIDTH = PANEL_WIDTH;
 
 /**
- * Inline loading state for the route content area only. Renders inside
- * AppLayout's main slot so AppHeader + SideNav stay visible while a lazy
- * page chunk loads.
+ * Inline loading state for the route content area. A top-anchored
+ * LinearProgress signals the page is fetching/parsing without blanking
+ * the column; a sparse skeleton scaffolds the typical page shape so the
+ * shell never reflows when the real content paints. AppHeader + SideNav
+ * remain mounted (Suspense fires inside the column only).
  */
 const RouteSuspenseFallback: React.FC = () => (
-  <Box
-    sx={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: 'calc(100vh - 64px)',
-    }}
-  >
-    <CircularProgress size={28} />
+  <Box sx={{ position: 'relative', height: '100%', minHeight: 'calc(100vh - 64px)' }}>
+    <LinearProgress
+      sx={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 2,
+      }}
+    />
+    <Stack spacing={2} sx={{ p: { xs: 2, sm: 3 }, pt: { xs: 3, sm: 4 } }}>
+      <Skeleton variant="text" width="40%" height={36} />
+      <Skeleton variant="text" width="60%" height={20} />
+      <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 1.5 }} />
+      <Stack direction="row" spacing={2}>
+        <Skeleton variant="rectangular" height={80} sx={{ flex: 1, borderRadius: 1.5 }} />
+        <Skeleton variant="rectangular" height={80} sx={{ flex: 1, borderRadius: 1.5 }} />
+        <Skeleton variant="rectangular" height={80} sx={{ flex: 1, borderRadius: 1.5 }} />
+      </Stack>
+      <Skeleton variant="rectangular" height={240} sx={{ borderRadius: 1.5 }} />
+    </Stack>
   </Box>
 );
 
@@ -74,6 +91,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
   const theme = useTheme();
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Brief top progress bar on every route transition. Suspense fires the
+  // skeleton fallback when the chunk needs fetching (first nav); for cached
+  // chunks the chunk is ready but the page still mounts + runs initial
+  // hooks. This flash gives users a "something's happening" signal so the
+  // shell never appears frozen on the first 300ms of a heavy page mount.
+  const location = useLocation();
+  const [navPending, setNavPending] = useState(false);
+  const firstRenderRef = useRef(true);
+  useEffect(() => {
+    if (firstRenderRef.current) {
+      firstRenderRef.current = false;
+      return;
+    }
+    setNavPending(true);
+    const t = setTimeout(() => setNavPending(false), 400);
+    return () => clearTimeout(t);
+  }, [location.pathname]);
 
   const { open: isCalendarsListOpen, closePanel, actions } = useCalendarsListPanel();
   const { calendarId } = useSelectedCalendar();
@@ -129,6 +164,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
           flex: 1,
           minWidth: 0,
           minHeight: 0,
+          position: 'relative',
           // Pages that fix their own height (calendar / performance / notes /
           // events) fill this column exactly and manage their own internal
           // scroll. Pages that don't (About) scroll inside this column rather
@@ -149,6 +185,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
           transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
+        {navPending && (
+          <LinearProgress
+            sx={{
+              position: 'sticky',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 2,
+              zIndex: theme.zIndex.appBar - 1,
+            }}
+          />
+        )}
         {children ?? (
           <Suspense fallback={<RouteSuspenseFallback />}>
             <Outlet />
