@@ -24,7 +24,8 @@ import React, {
 export type PanelSourceId =
   | 'global-side-panel'
   | 'calendars-list'
-  | 'page-side-panel';
+  | 'page-side-panel'
+  | 'ai-chat';
 
 interface PanelMutexContextValue {
   registerCloser: (id: PanelSourceId, close: () => void) => () => void;

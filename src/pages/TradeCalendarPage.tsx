@@ -87,7 +87,7 @@ import {
   TradeCount,
 
 } from '../components/StyledComponents';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
 
@@ -104,12 +104,7 @@ import ShareButton from '../components/sharing/ShareButton';
 import { exportTrades } from '../utils/tradeExportImport';
 import { ImportMappingDialog } from '../components/import/ImportMappingDialog';
 
-import AIChatDrawer from '../components/aiChat/AIChatDrawer';
-import { useNotifications } from '../contexts/NotificationsContext';
-import {
-  isOrionTaskResultPayload,
-  isReminderFiredPayload,
-} from '../types/notification';
+import { useAIChat } from '../contexts/AIChatContext';
 import OrionIcon from '../components/aiChat/OrionIcon';
 import NotesDrawer from '../components/notes/NotesDrawer';
 import NoteEditorDialog from '../components/notes/NoteEditorDialog';
@@ -751,58 +746,14 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setDismissedReminderIds(prev => new Set(prev).add(noteId));
   }, []);
 
-  // AI Chat drawer state
-  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
-  const [aiChatDeepLink, setAiChatDeepLink] = useState<{
-    conversationId: string;
-    messageId?: string;
-  } | null>(null);
-  const [aiChatRequestedTab, setAiChatRequestedTab] = useState<number | null>(null);
+  // AI Chat drawer — dispatched through global AIChatContext. The drawer
+  // itself mounts once at App level (GlobalAIChat); this page just opens it.
+  const globalAIChat = useAIChat();
 
-  // Local-route handler: intercept notification clicks while this calendar is
-  // mounted.
-  //  - reminder_fired (same calendar) → open drawer on Chat tab with deep-link
-  //  - orion_task_result (any calendar) → open drawer on Tasks tab; tasks are
-  //    user-scoped, so any calendar surface is a valid host
-  // Other cases fall through (handler returns false) so the bell's URL
-  // fallback runs.
-  const { registerRouteHandler } = useNotifications();
-  useEffect(() => {
-    if (!calendar?.id) return;
-    return registerRouteHandler((n) => {
-      if (isReminderFiredPayload(n)) {
-        if (n.payload.calendarId !== calendar.id) return false;
-        setAiChatDeepLink({
-          conversationId: n.payload.conversationId,
-          messageId: n.payload.messageId,
-        });
-        setAiChatRequestedTab(0);
-        setIsAIChatOpen(true);
-        return true;
-      }
-      if (isOrionTaskResultPayload(n)) {
-        setAiChatRequestedTab(1);
-        setIsAIChatOpen(true);
-        return true;
-      }
-      return false;
-    });
-  }, [calendar?.id, registerRouteHandler]);
-
-  // URL deep-link: ?openTasks=1 lands here when a task notification was
-  // clicked from a surface that couldn't host the drawer (bell on a non-
-  // calendar route fell back to URL navigation). Open drawer on Tasks tab,
-  // then strip the param so refresh doesn't re-trigger.
-  const [searchParams, setSearchParams] = useSearchParams();
-  useEffect(() => {
-    if (searchParams.get('openTasks') !== '1') return;
-    setAiChatRequestedTab(1);
-    setIsAIChatOpen(true);
-    const next = new URLSearchParams(searchParams);
-    next.delete('openTasks');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
-
+  // Orion tasks subscription is kept page-local solely to drive the FAB
+  // pulse + dot badge (`taskUnreadCount`). The drawer reads its own copy
+  // via GlobalAIChat — useOrionTasks shares a module-level cache so the
+  // two calls hydrate from the same data without refetching.
   const aiTasks = useOrionTasks(calendar?.user_id, calendar?.id);
   const taskUnreadCount = aiTasks.unreadCount;
 
@@ -1075,10 +1026,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     [togglePanel]
   );
 
-  // AI Chat toggle handler
+  // AI Chat toggle handler — opens the App-level GlobalAIChat drawer.
   const handleToggleAIChat = useCallback(() => {
-    setIsAIChatOpen(true);
-  }, []);
+    globalAIChat.open();
+  }, [globalAIChat]);
 
   // Scroll detection for floating month navigation with throttling
   // Listens on the main content container (not window) since content
@@ -1551,7 +1502,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     onDeleteMultipleTrades: isReadOnly ? undefined : handleDeleteMultipleTrades,
     onZoomImage: setZoomedImage,
     onOpenGalleryMode: openGalleryMode,
-    onOpenAIChat: isReadOnly ? undefined : (trade) => openGalleryModeAI(trades, trade.id, trade.name),
+    onOpenAIChat: isReadOnly ? undefined : (trade) => globalAIChat.openWithTrade(trade),
     onUpdateCalendarProperty: isReadOnly ? undefined : onUpdateCalendarProperty,
     isTradeUpdating,
     deletingTradeIds,
@@ -1567,8 +1518,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     handleDeleteMultipleTrades,
     setZoomedImage,
     openGalleryMode,
-    openGalleryModeAI,
-    trades,
+    globalAIChat,
     onUpdateCalendarProperty,
     isTradeUpdating,
     deletingTradeIds,
@@ -2910,20 +2860,8 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         />
       )}
 
-      {/* AI Chat Drawer */}
-      <AIChatDrawer
-        open={isAIChatOpen}
-        onClose={() => setIsAIChatOpen(false)}
-        trades={trades}
-        calendar={calendar!}
-        isReadOnly={isReadOnly}
-        tradeOperations={tradeOperations}
-        aiTasks={aiTasks}
-        pendingDeepLink={aiChatDeepLink}
-        onDeepLinkConsumed={() => setAiChatDeepLink(null)}
-        requestActiveTab={aiChatRequestedTab}
-        onTabRequestConsumed={() => setAiChatRequestedTab(null)}
-      />
+      {/* AI Chat Drawer is mounted once at App level via GlobalAIChat —
+          this page opens it through `globalAIChat.open()`. */}
 
       {/* Notes Drawer — <lg only */}
       {!isLgUp && (

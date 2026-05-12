@@ -58,11 +58,8 @@ import EconomicEventDetailDialog from '../components/economicCalendar/EconomicEv
 import EconomicEventDetailPanel from '../components/economicCalendar/EconomicEventDetailPanel';
 import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ImageZoomDialog from '../components/ImageZoomDialog';
-import AIChatDrawer from '../components/aiChat/AIChatDrawer';
 import NotesContent from '../components/sidePanel/content/NotesContent';
 import NotesDrawer from '../components/notes/NotesDrawer';
-import { useAuth } from '../contexts/SupabaseAuthContext';
-import { useOrionTasks } from '../hooks/useOrionTasks';
 import { useEventPageTradeOps } from '../hooks/useEventPageTradeOps';
 import AllPinnedEventsContent from '../components/economicCalendar/AllPinnedEventsContent';
 import EconomicEventShimmer from '../components/economicCalendar/EconomicEventShimmer';
@@ -399,10 +396,6 @@ const EconomicEventsPageInner: React.FC = () => {
   // Drawer state — only used on smaller screens. lg+ uses SidePanel.
   const [allPinnedOpen, setAllPinnedOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
-  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
-
-  const { user } = useAuth();
-  const aiTasks = useOrionTasks(user?.id);
 
   const {
     tradeOps,
@@ -813,12 +806,8 @@ const EconomicEventsPageInner: React.FC = () => {
         />
       )}
 
-      <AIChatDrawer
-        open={isAIChatOpen}
-        onClose={() => setIsAIChatOpen(false)}
-        tradeOperations={tradeOps}
-        aiTasks={aiTasks}
-      />
+      {/* AI Chat is mounted once at App level via GlobalAIChat — pages
+          dispatch through `useAIChat()` when they need to open it. */}
 
       {/* SidePanel sibling — lg+ only. Mirrors TradeCalendarPage. */}
       {isLargeScreen && <SidePanel renderView={renderView} />}
