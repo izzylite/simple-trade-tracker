@@ -102,12 +102,19 @@ const NotesPage: React.FC = () => {
     if (fresh) setSelectedNote(fresh);
   }, [notes]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // First-load gate. Once notes have hydrated once (loading flipped false),
-  // subsequent loading flips (search, tab change, calendar switch) don't
-  // re-blank the page — only the list panel shows its own loader.
+  // First-load gate. useNotes starts with loading=false (it doesn't fetch
+  // until the effect kicks in), so we can't treat "loading went false" as
+  // "data arrived". Instead watch for the true→false transition: a real
+  // fetch cycle has completed. After that, subsequent loading flips
+  // (search/tab/calendar) keep the page rendered and the list panel
+  // shows its own inline loader.
   const hasFetchedNotesRef = useRef(false);
+  const prevLoadingRef = useRef(loading);
   useEffect(() => {
-    if (!loading) hasFetchedNotesRef.current = true;
+    if (prevLoadingRef.current && !loading) {
+      hasFetchedNotesRef.current = true;
+    }
+    prevLoadingRef.current = loading;
   }, [loading]);
 
   // ─── Auto-select most recently updated note on first load ────────────────
@@ -206,10 +213,12 @@ const NotesPage: React.FC = () => {
     }
   }, [removeNote, selectedNote]);
 
-  // Initial cold-load loader. While the first fetch is in flight we'd
-  // otherwise render the empty NoteViewPanel — which is the "create note"
-  // CTA — and that flashes before real notes arrive.
-  if (!hasFetchedNotesRef.current && loading) {
+  // Initial cold-load loader. While the first fetch hasn't yet completed
+  // we'd otherwise render the empty NoteViewPanel — which is the "create
+  // note" CTA — and that flashes before real notes arrive. Covers both
+  // the loading=true window and the pre-fetch initial render where
+  // useNotes hasn't yet kicked off its first request.
+  if (!hasFetchedNotesRef.current) {
     return (
       <Box
         sx={{
