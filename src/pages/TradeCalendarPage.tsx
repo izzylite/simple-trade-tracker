@@ -70,7 +70,6 @@ import DayDialog from '../components/trades/DayDialog';
 import SelectDateDialog from '../components/SelectDateDialog';
 
 import TagFilterDialog from '../components/TagFilterDialog';
-import TagManagementDialog from '../components/TagManagementDialog';
 import TagManagementDrawer from '../components/TagManagementDrawer';
 import SearchDrawer from '../components/SearchDrawer';
 import TargetBadge from '../components/TargetBadge';
@@ -656,7 +655,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   }, []);
 
-  const [isTagManagementDialogOpen, setIsTagManagementDialogOpen] = useState(false);
   const [isTagManagementDrawerOpen, setIsTagManagementDrawerOpen] = useState(false);
   const [isSearchDrawerOpen, setIsSearchDrawerOpen] = useState(false);
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
@@ -2475,17 +2473,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             calendarOwnerId={calendar?.user_id}
           />
         )}
-
-        {/* Snackbar for notifications */}
-        <TagManagementDialog
-          open={isTagManagementDialogOpen}
-          onClose={() => setIsTagManagementDialogOpen(false)}
-          allTags={allTags}
-          calendarId={calendarId!!}
-          onTagUpdated={handleTagUpdated}
-          requiredTagGroups={requiredTagGroups}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
-        />
 
         <Snackbar
           open={snackbarOpen}
