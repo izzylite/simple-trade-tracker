@@ -4,6 +4,7 @@ import ImageZoomDialog from '../ImageZoomDialog';
 import { useTradeViewer } from '../../contexts/TradeViewerContext';
 import { useTradesContext } from '../../contexts/TradesContext';
 import { useAuthState } from '../../contexts/AuthStateContext';
+import { useTradeOperations } from '../../contexts/TradeOperationsContext';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 
 /**
@@ -22,6 +23,7 @@ const GlobalTradeViewer: React.FC = () => {
     useTradeViewer();
   const { calendar } = useTradesContext();
   const { user } = useAuthState();
+  const tradeOps = useTradeOperations();
 
   // Read-only when the active calendar isn't owned by the current user
   // (e.g. shared calendar) — also when there's no calendar at all.
@@ -31,21 +33,27 @@ const GlobalTradeViewer: React.FC = () => {
 
   const tradeOperations = useMemo<TradeOperationsProps>(
     () => ({
-      onUpdateTradeProperty: undefined,
-      onEditTrade: undefined,
-      onDeleteTrade: undefined,
-      onDeleteMultipleTrades: undefined,
+      onUpdateTradeProperty: isReadOnly
+        ? undefined
+        : tradeOps.onUpdateTradeProperty,
+      onEditTrade: isReadOnly ? undefined : tradeOps.onEditTrade,
+      onDeleteTrade: isReadOnly ? undefined : tradeOps.onDeleteTrade,
+      onDeleteMultipleTrades: isReadOnly
+        ? undefined
+        : tradeOps.onDeleteMultipleTrades,
       onZoomImage: openImageZoom,
       onOpenGalleryMode: undefined,
       onOpenAIChat: undefined,
-      onUpdateCalendarProperty: undefined,
-      isTradeUpdating: () => false,
-      deletingTradeIds: [] as string[],
+      onUpdateCalendarProperty: isReadOnly
+        ? undefined
+        : tradeOps.onUpdateCalendarProperty,
+      isTradeUpdating: tradeOps.isTradeUpdating ?? (() => false),
+      deletingTradeIds: tradeOps.deletingTradeIds ?? [],
       calendarId: calendar?.id,
       calendar: calendar || undefined,
       isReadOnly,
     }),
-    [calendar, isReadOnly, openImageZoom]
+    [calendar, isReadOnly, openImageZoom, tradeOps]
   );
 
   return (

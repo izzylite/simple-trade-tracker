@@ -6,6 +6,7 @@ import { useTradesContext } from '../../contexts/TradesContext';
 import { useTradeViewer } from '../../contexts/TradeViewerContext';
 import { useNotifications } from '../../contexts/NotificationsContext';
 import { usePanelMutexSlot } from '../../contexts/PanelMutexContext';
+import { useTradeOperations } from '../../contexts/TradeOperationsContext';
 import {
   isOrionTaskResultPayload,
   isReminderFiredPayload,
@@ -36,6 +37,7 @@ const GlobalAIChat: React.FC = () => {
   const aiChat = useAIChat();
   const tradeViewer = useTradeViewer();
   const { registerRouteHandler } = useNotifications();
+  const tradeOps = useTradeOperations();
   const aiTasks = aiChat.aiTasks;
 
   // Mutex slot — opening the chat closes other panels, and vice versa.
@@ -85,18 +87,16 @@ const GlobalAIChat: React.FC = () => {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, openOnTab]);
 
-  // tradeOperations for the chat surface. Read-only ops (zoom image,
-  // open gallery) route through TradeViewerContext so trade clicks open
-  // the global gallery dialog instead of doing nothing on non-calendar
-  // routes. Mutating ops (edit / delete / update) stay undefined here —
-  // those still live on the page-local TradeCalendarPage dialog stack,
-  // and the gallery's mutating buttons gracefully disable.
+  // tradeOperations for the chat surface. Mutating ops (edit / delete / update)
+  // now pull from TradeOperationsContext so the gallery's edit/delete buttons
+  // work from any route. Read-only ops (zoom image, open gallery) continue to
+  // route through TradeViewerContext.
   const tradeOperations = useMemo<TradeOperationsProps>(
     () => ({
-      onUpdateTradeProperty: undefined,
-      onEditTrade: undefined,
-      onDeleteTrade: undefined,
-      onDeleteMultipleTrades: undefined,
+      onUpdateTradeProperty: tradeOps.onUpdateTradeProperty,
+      onEditTrade: tradeOps.onEditTrade,
+      onDeleteTrade: tradeOps.onDeleteTrade,
+      onDeleteMultipleTrades: tradeOps.onDeleteMultipleTrades,
       onZoomImage: tradeViewer.openImageZoom,
       onOpenGalleryMode: (galleryTrades, initialTradeId, title, fetchYear) =>
         tradeViewer.openGallery({
@@ -106,14 +106,14 @@ const GlobalAIChat: React.FC = () => {
           fetchYear,
         }),
       onOpenAIChat: undefined,
-      onUpdateCalendarProperty: undefined,
-      isTradeUpdating: () => false,
-      deletingTradeIds: [] as string[],
+      onUpdateCalendarProperty: tradeOps.onUpdateCalendarProperty,
+      isTradeUpdating: tradeOps.isTradeUpdating ?? (() => false),
+      deletingTradeIds: tradeOps.deletingTradeIds ?? [],
       calendarId: calendar?.id,
       calendar: calendar || undefined,
       isReadOnly: !calendar,
     }),
-    [calendar, tradeViewer]
+    [calendar, tradeViewer, tradeOps]
   );
 
   // Consume initialTrade once the drawer mounts the prop — AIChatContent
