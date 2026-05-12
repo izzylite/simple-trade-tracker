@@ -1,17 +1,20 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
-import { Box, Typography, useTheme, useMediaQuery, Paper, Alert, Button } from '@mui/material';
+import { Box, Typography, useTheme, useMediaQuery, Paper, Alert, Button, CircularProgress } from '@mui/material';
 import { Trade, Calendar } from '../types/dualWrite';
 import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import ScoreSection from './scoring/ScoreSection';
 import RoundedTabs from './common/RoundedTabs';
+import KpiStrip from './performance/KpiStrip';
+import PerfPill from './performance/PerfPill';
+import WeekdayWinRate from './performance/WeekdayWinRate';
+import { perfTokens as perf } from './performance/performanceTokens';
 import { logger } from '../utils/logger';
 import { getFilteredTrades, getNormalizedDate } from '../utils/chartDataUtils';
 import {
   PerformanceCalculationResult
 } from '../services/performanceCalculationService';
-import ShimmerChartLoader from './common/ShimmerChartLoader';
 import { supabase } from '../config/supabase';
 import { EconomicCalendarFilterSettings, DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../hooks/useEconomicCalendarFilters';
 import { TradeOperationsProps } from '../types/tradeOperations';
@@ -27,13 +30,15 @@ import { useTradeSyncContextOptional } from '../contexts/TradeSyncContext';
 import { normalizeTradeDates } from '../utils/tradeUtils';
 
 // Type definition needed for module-level constants
-export type TimePeriod = 'month' | 'year' | 'all';
+export type TimePeriod = 'month' | 'quarter' | 'ytd' | 'year' | 'all';
 
 // Module-level static arrays to prevent recreation on every render
 export const TIME_PERIOD_TABS = [
   { label: 'Month', value: 'month' as TimePeriod },
+  { label: 'Quarter', value: 'quarter' as TimePeriod },
+  { label: 'YTD', value: 'ytd' as TimePeriod },
   { label: 'Year', value: 'year' as TimePeriod },
-  { label: 'All Time', value: 'all' as TimePeriod }
+  { label: 'All', value: 'all' as TimePeriod }
 ];
 
 const TAG_ANALYSIS_TABS = [
@@ -300,7 +305,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
           const dateKey = itemDate.toDateString();
 
           return {
-            date: format(itemDate, timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
+            date: format(itemDate, (timePeriod === 'month' || timePeriod === 'quarter' || timePeriod === 'ytd') ? 'MM/dd' : 'MM/dd/yyyy'),
             pnl: item.pnl,
             cumulativePnL: item.cumulativePnl,
             isIncreasing: item.cumulativePnl > prevCumulativePnl,
@@ -523,7 +528,19 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
 
 
   return (
-    <Box sx={{ p: { xs: 1, sm: 2 }, minHeight: { xs: 'auto', sm: 500 } }}>
+    <Box
+      sx={{
+        p: { xs: 1, sm: 2 },
+        minHeight: { xs: 'auto', sm: 500 },
+        '& .MuiPaper-root': {
+          backgroundColor: perf.bgAlt,
+          backgroundImage: 'none',
+          border: `1px solid ${perf.hair}`,
+          borderRadius: `${perf.radius.card}px`,
+          boxShadow: 'none',
+        },
+      }}
+    >
       {/* Image Zoom Dialog */}
       {zoomedImages && (
         <ImageZoomDialog
@@ -571,21 +588,40 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         )}
       </Box>
 
+      {/* KPI summary strip — hidden in narrow side-panel mode */}
+      {!basicOnly && !isLoadingData && performanceData && (
+        <KpiStrip performanceData={performanceData} />
+      )}
+
+      {/* Weekday win-rate breakdown — sits above the Basic/Advanced tabs */}
+      {!basicOnly && !isLoadingData && filteredTrades.length > 0 && (
+        <WeekdayWinRate trades={filteredTrades} />
+      )}
+
       {/* Basic/Advanced Tab Selection */}
       {!basicOnly && (
         <Box sx={{ mb: 2 }}>
-          <RoundedTabs
-            tabs={PERFORMANCE_TABS}
-            fullWidth={true}
-            activeTab={performanceTab === 'basic' ? 0 : 1}
-            onTabChange={(_, newIndex) => setPerformanceTab(newIndex === 0 ? 'basic' : 'advanced')}
+          <PerfPill<'basic' | 'advanced'>
+            options={PERFORMANCE_TABS}
+            value={performanceTab}
+            onChange={setPerformanceTab}
+            fullWidth
           />
         </Box>
       )}
 
       {/* Loading State */}
       {isLoadingData && (
-        <ShimmerChartLoader height={chartHeights.large} />
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: chartHeights.large,
+          }}
+        >
+          <CircularProgress size={28} />
+        </Box>
       )}
 
       {/* Error State */}

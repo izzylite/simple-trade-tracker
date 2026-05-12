@@ -19,7 +19,7 @@ interface DailyPnLChartProps {
   chartData: any[];
   drawdownViolationValue: number;
   setMultipleTradesDialog: (dialogState: any) => void;
-  timePeriod: 'month' | 'year' | 'all';
+  timePeriod: 'month' | 'quarter' | 'ytd' | 'year' | 'all';
 }
 
 // Custom Y-axis tick component for daily P&L
@@ -30,7 +30,7 @@ const CustomDailyPnLYAxisTick = (props: any) => {
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={5} textAnchor="end" fill="#94a3b8" fontSize={12}>
+      <text x={0} y={0} dy={5} textAnchor="end" fill="rgba(255,255,255,0.38)" fontSize={12}>
         {formattedValue}
       </text>
     </g>
@@ -90,19 +90,21 @@ const DailyPnLChart: React.FC<DailyPnLChartProps> = ({
 
   return (
     <Box>
-      <Typography variant="h6" sx={{ mb: 2 }}>
+      <Typography sx={{ mb: 2, fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.01em' }}>
         Daily P&L
       </Typography>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.3} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.06)" />
           <XAxis
             dataKey="date"
             axisLine={false}
             tickLine={false}
+            interval="preserveStartEnd"
+            minTickGap={timePeriod === 'month' ? 32 : 56}
             tick={{
               fill: theme.palette.text.secondary,
-              fontSize: timePeriod === 'year' ? 8 : 12
+              fontSize: 10
             }}
           />
           <YAxis

@@ -10,7 +10,6 @@ import {
   ReferenceLine
 } from 'recharts';
 import { Box, Paper, Typography, useTheme } from '@mui/material';
-import { alpha } from '@mui/material/styles';
 import { format } from 'date-fns';
 import { Trade } from '../../types/dualWrite';
 import { formatValue } from '../../utils/formatters';
@@ -21,7 +20,7 @@ interface CumulativePnLChartProps {
   targetValue: number | null;
   monthly_target?: number;
   setMultipleTradesDialog: (dialogState: any) => void;
-  timePeriod: 'month' | 'year' | 'all';
+  timePeriod: 'month' | 'quarter' | 'ytd' | 'year' | 'all';
 }
 
 // Custom Y-axis tick component
@@ -32,7 +31,7 @@ const CustomYAxisTick = (props: any) => {
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={5} textAnchor="end" fill="#94a3b8" fontSize={12}>
+      <text x={0} y={0} dy={5} textAnchor="end" fill="rgba(255,255,255,0.38)" fontSize={12}>
         {formattedValue}
       </text>
     </g>
@@ -94,17 +93,22 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Cumulative P&L</Typography>
+        <Typography sx={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.01em' }}>Cumulative P&L</Typography>
         {monthly_target && targetValue !== null && (
           <Box
             sx={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              bgcolor: alpha(theme.palette.primary.main, 0.1),
-              px: 1.5,
+              bgcolor: 'rgba(124,58,237,0.16)',
+              border: '1px solid rgba(124,58,237,0.32)',
+              color: '#ede9fe',
+              px: 1.25,
               py: 0.5,
-              borderRadius: 1,
-              fontSize: '0.875rem'
+              borderRadius: '8px',
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              letterSpacing: '0.01em',
+              fontFeatureSettings: "'tnum' on, 'lnum' on",
             }}
           >
             Target: {monthly_target}% (${targetValue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
@@ -123,14 +127,16 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
               <stop offset="95%" stopColor={COLORS.loss} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.3} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.06)" />
           <XAxis
             dataKey="date"
             axisLine={false}
             tickLine={false}
+            interval="preserveStartEnd"
+            minTickGap={timePeriod === 'month' ? 32 : 56}
             tick={{
               fill: theme.palette.text.secondary,
-              fontSize: timePeriod === 'year' ? 8 : 12
+              fontSize: 10
             }}
           />
           <YAxis

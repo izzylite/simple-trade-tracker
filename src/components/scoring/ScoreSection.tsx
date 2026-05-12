@@ -40,7 +40,7 @@ interface ScoreSectionProps {
   accountBalance?: number;
   dynamicRiskSettings?: DynamicRiskSettings;
   allTags?: string[]; // Add allTags prop to receive calendar.tags
-  timePeriod?: 'month' | 'year' | 'all'; // Parent chart time period to restrict available score periods
+  timePeriod?: 'month' | 'quarter' | 'ytd' | 'year' | 'all'; // Parent chart time period to restrict available score periods
 }
 
 

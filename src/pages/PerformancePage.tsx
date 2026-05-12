@@ -7,9 +7,11 @@ import {
 import { useAuthState } from '../contexts/AuthStateContext';
 import { useCalendars } from '../hooks/useCalendars';
 import { Calendar } from '../types/calendar';
-import PerformanceCharts from '../components/PerformanceCharts';
+import PerformanceCharts, { TimePeriod } from '../components/PerformanceCharts';
 import CalendarLockedOverlay from '../components/calendars/CalendarLockedOverlay';
 import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
+import PerformanceHeader from '../components/performance/PerformanceHeader';
+import { perfTokens } from '../components/performance/performanceTokens';
 
 const SWITCH_SPINNER_MS = 350;
 const APP_HEADER_HEIGHT = 64;
@@ -44,6 +46,8 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
   );
 
   const { calendarId: selectedId, setCalendarId } = useSelectedCalendar();
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [isSwitching, setIsSwitching] = useState(false);
   const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -151,13 +155,29 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
     <Box
       sx={{
         position: 'relative',
-        px: { xs: 2, sm: 3, md: 4 },
-        py: { xs: 2, sm: 3 },
-        maxWidth: 1600,
-        mx: 'auto',
+        bgcolor: perfTokens.bg,
+        minHeight: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
+        color: perfTokens.fg,
       }}
     >
-      {isSwitching || !selectedCalendar ? (
+      <Box
+        sx={{
+          px: { xs: 2, sm: 3, md: 4 },
+          py: { xs: 2, sm: 3 },
+          maxWidth: 1600,
+          mx: 'auto',
+        }}
+      >
+        {selectedCalendar && (
+          <PerformanceHeader
+            calendarName={selectedCalendar.name}
+            timePeriod={timePeriod}
+            onTimePeriodChange={setTimePeriod}
+            selectedDate={selectedDate}
+            onSelectedDateChange={setSelectedDate}
+          />
+        )}
+        {isSwitching || !selectedCalendar ? (
         <Box
           sx={{
             display: 'flex',
@@ -188,6 +208,10 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
           maxDailyDrawdown={selectedCalendar.max_daily_drawdown}
           monthlyTarget={selectedCalendar.monthly_target}
           scoreSettings={selectedCalendar.score_settings}
+          timePeriod={timePeriod}
+          onTimePeriodChange={setTimePeriod}
+          selectedDate={selectedDate}
+          hideTimePeriodTabs
           dynamicRiskSettings={{
             account_balance: selectedCalendar.account_balance,
             risk_per_trade: selectedCalendar.risk_per_trade,
@@ -199,6 +223,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
           isReadOnly
         />
       )}
+      </Box>
     </Box>
   );
 };

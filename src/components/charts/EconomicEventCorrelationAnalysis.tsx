@@ -47,7 +47,7 @@ const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {
 interface EconomicEventCorrelationAnalysisProps {
   calendarId: string; // Single calendar ID
   trades: Trade[];
-  timePeriod: 'month' | 'year' | 'all';
+  timePeriod: 'month' | 'quarter' | 'ytd' | 'year' | 'all';
   selectedDate: Date;
   setMultipleTradesDialog?: (dialogState: any) => void;
   economicCorrelations?: any; // Pre-calculated economic correlations { high: {...}, medium: {...} }
