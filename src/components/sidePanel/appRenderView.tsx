@@ -14,11 +14,13 @@ export interface SidePanelViewConfig {
 
 /**
  * App-level renderView for the global SidePanel. Each case maps a view id to
- * its title, icon, and a content component. Content components read what they
- * need from contexts (SelectedCalendarContext, TradesContext, etc.) — no prop
- * drilling from the page.
+ * its title, icon, and a content component. Content components read what
+ * they need from contexts (SelectedCalendarContext, etc.) — no prop drilling
+ * from the page.
  *
- * Migrated panel-by-panel from TradeCalendarPage / EconomicEventsPage.
+ * Today only FAQ lives here; trade- and event-coupled panels remain on
+ * their pages' local SidePanelProviders, coordinated with the global one
+ * via PanelMutexContext.
  */
 export const appRenderView = (view: SidePanelView): SidePanelViewConfig | null => {
   switch (view.id) {

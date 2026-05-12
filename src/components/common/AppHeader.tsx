@@ -163,12 +163,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
 
           {/* Calendar selector — auth-only. HeaderCalendarSelector returns
               null when the user has no calendars, so it self-hides on the
-              empty state. */}
-          {user && (
-            <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-              <HeaderCalendarSelector />
-            </Box>
-          )}
+              empty state (and contributes no spacing to the Toolbar gap). */}
+          {user && <HeaderCalendarSelector />}
 
           {/* Spacer */}
           <Box sx={{ flexGrow: 1 }} />

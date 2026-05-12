@@ -3086,7 +3086,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
 export const TradeCalendar: FC<TradeCalendarProps> = (props) => {
   return (
-    <SidePanelProvider defaultView={{ id: 'economic-calendar' }}>
+    <SidePanelProvider
+      defaultView={{ id: 'economic-calendar' }}
+      defaultOpen={false}
+    >
       <TradeCalendarInner {...props} />
     </SidePanelProvider>
   );
