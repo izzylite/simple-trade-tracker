@@ -20,9 +20,7 @@ import {
   ExpandLess as ExpandLessIcon,
   DateRange as WeekIcon,
   CalendarMonth as MonthIcon,
-  Event as EventIcon,
-  Notifications as NotificationsIcon,
-  NotificationsOff as NotificationsOffIcon
+  Event as EventIcon
 } from '@mui/icons-material';
 import {
   format, addDays, addWeeks, addMonths,
@@ -94,8 +92,8 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
   const { pins: userPinnedEvents } = useUserPinnedEvents();
 
   const {
-    appliedFilters, pendingFilters, viewType, notificationsEnabled, filtersModified,
-    toggleCurrency, toggleImpact, setOnlyUpcoming, setViewType, setNotificationsEnabled,
+    appliedFilters, pendingFilters, viewType, filtersModified,
+    toggleCurrency, toggleImpact, setOnlyUpcoming, setViewType,
     applyFilters, resetFilters,
   } = useEconomicCalendarFilters({ calendar, onUpdateCalendarProperty });
 
@@ -206,10 +204,6 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
   }, [applyFilters]);
 
   const handleResetFilters = useCallback(() => resetFilters(), [resetFilters]);
-
-  const handleNotificationToggle = useCallback(async (value: boolean) => {
-    await setNotificationsEnabled(value);
-  }, [setNotificationsEnabled]);
 
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
@@ -353,19 +347,6 @@ const EconomicCalendarPanel: React.FC<EconomicCalendarPanelProps> = ({
               </Box>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Tooltip title={notificationsEnabled ? 'Disable event notifications' : 'Enable event notifications'} placement="top">
-                <IconButton
-                  size="small"
-                  onClick={(e) => { e.stopPropagation(); handleNotificationToggle(!notificationsEnabled); }}
-                  sx={{
-                    color: notificationsEnabled ? 'primary.main' : 'text.disabled',
-                    '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.1), transform: 'scale(1.1)' },
-                    transition: 'all 0.2s ease-in-out',
-                  }}
-                >
-                  {notificationsEnabled ? <NotificationsIcon /> : <NotificationsOffIcon />}
-                </IconButton>
-              </Tooltip>
               <IconButton
                 size="small"
                 sx={{

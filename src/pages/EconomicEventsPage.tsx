@@ -24,6 +24,8 @@ import {
   HourglassEmpty as HourglassEmptyIcon,
   Close as CloseIcon,
   Notes as NotesIcon,
+  Notifications as NotificationsIcon,
+  NotificationsOff as NotificationsOffIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import {
@@ -42,6 +44,9 @@ import { useEconomicEvents } from '../hooks/useEconomicEvents';
 import { useEventCountdownTime } from '../hooks/useCurrentTime';
 import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
 import { useUserEconomicFilters } from '../contexts/UserEconomicFiltersContext';
+import { useTradesContext } from '../contexts/TradesContext';
+import { useTradeOperations } from '../contexts/TradeOperationsContext';
+import { useEconomicCalendarFilters } from '../hooks/useEconomicCalendarFilters';
 import { useUserTradeEventCounts } from '../hooks/useUserTradeEventCounts';
 import {
   SidePanelProvider,
@@ -257,6 +262,14 @@ const EconomicEventsPageInner: React.FC = () => {
     toggleCurrency,
     setOnlyUpcoming,
   } = useUserEconomicFilters();
+
+  // Per-calendar notifications toggle. Lifted from EconomicCalendarPanel so it
+  // lives on the page header where users actually look for it. Reads/writes
+  // through the same `useEconomicCalendarFilters` hook the panel used.
+  const { calendar } = useTradesContext();
+  const { onUpdateCalendarProperty } = useTradeOperations();
+  const { notificationsEnabled, setNotificationsEnabled } =
+    useEconomicCalendarFilters({ calendar, onUpdateCalendarProperty });
   const [hubTab, setHubTab] = useState<HubTab>('calendar');
 
   // Releases tab is only relevant for today — actuals print today, forecasts
@@ -591,11 +604,43 @@ const EconomicEventsPageInner: React.FC = () => {
           </Typography>
         </Box>
 
-        <FilterPill
-          value={impactFilter}
-          onChange={setImpactFilter}
-          theme={theme}
-        />
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <FilterPill
+            value={impactFilter}
+            onChange={setImpactFilter}
+            theme={theme}
+          />
+          <Tooltip
+            title={
+              notificationsEnabled
+                ? 'Disable event notifications'
+                : 'Enable event notifications'
+            }
+            placement="top"
+          >
+            <span>
+              <IconButton
+                size="small"
+                onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+                disabled={!calendar}
+                sx={{
+                  color: notificationsEnabled ? 'primary.main' : 'text.disabled',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    transform: 'scale(1.1)',
+                  },
+                }}
+              >
+                {notificationsEnabled ? (
+                  <NotificationsIcon />
+                ) : (
+                  <NotificationsOffIcon />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
       </Stack>
 
       {/* Currency chips + upcoming toggle (user-persisted) */}
