@@ -86,14 +86,11 @@ import {
 } from '../components/StyledComponents';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
-
 import PageActionBar from '../components/common/PageActionBar';
 import { Calendar } from '../types/calendar';
 import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
 import PinnedTradesDrawer from '../components/PinnedTradesDrawer';
-import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ShareButton from '../components/sharing/ShareButton';
 import { exportTrades } from '../utils/tradeExportImport';
 import { ImportMappingDialog } from '../components/import/ImportMappingDialog';
@@ -125,6 +122,7 @@ import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
 import { useTradesContext } from '../contexts/TradesContext';
 import { useTradeOperations } from '../contexts/TradeOperationsContext';
+import { useTradeViewer } from '../contexts/TradeViewerContext';
 import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
 import {
   SidePanelProvider,
@@ -573,6 +571,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   } = tradesHook;
 
   const globalTradeOps = useTradeOperations();
+  const tradeViewer = useTradeViewer();
 
   // Prevent outer page scroll — this page uses a fixed-height flex layout
   useEffect(() => {
@@ -645,14 +644,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isMonthSelectorOpen, setIsMonthSelectorOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [zoomedImages, setZoomedImagesState] = useState<ImageZoomProp | null>(null);
-
-  // Custom function to handle setting zoomed image and related state
-  const setZoomedImage = useCallback((url: string, allImages?: string[], initialIndex?: number) => {
-    setZoomedImagesState({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
-
-  }, []);
-
   const [isTagManagementDrawerOpen, setIsTagManagementDrawerOpen] = useState(false);
   const [isSearchDrawerOpen, setIsSearchDrawerOpen] = useState(false);
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
@@ -671,21 +662,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   );
   const [showFloatingMonthNav, setShowFloatingMonthNav] = useState(false);
   const [pinnedTradesDrawerOpen, setPinnedTradesDrawerOpen] = useState(false);
-  const [galleryMode, setGalleryMode] = useState<{
-    open: boolean;
-    trades: Trade[];
-    initialTradeId?: string;
-    title?: string;
-    aiOnlyMode?: boolean;
-    fetchYear?: number;
-  }>({
-    open: false,
-    trades: [],
-    initialTradeId: undefined,
-    title: undefined,
-    aiOnlyMode: false,
-    fetchYear: undefined
-  });
 
   // Calendar edit dialog state
   const [isCalendarEditOpen, setIsCalendarEditOpen] = useState(false);
@@ -1260,47 +1236,14 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setSnackbarOpen(false);
   };
 
-  // Gallery mode handlers
-  const openGalleryMode = (trades: Trade[], initialTradeId?: string, title?: string, fetchYear?: number) => {
-    setGalleryMode({
-      open: true,
-      trades,
-      initialTradeId,
-      title,
-      aiOnlyMode: false,
-      fetchYear
-    });
-  };
-
-  // Open gallery in AI-only mode (hides Trade tab, shows only Assistant)
-  const openGalleryModeAI = (trades: Trade[], tradeId: string, title?: string) => {
-    setGalleryMode({
-      open: true,
-      trades,
-      initialTradeId: tradeId,
-      title,
-      aiOnlyMode: true
-    });
-  };
-
-  const closeGalleryMode = () => {
-    setGalleryMode({
-      open: false,
-      trades: [],
-      initialTradeId: undefined,
-      title: undefined,
-      aiOnlyMode: false,
-      fetchYear: undefined
-    });
-  };
-
   const tradeOperations: TradeOperationsProps = useMemo(() => ({
     onUpdateTradeProperty: isReadOnly ? undefined : globalTradeOps.onUpdateTradeProperty,
     onEditTrade: isReadOnly ? undefined : globalTradeOps.onEditTrade,
     onDeleteTrade: isReadOnly ? undefined : globalTradeOps.onDeleteTrade,
     onDeleteMultipleTrades: isReadOnly ? undefined : globalTradeOps.onDeleteMultipleTrades,
-    onZoomImage: setZoomedImage,
-    onOpenGalleryMode: openGalleryMode,
+    onZoomImage: tradeViewer.openImageZoom,
+    onOpenGalleryMode: (trades, initialTradeId, title, fetchYear) =>
+      tradeViewer.openGallery({ trades, initialTradeId, title, fetchYear }),
     onOpenAIChat: isReadOnly ? undefined : (trade) => globalAIChat.openWithTrade(trade),
     onUpdateCalendarProperty: isReadOnly ? undefined : onUpdateCalendarProperty,
     isTradeUpdating,
@@ -1312,8 +1255,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   }), [
     isReadOnly,
     globalTradeOps,
-    setZoomedImage,
-    openGalleryMode,
+    tradeViewer,
     globalAIChat,
     onUpdateCalendarProperty,
     isTradeUpdating,
@@ -1379,9 +1321,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 selectedTags={selectedTags}
                 onTagsChange={handleTagsChange}
                 onTradeClick={(trade) => {
-                  openGalleryMode(
-                    trades, trade.id, 'Search Results'
-                  );
+                  tradeViewer.openGallery({
+                    trades,
+                    initialTradeId: trade.id,
+                    title: 'Search Results',
+                  });
                 }}
               />
             ),
@@ -1398,7 +1342,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                   isPanelOpen && currentView.id === 'pinned'
                 }
                 onTradeClick={(trade, allTrades, title) => {
-                  openGalleryMode(allTrades, trade.id, title);
+                  tradeViewer.openGallery({
+                    trades: allTrades,
+                    initialTradeId: trade.id,
+                    title,
+                  });
                 }}
               />
             ),
@@ -1470,7 +1418,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 pnlBeforeMonth={pnlBeforeMonth}
                 isPnlLoading={isPnlLoading}
                 onDeleteTrade={globalTradeOps.onDeleteTrade}
-                onOpenGalleryMode={openGalleryMode}
+                onOpenGalleryMode={(trades, initialTradeId, title) =>
+                  tradeViewer.openGallery({ trades, initialTradeId, title })
+                }
                 onUpdateTradeProperty={handleUpdateTradeProperty}
                 onUpdateCalendarProperty={onUpdateCalendarProperty}
                 onEditTrade={globalTradeOps.onEditTrade}
@@ -1552,7 +1502,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       calendar, economicCalendarUpdatedEvent, isReadOnly,
       tradeOperations, isPanelOpen, currentView, calendarId,
       allTags, selectedTags, handleTagsChange, trades,
-      openGalleryMode, openGalleryModeAI, handleTagUpdated,
+      tradeViewer, handleTagUpdated,
       requiredTagGroups, onUpdateCalendarProperty,
       getTradesForDate, weeklyStatsMap, accountBalance,
       pushPanel, replacePanel, globalTradeOps,
@@ -2348,7 +2298,17 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             onDateChange={handleDayChange}
             account_balance={accountBalance}
             tradeOperations={tradeOperations}
-            onOpenAIChatMode={isReadOnly ? undefined : openGalleryModeAI}
+            onOpenAIChatMode={
+              isReadOnly
+                ? undefined
+                : (trades, tradeId, title) =>
+                  tradeViewer.openGallery({
+                    trades,
+                    initialTradeId: tradeId,
+                    title,
+                    aiOnlyMode: true,
+                  })
+            }
             weekTrades={selectedDate
               ? weeklyStatsMap.get(format(startOfWeek(selectedDate, { weekStartsOn: 0 }), 'yyyy-MM-dd'))?.weekTrades
               : undefined
@@ -2356,13 +2316,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           />
         )}
 
-
-        {/* Image Zoom Dialog */}
-        {zoomedImages && <ImageZoomDialog
-          open={!!zoomedImages}
-          onClose={() => setZoomedImagesState(null)}
-          imageProp={zoomedImages}
-        />}
 
         <SelectDateDialog
           open={isMonthSelectorOpen}
@@ -2373,7 +2326,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           monthlyTarget={monthly_target}
           yearlyTarget={yearlyTarget}
           yearStats={calendar?.year_stats || {}}
-          onOpenGalleryMode={openGalleryMode}
+          onOpenGalleryMode={(trades, initialTradeId, title, fetchYear) =>
+            tradeViewer.openGallery({ trades, initialTradeId, title, fetchYear })
+          }
         />
 
 
@@ -2427,7 +2382,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             onTradeClick={(trade) => {
               // Close search drawer and open the trade in gallery mode
               setIsSearchDrawerOpen(false);
-              openGalleryMode(trades, trade.id, "Search Results");
+              tradeViewer.openGallery({
+                trades,
+                initialTradeId: trade.id,
+                title: 'Search Results',
+              });
             }}
           />
         )}
@@ -2441,29 +2400,15 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             onTradeClick={(trade, allTrades, title) => {
               // Close drawer and open the trade in gallery mode
               setPinnedTradesDrawerOpen(false);
-              openGalleryMode(allTrades, trade.id, title);
+              tradeViewer.openGallery({
+                trades: allTrades,
+                initialTradeId: trade.id,
+                title,
+              });
             }}
             tradeOperations={tradeOperations}
           />
         )}
-
-        {/* Trade Gallery Dialog */}
-        <TradeGalleryDialog
-          open={galleryMode.open}
-          onClose={closeGalleryMode}
-          trades={galleryMode.trades}
-          initialTradeId={galleryMode.initialTradeId}
-          setZoomedImage={setZoomedImage}
-          title={galleryMode.title}
-          calendarId={calendarId}
-          calendar={calendar}
-          aiOnlyMode={galleryMode.aiOnlyMode}
-          isReadOnly={isReadOnly}
-          fetchYear={galleryMode.fetchYear}
-          tradeOperations={tradeOperations}
-        />
-
-
 
         {/* Calendar Edit Dialog */}
         <CalendarFormDialog
@@ -2542,7 +2487,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           pnlBeforeMonth={pnlBeforeMonth}
           isPnlLoading={isPnlLoading}
           onDeleteTrade={globalTradeOps.onDeleteTrade}
-          onOpenGalleryMode={openGalleryMode}
+          onOpenGalleryMode={(trades, initialTradeId, title) =>
+            tradeViewer.openGallery({ trades, initialTradeId, title })
+          }
           onUpdateTradeProperty={handleUpdateTradeProperty}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
           onEditTrade={globalTradeOps.onEditTrade}
