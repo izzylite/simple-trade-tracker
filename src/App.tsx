@@ -82,11 +82,6 @@ function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const isLandingPage = !user && location.pathname === '/';
-  // Routes that lock to viewport and own their own bottom spacing — App
-  // outer pb would otherwise leave a visible gap below the page chrome.
-  const isViewportLockedPage =
-    location.pathname.startsWith('/events') ||
-    location.pathname.startsWith('/notes');
 
   // Global Create Calendar dialog — triggered from side nav "+ New", lock
   // overlays, and any future entry point. Lifted to App.tsx so a single
@@ -329,10 +324,15 @@ function AppContent() {
         <Box
           sx={{
             flexGrow: 1,
-            minHeight: '100vh',
+            // Landing scrolls (it has its own long-form content). Every other
+            // route is locked to the viewport — each page owns its own scroll
+            // container so the app shell never scrolls behind it.
+            height: isLandingPage ? 'auto' : '100vh',
+            minHeight: isLandingPage ? '100vh' : undefined,
+            overflow: isLandingPage ? 'visible' : 'hidden',
             bgcolor: isLandingPage ? '#000' : 'custom.pageBackground',
             position: 'relative',
-            pb: isLandingPage || isViewportLockedPage ? 0 : 4,
+            pb: isLandingPage ? 0 : 0,
             pt: isLandingPage ? 0 : 8, // Add top padding to account for fixed AppBar
             transition: theme.transitions.create(['margin', 'width'], {
               duration: theme.transitions.duration.shorter,

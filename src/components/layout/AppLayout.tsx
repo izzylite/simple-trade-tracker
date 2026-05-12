@@ -40,7 +40,7 @@ const RouteSuspenseFallback: React.FC = () => (
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: 'calc(100vh - 96px)',
+      minHeight: 'calc(100vh - 64px)',
     }}
   >
     <CircularProgress size={28} />
@@ -93,10 +93,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
   const sidePanelConfig = appRenderView(currentView);
 
   return (
-    // min-height accounts for AppHeader (64px) + App outer Box pb (32px).
-    // Old value (100vh - 64px) caused 32px body overflow on viewport-locked
-    // pages because AppLayout would extend past App outer's content area.
-    <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 96px)', position: 'relative' }}>
+    // App outer Box owns overflow:hidden + height:100vh, with 64px top
+    // padding for the AppHeader — so AppLayout fills the remaining viewport.
+    <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)', position: 'relative' }}>
       <SideNav
         onNewCalendar={onNewCalendar}
         mobileOpen={mobileNavOpen}
@@ -129,6 +128,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
         sx={{
           flex: 1,
           minWidth: 0,
+          minHeight: 0,
+          // Pages that fix their own height (calendar / performance / notes /
+          // events) fill this column exactly and manage their own internal
+          // scroll. Pages that don't (About) scroll inside this column rather
+          // than the page chrome.
+          overflowY: 'auto',
           // When the calendars-list inline panel and/or the global side
           // panel are open at lg+, shrink the main column to make room.
           // Only one of the two is typically open at once today, but the
