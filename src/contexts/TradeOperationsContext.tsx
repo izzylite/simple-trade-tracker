@@ -92,8 +92,7 @@ const TradeOperationsContext =
 export const TradeOperationsProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
-  const { calendar, calendarId, hook } = useTradesContext();
-  const isReadOnly = !calendar;
+  const { calendar, calendarId, hook, isReadOnly } = useTradesContext();
 
   const [formDialog, setFormDialog] = useState<FormDialogState>(EMPTY_FORM);
   const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);

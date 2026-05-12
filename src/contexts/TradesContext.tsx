@@ -15,6 +15,13 @@ interface TradesContextValue {
   calendar: Calendar | null;
   trades: Trade[];
   isLoading: boolean;
+  /**
+   * True when the active calendar isn't owned by the signed-in user
+   * (shared calendar) or no calendar is selected. Consumers gate
+   * mutating UI on this flag — RLS would reject the writes anyway, so
+   * surface that intent up front.
+   */
+  isReadOnly: boolean;
   // Raw hook return — consumers pick what they need. Don't add ops wrappers
   // unless a consumer demands them.
   hook: ReturnType<typeof useCalendarTrades>;
@@ -42,10 +49,11 @@ export const TradesProvider: React.FC<TradesProviderProps> = ({
     () => calendars.find((c) => c.id === calendarId) ?? null,
     [calendars, calendarId]
   );
-  // Disable realtime when the active calendar isn't owned by the signed-in
-  // user (shared / read-only). Mirrors the gate TradeCalendarPage used to
-  // apply locally before it consumed this context.
-  const isReadOnly = !!calendar && !!user?.uid && calendar.user_id !== user.uid;
+  // True for shared calendars (calendar owned by a different user) and
+  // when no calendar is selected. Mutating UI must gate on this flag —
+  // RLS would otherwise reject writes silently.
+  const isReadOnly =
+    !calendar || (!!user?.uid && calendar.user_id !== user.uid);
   const hook = useCalendarTrades({
     calendarId: calendarId || undefined,
     selectedCalendar: calendar,
@@ -58,9 +66,10 @@ export const TradesProvider: React.FC<TradesProviderProps> = ({
       calendar: hook.calendar ?? calendar,
       trades: hook.trades ?? [],
       isLoading: hook.isLoading ?? false,
+      isReadOnly,
       hook,
     }),
-    [calendarId, calendar, hook]
+    [calendarId, calendar, hook, isReadOnly]
   );
   return (
     <TradesContext.Provider value={value}>{children}</TradesContext.Provider>

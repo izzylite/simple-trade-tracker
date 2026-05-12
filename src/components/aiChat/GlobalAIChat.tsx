@@ -33,7 +33,7 @@ import { TradeOperationsProps } from '../../types/tradeOperations';
  * the full TradeUI dialog stack to App level is a separate refactor.
  */
 const GlobalAIChat: React.FC = () => {
-  const { calendar, trades } = useTradesContext();
+  const { calendar, trades, isReadOnly } = useTradesContext();
   const aiChat = useAIChat();
   const tradeViewer = useTradeViewer();
   const { registerRouteHandler } = useNotifications();
@@ -109,11 +109,12 @@ const GlobalAIChat: React.FC = () => {
       onUpdateCalendarProperty: tradeOps.onUpdateCalendarProperty,
       isTradeUpdating: tradeOps.isTradeUpdating ?? (() => false),
       deletingTradeIds: tradeOps.deletingTradeIds ?? [],
+      economicFilter: tradeOps.economicFilter,
       calendarId: calendar?.id,
       calendar: calendar || undefined,
-      isReadOnly: !calendar,
+      isReadOnly,
     }),
-    [calendar, tradeViewer, tradeOps]
+    [calendar, isReadOnly, tradeViewer, tradeOps]
   );
 
   // Consume initialTrade once the drawer mounts the prop — AIChatContent

@@ -3,7 +3,6 @@ import TradeGalleryDialog from '../TradeGalleryDialog';
 import ImageZoomDialog from '../ImageZoomDialog';
 import { useTradeViewer } from '../../contexts/TradeViewerContext';
 import { useTradesContext } from '../../contexts/TradesContext';
-import { useAuthState } from '../../contexts/AuthStateContext';
 import { useTradeOperations } from '../../contexts/TradeOperationsContext';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 
@@ -21,15 +20,8 @@ import { TradeOperationsProps } from '../../types/tradeOperations';
 const GlobalTradeViewer: React.FC = () => {
   const { gallery, closeGallery, zoomedImages, closeImageZoom, openImageZoom } =
     useTradeViewer();
-  const { calendar } = useTradesContext();
-  const { user } = useAuthState();
+  const { calendar, isReadOnly } = useTradesContext();
   const tradeOps = useTradeOperations();
-
-  // Read-only when the active calendar isn't owned by the current user
-  // (e.g. shared calendar) — also when there's no calendar at all.
-  const isReadOnly = !calendar || (user?.uid && calendar.user_id !== user.uid)
-    ? true
-    : false;
 
   const tradeOperations = useMemo<TradeOperationsProps>(
     () => ({
@@ -49,6 +41,7 @@ const GlobalTradeViewer: React.FC = () => {
         : tradeOps.onUpdateCalendarProperty,
       isTradeUpdating: tradeOps.isTradeUpdating ?? (() => false),
       deletingTradeIds: tradeOps.deletingTradeIds ?? [],
+      economicFilter: tradeOps.economicFilter,
       calendarId: calendar?.id,
       calendar: calendar || undefined,
       isReadOnly,
