@@ -7,7 +7,13 @@ import { log } from "../_shared/supabase.ts";
 import { fetchSerperScrape } from "../_shared/serperScrape.ts";
 import { scrapeArticle } from "../_shared/scrapeProvider.ts";
 import { tavilySearchNews, tavilySearchBreaking } from "../_shared/tavily.ts";
-import { getMarketPrice } from "../_shared/prices.ts";
+import { getMarketPrice, fetchYahooTimeSeries } from "../_shared/prices.ts";
+import {
+  fetchTimeSeries,
+  formatCandleLine,
+  type Candle,
+  type CandleInterval,
+} from "../_shared/twelvedata.ts";
 import {
   SLASH_COMMAND_TAG,
   GAME_PLAN_TAG,
@@ -122,17 +128,17 @@ export const scrapeUrlTool: GeminiFunctionDeclaration = {
 };
 
 /**
- * Universal market price tool — Yahoo Finance (intraday) as primary, with
- * internal fallbacks to CoinGecko and Frankfurter. Covers all asset classes.
+ * Universal market price tool — Twelve Data (intraday) primary, Yahoo Finance
+ * fallback (covers indices/futures/bonds), Frankfurter forex EOD as last resort.
  */
 export const getMarketPriceTool: GeminiFunctionDeclaration = {
   name: "get_market_price",
   description:
-    `Get intraday price data for any instrument — forex, indices, commodities, crypto, bonds, or stocks. Returns: price, day change %, day high/low, previous close, and data source.
+    `Get current price data for any instrument — forex, indices, commodities, crypto, bonds, or stocks. Returns: price, day change %, day high/low, previous close, and a freshness label.
 
-The tool automatically falls back to alternative providers internally if the primary source is unavailable. When fallback data is returned, the response will include a note indicating the source and freshness (e.g. "end-of-day reference rate" for forex fallback) — respect that in your wording (don't say "currently trading at" for end-of-day data).
+The tool routes internally across data sources. The result includes a freshness label (e.g. "live intraday", "near-realtime", "end-of-day reference rate") — respect it in your wording. Don't say "currently trading at" for end-of-day data; for that, say "last published rate".
 
-COMMON SYMBOLS (Yahoo Finance format):
+SYMBOL EXAMPLES:
   Forex: EURUSD=X, GBPUSD=X, USDJPY=X, USDCHF=X, USDCAD=X, AUDUSD=X, NZDUSD=X, EURGBP=X, EURJPY=X, GBPJPY=X, DX-Y.NYB (Dollar Index)
   Indices: ^GSPC (S&P 500), ^IXIC (Nasdaq), ^DJI (Dow), ^VIX, ^FTSE, ^GDAXI (DAX), ^N225 (Nikkei), ^HSI (Hang Seng)
   Commodities: GC=F (Gold), SI=F (Silver), CL=F (WTI Oil), BZ=F (Brent), NG=F (Natural Gas), HG=F (Copper)
@@ -146,10 +152,86 @@ COMMON SYMBOLS (Yahoo Finance format):
       symbol: {
         type: "string",
         description:
-          'Yahoo Finance symbol. Examples: "EURUSD=X", "^GSPC", "GC=F", "BTC-USD", "AAPL"',
+          'Symbol in the catalog format. Examples: "EURUSD=X", "^GSPC", "GC=F", "BTC-USD", "AAPL".',
       },
     },
     required: ["symbol"],
+  },
+};
+
+/**
+ * Historical OHLC candles via Twelve Data /time_series.
+ *
+ * Designed for "what was the market doing at the moment of this trade" lookups
+ * and short-window context. Returns compact OHLC lines, NOT raw arrays — keeps
+ * token usage bounded.
+ *
+ * Yahoo-format symbols accepted (same as get_market_price). Forex/US-stocks/
+ * crypto only on the free Twelve Data tier; indices/futures/bonds return a
+ * not-supported note.
+ */
+export const getMarketHistoryTool: GeminiFunctionDeclaration = {
+  name: "get_market_history",
+  description:
+    `Historical OHLC candles. Use ONLY when the question is NOT "right now":
+- past calendar dates ("yesterday's range", "what did X do on date Y")
+- intraday detail TODAY at finer granularity than get_market_price gives
+  (e.g. "what did EUR/USD do hour by hour this morning")
+- candle context around a logged trade's timestamp
+
+WHEN NOT TO CALL: "where is X right now", "what's the price of X", "today's day range" — those go to get_market_price (it already returns today's O/H/L/C plus previous close).
+
+For chart IMAGES attached to a trade, use analyze_image — that's vision over a screenshot; this is numeric OHLC data.
+
+COVERAGE: forex pairs (EURUSD=X…), US stocks (AAPL…), crypto (BTC-USD…), AND — via fallback — indices (^GSPC, ^IXIC, ^VIX…), futures (GC=F gold, CL=F oil, SI=F silver…), bonds/yields (^TNX, ^TYX…), and DXY (DX-Y.NYB). Daily/weekly/monthly work for all of these going back years. INTRADAY (1min–1h) for indices/futures/bonds/DXY has a horizon limit: roughly the last ~60 days only (and ~7 days for 1min). Beyond that, intraday returns "no data" — use a daily interval instead.
+
+INTERVALS: 1min, 5min, 15min, 30min, 1h, 2h, 4h, 1day, 1week, 1month. Pick the COARSEST interval that answers the question — "yesterday's range" is 1day with outputsize=2, NOT 1min. Default to 1min only for sub-hourly intraday questions. NOTE: 2h and 4h are NOT available for indices/futures/bonds/DXY — for those use 1h or 1day.
+
+RANGE: pass EITHER \`outputsize\` (last N candles back from now), OR \`start_date\`+\`end_date\` (specific window). If you accidentally pass both, the window wins and \`outputsize\` is ignored.
+
+OUTPUTSIZE: integer 1–200. Requests >200 are truncated.
+
+WINDOW TOO BIG: a start_date/end_date window that would span more than 200 candles at the chosen interval is rejected with a message telling you to use a coarser interval. If you get that, retry with the suggested interval — don't keep retrying at the same granularity.
+
+DATE FORMAT: "YYYY-MM-DD" for daily+, "YYYY-MM-DD HH:mm:ss" for intraday. Resolve relative dates ("yesterday", "this morning") from the current date in your context BEFORE calling. For a single target date, ALWAYS query a 2-bar window (outputsize=2, or start/end one day apart) — single-date queries occasionally return "no data" by API quirk.
+
+MARKET CLOSED: if the window falls outside trading hours (forex weekends, equity holidays), the tool returns "no data for window" — say so and suggest the nearest open trading day; do NOT fabricate a price.
+
+CALL DISCIPLINE: one call per question; never fan out across symbols or intervals in a single turn. Output is oldest→newest OHLC lines.`,
+  parameters: {
+    type: "object",
+    properties: {
+      symbol: {
+        type: "string",
+        description:
+          'Symbol in the catalog format. Examples: "EURUSD=X", "AAPL", "BTC-USD".',
+      },
+      interval: {
+        type: "string",
+        enum: [
+          "1min", "5min", "15min", "30min",
+          "1h", "2h", "4h",
+          "1day", "1week", "1month",
+        ],
+        description: "Candle interval. Pick the coarsest that answers the question.",
+      },
+      outputsize: {
+        type: "integer",
+        description:
+          "Last N candles back from now, 1–200. Ignored if start_date+end_date are provided. For 'yesterday' use 2, not 1.",
+      },
+      start_date: {
+        type: "string",
+        description:
+          'Window start, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with end_date. For a single-day target use a 2-day window (start = target, end = target + 1 day).',
+      },
+      end_date: {
+        type: "string",
+        description:
+          'Window end, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with start_date.',
+      },
+    },
+    required: ["symbol", "interval"],
   },
 };
 
@@ -754,7 +836,7 @@ Results include: title, significance (low/medium/high), task type, plain-text bo
           'Pass ANY of:\n' +
           '- A 3-letter currency code: "EUR", "USD", "GBP", "JPY"… → broad match across every briefing exposed to that currency.\n' +
           '- A natural instrument name: "DXY", "gold", "EUR/USD", "Bitcoin", "S&P 500" → narrow match to that specific instrument.\n' +
-          '- A Yahoo Finance symbol: "DX-Y.NYB", "GC=F", "EURUSD=X", "BTC-USD" → exact symbol match.\n' +
+          '- A catalog symbol: "DX-Y.NYB", "GC=F", "EURUSD=X", "BTC-USD" → exact symbol match.\n' +
           '- An informal alias: "yen"→JPY, "pound"/"sterling"→GBP, "euro"→EUR, "dollar"/"buck"→USD, "swissie"→CHF, "loonie"→CAD, "aussie"→AUD, "kiwi"→NZD, "spx"/"es"→S&P 500, "nq"/"ndx"→Nasdaq, "ym"→Dow, "rty"→Russell, "cable"→GBP/USD, "10y"/"2y"/"30y"→US Treasury yields.\n\n' +
           'The tool routes the input internally — currency-broad vs instrument-specific is automatic. Use the form the user actually said. Match is case-insensitive.',
       },
@@ -1109,52 +1191,6 @@ export async function scrapeUrl(
 }
 
 /**
- * Get cryptocurrency price using CoinGecko API
- */
-export async function getCryptoPrice(coinId: string): Promise<string> {
-  try {
-    // Normalize coin ID to lowercase
-    coinId = coinId.toLowerCase().trim();
-
-    const url =
-      `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`;
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      return `Failed to fetch crypto price: ${response.status}`;
-    }
-
-    const data = await response.json();
-
-    if (!data[coinId]) {
-      return `Cryptocurrency '${coinId}' not found. Try common names like: bitcoin, ethereum, solana, cardano, ripple, dogecoin`;
-    }
-
-    const coin = data[coinId];
-    const priceChange = coin.usd_24h_change || 0;
-    const changeSymbol = priceChange >= 0 ? "📈" : "📉";
-
-    let result = `${coinId.toUpperCase()} Market Data:\n\n`;
-    result += `💰 Price: $${
-      coin.usd.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
-    }\n`;
-    result += `${changeSymbol} 24h Change: ${priceChange.toFixed(2)}%\n`;
-    result += `📊 24h Volume: $${(coin.usd_24h_vol / 1e6).toFixed(2)}M\n`;
-    result += `🏦 Market Cap: $${(coin.usd_market_cap / 1e9).toFixed(2)}B\n`;
-
-    return result;
-  } catch (error) {
-    return `Crypto price error: ${
-      error instanceof Error ? error.message : "Unknown"
-    }`;
-  }
-}
-
-/**
  * Get forex exchange rate using Frankfurter API
  */
 export async function getForexPrice(
@@ -1199,12 +1235,12 @@ export async function getForexPrice(
 
 /**
  * Universal price lookup with fallback chain:
- *   1. Yahoo Finance (intraday, all asset classes) via shared cache
- *   2. CoinGecko (crypto only, near-realtime)
- *   3. Frankfurter/ECB (forex only, end-of-day)
+ *   1. Twelve Data (intraday — forex, US stocks, crypto) via shared cache
+ *   2. Yahoo Finance (intraday — all asset classes, incl. indices/futures/bonds)
+ *   3. Frankfurter/ECB (forex only, end-of-day reference rate — last resort)
  *
- * Each fallback tags its `source` so Gemini knows the data freshness and
- * adjusts language accordingly ("intraday" vs "end-of-day reference rate").
+ * Each result carries a freshness label so the model adjusts language
+ * ("live intraday" vs "end-of-day reference rate").
  */
 export async function executeGetMarketPrice(
   symbol: string,
@@ -1213,7 +1249,7 @@ export async function executeGetMarketPrice(
   const trimmed = symbol.trim();
   if (!trimmed) return "Symbol is required.";
 
-  // --- Primary: Yahoo via shared cache ---
+  // --- Primary: Twelve Data → Yahoo fallback (chosen inside getMarketPrice) ---
   if (supabase) {
     const snap = await getMarketPrice(supabase, trimmed);
     if (snap) {
@@ -1225,7 +1261,7 @@ export async function executeGetMarketPrice(
       });
       return [
         `${snap.displayName} (${snap.symbol})`,
-        `Source: Yahoo Finance (intraday)`,
+        `Freshness: live intraday`,
         ``,
         `Price: ${priceStr} ${snap.currency}`,
         `Day change: ${arrow} ${snap.percentChange.toFixed(2)}%`,
@@ -1235,31 +1271,9 @@ export async function executeGetMarketPrice(
     }
   }
 
-  log(`Yahoo miss for ${trimmed}, trying fallbacks`, "info");
+  log(`Primary price miss for ${trimmed}, trying forex EOD fallback`, "info");
 
-  // --- Fallback: CoinGecko for crypto symbols (BTC-USD → bitcoin) ---
-  if (trimmed.endsWith("-USD")) {
-    const coinMap: Record<string, string> = {
-      "BTC-USD": "bitcoin",
-      "ETH-USD": "ethereum",
-      "SOL-USD": "solana",
-      "XRP-USD": "ripple",
-      "ADA-USD": "cardano",
-      "DOGE-USD": "dogecoin",
-      "BNB-USD": "binancecoin",
-      "AVAX-USD": "avalanche-2",
-      "LINK-USD": "chainlink",
-      "LTC-USD": "litecoin",
-    };
-    const coinId = coinMap[trimmed] ??
-      trimmed.replace(/-USD$/, "").toLowerCase();
-    const result = await getCryptoPrice(coinId);
-    if (!result.startsWith("Crypto price error") && !result.startsWith("Failed")) {
-      return `${result}\nSource: CoinGecko (near-realtime, ~60s delay)`;
-    }
-  }
-
-  // --- Fallback: Frankfurter for forex symbols (EURUSD=X → EUR/USD) ---
+  // --- Last resort: Frankfurter/ECB for forex symbols (EURUSD=X → EUR/USD) ---
   if (trimmed.endsWith("=X") && trimmed.length >= 8) {
     const pair = trimmed.replace("=X", "");
     const base = pair.substring(0, 3);
@@ -1269,7 +1283,7 @@ export async function executeGetMarketPrice(
       if (!result.startsWith("Forex rate error") && !result.startsWith("Failed")) {
         return (
           result +
-          "\n⚠️ Source: Frankfurter/ECB (end-of-day reference rate — NOT intraday). " +
+          "\n⚠️ Freshness: end-of-day reference rate (NOT intraday). " +
           "This is the last published daily rate, not a live quote. " +
           "Do NOT present this as a current or real-time price."
         );
@@ -1277,7 +1291,156 @@ export async function executeGetMarketPrice(
     }
   }
 
-  return `Could not fetch price for "${trimmed}". Yahoo, CoinGecko, and Frankfurter all failed or the symbol is unrecognized.`;
+  return `Could not fetch price for "${trimmed}". All data sources failed or the symbol is unrecognized.`;
+}
+
+/**
+ * Historical OHLC executor — Yahoo-format symbol → Twelve Data /time_series.
+ * Returns compact lines, oldest→newest, capped to MAX_CANDLES per call.
+ */
+const MAX_CANDLES = 200;
+
+const VALID_INTERVALS: readonly CandleInterval[] = [
+  "1min", "5min", "15min", "30min",
+  "1h", "2h", "4h", "1day", "1week", "1month",
+] as const;
+
+function isCandleInterval(v: string): v is CandleInterval {
+  return (VALID_INTERVALS as readonly string[]).includes(v);
+}
+
+const INTERVAL_MINUTES: Record<CandleInterval, number> = {
+  "1min": 1, "5min": 5, "15min": 15, "30min": 30,
+  "1h": 60, "2h": 120, "4h": 240,
+  "1day": 1440, "1week": 10080, "1month": 43200,
+};
+
+// When a window is too granular, point Orion at the next sensible step up.
+const SUGGEST_COARSER: Record<CandleInterval, CandleInterval> = {
+  "1min": "30min", "5min": "1h", "15min": "1h", "30min": "4h",
+  "1h": "4h", "2h": "1day", "4h": "1day",
+  "1day": "1week", "1week": "1month", "1month": "1month",
+};
+
+/**
+ * Conservative estimate of how many candles a [start, end] window spans at the
+ * given interval. Treats the market as 24/7 (overestimates for equities — that's
+ * the safe direction, we'd rather nudge than flood). Returns null if the dates
+ * don't parse or the window is empty/inverted.
+ */
+function estimateWindowBars(
+  interval: CandleInterval,
+  startDate: string,
+  endDate: string,
+): number | null {
+  const parse = (d: string) =>
+    Date.parse(d.includes(" ") ? d.replace(" ", "T") : d);
+  const start = parse(startDate);
+  const end = parse(endDate);
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null;
+  return Math.ceil((end - start) / 60000 / INTERVAL_MINUTES[interval]);
+}
+
+export async function executeGetMarketHistory(args: {
+  symbol: string;
+  interval: string;
+  outputsize?: number;
+  start_date?: string;
+  end_date?: string;
+}): Promise<string> {
+  const symbol = (args.symbol || "").trim();
+  if (!symbol) return "Symbol is required.";
+
+  const interval = (args.interval || "").trim();
+  if (!isCandleInterval(interval)) {
+    return `Invalid interval "${interval}". Valid: ${VALID_INTERVALS.join(", ")}.`;
+  }
+
+  // Range: prefer explicit start/end; else outputsize; else 30.
+  const hasWindow = !!(args.start_date && args.end_date);
+
+  // Reject windows that would blow past the candle cap BEFORE spending an API
+  // credit — nudge Orion to a coarser interval instead of silently truncating.
+  if (hasWindow) {
+    const est = estimateWindowBars(interval, args.start_date!, args.end_date!);
+    if (est !== null && est > MAX_CANDLES) {
+      const coarser = SUGGEST_COARSER[interval];
+      return (
+        `That window at ${interval} is roughly ${est} candles — over the ` +
+        `${MAX_CANDLES}-candle limit. Use a coarser interval (try ${coarser}) ` +
+        `or narrow the window.`
+      );
+    }
+  }
+
+  const wantSize = Math.min(args.outputsize ?? 30, MAX_CANDLES);
+  const outputsize = hasWindow ? undefined : wantSize;
+
+  // Unix [period1, period2] window — needed for the Yahoo fallback. For
+  // outputsize mode we pad the lookback 3× to absorb weekends/holidays, then
+  // slice down after fetching.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const parseSec = (d: string): number => {
+    const ms = Date.parse(d.includes(" ") ? d.replace(" ", "T") : d);
+    return Number.isNaN(ms) ? NaN : Math.floor(ms / 1000);
+  };
+  const period2 = hasWindow ? parseSec(args.end_date!) : nowSec;
+  const period1 = hasWindow
+    ? parseSec(args.start_date!)
+    : nowSec - wantSize * 3 * INTERVAL_MINUTES[interval] * 60;
+
+  // Primary: Twelve Data (forex / US stocks / crypto). Newest→oldest order.
+  let candles: Candle[] | null = await fetchTimeSeries(symbol, {
+    interval,
+    outputsize,
+    startDate: args.start_date,
+    endDate: args.end_date,
+  });
+  let chronological = false; // Twelve Data is newest→oldest
+
+  // Fallback: Yahoo (DXY, indices, futures, bonds — everything Twelve can't do).
+  // Yahoo returns oldest→newest.
+  if (candles === null && !Number.isNaN(period1) && !Number.isNaN(period2)) {
+    candles = await fetchYahooTimeSeries(symbol, { interval, period1, period2 });
+    chronological = true;
+  }
+
+  if (candles === null) {
+    if (interval === "2h" || interval === "4h") {
+      return (
+        `Could not fetch ${interval} history for "${symbol}". The ${interval} ` +
+        `granularity isn't available for this instrument — use 1h or 1day.`
+      );
+    }
+    return (
+      `Could not fetch history for "${symbol}". The symbol may be unrecognized ` +
+      `or the data source is unavailable. Try get_market_price for the current value.`
+    );
+  }
+  if (candles.length === 0) {
+    const win =
+      hasWindow ? `${args.start_date} → ${args.end_date}` : "requested window";
+    return (
+      `No data for ${symbol} at ${interval} over ${win}. ` +
+      `Likely the market was closed (weekend, holiday, pre-market) or the ` +
+      `window is older than the intraday history limit. Try the nearest open ` +
+      `trading day, or a coarser interval (1day goes back decades).`
+    );
+  }
+
+  // Normalize to oldest→newest, then cap. For outputsize mode keep the last
+  // `wantSize`; for window mode keep the last MAX_CANDLES.
+  const asc = chronological ? [...candles] : [...candles].reverse();
+  const keep = hasWindow ? MAX_CANDLES : wantSize;
+  const ordered = asc.slice(-keep);
+  const truncatedNote =
+    asc.length > ordered.length
+      ? `\n(showing last ${ordered.length} of ${asc.length} candles)`
+      : "";
+
+  const header = `${symbol} ${interval} — ${ordered.length} candles:`;
+  const lines = ordered.map((c) => `  ${formatCandleLine(c)}`).join("\n");
+  return `${header}\n${lines}${truncatedNote}`;
 }
 
 /**
@@ -1987,7 +2150,7 @@ export async function getRecentOrionBriefings(
           return (
             `Unknown instrument "${instrument}". Pass either a currency code ` +
             `(${validCurrencies}) for broad matching, a natural name ` +
-            `("DXY", "gold", "EUR/USD", "Bitcoin"), or a Yahoo symbol ` +
+            `("DXY", "gold", "EUR/USD", "Bitcoin"), or a catalog symbol ` +
             `("DX-Y.NYB", "GC=F", "EURUSD=X"). Examples: ${sample}.`
           );
         }
@@ -2795,6 +2958,19 @@ export async function executeCustomTool(
         return await executeGetMarketPrice(sym, supabase);
       }
 
+      case "get_market_history": {
+        return await executeGetMarketHistory({
+          symbol: typeof args.symbol === "string" ? args.symbol : "",
+          interval: typeof args.interval === "string" ? args.interval : "",
+          outputsize:
+            typeof args.outputsize === "number" ? args.outputsize : undefined,
+          start_date:
+            typeof args.start_date === "string" ? args.start_date : undefined,
+          end_date:
+            typeof args.end_date === "string" ? args.end_date : undefined,
+        });
+      }
+
       case "generate_chart": {
         const chartType = typeof args.chart_type === "string"
           ? args.chart_type
@@ -3170,6 +3346,7 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     searchWebTool,
     scrapeUrlTool,
     getMarketPriceTool,
+    getMarketHistoryTool,
     generateChartTool,
     createNoteTool,
     updateNoteTool,
