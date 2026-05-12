@@ -4,27 +4,23 @@ import { SmartToy as AIIcon } from '@mui/icons-material';
 import { useLocation } from 'react-router-dom';
 import { useAuthState } from '../../contexts/AuthStateContext';
 import { useAIChat } from '../../contexts/AIChatContext';
-import { useTradesContext } from '../../contexts/TradesContext';
-import { useOrionTasks } from '../../hooks/useOrionTasks';
 
 /**
  * Floating "Open Orion" button mounted once at App level. Shows on every
  * authenticated, non-shared route. Click opens the global AI chat drawer;
  * an unread Orion task pulses a ring + shows a red dot.
  *
- * Uses a separate useOrionTasks call from GlobalAIChat. Both share the
- * module-level orionCache + the same realtime channel name, so this is
- * not a duplicate fetch — just a second subscription to the same broadcast.
+ * Reads the unread count from AIChatContext.aiTasks (a single
+ * useOrionTasks call owned by the provider) so the app keeps exactly one
+ * subscription regardless of how many surfaces consume the bundle.
  */
 const HIDDEN_PREFIXES = ['/shared', '/auth', '/landing'];
 
 const GlobalAIChatFab: React.FC = () => {
   const theme = useTheme();
   const { user } = useAuthState();
-  const { calendar } = useTradesContext();
-  const { open } = useAIChat();
+  const { open, aiTasks } = useAIChat();
   const location = useLocation();
-  const aiTasks = useOrionTasks(user?.uid, calendar?.id);
 
   if (!user) return null;
   if (HIDDEN_PREFIXES.some((p) => location.pathname.startsWith(p))) return null;

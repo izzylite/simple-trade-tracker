@@ -3,9 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import AIChatDrawer from './AIChatDrawer';
 import { useAIChat } from '../../contexts/AIChatContext';
 import { useTradesContext } from '../../contexts/TradesContext';
-import { useAuthState } from '../../contexts/AuthStateContext';
 import { useNotifications } from '../../contexts/NotificationsContext';
-import { useOrionTasks } from '../../hooks/useOrionTasks';
 import { usePanelMutexSlot } from '../../contexts/PanelMutexContext';
 import {
   isOrionTaskResultPayload,
@@ -33,11 +31,10 @@ import { TradeOperationsProps } from '../../types/tradeOperations';
  * the full TradeUI dialog stack to App level is a separate refactor.
  */
 const GlobalAIChat: React.FC = () => {
-  const { user } = useAuthState();
   const { calendar, trades } = useTradesContext();
   const aiChat = useAIChat();
   const { registerRouteHandler } = useNotifications();
-  const aiTasks = useOrionTasks(user?.uid, calendar?.id);
+  const aiTasks = aiChat.aiTasks;
 
   // Mutex slot — opening the chat closes other panels, and vice versa.
   usePanelMutexSlot('ai-chat', aiChat.isOpen, aiChat.close);

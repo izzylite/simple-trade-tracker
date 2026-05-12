@@ -6,6 +6,10 @@ import React, {
   useState,
 } from 'react';
 import { Trade } from '../types/dualWrite';
+import { AITasksBundle } from '../types/orionTask';
+import { useOrionTasks } from '../hooks/useOrionTasks';
+import { useAuthState } from './AuthStateContext';
+import { useTradesContextOptional } from './TradesContext';
 
 /**
  * App-level controller for the single AI chat drawer instance.
@@ -43,6 +47,12 @@ interface AIChatContextValue {
   consumeDeepLink: () => void;
   requestedTab: number | null;
   consumeTabRequest: () => void;
+
+  /** Single Orion tasks bundle — shared by the drawer (chat tab + Tasks tab)
+   *  and the floating FAB (unread badge). Sourced from useOrionTasks here so
+   *  the app keeps exactly one subscription regardless of how many consumers
+   *  read unreadCount / tasks / results. */
+  aiTasks: AITasksBundle;
 }
 
 const AIChatContext = createContext<AIChatContextValue | null>(null);
@@ -56,6 +66,14 @@ export const AIChatProvider: React.FC<{ children: React.ReactNode }> = ({
     null
   );
   const [requestedTab, setRequestedTab] = useState<number | null>(null);
+
+  // Single Orion tasks subscription for the entire app. useTradesContext is
+  // optional here because AIChatProvider mounts inside TradesProvider in the
+  // app stack, but the file structure tolerates being rendered outside (e.g.
+  // tests) without throwing.
+  const { user } = useAuthState();
+  const trades = useTradesContextOptional();
+  const aiTasks = useOrionTasks(user?.uid, trades?.calendar?.id);
 
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
@@ -94,6 +112,7 @@ export const AIChatProvider: React.FC<{ children: React.ReactNode }> = ({
       consumeDeepLink,
       requestedTab,
       consumeTabRequest,
+      aiTasks,
     }),
     [
       isOpen,
@@ -108,6 +127,7 @@ export const AIChatProvider: React.FC<{ children: React.ReactNode }> = ({
       consumeDeepLink,
       requestedTab,
       consumeTabRequest,
+      aiTasks,
     ]
   );
 
