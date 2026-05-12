@@ -65,6 +65,14 @@ export const EventNotificationsProvider: React.FC<{
   useEffect(() => {
     calendarIdRef.current = calendarId;
   }, [calendarId]);
+  // Live filter snapshot so the notification gate re-checks impact/currency
+  // against the *current* settings — MQL5 refresh in the watcher can mutate
+  // an event's impact after it passed the DB-level filter, so the queue is
+  // not a sufficient guarantee on its own.
+  const filtersRef = useRef(calendar?.economic_calendar_filters);
+  useEffect(() => {
+    filtersRef.current = calendar?.economic_calendar_filters;
+  }, [calendar?.economic_calendar_filters]);
 
   // Track timers so we can cancel them on unmount and avoid setState on
   // a torn-down provider during the 300ms exit animations.
@@ -121,7 +129,30 @@ export const EventNotificationsProvider: React.FC<{
       const activeId = calendarIdRef.current;
       if (!activeId || updatedCalendarId !== activeId) return;
       if (!notificationsEnabledRef.current) return;
-      updatedEvents.forEach(pushNotification);
+
+      const filters = filtersRef.current;
+      const allowedImpacts = filters?.impacts;
+      const allowedCurrencies = filters?.currencies;
+
+      updatedEvents.forEach((evt) => {
+        if (
+          allowedImpacts &&
+          allowedImpacts.length > 0 &&
+          evt.impact &&
+          !allowedImpacts.includes(evt.impact)
+        ) {
+          return;
+        }
+        if (
+          allowedCurrencies &&
+          allowedCurrencies.length > 0 &&
+          evt.currency &&
+          !allowedCurrencies.includes(evt.currency)
+        ) {
+          return;
+        }
+        pushNotification(evt);
+      });
     },
     [pushNotification]
   );
