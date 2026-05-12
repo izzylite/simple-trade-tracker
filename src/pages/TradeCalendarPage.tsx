@@ -93,7 +93,7 @@ import PageActionBar from '../components/common/PageActionBar';
 import { NewTradeForm, TradeImage } from '../components/trades/TradeForm';
 import { Calendar } from '../types/calendar';
 import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
-import TradeFormDialog, { createEditTradeData } from '../components/trades/TradeFormDialog';
+import TradeFormDialog, { createEditTradeData, createNewTradeData } from '../components/trades/TradeFormDialog';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import PinnedTradesDrawer from '../components/PinnedTradesDrawer';
@@ -348,30 +348,6 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({
 
   return content;
 });
-
-
-
-export const createNewTradeData = (): NewTradeForm => ({
-  id: uuidv4()!!,
-  name: '',
-  amount: 0,
-  trade_type: 'win',
-  entry_price: 0,
-  trade_date: null,
-  exit_price: 0,
-  stop_loss: 0,
-  take_profit: 0,
-  tags: [],
-  risk_to_reward: 0,
-  partials_taken: false,
-  session: '',
-  notes: '',
-  pending_images: [],
-  uploaded_images: [],
-  economic_events: [],
-});
-
-
 
 
 // TagFilter component for filtering trades by tags

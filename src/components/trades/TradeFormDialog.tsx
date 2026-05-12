@@ -16,7 +16,6 @@ import { DayHeader, TradeForm, NewTradeForm } from './';
 import { v4 as uuidv4 } from 'uuid';
 import { DEFAULT_PAIRS_TAG_GROUP, PendingImage, TradeImage } from './TradeForm';
 import { GridImage, GridPendingImage } from './ImageGrid';
-import { createNewTradeData } from '../../pages/TradeCalendarPage';
 import {
   calculateCumulativePnLToDateAsync,
   calculateEffectiveRiskPercentageAsync,
@@ -119,6 +118,26 @@ export const createEditTradeData = (trade: Trade): NewTradeForm => {
 
   }
 }
+
+export const createNewTradeData = (): NewTradeForm => ({
+  id: uuidv4(),
+  name: '',
+  amount: 0,
+  trade_type: 'win',
+  entry_price: 0,
+  trade_date: null,
+  exit_price: 0,
+  stop_loss: 0,
+  take_profit: 0,
+  tags: [],
+  risk_to_reward: 0,
+  partials_taken: false,
+  session: '',
+  notes: '',
+  pending_images: [],
+  uploaded_images: [],
+  economic_events: [],
+});
 
 const TradeFormDialog: React.FC<FormDialogProps> = ({
   open,
