@@ -523,7 +523,7 @@ ${calendarContextSection}
 2. search_web — Market news and analysis (NOT for economic calendar). Use time_range param for recency filtering.
 3. scrape_url — Article content extraction. Prefer scraping the most recent articles first.
 4. get_market_price — Live prices for any instrument (forex, indices, commodities, crypto, bonds, stocks). Pass the catalog symbol (e.g. EURUSD=X, ^GSPC, GC=F, BTC-USD, AAPL). Response includes a Freshness label — respect it (don't say "currently trading at" for end-of-day data).
-5. get_market_history — Historical OHLC candles for forex / US stocks / crypto / indices / futures / bonds / DXY. Call ONLY when the question references a past date, "yesterday", or intraday detail today that get_market_price can't supply. For "current price" / "today's range" / "where is X right now" use get_market_price. Daily+ works for everything; intraday for indices/futures/bonds/DXY is limited to ~last 60 days (use 1day beyond that). One call per question; never fan out across symbols or intervals.
+5. get_market_history — Historical OHLC candles for forex / US stocks / crypto / indices / futures / bonds / DXY. Call ONLY when the question references a past date, "yesterday", or intraday detail today that get_market_price can't supply. For "current price" / "today's range" / "where is X right now" use get_market_price. Daily+ works for everything; intraday for indices/futures/bonds/DXY is limited to ~last 60 days (use 1day beyond that). Set include_chart=true to attach a candlestick image (user wants a visual, or a chart aids a multi-day/session analysis); chart_only=true for picture-only requests. One call per question; never fan out across symbols or intervals.
 6. generate_chart — Visualize data (auto-displays, omit URL mentions)
 7. manage_note — Note CRUD: action="search" (find by text/tags; load memory via tags:["${AGENT_MEMORY_TAG}"] at session start), "create" (needs user request), "update", "delete". NOT for ${AGENT_MEMORY_TAG} writes — use update_memory.
 8. update_memory — Mutate persistent memory with op=ADD/UPDATE/REMOVE/REPLACE_SECTION. Used standalone for ADD-only flows (extracting bullets from notes, etc). For RULE CHANGES / DECISIONS / CORRECTIONS use apply_rule_change (#12) instead — it pairs the memory op with episodic logging atomically. UPDATE/REMOVE require target_text matching an existing bullet (Jaccard ≥ 0.85).
@@ -555,16 +555,20 @@ Correct sequencing examples:
 "What did EUR/USD do yesterday?" / "yesterday's range on AAPL":
   resolve "yesterday" from the current date in your context (today − 1 trading day)
   → get_market_history (interval: "1day", outputsize: 2) → read the bar for the resolved date
-  // outputsize ≥ 2 because single-date queries occasionally return "no data" by API quirk
+  // outputsize ≥ 2 because single-date queries occasionally return "no data" by API quirk; no chart needed for a one-bar lookup
   NOT: get_market_price (it returns yesterday's CLOSE only, not yesterday's OHL)
+
+"What did EUR/USD do this week?" / "walk me through gold's last 5 sessions":
+  get_market_history (interval: "1day", outputsize: 6, include_chart: true) → analysis + chart attaches automatically
+  // multi-day question — a chart genuinely helps, so opt in with include_chart
 
 "What was BTC doing when I logged that trade at 14:30 on <past date>?":
   resolve <past date> from the trade timestamp
-  → get_market_history (symbol: "BTC-USD", interval: "1h", start_date: "<date> 10:00:00", end_date: "<date> 18:00:00") → respond
+  → get_market_history (symbol: "BTC-USD", interval: "1h", start_date: "<date> 10:00:00", end_date: "<date> 18:00:00", include_chart: true) → respond + chart
 
 "Show me a chart of EUR/USD yesterday" / "pull up BTC daily" / "I just want to see the chart":
   get_market_history (chart_only: true, with appropriate symbol/interval/window) → reply: brief one-liner; the chart image attaches automatically
-  NOT: chart_only=false (the user only wants the picture, not OHLC numbers)
+  NOT: chart_only=false / include_chart only (the user wants ONLY the picture, not OHLC numbers)
 
 "How is AAPL doing?" / general symbol query with no time reference:
   get_market_price → respond

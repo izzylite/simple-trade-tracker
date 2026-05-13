@@ -199,9 +199,7 @@ MARKET CLOSED: if the window falls outside trading hours (forex weekends, equity
 
 CALL DISCIPLINE: one call per question; never fan out across symbols or intervals in a single turn. Output is oldest→newest OHLC lines.
 
-CHART: when the result has 3+ candles, it ends with a "Chart: <url>" line — a rendered candlestick image. The system AUTOMATICALLY attaches that image below your reply. Do NOT embed it yourself, do NOT repeat the URL, and do NOT describe what the chart shows ("notice the bearish engulfing…", "as you can see in the chart…") — just give your analysis; the image appears on its own. If there's no "Chart:" line (fewer than 3 candles, or render failed), don't mention a chart at all.
-
-CHART-ONLY MODE: set \`chart_only: true\` when the user asks ONLY to see a chart with no numeric analysis ("show me the chart", "pull up a chart of X yesterday", "I want to look at the chart"). The tool then skips the OHLC text dump and returns just the chart URL — saves context. Your reply should be a brief one-liner ("Here's EUR/USD yesterday:"); the chart image attaches automatically below it. Default to \`false\` (data + chart) for any question that wants analysis, ranges, or specifics ("what did X do", "yesterday's range", "compare highs").`,
+CHARTS: a candlestick image is attached below your reply ONLY when you ask for one — set \`include_chart: true\` (user wants a visual, or a chart genuinely helps a multi-day/intraday-session analysis) or \`chart_only: true\` (user wants ONLY the picture, no numbers — skips the OHLC dump). For plain numeric lookups ("what was the close", "yesterday's high") set neither — a chart there is just latency + clutter. When a chart IS attached: do NOT embed it yourself, do NOT repeat the URL, do NOT describe what it shows ("notice the bearish engulfing…", "as you can see in the chart…") — just write your analysis (or, in chart_only mode, a brief one-liner); the image appears on its own. Needs 3+ candles to render.`,
   parameters: {
     type: "object",
     properties: {
@@ -234,10 +232,15 @@ CHART-ONLY MODE: set \`chart_only: true\` when the user asks ONLY to see a chart
         description:
           'Window end, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with start_date.',
       },
+      include_chart: {
+        type: "boolean",
+        description:
+          'Optional, default false. When true, a candlestick chart image of the data is attached below your reply (auto — you don\'t embed it). Set true when the user asks for a chart/visual, or when a chart genuinely aids the analysis (multi-day trend, intraday session price action). Leave false for quick numeric lookups ("what was the close", "yesterday\'s high") — a chart adds latency and clutter there. Needs 3+ candles to render; ignored (implied true) when chart_only is set.',
+      },
       chart_only: {
         type: "boolean",
         description:
-          'Optional. When true, skip the OHLC text dump and return ONLY the chart URL. Use when the user asks to see a chart with no numeric analysis ("show me the chart", "pull up X yesterday"). Default false.',
+          'Optional, default false. When true, skip the OHLC text dump and return ONLY the chart. Implies a chart. Use when the user asks to see a chart with no numeric analysis ("show me the chart", "pull up X yesterday").',
       },
     },
     required: ["symbol", "interval"],
@@ -1156,6 +1159,7 @@ export async function executeGetMarketHistory(args: {
   start_date?: string;
   end_date?: string;
   chart_only?: boolean;
+  include_chart?: boolean;
 }): Promise<string> {
   const symbol = (args.symbol || "").trim();
   if (!symbol) return "Symbol is required.";
@@ -1247,7 +1251,13 @@ export async function executeGetMarketHistory(args: {
       ? `\n(showing last ${ordered.length} of ${asc.length} candles)`
       : "";
 
-  const chartUrl = await buildHistoryChartUrl(symbol, interval, ordered);
+  // Render a chart only when asked: chart_only mode always wants one;
+  // include_chart=true is the opt-in for the data+chart case. Skip the
+  // QuickChart round-trip otherwise. (< CHART_MIN_CANDLES never renders.)
+  const wantChart = args.chart_only || args.include_chart;
+  const chartUrl = wantChart
+    ? await buildHistoryChartUrl(symbol, interval, ordered)
+    : null;
 
   // chart_only mode: skip the OHLC text dump entirely, return just the chart
   // URL. Saves ~1.5k tokens of context when the user only wants the picture.
@@ -2728,6 +2738,7 @@ export async function executeCustomTool(
           end_date:
             typeof args.end_date === "string" ? args.end_date : undefined,
           chart_only: args.chart_only === true,
+          include_chart: args.include_chart === true,
         });
       }
 
