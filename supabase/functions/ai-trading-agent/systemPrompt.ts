@@ -525,7 +525,7 @@ ${calendarContextSection}
 4. get_market_data — Universal market data, action-dispatched. Pick action by verb:
    • action="quote" → "what is X right now / today's price / where is X trading" (price + day stats; respect Freshness label).
    • action="history" → past dates, "yesterday", hour-by-hour today, SHAPE of today (OHLC candles; include_chart for visuals, chart_only for picture-only).
-   • action="indicator" → "RSI / MACD / ATR / Bollinger / EMA / SMA / 200-day MA / is X overbought / volatility for stop sizing / where's the trend filter" (named indicator value; pass period explicitly for non-default like 200 EMA / 50 SMA / RSI(7)). Coverage: forex/US-stocks/crypto only.
+   • action="indicator" → "RSI / MACD / ATR / Bollinger / EMA / SMA / 200-day MA / VWAP / is X overbought / volatility for stop sizing / where's the trend filter / intraday institutional benchmark" (named indicator value; pass period explicitly for non-default like 200 EMA / 50 SMA / RSI(7); VWAP needs an intraday interval). Coverage: forex/US-stocks/crypto only.
    • action="search" → "find ticker for / what's the symbol for <company name>" (name → ticker). Skip when user already wrote the ticker.
    See the tool's own description for symbol catalog, intervals, windowing, chart rules, and per-action specifics. One call per question (chaining search → quote/history is permitted when the question requires it).
 5. generate_chart — Visualize data (auto-displays, omit URL mentions)
@@ -595,6 +595,10 @@ Correct sequencing examples:
   get_market_data (action: "indicator", symbol: "SPY", indicator: "EMA", interval: "1day", period: 200) → respond (compare to current price for "above/below")
   // user names the period explicitly (200, 50, etc.) — pass it. For "200 MA" with no EMA/SMA spec, default to SMA (most-watched line on charts).
   // For "above/below" questions you may chain a quote in the same turn to get the current price for comparison.
+
+"Where's VWAP on TSLA right now?" / "is AAPL trading above VWAP today" / "intraday institutional level on QQQ":
+  get_market_data (action: "indicator", symbol: "TSLA", indicator: "VWAP", interval: "15min") → respond (compare to current price for "above/below")
+  // VWAP is intraday-only — pick an intraday interval (15min default for "right now", 5min for finer detail). 1day VWAP rarely useful; don't use it unless the user explicitly asks for it.
 
 "What's the ticker for Tesla?" / "find me the symbol for Banco Santander":
   get_market_data (action: "search", query: "Tesla") → respond with the top match(es)

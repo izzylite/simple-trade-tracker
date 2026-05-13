@@ -139,9 +139,9 @@ export const scrapeUrlTool: GeminiFunctionDeclaration = {
  *                      Yahoo fallback, Frankfurter forex EOD last resort).
  * action="history"   — historical OHLC candles via Twelve Data /time_series
  *                      with Yahoo fallback for indices/futures/bonds/DXY.
- * action="indicator" — RSI/MACD/ATR/BBANDS/EMA/SMA via Twelve Data
+ * action="indicator" — RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP via Twelve Data
  *                      per-indicator endpoints. Free-tier coverage:
- *                      forex/US-stocks/crypto.
+ *                      forex/US-stocks/crypto. VWAP is intraday-only.
  * action="search"    — fuzzy name-to-ticker resolution via /symbol_search.
  *
  * Future actions reserved: "earnings" (earnings calendar).
@@ -154,7 +154,7 @@ export const getMarketDataTool: GeminiFunctionDeclaration = {
 ACTION ROUTING — pick by the user's verb:
 - "What is X right now / today's range / where is X trading" → action="quote"
 - "What did X do yesterday / on date Y / hour-by-hour this morning / chart of last week" → action="history"
-- "RSI / MACD / ATR / Bollinger Bands / EMA / SMA / 200-day moving average / is X overbought / volatility on X / where's the trend filter" → action="indicator"
+- "RSI / MACD / ATR / Bollinger Bands / EMA / SMA / 200-day moving average / VWAP / is X overbought / volatility on X / where's the trend filter / institutional intraday benchmark" → action="indicator"
 - "Find the ticker for / what's the symbol for / look up <company name>" → action="search"
 - AMBIGUOUS "is X bullish/bearish / how is X moving / momentum on X" → start with action="quote" (it includes change% which usually answers it). Only chain to action="indicator" if the user explicitly named one (RSI/MACD/etc).
 - For chart IMAGES attached to a trade, use analyze_image (vision over a screenshot); this tool is numeric data.
@@ -207,7 +207,7 @@ CALL DISCIPLINE: one call per question; never fan out across symbols or interval
 CHARTS (history only): a candlestick image is attached below your reply ONLY when you ask for one — set \`include_chart: true\` (user wants a visual, or a chart genuinely helps a multi-day/intraday-session analysis) or \`chart_only: true\` (user wants ONLY the picture, no numbers — skips the OHLC dump). For plain numeric lookups ("what was the close", "yesterday's high") set neither — a chart there is just latency + clutter. When a chart IS attached: do NOT embed it yourself, do NOT repeat the URL, do NOT describe what it shows ("notice the bearish engulfing…", "as you can see in the chart…") — just write your analysis (or, in chart_only mode, a brief one-liner); the image appears on its own. Needs 3+ candles to render.
 
 ═══════════════════════════════════════════════════════════════════════════════
-action="indicator" — technical indicators (RSI / MACD / ATR / BBANDS / EMA / SMA)
+action="indicator" — technical indicators (RSI / MACD / ATR / BBANDS / EMA / SMA / VWAP)
 ═══════════════════════════════════════════════════════════════════════════════
 Use when the user asks for a NAMED indicator value or a question that requires one (overbought/oversold, volatility for stop sizing, trend strength, band squeeze, "above/below the 200 MA"). Do NOT use to compute indicators yourself from history candles — call this directly.
 
@@ -220,6 +220,7 @@ INDICATORS:
 - BBANDS — volatility envelope {upper, middle, lower}. Default period=20. Squeeze = bands tight = breakout pending.
 - EMA    — exponential moving average. Default period=20. Pass period explicitly for the common trend filters: 50 (medium), 200 (regime). Reacts faster than SMA — use for entry timing.
 - SMA    — simple moving average. Default period=20. Pass period explicitly for the major levels: 50, 100, 200. Use for regime / institutional levels — 200 SMA is the most-watched line on charts.
+- VWAP   — volume-weighted average price. Day-traders' institutional benchmark for "fair value" intraday — price above VWAP = bullish session, below = bearish. INTRADAY ONLY in practice (1min / 5min / 15min / 30min / 1h). A 1day VWAP is just that single day's value and rarely useful; default to 15min or 1h when the user asks "where's VWAP". Default period=9 (moving VWAP over last 9 bars).
 
 COVERAGE: forex / US stocks / crypto only on free tier. Indices/futures/bonds/DXY return "not supported" — for those, fetch action="history" and reason about levels manually.
 
@@ -227,7 +228,7 @@ NO DATA: if the symbol has no recent bars (market closed, weekend, holiday, fres
 
 OUTPUTSIZE: integer 1–20 (default 1 = just the latest reading). Use >1 only when the user asks to see the trend ("RSI for the last week"). Values outside the range are silently clamped (passing 100 becomes 20).
 
-PERIOD: optional. Override when the user names one — common cases: "200 EMA on SPY" → period=200, "RSI(7)" → period=7, "50 SMA" → period=50. MACD ignores period (uses fixed 12/26/9). When the user says just "EMA" or "SMA" with no number, default 20.
+PERIOD: optional. Override when the user names one — common cases: "200 EMA on SPY" → period=200, "RSI(7)" → period=7, "50 SMA" → period=50. MACD ignores period (uses fixed 12/26/9). When the user says just "EMA" or "SMA" with no number, default 20. VWAP defaults to 9.
 
 AMBIGUOUS "MA" / "moving average" with no EMA/SMA prefix → default indicator="SMA" (the most-watched chart line is the 200 SMA, so SMA matches user expectation better than EMA when unspecified).
 
@@ -245,12 +246,12 @@ CHAINING (EXPLICIT EXCEPTION to "one call per question"): when search returns on
 ═══════════════════════════════════════════════════════════════════════════════
 BEFORE CALLING — quick checklist
 ═══════════════════════════════════════════════════════════════════════════════
-1. \`action\`      — "quote" (current price) | "history" (past/shape) | "indicator" (RSI/MACD/ATR/BBANDS) | "search" (name → ticker).
+1. \`action\`      — "quote" (current price) | "history" (past/shape) | "indicator" (RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP) | "search" (name → ticker).
 2. \`symbol\`      — catalog format. Required for quote/history/indicator. (search uses \`query\` instead.)
-3. If history/indicator: \`interval\` is REQUIRED. Pick the COARSEST that answers (yesterday → 1day, this morning → 1h). Indices/futures/bonds/DXY: NO 2h/4h.
+3. If history/indicator: \`interval\` is REQUIRED. Pick the COARSEST that answers (yesterday → 1day, this morning → 1h). Indices/futures/bonds/DXY: NO 2h/4h. VWAP: intraday only (1min–1h).
 4. If history: pick range — \`outputsize\` OR \`start_date\`+\`end_date\`. Single date → 2-bar window.
 5. If history: chart flags — \`include_chart\` (analysis + visual) or \`chart_only\` (picture-only). OFF for numeric lookups.
-6. If indicator: \`indicator\` enum (RSI/MACD/ATR/BBANDS). Free-tier coverage: forex/US-stocks/crypto only.
+6. If indicator: \`indicator\` enum (RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP). Free-tier coverage: forex/US-stocks/crypto only.
 7. If search: \`query\` (free text — company or asset name).`,
   parameters: {
     type: "object",
@@ -259,7 +260,7 @@ BEFORE CALLING — quick checklist
         type: "string",
         enum: ["quote", "history", "indicator", "search"],
         description:
-          'Which data to fetch. "quote" — current price + day stats ("right now / today / where is X trading"). "history" — OHLC candles for past or shape-of-today ("yesterday", a specific date, hour-by-hour, candle context for a logged trade). "indicator" — named technical indicator value (RSI/MACD/ATR/BBANDS — overbought, volatility, momentum, bands). "search" — fuzzy resolve a company/asset NAME to a ticker (use only when you do not already know the catalog symbol). Default to "quote" if no past-time/indicator/name-lookup intent is present.',
+          'Which data to fetch. "quote" — current price + day stats ("right now / today / where is X trading"). "history" — OHLC candles for past or shape-of-today ("yesterday", a specific date, hour-by-hour, candle context for a logged trade). "indicator" — named technical indicator value (RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP — overbought, volatility, momentum, bands, moving averages, intraday benchmark). "search" — fuzzy resolve a company/asset NAME to a ticker (use only when you do not already know the catalog symbol). Default to "quote" if no past-time/indicator/name-lookup intent is present.',
       },
       symbol: {
         type: "string",
@@ -268,14 +269,14 @@ BEFORE CALLING — quick checklist
       },
       indicator: {
         type: "string",
-        enum: ["RSI", "MACD", "ATR", "BBANDS", "EMA", "SMA"],
+        enum: ["RSI", "MACD", "ATR", "BBANDS", "EMA", "SMA", "VWAP"],
         description:
-          "action='indicator' ONLY (ignored otherwise). Which technical indicator to compute. RSI = momentum oscillator, MACD = trend/momentum, ATR = volatility for risk sizing, BBANDS = volatility envelope, EMA = exponential moving average (faster, entry timing), SMA = simple moving average (regime / 200-line).",
+          "action='indicator' ONLY (ignored otherwise). Which technical indicator to compute. RSI = momentum oscillator, MACD = trend/momentum, ATR = volatility for risk sizing, BBANDS = volatility envelope, EMA = exponential moving average (faster, entry timing), SMA = simple moving average (regime / 200-line), VWAP = volume-weighted average price (intraday institutional benchmark — INTRADAY INTERVAL ONLY).",
       },
       period: {
         type: "integer",
         description:
-          "action='indicator' ONLY (ignored otherwise). Lookback period. Defaults: RSI 14, ATR 14, BBANDS 20, EMA 20, SMA 20. MACD ignores this (uses fixed fast=12 slow=26 signal=9). Override when the user names a non-default — e.g. \"200 EMA on SPY\" → period=200, \"RSI(7)\" → period=7, \"50 SMA\" → period=50.",
+          "action='indicator' ONLY (ignored otherwise). Lookback period. Defaults: RSI 14, ATR 14, BBANDS 20, EMA 20, SMA 20, VWAP 9. MACD ignores this (uses fixed fast=12 slow=26 signal=9). Override when the user names a non-default — e.g. \"200 EMA on SPY\" → period=200, \"RSI(7)\" → period=7, \"50 SMA\" → period=50.",
       },
       query: {
         type: "string",
@@ -1373,7 +1374,7 @@ export async function executeGetMarketHistory(args: {
 }
 
 // ============================================================================
-// get_market_data action="indicator" — RSI / MACD / ATR / BBANDS
+// get_market_data action="indicator" — RSI / MACD / ATR / BBANDS / EMA / SMA / VWAP
 // ============================================================================
 
 const VALID_INDICATORS: ReadonlySet<IndicatorName> = new Set([
@@ -1383,15 +1384,17 @@ const VALID_INDICATORS: ReadonlySet<IndicatorName> = new Set([
   "BBANDS",
   "EMA",
   "SMA",
+  "VWAP",
 ]);
 
 const INDICATOR_DEFAULT_PERIOD: Record<IndicatorName, number> = {
   RSI: 14,
   ATR: 14,
   BBANDS: 20,
-  EMA: 20, // 20-period default — user names 50/200 when they want trend filter
-  SMA: 20, // same as EMA — period is the meaningful axis (20/50/200)
-  MACD: 0, // unused — MACD uses fast/slow/signal internally
+  EMA: 20,  // 20-period default — user names 50/200 when they want trend filter
+  SMA: 20,  // same as EMA — period is the meaningful axis (20/50/200)
+  VWAP: 9,  // TD /vwap default — moving VWAP over the last 9 bars
+  MACD: 0,  // unused — MACD uses fast/slow/signal internally
 };
 
 function formatIndicatorLine(
@@ -1412,6 +1415,8 @@ function formatIndicatorLine(
       return `${datetime}: EMA ${dp4(values.value)}`;
     case "SMA":
       return `${datetime}: SMA ${dp4(values.value)}`;
+    case "VWAP":
+      return `${datetime}: VWAP ${dp4(values.value)}`;
     case "MACD":
       return (
         `${datetime}: MACD ${dp4(values.macd)} ` +
@@ -3024,6 +3029,21 @@ export async function executeCustomTool(
             return (
               `get_market_data action="indicator" requires \`interval\`. ` +
               `Common choices: "1day" for daily readings, "1h" for intraday momentum.`
+            );
+          }
+          // VWAP is intraday-only by convention — a 1day/1week/1month VWAP
+          // collapses to single-bar values that aren't useful. Reject early
+          // with a clear retry hint instead of returning a useless number.
+          if (
+            indicator.toUpperCase() === "VWAP" &&
+            (interval === "1day" || interval === "1week" || interval === "1month")
+          ) {
+            return (
+              `VWAP is intraday-only — daily/weekly/monthly aggregation ` +
+              `returns single-bar values that aren't useful for the "fair ` +
+              `value" reading traders watch. Retry with an intraday interval ` +
+              `("15min" for "where's VWAP right now", "5min" for finer ` +
+              `detail, "1h" for session-shape).`
             );
           }
           return await executeGetIndicator({
