@@ -310,19 +310,20 @@ export function formatCandleLine(c: Candle, currency = ''): string {
 // Period defaults match Twelve Data's own defaults: RSI/ATR=14, BBANDS=20.
 // MACD uses fast=12, slow=26, signal=9 (standard); we don't expose tuning.
 
-export type IndicatorName = 'RSI' | 'MACD' | 'ATR' | 'BBANDS';
+export type IndicatorName = 'RSI' | 'MACD' | 'ATR' | 'BBANDS' | 'EMA' | 'SMA';
 
 export interface IndicatorPoint {
   datetime: string;
-  /** Indicator-specific keys. RSI/ATR: {value}. MACD: {macd, signal, hist}.
-   *  BBANDS: {upper, middle, lower}. Kept loose so the formatter handles
-   *  each case without a 4-way type union per call site. */
+  /** Indicator-specific keys. RSI/ATR/EMA/SMA: {value}. MACD: {macd, signal,
+   *  hist}. BBANDS: {upper, middle, lower}. Kept loose so the formatter
+   *  handles each case without a wide type union per call site. */
   values: Record<string, number>;
 }
 
 export interface IndicatorOptions {
   interval: CandleInterval;
-  /** Lookback period for RSI/ATR/BBANDS. Ignored for MACD. */
+  /** Lookback period. Defaults: RSI 14, ATR 14, BBANDS 20, EMA 20, SMA 20.
+   *  Ignored for MACD (which uses fixed fast=12 slow=26 signal=9). */
   period?: number;
   /** How many indicator points to return (default 1 — just the latest). */
   outputsize?: number;
@@ -333,6 +334,8 @@ const INDICATOR_ENDPOINT: Record<IndicatorName, string> = {
   MACD: 'macd',
   ATR: 'atr',
   BBANDS: 'bbands',
+  EMA: 'ema',
+  SMA: 'sma',
 };
 
 export async function fetchIndicator(
@@ -407,6 +410,10 @@ function normalizeIndicatorPoint(
       return { datetime, values: { value: n('rsi') } };
     case 'ATR':
       return { datetime, values: { value: n('atr') } };
+    case 'EMA':
+      return { datetime, values: { value: n('ema') } };
+    case 'SMA':
+      return { datetime, values: { value: n('sma') } };
     case 'MACD':
       return {
         datetime,

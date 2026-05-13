@@ -139,8 +139,9 @@ export const scrapeUrlTool: GeminiFunctionDeclaration = {
  *                      Yahoo fallback, Frankfurter forex EOD last resort).
  * action="history"   — historical OHLC candles via Twelve Data /time_series
  *                      with Yahoo fallback for indices/futures/bonds/DXY.
- * action="indicator" — RSI/MACD/ATR/BBANDS via Twelve Data per-indicator
- *                      endpoints. Free-tier coverage: forex/US-stocks/crypto.
+ * action="indicator" — RSI/MACD/ATR/BBANDS/EMA/SMA via Twelve Data
+ *                      per-indicator endpoints. Free-tier coverage:
+ *                      forex/US-stocks/crypto.
  * action="search"    — fuzzy name-to-ticker resolution via /symbol_search.
  *
  * Future actions reserved: "earnings" (earnings calendar).
@@ -153,7 +154,7 @@ export const getMarketDataTool: GeminiFunctionDeclaration = {
 ACTION ROUTING — pick by the user's verb:
 - "What is X right now / today's range / where is X trading" → action="quote"
 - "What did X do yesterday / on date Y / hour-by-hour this morning / chart of last week" → action="history"
-- "RSI / MACD / ATR / Bollinger Bands / is X overbought / volatility on X" → action="indicator"
+- "RSI / MACD / ATR / Bollinger Bands / EMA / SMA / 200-day moving average / is X overbought / volatility on X / where's the trend filter" → action="indicator"
 - "Find the ticker for / what's the symbol for / look up <company name>" → action="search"
 - AMBIGUOUS "is X bullish/bearish / how is X moving / momentum on X" → start with action="quote" (it includes change% which usually answers it). Only chain to action="indicator" if the user explicitly named one (RSI/MACD/etc).
 - For chart IMAGES attached to a trade, use analyze_image (vision over a screenshot); this tool is numeric data.
@@ -206,9 +207,9 @@ CALL DISCIPLINE: one call per question; never fan out across symbols or interval
 CHARTS (history only): a candlestick image is attached below your reply ONLY when you ask for one — set \`include_chart: true\` (user wants a visual, or a chart genuinely helps a multi-day/intraday-session analysis) or \`chart_only: true\` (user wants ONLY the picture, no numbers — skips the OHLC dump). For plain numeric lookups ("what was the close", "yesterday's high") set neither — a chart there is just latency + clutter. When a chart IS attached: do NOT embed it yourself, do NOT repeat the URL, do NOT describe what it shows ("notice the bearish engulfing…", "as you can see in the chart…") — just write your analysis (or, in chart_only mode, a brief one-liner); the image appears on its own. Needs 3+ candles to render.
 
 ═══════════════════════════════════════════════════════════════════════════════
-action="indicator" — technical indicators (RSI / MACD / ATR / BBANDS)
+action="indicator" — technical indicators (RSI / MACD / ATR / BBANDS / EMA / SMA)
 ═══════════════════════════════════════════════════════════════════════════════
-Use when the user asks for a NAMED indicator value or a question that requires one (overbought/oversold, volatility for stop sizing, trend strength, band squeeze). Do NOT use to compute indicators yourself from history candles — call this directly.
+Use when the user asks for a NAMED indicator value or a question that requires one (overbought/oversold, volatility for stop sizing, trend strength, band squeeze, "above/below the 200 MA"). Do NOT use to compute indicators yourself from history candles — call this directly.
 
 Required: \`symbol\`, \`indicator\`, \`interval\`.
 
@@ -217,6 +218,8 @@ INDICATORS:
 - MACD   — trend/momentum. Returns {macd, signal, hist}. Positive hist = bullish momentum. Fast=12 slow=26 signal=9 (not tunable here).
 - ATR    — average true range in price units. NOT predictive — use for stop placement (1.5-2x ATR trail) and position sizing. Default period=14.
 - BBANDS — volatility envelope {upper, middle, lower}. Default period=20. Squeeze = bands tight = breakout pending.
+- EMA    — exponential moving average. Default period=20. Pass period explicitly for the common trend filters: 50 (medium), 200 (regime). Reacts faster than SMA — use for entry timing.
+- SMA    — simple moving average. Default period=20. Pass period explicitly for the major levels: 50, 100, 200. Use for regime / institutional levels — 200 SMA is the most-watched line on charts.
 
 COVERAGE: forex / US stocks / crypto only on free tier. Indices/futures/bonds/DXY return "not supported" — for those, fetch action="history" and reason about levels manually.
 
@@ -224,7 +227,9 @@ NO DATA: if the symbol has no recent bars (market closed, weekend, holiday, fres
 
 OUTPUTSIZE: integer 1–20 (default 1 = just the latest reading). Use >1 only when the user asks to see the trend ("RSI for the last week"). Values outside the range are silently clamped (passing 100 becomes 20).
 
-PERIOD: optional. Override only when the user specifies (e.g. "RSI(7) on EURUSD"). MACD ignores period.
+PERIOD: optional. Override when the user names one — common cases: "200 EMA on SPY" → period=200, "RSI(7)" → period=7, "50 SMA" → period=50. MACD ignores period (uses fixed 12/26/9). When the user says just "EMA" or "SMA" with no number, default 20.
+
+AMBIGUOUS "MA" / "moving average" with no EMA/SMA prefix → default indicator="SMA" (the most-watched chart line is the 200 SMA, so SMA matches user expectation better than EMA when unspecified).
 
 ═══════════════════════════════════════════════════════════════════════════════
 action="search" — fuzzy symbol resolution
@@ -263,14 +268,14 @@ BEFORE CALLING — quick checklist
       },
       indicator: {
         type: "string",
-        enum: ["RSI", "MACD", "ATR", "BBANDS"],
+        enum: ["RSI", "MACD", "ATR", "BBANDS", "EMA", "SMA"],
         description:
-          "action='indicator' ONLY (ignored otherwise). Which technical indicator to compute. RSI = momentum oscillator, MACD = trend/momentum, ATR = volatility for risk sizing, BBANDS = volatility envelope.",
+          "action='indicator' ONLY (ignored otherwise). Which technical indicator to compute. RSI = momentum oscillator, MACD = trend/momentum, ATR = volatility for risk sizing, BBANDS = volatility envelope, EMA = exponential moving average (faster, entry timing), SMA = simple moving average (regime / 200-line).",
       },
       period: {
         type: "integer",
         description:
-          "action='indicator' ONLY (ignored otherwise). Lookback period. Defaults: RSI 14, ATR 14, BBANDS 20. MACD ignores this (uses fixed fast=12 slow=26 signal=9). Override only when the user names a non-default (e.g. \"RSI(7)\").",
+          "action='indicator' ONLY (ignored otherwise). Lookback period. Defaults: RSI 14, ATR 14, BBANDS 20, EMA 20, SMA 20. MACD ignores this (uses fixed fast=12 slow=26 signal=9). Override when the user names a non-default — e.g. \"200 EMA on SPY\" → period=200, \"RSI(7)\" → period=7, \"50 SMA\" → period=50.",
       },
       query: {
         type: "string",
@@ -1376,12 +1381,16 @@ const VALID_INDICATORS: ReadonlySet<IndicatorName> = new Set([
   "MACD",
   "ATR",
   "BBANDS",
+  "EMA",
+  "SMA",
 ]);
 
 const INDICATOR_DEFAULT_PERIOD: Record<IndicatorName, number> = {
   RSI: 14,
   ATR: 14,
   BBANDS: 20,
+  EMA: 20, // 20-period default — user names 50/200 when they want trend filter
+  SMA: 20, // same as EMA — period is the meaningful axis (20/50/200)
   MACD: 0, // unused — MACD uses fast/slow/signal internally
 };
 
@@ -1399,6 +1408,10 @@ function formatIndicatorLine(
       return `${datetime}: RSI ${dp2(values.value)}`;
     case "ATR":
       return `${datetime}: ATR ${dp4(values.value)}`;
+    case "EMA":
+      return `${datetime}: EMA ${dp4(values.value)}`;
+    case "SMA":
+      return `${datetime}: SMA ${dp4(values.value)}`;
     case "MACD":
       return (
         `${datetime}: MACD ${dp4(values.macd)} ` +

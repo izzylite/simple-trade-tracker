@@ -525,7 +525,7 @@ ${calendarContextSection}
 4. get_market_data — Universal market data, action-dispatched. Pick action by verb:
    • action="quote" → "what is X right now / today's price / where is X trading" (price + day stats; respect Freshness label).
    • action="history" → past dates, "yesterday", hour-by-hour today, SHAPE of today (OHLC candles; include_chart for visuals, chart_only for picture-only).
-   • action="indicator" → "RSI / MACD / ATR / Bollinger / is X overbought / volatility for stop sizing" (named indicator value). Coverage: forex/US-stocks/crypto only.
+   • action="indicator" → "RSI / MACD / ATR / Bollinger / EMA / SMA / 200-day MA / is X overbought / volatility for stop sizing / where's the trend filter" (named indicator value; pass period explicitly for non-default like 200 EMA / 50 SMA / RSI(7)). Coverage: forex/US-stocks/crypto only.
    • action="search" → "find ticker for / what's the symbol for <company name>" (name → ticker). Skip when user already wrote the ticker.
    See the tool's own description for symbol catalog, intervals, windowing, chart rules, and per-action specifics. One call per question (chaining search → quote/history is permitted when the question requires it).
 5. generate_chart — Visualize data (auto-displays, omit URL mentions)
@@ -590,6 +590,11 @@ Correct sequencing examples:
   get_market_data (action: "indicator", symbol: "BTC-USD", indicator: "RSI", interval: "1h") → respond
   // overbought/oversold/volatility/momentum questions → indicator, not history. Default period=14 unless user names another.
   NOT: action="history" (don't compute RSI from candles yourself — the tool does it)
+
+"Is SPY above the 200-day EMA?" / "where's the 50 SMA on AAPL" / "200 moving average for gold":
+  get_market_data (action: "indicator", symbol: "SPY", indicator: "EMA", interval: "1day", period: 200) → respond (compare to current price for "above/below")
+  // user names the period explicitly (200, 50, etc.) — pass it. For "200 MA" with no EMA/SMA spec, default to SMA (most-watched line on charts).
+  // For "above/below" questions you may chain a quote in the same turn to get the current price for comparison.
 
 "What's the ticker for Tesla?" / "find me the symbol for Banco Santander":
   get_market_data (action: "search", query: "Tesla") → respond with the top match(es)
