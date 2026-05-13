@@ -197,7 +197,11 @@ DATE FORMAT: "YYYY-MM-DD" for daily+, "YYYY-MM-DD HH:mm:ss" for intraday. Resolv
 
 MARKET CLOSED: if the window falls outside trading hours (forex weekends, equity holidays), the tool returns "no data for window" — say so and suggest the nearest open trading day; do NOT fabricate a price.
 
-CALL DISCIPLINE: one call per question; never fan out across symbols or intervals in a single turn. Output is oldest→newest OHLC lines.`,
+CALL DISCIPLINE: one call per question; never fan out across symbols or intervals in a single turn. Output is oldest→newest OHLC lines.
+
+CHART: when the result has 3+ candles, the response ends with a "Chart: <url>" line — a rendered candlestick image of the data. ALWAYS include it in your reply as a markdown image: \`![chart](URL)\` at the END of your answer (after the text). Do NOT describe what the chart shows ("notice the bearish engulfing…", "as you can see…") — the user can see it. Just embed it and move on. If the Chart line is absent (fewer than 3 candles, or render failed), don't mention a chart at all.
+
+CHART-ONLY MODE: set \`chart_only: true\` when the user asks ONLY to see a chart with no numeric analysis ("show me the chart", "pull up a chart of X yesterday", "I want to look at the chart"). The tool then skips the OHLC text dump and returns just the chart URL — saves context. Your reply should be a brief one-liner ("Here's EUR/USD yesterday:") + the \`![chart](URL)\`. Default to \`false\` (data + chart) for any question that wants analysis, ranges, or specifics ("what did X do", "yesterday's range", "compare highs").`,
   parameters: {
     type: "object",
     properties: {
@@ -229,6 +233,11 @@ CALL DISCIPLINE: one call per question; never fan out across symbols or interval
         type: "string",
         description:
           'Window end, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with start_date.',
+      },
+      chart_only: {
+        type: "boolean",
+        description:
+          'Optional. When true, skip the OHLC text dump and return ONLY the chart URL. Use when the user asks to see a chart with no numeric analysis ("show me the chart", "pull up X yesterday"). Default false.',
       },
     },
     required: ["symbol", "interval"],
@@ -275,68 +284,6 @@ export const generateChartTool: GeminiFunctionDeclaration = {
       },
     },
     required: ["chart_type", "title", "labels", "datasets"],
-  },
-};
-
-/**
- * Create note tool definition
- */
-export const createNoteTool: GeminiFunctionDeclaration = {
-  name: "create_note",
-  description: `Create a new note for the user in their trading calendar.
-
-USE CASES:
-- Save trading strategies, insights, lessons learned, or game plans for the user
-- Save a reusable prompt as a ${SLASH_COMMAND_TAG} note (see "Slash Commands" in system prompt) — title becomes the / autocomplete name, content becomes the instruction
-
-⚠️ CANNOT create ${AGENT_MEMORY_TAG} notes - use update_memory tool instead (it auto-creates if needed).
-
-Content should be in plain text format. User ID and Calendar ID are automatically provided from context.`,
-  parameters: {
-    type: "object",
-    properties: {
-      title: {
-        type: "string",
-        description: "Note title (concise and descriptive)",
-      },
-      content: {
-        type: "string",
-        description:
-          "Note content in plain text format. Use clear paragraphs and line breaks for readability. Do not use HTML tags.",
-      },
-      tags: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          `Categorize the note. Available: "${STRATEGY_TAG}", "${GAME_PLAN_TAG}", "${INSIGHT_TAG}", "${LESSON_LEARNED_TAG}", "${RISK_MANAGEMENT_TAG}", "${PSYCHOLOGY_TAG}", "${GENERAL_TAG}", "${SLASH_COMMAND_TAG}" (reusable / commands — see system prompt). Use "${AGENT_MEMORY_TAG}" ONLY for AI memory notes.`,
-      },
-      reminder_type: {
-        type: "string",
-        enum: ["none", "once", "weekly"],
-        description:
-          'Reminder type: "none" (no reminder), "once" (specific date), or "weekly" (recurring days)',
-      },
-      reminder_date: {
-        type: "string",
-        description:
-          'ISO date string (YYYY-MM-DD) for one-time reminders. Only used when reminder_type is "once".',
-      },
-      reminder_days: {
-        type: "array",
-        items: {
-          type: "string",
-          enum: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-        },
-        description:
-          'Array of day abbreviations for weekly reminders. Only used when reminder_type is "weekly". Example: ["Mon", "Wed", "Fri"]',
-      },
-      color: {
-        type: "string",
-        description:
-          "Optional background color name. Available: 'red', 'pink', 'purple', 'deepPurple', 'indigo', 'blue', 'lightBlue', 'cyan', 'teal', 'green', 'lightGreen', 'lime', 'yellow', 'amber', 'orange', 'deepOrange', 'brown', 'grey', 'blueGrey'. If not provided, a random color will be assigned.",
-      },
-    },
-    required: ["title", "content"],
   },
 };
 
@@ -497,310 +444,6 @@ Example — user says "I'm tightening my max leverage from 2% to 1.5%":
 };
 
 /**
- * Record an episodic event — time-stamped fact about *what happened*
- * (separate from update_memory, which captures *what is true now*).
- *
- * Backed by the agent_memory_events table. Capped at 50 writes per
- * (user, calendar) per day to prevent runaway prompts from spamming
- * the log.
- */
-export const recordEventTool: GeminiFunctionDeclaration = {
-  name: "record_event",
-  description:
-    `Append a time-stamped event to the episodic log. Use this to capture *what happened* during a session — corrections, rule changes, observed patterns, decisions — separately from update_memory which captures the trader's stable profile.
-
-WHEN TO CALL:
-- The user corrected something you said: event_type="user_correction"
-- The user changed a rule (stop, size, session, setup): event_type="rule_changed"
-- A pattern was discovered (e.g. losing streaks after 2 wins): event_type="pattern_observed"
-- A specific trading decision was discussed and agreed: event_type="decision_made"
-- A strategy was discussed in detail: event_type="strategy_discussion"
-
-WHEN NOT TO CALL:
-- Casual chitchat, simple data lookups, or routine acknowledgements
-- Anything the user wouldn't expect you to "remember happened on a specific day"
-
-FORMAT summary as ONE past-tense sentence in third person, max 500 chars:
-- Good: "User changed daily stop from $200 to $150 due to recent drawdown"
-- Bad: "I should remember that the user's stop is now $150" (first person, future-facing)
-- Bad: "Stop change" (too terse)
-
-Limit: 50 events per day per (user, calendar). Excess calls return a "log full" notice — do NOT retry on this turn.`,
-  parameters: {
-    type: "object",
-    properties: {
-      event_type: {
-        type: "string",
-        enum: [
-          "pattern_observed",
-          "user_correction",
-          "strategy_discussion",
-          "decision_made",
-          "rule_changed",
-        ],
-        description: "What kind of event to log.",
-      },
-      summary: {
-        type: "string",
-        description:
-          "Single past-tense sentence describing the event (max 500 chars).",
-      },
-      tags: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          "Optional tags for later recall (e.g. ['risk', 'london-session']).",
-      },
-      metadata: {
-        type: "object",
-        description:
-          "Optional structured context: trade_ids, source_note_id, confidence, etc.",
-      },
-    },
-    required: ["event_type", "summary"],
-  },
-};
-
-/**
- * Recall episodic events — answers "have we discussed X / what changed
- * last week / when did we decide Y" without scraping chat history.
- *
- * Backed by agent_memory_events. At least one filter is required to
- * avoid full-table paginates — unfiltered recall is almost never what
- * the agent actually wants.
- */
-export const recallEventsTool: GeminiFunctionDeclaration = {
-  name: "recall_events",
-  description:
-    `Query the episodic event log to answer questions about *what happened* across past sessions. Prefer this over search_chat_history for "have we discussed X", "last time we talked about Y", "what changed recently" — events are structured and timestamped, chat history is fuzzy.
-
-REQUIRES at least one filter (event_types, tags, since, or query). Unfiltered calls are rejected.
-
-FILTERS (combine freely):
-- event_types: limit to specific kinds (rule_changed, user_correction, etc.)
-- tags: events tagged with ALL of these (intersection)
-- since: ISO timestamp — only events on/after this date
-- query: substring match on the event summary (case-insensitive)
-
-Returns at most 10 events by default (50 max), most recent first.
-
-EXAMPLES:
-- "What rules has the user changed in the last month?" → since=<30d ago>, event_types=['rule_changed']
-- "Have we discussed FOMC before?" → query='FOMC'
-- "Recent corrections about position sizing" → query='position', event_types=['user_correction']`,
-  parameters: {
-    type: "object",
-    properties: {
-      event_types: {
-        type: "array",
-        items: {
-          type: "string",
-          enum: [
-            "pattern_observed",
-            "user_correction",
-            "strategy_discussion",
-            "decision_made",
-            "rule_changed",
-          ],
-        },
-        description: "Filter to these event types only.",
-      },
-      tags: {
-        type: "array",
-        items: { type: "string" },
-        description: "Match events containing ALL of these tags.",
-      },
-      since: {
-        type: "string",
-        description: "ISO timestamp — only return events on/after this date.",
-      },
-      query: {
-        type: "string",
-        description: "Case-insensitive substring match on summary text.",
-      },
-      limit: {
-        type: "number",
-        description: "Max events to return (1..50, default 10).",
-      },
-    },
-  },
-};
-
-/**
- * Update note tool definition
- */
-export const updateNoteTool: GeminiFunctionDeclaration = {
-  name: "update_note",
-  description:
-    `Update an existing note. By default you can only update AI-created notes (by_assistant=true). EXCEPTION: notes tagged "${SLASH_COMMAND_TAG}" are user-owned but you may still update them on user request (e.g. "change my Daily Review slash command to also flag oversized losses").
-
-⚠️ CANNOT update ${AGENT_MEMORY_TAG} notes - use update_memory tool instead for memory management.
-
-CONTENT EDITING — choose ONE approach:
-
-A) INCREMENTAL EDITS (REQUIRED for ${SLASH_COMMAND_TAG} when user says "also", "add", "change X to Y", "remove X", etc.)
-   1. Read the note's current text first (via search_notes or recent context).
-   2. Set content_mode + the matching field(s):
-      - "append": needs content_text (added on a new line at the end).
-      - "replace": needs content_old_text (exact, unique substring) and content_text.
-      - "remove": needs content_old_text (exact, unique substring).
-   The server REJECTS with current content echoed back if content_old_text is missing or not unique. Re-read and retry — do not guess.
-
-B) FULL REWRITE — use ONLY when the user explicitly asks to rewrite from scratch.
-   Set "content" to the entire new note. For ${SLASH_COMMAND_TAG} notes you MUST also set replace_full_content=true to confirm the destructive overwrite, otherwise the call is rejected.
-
-Note: incremental edits do not work on rich-text (Draft.js JSON) notes — those require full overwrite.
-
-USE CASES:
-- Tweak a strategy / insight → content_mode: "append" or "replace"
-- Add/modify/remove tags or reminders → tags / reminder_* params
-- Edit a saved ${SLASH_COMMAND_TAG} (user's reusable / prompt) → incremental edits, NOT full rewrite`,
-  parameters: {
-    type: "object",
-    properties: {
-      note_id: {
-        type: "string",
-        description: "ID of the note to update",
-      },
-      title: {
-        type: "string",
-        description: "New title (optional - only include if changing)",
-      },
-      content: {
-        type: "string",
-        description:
-          "FULL REPLACEMENT of the note's content. Destructive — wipes existing text. Prefer content_mode for partial edits. SLASH_COMMAND notes additionally require replace_full_content=true. Plain text, no HTML.",
-      },
-      content_mode: {
-        type: "string",
-        enum: ["append", "replace", "remove"],
-        description:
-          "Incremental content edit. Mutually exclusive with the 'content' param. Not allowed on rich-text (Draft.js JSON) notes.",
-      },
-      content_text: {
-        type: "string",
-        description:
-          "New text. Required for content_mode='append' (added at end on a new line) or 'replace' (replaces content_old_text). Plain text, no HTML.",
-      },
-      content_old_text: {
-        type: "string",
-        description:
-          "Exact, unique substring of the current note to find. Required for content_mode='replace' or 'remove'. Whitespace-sensitive — must match the note verbatim. Read the note first.",
-      },
-      replace_full_content: {
-        type: "boolean",
-        description:
-          "Required confirmation when overwriting a SLASH_COMMAND note via the full 'content' param. Prevents accidental destructive rewrites of user automations. Set true only when the user explicitly asked to rewrite the entire command.",
-      },
-      tags: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          `Updated tags (optional). Available: "${STRATEGY_TAG}", "${GAME_PLAN_TAG}", "${INSIGHT_TAG}", "${LESSON_LEARNED_TAG}", "${RISK_MANAGEMENT_TAG}", "${PSYCHOLOGY_TAG}", "${GENERAL_TAG}", "${SLASH_COMMAND_TAG}", "${AGENT_MEMORY_TAG}".`,
-      },
-      reminder_type: {
-        type: "string",
-        enum: ["none", "once", "weekly"],
-        description:
-          'Reminder type: "none" (no reminder), "once" (specific date), or "weekly" (recurring days). Use "none" to remove reminders.',
-      },
-      reminder_date: {
-        type: "string",
-        description:
-          'ISO date string (YYYY-MM-DD) for one-time reminders. Only used when reminder_type is "once".',
-      },
-      reminder_days: {
-        type: "array",
-        items: {
-          type: "string",
-          enum: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-        },
-        description:
-          'Array of day abbreviations for weekly reminders. Only used when reminder_type is "weekly". Example: ["Mon", "Wed", "Fri"]',
-      },
-    },
-    required: ["note_id"],
-  },
-};
-
-/**
- * Delete note tool definition
- */
-export const deleteNoteTool: GeminiFunctionDeclaration = {
-  name: "delete_note",
-  description:
-    `Delete an existing note. By default you can only delete AI-created notes (by_assistant=true). EXCEPTION: notes tagged "${SLASH_COMMAND_TAG}" are user-owned but you may delete them on explicit user request (e.g. "remove my Quick Review slash command"). Use this to remove outdated or incorrect notes.`,
-  parameters: {
-    type: "object",
-    properties: {
-      note_id: {
-        type: "string",
-        description: "ID of the note to delete",
-      },
-    },
-    required: ["note_id"],
-  },
-};
-
-/**
- * Search notes tool definition
- */
-export const searchNotesTool: GeminiFunctionDeclaration = {
-  name: "search_notes",
-  description: `Search and retrieve notes from the user's trading calendar.
-
-CRITICAL: At the START of EVERY session, search with tags: ["${AGENT_MEMORY_TAG}"] to retrieve your persistent memory about this trader.
-
-AVAILABLE TAGS (use these to filter by category):
-- "${STRATEGY_TAG}" - Trading strategies and methodologies
-- "${GAME_PLAN_TAG}" - Daily/weekly trading plans and preparation
-- "${INSIGHT_TAG}" - Market observations and realizations
-- "${LESSON_LEARNED_TAG}" - Post-trade reflections and mistakes to avoid
-- "${RISK_MANAGEMENT_TAG}" - Position sizing, stop loss rules, risk parameters
-- "${PSYCHOLOGY_TAG}" - Trading mindset, emotions, mental frameworks
-- "${GENERAL_TAG}" - Miscellaneous notes
-- "${SLASH_COMMAND_TAG}" - User-saved reusable prompts triggered via "/" in chat (see system prompt)
-- "${AGENT_MEMORY_TAG}" - AI persistent memory (retrieve at session start)
-
-SMART QUERYING EXAMPLES:
-- Analyze user's risk approach: tags: ["${RISK_MANAGEMENT_TAG}"]
-- Review strategies before trading: tags: ["${STRATEGY_TAG}"]
-- Understand daily preparation: tags: ["${GAME_PLAN_TAG}"]
-- Learn from past mistakes: tags: ["${LESSON_LEARNED_TAG}"]
-- List user's saved slash commands (e.g. "what slash commands do I have?"): tags: ["${SLASH_COMMAND_TAG}"]
-- Combine with search_query for precision: tags: ["${STRATEGY_TAG}"], search_query: "scalping"
-
-EMBEDDED IMAGES:
-- Notes may contain embedded images (diagrams, charts, frameworks)
-- Results show: [Embedded images: url1, url2] when images exist
-- Use analyze_image tool on these URLs for visual context
-- Especially valuable for: strategy diagrams, setup examples, risk frameworks
-
-Returns both user-created and AI-created notes. User ID and Calendar ID are automatically provided from context.`,
-  parameters: {
-    type: "object",
-    properties: {
-      search_query: {
-        type: "string",
-        description:
-          "Optional text search to filter notes by title or content. Combine with tags for precision.",
-      },
-      tags: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          `Filter by category. Available: "${STRATEGY_TAG}", "${GAME_PLAN_TAG}", "${INSIGHT_TAG}", "${LESSON_LEARNED_TAG}", "${RISK_MANAGEMENT_TAG}", "${PSYCHOLOGY_TAG}", "${GENERAL_TAG}", "${SLASH_COMMAND_TAG}", "${AGENT_MEMORY_TAG}". Notes must have ALL specified tags.`,
-      },
-      include_archived: {
-        type: "boolean",
-        description: "Whether to include archived notes. Default is false.",
-      },
-    },
-    required: [],
-  },
-};
-
-/**
  * Get recent Orion task briefings tool definition
  */
 export const getRecentOrionBriefingsTool: GeminiFunctionDeclaration = {
@@ -865,58 +508,6 @@ Results include: title, significance (low/medium/high), task type, plain-text bo
 };
 
 /**
- * Search past conversations tool definition (Tier 1)
- */
-export const searchConversationsTool: GeminiFunctionDeclaration = {
-  name: "search_conversations",
-  description: `Search the user's past chat conversations with you by keyword. Returns lightweight metadata (title + snippet + timestamp), NOT full message bodies. Use get_conversation(id) afterwards if a result looks relevant.
-
-ONLY USE WHEN the user explicitly references a past chat — phrases like "last time", "yesterday we discussed", "you told me before", "our previous conversation", "remember when I asked about...". Do NOT use on every turn to pad context; ${AGENT_MEMORY_TAG} (via search_notes with tags:["${AGENT_MEMORY_TAG}"]) is the primary long-term memory.
-
-Returns: [{ id, title, message_count, created_at, updated_at, snippet }]. The snippet is the first ~200 chars of the most recent message in each conversation.`,
-  parameters: {
-    type: "object",
-    properties: {
-      query: {
-        type: "string",
-        description:
-          "Search term to match against conversation titles and message content. Use the subject the user referenced (e.g. 'Powell', 'risk management', 'EURUSD strategy').",
-      },
-      since_days: {
-        type: "number",
-        description:
-          "Optional: only return conversations updated in the last N days. Default 30.",
-      },
-      limit: {
-        type: "number",
-        description: "Max conversations to return. Default 5, max 10.",
-      },
-    },
-    required: ["query"],
-  },
-};
-
-/**
- * Fetch a specific conversation's full transcript tool definition (Tier 2)
- */
-export const getConversationTool: GeminiFunctionDeclaration = {
-  name: "get_conversation",
-  description: `Fetch the full message transcript of a specific past conversation by id. Call this ONLY after search_conversations has identified a relevant conversation — do not guess conversation ids.
-
-Each conversation is capped at 50 messages so the transcript is bounded (roughly 5-12k tokens). The returned transcript is formatted as "user: ..." / "orion: ..." turns with timestamps.`,
-  parameters: {
-    type: "object",
-    properties: {
-      conversation_id: {
-        type: "string",
-        description: "The id of the conversation to fetch (from search_conversations results).",
-      },
-    },
-    required: ["conversation_id"],
-  },
-};
-
-/**
  * Analyze trade image tool definition
  */
 export const analyzeImageTool: GeminiFunctionDeclaration = {
@@ -948,61 +539,172 @@ export const analyzeImageTool: GeminiFunctionDeclaration = {
 };
 
 /**
- * Get tag definition tool - look up user-defined meanings for custom tags
+ * ============================================================================
+ * MERGED (ACTION-DISPATCHED) TOOL DEFINITIONS
+ *
+ * These collapse former CRUD clusters into single declarations to keep the
+ * Gemini function registry small (fewer declarations = better tool selection
+ * + lower fixed prompt cost). Each carries a required `action` enum; the
+ * executor re-dispatches to the original per-action handler.
+ * ============================================================================
  */
-export const getTagDefinitionTool: GeminiFunctionDeclaration = {
-  name: "get_tag_definition",
-  description: `Look up the user's definition for a custom trading tag.
 
-USE WHEN: You encounter a tag you don't understand (e.g., "Confluence:3x Displacement", "Setup:ICT OTE", "Risk:A++ Setup").
+/** manage_note — replaces create_note / update_note / delete_note / search_notes */
+export const manageNoteTool: GeminiFunctionDeclaration = {
+  name: "manage_note",
+  description:
+    `Create, update, delete, or search the user's trading-calendar notes. Pick ONE \`action\`:
 
-WORKFLOW:
-1. If tag meaning is unclear, call this tool to get user's definition
-2. If no definition exists, you may SUGGEST a definition based on context
-3. ALWAYS ask user permission before saving a new definition
-4. Present your suggested definition and ask: "Would you like me to save this definition for future reference?"
+- action="search" — find notes by text and/or tags. Use \`search_query\` and/or \`tags\`. AT SESSION START, search with tags:["${AGENT_MEMORY_TAG}"] to load your persistent memory. Returns user + AI notes; \`include_archived\` optional.
+- action="create" — make a new note. Needs \`title\` + \`content\` (plain text, no HTML). Optional \`tags\`, \`reminder_type\`/\`reminder_date\`/\`reminder_days\`. Use tags:["${SLASH_COMMAND_TAG}"] to save a reusable / command (title → autocomplete name, content → instruction). ⚠️ CANNOT create ${AGENT_MEMORY_TAG} notes — use update_memory.
+- action="update" — edit an existing note. Needs \`note_id\`. Incremental edit: set \`content_mode\` ("append" needs \`content_text\`; "replace" needs \`content_old_text\`+\`content_text\`; "remove" needs \`content_old_text\`). Full rewrite: set \`content\` (for ${SLASH_COMMAND_TAG} notes also set \`replace_full_content\`=true). May also change \`title\`/\`tags\`/\`reminder_*\`. Only AI-created notes, EXCEPT ${SLASH_COMMAND_TAG} notes (user-owned, editable on request). ⚠️ CANNOT update ${AGENT_MEMORY_TAG} notes.
+- action="delete" — remove a note. Needs \`note_id\`. Only AI-created notes, EXCEPT ${SLASH_COMMAND_TAG} notes (deletable on explicit user request).
 
-Returns the user's explanation of what this tag means to them, or null if no definition exists.`,
+AVAILABLE TAGS: "${STRATEGY_TAG}", "${GAME_PLAN_TAG}", "${INSIGHT_TAG}", "${LESSON_LEARNED_TAG}", "${RISK_MANAGEMENT_TAG}", "${PSYCHOLOGY_TAG}", "${GENERAL_TAG}", "${SLASH_COMMAND_TAG}", "${AGENT_MEMORY_TAG}". User ID + Calendar ID come from context.`,
   parameters: {
     type: "object",
     properties: {
-      tag_name: {
+      action: {
+        type: "string",
+        enum: ["search", "create", "update", "delete"],
+        description: "Which note operation to perform.",
+      },
+      note_id: { type: "string", description: "Target note id (update/delete)." },
+      title: { type: "string", description: "Note title (create; optional on update)." },
+      content: {
         type: "string",
         description:
-          "The exact tag name to look up (e.g., 'Confluence:3x Displacement')",
+          "Plain-text note body, no HTML. On create: required. On update: FULL replacement (destructive) — prefer content_mode for partial edits.",
+      },
+      content_mode: {
+        type: "string",
+        enum: ["append", "replace", "remove"],
+        description: "Incremental update mode. Mutually exclusive with `content`. Not allowed on rich-text (Draft.js) notes.",
+      },
+      content_text: { type: "string", description: "New text for content_mode append/replace." },
+      content_old_text: { type: "string", description: "Exact unique substring to find, for content_mode replace/remove." },
+      replace_full_content: { type: "boolean", description: "Confirmation flag required to overwrite a SLASH_COMMAND note via `content`." },
+      search_query: { type: "string", description: "Text filter for action=search." },
+      include_archived: { type: "boolean", description: "Include archived notes in search (default false)." },
+      tags: {
+        type: "array",
+        items: { type: "string" },
+        description: `Tags to filter by (search) or set (create/update). Notes must have ALL given tags when searching.`,
+      },
+      reminder_type: {
+        type: "string",
+        enum: ["none", "once", "weekly"],
+        description: '"none" / "once" (uses reminder_date) / "weekly" (uses reminder_days). Use "none" on update to clear.',
+      },
+      reminder_date: { type: "string", description: 'ISO date (YYYY-MM-DD) for reminder_type="once".' },
+      reminder_days: {
+        type: "array",
+        items: { type: "string", enum: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] },
+        description: 'Day abbreviations for reminder_type="weekly", e.g. ["Mon","Wed","Fri"].',
       },
     },
-    required: ["tag_name"],
+    required: ["action"],
   },
 };
 
-/**
- * Save tag definition tool - save a definition with user permission
- */
-export const saveTagDefinitionTool: GeminiFunctionDeclaration = {
-  name: "save_tag_definition",
+/** manage_event — replaces record_event / recall_events (episodic log) */
+export const manageEventTool: GeminiFunctionDeclaration = {
+  name: "manage_event",
   description:
-    `Save or update a definition for a trading tag. IMPORTANT: Only use this AFTER getting explicit user permission.
+    `Read or write the episodic event log — time-stamped facts about *what happened* in past sessions (distinct from update_memory, which is the trader's stable profile). Pick ONE \`action\`:
 
-WORKFLOW:
-1. First suggest a definition to the user
-2. Wait for user confirmation
-3. Only then call this tool to save
-
-Never call this tool without user consent.`,
+- action="record" — append an event. Needs \`event_type\` + \`summary\` (ONE past-tense third-person sentence, ≤500 chars). Optional \`tags\`, \`metadata\`. ⚠️ For rule changes / decisions / corrections, prefer apply_rule_change instead (it also syncs core memory). Use record here for pattern_observed / strategy_discussion (no rule change). Limit 50/day per (user, calendar) — on "log full", do not retry.
+- action="recall" — query the log. REQUIRES at least one filter: \`event_types\`, \`tags\` (intersection), \`since\` (ISO ts), or \`query\` (case-insensitive substring on summary). Returns ≤10 (max via \`limit\` 50), newest first. Prefer this over recall_conversations for "have we discussed X / when did we decide Y / what changed recently". Empty result IS the answer — don't fall back to other tools.`,
   parameters: {
     type: "object",
     properties: {
-      tag_name: {
+      action: { type: "string", enum: ["record", "recall"], description: "Write a new event or query existing ones." },
+      event_type: {
         type: "string",
-        description: "The exact tag name to define",
+        enum: ["pattern_observed", "user_correction", "strategy_discussion", "decision_made", "rule_changed"],
+        description: "Kind of event (action=record).",
       },
-      definition: {
-        type: "string",
-        description: "The definition/meaning of the tag",
+      summary: { type: "string", description: "Past-tense single sentence, ≤500 chars (action=record)." },
+      metadata: { type: "object", description: "Optional structured context (trade_ids, source_note_id, confidence…) — action=record." },
+      event_types: {
+        type: "array",
+        items: { type: "string", enum: ["pattern_observed", "user_correction", "strategy_discussion", "decision_made", "rule_changed"] },
+        description: "Filter recall to these event types.",
       },
+      since: { type: "string", description: "ISO timestamp — recall events on/after this (action=recall)." },
+      query: { type: "string", description: "Case-insensitive substring match on summary (action=recall)." },
+      tags: {
+        type: "array",
+        items: { type: "string" },
+        description: "record: tags to attach. recall: match events containing ALL these tags.",
+      },
+      limit: { type: "number", description: "Max events to return for action=recall (1..50, default 10)." },
     },
-    required: ["tag_name", "definition"],
+    required: ["action"],
+  },
+};
+
+/** manage_tag — replaces get_tag_definition / save_tag_definition */
+export const manageTagTool: GeminiFunctionDeclaration = {
+  name: "manage_tag",
+  description:
+    `Look up or save the user's definition for a custom trading tag (e.g. "Confluence:3x Displacement", "Setup:ICT OTE"). Pick ONE \`action\`:
+
+- action="get" — fetch the user's explanation of what \`tag_name\` means, or null if undefined. Call this when you hit a tag you don't understand.
+- action="save" — store/overwrite a definition. Needs \`tag_name\` + \`definition\`. ⚠️ ONLY after the user gives explicit permission — suggest a definition, wait for confirmation, then save.`,
+  parameters: {
+    type: "object",
+    properties: {
+      action: { type: "string", enum: ["get", "save"], description: "Look up or save a tag definition." },
+      tag_name: { type: "string", description: "Exact tag name." },
+      definition: { type: "string", description: "Meaning of the tag (action=save only)." },
+    },
+    required: ["action", "tag_name"],
+  },
+};
+
+/** recall_conversations — replaces search_conversations / get_conversation */
+export const recallConversationsTool: GeminiFunctionDeclaration = {
+  name: "recall_conversations",
+  description:
+    `Search past chat conversations with this user, or fetch one's full transcript. Pick ONE \`action\`:
+
+- action="search" — keyword search over conversation titles + message content. Needs \`query\`. Optional \`since_days\` (default 30), \`limit\` (default 5, max 10). Returns lightweight metadata: [{ id, title, message_count, created_at, updated_at, snippet }] — NOT full bodies.
+- action="get" — fetch the full transcript of one conversation. Needs \`conversation_id\` (from a prior search — do NOT guess ids). Capped at 50 messages; formatted as "user:" / "orion:" turns with timestamps.
+
+ONLY use when the user explicitly references a past chat ("last time", "yesterday we discussed", "you told me before", "show me what we said about X"). For structured "what happened / when did" questions, prefer manage_event(action="recall") — faster and more precise. ${AGENT_MEMORY_TAG} notes (manage_note search) remain the primary long-term memory.`,
+  parameters: {
+    type: "object",
+    properties: {
+      action: { type: "string", enum: ["search", "get"], description: "Search conversations or fetch one transcript." },
+      query: { type: "string", description: "Search term against titles + message content (action=search)." },
+      since_days: { type: "number", description: "Only conversations updated in the last N days (action=search, default 30)." },
+      limit: { type: "number", description: "Max conversations to return (action=search, default 5, max 10)." },
+      conversation_id: { type: "string", description: "Conversation id from a search result (action=get)." },
+    },
+    required: ["action"],
+  },
+};
+
+/** manage_reminder — replaces set_reminder / list_reminders / cancel_reminder */
+export const manageReminderTool: GeminiFunctionDeclaration = {
+  name: "manage_reminder",
+  description:
+    `Schedule, list, or cancel future Orion turns in this conversation. Pick ONE \`action\`:
+
+- action="set" — schedule a reminder. Needs \`trigger_at\` (ISO timestamp — resolve it FIRST: econ events via execute_sql on economic_events, relative times computed from now) + \`instructions\` (what Orion should do at fire time). Optional \`description\`. Only when the user EXPLICITLY asks ("remind me", "set a reminder", "schedule"). Confirm the time to the user. Casual self-talk ("I should remember to…") → ASK first, don't act unilaterally.
+- action="list" — show the user's pending reminders across all conversations. No other params. Empty result means none — say so directly, don't double-check.
+- action="cancel" — cancel a pending reminder by \`id\`. Call action="list" first if you need to disambiguate which one.`,
+  parameters: {
+    type: "object",
+    properties: {
+      action: { type: "string", enum: ["set", "list", "cancel"], description: "Schedule, list, or cancel a reminder." },
+      trigger_at: { type: "string", description: "ISO timestamp when the reminder fires (action=set)." },
+      instructions: { type: "string", description: "What Orion should do when the reminder fires (action=set)." },
+      description: { type: "string", description: "Optional short label for the reminder (action=set)." },
+      id: { type: "string", description: "Reminder id to cancel (action=cancel)." },
+    },
+    required: ["action"],
   },
 };
 
@@ -1341,12 +1043,119 @@ function estimateWindowBars(
   return Math.ceil((end - start) / 60000 / INTERVAL_MINUTES[interval]);
 }
 
+// Minimum candles before we bother rendering a chart — fewer than 3 is just
+// numbers, no shape to read.
+const CHART_MIN_CANDLES = 3;
+
+/**
+ * Render an OHLC candlestick via QuickChart `/chart/create`, return the short
+ * URL. Failures (network, rate limit, plugin error) return null silently so
+ * the data text response still ships.
+ */
+async function buildHistoryChartUrl(
+  symbol: string,
+  interval: string,
+  candles: Candle[],
+): Promise<string | null> {
+  if (candles.length < CHART_MIN_CANDLES) return null;
+
+  // Symbol pretty-print for the title (Orion never sees this).
+  let label = symbol;
+  if (/^[A-Z]{6}=X$/.test(symbol)) {
+    label = `${symbol.slice(0, 3)}/${symbol.slice(3, 6)}`;
+  } else if (/^[A-Z0-9]+-(USD|USDT|EUR)$/.test(symbol)) {
+    label = symbol.replace("-", "/");
+  }
+
+  // Convert "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss" (UTC) → unix ms.
+  const points: Array<
+    { x: number; o: number; h: number; l: number; c: number }
+  > = [];
+  for (const cdl of candles) {
+    const iso = cdl.datetime.includes(" ")
+      ? `${cdl.datetime.replace(" ", "T")}Z`
+      : `${cdl.datetime}T00:00:00Z`;
+    const x = Date.parse(iso);
+    if (Number.isNaN(x)) continue;
+    points.push({ x, o: cdl.open, h: cdl.high, l: cdl.low, c: cdl.close });
+  }
+  if (points.length < CHART_MIN_CANDLES) return null;
+
+  // TradingView-style palette: mint up, dark navy down, light grey canvas.
+  const spec = {
+    type: "candlestick",
+    data: {
+      datasets: [{
+        label: `${label} ${interval}`,
+        data: points,
+        color: { up: "#26A69A", down: "#2A2E39", unchanged: "#26A69A" },
+        borderColor: { up: "#26A69A", down: "#2A2E39", unchanged: "#26A69A" },
+      }],
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        title: {
+          display: true,
+          text: `${label} ${interval}`,
+          color: "#2A2E39",
+        },
+      },
+      scales: {
+        x: {
+          type: "time",
+          grid: { color: "rgba(42,46,57,0.08)" },
+          ticks: { color: "#2A2E39" },
+        },
+        y: {
+          position: "right",
+          grid: { color: "rgba(42,46,57,0.08)" },
+          ticks: { color: "#2A2E39" },
+        },
+      },
+    },
+  };
+
+  const body = {
+    version: "4",
+    backgroundColor: "#D1D4DC",
+    width: 1100,
+    height: 500,
+    format: "png",
+    chart: spec,
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch("https://quickchart.io/chart/create", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      log(`QuickChart create HTTP ${res.status} for ${symbol}`, "warn");
+      return null;
+    }
+    const j = (await res.json()) as { success?: boolean; url?: string };
+    if (!j.success || !j.url) return null;
+    return j.url;
+  } catch (err) {
+    log(`QuickChart create exception for ${symbol}`, "warn", err);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function executeGetMarketHistory(args: {
   symbol: string;
   interval: string;
   outputsize?: number;
   start_date?: string;
   end_date?: string;
+  chart_only?: boolean;
 }): Promise<string> {
   const symbol = (args.symbol || "").trim();
   if (!symbol) return "Symbol is required.";
@@ -1438,9 +1247,30 @@ export async function executeGetMarketHistory(args: {
       ? `\n(showing last ${ordered.length} of ${asc.length} candles)`
       : "";
 
+  const chartUrl = await buildHistoryChartUrl(symbol, interval, ordered);
+
+  // chart_only mode: skip the OHLC text dump entirely, return just the chart
+  // URL. Saves ~1.5k tokens of context when the user only wants the picture.
+  if (args.chart_only) {
+    if (!chartUrl) {
+      if (ordered.length < CHART_MIN_CANDLES) {
+        return (
+          `Only ${ordered.length} candle(s) in the window — too few to render ` +
+          `a chart. Widen the window or set chart_only=false to see the data.`
+        );
+      }
+      return (
+        `Chart render failed for ${symbol} ${interval}. ` +
+        `Retry, or set chart_only=false to get the OHLC data instead.`
+      );
+    }
+    return `${symbol} ${interval} — ${ordered.length} candles\nChart: ${chartUrl}`;
+  }
+
   const header = `${symbol} ${interval} — ${ordered.length} candles:`;
   const lines = ordered.map((c) => `  ${formatCandleLine(c)}`).join("\n");
-  return `${header}\n${lines}${truncatedNote}`;
+  const chartLine = chartUrl ? `\nChart: ${chartUrl}` : "";
+  return `${header}\n${lines}${truncatedNote}${chartLine}`;
 }
 
 /**
@@ -2620,46 +2450,6 @@ ${taskInstruction}`;
 // REMINDERS TOOLS
 // ============================================================
 
-export const setReminderTool: GeminiFunctionDeclaration = {
-  name: "set_reminder",
-  description:
-    "Schedule a future Orion turn that will fire at a specific time in this same conversation. " +
-    "Use when the user asks 'remind me when X happens' or 'check on Y at time Z'. " +
-    "At fire time, Orion runs a fresh turn with the stored instructions, full conversation history, " +
-    "and tool access — exactly as if the user had asked the question themselves at that moment. " +
-    "The response posts as an assistant message into this conversation, marked with a small 'Reminder' label. " +
-    "ALWAYS resolve the trigger time first — for an economic release, query the economic_events table " +
-    "via execute_sql (SELECT event_date, time_utc FROM economic_events WHERE event_name ILIKE '%X%' AND event_date >= CURRENT_DATE ORDER BY event_date LIMIT 1). " +
-    "IMPORTANT for economic releases: set trigger_at = time_utc + 20 seconds (NOT time_utc exactly). Actual values are scraped after release and need a short buffer to land in the DB; firing at release time gives stale/null actuals. " +
-    "For 'in N hours/days', compute trigger_at relative to current time. Confirm the resolved trigger time back to the user. " +
-    "Returns JSON: {success: true, id, trigger_at, description} on success, or {success: false, error_code, error} on failure. " +
-    "Possible error_codes: past_trigger_at (trigger is now or earlier), too_far_future (>1 year out), " +
-    "reminder_limit_reached (user has 50 pending — ask them to cancel one first), invalid_args, db_error. " +
-    "Use list_reminders to see existing ones, cancel_reminder to remove one.",
-  parameters: {
-    type: "object",
-    properties: {
-      trigger_at: {
-        type: "string",
-        description:
-          "ISO 8601 UTC timestamp when the reminder should fire. Must be in the future and within 1 year.",
-      },
-      instructions: {
-        type: "string",
-        description:
-          "What Orion should do at fire time, written as a prompt — e.g. 'Look up the latest jobless claims " +
-          "release and summarize the result vs forecast'. 1-1000 chars.",
-      },
-      description: {
-        type: "string",
-        description:
-          "Short user-facing label shown in the reminders panel — e.g. 'Jobless claims report'. <=200 chars.",
-      },
-    },
-    required: ["trigger_at", "instructions", "description"],
-  },
-};
-
 interface SetReminderResult {
   success: boolean;
   id?: string;
@@ -2776,19 +2566,6 @@ async function executeSetReminder(
   return JSON.stringify(result);
 }
 
-export const listRemindersTool: GeminiFunctionDeclaration = {
-  name: "list_reminders",
-  description:
-    "List all of the user's pending reminders across all their conversations. " +
-    "Use when the user asks 'what reminders do I have?' or before cancelling so you can disambiguate. " +
-    "Returns JSON: {success: true, reminders: [{id, description, trigger_at, instructions, conversation_id, conversation_title}, ...]}. " +
-    "An empty array means the user has no pending reminders — say so directly; do NOT call other tools to double-check.",
-  parameters: {
-    type: "object",
-    properties: {},
-  },
-};
-
 interface ListRemindersRow {
   id: string;
   description: string | null;
@@ -2844,24 +2621,6 @@ async function executeListReminders(
 
   return JSON.stringify({ success: true, reminders: rows });
 }
-
-export const cancelReminderTool: GeminiFunctionDeclaration = {
-  name: "cancel_reminder",
-  description:
-    "Cancel a pending reminder by id. Call list_reminders first if you need to disambiguate. " +
-    "Returns JSON: {success: true, id} on success, or {success: false, error_code, error} on failure. " +
-    "Possible error_codes: not_found (no reminder with that id for this user), not_pending (already fired/cancelled), invalid_args.",
-  parameters: {
-    type: "object",
-    properties: {
-      id: {
-        type: "string",
-        description: "The reminder id to cancel (UUID).",
-      },
-    },
-    required: ["id"],
-  },
-};
 
 async function executeCancelReminder(
   id: string,
@@ -2968,6 +2727,7 @@ export async function executeCustomTool(
             typeof args.start_date === "string" ? args.start_date : undefined,
           end_date:
             typeof args.end_date === "string" ? args.end_date : undefined,
+          chart_only: args.chart_only === true,
         });
       }
 
@@ -3328,6 +3088,92 @@ export async function executeCustomTool(
         return await executeCancelReminder(id, context, supabase);
       }
 
+      // -- Merged action-dispatched tools: re-dispatch to the per-action
+      //    handler above. Param names are kept identical so args pass through
+      //    untouched.
+      case "manage_note": {
+        const action = typeof args.action === "string" ? args.action : "";
+        const target: Record<string, string> = {
+          search: "search_notes",
+          create: "create_note",
+          update: "update_note",
+          delete: "delete_note",
+        };
+        const t = target[action];
+        if (!t) {
+          return JSON.stringify({
+            success: false,
+            error: `manage_note: unknown action "${action}". Use search|create|update|delete.`,
+          });
+        }
+        return await executeCustomTool(t, args, context, supabase);
+      }
+
+      case "manage_event": {
+        const action = typeof args.action === "string" ? args.action : "";
+        const target: Record<string, string> = {
+          record: "record_event",
+          recall: "recall_events",
+        };
+        const t = target[action];
+        if (!t) {
+          return JSON.stringify({
+            success: false,
+            error: `manage_event: unknown action "${action}". Use record|recall.`,
+          });
+        }
+        return await executeCustomTool(t, args, context, supabase);
+      }
+
+      case "manage_tag": {
+        const action = typeof args.action === "string" ? args.action : "";
+        const target: Record<string, string> = {
+          get: "get_tag_definition",
+          save: "save_tag_definition",
+        };
+        const t = target[action];
+        if (!t) {
+          return JSON.stringify({
+            success: false,
+            error: `manage_tag: unknown action "${action}". Use get|save.`,
+          });
+        }
+        return await executeCustomTool(t, args, context, supabase);
+      }
+
+      case "recall_conversations": {
+        const action = typeof args.action === "string" ? args.action : "";
+        const target: Record<string, string> = {
+          search: "search_conversations",
+          get: "get_conversation",
+        };
+        const t = target[action];
+        if (!t) {
+          return JSON.stringify({
+            success: false,
+            error: `recall_conversations: unknown action "${action}". Use search|get.`,
+          });
+        }
+        return await executeCustomTool(t, args, context, supabase);
+      }
+
+      case "manage_reminder": {
+        const action = typeof args.action === "string" ? args.action : "";
+        const target: Record<string, string> = {
+          set: "set_reminder",
+          list: "list_reminders",
+          cancel: "cancel_reminder",
+        };
+        const t = target[action];
+        if (!t) {
+          return JSON.stringify({
+            success: false,
+            error: `manage_reminder: unknown action "${action}". Use set|list|cancel.`,
+          });
+        }
+        return await executeCustomTool(t, args, context, supabase);
+      }
+
       default:
         return `Unknown custom tool: ${toolName}`;
     }
@@ -3348,23 +3194,16 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
     getMarketPriceTool,
     getMarketHistoryTool,
     generateChartTool,
-    createNoteTool,
-    updateNoteTool,
-    deleteNoteTool,
-    searchNotesTool,
-    getRecentOrionBriefingsTool,
-    searchConversationsTool,
-    getConversationTool,
     analyzeImageTool,
-    getTagDefinitionTool,
-    saveTagDefinitionTool,
+    getRecentOrionBriefingsTool,
     updateMemoryTool,
     applyRuleChangeTool,
-    recordEventTool,
-    recallEventsTool,
-    setReminderTool,
-    listRemindersTool,
-    cancelReminderTool,
+    // Merged action-dispatched tools (replace the former CRUD clusters).
+    manageNoteTool,
+    manageEventTool,
+    manageTagTool,
+    recallConversationsTool,
+    manageReminderTool,
   ];
 }
 

@@ -35,16 +35,38 @@ const TOOL_LABELS: Record<string, string> = {
   get_economic_events: 'Checking economic calendar',
   get_crypto_price: 'Checking crypto price',
   get_forex_price: 'Checking forex price',
-  create_note: 'Creating note',
-  update_note: 'Updating note',
-  delete_note: 'Deleting note',
-  search_notes: 'Searching notes',
   update_memory: 'Updating memory',
-  get_tag_definition: 'Looking up tag',
-  save_tag_definition: 'Saving tag definition',
+  apply_rule_change: 'Updating memory',
   get_recent_orion_briefings: 'Reading briefings',
-  search_conversations: 'Searching conversations',
-  get_conversation: 'Loading conversation',
+  // Merged action-dispatched tools — generic fallbacks
+  manage_note: 'Working with notes',
+  manage_event: 'Episodic memory',
+  manage_tag: 'Working with tags',
+  recall_conversations: 'Searching conversations',
+  manage_reminder: 'Working with reminders',
+  // Merged tools — per-action labels (resolved via `${name}:${action}`)
+  'manage_note:create': 'Creating note',
+  'manage_note:update': 'Updating note',
+  'manage_note:delete': 'Deleting note',
+  'manage_note:search': 'Searching notes',
+  'manage_event:record': 'Logging event',
+  'manage_event:recall': 'Recalling events',
+  'manage_tag:get': 'Looking up tag',
+  'manage_tag:save': 'Saving tag definition',
+  'recall_conversations:search': 'Searching conversations',
+  'recall_conversations:get': 'Loading conversation',
+  'manage_reminder:set': 'Setting reminder',
+  'manage_reminder:list': 'Checking reminders',
+  'manage_reminder:cancel': 'Cancelling reminder',
+};
+
+const labelForToolCall = (name: string, args?: unknown): string => {
+  const action =
+    args && typeof args === 'object' && typeof (args as Record<string, unknown>).action === 'string'
+      ? (args as Record<string, unknown>).action as string
+      : undefined;
+  if (action && TOOL_LABELS[`${name}:${action}`]) return TOOL_LABELS[`${name}:${action}`];
+  return TOOL_LABELS[name] || name;
 };
 
 export interface UseAIChatOptions {
@@ -594,6 +616,8 @@ export function useAIChat({
       let embeddedNotes: any | undefined;
       let toolCallsInProgress: string[] = [];
       const toolCallHistory: Array<{ name: string; label: string }> = [];
+      const toolLabelByName = new Map<string, string>();
+      const labelOf = (name: string) => toolLabelByName.get(name) || TOOL_LABELS[name] || name;
 
       // Title hint is only meaningful on the very first send of a new
       // conversation (the backend's upsert uses `ignoreDuplicates: true`,
@@ -700,10 +724,12 @@ export function useAIChat({
           case 'tool_call': {
             const name = event.data.name as string;
             logger.log(`Tool called: ${name}`);
+            const label = labelForToolCall(name, event.data.args);
+            toolLabelByName.set(name, label);
             toolCallsInProgress.push(name);
-            toolCallHistory.push({ name, label: TOOL_LABELS[name] || name });
+            toolCallHistory.push({ name, label });
             setToolExecutionStatus(
-              toolCallsInProgress.map(t => TOOL_LABELS[t] || t).join(', ')
+              toolCallsInProgress.map(labelOf).join(', ')
             );
             break;
           }
@@ -713,7 +739,7 @@ export function useAIChat({
             toolCallsInProgress = toolCallsInProgress.filter(t => t !== event.data.name);
             setToolExecutionStatus(
               toolCallsInProgress.length > 0
-                ? toolCallsInProgress.map(t => TOOL_LABELS[t] || t).join(', ')
+                ? toolCallsInProgress.map(labelOf).join(', ')
                 : ''
             );
             break;
