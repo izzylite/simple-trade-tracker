@@ -5,7 +5,6 @@
  */
 
 import { TradeImage } from '../components/trades/TradeForm';
-import { ScoreSettings } from './score';
 import { ImageAttribution } from '../components/heroImage';
 import { EconomicCalendarFilterSettings } from '../hooks/useEconomicCalendarFilters';
 import { ImpactLevel, Currency } from './economicCalendar';
@@ -194,7 +193,8 @@ export interface Calendar extends BaseEntity {
   hero_image_attribution?: ImageAttribution;
 
   // Settings
-  score_settings?: ScoreSettings;
+  /** Tags excluded from tag-pattern analysis on the Performance page. */
+  excluded_tags_from_patterns?: string[];
   economic_calendar_filters?: EconomicCalendarFilterSettings;
 
   // Pre-calculated year statistics

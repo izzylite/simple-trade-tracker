@@ -267,7 +267,7 @@ export const duplicateCalendar = async (
       profit_threshold_percentage: sourceCalendar.profit_threshold_percentage,
       required_tag_groups: sourceCalendar.required_tag_groups,
       tags: sourceCalendar.tags,
-      score_settings: sourceCalendar.score_settings,
+      excluded_tags_from_patterns: sourceCalendar.excluded_tags_from_patterns,
       economic_calendar_filters: sourceCalendar.economic_calendar_filters,
       duplicated_calendar: true,
       source_calendar_id: sourceCalendarId

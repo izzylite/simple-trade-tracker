@@ -40,7 +40,6 @@ interface MonthlyStatsProps {
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
   // Performance charts props
   calendarId?: string;
-  scoreSettings?: import('../types/score').ScoreSettings;
   dynamicRiskSettings?: import('../utils/dynamicRiskUtils').DynamicRiskSettings;
   onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
   onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: import('../types/dualWrite').Calendar) => import('../types/dualWrite').Calendar) => Promise<import('../types/dualWrite').Calendar | undefined>;
@@ -62,7 +61,6 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   isReadOnly = false,
   onOpenGalleryMode,
   calendarId,
-  scoreSettings,
   dynamicRiskSettings,
   onUpdateTradeProperty,
   onUpdateCalendarProperty,

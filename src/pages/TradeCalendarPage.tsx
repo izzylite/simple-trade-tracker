@@ -601,7 +601,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const calendarName = calendar.name;
   const heroImageUrl = calendar.hero_image_url;
   const heroImageAttribution = calendar.hero_image_attribution;
-  const scoreSettings = calendar.score_settings;
   const totalPnL = calendar.total_pnl;
 
   const dynamicRiskSettings: DynamicRiskSettings = useMemo(() => ({
@@ -1413,7 +1412,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 currentDate={currentDate}
                 monthlyTarget={monthly_target}
                 calendarId={calendarId}
-                scoreSettings={scoreSettings}
                 calendar={calendar}
                 pnlBeforeMonth={pnlBeforeMonth}
                 isPnlLoading={isPnlLoading}
@@ -2500,7 +2498,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           currentDate={currentDate}
           monthlyTarget={monthly_target}
           calendarId={calendarId}
-          scoreSettings={scoreSettings}
           calendar={calendar}
           pnlBeforeMonth={pnlBeforeMonth}
           isPnlLoading={isPnlLoading}

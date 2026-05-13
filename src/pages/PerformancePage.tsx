@@ -207,7 +207,6 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
           accountBalance={selectedCalendar.account_balance}
           maxDailyDrawdown={selectedCalendar.max_daily_drawdown}
           monthlyTarget={selectedCalendar.monthly_target}
-          scoreSettings={selectedCalendar.score_settings}
           timePeriod={timePeriod}
           onTimePeriodChange={setTimePeriod}
           selectedDate={selectedDate}

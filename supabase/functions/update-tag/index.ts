@@ -15,7 +15,7 @@ import type { Calendar, Trade, UpdateTagRequest } from '../_shared/types.ts';
 
 /**
  * Helper function to update tags array with group name changes
- * Used for calendar metadata (tags, scoreSettings, requiredTagGroups)
+ * Used for calendar metadata (tags, excluded_tags_from_patterns, requiredTagGroups)
  */ function updateTagsArray(tags: string[], oldTag: string, newTag: string): string[] {
   if (!Array.isArray(tags)) return [];
   const oldGroup = oldTag.includes(':') ? oldTag.split(':')[0] : null;
@@ -50,7 +50,7 @@ import type { Calendar, Trade, UpdateTagRequest } from '../_shared/types.ts';
   return [...new Set(updatedTags)].sort();
 }
 /**
- * Update tags in calendar metadata (tags, scoreSettings, requiredTagGroups)
+ * Update tags in calendar metadata (tags, excluded_tags_from_patterns, requiredTagGroups)
  */ async function updateCalendarMetadata(supabase: AuthenticatedRequest['supabase'], calendarId: string, calendarData: Calendar, oldTag: string, newTag: string): Promise<void> {
   try {
     log('Updating calendar metadata');
@@ -72,17 +72,14 @@ import type { Calendar, Trade, UpdateTagRequest } from '../_shared/types.ts';
       updateData.tags = updateTagsArray(calendarData.tags, oldTag, newTag);
       log(`Updated calendar tags array`);
     }
-    // Update score settings if they exist
-    if (calendarData.score_settings) {
-      const scoreSettings = { ...calendarData.score_settings };
-      if (scoreSettings.excluded_tags_from_patterns && Array.isArray(scoreSettings.excluded_tags_from_patterns)) {
-        scoreSettings.excluded_tags_from_patterns = updateTagsArray(scoreSettings.excluded_tags_from_patterns, oldTag, newTag);
-      }
-      if (scoreSettings.selected_tags && Array.isArray(scoreSettings.selected_tags)) {
-        scoreSettings.selected_tags = updateTagsArray(scoreSettings.selected_tags, oldTag, newTag);
-      }
-      updateData.score_settings = scoreSettings;
-      log(`Updated score settings`);
+    // Propagate the rename into the tag-pattern exclusion list.
+    if (Array.isArray(calendarData.excluded_tags_from_patterns)) {
+      updateData.excluded_tags_from_patterns = updateTagsArray(
+        calendarData.excluded_tags_from_patterns,
+        oldTag,
+        newTag,
+      );
+      log('Updated excluded_tags_from_patterns');
     }
     // Update the calendar
     // Cast to satisfy TypeScript in edge runtime (no generated DB types)

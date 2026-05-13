@@ -26,7 +26,6 @@ export interface StatsContentProps {
   currentDate?: Date;
   monthlyTarget?: number;
   calendarId?: string;
-  scoreSettings?: import('../../../types/score').ScoreSettings;
   calendar?: Calendar;
   pnlBeforeMonth?: number;
   isPnlLoading?: boolean;
@@ -70,7 +69,6 @@ const StatsContent: React.FC<StatsContentProps> = ({
   currentDate,
   monthlyTarget,
   calendarId,
-  scoreSettings,
   calendar,
   pnlBeforeMonth,
   isPnlLoading,
@@ -115,7 +113,6 @@ const StatsContent: React.FC<StatsContentProps> = ({
             isReadOnly={isReadOnly}
             onOpenGalleryMode={onOpenGalleryMode}
             calendarId={calendarId}
-            scoreSettings={scoreSettings}
             dynamicRiskSettings={dynamicRiskSettings}
             onUpdateTradeProperty={onUpdateTradeProperty}
             onUpdateCalendarProperty={onUpdateCalendarProperty}
@@ -135,7 +132,6 @@ const StatsContent: React.FC<StatsContentProps> = ({
             accountBalance={balance}
             maxDailyDrawdown={maxDailyDrawdown}
             monthlyTarget={monthlyTarget}
-            scoreSettings={scoreSettings}
             calendar={calendar}
             dynamicRiskSettings={dynamicRiskSettings}
             onEditTrade={onEditTrade}

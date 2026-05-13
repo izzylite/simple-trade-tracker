@@ -1,5 +1,5 @@
 import { Trade } from '../types/dualWrite';
-import { TagCombination, TagPatternInsight, TagPatternAnalysis, ScoreSettings } from '../types/score';
+import { TagCombination, TagPatternInsight, TagPatternAnalysis } from '../types/score';
 import { subDays, isAfter } from 'date-fns';
 import { generateTagCombinationsInWorker } from '../workers/tagPatternWorker';
 import { logger } from '../utils/logger';
@@ -17,7 +17,7 @@ class TagPatternService {
    * Analyze tag patterns and generate insights
    * Now async to support Web Worker integration
    */
-  async analyzeTagPatterns(trades: Trade[], targetDate: Date = new Date(), settings?: ScoreSettings): Promise<TagPatternAnalysis> {
+  async analyzeTagPatterns(trades: Trade[], targetDate: Date = new Date(), excludedTags?: string[]): Promise<TagPatternAnalysis> {
     const recentCutoff = subDays(targetDate, this.recentPeriodDays);
     const historicalCutoff = subDays(targetDate, this.historicalPeriodDays);
 
@@ -31,10 +31,10 @@ class TagPatternService {
     // Get all tag combinations using Web Worker (excluding specified tags)
     let combinations: string[][];
     try {
-      combinations = await generateTagCombinationsInWorker(trades, settings?.excludedTagsFromPatterns);
+      combinations = await generateTagCombinationsInWorker(trades, excludedTags);
     } catch (error) {
       logger.error('Tag pattern worker failed, using fallback:', error);
-      combinations = this.generateTagCombinations(trades, settings?.excludedTagsFromPatterns);
+      combinations = this.generateTagCombinations(trades, excludedTags);
     }
 
     // Analyze each combination
