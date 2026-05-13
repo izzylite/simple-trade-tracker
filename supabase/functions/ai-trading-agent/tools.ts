@@ -9,10 +9,13 @@ import { scrapeArticle } from "../_shared/scrapeProvider.ts";
 import { tavilySearchNews, tavilySearchBreaking } from "../_shared/tavily.ts";
 import { getMarketPrice, fetchYahooTimeSeries } from "../_shared/prices.ts";
 import {
+  fetchIndicator,
+  fetchSymbolSearch,
   fetchTimeSeries,
   formatCandleLine,
   type Candle,
   type CandleInterval,
+  type IndicatorName,
 } from "../_shared/twelvedata.ts";
 import {
   SLASH_COMMAND_TAG,
@@ -132,13 +135,15 @@ export const scrapeUrlTool: GeminiFunctionDeclaration = {
  * get_market_price + get_market_history pair so Orion has a single mental
  * bucket ("market data") with sub-actions, matching the manage_* pattern.
  *
- * action="quote"   — current price + day stats (Twelve Data intraday primary,
- *                    Yahoo fallback, Frankfurter forex EOD last resort).
- * action="history" — historical OHLC candles via Twelve Data /time_series
- *                    with Yahoo fallback for indices/futures/bonds/DXY.
+ * action="quote"     — current price + day stats (Twelve Data intraday primary,
+ *                      Yahoo fallback, Frankfurter forex EOD last resort).
+ * action="history"   — historical OHLC candles via Twelve Data /time_series
+ *                      with Yahoo fallback for indices/futures/bonds/DXY.
+ * action="indicator" — RSI/MACD/ATR/BBANDS via Twelve Data per-indicator
+ *                      endpoints. Free-tier coverage: forex/US-stocks/crypto.
+ * action="search"    — fuzzy name-to-ticker resolution via /symbol_search.
  *
- * Future actions reserved (commit 2+): "indicator" (RSI/MACD/ATR/BBANDS),
- * "search" (symbol lookup), "earnings" (earnings calendar).
+ * Future actions reserved: "earnings" (earnings calendar).
  */
 export const getMarketDataTool: GeminiFunctionDeclaration = {
   name: "get_market_data",
@@ -148,10 +153,13 @@ export const getMarketDataTool: GeminiFunctionDeclaration = {
 ACTION ROUTING — pick by the user's verb:
 - "What is X right now / today's range / where is X trading" → action="quote"
 - "What did X do yesterday / on date Y / hour-by-hour this morning / chart of last week" → action="history"
+- "RSI / MACD / ATR / Bollinger Bands / is X overbought / volatility on X" → action="indicator"
+- "Find the ticker for / what's the symbol for / look up <company name>" → action="search"
+- AMBIGUOUS "is X bullish/bearish / how is X moving / momentum on X" → start with action="quote" (it includes change% which usually answers it). Only chain to action="indicator" if the user explicitly named one (RSI/MACD/etc).
 - For chart IMAGES attached to a trade, use analyze_image (vision over a screenshot); this tool is numeric data.
 
 ═══════════════════════════════════════════════════════════════════════════════
-SHARED — SYMBOL CATALOG (both actions)
+SHARED — SYMBOL CATALOG (quote / history / indicator)
 ═══════════════════════════════════════════════════════════════════════════════
   Forex: EURUSD=X, GBPUSD=X, USDJPY=X, USDCHF=X, USDCAD=X, AUDUSD=X, NZDUSD=X, EURGBP=X, EURJPY=X, GBPJPY=X, DX-Y.NYB (Dollar Index)
   Indices: ^GSPC (S&P 500), ^IXIC (Nasdaq), ^DJI (Dow), ^VIX, ^FTSE, ^GDAXI (DAX), ^N225 (Nikkei), ^HSI (Hang Seng)
@@ -198,26 +206,76 @@ CALL DISCIPLINE: one call per question; never fan out across symbols or interval
 CHARTS (history only): a candlestick image is attached below your reply ONLY when you ask for one — set \`include_chart: true\` (user wants a visual, or a chart genuinely helps a multi-day/intraday-session analysis) or \`chart_only: true\` (user wants ONLY the picture, no numbers — skips the OHLC dump). For plain numeric lookups ("what was the close", "yesterday's high") set neither — a chart there is just latency + clutter. When a chart IS attached: do NOT embed it yourself, do NOT repeat the URL, do NOT describe what it shows ("notice the bearish engulfing…", "as you can see in the chart…") — just write your analysis (or, in chart_only mode, a brief one-liner); the image appears on its own. Needs 3+ candles to render.
 
 ═══════════════════════════════════════════════════════════════════════════════
+action="indicator" — technical indicators (RSI / MACD / ATR / BBANDS)
+═══════════════════════════════════════════════════════════════════════════════
+Use when the user asks for a NAMED indicator value or a question that requires one (overbought/oversold, volatility for stop sizing, trend strength, band squeeze). Do NOT use to compute indicators yourself from history candles — call this directly.
+
+Required: \`symbol\`, \`indicator\`, \`interval\`.
+
+INDICATORS:
+- RSI    — 0-100 momentum oscillator. >70 overbought, <30 oversold. Divergence signal. Default period=14.
+- MACD   — trend/momentum. Returns {macd, signal, hist}. Positive hist = bullish momentum. Fast=12 slow=26 signal=9 (not tunable here).
+- ATR    — average true range in price units. NOT predictive — use for stop placement (1.5-2x ATR trail) and position sizing. Default period=14.
+- BBANDS — volatility envelope {upper, middle, lower}. Default period=20. Squeeze = bands tight = breakout pending.
+
+COVERAGE: forex / US stocks / crypto only on free tier. Indices/futures/bonds/DXY return "not supported" — for those, fetch action="history" and reason about levels manually.
+
+NO DATA: if the symbol has no recent bars (market closed, weekend, holiday, fresh listing), the tool returns "No <indicator> data" — say so and suggest the nearest open trading day; do NOT fabricate a value.
+
+OUTPUTSIZE: integer 1–20 (default 1 = just the latest reading). Use >1 only when the user asks to see the trend ("RSI for the last week"). Values outside the range are silently clamped (passing 100 becomes 20).
+
+PERIOD: optional. Override only when the user specifies (e.g. "RSI(7) on EURUSD"). MACD ignores period.
+
+═══════════════════════════════════════════════════════════════════════════════
+action="search" — fuzzy symbol resolution
+═══════════════════════════════════════════════════════════════════════════════
+Use when the user names a company / asset by name and you don't already know the catalog symbol ("find the ticker for Tesla", "what's the symbol for Banco Santander", "is there an ETF for clean energy"). Returns up to 8 matches with symbol + name + exchange + country + type.
+
+Required: \`query\`.
+
+WHEN NOT TO USE: if the user already wrote the ticker ("AAPL", "EURUSD=X"), skip search and go straight to action="quote" or action="history". This action is for resolving names → tickers, not double-checking known tickers.
+
+CHAINING (EXPLICIT EXCEPTION to "one call per question"): when search returns one obvious match AND the user wants the data (not just the ticker), chain directly to action="quote" or action="history" in the SAME turn — e.g. "what's Tesla doing" → search("Tesla") → quote("TSLA") → respond. For pure "what's the ticker for X" questions, stop after search.
+
+═══════════════════════════════════════════════════════════════════════════════
 BEFORE CALLING — quick checklist
 ═══════════════════════════════════════════════════════════════════════════════
-1. \`action\`     — "quote" (current single price) OR "history" (past or shape-of-today).
-2. \`symbol\`     — catalog format (EURUSD=X, ^GSPC, GC=F, BTC-USD, AAPL…). Required for both.
-3. If history: \`interval\` is REQUIRED — pick the COARSEST that answers (yesterday → 1day, this morning → 1h, sub-hour → 5min). Indices/futures/bonds/DXY: NO 2h/4h.
-4. If history: pick range — \`outputsize\` (N candles back) OR \`start_date\`+\`end_date\` (window). Single target date → use 2-bar window.
-5. If history: chart flags — \`include_chart\` for analysis + visual, \`chart_only\` for picture-only. Leave OFF for pure numeric lookups.`,
+1. \`action\`      — "quote" (current price) | "history" (past/shape) | "indicator" (RSI/MACD/ATR/BBANDS) | "search" (name → ticker).
+2. \`symbol\`      — catalog format. Required for quote/history/indicator. (search uses \`query\` instead.)
+3. If history/indicator: \`interval\` is REQUIRED. Pick the COARSEST that answers (yesterday → 1day, this morning → 1h). Indices/futures/bonds/DXY: NO 2h/4h.
+4. If history: pick range — \`outputsize\` OR \`start_date\`+\`end_date\`. Single date → 2-bar window.
+5. If history: chart flags — \`include_chart\` (analysis + visual) or \`chart_only\` (picture-only). OFF for numeric lookups.
+6. If indicator: \`indicator\` enum (RSI/MACD/ATR/BBANDS). Free-tier coverage: forex/US-stocks/crypto only.
+7. If search: \`query\` (free text — company or asset name).`,
   parameters: {
     type: "object",
     properties: {
       action: {
         type: "string",
-        enum: ["quote", "history"],
+        enum: ["quote", "history", "indicator", "search"],
         description:
-          'Which data to fetch. Use "quote" for "right now / today / where is X trading" (current price + day stats). Use "history" for any past-time question — "yesterday", a specific date, hour-by-hour today, candle context for a logged trade (OHLC bars). Default to "quote" if no past-time intent is present.',
+          'Which data to fetch. "quote" — current price + day stats ("right now / today / where is X trading"). "history" — OHLC candles for past or shape-of-today ("yesterday", a specific date, hour-by-hour, candle context for a logged trade). "indicator" — named technical indicator value (RSI/MACD/ATR/BBANDS — overbought, volatility, momentum, bands). "search" — fuzzy resolve a company/asset NAME to a ticker (use only when you do not already know the catalog symbol). Default to "quote" if no past-time/indicator/name-lookup intent is present.',
       },
       symbol: {
         type: "string",
         description:
-          'Symbol in the catalog format. Examples: "EURUSD=X", "^GSPC", "GC=F", "BTC-USD", "AAPL". Required for both actions.',
+          'Catalog format symbol. Examples: "EURUSD=X", "^GSPC", "GC=F", "BTC-USD", "AAPL". Required for action="quote" / "history" / "indicator". Not used for action="search" (use `query` instead).',
+      },
+      indicator: {
+        type: "string",
+        enum: ["RSI", "MACD", "ATR", "BBANDS"],
+        description:
+          "action='indicator' ONLY (ignored otherwise). Which technical indicator to compute. RSI = momentum oscillator, MACD = trend/momentum, ATR = volatility for risk sizing, BBANDS = volatility envelope.",
+      },
+      period: {
+        type: "integer",
+        description:
+          "action='indicator' ONLY (ignored otherwise). Lookback period. Defaults: RSI 14, ATR 14, BBANDS 20. MACD ignores this (uses fixed fast=12 slow=26 signal=9). Override only when the user names a non-default (e.g. \"RSI(7)\").",
+      },
+      query: {
+        type: "string",
+        description:
+          "action='search' ONLY (ignored otherwise). Free-text company or asset name to resolve to a ticker. Examples: \"Tesla\", \"Banco Santander\", \"clean energy ETF\".",
       },
       interval: {
         type: "string",
@@ -227,22 +285,22 @@ BEFORE CALLING — quick checklist
           "1day", "1week", "1month",
         ],
         description:
-          "Candle interval. REQUIRED whenever action='history' (omit for action='quote'). Pick the coarsest interval that answers the question — 'yesterday' is 1day, not 1min. NOTE: 2h/4h are forex/stocks/crypto only — for indices/futures/bonds/DXY (^GSPC, GC=F, ^TNX, DX-Y.NYB) use 1h or 1day.",
+          "Candle interval. REQUIRED for action='history' AND action='indicator' (omit for 'quote' / 'search'). Pick the coarsest interval that answers the question — 'yesterday' is 1day, not 1min. NOTE: 2h/4h are forex/stocks/crypto only — for indices/futures/bonds/DXY (^GSPC, GC=F, ^TNX, DX-Y.NYB) use 1h or 1day.",
       },
       outputsize: {
         type: "integer",
         description:
-          "action='history' ONLY (ignored for action='quote'). Last N candles back from now, 1–200. Ignored if start_date+end_date are provided. For 'yesterday' use 2, not 1.",
+          "action='history': last N candles back from now, 1–200 (ignored if start_date+end_date are provided; for 'yesterday' use 2 not 1). action='indicator': how many indicator points to return, 1–20 (default 1 = latest reading only). Ignored for action='quote' / 'search'.",
       },
       start_date: {
         type: "string",
         description:
-          'action=\'history\' ONLY (ignored for action=\'quote\'). Window start, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with end_date. For a single-day target use a 2-day window (start = target, end = target + 1 day).',
+          'action=\'history\' ONLY (ignored for \'quote\' / \'indicator\' / \'search\'). Window start, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with end_date. For a single-day target use a 2-day window (start = target, end = target + 1 day).',
       },
       end_date: {
         type: "string",
         description:
-          'action=\'history\' ONLY (ignored for action=\'quote\'). Window end, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with start_date.',
+          'action=\'history\' ONLY (ignored for \'quote\' / \'indicator\' / \'search\'). Window end, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with start_date.',
       },
       include_chart: {
         type: "boolean",
@@ -255,7 +313,11 @@ BEFORE CALLING — quick checklist
           'action=\'history\' ONLY (ignored for action=\'quote\'). Default false. When true, skip the OHLC text dump and return ONLY the chart. Implies a chart. Use when the user asks to see a chart with no numeric analysis ("show me the chart", "pull up X yesterday").',
       },
     },
-    required: ["action", "symbol"],
+    // Only `action` is universally required. Per-action requirements
+    // (symbol for quote/history/indicator; query for search; interval for
+    // history/indicator; indicator name for indicator) are enforced
+    // server-side in the dispatcher so we can return targeted errors.
+    required: ["action"],
   },
 };
 
@@ -1303,6 +1365,155 @@ export async function executeGetMarketHistory(args: {
   const lines = ordered.map((c) => `  ${formatCandleLine(c)}`).join("\n");
   const chartLine = chartUrl ? `\nChart: ${chartUrl}` : "";
   return `${header}\n${lines}${truncatedNote}${chartLine}`;
+}
+
+// ============================================================================
+// get_market_data action="indicator" — RSI / MACD / ATR / BBANDS
+// ============================================================================
+
+const VALID_INDICATORS: ReadonlySet<IndicatorName> = new Set([
+  "RSI",
+  "MACD",
+  "ATR",
+  "BBANDS",
+]);
+
+const INDICATOR_DEFAULT_PERIOD: Record<IndicatorName, number> = {
+  RSI: 14,
+  ATR: 14,
+  BBANDS: 20,
+  MACD: 0, // unused — MACD uses fast/slow/signal internally
+};
+
+function formatIndicatorLine(
+  indicator: IndicatorName,
+  datetime: string,
+  values: Record<string, number>,
+): string {
+  // Format precision: indicators on percent/oscillator scale (RSI/MACD hist)
+  // get 2dp; price-scale (ATR, BBands) gets 4dp.
+  const dp2 = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : "n/a");
+  const dp4 = (n: number) => (Number.isFinite(n) ? n.toFixed(4) : "n/a");
+  switch (indicator) {
+    case "RSI":
+      return `${datetime}: RSI ${dp2(values.value)}`;
+    case "ATR":
+      return `${datetime}: ATR ${dp4(values.value)}`;
+    case "MACD":
+      return (
+        `${datetime}: MACD ${dp4(values.macd)} ` +
+        `signal ${dp4(values.signal)} hist ${dp4(values.hist)}`
+      );
+    case "BBANDS":
+      return (
+        `${datetime}: BB upper ${dp4(values.upper)} ` +
+        `mid ${dp4(values.middle)} lower ${dp4(values.lower)}`
+      );
+  }
+}
+
+export async function executeGetIndicator(args: {
+  symbol: string;
+  indicator: string;
+  interval: string;
+  period?: number;
+  outputsize?: number;
+}): Promise<string> {
+  const symbol = (args.symbol || "").trim();
+  if (!symbol) return "Symbol is required.";
+
+  const indicator = (args.indicator || "").trim().toUpperCase() as IndicatorName;
+  if (!VALID_INDICATORS.has(indicator)) {
+    return (
+      `Invalid indicator "${args.indicator}". ` +
+      `Valid: ${Array.from(VALID_INDICATORS).join(", ")}.`
+    );
+  }
+
+  const interval = (args.interval || "").trim();
+  if (!isCandleInterval(interval)) {
+    return `Invalid interval "${interval}". Valid: ${VALID_INTERVALS.join(", ")}.`;
+  }
+
+  // Default to 1 point — just the latest reading is usually what's asked.
+  // Cap at 20 to keep token cost bounded (a 20-point RSI series is plenty
+  // for "show me the trend").
+  const outputsize = Math.max(
+    1,
+    Math.min(20, Number.isFinite(args.outputsize) ? Number(args.outputsize) : 1),
+  );
+
+  const period = Number.isFinite(args.period)
+    ? Number(args.period)
+    : INDICATOR_DEFAULT_PERIOD[indicator];
+
+  const points = await fetchIndicator(symbol, indicator, {
+    interval: interval as CandleInterval,
+    period: period > 0 ? period : undefined,
+    outputsize,
+  });
+
+  if (points === null) {
+    return (
+      `Could not fetch ${indicator} for "${symbol}". ` +
+      `Coverage on free tier is forex / US stocks / crypto only — indices ` +
+      `(^GSPC…), futures (GC=F…), bonds (^TNX…), and DXY (DX-Y.NYB) aren't ` +
+      `supported here. For those, fetch action="history" candles instead and ` +
+      `reason about levels manually.`
+    );
+  }
+  if (points.length === 0) {
+    return (
+      `No ${indicator} data for "${symbol}" at ${interval}. ` +
+      `Likely the market was closed or the interval has no recent bars.`
+    );
+  }
+
+  // Oldest → newest in the rendered output (matches history convention).
+  const asc = [...points].reverse();
+  const periodLabel =
+    indicator === "MACD" ? "fast=12 slow=26 signal=9" : `period ${period}`;
+  const header =
+    `${symbol} ${indicator} (${periodLabel}, ${interval}) — ` +
+    `${asc.length} point${asc.length === 1 ? "" : "s"}:`;
+  const lines = asc
+    .map((p) => `  ${formatIndicatorLine(indicator, p.datetime, p.values)}`)
+    .join("\n");
+  return `${header}\n${lines}`;
+}
+
+// ============================================================================
+// get_market_data action="search" — symbol fuzzy resolution
+// ============================================================================
+
+export async function executeSymbolSearch(args: {
+  query: string;
+}): Promise<string> {
+  const q = (args.query || "").trim();
+  if (!q) return "Query is required for action=\"search\".";
+
+  const matches = await fetchSymbolSearch(q, 10);
+  if (matches === null) {
+    return (
+      `Symbol search failed for "${q}". The data source may be unavailable — ` +
+      `retry shortly, or pass the catalog symbol directly if you know it.`
+    );
+  }
+  if (matches.length === 0) {
+    return `No symbols matched "${q}". Try a different spelling or use the catalog form (e.g. "AAPL", "EURUSD=X").`;
+  }
+
+  // Cap formatted output at 8 even though we requested 10 — keeps reply
+  // compact; Orion almost always wants the top 1-3.
+  const top = matches.slice(0, 8);
+  const lines = top
+    .map((m) => {
+      const tail = [m.exchange, m.country, m.type].filter(Boolean).join(", ");
+      const name = m.instrumentName ? ` — ${m.instrumentName}` : "";
+      return `  ${m.symbol}${name}${tail ? ` (${tail})` : ""}`;
+    })
+    .join("\n");
+  return `Matches for "${q}" (top ${top.length}):\n${lines}`;
 }
 
 /**
@@ -2748,12 +2959,17 @@ export async function executeCustomTool(
         const action = typeof args.action === "string" ? args.action : "";
         const sym = typeof args.symbol === "string" ? args.symbol : "";
         if (action === "quote") {
+          if (!sym) {
+            return `get_market_data action="quote" requires \`symbol\` (catalog format, e.g. "EURUSD=X", "AAPL").`;
+          }
           return await executeGetMarketPrice(sym, supabase);
         }
         if (action === "history") {
-          // Surface the missing-interval case before delegating — the
-          // downstream "Invalid interval ''" error is less actionable than
-          // this hint, which names the most common right choice.
+          // Surface missing required fields before delegating — the downstream
+          // "Invalid interval ''" error is less actionable than these hints.
+          if (!sym) {
+            return `get_market_data action="history" requires \`symbol\` (catalog format).`;
+          }
           const interval =
             typeof args.interval === "string" ? args.interval.trim() : "";
           if (!interval) {
@@ -2777,9 +2993,50 @@ export async function executeCustomTool(
             include_chart: args.include_chart === true,
           });
         }
+        if (action === "indicator") {
+          if (!sym) {
+            return `get_market_data action="indicator" requires \`symbol\` (catalog format).`;
+          }
+          const indicator =
+            typeof args.indicator === "string" ? args.indicator : "";
+          if (!indicator) {
+            return (
+              `get_market_data action="indicator" requires \`indicator\`. ` +
+              `Valid: RSI, MACD, ATR, BBANDS.`
+            );
+          }
+          const interval =
+            typeof args.interval === "string" ? args.interval.trim() : "";
+          if (!interval) {
+            return (
+              `get_market_data action="indicator" requires \`interval\`. ` +
+              `Common choices: "1day" for daily readings, "1h" for intraday momentum.`
+            );
+          }
+          return await executeGetIndicator({
+            symbol: sym,
+            indicator,
+            interval,
+            period:
+              typeof args.period === "number" ? args.period : undefined,
+            outputsize:
+              typeof args.outputsize === "number" ? args.outputsize : undefined,
+          });
+        }
+        if (action === "search") {
+          const query = typeof args.query === "string" ? args.query : "";
+          if (!query) {
+            return (
+              `get_market_data action="search" requires \`query\` ` +
+              `(free-text company or asset name, e.g. "Tesla", "Apple").`
+            );
+          }
+          return await executeSymbolSearch({ query });
+        }
         return (
-          `get_market_data: invalid action "${action}". ` +
-          `Use action="quote" for current price, action="history" for OHLC candles.`
+          `get_market_data: invalid action "${action}". Valid: ` +
+          `"quote" (current price), "history" (OHLC candles), ` +
+          `"indicator" (RSI/MACD/ATR/BBANDS), "search" (name→ticker).`
         );
       }
 

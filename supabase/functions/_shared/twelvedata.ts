@@ -297,3 +297,209 @@ export function formatCandleLine(c: Candle, currency = ''): string {
     `H ${c.high.toFixed(dp)} L ${c.low.toFixed(dp)} C ${c.close.toFixed(dp)}${cur}${vol}`
   );
 }
+
+// ============================================================
+// Technical indicators — /rsi /macd /atr /bbands
+// ============================================================
+//
+// One unified entry point routes to the per-indicator endpoint. All four
+// share the same auth + error model as /quote and /time_series. Coverage
+// matches the time_series client (forex/US-stocks/crypto on free tier;
+// indices/futures/bonds/DXY return null → caller surfaces "not supported").
+//
+// Period defaults match Twelve Data's own defaults: RSI/ATR=14, BBANDS=20.
+// MACD uses fast=12, slow=26, signal=9 (standard); we don't expose tuning.
+
+export type IndicatorName = 'RSI' | 'MACD' | 'ATR' | 'BBANDS';
+
+export interface IndicatorPoint {
+  datetime: string;
+  /** Indicator-specific keys. RSI/ATR: {value}. MACD: {macd, signal, hist}.
+   *  BBANDS: {upper, middle, lower}. Kept loose so the formatter handles
+   *  each case without a 4-way type union per call site. */
+  values: Record<string, number>;
+}
+
+export interface IndicatorOptions {
+  interval: CandleInterval;
+  /** Lookback period for RSI/ATR/BBANDS. Ignored for MACD. */
+  period?: number;
+  /** How many indicator points to return (default 1 — just the latest). */
+  outputsize?: number;
+}
+
+const INDICATOR_ENDPOINT: Record<IndicatorName, string> = {
+  RSI: 'rsi',
+  MACD: 'macd',
+  ATR: 'atr',
+  BBANDS: 'bbands',
+};
+
+export async function fetchIndicator(
+  yahooSymbol: string,
+  indicator: IndicatorName,
+  opts: IndicatorOptions,
+): Promise<IndicatorPoint[] | null> {
+  const tdSymbol = yahooToTwelve(yahooSymbol);
+  if (!tdSymbol) return null;
+
+  const apiKey = Deno.env.get('TWELVE_DATA_API_KEY');
+  if (!apiKey) {
+    log('TWELVE_DATA_API_KEY not set', 'warn');
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    symbol: tdSymbol,
+    interval: opts.interval,
+    apikey: apiKey,
+  });
+  // /macd doesn't take time_period (uses fast/slow/signal).
+  if (indicator !== 'MACD' && opts.period) {
+    params.set('time_period', String(opts.period));
+  }
+  if (opts.outputsize) params.set('outputsize', String(opts.outputsize));
+
+  const url = `${BASE}/${INDICATOR_ENDPOINT[indicator]}?${params.toString()}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      log(
+        `Twelve Data /${INDICATOR_ENDPOINT[indicator]} HTTP ${res.status} for ${tdSymbol}`,
+        'warn',
+      );
+      return null;
+    }
+    const body = (await res.json()) as
+      | { values?: Array<Record<string, string>>; status?: string }
+      | TwelveError;
+    if (isErrorBody(body)) {
+      log(
+        `Twelve Data /${INDICATOR_ENDPOINT[indicator]} error ${body.code} for ${tdSymbol}: ${body.message}`,
+        'warn',
+      );
+      return null;
+    }
+    const raw = body.values;
+    if (!raw) return null;
+    return raw.map((v) => normalizeIndicatorPoint(indicator, v));
+  } catch (err) {
+    log(
+      `Twelve Data /${INDICATOR_ENDPOINT[indicator]} exception for ${tdSymbol}`,
+      'warn',
+      err,
+    );
+    return null;
+  }
+}
+
+function normalizeIndicatorPoint(
+  indicator: IndicatorName,
+  v: Record<string, string>,
+): IndicatorPoint {
+  const n = (key: string): number => {
+    const x = Number(v[key]);
+    return Number.isFinite(x) ? x : NaN;
+  };
+  const datetime = v.datetime;
+  switch (indicator) {
+    case 'RSI':
+      return { datetime, values: { value: n('rsi') } };
+    case 'ATR':
+      return { datetime, values: { value: n('atr') } };
+    case 'MACD':
+      return {
+        datetime,
+        values: {
+          macd: n('macd'),
+          signal: n('macd_signal'),
+          hist: n('macd_hist'),
+        },
+      };
+    case 'BBANDS':
+      return {
+        datetime,
+        values: {
+          upper: n('upper_band'),
+          middle: n('middle_band'),
+          lower: n('lower_band'),
+        },
+      };
+  }
+}
+
+// ============================================================
+// /symbol_search — fuzzy resolution of company / ticker names
+// ============================================================
+//
+// Free tier: returns up to ~30 matches across all asset classes. We trim
+// to the most useful columns; Orion uses this to disambiguate "tesla" →
+// TSLA before chaining into a quote/history call.
+
+export interface SymbolMatch {
+  symbol: string;
+  instrumentName: string;
+  exchange: string;
+  country: string;
+  type: string; // "Common Stock", "ETF", "Index", "Physical Currency", ...
+}
+
+interface TwelveSymbolSearchResponse {
+  data?: Array<{
+    symbol: string;
+    instrument_name?: string;
+    exchange?: string;
+    country?: string;
+    instrument_type?: string;
+  }>;
+  status?: string;
+}
+
+export async function fetchSymbolSearch(
+  query: string,
+  outputsize = 10,
+): Promise<SymbolMatch[] | null> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const apiKey = Deno.env.get('TWELVE_DATA_API_KEY');
+  if (!apiKey) {
+    log('TWELVE_DATA_API_KEY not set', 'warn');
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    symbol: q,
+    outputsize: String(outputsize),
+    apikey: apiKey,
+  });
+  const url = `${BASE}/symbol_search?${params.toString()}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      log(`Twelve Data /symbol_search HTTP ${res.status} for "${q}"`, 'warn');
+      return null;
+    }
+    const body = (await res.json()) as TwelveSymbolSearchResponse | TwelveError;
+    if (isErrorBody(body)) {
+      log(
+        `Twelve Data /symbol_search error ${body.code} for "${q}": ${body.message}`,
+        'warn',
+      );
+      return null;
+    }
+    const data = body.data;
+    if (!data) return [];
+    return data.map((d) => ({
+      symbol: d.symbol,
+      instrumentName: d.instrument_name ?? '',
+      exchange: d.exchange ?? '',
+      country: d.country ?? '',
+      type: d.instrument_type ?? '',
+    }));
+  } catch (err) {
+    log(`Twelve Data /symbol_search exception for "${q}"`, 'warn', err);
+    return null;
+  }
+}

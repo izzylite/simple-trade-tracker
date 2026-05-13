@@ -523,9 +523,11 @@ ${calendarContextSection}
 2. search_web — Market news and analysis (NOT for economic calendar). Use time_range param for recency filtering.
 3. scrape_url — Article content extraction. Prefer scraping the most recent articles first.
 4. get_market_data — Universal market data, action-dispatched. Pick action by verb:
-   • action="quote" → "what is X right now / today's price / where is X trading" (returns price + day stats; respect the Freshness label).
-   • action="history" → past dates, "yesterday", hour-by-hour today, or the SHAPE of today (returns OHLC candles; set include_chart for visuals, chart_only for picture-only).
-   See the tool's own description for symbol catalog, intervals, windowing, and chart rules — don't repeat them here. One call per question.
+   • action="quote" → "what is X right now / today's price / where is X trading" (price + day stats; respect Freshness label).
+   • action="history" → past dates, "yesterday", hour-by-hour today, SHAPE of today (OHLC candles; include_chart for visuals, chart_only for picture-only).
+   • action="indicator" → "RSI / MACD / ATR / Bollinger / is X overbought / volatility for stop sizing" (named indicator value). Coverage: forex/US-stocks/crypto only.
+   • action="search" → "find ticker for / what's the symbol for <company name>" (name → ticker). Skip when user already wrote the ticker.
+   See the tool's own description for symbol catalog, intervals, windowing, chart rules, and per-action specifics. One call per question (chaining search → quote/history is permitted when the question requires it).
 5. generate_chart — Visualize data (auto-displays, omit URL mentions)
 6. manage_note — Note CRUD: action="search" (find by text/tags; load memory via tags:["${AGENT_MEMORY_TAG}"] at session start), "create" (needs user request), "update", "delete". NOT for ${AGENT_MEMORY_TAG} writes — use update_memory.
 7. update_memory — Mutate persistent memory with op=ADD/UPDATE/REMOVE/REPLACE_SECTION. Used standalone for ADD-only flows (extracting bullets from notes, etc). For RULE CHANGES / DECISIONS / CORRECTIONS use apply_rule_change (#11) instead — it pairs the memory op with episodic logging atomically. UPDATE/REMOVE require target_text matching an existing bullet (Jaccard ≥ 0.85).
@@ -584,6 +586,21 @@ Correct sequencing examples:
   get_market_data (action: "history", symbol: "GC=F", interval: "1day", outputsize: 2) → tool returns "no data for window"
   → reply: "Gold doesn't trade weekends — Friday's close was X, Monday's open was Y." (use the available bars; never fabricate)
 
+"Is BTC overbought right now?" / "what's the RSI on EURUSD" / "give me ATR on AAPL for stop sizing":
+  get_market_data (action: "indicator", symbol: "BTC-USD", indicator: "RSI", interval: "1h") → respond
+  // overbought/oversold/volatility/momentum questions → indicator, not history. Default period=14 unless user names another.
+  NOT: action="history" (don't compute RSI from candles yourself — the tool does it)
+
+"What's the ticker for Tesla?" / "find me the symbol for Banco Santander":
+  get_market_data (action: "search", query: "Tesla") → respond with the top match(es)
+  // pure name-to-ticker lookup, no follow-up data fetch needed.
+
+"What's Tesla trading at?" (name + price intent):
+  get_market_data (action: "search", query: "Tesla") → resolve to TSLA
+  → get_market_data (action: "quote", symbol: "TSLA") → respond
+  // chain is allowed when the user's question requires the resolved symbol's data.
+  NOT: action="quote" with symbol="Tesla" (free-text names won't resolve in the catalog)
+
 "What have we discussed about risk management?":
   recall_conversations(action="search") → respond
   NOT: manage_note(action="search") (wrong tool — this requires conversation history, not notes)
@@ -607,7 +624,9 @@ Correct sequencing examples:
 | "What did you tell me on Tuesday at 3pm?", "Show me what we said about X exactly", user wants verbatim chat content | recall_conversations(action="search") → recall_conversations(action="get") |
 | User says "I've decided / I'm changing / actually / you're wrong" — call BEFORE replying | apply_rule_change (TIER 3 R1) |
 | Market news, sentiment, analysis | search_web (type: "news", time_range: "day"/"week") → THEN scrape_url |
-| Current price / past OHLC / yesterday / "what did X do" / candle context for a trade — any asset class. (Trade chart IMAGES → analyze_image instead — vision over a screenshot, not numeric OHLC.) | get_market_data — see its description for action choice, intervals, and asset-class caveats. Always resolve relative dates ("yesterday", "this morning") from current-date context BEFORE calling. |
+| Current price / past OHLC / yesterday / "what did X do" / candle context for a trade — any asset class. (Trade chart IMAGES → analyze_image instead — vision over a screenshot, not numeric OHLC.) | get_market_data (action: "quote" or "history") — see its description for action choice, intervals, and asset-class caveats. Always resolve relative dates ("yesterday", "this morning") from current-date context BEFORE calling. |
+| Named technical indicator (RSI / MACD / ATR / Bollinger) — overbought, volatility for stops, momentum, band squeeze | get_market_data (action: "indicator") — forex/US-stocks/crypto only. Don't compute from candles yourself. |
+| Resolve company / asset NAME to a ticker — "what's the symbol for X", "find ticker for Y" — and optional follow-up data fetch | get_market_data (action: "search") → optionally chain to action="quote"/"history" when the user needs the data, not just the ticker. |
 | Review trade charts/images | analyze_image (pass trade.images[].url) |
 | Unknown tag meaning | manage_tag(action="get") → user's tag dictionary |
 | New fact, observed pattern, additional rule, info from a note | update_memory op=ADD |

@@ -56,6 +56,8 @@ const TOOL_LABELS: Record<string, string> = {
   'manage_reminder:cancel': 'Cancelling reminder',
   'get_market_data:quote': 'Checking market price',
   'get_market_data:history': 'Pulling historical candles',
+  'get_market_data:indicator': 'Computing indicator',
+  'get_market_data:search': 'Searching symbols',
 };
 
 const labelForToolCall = (name: string, args?: unknown): string => {
