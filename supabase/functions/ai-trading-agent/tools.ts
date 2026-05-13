@@ -191,7 +191,7 @@ RANGE: pass EITHER \`outputsize\` (last N candles back from now), OR \`start_dat
 
 OUTPUTSIZE: integer 1–200. Requests >200 are truncated.
 
-WINDOW TOO BIG: a start_date/end_date window that would span more than 200 candles at the chosen interval is rejected with a message telling you to use a coarser interval. If you get that, retry with the suggested interval — don't keep retrying at the same granularity.
+WINDOW TOO BIG: a start_date/end_date window that spans more than ~200 candles at the chosen interval is rejected (use a coarser interval — the message tells you which; retry with that, don't re-try the same granularity). EXCEPTION: in chart_only mode the limit is ~2000 candles, so a full day of 5-min bars (~288) or a week of 5-min (~2000) is fine — pick the granularity the user actually wants for the visual.
 
 DATE FORMAT: "YYYY-MM-DD" for daily+, "YYYY-MM-DD HH:mm:ss" for intraday. Resolve relative dates ("yesterday", "this morning") from the current date in your context BEFORE calling. For a single target date, ALWAYS query a 2-bar window (outputsize=2, or start/end one day apart) — single-date queries occasionally return "no data" by API quirk.
 
@@ -1001,9 +1001,15 @@ export async function executeGetMarketPrice(
 
 /**
  * Historical OHLC executor — Yahoo-format symbol → Twelve Data /time_series.
- * Returns compact lines, oldest→newest, capped to MAX_CANDLES per call.
+ * Returns compact lines, oldest→newest, capped per call.
+ *
+ * Two caps: the text path is bounded by MAX_CANDLES (each OHLC line ≈ 28
+ * tokens, so 200 ≈ 5.6k tokens). chart_only has no text dump, so the only
+ * constraint is a renderable/POST-able chart — MAX_CHART_CANDLES is much
+ * higher (a full day of 5-min bars ≈ 288, a week ≈ 2000).
  */
 const MAX_CANDLES = 200;
+const MAX_CHART_CANDLES = 2000;
 
 const VALID_INTERVALS: readonly CandleInterval[] = [
   "1min", "5min", "15min", "30min",
@@ -1172,21 +1178,25 @@ export async function executeGetMarketHistory(args: {
   // Range: prefer explicit start/end; else outputsize; else 30.
   const hasWindow = !!(args.start_date && args.end_date);
 
-  // Reject windows that would blow past the candle cap BEFORE spending an API
-  // credit — nudge Orion to a coarser interval instead of silently truncating.
+  // chart_only renders an image with no OHLC text dump → the token budget
+  // doesn't apply, so allow far more bars (a full day of 5-min ≈ 288).
+  const candleCap = args.chart_only ? MAX_CHART_CANDLES : MAX_CANDLES;
+
+  // Reject windows that would blow past the cap BEFORE spending an API credit —
+  // nudge Orion to a coarser interval instead of silently truncating.
   if (hasWindow) {
     const est = estimateWindowBars(interval, args.start_date!, args.end_date!);
-    if (est !== null && est > MAX_CANDLES) {
+    if (est !== null && est > candleCap) {
       const coarser = SUGGEST_COARSER[interval];
       return (
         `That window at ${interval} is roughly ${est} candles — over the ` +
-        `${MAX_CANDLES}-candle limit. Use a coarser interval (try ${coarser}) ` +
+        `${candleCap}-candle limit. Use a coarser interval (try ${coarser}) ` +
         `or narrow the window.`
       );
     }
   }
 
-  const wantSize = Math.min(args.outputsize ?? 30, MAX_CANDLES);
+  const wantSize = Math.min(args.outputsize ?? 30, candleCap);
   const outputsize = hasWindow ? undefined : wantSize;
 
   // Unix [period1, period2] window — needed for the Yahoo fallback. For
@@ -1242,9 +1252,9 @@ export async function executeGetMarketHistory(args: {
   }
 
   // Normalize to oldest→newest, then cap. For outputsize mode keep the last
-  // `wantSize`; for window mode keep the last MAX_CANDLES.
+  // `wantSize`; for window mode keep the last `candleCap`.
   const asc = chronological ? [...candles] : [...candles].reverse();
-  const keep = hasWindow ? MAX_CANDLES : wantSize;
+  const keep = hasWindow ? candleCap : wantSize;
   const ordered = asc.slice(-keep);
   const truncatedNote =
     asc.length > ordered.length
