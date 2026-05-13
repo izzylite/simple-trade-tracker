@@ -17,8 +17,7 @@ export const ORION_TOOL_LABELS: Record<string, string> = {
   scrape_url: 'Reading article',
   analyze_image: 'Analyzing chart',
   generate_chart: 'Generating chart',
-  get_market_price: 'Checking market price',
-  get_market_history: 'Pulling historical candles',
+  get_market_data: 'Fetching market data',
   update_memory: 'Updating memory',
   apply_rule_change: 'Updating memory',
   get_recent_orion_briefings: 'Reading briefings',
@@ -44,6 +43,8 @@ export const ORION_TOOL_LABELS: Record<string, string> = {
   'manage_reminder:set': 'Setting reminder',
   'manage_reminder:list': 'Checking reminders',
   'manage_reminder:cancel': 'Cancelling reminder',
+  'get_market_data:quote': 'Checking market price',
+  'get_market_data:history': 'Pulling historical candles',
 };
 
 /** Resolve a friendly label for a tool call, using `action` when present. */

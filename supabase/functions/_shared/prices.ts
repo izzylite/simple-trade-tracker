@@ -94,7 +94,7 @@ export async function fetchYahoo(symbol: string): Promise<PriceSnapshot | null> 
 // Yahoo Finance adapter — historical candles (chart endpoint)
 // ============================================================
 //
-// Fallback for get_market_history when Twelve Data can't reach an asset class
+// Fallback for get_market_data(history) when Twelve Data can't reach an asset class
 // (DXY, indices, futures, bonds). Yahoo carries all of them. Same scrape
 // fragility as fetchYahoo above — UA-spoofed, unofficial endpoint.
 

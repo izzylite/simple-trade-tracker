@@ -960,7 +960,7 @@ function handleStreamingRequest(
             // Retry 2: Simplify - use fewer tools (only custom tools, no MCP)
             clarifiedMessage = `${contextPrefix}User says: "${message}"\n\nProvide a helpful response.`;
             retryTools = allTools.filter(t =>
-              ['execute_sql', 'search_web', 'get_market_price', 'manage_note', 'update_memory'].includes(t.name)
+              ['execute_sql', 'search_web', 'get_market_data', 'manage_note', 'update_memory'].includes(t.name)
             );
             log(`Retry 2: Using reduced tool set (${retryTools.length} tools)`, 'info');
           } else {

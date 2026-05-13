@@ -107,7 +107,7 @@ export interface GenerateBriefingParams {
   /**
    * User-turn message. Callers build this with tone instruction + task spec
    * + the suggested JSON contract. The agent is free to query whatever it
-   * needs via execute_sql / get_market_price / etc.
+   * needs via execute_sql / get_market_data / etc.
    */
   userMessage: string;
   /** Title to use when the model's JSON is missing or malformed. */
@@ -129,7 +129,7 @@ export async function generateBriefing(
     'list_tables',
   ]);
 
-  // 2. Combine with all custom tools (search_web, get_market_price, notes, memory, etc.).
+  // 2. Combine with all custom tools (search_web, get_market_data, notes, memory, etc.).
   const customTools = getAllCustomTools();
   const allTools = [...mcpTools, ...customTools];
 

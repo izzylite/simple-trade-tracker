@@ -221,7 +221,7 @@ export async function handleMarketResearch(
   const successfulSearches = Math.max(0, totalQueries - totalErrors);
   const rawToolCalls: Array<{ name: string }> = [
     ...Array.from({ length: successfulSearches }, () => ({ name: 'search_web' })),
-    ...prices.map(() => ({ name: 'get_market_price' })),
+    ...prices.map(() => ({ name: 'get_market_data', args: { action: 'quote' } })),
     ...(economicEvents.length > 0 ? [{ name: 'get_economic_events' }] : []),
     ...briefing.scrapedUrls.map(() => ({ name: 'scrape_url' })),
     ...briefing.scrapedUrlsFailed.map(() => ({ name: 'scrape_url' })),

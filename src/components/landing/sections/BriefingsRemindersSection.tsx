@@ -24,7 +24,7 @@ interface ToolChip {
 const TASK_TOOLS: ToolChip[] = [
     { label: 'search_web' },
     { label: 'scrape_url' },
-    { label: 'get_market_price' },
+    { label: 'get_market_data' },
     { label: 'execute_sql' },
     { label: 'economic_events' },
     { label: 'notes' },

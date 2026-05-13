@@ -14,7 +14,7 @@ import SectionMarker from './SectionMarker';
    Maps to the real Orion tool surface:
      - trade history & user notes via execute_sql (tools.ts:1657)
      - economic_events via execute_sql
-     - get_market_price (tools.ts:128-154)
+     - get_market_data action="quote" (tools.ts)
      - search_web + scrape_url (tools.ts:80-122)
      - search_web type=news, time_range=day → "breaking news"
      - analyze_image (tools.ts:841-868) over chart screenshots

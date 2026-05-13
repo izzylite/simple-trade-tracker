@@ -128,85 +128,96 @@ export const scrapeUrlTool: GeminiFunctionDeclaration = {
 };
 
 /**
- * Universal market price tool — Twelve Data (intraday) primary, Yahoo Finance
- * fallback (covers indices/futures/bonds), Frankfurter forex EOD as last resort.
+ * Universal market data tool — action-dispatched. Replaces the former
+ * get_market_price + get_market_history pair so Orion has a single mental
+ * bucket ("market data") with sub-actions, matching the manage_* pattern.
+ *
+ * action="quote"   — current price + day stats (Twelve Data intraday primary,
+ *                    Yahoo fallback, Frankfurter forex EOD last resort).
+ * action="history" — historical OHLC candles via Twelve Data /time_series
+ *                    with Yahoo fallback for indices/futures/bonds/DXY.
+ *
+ * Future actions reserved (commit 2+): "indicator" (RSI/MACD/ATR/BBANDS),
+ * "search" (symbol lookup), "earnings" (earnings calendar).
  */
-export const getMarketPriceTool: GeminiFunctionDeclaration = {
-  name: "get_market_price",
+export const getMarketDataTool: GeminiFunctionDeclaration = {
+  name: "get_market_data",
   description:
-    `Get current price data for any instrument — forex, indices, commodities, crypto, bonds, or stocks. Returns: price, day change %, day high/low, previous close, and a freshness label.
+    `Universal market data tool. Pick ONE \`action\`.
 
-The tool routes internally across data sources. The result includes a freshness label (e.g. "live intraday", "near-realtime", "end-of-day reference rate") — respect it in your wording. Don't say "currently trading at" for end-of-day data; for that, say "last published rate".
+ACTION ROUTING — pick by the user's verb:
+- "What is X right now / today's range / where is X trading" → action="quote"
+- "What did X do yesterday / on date Y / hour-by-hour this morning / chart of last week" → action="history"
+- For chart IMAGES attached to a trade, use analyze_image (vision over a screenshot); this tool is numeric data.
 
-SYMBOL EXAMPLES:
+═══════════════════════════════════════════════════════════════════════════════
+SHARED — SYMBOL CATALOG (both actions)
+═══════════════════════════════════════════════════════════════════════════════
   Forex: EURUSD=X, GBPUSD=X, USDJPY=X, USDCHF=X, USDCAD=X, AUDUSD=X, NZDUSD=X, EURGBP=X, EURJPY=X, GBPJPY=X, DX-Y.NYB (Dollar Index)
   Indices: ^GSPC (S&P 500), ^IXIC (Nasdaq), ^DJI (Dow), ^VIX, ^FTSE, ^GDAXI (DAX), ^N225 (Nikkei), ^HSI (Hang Seng)
   Commodities: GC=F (Gold), SI=F (Silver), CL=F (WTI Oil), BZ=F (Brent), NG=F (Natural Gas), HG=F (Copper)
   Crypto: BTC-USD, ETH-USD, SOL-USD, XRP-USD, ADA-USD, DOGE-USD
   Bonds: ^TNX (10Y Yield), ^FVX (5Y), ^TYX (30Y), TLT (20Y+ ETF)
   Stocks: AAPL, MSFT, NVDA, GOOGL, META, AMZN, TSLA, JPM
-  ETFs: SPY, QQQ, IWM`,
-  parameters: {
-    type: "object",
-    properties: {
-      symbol: {
-        type: "string",
-        description:
-          'Symbol in the catalog format. Examples: "EURUSD=X", "^GSPC", "GC=F", "BTC-USD", "AAPL".',
-      },
-    },
-    required: ["symbol"],
-  },
-};
+  ETFs: SPY, QQQ, IWM
 
-/**
- * Historical OHLC candles via Twelve Data /time_series.
- *
- * Designed for "what was the market doing at the moment of this trade" lookups
- * and short-window context. Returns compact OHLC lines, NOT raw arrays — keeps
- * token usage bounded.
- *
- * Yahoo-format symbols accepted (same as get_market_price). Forex/US-stocks/
- * crypto only on the free Twelve Data tier; indices/futures/bonds return a
- * not-supported note.
- */
-export const getMarketHistoryTool: GeminiFunctionDeclaration = {
-  name: "get_market_history",
-  description:
-    `Historical OHLC candles. Use ONLY when the question is NOT "right now":
+═══════════════════════════════════════════════════════════════════════════════
+action="quote" — current price + day stats
+═══════════════════════════════════════════════════════════════════════════════
+Returns: price, day change %, day high/low, previous close, freshness label.
+Required: \`symbol\`. The freshness label (e.g. "live intraday", "near-realtime", "end-of-day reference rate") MUST be respected in your wording — don't say "currently trading at" for end-of-day data; say "last published rate" instead.
+
+═══════════════════════════════════════════════════════════════════════════════
+action="history" — historical OHLC candles
+═══════════════════════════════════════════════════════════════════════════════
+Use when the question is about PAST data OR the SHAPE of today (multi-bar pattern), not a current single price:
 - past calendar dates ("yesterday's range", "what did X do on date Y")
-- intraday detail TODAY at finer granularity than get_market_price gives
-  (e.g. "what did EUR/USD do hour by hour this morning")
+- intraday detail TODAY at finer granularity than action="quote" gives ("what did EUR/USD do hour by hour this morning", "today's price action so far")
 - candle context around a logged trade's timestamp
 
-WHEN NOT TO CALL: "where is X right now", "what's the price of X", "today's day range" — those go to get_market_price (it already returns today's O/H/L/C plus previous close).
+DO NOT use for: "where is X right now", "what's the price of X", "today's high so far" (single number, no shape) — use action="quote" (it already returns today's O/H/L/C plus previous close).
 
-For chart IMAGES attached to a trade, use analyze_image — that's vision over a screenshot; this is numeric OHLC data.
+Required: \`symbol\`, \`interval\`.
 
-COVERAGE: forex pairs (EURUSD=X…), US stocks (AAPL…), crypto (BTC-USD…), AND — via fallback — indices (^GSPC, ^IXIC, ^VIX…), futures (GC=F gold, CL=F oil, SI=F silver…), bonds/yields (^TNX, ^TYX…), and DXY (DX-Y.NYB). Daily/weekly/monthly work for all of these going back years. INTRADAY (1min–1h) for indices/futures/bonds/DXY has a horizon limit: roughly the last ~60 days only (and ~7 days for 1min). Beyond that, intraday returns "no data" — use a daily interval instead.
+COVERAGE: forex pairs, US stocks, crypto (primary). Indices, futures, bonds, DXY via fallback. Daily/weekly/monthly works for all going back years. INTRADAY (1min–1h) for indices/futures/bonds/DXY is limited to ~last 60 days (and ~7 days for 1min) — beyond that, use a daily interval.
 
-INTERVALS: 1min, 5min, 15min, 30min, 1h, 2h, 4h, 1day, 1week, 1month. Pick the COARSEST interval that answers the question — "yesterday's range" is 1day with outputsize=2, NOT 1min. Default to 1min only for sub-hourly intraday questions. NOTE: 2h and 4h are NOT available for indices/futures/bonds/DXY — for those use 1h or 1day.
+INTERVALS: 1min, 5min, 15min, 30min, 1h, 2h, 4h, 1day, 1week, 1month. Pick the COARSEST interval that answers the question — "yesterday's range" is 1day with outputsize=2, NOT 1min. NOTE: 2h and 4h are NOT available for indices/futures/bonds/DXY — for those use 1h or 1day.
 
-RANGE: pass EITHER \`outputsize\` (last N candles back from now), OR \`start_date\`+\`end_date\` (specific window). If you accidentally pass both, the window wins and \`outputsize\` is ignored.
+RANGE: pass EITHER \`outputsize\` (last N candles back from now), OR \`start_date\`+\`end_date\` (specific window). If both are passed, the window wins and \`outputsize\` is ignored.
 
 OUTPUTSIZE: integer 1–200. Requests >200 are truncated.
 
-WINDOW TOO BIG: a start_date/end_date window that spans more than ~200 candles at the chosen interval is rejected (use a coarser interval — the message tells you which; retry with that, don't re-try the same granularity). EXCEPTION: in chart_only mode the limit is ~2000 candles, so a full day of 5-min bars (~288) or a week of 5-min (~2000) is fine — pick the granularity the user actually wants for the visual.
+WINDOW TOO BIG: a start_date/end_date window spanning more than ~200 candles at the chosen interval is rejected — retry with the coarser interval the message names, not the same granularity. EXCEPTION: in chart_only mode the limit is ~2000 candles (a full day of 5-min bars ~288, or a week of 5-min ~2000 is fine).
 
-DATE FORMAT: "YYYY-MM-DD" for daily+, "YYYY-MM-DD HH:mm:ss" for intraday. Resolve relative dates ("yesterday", "this morning") from the current date in your context BEFORE calling. For a single target date, ALWAYS query a 2-bar window (outputsize=2, or start/end one day apart) — single-date queries occasionally return "no data" by API quirk.
+DATE FORMAT: "YYYY-MM-DD" for daily+, "YYYY-MM-DD HH:mm:ss" for intraday. Resolve relative dates ("yesterday", "this morning") from your current-date context BEFORE calling. For a single target date, ALWAYS query a 2-bar window (outputsize=2, or start/end one day apart) — single-date queries occasionally return "no data" by API quirk.
 
 MARKET CLOSED: if the window falls outside trading hours (forex weekends, equity holidays), the tool returns "no data for window" — say so and suggest the nearest open trading day; do NOT fabricate a price.
 
 CALL DISCIPLINE: one call per question; never fan out across symbols or intervals in a single turn. Output is oldest→newest OHLC lines.
 
-CHARTS: a candlestick image is attached below your reply ONLY when you ask for one — set \`include_chart: true\` (user wants a visual, or a chart genuinely helps a multi-day/intraday-session analysis) or \`chart_only: true\` (user wants ONLY the picture, no numbers — skips the OHLC dump). For plain numeric lookups ("what was the close", "yesterday's high") set neither — a chart there is just latency + clutter. When a chart IS attached: do NOT embed it yourself, do NOT repeat the URL, do NOT describe what it shows ("notice the bearish engulfing…", "as you can see in the chart…") — just write your analysis (or, in chart_only mode, a brief one-liner); the image appears on its own. Needs 3+ candles to render.`,
+CHARTS (history only): a candlestick image is attached below your reply ONLY when you ask for one — set \`include_chart: true\` (user wants a visual, or a chart genuinely helps a multi-day/intraday-session analysis) or \`chart_only: true\` (user wants ONLY the picture, no numbers — skips the OHLC dump). For plain numeric lookups ("what was the close", "yesterday's high") set neither — a chart there is just latency + clutter. When a chart IS attached: do NOT embed it yourself, do NOT repeat the URL, do NOT describe what it shows ("notice the bearish engulfing…", "as you can see in the chart…") — just write your analysis (or, in chart_only mode, a brief one-liner); the image appears on its own. Needs 3+ candles to render.
+
+═══════════════════════════════════════════════════════════════════════════════
+BEFORE CALLING — quick checklist
+═══════════════════════════════════════════════════════════════════════════════
+1. \`action\`     — "quote" (current single price) OR "history" (past or shape-of-today).
+2. \`symbol\`     — catalog format (EURUSD=X, ^GSPC, GC=F, BTC-USD, AAPL…). Required for both.
+3. If history: \`interval\` is REQUIRED — pick the COARSEST that answers (yesterday → 1day, this morning → 1h, sub-hour → 5min). Indices/futures/bonds/DXY: NO 2h/4h.
+4. If history: pick range — \`outputsize\` (N candles back) OR \`start_date\`+\`end_date\` (window). Single target date → use 2-bar window.
+5. If history: chart flags — \`include_chart\` for analysis + visual, \`chart_only\` for picture-only. Leave OFF for pure numeric lookups.`,
   parameters: {
     type: "object",
     properties: {
+      action: {
+        type: "string",
+        enum: ["quote", "history"],
+        description:
+          'Which data to fetch. Use "quote" for "right now / today / where is X trading" (current price + day stats). Use "history" for any past-time question — "yesterday", a specific date, hour-by-hour today, candle context for a logged trade (OHLC bars). Default to "quote" if no past-time intent is present.',
+      },
       symbol: {
         type: "string",
         description:
-          'Symbol in the catalog format. Examples: "EURUSD=X", "AAPL", "BTC-USD".',
+          'Symbol in the catalog format. Examples: "EURUSD=X", "^GSPC", "GC=F", "BTC-USD", "AAPL". Required for both actions.',
       },
       interval: {
         type: "string",
@@ -215,35 +226,36 @@ CHARTS: a candlestick image is attached below your reply ONLY when you ask for o
           "1h", "2h", "4h",
           "1day", "1week", "1month",
         ],
-        description: "Candle interval. Pick the coarsest that answers the question.",
+        description:
+          "Candle interval. REQUIRED whenever action='history' (omit for action='quote'). Pick the coarsest interval that answers the question — 'yesterday' is 1day, not 1min. NOTE: 2h/4h are forex/stocks/crypto only — for indices/futures/bonds/DXY (^GSPC, GC=F, ^TNX, DX-Y.NYB) use 1h or 1day.",
       },
       outputsize: {
         type: "integer",
         description:
-          "Last N candles back from now, 1–200. Ignored if start_date+end_date are provided. For 'yesterday' use 2, not 1.",
+          "action='history' ONLY (ignored for action='quote'). Last N candles back from now, 1–200. Ignored if start_date+end_date are provided. For 'yesterday' use 2, not 1.",
       },
       start_date: {
         type: "string",
         description:
-          'Window start, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with end_date. For a single-day target use a 2-day window (start = target, end = target + 1 day).',
+          'action=\'history\' ONLY (ignored for action=\'quote\'). Window start, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with end_date. For a single-day target use a 2-day window (start = target, end = target + 1 day).',
       },
       end_date: {
         type: "string",
         description:
-          'Window end, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with start_date.',
+          'action=\'history\' ONLY (ignored for action=\'quote\'). Window end, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with start_date.',
       },
       include_chart: {
         type: "boolean",
         description:
-          'Optional, default false. When true, a candlestick chart image of the data is attached below your reply (auto — you don\'t embed it). Set true when the user asks for a chart/visual, or when a chart genuinely aids the analysis (multi-day trend, intraday session price action). Leave false for quick numeric lookups ("what was the close", "yesterday\'s high") — a chart adds latency and clutter there. Needs 3+ candles to render; ignored (implied true) when chart_only is set.',
+          'action=\'history\' ONLY (ignored for action=\'quote\'). Default false. When true, a candlestick chart image of the data is attached below your reply (auto — you don\'t embed it). Set true when the user asks for a chart/visual, or when a chart genuinely aids the analysis (multi-day trend, intraday session price action). Leave false for quick numeric lookups ("what was the close", "yesterday\'s high") — a chart adds latency and clutter there. Needs 3+ candles to render; ignored (implied true) when chart_only is set.',
       },
       chart_only: {
         type: "boolean",
         description:
-          'Optional, default false. When true, skip the OHLC text dump and return ONLY the chart. Implies a chart. Use when the user asks to see a chart with no numeric analysis ("show me the chart", "pull up X yesterday").',
+          'action=\'history\' ONLY (ignored for action=\'quote\'). Default false. When true, skip the OHLC text dump and return ONLY the chart. Implies a chart. Use when the user asks to see a chart with no numeric analysis ("show me the chart", "pull up X yesterday").',
       },
     },
-    required: ["symbol", "interval"],
+    required: ["action", "symbol"],
   },
 };
 
@@ -1237,7 +1249,7 @@ export async function executeGetMarketHistory(args: {
     }
     return (
       `Could not fetch history for "${symbol}". The symbol may be unrecognized ` +
-      `or the data source is unavailable. Try get_market_price for the current value.`
+      `or the data source is unavailable. Try action="quote" for the current value.`
     );
   }
   if (candles.length === 0) {
@@ -2732,24 +2744,43 @@ export async function executeCustomTool(
         return await scrapeUrl(url, supabase);
       }
 
-      case "get_market_price": {
+      case "get_market_data": {
+        const action = typeof args.action === "string" ? args.action : "";
         const sym = typeof args.symbol === "string" ? args.symbol : "";
-        return await executeGetMarketPrice(sym, supabase);
-      }
-
-      case "get_market_history": {
-        return await executeGetMarketHistory({
-          symbol: typeof args.symbol === "string" ? args.symbol : "",
-          interval: typeof args.interval === "string" ? args.interval : "",
-          outputsize:
-            typeof args.outputsize === "number" ? args.outputsize : undefined,
-          start_date:
-            typeof args.start_date === "string" ? args.start_date : undefined,
-          end_date:
-            typeof args.end_date === "string" ? args.end_date : undefined,
-          chart_only: args.chart_only === true,
-          include_chart: args.include_chart === true,
-        });
+        if (action === "quote") {
+          return await executeGetMarketPrice(sym, supabase);
+        }
+        if (action === "history") {
+          // Surface the missing-interval case before delegating — the
+          // downstream "Invalid interval ''" error is less actionable than
+          // this hint, which names the most common right choice.
+          const interval =
+            typeof args.interval === "string" ? args.interval.trim() : "";
+          if (!interval) {
+            return (
+              `get_market_data action="history" requires \`interval\`. ` +
+              `Common choices: "1day" for daily candles ("yesterday's range"), ` +
+              `"1h" for intraday context, "5min" for sub-hour detail. ` +
+              `Pick the coarsest that answers the question and retry.`
+            );
+          }
+          return await executeGetMarketHistory({
+            symbol: sym,
+            interval,
+            outputsize:
+              typeof args.outputsize === "number" ? args.outputsize : undefined,
+            start_date:
+              typeof args.start_date === "string" ? args.start_date : undefined,
+            end_date:
+              typeof args.end_date === "string" ? args.end_date : undefined,
+            chart_only: args.chart_only === true,
+            include_chart: args.include_chart === true,
+          });
+        }
+        return (
+          `get_market_data: invalid action "${action}". ` +
+          `Use action="quote" for current price, action="history" for OHLC candles.`
+        );
       }
 
       case "generate_chart": {
@@ -3212,8 +3243,7 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
   return [
     searchWebTool,
     scrapeUrlTool,
-    getMarketPriceTool,
-    getMarketHistoryTool,
+    getMarketDataTool,
     generateChartTool,
     analyzeImageTool,
     getRecentOrionBriefingsTool,
