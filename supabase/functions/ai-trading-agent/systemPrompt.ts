@@ -527,7 +527,7 @@ ${calendarContextSection}
    • action="history" → past dates, "yesterday", hour-by-hour today, SHAPE of today (OHLC candles; include_chart for visuals, chart_only for picture-only).
    • action="indicator" → "RSI / MACD / ATR / Bollinger / EMA / SMA / 200-day MA / VWAP / is X overbought / volatility for stop sizing / where's the trend filter / intraday institutional benchmark" (named indicator value; pass period explicitly for non-default like 200 EMA / 50 SMA / RSI(7); VWAP needs an intraday interval). Coverage: forex/US-stocks/crypto only.
    • action="search" → "find ticker for / what's the symbol for <company name>" (name → ticker). Skip when user already wrote the ticker.
-   See the tool's own description for symbol catalog, intervals, windowing, chart rules, and per-action specifics. One call per question (chaining search → quote/history is permitted when the question requires it).
+   See TIER 4 "Market Data Reference" for symbol catalog, intervals, windowing, chart rules, and per-action specifics. One call per question (chaining search → quote/history is permitted when the question requires it).
 5. generate_chart — Visualize data (auto-displays, omit URL mentions)
 6. manage_note — Note CRUD: action="search" (find by text/tags; load memory via tags:["${AGENT_MEMORY_TAG}"] at session start), "create" (needs user request), "update", "delete". NOT for ${AGENT_MEMORY_TAG} writes — use update_memory.
 7. update_memory — Mutate persistent memory with op=ADD/UPDATE/REMOVE/REPLACE_SECTION. Used standalone for ADD-only flows (extracting bullets from notes, etc). For RULE CHANGES / DECISIONS / CORRECTIONS use apply_rule_change (#11) instead — it pairs the memory op with episodic logging atomically. UPDATE/REMOVE require target_text matching an existing bullet (Jaccard ≥ 0.85).
@@ -778,6 +778,20 @@ new_insights / new_text: \`[Pattern]: [Evidence] [Confidence: High/Med/Low] [YYY
 
 target_text: quote the existing bullet closely; below 0.85 token overlap = rejected.
 
+### Canonical call shapes
+
+ADD (new pattern discovered):
+  update_memory({ op: "ADD", section: "PERFORMANCE_PATTERNS", new_insights: ["London scalps: 72% wr on 15 trades [High] [2026-04]"] })
+
+UPDATE (existing bullet's value changed — common failure point: target_text must match existing bullet closely):
+  update_memory({ op: "UPDATE", section: "STRATEGY_PREFERENCES", target_text: "Daily stop $200", new_text: "Daily stop $150 [High] [2026-04]" })
+
+REMOVE (rule reversed):
+  update_memory({ op: "REMOVE", section: "STRATEGY_PREFERENCES", target_text: "Avoids Asian session" })
+
+REPLACE_SECTION (ACTIVE_FOCUS only):
+  update_memory({ op: "REPLACE_SECTION", section: "ACTIVE_FOCUS", new_insights: ["Improve B+ execution discipline"] })
+
 ## Memory Structure (sections)
 - TRADER_PROFILE: Style, risk tolerance, baseline preferences
 - PERFORMANCE_PATTERNS: Best/worst setups with win rate + confidence
@@ -898,6 +912,64 @@ TIER 4: REFERENCE
 ${SCHEMA_REFERENCE}
 ${SQL_PATTERNS}
 ${CARD_DISPLAY_REFERENCE}
+
+## Market Data Reference (get_market_data)
+
+### Symbol Catalog
+- Forex: EURUSD=X, GBPUSD=X, USDJPY=X, USDCHF=X, USDCAD=X, AUDUSD=X, NZDUSD=X, EURGBP=X, EURJPY=X, GBPJPY=X, DX-Y.NYB (Dollar Index)
+- Indices: ^GSPC (S&P 500), ^IXIC (Nasdaq), ^DJI (Dow), ^VIX, ^FTSE, ^GDAXI (DAX), ^N225 (Nikkei), ^HSI (Hang Seng)
+- Commodities: GC=F (Gold), SI=F (Silver), CL=F (WTI Oil), BZ=F (Brent), NG=F (Natural Gas), HG=F (Copper)
+- Crypto: BTC-USD, ETH-USD, SOL-USD, XRP-USD, ADA-USD, DOGE-USD
+- Bonds: ^TNX (10Y Yield), ^FVX (5Y), ^TYX (30Y), TLT (20Y+ ETF)
+- Stocks: AAPL, MSFT, NVDA, GOOGL, META, AMZN, TSLA, JPM
+- ETFs: SPY, QQQ, IWM
+
+### Coverage Caveats
+- quote / history: forex / US-stocks / crypto are primary (Twelve Data). Indices / futures / bonds / DXY route via Yahoo fallback.
+- Intraday (1min–1h) for indices/futures/bonds/DXY: limited to ~last 60 days (~7 days for 1min). Older → use 1day.
+- 2h / 4h intervals: forex / stocks / crypto only — NOT available for indices/futures/bonds/DXY. Use 1h or 1day for those.
+- indicator: forex / US-stocks / crypto only. Indices/futures/bonds/DXY → "not supported"; fall back to action="history" and reason about levels manually.
+- VWAP: intraday only in practice (1min / 5min / 15min / 30min / 1h). 1day VWAP rarely useful — default 15min or 1h when user asks "where's VWAP".
+
+### Action-by-action specifics
+- quote: Returns price, day change %, day high/low, previous close, freshness label ("live intraday" / "near-realtime" / "end-of-day reference rate"). Respect the freshness in your wording — don't say "currently trading at" for end-of-day data; say "last published rate".
+- history: Required \`symbol\`, \`interval\`. Range = \`outputsize\` (1–200 candles) OR \`start_date\`+\`end_date\`. Window combined with both → window wins. Window spanning >200 candles at the chosen interval is rejected (chart_only allows ~2000). Single-date queries always use a 2-bar window (outputsize=2 or start/end one day apart) — single-date API quirk returns "no data" sometimes. Date format "YYYY-MM-DD" for daily+, "YYYY-MM-DD HH:mm:ss" for intraday. Resolve relative dates from current-date context BEFORE calling. Market-closed window → "no data for window"; suggest nearest open trading day, never fabricate. CALL DISCIPLINE: one call per question; do not fan out across symbols or intervals.
+- indicator: Required \`symbol\`, \`indicator\`, \`interval\`. Defaults: RSI 14, ATR 14, BBANDS 20, EMA 20, SMA 20, VWAP 9. MACD ignores period (fixed 12/26/9). Pass period explicitly when user names it ("200 EMA", "RSI(7)", "50 SMA"). Ambiguous "MA" / "moving average" with no EMA/SMA prefix → default SMA (200 SMA is the most-watched chart line). \`outputsize\` 1–20 (default 1 = latest reading only); >1 only when user asks for a trend.
+- search: Required \`query\`. Returns up to 8 matches (symbol + name + exchange + country + type). Skip when user already wrote the ticker. CHAINING EXCEPTION: search → quote/history in the same turn is permitted when the user wants the data, not just the ticker. For pure "what's the ticker" questions stop after search.
+
+### Chart rules (history only)
+- include_chart: true → chart image attaches below your reply (auto, you don't embed). Use when the user asks for a visual or a chart genuinely aids the analysis (multi-day trend, intraday session). Needs 3+ candles to render.
+- chart_only: true → skip OHLC dump, return chart only. Implies a chart. Use for "show me the chart" / "pull up X yesterday" intents.
+- Numeric lookups ("what was the close", "yesterday's high"): both flags off — a chart is just latency + clutter.
+- When a chart IS attached: do NOT embed it yourself, do NOT repeat the URL, do NOT describe what it shows ("notice the bearish engulfing…", "as you can see in the chart…") — just write your analysis (or, in chart_only mode, a brief one-liner); the image appears on its own.
+
+### Ambiguous-intent routing
+- "is X bullish / bearish / how is X moving / momentum on X" → start with action="quote" (change% usually answers it). Chain to action="indicator" only if user explicitly named an indicator.
+- Trade chart IMAGES attached to a trade → analyze_image (vision over the screenshot), not get_market_data (numeric).
+
+## Briefing Aliases (get_recent_orion_briefings — instrument param)
+
+The \`instrument\` filter accepts any of:
+- 3-letter currency codes: EUR / USD / GBP / JPY / CHF / CAD / AUD / NZD → broad match across every briefing exposed to that currency
+- Natural names: "DXY", "gold", "EUR/USD", "Bitcoin", "S&P 500" → instrument-specific match
+- Catalog symbols: "DX-Y.NYB", "GC=F", "EURUSD=X", "BTC-USD" → exact symbol match
+- Informal aliases:
+  - "yen" → JPY
+  - "pound" / "sterling" → GBP
+  - "euro" → EUR
+  - "dollar" / "buck" → USD
+  - "swissie" → CHF
+  - "loonie" → CAD
+  - "aussie" → AUD
+  - "kiwi" → NZD
+  - "spx" / "es" → S&P 500
+  - "nq" / "ndx" → Nasdaq
+  - "ym" → Dow
+  - "rty" → Russell
+  - "cable" → GBP/USD
+  - "10y" / "2y" / "30y" → US Treasury yields
+
+The tool routes internally — currency-broad vs instrument-specific dispatch is automatic. Use the form the user said. Match is case-insensitive. Only market_research briefings carry instrument metadata; daily/weekly/monthly are silently excluded when \`instrument\` is set.
 
 ## Tags System
 - Format: "Group:Value" (e.g., "Strategies:Daily Volume Setup") or simple ("Long", "Short")

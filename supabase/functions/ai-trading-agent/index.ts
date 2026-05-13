@@ -551,10 +551,14 @@ async function callGemini(
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
     tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
-    // Force function calling on initial request to prevent "I will search..." without action
+    // AUTO lets the model skip tool calls on pure conversational turns
+    // (thanks, clarifications, summaries) — the previous "ANY" hammer forced
+    // a useless function call on every request, doubling round-trips.
+    // TIER 1 ACTION-ORIENTED rule + the text_reset SSE path in the streaming
+    // call cover the "narrate then call" drift case.
     tool_config: tools.length > 0 ? {
       function_calling_config: {
-        mode: "ANY"  // Forces model to call at least one function
+        mode: "AUTO"
       }
     } : undefined,
     generationConfig: {
@@ -652,10 +656,13 @@ async function callGeminiStreaming(
     { role: 'user', parts: userMessageParts }
   ];
 
-  // When images are present, use AUTO mode so model can respond directly to images
-  // without being forced to call a tool. Otherwise use ANY to prevent "I will search..." without action
-  const hasImages = userImages && userImages.length > 0;
-  const toolMode = hasImages ? "AUTO" : "ANY";
+  // AUTO across the board — model decides whether the turn needs a tool.
+  // Forcing "ANY" doubled round-trips on conversational replies (thanks,
+  // clarifications, post-tool synthesis). The text_reset SSE path below
+  // already handles the "narrate then call" drift case, and TIER 1
+  // ACTION-ORIENTED in the system prompt enforces tool-with-narration.
+  // hasImages retained for future per-mode tweaks but no longer needed here.
+  const toolMode = "AUTO";
 
   const requestBody = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -2017,27 +2024,20 @@ Deno.serve(async (req: Request) => {
       throw new Error('Supabase configuration missing');
     }
 
-    // Get MCP tools (with caching) filtered to the ones this agent needs —
-    // execute_sql for queries and list_tables for schema discovery. Any other
-    // MCP tools would just bloat the Gemini tool registry.
+    // Pre-load in parallel — MCP tools, agent memory, and the GUIDELINE
+    // reminder are all independent reads. MCP fetch is cached for 5 min but
+    // a cold miss costs a network round-trip we don't need to serialize.
     log(`Getting MCP tools for project ${projectRef}`, 'info');
-    const geminiMcpTools = await getCachedMCPTools(
-      projectRef,
-      supabaseAccessToken,
-      ['execute_sql', 'list_tables']
-    );
+    const [geminiMcpTools, preloadedMemory, guidelineReminder] = await Promise.all([
+      getCachedMCPTools(projectRef, supabaseAccessToken, ['execute_sql', 'list_tables']),
+      fetchMemory(userId, calendarId),
+      fetchGuidelineReminder(userId, calendarId),
+    ]);
     log(`Using ${geminiMcpTools.length} MCP tools (filtered)`, 'info');
 
     // Combine all tools (MCP + Custom)
     const customTools = getAllCustomTools();
     const allTools = [...geminiMcpTools, ...customTools];
-
-    // Pre-load agent memory (enforces memory availability from turn 0) and
-    // the GUIDELINE-note reminder in parallel — both are independent reads.
-    const [preloadedMemory, guidelineReminder] = await Promise.all([
-      fetchMemory(userId, calendarId),
-      fetchGuidelineReminder(userId, calendarId),
-    ]);
 
     // Pre-fetch focused trade data so the AI has full context from turn 0
     const preloadedTrade = focusedTradeId

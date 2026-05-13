@@ -19,13 +19,6 @@ import {
 } from "../_shared/twelvedata.ts";
 import {
   SLASH_COMMAND_TAG,
-  GAME_PLAN_TAG,
-  LESSON_LEARNED_TAG,
-  RISK_MANAGEMENT_TAG,
-  PSYCHOLOGY_TAG,
-  GENERAL_TAG,
-  STRATEGY_TAG,
-  INSIGHT_TAG,
   AGENT_MEMORY_TAG,
 } from "../_shared/noteTags.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -149,180 +142,58 @@ export const scrapeUrlTool: GeminiFunctionDeclaration = {
 export const getMarketDataTool: GeminiFunctionDeclaration = {
   name: "get_market_data",
   description:
-    `Universal market data tool. Pick ONE \`action\`.
-
-ACTION ROUTING — pick by the user's verb:
-- "What is X right now / today's range / where is X trading" → action="quote"
-- "What did X do yesterday / on date Y / hour-by-hour this morning / chart of last week" → action="history"
-- "RSI / MACD / ATR / Bollinger Bands / EMA / SMA / 200-day moving average / VWAP / is X overbought / volatility on X / where's the trend filter / institutional intraday benchmark" → action="indicator"
-- "Find the ticker for / what's the symbol for / look up <company name>" → action="search"
-- AMBIGUOUS "is X bullish/bearish / how is X moving / momentum on X" → start with action="quote" (it includes change% which usually answers it). Only chain to action="indicator" if the user explicitly named one (RSI/MACD/etc).
-- For chart IMAGES attached to a trade, use analyze_image (vision over a screenshot); this tool is numeric data.
-
-═══════════════════════════════════════════════════════════════════════════════
-SHARED — SYMBOL CATALOG (quote / history / indicator)
-═══════════════════════════════════════════════════════════════════════════════
-  Forex: EURUSD=X, GBPUSD=X, USDJPY=X, USDCHF=X, USDCAD=X, AUDUSD=X, NZDUSD=X, EURGBP=X, EURJPY=X, GBPJPY=X, DX-Y.NYB (Dollar Index)
-  Indices: ^GSPC (S&P 500), ^IXIC (Nasdaq), ^DJI (Dow), ^VIX, ^FTSE, ^GDAXI (DAX), ^N225 (Nikkei), ^HSI (Hang Seng)
-  Commodities: GC=F (Gold), SI=F (Silver), CL=F (WTI Oil), BZ=F (Brent), NG=F (Natural Gas), HG=F (Copper)
-  Crypto: BTC-USD, ETH-USD, SOL-USD, XRP-USD, ADA-USD, DOGE-USD
-  Bonds: ^TNX (10Y Yield), ^FVX (5Y), ^TYX (30Y), TLT (20Y+ ETF)
-  Stocks: AAPL, MSFT, NVDA, GOOGL, META, AMZN, TSLA, JPM
-  ETFs: SPY, QQQ, IWM
-
-═══════════════════════════════════════════════════════════════════════════════
-action="quote" — current price + day stats
-═══════════════════════════════════════════════════════════════════════════════
-Returns: price, day change %, day high/low, previous close, freshness label.
-Required: \`symbol\`. The freshness label (e.g. "live intraday", "near-realtime", "end-of-day reference rate") MUST be respected in your wording — don't say "currently trading at" for end-of-day data; say "last published rate" instead.
-
-═══════════════════════════════════════════════════════════════════════════════
-action="history" — historical OHLC candles
-═══════════════════════════════════════════════════════════════════════════════
-Use when the question is about PAST data OR the SHAPE of today (multi-bar pattern), not a current single price:
-- past calendar dates ("yesterday's range", "what did X do on date Y")
-- intraday detail TODAY at finer granularity than action="quote" gives ("what did EUR/USD do hour by hour this morning", "today's price action so far")
-- candle context around a logged trade's timestamp
-
-DO NOT use for: "where is X right now", "what's the price of X", "today's high so far" (single number, no shape) — use action="quote" (it already returns today's O/H/L/C plus previous close).
-
-Required: \`symbol\`, \`interval\`.
-
-COVERAGE: forex pairs, US stocks, crypto (primary). Indices, futures, bonds, DXY via fallback. Daily/weekly/monthly works for all going back years. INTRADAY (1min–1h) for indices/futures/bonds/DXY is limited to ~last 60 days (and ~7 days for 1min) — beyond that, use a daily interval.
-
-INTERVALS: 1min, 5min, 15min, 30min, 1h, 2h, 4h, 1day, 1week, 1month. Pick the COARSEST interval that answers the question — "yesterday's range" is 1day with outputsize=2, NOT 1min. NOTE: 2h and 4h are NOT available for indices/futures/bonds/DXY — for those use 1h or 1day.
-
-RANGE: pass EITHER \`outputsize\` (last N candles back from now), OR \`start_date\`+\`end_date\` (specific window). If both are passed, the window wins and \`outputsize\` is ignored.
-
-OUTPUTSIZE: integer 1–200. Requests >200 are truncated.
-
-WINDOW TOO BIG: a start_date/end_date window spanning more than ~200 candles at the chosen interval is rejected — retry with the coarser interval the message names, not the same granularity. EXCEPTION: in chart_only mode the limit is ~2000 candles (a full day of 5-min bars ~288, or a week of 5-min ~2000 is fine).
-
-DATE FORMAT: "YYYY-MM-DD" for daily+, "YYYY-MM-DD HH:mm:ss" for intraday. Resolve relative dates ("yesterday", "this morning") from your current-date context BEFORE calling. For a single target date, ALWAYS query a 2-bar window (outputsize=2, or start/end one day apart) — single-date queries occasionally return "no data" by API quirk.
-
-MARKET CLOSED: if the window falls outside trading hours (forex weekends, equity holidays), the tool returns "no data for window" — say so and suggest the nearest open trading day; do NOT fabricate a price.
-
-CALL DISCIPLINE: one call per question; never fan out across symbols or intervals in a single turn. Output is oldest→newest OHLC lines.
-
-CHARTS (history only): a candlestick image is attached below your reply ONLY when you ask for one — set \`include_chart: true\` (user wants a visual, or a chart genuinely helps a multi-day/intraday-session analysis) or \`chart_only: true\` (user wants ONLY the picture, no numbers — skips the OHLC dump). For plain numeric lookups ("what was the close", "yesterday's high") set neither — a chart there is just latency + clutter. When a chart IS attached: do NOT embed it yourself, do NOT repeat the URL, do NOT describe what it shows ("notice the bearish engulfing…", "as you can see in the chart…") — just write your analysis (or, in chart_only mode, a brief one-liner); the image appears on its own. Needs 3+ candles to render.
-
-═══════════════════════════════════════════════════════════════════════════════
-action="indicator" — technical indicators (RSI / MACD / ATR / BBANDS / EMA / SMA / VWAP)
-═══════════════════════════════════════════════════════════════════════════════
-Use when the user asks for a NAMED indicator value or a question that requires one (overbought/oversold, volatility for stop sizing, trend strength, band squeeze, "above/below the 200 MA"). Do NOT use to compute indicators yourself from history candles — call this directly.
-
-Required: \`symbol\`, \`indicator\`, \`interval\`.
-
-INDICATORS:
-- RSI    — 0-100 momentum oscillator. >70 overbought, <30 oversold. Divergence signal. Default period=14.
-- MACD   — trend/momentum. Returns {macd, signal, hist}. Positive hist = bullish momentum. Fast=12 slow=26 signal=9 (not tunable here).
-- ATR    — average true range in price units. NOT predictive — use for stop placement (1.5-2x ATR trail) and position sizing. Default period=14.
-- BBANDS — volatility envelope {upper, middle, lower}. Default period=20. Squeeze = bands tight = breakout pending.
-- EMA    — exponential moving average. Default period=20. Pass period explicitly for the common trend filters: 50 (medium), 200 (regime). Reacts faster than SMA — use for entry timing.
-- SMA    — simple moving average. Default period=20. Pass period explicitly for the major levels: 50, 100, 200. Use for regime / institutional levels — 200 SMA is the most-watched line on charts.
-- VWAP   — volume-weighted average price. Day-traders' institutional benchmark for "fair value" intraday — price above VWAP = bullish session, below = bearish. INTRADAY ONLY in practice (1min / 5min / 15min / 30min / 1h). A 1day VWAP is just that single day's value and rarely useful; default to 15min or 1h when the user asks "where's VWAP". Default period=9 (moving VWAP over last 9 bars).
-
-COVERAGE: forex / US stocks / crypto only on free tier. Indices/futures/bonds/DXY return "not supported" — for those, fetch action="history" and reason about levels manually.
-
-NO DATA: if the symbol has no recent bars (market closed, weekend, holiday, fresh listing), the tool returns "No <indicator> data" — say so and suggest the nearest open trading day; do NOT fabricate a value.
-
-OUTPUTSIZE: integer 1–20 (default 1 = just the latest reading). Use >1 only when the user asks to see the trend ("RSI for the last week"). Values outside the range are silently clamped (passing 100 becomes 20).
-
-PERIOD: optional. Override when the user names one — common cases: "200 EMA on SPY" → period=200, "RSI(7)" → period=7, "50 SMA" → period=50. MACD ignores period (uses fixed 12/26/9). When the user says just "EMA" or "SMA" with no number, default 20. VWAP defaults to 9.
-
-AMBIGUOUS "MA" / "moving average" with no EMA/SMA prefix → default indicator="SMA" (the most-watched chart line is the 200 SMA, so SMA matches user expectation better than EMA when unspecified).
-
-═══════════════════════════════════════════════════════════════════════════════
-action="search" — fuzzy symbol resolution
-═══════════════════════════════════════════════════════════════════════════════
-Use when the user names a company / asset by name and you don't already know the catalog symbol ("find the ticker for Tesla", "what's the symbol for Banco Santander", "is there an ETF for clean energy"). Returns up to 8 matches with symbol + name + exchange + country + type.
-
-Required: \`query\`.
-
-WHEN NOT TO USE: if the user already wrote the ticker ("AAPL", "EURUSD=X"), skip search and go straight to action="quote" or action="history". This action is for resolving names → tickers, not double-checking known tickers.
-
-CHAINING (EXPLICIT EXCEPTION to "one call per question"): when search returns one obvious match AND the user wants the data (not just the ticker), chain directly to action="quote" or action="history" in the SAME turn — e.g. "what's Tesla doing" → search("Tesla") → quote("TSLA") → respond. For pure "what's the ticker for X" questions, stop after search.
-
-═══════════════════════════════════════════════════════════════════════════════
-BEFORE CALLING — quick checklist
-═══════════════════════════════════════════════════════════════════════════════
-1. \`action\`      — "quote" (current price) | "history" (past/shape) | "indicator" (RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP) | "search" (name → ticker).
-2. \`symbol\`      — catalog format. Required for quote/history/indicator. (search uses \`query\` instead.)
-3. If history/indicator: \`interval\` is REQUIRED. Pick the COARSEST that answers (yesterday → 1day, this morning → 1h). Indices/futures/bonds/DXY: NO 2h/4h. VWAP: intraday only (1min–1h).
-4. If history: pick range — \`outputsize\` OR \`start_date\`+\`end_date\`. Single date → 2-bar window.
-5. If history: chart flags — \`include_chart\` (analysis + visual) or \`chart_only\` (picture-only). OFF for numeric lookups.
-6. If indicator: \`indicator\` enum (RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP). Free-tier coverage: forex/US-stocks/crypto only.
-7. If search: \`query\` (free text — company or asset name).`,
+    `Universal market data. Pick ONE \`action\`: "quote" (current price + day stats), "history" (OHLC candles for past dates / today's shape), "indicator" (RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP), "search" (resolve company name → ticker). See TIER 4 MARKET DATA REFERENCE in the system prompt for the symbol catalog, indicator defaults, asset-class coverage caveats, and chart rules. Tool dispatcher validates per-action required params server-side.`,
   parameters: {
     type: "object",
     properties: {
       action: {
         type: "string",
         enum: ["quote", "history", "indicator", "search"],
-        description:
-          'Which data to fetch. "quote" — current price + day stats ("right now / today / where is X trading"). "history" — OHLC candles for past or shape-of-today ("yesterday", a specific date, hour-by-hour, candle context for a logged trade). "indicator" — named technical indicator value (RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP — overbought, volatility, momentum, bands, moving averages, intraday benchmark). "search" — fuzzy resolve a company/asset NAME to a ticker (use only when you do not already know the catalog symbol). Default to "quote" if no past-time/indicator/name-lookup intent is present.',
+        description: "Sub-action. Default to 'quote' when no past-time / indicator / name-lookup intent.",
       },
       symbol: {
         type: "string",
-        description:
-          'Catalog format symbol. Examples: "EURUSD=X", "^GSPC", "GC=F", "BTC-USD", "AAPL". Required for action="quote" / "history" / "indicator". Not used for action="search" (use `query` instead).',
+        description: 'Catalog symbol (e.g. "EURUSD=X", "^GSPC", "GC=F", "BTC-USD", "AAPL"). Required for quote/history/indicator.',
       },
       indicator: {
         type: "string",
         enum: ["RSI", "MACD", "ATR", "BBANDS", "EMA", "SMA", "VWAP"],
-        description:
-          "action='indicator' ONLY (ignored otherwise). Which technical indicator to compute. RSI = momentum oscillator, MACD = trend/momentum, ATR = volatility for risk sizing, BBANDS = volatility envelope, EMA = exponential moving average (faster, entry timing), SMA = simple moving average (regime / 200-line), VWAP = volume-weighted average price (intraday institutional benchmark — INTRADAY INTERVAL ONLY).",
+        description: "Required for action='indicator'. Ignored otherwise.",
       },
       period: {
         type: "integer",
-        description:
-          "action='indicator' ONLY (ignored otherwise). Lookback period. Defaults: RSI 14, ATR 14, BBANDS 20, EMA 20, SMA 20, VWAP 9. MACD ignores this (uses fixed fast=12 slow=26 signal=9). Override when the user names a non-default — e.g. \"200 EMA on SPY\" → period=200, \"RSI(7)\" → period=7, \"50 SMA\" → period=50.",
+        description: "action='indicator' lookback. Defaults per indicator (RSI/ATR 14, BBANDS/EMA/SMA 20, VWAP 9). MACD ignores. Override when user names one.",
       },
       query: {
         type: "string",
-        description:
-          "action='search' ONLY (ignored otherwise). Free-text company or asset name to resolve to a ticker. Examples: \"Tesla\", \"Banco Santander\", \"clean energy ETF\".",
+        description: "action='search'. Free-text company / asset name.",
       },
       interval: {
         type: "string",
-        enum: [
-          "1min", "5min", "15min", "30min",
-          "1h", "2h", "4h",
-          "1day", "1week", "1month",
-        ],
-        description:
-          "Candle interval. REQUIRED for action='history' AND action='indicator' (omit for 'quote' / 'search'). Pick the coarsest interval that answers the question — 'yesterday' is 1day, not 1min. NOTE: 2h/4h are forex/stocks/crypto only — for indices/futures/bonds/DXY (^GSPC, GC=F, ^TNX, DX-Y.NYB) use 1h or 1day.",
+        enum: ["1min", "5min", "15min", "30min", "1h", "2h", "4h", "1day", "1week", "1month"],
+        description: "REQUIRED for history + indicator. Pick coarsest that answers. Indices/futures/bonds/DXY: no 2h/4h. VWAP: intraday only.",
       },
       outputsize: {
         type: "integer",
-        description:
-          "action='history': last N candles back from now, 1–200 (ignored if start_date+end_date are provided; for 'yesterday' use 2 not 1). action='indicator': how many indicator points to return, 1–20 (default 1 = latest reading only). Ignored for action='quote' / 'search'.",
+        description: "history: 1–200 candles. indicator: 1–20 (default 1). Ignored if start_date+end_date set.",
       },
       start_date: {
         type: "string",
-        description:
-          'action=\'history\' ONLY (ignored for \'quote\' / \'indicator\' / \'search\'). Window start, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with end_date. For a single-day target use a 2-day window (start = target, end = target + 1 day).',
+        description: 'action="history" window start. "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with end_date.',
       },
       end_date: {
         type: "string",
-        description:
-          'action=\'history\' ONLY (ignored for \'quote\' / \'indicator\' / \'search\'). Window end, "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with start_date.',
+        description: 'action="history" window end. Pair with start_date.',
       },
       include_chart: {
         type: "boolean",
-        description:
-          'action=\'history\' ONLY (ignored for action=\'quote\'). Default false. When true, a candlestick chart image of the data is attached below your reply (auto — you don\'t embed it). Set true when the user asks for a chart/visual, or when a chart genuinely aids the analysis (multi-day trend, intraday session price action). Leave false for quick numeric lookups ("what was the close", "yesterday\'s high") — a chart adds latency and clutter there. Needs 3+ candles to render; ignored (implied true) when chart_only is set.',
+        description: 'action="history". Attach candlestick chart below reply. Default false. Off for plain numeric lookups.',
       },
       chart_only: {
         type: "boolean",
-        description:
-          'action=\'history\' ONLY (ignored for action=\'quote\'). Default false. When true, skip the OHLC text dump and return ONLY the chart. Implies a chart. Use when the user asks to see a chart with no numeric analysis ("show me the chart", "pull up X yesterday").',
+        description: 'action="history". Skip OHLC dump, return chart only. Implies a chart. Use for "show me the chart" requests.',
       },
     },
-    // Only `action` is universally required. Per-action requirements
-    // (symbol for quote/history/indicator; query for search; interval for
-    // history/indicator; indicator name for indicator) are enforced
-    // server-side in the dispatcher so we can return targeted errors.
     required: ["action"],
   },
 };
@@ -376,30 +247,7 @@ export const generateChartTool: GeminiFunctionDeclaration = {
 export const updateMemoryTool: GeminiFunctionDeclaration = {
   name: "update_memory",
   description:
-    `Mutate your persistent memory with one of four ops:
-
-- ADD (default): append new bullets to a section. The server dedups against existing bullets — provide ONLY new information.
-- UPDATE: replace ONE existing bullet with refined text. Use when a fact changed but the topic is the same (e.g. user changed daily stop from $200 to $150 and the old "$200 stop" bullet is now wrong).
-- REMOVE: delete ONE existing bullet that is no longer true (e.g. user no longer trades a session they used to avoid).
-- REPLACE_SECTION: replace the entire ACTIVE_FOCUS section in one shot. Only valid for ACTIVE_FOCUS — other sections must use ADD/UPDATE/REMOVE.
-
-UPDATE and REMOVE identify the target via fuzzy text matching (Jaccard ≥ 0.85). If multiple bullets match or none match, the call is rejected — you'll receive the section's current contents to retry with a more specific target_text.
-
-SECTIONS:
-- TRADER_PROFILE — style, risk tolerance, baseline preferences
-- PERFORMANCE_PATTERNS — setups/sessions that work, with win rates + evidence
-- STRATEGY_PREFERENCES — user-stated rules, entry criteria, risk management
-- PSYCHOLOGICAL_PATTERNS — emotional triggers, tilt patterns, behavioral biases
-- LESSONS_LEARNED — errors to avoid, corrections, communication preferences
-- ACTIVE_FOCUS — current goals (this is the only section that supports REPLACE_SECTION)
-
-FORMAT each insight as: "[Pattern/Rule]: [Evidence] [Confidence: High/Med/Low] [YYYY-MM]"
-
-EXAMPLES:
-ADD:    op="ADD",    section="PERFORMANCE_PATTERNS", new_insights=["London scalps: 72% wr on 15 trades [High] [2026-04]"]
-UPDATE: op="UPDATE", section="STRATEGY_PREFERENCES", target_text="Daily stop $200", new_text="Daily stop $150 [High] [2026-04]"
-REMOVE: op="REMOVE", section="STRATEGY_PREFERENCES", target_text="Avoids Asian session"
-REPLACE_SECTION: op="REPLACE_SECTION", section="ACTIVE_FOCUS", new_insights=["Improve B+ execution discipline"]`,
+    `Mutate persistent memory. op=ADD (default) appends bullets; UPDATE replaces one bullet via target_text+new_text; REMOVE deletes one via target_text; REPLACE_SECTION rewrites entire ACTIVE_FOCUS section. UPDATE/REMOVE need Jaccard ≥0.85 against an existing bullet. For rule-change / decision / correction triggers use apply_rule_change instead (atomic pairing). See TIER 3 in the system prompt for sections, format, and op routing.`,
   parameters: {
     type: "object",
     properties: {
@@ -453,34 +301,7 @@ REPLACE_SECTION: op="REPLACE_SECTION", section="ACTIVE_FOCUS", new_insights=["Im
 export const applyRuleChangeTool: GeminiFunctionDeclaration = {
   name: "apply_rule_change",
   description:
-    `ATOMIC PAIRING: logs an episodic event AND mutates core memory in a SINGLE call. Use this whenever the user changes a rule, makes a decision, or corrects something — INSTEAD OF calling record_event + update_memory separately.
-
-WHEN TO CALL:
-- User states they CHANGED, DECIDED, CORRECTED, TIGHTENED, LOOSENED, SWITCHED, or PIVOTED something.
-- User says "I've decided", "I'm changing", "from now on", "going forward", "actually", "you're wrong", "no it's", "let's change".
-- These triggers previously routed to record_event — now route to apply_rule_change so the stable memory state stays in sync with the event log.
-
-WHEN NOT TO CALL (use record_event alone instead):
-- You observed a pattern from data (no rule change) → record_event(pattern_observed)
-- A strategy was discussed but no rule change was decided → record_event(strategy_discussion)
-- You're extracting bullets from a note → update_memory(op=ADD)
-
-MEMORY OP CHOICE:
-- memory_op=UPDATE — for CHANGED facts: replace one bullet (provide target_text + new_text)
-- memory_op=REMOVE — for REVERSED preferences: delete one bullet (provide target_text)
-- memory_op=ADD — for genuinely-NEW rules with no existing bullet to update (provide new_insights)
-
-If memory_op rejection happens (no match / multi-match), the event is still logged; retry the memory leg only by calling update_memory directly with a sharper target_text.
-
-Example — user says "I'm tightening my max leverage from 2% to 1.5%":
-  apply_rule_change(
-    event_type="rule_changed",
-    summary="User tightened max leverage from 2% to 1.5%",
-    memory_op="UPDATE",
-    memory_section="STRATEGY_PREFERENCES",
-    target_text="Leverage Min 0.5% Max 2%",
-    new_text="Leverage: Min 0.5%, Max 1.5% [High] [2026-04]"
-  )`,
+    `ATOMIC PAIRING: logs episodic event AND mutates core memory in ONE call. Use for every user-stated rule change / decision / correction (trigger phrases + worked example in TIER 3 R1 of the system prompt). memory_op=UPDATE for changed facts (target_text+new_text), REMOVE for reversed preferences (target_text), ADD for genuinely-new rules (new_insights). If memory leg rejects (no match / multi-match), event still logs — retry memory via update_memory with sharper target_text.`,
   parameters: {
     type: "object",
     properties: {
@@ -531,59 +352,34 @@ Example — user says "I'm tightening my max leverage from 2% to 1.5%":
  */
 export const getRecentOrionBriefingsTool: GeminiFunctionDeclaration = {
   name: "get_recent_orion_briefings",
-  description: `Retrieve recent Orion task briefings (Market Research, Daily Analysis, Weekly Review, Monthly Rollup) that Orion (You) has already sent this user.
-
-Use this whenever the user references a briefing or alert you sent — whether past or just-delivered. Trigger signals:
-- Backward refs: "what did you say about…", "your last alert", "summarize your briefings this week"
-- Forward refs: "new briefing is out", "the latest briefing", "this briefing", "the alert you just sent"
-- Implicit refs: user cites an event/claim as being "in the briefing" or "from your alert" without quoting it in full
-
-When the user references a briefing AND asks a market/trading question, call this FIRST (before search_web) so you know what the briefing actually said — do not assume its contents from the user's paraphrase.
-
-Do NOT use this for general market questions with no briefing reference; use search_web for those.
-
-Results include: title, significance (low/medium/high), task type, plain-text body, timestamp, and the source URLs Orion saw when generating the briefing. If the user asks for deeper context on a past briefing, call scrape_url on those source URLs to read the full articles. User ID is automatically provided from context.`,
+  description: `Retrieve Orion task briefings already sent to this user (market_research / daily_analysis / weekly_review / monthly_rollup). Call this whenever the user references a briefing or alert you sent (past, just-delivered, or implicit). When the user references a briefing AND asks a market question, call this FIRST — do not paraphrase the briefing from the user's wording. Results include title, significance, task type, plain-text body, timestamp, source URLs. Chain scrape_url on source URLs for deeper context. See TIER 4 BRIEFING ALIASES in the system prompt for the instrument alias table.`,
   parameters: {
     type: "object",
     properties: {
       task_type: {
         type: "string",
-        description:
-          'Optional filter by task type. Use when the user asks about a specific type, e.g. "what did you tell me in the weekly review".',
         enum: ["market_research", "daily_analysis", "weekly_review", "monthly_rollup"],
+        description: "Optional filter by briefing type.",
       },
       instrument: {
         type: "string",
-        description:
-          'Optional filter — only applies to market_research briefings. ' +
-          'Daily/weekly/monthly briefings lack instrument metadata and are ' +
-          'silently excluded when this is set, so do NOT use this with ' +
-          'task_type="daily_analysis"/"weekly_review"/"monthly_rollup".\n\n' +
-          'Pass ANY of:\n' +
-          '- A 3-letter currency code: "EUR", "USD", "GBP", "JPY"… → broad match across every briefing exposed to that currency.\n' +
-          '- A natural instrument name: "DXY", "gold", "EUR/USD", "Bitcoin", "S&P 500" → narrow match to that specific instrument.\n' +
-          '- A catalog symbol: "DX-Y.NYB", "GC=F", "EURUSD=X", "BTC-USD" → exact symbol match.\n' +
-          '- An informal alias: "yen"→JPY, "pound"/"sterling"→GBP, "euro"→EUR, "dollar"/"buck"→USD, "swissie"→CHF, "loonie"→CAD, "aussie"→AUD, "kiwi"→NZD, "spx"/"es"→S&P 500, "nq"/"ndx"→Nasdaq, "ym"→Dow, "rty"→Russell, "cable"→GBP/USD, "10y"/"2y"/"30y"→US Treasury yields.\n\n' +
-          'The tool routes the input internally — currency-broad vs instrument-specific is automatic. Use the form the user actually said. Match is case-insensitive.',
+        description: 'Optional. Only applies to market_research (daily/weekly/monthly lack instrument metadata). Accepts: 3-letter currency code, natural name ("gold", "EUR/USD"), catalog symbol, or alias (see TIER 4 BRIEFING ALIASES). Case-insensitive.',
       },
       since_hours: {
         type: "number",
-        description:
-          "Optional: only return briefings from the last N hours. E.g. 2 for the past 2 hours, 24 for today. Default is 72 (past 3 days). Ignored when since_date is provided.",
+        description: "Past N hours. Default 72. Ignored when since_date is set.",
       },
       since_date: {
         type: "string",
-        description:
-          'Optional ISO date string (YYYY-MM-DD). Return briefings on or after this date. Use when the user references a specific historical date, e.g. "Monday two weeks ago". Takes precedence over since_hours when provided.',
+        description: 'ISO date "YYYY-MM-DD". Briefings on/after this date. Overrides since_hours.',
       },
       until_date: {
         type: "string",
-        description:
-          'Optional ISO date string (YYYY-MM-DD). Return briefings strictly before this date. Pair with since_date to target a single day, e.g. since_date:"2026-04-20", until_date:"2026-04-21".',
+        description: 'ISO date "YYYY-MM-DD". Briefings strictly before. Pair with since_date for single-day window.',
       },
       limit: {
         type: "number",
-        description: "Max briefings to return. Default 10, max 30.",
+        description: "Max results. Default 10, max 30.",
       },
     },
     required: [],
@@ -636,14 +432,7 @@ export const analyzeImageTool: GeminiFunctionDeclaration = {
 export const manageNoteTool: GeminiFunctionDeclaration = {
   name: "manage_note",
   description:
-    `Create, update, delete, or search the user's trading-calendar notes. Pick ONE \`action\`:
-
-- action="search" — find notes by text and/or tags. Use \`search_query\` and/or \`tags\`. AT SESSION START, search with tags:["${AGENT_MEMORY_TAG}"] to load your persistent memory. Returns user + AI notes; \`include_archived\` optional.
-- action="create" — make a new note. Needs \`title\` + \`content\` (plain text, no HTML). Optional \`tags\`, \`reminder_type\`/\`reminder_date\`/\`reminder_days\`. Use tags:["${SLASH_COMMAND_TAG}"] to save a reusable / command (title → autocomplete name, content → instruction). ⚠️ CANNOT create ${AGENT_MEMORY_TAG} notes — use update_memory.
-- action="update" — edit an existing note. Needs \`note_id\`. Incremental edit: set \`content_mode\` ("append" needs \`content_text\`; "replace" needs \`content_old_text\`+\`content_text\`; "remove" needs \`content_old_text\`). Full rewrite: set \`content\` (for ${SLASH_COMMAND_TAG} notes also set \`replace_full_content\`=true). May also change \`title\`/\`tags\`/\`reminder_*\`. Only AI-created notes, EXCEPT ${SLASH_COMMAND_TAG} notes (user-owned, editable on request). ⚠️ CANNOT update ${AGENT_MEMORY_TAG} notes.
-- action="delete" — remove a note. Needs \`note_id\`. Only AI-created notes, EXCEPT ${SLASH_COMMAND_TAG} notes (deletable on explicit user request).
-
-AVAILABLE TAGS: "${STRATEGY_TAG}", "${GAME_PLAN_TAG}", "${INSIGHT_TAG}", "${LESSON_LEARNED_TAG}", "${RISK_MANAGEMENT_TAG}", "${PSYCHOLOGY_TAG}", "${GENERAL_TAG}", "${SLASH_COMMAND_TAG}", "${AGENT_MEMORY_TAG}". User ID + Calendar ID come from context.`,
+    `CRUD on user's trading-calendar notes. action="search" (search_query and/or tags; at session start search tags:["${AGENT_MEMORY_TAG}"] to load memory), "create" (title + content plain-text; optional tags + reminder), "update" (note_id; incremental via content_mode or full via content; AI-created notes + ${SLASH_COMMAND_TAG} notes only), "delete" (note_id; same scope as update). ⚠️ ${AGENT_MEMORY_TAG} notes are NOT writeable here — use update_memory. See TIER 4 SCHEMA_REFERENCE for the available tag list.`,
   parameters: {
     type: "object",
     properties: {
@@ -694,10 +483,7 @@ AVAILABLE TAGS: "${STRATEGY_TAG}", "${GAME_PLAN_TAG}", "${INSIGHT_TAG}", "${LESS
 export const manageEventTool: GeminiFunctionDeclaration = {
   name: "manage_event",
   description:
-    `Read or write the episodic event log — time-stamped facts about *what happened* in past sessions (distinct from update_memory, which is the trader's stable profile). Pick ONE \`action\`:
-
-- action="record" — append an event. Needs \`event_type\` + \`summary\` (ONE past-tense third-person sentence, ≤500 chars). Optional \`tags\`, \`metadata\`. ⚠️ For rule changes / decisions / corrections, prefer apply_rule_change instead (it also syncs core memory). Use record here for pattern_observed / strategy_discussion (no rule change). Limit 50/day per (user, calendar) — on "log full", do not retry.
-- action="recall" — query the log. REQUIRES at least one filter: \`event_types\`, \`tags\` (intersection), \`since\` (ISO ts), or \`query\` (case-insensitive substring on summary). Returns ≤10 (max via \`limit\` 50), newest first. Prefer this over recall_conversations for "have we discussed X / when did we decide Y / what changed recently". Empty result IS the answer — don't fall back to other tools.`,
+    `Episodic event log — time-stamped facts about what happened (distinct from update_memory's stable profile). action="record" appends (event_type + ≤500-char past-tense summary; for rule changes / corrections / decisions prefer apply_rule_change instead — only use record here for pattern_observed / strategy_discussion). action="recall" queries — REQUIRES ≥1 filter (event_types | tags | since | query). Empty recall IS the answer; do not fall back to other tools. See TIER 3 Episodic Memory for trigger table.`,
   parameters: {
     type: "object",
     properties: {
