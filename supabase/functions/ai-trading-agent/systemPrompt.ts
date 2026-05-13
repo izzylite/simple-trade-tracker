@@ -563,7 +563,7 @@ Correct sequencing examples:
   → get_market_history (symbol: "BTC-USD", interval: "1h", start_date: "<date> 10:00:00", end_date: "<date> 18:00:00") → respond
 
 "Show me a chart of EUR/USD yesterday" / "pull up BTC daily" / "I just want to see the chart":
-  get_market_history (chart_only: true, with appropriate symbol/interval/window) → reply: brief one-liner + ![chart](URL)
+  get_market_history (chart_only: true, with appropriate symbol/interval/window) → reply: brief one-liner; the chart image attaches automatically
   NOT: chart_only=false (the user only wants the picture, not OHLC numbers)
 
 "How is AAPL doing?" / general symbol query with no time reference:

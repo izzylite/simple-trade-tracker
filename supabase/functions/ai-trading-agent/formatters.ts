@@ -691,6 +691,34 @@ export function formatResponseWithHtmlAndCitations(
     }
   }
 
+  // Auto-attach candlestick charts from get_market_history results. The tool
+  // result ends with a "Chart: <url>" line; we render that as an inline image
+  // below the AI's text — regardless of whether/how the AI echoed it. Strip
+  // any plain-text echo of the URL or the "Chart: <url>" line first so we
+  // don't double up. (The ![](quickchart) markdown form is already stripped
+  // above; this also handles bare-text echoes.)
+  const historyToolCalls = toolCalls.filter(tc => tc.name === 'get_market_history');
+  if (historyToolCalls.length > 0) {
+    const urls = new Set<string>();
+    for (const tc of historyToolCalls) {
+      if (typeof tc.result !== 'string') continue;
+      const m = tc.result.match(/Chart:\s*(https?:\/\/\S+)/);
+      if (m) urls.add(m[1]);
+    }
+    for (const url of urls) {
+      // Drop any "Chart: <url>" line or bare URL the AI may have echoed.
+      const escaped = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      cleanedMessage = cleanedMessage
+        .replace(new RegExp(`^\\s*Chart:\\s*${escaped}\\s*$`, 'gm'), '')
+        .replace(new RegExp(escaped, 'g'), '')
+        .replace(/\n\s*\n\s*\n/g, '\n\n')
+        .trim();
+      if (!cleanedMessage.includes(`[CHART_IMAGE:${url}]`)) {
+        cleanedMessage = `${cleanedMessage}\n\n[CHART_IMAGE:${url}]`;
+      }
+    }
+  }
+
   let messageHtml = convertMarkdownToHtml(cleanedMessage, citations);
 
   // Remove "Open chart in new tab" links from HTML (after conversion)

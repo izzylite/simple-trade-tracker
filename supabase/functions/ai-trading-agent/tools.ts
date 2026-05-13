@@ -199,9 +199,9 @@ MARKET CLOSED: if the window falls outside trading hours (forex weekends, equity
 
 CALL DISCIPLINE: one call per question; never fan out across symbols or intervals in a single turn. Output is oldest→newest OHLC lines.
 
-CHART: when the result has 3+ candles, the response ends with a "Chart: <url>" line — a rendered candlestick image of the data. ALWAYS include it in your reply as a markdown image: \`![chart](URL)\` at the END of your answer (after the text). Do NOT describe what the chart shows ("notice the bearish engulfing…", "as you can see…") — the user can see it. Just embed it and move on. If the Chart line is absent (fewer than 3 candles, or render failed), don't mention a chart at all.
+CHART: when the result has 3+ candles, it ends with a "Chart: <url>" line — a rendered candlestick image. The system AUTOMATICALLY attaches that image below your reply. Do NOT embed it yourself, do NOT repeat the URL, and do NOT describe what the chart shows ("notice the bearish engulfing…", "as you can see in the chart…") — just give your analysis; the image appears on its own. If there's no "Chart:" line (fewer than 3 candles, or render failed), don't mention a chart at all.
 
-CHART-ONLY MODE: set \`chart_only: true\` when the user asks ONLY to see a chart with no numeric analysis ("show me the chart", "pull up a chart of X yesterday", "I want to look at the chart"). The tool then skips the OHLC text dump and returns just the chart URL — saves context. Your reply should be a brief one-liner ("Here's EUR/USD yesterday:") + the \`![chart](URL)\`. Default to \`false\` (data + chart) for any question that wants analysis, ranges, or specifics ("what did X do", "yesterday's range", "compare highs").`,
+CHART-ONLY MODE: set \`chart_only: true\` when the user asks ONLY to see a chart with no numeric analysis ("show me the chart", "pull up a chart of X yesterday", "I want to look at the chart"). The tool then skips the OHLC text dump and returns just the chart URL — saves context. Your reply should be a brief one-liner ("Here's EUR/USD yesterday:"); the chart image attaches automatically below it. Default to \`false\` (data + chart) for any question that wants analysis, ranges, or specifics ("what did X do", "yesterday's range", "compare highs").`,
   parameters: {
     type: "object",
     properties: {
