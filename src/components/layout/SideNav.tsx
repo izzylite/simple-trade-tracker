@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   Drawer,
@@ -21,33 +21,37 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SELECTED_CALENDAR_STORAGE_KEY } from '../../contexts/SelectedCalendarContext';
 import { preloadRoute } from '../../utils/routePreload';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { useCalendars } from '../../hooks/useCalendars';
+import type { Calendar } from '../../types/dualWrite';
 
 export const SIDE_NAV_WIDTH = 92;
 const APP_HEADER_HEIGHT = 64;
 const TILE_SIZE = 44;
 
 /**
- * Resolve the destination for the Home nav item. CalendarRoute writes
- * last_active_calendar_id whenever the user opens a calendar, so we can
- * usually navigate straight there and avoid the "/ -> resolver -> Navigate"
- * hop, which briefly unmounts TradeCalendarPage. If nothing is stored yet
- * (or storage is disabled) fall back to "/" — the resolver picks the right
- * calendar from there.
+ * Resolve the Home destination. Fast-path to /calendar/<id> when the stored
+ * id still maps to a non-deleted calendar — skips the "/ -> resolver -> Navigate"
+ * hop that briefly unmounts TradeCalendarPage. Falls back to "/" when the
+ * stored id is missing, deleted, or calendars haven't loaded yet, so the
+ * HomeRouteResolver can pick the correct target.
  */
-const resolveHomePath = (): string => {
+const resolveHomePath = (calendars: Calendar[] | null | undefined): string => {
+  if (!calendars || calendars.length === 0) return '/';
+  let stored: string | null = null;
   try {
-    const stored = localStorage.getItem(SELECTED_CALENDAR_STORAGE_KEY);
-    if (stored) return `/calendar/${stored}`;
+    stored = localStorage.getItem(SELECTED_CALENDAR_STORAGE_KEY);
   } catch {
-    // ignore
+    return '/';
   }
-  return '/';
+  if (!stored) return '/';
+  const exists = calendars.some((c) => c.id === stored && !c.deleted_at);
+  return exists ? `/calendar/${stored}` : '/';
 };
 
 interface NavItem {
   label: string;
-  /** Static path, OR a function evaluated at click time (used by Home). */
-  path: string | (() => string);
+  path: string;
   icon: React.ReactNode;
   /**
    * Match function — when provided, used instead of strict `path === pathname`.
@@ -55,18 +59,6 @@ interface NavItem {
    */
   match?: (pathname: string) => boolean;
 }
-
-const NAV_ITEMS: NavItem[] = [
-  {
-    label: 'Home',
-    path: resolveHomePath,
-    icon: <HomeIcon />,
-    match: (p) => p === '/' || p.startsWith('/calendar/') || p === '/dashboard',
-  },
-  { label: 'Stats', path: '/performance', icon: <PerformanceIcon /> },
-  { label: 'Notes', path: '/notes', icon: <NotesIcon /> },
-  { label: 'Events', path: '/events', icon: <EventsIcon /> },
-];
 
 /**
  * Utility-tier items live at the bottom of the rail under a hairline divider.
@@ -101,14 +93,29 @@ const SideNav: React.FC<SideNavProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
+  const { user } = useAuth();
+  const { calendars } = useCalendars(user?.uid);
 
-  const resolvePath = (item: NavItem) =>
-    typeof item.path === 'function' ? item.path() : item.path;
+  const navItems: NavItem[] = useMemo(
+    () => [
+      {
+        label: 'Home',
+        path: resolveHomePath(calendars),
+        icon: <HomeIcon />,
+        match: (p) =>
+          p === '/' || p.startsWith('/calendar/') || p === '/dashboard',
+      },
+      { label: 'Stats', path: '/performance', icon: <PerformanceIcon /> },
+      { label: 'Notes', path: '/notes', icon: <NotesIcon /> },
+      { label: 'Events', path: '/events', icon: <EventsIcon /> },
+    ],
+    [calendars]
+  );
 
   const isActive = (item: NavItem) =>
     item.match
       ? item.match(location.pathname)
-      : location.pathname === resolvePath(item);
+      : location.pathname === item.path;
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -177,6 +184,8 @@ const SideNav: React.FC<SideNavProps> = ({
         onTouchStart={preload}
         disabled={disabled}
         focusRipple
+        aria-current={active ? 'page' : undefined}
+        aria-label={label}
         sx={{
           width: '100%',
           py: 0.75,
@@ -279,12 +288,12 @@ const SideNav: React.FC<SideNavProps> = ({
       />
 
       <Stack spacing={0.25} sx={{ flex: 1, py: 1, px: 1 }}>
-        {NAV_ITEMS.map((item) =>
+        {navItems.map((item) =>
           renderItem(
             item.label,
             item.icon,
-            () => handleNavigate(resolvePath(item)),
-            { active: isActive(item), preloadPath: resolvePath(item) }
+            () => handleNavigate(item.path),
+            { active: isActive(item), preloadPath: item.path }
           )
         )}
       </Stack>
@@ -303,8 +312,8 @@ const SideNav: React.FC<SideNavProps> = ({
           renderItem(
             item.label,
             item.icon,
-            () => handleNavigate(resolvePath(item)),
-            { active: isActive(item), preloadPath: resolvePath(item) }
+            () => handleNavigate(item.path),
+            { active: isActive(item), preloadPath: item.path }
           )
         )}
       </Stack>
@@ -342,6 +351,11 @@ const SideNav: React.FC<SideNavProps> = ({
         '& .MuiDrawer-paper': {
           width: SIDE_NAV_WIDTH,
           boxSizing: 'border-box',
+          top: APP_HEADER_HEIGHT,
+          height: `calc(100% - ${APP_HEADER_HEIGHT}px)`,
+        },
+        '& .MuiBackdrop-root': {
+          top: APP_HEADER_HEIGHT,
         },
       }}
     >

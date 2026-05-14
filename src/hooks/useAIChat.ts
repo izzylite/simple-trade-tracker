@@ -54,6 +54,8 @@ const TOOL_LABELS: Record<string, string> = {
   'manage_reminder:set': 'Setting reminder',
   'manage_reminder:list': 'Checking reminders',
   'manage_reminder:cancel': 'Cancelling reminder',
+  'manage_reminder:edit': 'Editing reminder',
+  code_execution: 'Running code',
   'get_market_data:quote': 'Checking market price',
   'get_market_data:history': 'Pulling historical candles',
   'get_market_data:indicator': 'Computing indicator',
@@ -221,8 +223,35 @@ export function useAIChat({
   // metadata.triggered_by='reminder:...' to avoid fighting the optimistic
   // streaming UI on normal chat sends (where client and server use different
   // message ids).
+  //
+  // Backfill: on (re)subscribe we also fetch the conversation row once and
+  // merge any reminder messages we missed. Without this, fires that happen
+  // while the chat panel is closed never reach local state — the UI shows
+  // stale messages from the conversations-list cache until next full mount.
   useEffect(() => {
     if (!currentConversationId) return;
+
+    const mergeReminderMessages = (incoming: unknown): void => {
+      const arr = Array.isArray(incoming) ? incoming : [];
+      const reminderMsgs = arr.filter(
+        (m: any) =>
+          m && typeof m === 'object' &&
+          typeof m.metadata?.triggered_by === 'string' &&
+          m.metadata.triggered_by.startsWith('reminder:')
+      );
+      if (reminderMsgs.length === 0) return;
+      setMessages(prev => {
+        const have = new Set(prev.map(m => m.id));
+        const toAppend = reminderMsgs.filter((m: any) => !have.has(m.id));
+        if (toAppend.length === 0) return prev;
+        // Convert stored timestamps (ISO strings) back to Date for the UI.
+        const normalized = toAppend.map((m: any) => ({
+          ...m,
+          timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+        }));
+        return [...prev, ...normalized];
+      });
+    };
 
     const channel = supabase
       .channel(`ai-convo-realtime-${currentConversationId}`)
@@ -235,35 +264,24 @@ export function useAIChat({
           filter: `id=eq.${currentConversationId}`,
         },
         (payload: any) => {
-          const incoming = Array.isArray(payload?.new?.messages)
-            ? payload.new.messages
-            : [];
-          const reminderMsgs = incoming.filter(
-            (m: any) =>
-              m && typeof m === 'object' &&
-              typeof m.metadata?.triggered_by === 'string' &&
-              m.metadata.triggered_by.startsWith('reminder:')
-          );
-          if (reminderMsgs.length === 0) return;
-          setMessages(prev => {
-            const have = new Set(prev.map(m => m.id));
-            const toAppend = reminderMsgs.filter((m: any) => !have.has(m.id));
-            if (toAppend.length === 0) return prev;
-            // Convert stored timestamps (ISO strings) back to Date for the UI.
-            const normalized = toAppend.map((m: any) => ({
-              ...m,
-              timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
-            }));
-            return [...prev, ...normalized];
-          });
+          mergeReminderMessages(payload?.new?.messages);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        // SUBSCRIBED fires on first subscribe AND every reconnect — backfill
+        // each time so any reminder fires that landed during a disconnect
+        // (or while the panel was closed) get adopted on reopen/reconnect.
+        if (status !== 'SUBSCRIBED') return;
+        void conversationRepo.findById(currentConversationId).then((convo) => {
+          if (!convo) return;
+          mergeReminderMessages(convo.messages);
+        });
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentConversationId]);
+  }, [currentConversationId, conversationRepo]);
 
   /**
    * Load conversations - either trade-specific or calendar-level
@@ -563,7 +581,18 @@ export function useAIChat({
           timestamp: new Date(),
           status: 'sent'
         };
-        const updatedMessages = [...baseHistory, userMessage];
+        // Preserve reminder-fired messages from the discarded tail — they're
+        // independent events (cron-triggered, not turn-tree replies) and
+        // shouldn't disappear when the user edits an earlier message.
+        // Mirrors the server-side preservation in conversationStore.ts.
+        const preservedFires = messages
+          .slice(messageIndex)
+          .filter((m) =>
+            typeof (m as { metadata?: { triggered_by?: string } }).metadata
+              ?.triggered_by === 'string' &&
+            (m as { metadata: { triggered_by: string } }).metadata.triggered_by.startsWith('reminder:')
+          );
+        const updatedMessages = [...baseHistory, userMessage, ...preservedFires];
         setMessages(updatedMessages);
       }
       setEditingMessageId(null);

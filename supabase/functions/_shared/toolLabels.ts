@@ -43,6 +43,9 @@ export const ORION_TOOL_LABELS: Record<string, string> = {
   'manage_reminder:set': 'Setting reminder',
   'manage_reminder:list': 'Checking reminders',
   'manage_reminder:cancel': 'Cancelling reminder',
+  'manage_reminder:edit': 'Editing reminder',
+  // Gemini built-in tool (no namespacing — single label).
+  code_execution: 'Running code',
   'get_market_data:quote': 'Checking market price',
   'get_market_data:history': 'Pulling historical candles',
   'get_market_data:indicator': 'Computing indicator',

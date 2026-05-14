@@ -33,6 +33,12 @@ export interface Reminder {
   last_error: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * Shared UUID across reminders inserted in one manage_reminder(set) call.
+   * NULL for solo reminders. Used by the UI to group polling loops and
+   * multi-event batches into a single card.
+   */
+  batch_id: string | null;
   // Joined when fetched via getReminders()
   conversation_title?: string;
 }
@@ -43,7 +49,7 @@ export async function getReminders(): Promise<Reminder[]> {
     .from('reminders')
     .select(`
       id, user_id, conversation_id, trigger_at, instructions, description,
-      status, fired_at, last_error, created_at, updated_at,
+      status, fired_at, last_error, created_at, updated_at, batch_id,
       ai_conversations!inner(title)
     `)
     .eq('status', 'pending')
@@ -69,4 +75,20 @@ export async function cancelReminder(id: string): Promise<Reminder | null> {
     .maybeSingle();
   if (error) throw error;
   return (data as Reminder) ?? null;
+}
+
+/**
+ * Cancel every pending reminder sharing this batch_id atomically. Returns the
+ * cancelled rows (may be empty if none were still pending). RLS scopes the
+ * UPDATE to the current user, so cross-user batch cancels are impossible.
+ */
+export async function cancelReminderBatch(batchId: string): Promise<Reminder[]> {
+  const { data, error } = await supabase
+    .from('reminders')
+    .update({ status: 'cancelled' })
+    .eq('batch_id', batchId)
+    .eq('status', 'pending')
+    .select();
+  if (error) throw error;
+  return (data as Reminder[]) ?? [];
 }

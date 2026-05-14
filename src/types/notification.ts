@@ -6,6 +6,11 @@ export interface ReminderFiredPayload {
   reminderId: string;
   messageId: string;
   preview: string;
+  // Present when this reminder was scheduled as part of a multi-fire batch
+  // (polling loop or grouped events). Used by the UI to collapse sibling
+  // fires into a single grouped notification card. Pre-batch-id notifications
+  // omit this field entirely (treated as solo at the UI layer).
+  batchId?: string | null;
 }
 
 export interface OrionTaskResultPayload {

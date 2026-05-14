@@ -39,7 +39,152 @@ const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash';
 // Default "medium" — enough reasoning for multi-step analysis without burning
 // the token budget on shallow tool-routing queries. Flip via env to A/B.
 const THINKING_LEVEL = Deno.env.get('GEMINI_THINKING_LEVEL') ?? 'medium';
+
+// Gemini 3 mediaResolution. API expects the enum constants
+// "MEDIA_RESOLUTION_LOW" | "MEDIA_RESOLUTION_MEDIUM" | "MEDIA_RESOLUTION_HIGH"
+// (not the lowercase names from the prose docs — those return 400). Default
+// MEDIUM for chart screenshots: HIGH wastes tokens on typical resolutions,
+// LOW loses candlestick detail. Env accepts the short name for convenience.
+// See: https://ai.google.dev/gemini-api/docs/vision#media-resolution
+const MEDIA_RESOLUTION_MAP: Record<string, string> = {
+  low: 'MEDIA_RESOLUTION_LOW',
+  medium: 'MEDIA_RESOLUTION_MEDIUM',
+  high: 'MEDIA_RESOLUTION_HIGH',
+};
+const MEDIA_RESOLUTION = MEDIA_RESOLUTION_MAP[
+  (Deno.env.get('GEMINI_MEDIA_RESOLUTION') ?? 'medium').toLowerCase()
+] ?? 'MEDIA_RESOLUTION_MEDIUM';
+
+// Optional deterministic seed for testing / eval reproducibility. When unset
+// (production default) Gemini samples freely. Set GEMINI_SEED to a number to
+// pin generation — used by orion-quality-check skill to detect regressions.
+const GEMINI_SEED_RAW = Deno.env.get('GEMINI_SEED');
+const GEMINI_SEED = GEMINI_SEED_RAW && !Number.isNaN(Number(GEMINI_SEED_RAW))
+  ? Number(GEMINI_SEED_RAW)
+  : undefined;
+
+// Toggle Gemini's built-in code_execution tool. Off by default — when on, the
+// model can run Python sandboxed and return results inline. Useful for math /
+// stats calculations the agent would otherwise approximate.
+// See: https://ai.google.dev/gemini-api/docs/code-execution
+const ENABLE_CODE_EXECUTION = Deno.env.get('GEMINI_ENABLE_CODE_EXECUTION') === 'true';
+
+// Preflight countTokens guard. When a request's contents serialise larger than
+// this many KB, we call models:countTokens first and refuse if total tokens
+// would exceed PROMPT_TOKEN_LIMIT. Off by default; set GEMINI_PREFLIGHT_KB to
+// a number (e.g. 200) to enable. See: https://ai.google.dev/gemini-api/docs/tokens
+const PREFLIGHT_KB_THRESHOLD = (() => {
+  const v = Number(Deno.env.get('GEMINI_PREFLIGHT_KB'));
+  return Number.isFinite(v) && v > 0 ? v : 0; // 0 = disabled
+})();
+const PROMPT_TOKEN_LIMIT = 900_000; // ~90% of 1M context, leaves room for output
+
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+/**
+ * Build the `tools` array shape Gemini expects, combining custom function
+ * declarations with optional built-in tools (currently just code_execution).
+ * Built-ins live alongside function_declarations as sibling tool entries —
+ * the model picks the right one per call.
+ */
+function buildToolsArray(
+  customTools: GeminiFunctionDeclaration[]
+): Array<Record<string, unknown>> | undefined {
+  const entries: Array<Record<string, unknown>> = [];
+  if (customTools.length > 0) {
+    entries.push({ function_declarations: customTools });
+  }
+  if (ENABLE_CODE_EXECUTION) {
+    entries.push({ code_execution: {} });
+  }
+  return entries.length > 0 ? entries : undefined;
+}
+
+/**
+ * Build the `tool_config` block. When mixing code_execution (a built-in /
+ * server-side tool) with function_declarations, Gemini requires the
+ * include_server_side_tool_invocations flag — otherwise the API 400s with
+ * "Please enable tool_config.include_server_side_tool_invocations to use
+ * Built-in tools with Function calling."
+ */
+function buildToolConfig(
+  customTools: GeminiFunctionDeclaration[],
+  mode: 'AUTO' | 'ANY' | 'NONE'
+): Record<string, unknown> | undefined {
+  if (customTools.length === 0) return undefined;
+  const cfg: Record<string, unknown> = {
+    function_calling_config: { mode },
+  };
+  if (ENABLE_CODE_EXECUTION) {
+    cfg.include_server_side_tool_invocations = true;
+  }
+  return cfg;
+}
+
+/**
+ * Build the generationConfig shared across every Gemini call. Keeps
+ * temperature, mediaResolution, optional seed, and thinkingConfig in ONE
+ * place so a tuning change touches one spot instead of three.
+ */
+function buildGenerationConfig(maxOutputTokens: number): Record<string, unknown> {
+  const cfg: Record<string, unknown> = {
+    // Gemini 3 default — lower values cause function-calling loops.
+    temperature: 1.0,
+    maxOutputTokens,
+    // Vision token control. Set explicitly so the cost profile is deterministic.
+    mediaResolution: MEDIA_RESOLUTION,
+    thinkingConfig: { includeThoughts: true, thinkingLevel: THINKING_LEVEL },
+  };
+  if (GEMINI_SEED !== undefined) {
+    cfg.seed = GEMINI_SEED;
+  }
+  return cfg;
+}
+
+/**
+ * Preflight check using models:countTokens. Skipped (returns ok=true) when
+ * PREFLIGHT_KB_THRESHOLD is 0 (default off) or the serialised body is below
+ * the byte-size threshold. When enabled, refuses the call if the count would
+ * blow PROMPT_TOKEN_LIMIT — cheaper to fail fast than to pay for an
+ * impossible-to-fulfil request.
+ */
+async function preflightTokenCount(
+  apiKey: string,
+  contents: Array<{ role: string; parts: Array<Record<string, unknown>> }>,
+  systemInstruction: string | undefined
+): Promise<{ ok: true } | { ok: false; tokenCount: number; reason: string }> {
+  if (PREFLIGHT_KB_THRESHOLD === 0) return { ok: true };
+  const bodyForSize = { contents, systemInstruction };
+  const bytes = JSON.stringify(bodyForSize).length;
+  if (bytes / 1024 < PREFLIGHT_KB_THRESHOLD) return { ok: true };
+
+  try {
+    const url = `${GEMINI_API_BASE}/${MODEL}:countTokens?key=${apiKey}`;
+    const reqBody: Record<string, unknown> = { contents };
+    if (systemInstruction) {
+      reqBody.systemInstruction = { parts: [{ text: systemInstruction }] };
+    }
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reqBody),
+    });
+    if (!resp.ok) {
+      // Soft-fail: don't block the request because the preflight itself failed.
+      log(`Preflight countTokens HTTP ${resp.status} — skipping check`, 'warn');
+      return { ok: true };
+    }
+    const data = await resp.json();
+    const tokenCount = Number(data?.totalTokens ?? 0);
+    if (tokenCount > PROMPT_TOKEN_LIMIT) {
+      return { ok: false, tokenCount, reason: `request would use ${tokenCount} tokens, limit ${PROMPT_TOKEN_LIMIT}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    log(`Preflight countTokens threw: ${err instanceof Error ? err.message : String(err)} — skipping check`, 'warn');
+    return { ok: true };
+  }
+}
 
 function buildGeminiUrl(apiKey: string, streaming: boolean): string {
   return streaming
@@ -83,19 +228,32 @@ type ParsedFunctionCall = {
   name: string;
   args: Record<string, unknown>;
   thoughtSignature?: string;
+  /**
+   * Gemini 3 returns a unique id on every functionCall. The matching
+   * functionResponse MUST echo this id so the model maps results back to
+   * calls correctly — critical for parallel calls. Older Gemini versions
+   * (≤2.5) may omit it. See:
+   * https://ai.google.dev/gemini-api/docs/function-calling#parallel-and-compositional
+   */
+  id?: string;
 };
 
 /**
  * Extract a ParsedFunctionCall from a response Part. `thoughtSignature`
  * may live on the Part itself, nested in the functionCall object, or on a
  * preceding standalone Part — all three are captured elsewhere via rawParts
- * preservation. Here we just pull name/args for tool execution.
+ * preservation. Here we pull name/args/id for tool execution + result mapping.
  */
 function extractFunctionCall(part: Record<string, unknown>): ParsedFunctionCall | undefined {
-  const fc = part.functionCall as { name?: string; args?: Record<string, unknown>; thoughtSignature?: string } | undefined;
+  const fc = part.functionCall as {
+    name?: string;
+    args?: Record<string, unknown>;
+    thoughtSignature?: string;
+    id?: string;
+  } | undefined;
   if (!fc?.name) return undefined;
   const thoughtSignature = (part as { thoughtSignature?: string }).thoughtSignature ?? fc.thoughtSignature;
-  return { name: fc.name, args: fc.args || {}, thoughtSignature };
+  return { name: fc.name, args: fc.args || {}, thoughtSignature, id: fc.id };
 }
 
 /**
@@ -105,8 +263,10 @@ function extractFunctionCall(part: Record<string, unknown>): ParsedFunctionCall 
  * preceding the functionCall, and reconstructing loses that context.
  */
 function buildFunctionCallPart(call: ParsedFunctionCall): Record<string, unknown> {
+  const fc: Record<string, unknown> = { name: call.name, args: call.args };
+  if (call.id) fc.id = call.id;
   return {
-    functionCall: { name: call.name, args: call.args },
+    functionCall: fc,
     ...(call.thoughtSignature ? { thoughtSignature: call.thoughtSignature } : {})
   };
 }
@@ -159,15 +319,9 @@ async function callGeminiWithContents(
   // helper. Body shape mirrors `_shared/gemini.ts` so behavior stays in sync.
   const body: Record<string, unknown> = {
     contents,
-    tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
-    tool_config: tools.length > 0 ? {
-      function_calling_config: { mode: opts.mode ?? 'AUTO' }
-    } : undefined,
-    generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: opts.maxOutputTokens ?? 4000,
-      thinkingConfig: { includeThoughts: true, thinkingLevel: THINKING_LEVEL }
-    }
+    tools: buildToolsArray(tools),
+    tool_config: buildToolConfig(tools, opts.mode ?? 'AUTO'),
+    generationConfig: buildGenerationConfig(opts.maxOutputTokens ?? 4000),
   };
   if (opts.systemInstruction) {
     body.systemInstruction = { parts: [{ text: opts.systemInstruction }] };
@@ -374,9 +528,18 @@ async function sendSSE(writer: WritableStreamDefaultWriter, event: SSEEventType,
  */
 async function buildFunctionResponseParts(
   toolName: string,
-  result: string
+  result: string,
+  callId?: string
 ): Promise<Array<Record<string, unknown>>> {
   const parts: Array<Record<string, unknown>> = [];
+  // Build a functionResponse object with the optional id echoed back so
+  // Gemini 3 can map this response to the original call (essential for
+  // parallel calls; harmless when id is undefined on older models).
+  const buildFnResponse = (response: Record<string, unknown>): Record<string, unknown> => {
+    const fr: Record<string, unknown> = { name: toolName, response };
+    if (callId) fr.id = callId;
+    return { functionResponse: fr };
+  };
 
   // Check for image analysis marker
   const imageMarkerMatch = result.match(/\[IMAGE_ANALYSIS:(https?:\/\/[^\]]+)\]/);
@@ -405,12 +568,7 @@ async function buildFunctionResponseParts(
 
         // Add text instructions (without the marker)
         const textWithoutMarker = result.replace(/\[IMAGE_ANALYSIS:[^\]]+\]\n?/, '').trim();
-        parts.push({
-          functionResponse: {
-            name: toolName,
-            response: { result: textWithoutMarker }
-          }
-        });
+        parts.push(buildFnResponse({ result: textWithoutMarker }));
 
         log('Image injected successfully into conversation', 'info');
         return parts;
@@ -423,12 +581,7 @@ async function buildFunctionResponseParts(
   }
 
   // Default: just return text function response
-  parts.push({
-    functionResponse: {
-      name: toolName,
-      response: { result }
-    }
-  });
+  parts.push(buildFnResponse({ result }));
 
   return parts;
 }
@@ -550,22 +703,14 @@ async function callGemini(
   const requestBody = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
-    tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
+    tools: buildToolsArray(tools),
     // AUTO lets the model skip tool calls on pure conversational turns
     // (thanks, clarifications, summaries) — the previous "ANY" hammer forced
     // a useless function call on every request, doubling round-trips.
     // TIER 1 ACTION-ORIENTED rule + the text_reset SSE path in the streaming
     // call cover the "narrate then call" drift case.
-    tool_config: tools.length > 0 ? {
-      function_calling_config: {
-        mode: "AUTO"
-      }
-    } : undefined,
-    generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 4000,
-      thinkingConfig: { includeThoughts: true, thinkingLevel: THINKING_LEVEL }
-    }
+    tool_config: buildToolConfig(tools, 'AUTO'),
+    generationConfig: buildGenerationConfig(4000),
   };
 
   const response = await fetch(apiUrl, {
@@ -664,21 +809,26 @@ async function callGeminiStreaming(
   // hasImages retained for future per-mode tweaks but no longer needed here.
   const toolMode = "AUTO";
 
+  // Optional preflight: if the request is big (long history + images), call
+  // countTokens first and refuse if we'd exceed the model's 1M context.
+  // Disabled by default (PREFLIGHT_KB_THRESHOLD=0); set GEMINI_PREFLIGHT_KB
+  // env var to enable. Cheap way to fail fast on accidental oversize sends.
+  const preflight = await preflightTokenCount(apiKey, contents, systemPrompt);
+  if (preflight.ok === false) {
+    log(`Preflight rejected: ${preflight.reason}`, 'warn');
+    throw new Error(
+      `Request too large for the model's context window (${preflight.tokenCount} tokens). ` +
+      `Trim history or attached images and retry.`
+    );
+  }
+
   const requestBody = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
-    tools: tools.length > 0 ? [{ function_declarations: tools }] : undefined,
+    tools: buildToolsArray(tools),
     // Force function calling on initial request (unless images present - then allow direct analysis)
-    tool_config: tools.length > 0 ? {
-      function_calling_config: {
-        mode: toolMode
-      }
-    } : undefined,
-    generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 4000,
-      thinkingConfig: { includeThoughts: true, thinkingLevel: THINKING_LEVEL }
-    }
+    tool_config: buildToolConfig(tools, toolMode),
+    generationConfig: buildGenerationConfig(4000),
   };
 
   // Log request details for debugging
@@ -927,6 +1077,12 @@ function handleStreamingRequest(
       let turnCount = 0;
       const maxTurns = 15;
       const maxRetries = 3;
+      // Wall-clock budget: Supabase edge functions are hard-killed at 150s for
+      // the initial request (Free + Pro). Track turn-start so we can bail out
+      // BEFORE infra terminates us, giving the persist step a chance to run.
+      // See: https://supabase.com/docs/guides/functions/limits
+      const wallClockStartMs = Date.now();
+      const WALL_CLOCK_BUDGET_MS = 130_000; // leave ~20s for synthesis + persist
 
       // Initial streaming call with retry logic for known Gemini empty response bug
       let result = await callGeminiStreaming(
@@ -1020,6 +1176,16 @@ function handleStreamingRequest(
       while (turnCount < maxTurns) {
         turnCount++;
 
+        // Wall-clock guard: if we're nearing the 150s edge-function hard
+        // timeout, stop iterating, fall through to force-synthesis (which
+        // gets ~20s remaining), and let the persist step run. Without this
+        // the infra kills us mid-turn and the assistant message never lands.
+        const elapsedMs = Date.now() - wallClockStartMs;
+        if (elapsedMs > WALL_CLOCK_BUDGET_MS) {
+          log(`Wall-clock budget exhausted (${elapsedMs}ms / ${WALL_CLOCK_BUDGET_MS}ms) after ${turnCount} turns — breaking loop`, 'warn');
+          break;
+        }
+
         // If we have text and NO function calls, we're done (final answer)
         if (result.text && !result.functionCall && !result.functionCalls) {
           finalText = result.text;
@@ -1071,8 +1237,9 @@ function handleStreamingRequest(
             // Add to function calls history
             functionCalls.push({ name: call.name, args: call.args, result: funcResult });
 
-            // Build multimodal response parts (handles image injection)
-            const responseParts = await buildFunctionResponseParts(call.name, funcResult);
+            // Build multimodal response parts (handles image injection).
+            // Pass call.id so the functionResponse carries Gemini 3's id mapping.
+            const responseParts = await buildFunctionResponseParts(call.name, funcResult, call.id);
             userParts.push(...responseParts);
           }
 
@@ -1151,8 +1318,9 @@ function handleStreamingRequest(
             parts: singleCallModelParts
           });
 
-          // Build multimodal response parts (handles image injection)
-          const responseParts = await buildFunctionResponseParts(call.name, functionResult);
+          // Build multimodal response parts (handles image injection).
+          // Pass call.id for Gemini 3 id mapping.
+          const responseParts = await buildFunctionResponseParts(call.name, functionResult, call.id);
           conversationContents.push({
             role: 'user',
             parts: responseParts
@@ -1374,8 +1542,14 @@ function handleStreamingRequest(
       // messageHtml (which is built from the same cleaned text). finalText
       // and cleanedFinalText only diverge when reference validation stripped
       // dead trade-ref/event-ref/note-ref tags.
+      //
+      // Persist runs as a background task via EdgeRuntime.waitUntil so the DB
+      // write survives even if the streaming response window closes (the
+      // 150s initial-request limit is hard; background tasks get up to 400s
+      // on Pro). Without this, a slow turn that races the wall-clock leaves
+      // the assistant message un-persisted and the chat UI shows only the
+      // reasoning bubble. See: https://supabase.com/docs/guides/functions/limits
       if (conversationId) {
-        const persistClient = createServiceClient();
         const assistantRecord = {
           id: crypto.randomUUID(),
           role: 'assistant',
@@ -1388,16 +1562,29 @@ function handleStreamingRequest(
             ? functionCalls.map(fc => ({ name: fc.name, label: fc.name }))
             : undefined,
         };
-        const assistantPersist = await appendAssistantMessage(persistClient, {
-          conversationId,
-          userId,
-          assistantMessage: assistantRecord,
-        });
-        if (!assistantPersist.ok && !assistantPersist.deleted) {
-          log('Assistant message persist failed (streaming)', 'error', {
+        const persistTask = (async () => {
+          const persistClient = createServiceClient();
+          const assistantPersist = await appendAssistantMessage(persistClient, {
             conversationId,
-            error: assistantPersist.error,
+            userId,
+            assistantMessage: assistantRecord,
           });
+          if (!assistantPersist.ok && !assistantPersist.deleted) {
+            log('Assistant message persist failed (streaming)', 'error', {
+              conversationId,
+              error: assistantPersist.error,
+            });
+          }
+        })();
+        // EdgeRuntime is the Supabase-blessed handle for background work.
+        // Available at runtime but not in the Deno type defs; cast through
+        // globalThis to keep TS quiet without pulling in extra typings.
+        const er = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;
+        if (er?.waitUntil) {
+          er.waitUntil(persistTask);
+        } else {
+          // Local/dev fallback: just await inline.
+          await persistTask;
         }
       }
 
@@ -1543,6 +1730,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
     instructions: string;
     description: string | null;
     created_at: string;
+    batch_id: string | null;
   };
 
   // ---- 3d. Cross-check authorization vs claimed row ----
@@ -1618,7 +1806,42 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
   // at fire time), with a reminder hint appended so the model continues the
   // conversation rather than greeting fresh.
   const baseSystemPrompt = buildSecureSystemPrompt(userId, calendarId);
-  const reminderHint = `\n---\nThis turn is firing because of a reminder you (the user) set on ${claimed.created_at}.\nThe original instructions were: "${claimed.instructions}"\nConversation history follows. Respond directly as a continuation of the conversation —\ndo NOT greet the user as if starting fresh.\n`;
+
+  // Sibling awareness: when this reminder is part of a batch (polling loop or
+  // multi-event set), surface the remaining batch fires so Orion knows it's
+  // mid-loop. Without this, the model can't tell whether to say "I'll keep
+  // watching" (sibling exists) vs "this is the final check" (none left), and
+  // a cancel request for the loop wouldn't know to use batch_id.
+  let batchHint = '';
+  if (claimed.batch_id) {
+    const { data: siblingRows } = await serviceClient
+      .from('reminders')
+      .select('id, trigger_at, description')
+      .eq('batch_id', claimed.batch_id)
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+      .order('trigger_at', { ascending: true })
+      .limit(20);
+    const siblings = siblingRows ?? [];
+    if (siblings.length > 0) {
+      const nextIso = siblings[0].trigger_at;
+      batchHint =
+        `\nBATCH CONTEXT: this reminder belongs to batch_id="${claimed.batch_id}". ` +
+        `${siblings.length} more fire(s) still pending in the same batch (next at ${nextIso}). ` +
+        `If the user asks to stop / cancel / end the loop, call ` +
+        `manage_reminder(action="cancel", batch_id="${claimed.batch_id}") — ` +
+        `that cancels every sibling atomically WITHOUT touching unrelated reminders. ` +
+        `Do NOT cancel by single id when the user means the whole loop. ` +
+        `USER-FACING VOCAB: NEVER say "batch", "batch_id", "siblings", or "loop id" to the user — ` +
+        `describe the action naturally ("stopped the every-5min check", "ended the monitoring", "cancelled the price watch").\n`;
+    } else {
+      batchHint =
+        `\nBATCH CONTEXT: this is the final fire of batch_id="${claimed.batch_id}" — ` +
+        `no more siblings pending. The scheduled loop is now complete.\n`;
+    }
+  }
+
+  const reminderHint = `\n---\nThis turn is firing because of a reminder you (the user) set on ${claimed.created_at}.\nThe original instructions were: "${claimed.instructions}"\n${batchHint}Conversation history follows. Respond directly as a continuation of the conversation —\ndo NOT greet the user as if starting fresh.\n`;
   const systemPrompt = baseSystemPrompt + reminderHint;
 
   // Translate stored messages -> the {role, content} shape callGemini expects.
@@ -1679,8 +1902,19 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
 
     let turnCount = 0;
     const maxTurns = 15;
+    const reminderStartMs = Date.now();
+    const REMINDER_BUDGET_MS = 130_000;
     while (turnCount < maxTurns) {
       turnCount++;
+
+      // Same wall-clock guard as the streaming path — bail before infra kills
+      // us so the assistant reply lands in DB. The reminder fire path is a
+      // 150s initial-request too (POSTed from cron / browser local timer).
+      const elapsed = Date.now() - reminderStartMs;
+      if (elapsed > REMINDER_BUDGET_MS) {
+        log(`[reminder] Wall-clock budget exhausted (${elapsed}ms) after ${turnCount} turns — breaking loop`, 'warn');
+        break;
+      }
 
       if (result.text && !result.functionCall) {
         finalText = result.text;
@@ -1716,7 +1950,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
         ? result.rawParts
         : [buildFunctionCallPart(call)];
       conversationContents.push({ role: 'model', parts: modelTurnParts });
-      const responseParts = await buildFunctionResponseParts(call.name, functionResult);
+      const responseParts = await buildFunctionResponseParts(call.name, functionResult, call.id);
       conversationContents.push({ role: 'user', parts: responseParts });
 
       const cont = await callGeminiWithContents(
@@ -1864,6 +2098,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
           reminderId,
           messageId: newMessage.id,
           preview,
+          batchId: claimed.batch_id ?? null,
         },
       });
     if (notifErr) {
@@ -2130,6 +2365,8 @@ Deno.serve(async (req: Request) => {
     let finalText = '';
     let turnCount = 0;
     const maxTurns = 15;
+    const nonStreamStartMs = Date.now();
+    const NON_STREAM_BUDGET_MS = 130_000;
 
     // Build conversation history for multi-turn function calling.
     // systemPrompt is passed separately via the `systemInstruction` field
@@ -2145,6 +2382,14 @@ Deno.serve(async (req: Request) => {
     // Function calling loop — per Google docs, loop until no function calls remain.
     while (turnCount < maxTurns) {
       turnCount++;
+
+      // Wall-clock guard mirrors the streaming path. 150s edge-function limit
+      // is hard; bail with ~20s left so synthesis + persist can run.
+      const elapsed = Date.now() - nonStreamStartMs;
+      if (elapsed > NON_STREAM_BUDGET_MS) {
+        log(`[non-streaming] Wall-clock budget exhausted (${elapsed}ms) after ${turnCount} turns — breaking loop`, 'warn');
+        break;
+      }
 
       // Only treat text as final answer when there are NO function calls
       if (result.text && !result.functionCall) {
@@ -2202,8 +2447,9 @@ Deno.serve(async (req: Request) => {
         parts: modelTurnParts
       });
 
-      // Append function response to conversation history (handles image injection)
-      const responseParts = await buildFunctionResponseParts(call.name, functionResult);
+      // Append function response to conversation history (handles image injection).
+      // Pass call.id for Gemini 3 id mapping.
+      const responseParts = await buildFunctionResponseParts(call.name, functionResult, call.id);
       conversationContents.push({
         role: 'user',
         parts: responseParts
@@ -2396,6 +2642,8 @@ Deno.serve(async (req: Request) => {
     log('Response validated - security check passed', 'info');
 
     // ---- Persist the assistant reply at turn end ----
+    // Same waitUntil pattern as the streaming path: survives past the 150s
+    // initial-request window. See: https://supabase.com/docs/guides/functions/limits
     const assistantRecord = {
       id: crypto.randomUUID(),
       role: 'assistant',
@@ -2404,17 +2652,24 @@ Deno.serve(async (req: Request) => {
       status: 'received',
       toolCalls: functionCalls.map(fc => ({ name: fc.name, label: fc.name })),
     };
-    const assistantPersist = await appendAssistantMessage(serviceClientForPersistence, {
-      conversationId,
-      userId,
-      assistantMessage: assistantRecord,
-    });
-    if (!assistantPersist.ok && !assistantPersist.deleted) {
-      log('Assistant message persist failed (non-streaming)', 'error', {
+    const persistTask = (async () => {
+      const assistantPersist = await appendAssistantMessage(serviceClientForPersistence, {
         conversationId,
-        error: assistantPersist.error,
+        userId,
+        assistantMessage: assistantRecord,
       });
-      // Don't fail the response — the user has the text, we just couldn't store it.
+      if (!assistantPersist.ok && !assistantPersist.deleted) {
+        log('Assistant message persist failed (non-streaming)', 'error', {
+          conversationId,
+          error: assistantPersist.error,
+        });
+      }
+    })();
+    const er = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;
+    if (er?.waitUntil) {
+      er.waitUntil(persistTask);
+    } else {
+      await persistTask;
     }
 
     return new Response(JSON.stringify(formattedResponse), {

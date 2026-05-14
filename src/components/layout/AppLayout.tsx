@@ -147,7 +147,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
         component="main"
         sx={{
           flex: 1,
-          minWidth: 0,
+          minWidth: { xs: 0, lg: 360 },
           minHeight: 0,
           position: 'relative',
           // Pages that fix their own height (calendar / performance / notes /
@@ -158,7 +158,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
           // When the calendars-list inline panel and/or the global side
           // panel are open at lg+, shrink the main column to make room.
           // Only one of the two is typically open at once today, but the
-          // math tolerates both being open.
+          // math tolerates both being open. minWidth above keeps the column
+          // from collapsing if both panels open on a narrow lg viewport.
           width: {
             lg: (() => {
               const subtract: string[] = [`${SIDE_NAV_WIDTH}px`];

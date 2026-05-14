@@ -95,17 +95,33 @@ export async function appendUserMessage(
   // append. Atomic UPDATE guarded by `message_count < 100` so two-tab races
   // can't blow past the cap; if a parallel turn raced us to the cap this
   // UPDATE matches 0 rows and we return the cap error.
+  //
+  // Reminder-fired messages (metadata.triggered_by starts with "reminder:")
+  // are INDEPENDENT events, not turn-tree replies. They MUST survive an
+  // edit-resend — losing them silently destroys the user's history of
+  // every reminder fire after the edited message. We preserve any such
+  // messages from the post-truncation tail and re-attach them after the
+  // new user message.
   const existingRaw = Array.isArray(convo.messages) ? convo.messages : [];
-  const truncatedExisting = editingMessageId
-    ? (() => {
-        const idx = existingRaw.findIndex(
-          // deno-lint-ignore no-explicit-any
-          (m: any) => m && typeof m === 'object' && m.id === editingMessageId
-        );
-        return idx >= 0 ? existingRaw.slice(0, idx) : existingRaw;
-      })()
-    : existingRaw;
-  const nextMessages = [...truncatedExisting, userMessage];
+  // deno-lint-ignore no-explicit-any
+  const isReminderFire = (m: any): boolean =>
+    !!m && typeof m === 'object' &&
+    typeof m.metadata?.triggered_by === 'string' &&
+    m.metadata.triggered_by.startsWith('reminder:');
+  let truncatedExisting: unknown[] = existingRaw;
+  let preservedFires: unknown[] = [];
+  if (editingMessageId) {
+    const idx = existingRaw.findIndex(
+      // deno-lint-ignore no-explicit-any
+      (m: any) => m && typeof m === 'object' && m.id === editingMessageId
+    );
+    if (idx >= 0) {
+      truncatedExisting = existingRaw.slice(0, idx);
+      // Reminder fires from the discarded tail survive verbatim.
+      preservedFires = existingRaw.slice(idx).filter(isReminderFire);
+    }
+  }
+  const nextMessages = [...truncatedExisting, userMessage, ...preservedFires];
 
   const { data: updated, error: updateErr } = await serviceClient
     .from('ai_conversations')
