@@ -139,10 +139,13 @@ export const UserPinnedEventsProvider: React.FC<{
       const cleanedName = cleanEventNameForPinning(
         event.event_name
       ).toLowerCase();
-      const next = current.filter((p) =>
-        p.event_id
-          ? p.event_id !== event.id
-          : p.event.toLowerCase() !== cleanedName
+      const next = current.filter(
+        (p) =>
+          !(
+            p.event.toLowerCase() === cleanedName &&
+            p.impact === event.impact &&
+            p.currency === event.currency
+          )
       );
       if (next.length === current.length) return;
       setPinningEventId(event.id);
