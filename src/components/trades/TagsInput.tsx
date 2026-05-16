@@ -16,7 +16,7 @@ import {
   isGroupedTag,
   getTagGroup
 } from '../../utils/tagColors';
-import TagEditDialog from '../TagEditDialog';
+import TagFormDialog from '../TagFormDialog';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
 
@@ -173,12 +173,13 @@ const TagsInput: React.FC<TagsInputProps> = ({
       />
 
       {tagToEdit && (
-        <TagEditDialog
+        <TagFormDialog
           open={!!tagToEdit}
           onClose={() => setTagToEdit(null)}
-          tag={tagToEdit}
+          editTag={tagToEdit}
           calendarId={calendarId}
-          onSuccess={handleTagEditSuccess}
+          allTags={allTags}
+          onEditSuccess={handleTagEditSuccess}
           onDelete={handleTagDelete}
           onTagUpdated={onTagUpdated}
         />

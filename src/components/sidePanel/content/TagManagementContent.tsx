@@ -2,20 +2,13 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
   Typography,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemButton,
   IconButton,
-  Divider,
   TextField,
   InputAdornment,
   Chip,
   useTheme,
   alpha,
-  Tooltip,
   Button,
-  FormControlLabel,
   Switch,
   Select,
   MenuItem,
@@ -24,29 +17,31 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Collapse
+  Collapse,
 } from '@mui/material';
 import { scrollbarStyles } from '../../../styles/scrollbarStyles';
 import {
-  Edit as EditIcon,
   Search as SearchIcon,
   FilterList as FilterListIcon,
-  Info as InfoIcon,
   Tag as TagIcon,
   Close as CloseIcon,
   Add as AddIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon
+  ExpandLess as ExpandLessIcon,
+  KeyboardArrowRight as ChevronRightIcon,
+  AutoAwesome as SparkleIcon,
+  Star as StarIcon,
 } from '@mui/icons-material';
 import Shimmer from '../../Shimmer';
-import TagEditDialog from '../../TagEditDialog';
-import TagCreateDialog from '../../TagCreateDialog';
+import TagFormDialog from '../../TagFormDialog';
+import TagSuggestionReviewDialog from '../../TagSuggestionReviewDialog';
+import TagSelectionDialog, { SelectableItem } from '../../TagSelectionDialog';
 import {
+  getTagColor,
   getTagChipStyles,
   formatTagForDisplay,
   isGroupedTag,
   getTagGroup,
-  getUniqueTagGroups
+  getUniqueTagGroups,
 } from '../../../utils/tagColors';
 import { Calendar } from '../../../types/calendar';
 import { logger } from '../../../utils/logger';
@@ -68,7 +63,96 @@ export interface TagManagementContentProps {
   showFooter?: boolean;
   /** Called once with a function to trigger the create dialog from outside */
   onCreateReady?: (triggerCreate: () => void) => void;
+  /**
+   * Optional override — when set, parent controls what "Suggest definitions"
+   * does (e.g. routing through a custom flow). When omitted, the component
+   * opens its internal AI review dialog. Pass `null` semantics through
+   * `isReadOnly` to suppress the affordance entirely.
+   */
+  onSuggestDefinitions?: (tags: string[]) => void;
 }
+
+/**
+ * Compact coverage donut — SVG, 1-stroke arc, percentage in center.
+ * Used by the coverage card and the "all tags" KPI strip.
+ */
+const CoverageDonut: React.FC<{
+  ratio: number;
+  size?: number;
+  stroke?: number;
+  showLabel?: boolean;
+}> = ({ ratio, size = 64, stroke = 6, showLabel = true }) => {
+  const theme = useTheme();
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const filled = Math.max(0, Math.min(1, ratio)) * c;
+  const percent = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
+  return (
+    <Box sx={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={alpha(theme.palette.primary.main, 0.18)}
+          strokeWidth={stroke}
+          fill="none"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={theme.palette.primary.main}
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={`${filled} ${c}`}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </svg>
+      {showLabel && (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            lineHeight: 1,
+          }}
+        >
+          <Typography
+            component="span"
+            sx={{
+              fontSize: '0.95rem',
+              fontWeight: 700,
+              color: 'text.primary',
+              fontFeatureSettings: "'tnum' on, 'lnum' on",
+              lineHeight: 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+          >
+            {percent}
+            <Box
+              component="span"
+              sx={{
+                fontSize: '0.55rem',
+                color: 'text.secondary',
+                fontWeight: 600,
+                ml: '1px',
+                position: 'relative',
+                top: '-0.05em',
+              }}
+            >
+              %
+            </Box>
+          </Typography>
+        </Box>
+      )}
+    </Box>
+  );
+};
 
 const TagManagementContent: React.FC<TagManagementContentProps> = ({
   allTags,
@@ -81,6 +165,7 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
   isActive,
   showFooter = true,
   onCreateReady,
+  onSuggestDefinitions,
 }) => {
   const theme = useTheme();
   const { user } = useAuthState();
@@ -94,6 +179,23 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
   const [definitionsLoading, setDefinitionsLoading] = useState(false);
   const [definitionsLoaded, setDefinitionsLoaded] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [suggestTags, setSuggestTags] = useState<string[] | null>(null);
+  const [isRequiredDialogOpen, setIsRequiredDialogOpen] = useState(false);
+
+  // Suggestions are available unless we're in read-only mode (shared calendar).
+  const suggestionsAvailable = !isReadOnly;
+
+  const handleSuggest = useCallback(
+    (tagsToSuggest: string[]) => {
+      if (!suggestionsAvailable || tagsToSuggest.length === 0) return;
+      if (onSuggestDefinitions) {
+        onSuggestDefinitions(tagsToSuggest);
+        return;
+      }
+      setSuggestTags(tagsToSuggest);
+    },
+    [suggestionsAvailable, onSuggestDefinitions],
+  );
 
   // Expose create trigger to parent (for drawer headerActions)
   useEffect(() => {
@@ -102,10 +204,15 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
     }
   }, [onCreateReady]);
 
+  /**
+   * Groups start collapsed (a fresh entry resolves to `true`), so the panel
+   * opens as a tight scannable list rather than a 1000-line scroll. First
+   * click on a group flips it to expanded.
+   */
   const toggleGroup = (group: string) => {
     setCollapsedGroups(prev => ({
       ...prev,
-      [group]: !prev[group]
+      [group]: !(prev[group] ?? true)
     }));
   };
 
@@ -264,280 +371,958 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
     }
   };
 
+  const groupEntries = Object.entries(groupedTags);
+  const isDark = theme.palette.mode === 'dark';
+
+  // Coverage metrics — how much of the user's vocabulary has definitions.
+  // The kit is "coverage-first": this is the panel's hero KPI.
+  const tagsWithDefs = useMemo(
+    () => allTags.filter((t) => !!tagDefinitions[t] && tagDefinitions[t].trim() !== ''),
+    [allTags, tagDefinitions],
+  );
+  const missingTags = useMemo(
+    () => allTags.filter((t) => !tagDefinitions[t] || tagDefinitions[t].trim() === ''),
+    [allTags, tagDefinitions],
+  );
+  const coverageRatio = allTags.length > 0 ? tagsWithDefs.length / allTags.length : 0;
+
+  // Per-group coverage — drives the "X/Y" progress in each group header.
+  const groupCoverage = useMemo(() => {
+    const map = new Map<string, { defined: number; total: number }>();
+    Object.entries(groupedTags).forEach(([group, tags]) => {
+      const defined = tags.filter(
+        (t) => !!tagDefinitions[t] && tagDefinitions[t].trim() !== '',
+      ).length;
+      map.set(group, { defined, total: tags.length });
+    });
+    return map;
+  }, [groupedTags, tagDefinitions]);
+
+  const requiredPreviewCount = 4;
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      {/* Scrollable content */}
-      <Box sx={{ p: 2, flex: 1, overflowY: 'auto', minHeight: 0, ...scrollbarStyles(theme) }}>
-      <Box>
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="body1" gutterBottom>
-            {isReadOnly
-              ? "View tags and their definitions to better understand this trader's terminology."
-              : "Manage your tags and set required tag groups for new trades."}
-          </Typography>
-          {!isReadOnly && (
-            <>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                When a tag group is set as required, every new trade must include at least one tag from
-                this group.
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
-                Adding definitions to your tags helps Orion and traders understand your
-                trading terminology and provide more accurate analysis.
-              </Typography>
-            </>
-          )}
-        </Box>
-
+      {/* Scrollable content.
+          `display: flex, flexDirection: column` is required so the group-list
+          container's `flex: 1` actually claims the leftover vertical space —
+          which is what lets the empty-state card center its icon + title in
+          the optical middle of the panel instead of hugging the search row. */}
+      <Box
+        sx={{
+          px: 2,
+          pt: 2,
+          pb: 2,
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+          minHeight: 0,
+          ...scrollbarStyles(theme),
+        }}
+      >
+        {/* Coverage card — the hero KPI for "coverage-first" mission control.
+            Renders even when allTags is empty so the user has a clear entry
+            point (the + Tag CTA) instead of staring at a barren panel. */}
         {!isReadOnly && (
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-              Required Tag Groups
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-              {localRequiredGroups.length > 0 ? (
-                localRequiredGroups.map(group => (
-                  <Chip
-                    key={group}
-                    label={group}
-                    color="primary"
-                    variant="outlined"
-                    sx={{ fontWeight: 600 }}
-                    onDelete={() => {
-                      const updatedGroups = localRequiredGroups.filter(g => g !== group);
-                      handleRequiredTagGroupsChange(updatedGroups);
-                    }}
-                  />
-                ))
+          <Box
+            sx={{
+              mb: 2,
+              p: 1.75,
+              borderRadius: '12px',
+              border: `1px solid ${theme.palette.divider}`,
+              bgcolor: alpha(isDark ? '#fff' : '#000', isDark ? 0.02 : 0.015),
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.75 }}>
+              {allTags.length > 0 ? (
+                <CoverageDonut ratio={coverageRatio} size={64} stroke={6} />
               ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No required tag groups set. Edit a tag group to make it required.
-                </Typography>
+                // No tags yet — render a tag-icon tile in place of the donut
+                // so the card still has a visual anchor on the left.
+                <Box
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: '14px',
+                    bgcolor: theme.palette.custom.tintViolet.soft,
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                    display: 'grid',
+                    placeItems: 'center',
+                    color: 'primary.light',
+                    flexShrink: 0,
+                  }}
+                >
+                  <TagIcon sx={{ fontSize: '1.6rem' }} />
+                </Box>
               )}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  variant="subtitle2"
+                  sx={{ fontWeight: 700, color: 'text.primary' }}
+                >
+                  Tag vocabulary
+                </Typography>
+                {allTags.length > 0 ? (
+                  <>
+                    <Typography
+                      sx={{
+                        fontSize: '0.78rem',
+                        color: 'text.secondary',
+                        mt: 0.25,
+                        fontFeatureSettings: "'tnum' on, 'lnum' on",
+                      }}
+                    >
+                      <Box
+                        component="span"
+                        sx={{ fontWeight: 700, color: 'text.primary' }}
+                      >
+                        {tagsWithDefs.length}
+                      </Box>{' '}
+                      of{' '}
+                      <Box
+                        component="span"
+                        sx={{ fontWeight: 700, color: 'text.primary' }}
+                      >
+                        {allTags.length}
+                      </Box>{' '}
+                      tags have definitions.
+                    </Typography>
+                    <Typography
+                      sx={{ fontSize: '0.75rem', color: 'text.disabled', mt: 0.25 }}
+                    >
+                      Orion uses these to analyze your trades.
+                    </Typography>
+                  </>
+                ) : (
+                  <>
+                    <Typography
+                      sx={{
+                        fontSize: '0.78rem',
+                        color: 'text.secondary',
+                        mt: 0.25,
+                      }}
+                    >
+                      No tags yet. Add your first to start building.
+                    </Typography>
+                    <Typography
+                      sx={{ fontSize: '0.75rem', color: 'text.disabled', mt: 0.25 }}
+                    >
+                      Tags categorize trades so Orion can spot patterns.
+                    </Typography>
+                  </>
+                )}
+              </Box>
             </Box>
+
+            {/* CTA row — three states:
+                  (a) no tags     → single full-width primary "+ Add first tag"
+                  (b) some missing → Suggest definitions + small Tag button
+                  (c) all defined → none (no work to surface)                */}
+            {allTags.length === 0 ? (
+              <Box sx={{ mt: 1.5 }}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  size="small"
+                  startIcon={<AddIcon sx={{ fontSize: '0.9rem' }} />}
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  sx={{
+                    height: 36,
+                    borderRadius: '8px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    boxShadow: 'none',
+                  }}
+                >
+                  Add your first tag
+                </Button>
+              </Box>
+            ) : missingTags.length > 0 ? (
+              <Box sx={{ display: 'flex', gap: 0.75, mt: 1.5 }}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  size="small"
+                  disabled={!suggestionsAvailable}
+                  startIcon={<SparkleIcon sx={{ fontSize: '0.85rem' }} />}
+                  onClick={() => handleSuggest(missingTags)}
+                  sx={{
+                    flex: 1,
+                    height: 36,
+                    borderRadius: '8px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    boxShadow: 'none',
+                  }}
+                >
+                  Suggest definitions for{' '}
+                  <Box
+                    component="span"
+                    sx={{ ml: 0.5, fontFeatureSettings: "'tnum' on, 'lnum' on" }}
+                  >
+                    {missingTags.length}
+                  </Box>{' '}
+                  tags
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon sx={{ fontSize: '0.85rem' }} />}
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  sx={{
+                    height: 36,
+                    px: 1.5,
+                    borderRadius: '8px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    borderColor: theme.palette.divider,
+                    color: 'text.secondary',
+                    flexShrink: 0,
+                    '&:hover': {
+                      borderColor: alpha(theme.palette.primary.main, 0.4),
+                      color: 'primary.main',
+                      bgcolor: alpha(theme.palette.primary.main, 0.06),
+                    },
+                  }}
+                >
+                  Tag
+                </Button>
+              </Box>
+            ) : null}
           </Box>
         )}
 
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            <TextField
-              fullWidth
-              placeholder="Search tags..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                )
+        {/* Required tags — compact horizontal row when populated, vertical
+            onboarding brief when the user has no tags yet. Clicking the row
+            opens the group-picker dialog (when there are tags to pick from). */}
+        {!isReadOnly && (
+          <Box
+            onClick={() => {
+              if (allTags.length > 0) setIsRequiredDialogOpen(true);
+            }}
+            sx={{
+              mb: 2,
+              p: 1.25,
+              borderRadius: '12px',
+              border: `1px solid ${theme.palette.divider}`,
+              bgcolor: alpha(isDark ? '#fff' : '#000', isDark ? 0.02 : 0.015),
+              display: 'flex',
+              alignItems: allTags.length === 0 ? 'flex-start' : 'flex-start',
+              flexDirection: allTags.length === 0 ? 'column' : 'row',
+              gap: allTags.length === 0 ? 0.75 : 1.25,
+              cursor: allTags.length > 0 ? 'pointer' : 'default',
+              transition: 'background 120ms',
+              '&:hover':
+                allTags.length > 0
+                  ? { bgcolor: alpha(isDark ? '#fff' : '#000', isDark ? 0.04 : 0.03) }
+                  : undefined,
+            }}
+          >
+            <Box
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.625,
+                flexShrink: 0,
+                minHeight: 22,
               }}
-              size="small"
-            />
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <Select
-                value={selectedTagGroup}
-                onChange={(e) => setSelectedTagGroup(e.target.value)}
-                displayEmpty
-                startAdornment={
-                  <InputAdornment position="start">
-                    <FilterListIcon fontSize="small" />
-                  </InputAdornment>
-                }
+            >
+              <StarIcon sx={{ fontSize: '0.9rem', color: '#f59e0b' }} />
+              <Typography
+                sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'text.primary' }}
               >
-                <MenuItem value="">All Groups</MenuItem>
-                {tagGroups.map(group => (
-                  <MenuItem key={group} value={group}>{group}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-
-          <Box sx={{
-            maxHeight: '100%',
-            overflow: 'auto',
-            border: `1px solid ${theme.palette.divider}`,
-            borderRadius: 1,
-            ...theme.typography.body2,
-            ...scrollbarStyles(theme)
-          }}>
-            {Object.entries(groupedTags).length > 0 ? (
-              Object.entries(groupedTags).map(([group, tags]) => (
-                <Box key={group}>
-                  <Box sx={{
-                    p: 1.5,
-                    bgcolor: alpha(theme.palette.primary.main, 0.05),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        {group}
-                      </Typography>
-                      {group !== 'Ungrouped' && !isReadOnly && (
-                        <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                          <FormControlLabel
-                            control={
-                              <Switch
-                                checked={localRequiredGroups.includes(group)}
-                                onChange={(e) => {
-                                  const isChecked = e.target.checked;
-                                  const updatedGroups = isChecked
-                                    ? [...localRequiredGroups, group]
-                                    : localRequiredGroups.filter(g => g !== group);
-                                  handleRequiredTagGroupsChange(updatedGroups);
-                                }}
-                                color="primary"
-                                size="small"
-                              />
-                            }
-                            label={null}
-                          />
-                          <Tooltip title="When a tag group is set as required, every new trade must include at least one tag from this group">
-                            <InfoIcon sx={{ ml: -1.5, color: 'text.secondary', fontSize: '0.875rem' }} />
-                          </Tooltip>
-                        </Box>
-                      )}
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        {tags.length} tag{tags.length !== 1 ? 's' : ''}
-                      </Typography>
-                      <IconButton size="small" onClick={() => toggleGroup(group)}>
-                        {collapsedGroups[group]
-                          ? <ExpandMoreIcon fontSize="small" />
-                          : <ExpandLessIcon fontSize="small" />}
-                      </IconButton>
-                    </Box>
-                  </Box>
-                  <Divider />
-                  <Collapse in={!collapsedGroups[group]} timeout="auto" unmountOnExit>
-                    <List disablePadding>
-                      {tags.map((tag) => (
-                        <ListItem
-                          key={tag}
-                          disablePadding
-                          secondaryAction={
-                            !isReadOnly ? (
-                              <Button
-                                color="primary"
-                                sx={{ minWidth: 'auto', p: 0.5 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setTagToEdit(tag);
-                                }}
-                              >
-                                Edit
-                              </Button>
-                            ) : undefined
-                          }
-                        >
-                          <ListItemButton
-                            onClick={() => setTagToView(tag)}
-                            sx={{
-                              '&:hover': {
-                                bgcolor: alpha(theme.palette.primary.main, 0.05)
-                              }
-                            }}
-                          >
-                            <ListItemText
-                              primary={
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <Chip
-                                    label={formatTagForDisplay(tag, true)}
-                                    size="small"
-                                    sx={getTagChipStyles(tag, theme)}
-                                  />
-                                </Box>
-                              }
-                              secondary={
-                                definitionsLoading && !definitionsLoaded ? (
-                                  <Box sx={{ mt: 0.75, ml: 0.5 }}>
-                                    <Shimmer height={9} borderRadius={4} intensity="low" sx={{ mb: 0.5 }} />
-                                   <Shimmer height={9} borderRadius={4} intensity="low" sx={{ mb: 0.5 }} />
-                                  </Box>
-                                ) : (
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{
-                                      display: '-webkit-box',
-                                      WebkitLineClamp: 4,
-                                      WebkitBoxOrient: 'vertical',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      mt: 0.5,
-                                      ml: 0.5,
-                                      opacity: tagDefinitions[tag] ? 1 : 0.6
-                                    }}
-                                  >
-                                    {tagDefinitions[tag] || (isReadOnly
-                                      ? 'No definition'
-                                      : 'No definition — click Edit to add one')}
-                                  </Typography>
-                                )
-                              }
-                            />
-                          </ListItemButton>
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Collapse>
-                </Box>
-              ))
+                Required for new trades
+              </Typography>
+            </Box>
+            {allTags.length === 0 ? (
+              // Onboarding brief — explains *why* a trader should mark groups
+              // required, so the feature doesn't feel like idle chrome before
+              // any tags exist.
+              <Typography
+                sx={{
+                  fontSize: '0.74rem',
+                  color: 'text.secondary',
+                  lineHeight: 1.55,
+                }}
+              >
+                Mark a tag group as required and every new trade must include
+                at least one tag from it — so your data stays consistent and
+                Orion can compare like with like.
+              </Typography>
             ) : (
-              <Box sx={{ p: 3, textAlign: 'center' }}>
-                <Typography color="text.secondary">
-                  No tags found matching your search criteria.
+            <Box
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 0.5,
+                justifyContent: 'flex-end',
+                alignContent: 'flex-start',
+              }}
+            >
+              {localRequiredGroups.length === 0 ? (
+                <Typography sx={{ fontSize: '0.72rem', color: 'text.disabled' }}>
+                  None — toggle a group below
                 </Typography>
-              </Box>
+              ) : (
+                <>
+                  {localRequiredGroups.slice(0, requiredPreviewCount).map((group) => {
+                    const color = getTagColor(group);
+                    return (
+                      <Box
+                        key={group}
+                        sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          height: 22,
+                          px: 1,
+                          borderRadius: '6px',
+                          bgcolor: alpha(color, isDark ? 0.18 : 0.14),
+                          border: `1px solid ${alpha(color, 0.3)}`,
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            color: color,
+                            lineHeight: 1,
+                          }}
+                        >
+                          {group}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+                  {localRequiredGroups.length > requiredPreviewCount && (
+                    <Box
+                      sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        height: 22,
+                        px: 1,
+                        borderRadius: '6px',
+                        bgcolor: alpha(theme.palette.text.primary, 0.06),
+                        border: `1px solid ${theme.palette.divider}`,
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          color: 'text.secondary',
+                          lineHeight: 1,
+                          fontFeatureSettings: "'tnum' on, 'lnum' on",
+                        }}
+                      >
+                        +{localRequiredGroups.length - requiredPreviewCount}
+                      </Typography>
+                    </Box>
+                  )}
+                </>
+              )}
+            </Box>
             )}
           </Box>
+        )}
+
+        {isReadOnly && (
+          <Typography
+            variant="body2"
+            sx={{ color: 'text.secondary', lineHeight: 1.55, mb: 2 }}
+          >
+            View tags and their definitions to better understand this trader's terminology.
+          </Typography>
+        )}
+
+        {/* Search + filter */}
+        <Box sx={{ display: 'flex', gap: 0.75, mb: 1.25 }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search tags…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: '0.95rem', color: 'text.disabled' }} />
+                </InputAdornment>
+              ),
+              sx: {
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                bgcolor: alpha(isDark ? '#fff' : '#000', 0.03),
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+              },
+            }}
+          />
+          <FormControl size="small" sx={{ minWidth: 130 }}>
+            <Select
+              value={selectedTagGroup}
+              onChange={(e) => setSelectedTagGroup(e.target.value)}
+              displayEmpty
+              startAdornment={
+                <InputAdornment position="start">
+                  <FilterListIcon sx={{ fontSize: '0.95rem', color: 'text.disabled' }} />
+                </InputAdornment>
+              }
+              sx={{
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                bgcolor: alpha(isDark ? '#fff' : '#000', 0.03),
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+              }}
+            >
+              <MenuItem value="" sx={{ fontSize: '0.82rem' }}>All</MenuItem>
+              {tagGroups.map((group) => (
+                <MenuItem key={group} value={group} sx={{ fontSize: '0.82rem' }}>
+                  {group}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+
+        {/* Group cards — each group is its own card with a 1px violet edge
+            accent. DESIGN.md forbids accent stripes wider than 1px on list
+            items, so the kit's 3px is rendered here as 1px + tint background.
+            `flex: 1` so when there's no content (empty state), the inner
+            placeholder card can stretch and vertically center its message. */}
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1.25,
+            minHeight: 0,
+          }}
+        >
+          {groupEntries.length > 0 ? (
+            groupEntries.map(([group, tags]) => {
+              const collapsed = collapsedGroups[group] ?? true;
+              const color = getTagColor(group);
+              const required = localRequiredGroups.includes(group);
+              const cov = groupCoverage.get(group);
+              const groupMissing = tags.filter(
+                (t) => !tagDefinitions[t] || tagDefinitions[t].trim() === '',
+              );
+
+              return (
+                <Box
+                  key={group}
+                  sx={{
+                    borderRadius: '12px',
+                    border: `1px solid ${theme.palette.divider}`,
+                  }}
+                >
+                  {/* Group header — single row, NOT a <button> wrapper.
+                      A button containing the Switch (also a button) is invalid
+                      HTML and the browser collapses the layout. */}
+                  <Box
+                    onClick={() => toggleGroup(group)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      px: 1.5,
+                      py: 1.1,
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                      '&:hover': {
+                        bgcolor: alpha(isDark ? '#fff' : '#000', isDark ? 0.02 : 0.02),
+                      },
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: '0.92rem',
+                        fontWeight: 700,
+                        // Color every named group with its tag color so the
+                        // panel reads as a topic legend. Required vs not is
+                        // conveyed by the Switch position, not by graying out
+                        // non-required group names.
+                        color: group === 'Ungrouped' ? 'text.primary' : color,
+                        letterSpacing: '-0.005em',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        flex: '1 1 auto',
+                        minWidth: 0,
+                      }}
+                    >
+                      {group}
+                    </Typography>
+                    {group !== 'Ungrouped' && !isReadOnly && (
+                      <Box
+                        onClick={(e) => e.stopPropagation()}
+                        sx={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
+                      >
+                        <Switch
+                          checked={required}
+                          onChange={(e) => {
+                            const updated = e.target.checked
+                              ? [...localRequiredGroups, group]
+                              : localRequiredGroups.filter((g) => g !== group);
+                            handleRequiredTagGroupsChange(updated);
+                          }}
+                          size="small"
+                          color="primary"
+                        />
+                      </Box>
+                    )}
+                    {/* Right-side meta cluster — every element has a fixed
+                        width so rows line up across groups regardless of
+                        whether the digit count is 1, 2, or 3 chars. */}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Box sx={{ width: 20, display: 'flex', justifyContent: 'center' }}>
+                        {cov && cov.total > 0 && (
+                          <CoverageDonut
+                            ratio={cov.defined / cov.total}
+                            size={20}
+                            stroke={3}
+                            showLabel={false}
+                          />
+                        )}
+                      </Box>
+                      <Typography
+                        sx={{
+                          width: 42,
+                          textAlign: 'right',
+                          fontSize: '0.75rem',
+                          color:
+                            cov && cov.defined === cov.total
+                              ? 'success.main'
+                              : 'text.secondary',
+                          fontWeight: 600,
+                          fontFeatureSettings: "'tnum' on, 'lnum' on",
+                        }}
+                      >
+                        {cov && cov.total > 0 ? `${cov.defined}/${cov.total}` : ''}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          width: 50,
+                          textAlign: 'right',
+                          fontSize: '0.75rem',
+                          color: 'text.disabled',
+                          fontFeatureSettings: "'tnum' on, 'lnum' on",
+                        }}
+                      >
+                        {tags.length} tags
+                      </Typography>
+                      <Box sx={{ width: 18, display: 'flex', justifyContent: 'center' }}>
+                        {collapsed ? (
+                          <ChevronRightIcon
+                            sx={{ fontSize: '1.1rem', color: 'text.disabled' }}
+                          />
+                        ) : (
+                          <ExpandLessIcon
+                            sx={{ fontSize: '1.1rem', color: 'text.disabled' }}
+                          />
+                        )}
+                      </Box>
+                    </Box>
+                  </Box>
+
+                  {/* Group body */}
+                  <Collapse in={!collapsed} timeout="auto" unmountOnExit>
+                    <Box sx={{ borderTop: `1px solid ${theme.palette.divider}` }}>
+                      {tags.map((tag, ti) => {
+                        const definition = tagDefinitions[tag];
+                        const hasDef = !!definition && definition.trim() !== '';
+                        const showShimmer = definitionsLoading && !definitionsLoaded;
+                        const isLastInGroup = ti === tags.length - 1;
+                        return (
+                          <Box
+                            key={tag}
+                            onClick={() => setTagToView(tag)}
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: 1,
+                              px: 1.5,
+                              py: 1.25,
+                              cursor: 'pointer',
+                              borderBottom: isLastInGroup
+                                ? 0
+                                : `1px solid ${theme.palette.divider}`,
+                              transition: 'background 120ms',
+                              '&:hover': {
+                                bgcolor: alpha(isDark ? '#fff' : '#000', isDark ? 0.02 : 0.02),
+                              },
+                            }}
+                          >
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              {/* Tag chip + No-definition status */}
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.75,
+                                  flexWrap: 'wrap',
+                                }}
+                              >
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    height: 22,
+                                    px: 1,
+                                    borderRadius: '6px',
+                                    bgcolor: alpha(isDark ? '#fff' : '#000', isDark ? 0.06 : 0.05),
+                                    border: `1px solid ${theme.palette.divider}`,
+                                  }}
+                                >
+                                  <Typography
+                                    sx={{
+                                      fontSize: '0.72rem',
+                                      fontWeight: 600,
+                                      color: 'text.primary',
+                                      lineHeight: 1,
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    {formatTagForDisplay(tag, true)}
+                                  </Typography>
+                                </Box>
+                                {!hasDef && !showShimmer && (
+                                  <Box
+                                    component="span"
+                                    sx={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 0.375,
+                                      height: 18,
+                                      px: 0.75,
+                                      borderRadius: '4px',
+                                      bgcolor: alpha('#f59e0b', isDark ? 0.18 : 0.14),
+                                      border: `1px solid ${alpha('#f59e0b', 0.3)}`,
+                                    }}
+                                  >
+                                    <Box
+                                      component="span"
+                                      sx={{
+                                        width: 5,
+                                        height: 5,
+                                        borderRadius: '50%',
+                                        bgcolor: '#f59e0b',
+                                      }}
+                                    />
+                                    <Typography
+                                      sx={{
+                                        fontSize: '0.66rem',
+                                        fontWeight: 600,
+                                        color: '#f59e0b',
+                                        lineHeight: 1,
+                                      }}
+                                    >
+                                      No definition
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Box>
+                              {/* Definition line — only rendered when a
+                                  definition exists or shimmer is loading.
+                                  When the tag has no definition, the
+                                  amber "No definition" badge above already
+                                  communicates the state; no second line. */}
+                              {showShimmer ? (
+                                <Box sx={{ mt: 0.75 }}>
+                                  <Shimmer
+                                    height={8}
+                                    borderRadius={4}
+                                    intensity="low"
+                                    sx={{ mb: 0.4 }}
+                                  />
+                                  <Shimmer height={8} borderRadius={4} intensity="low" />
+                                </Box>
+                              ) : hasDef ? (
+                                <Typography
+                                  sx={{
+                                    mt: 0.5,
+                                    fontSize: '0.75rem',
+                                    color: 'text.secondary',
+                                    lineHeight: 1.5,
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 3,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                  }}
+                                >
+                                  {definition}
+                                </Typography>
+                              ) : null}
+                            </Box>
+
+                            {/* Per-tag actions */}
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.5,
+                                flexShrink: 0,
+                              }}
+                            >
+                              {!hasDef && !showShimmer && suggestionsAvailable && (
+                                <Box
+                                  component="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSuggest([tag]);
+                                  }}
+                                  sx={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 0.375,
+                                    bgcolor: 'transparent',
+                                    border: 0,
+                                    font: 'inherit',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    color: 'primary.light',
+                                    cursor: 'pointer',
+                                    px: 0.5,
+                                    py: 0.25,
+                                    borderRadius: '4px',
+                                    '&:hover': {
+                                      color: 'primary.main',
+                                      bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                    },
+                                  }}
+                                >
+                                  <SparkleIcon sx={{ fontSize: '0.75rem' }} />
+                                  Suggest
+                                </Box>
+                              )}
+                              {!isReadOnly && (
+                                <Box
+                                  component="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTagToEdit(tag);
+                                  }}
+                                  sx={{
+                                    bgcolor: 'transparent',
+                                    border: 0,
+                                    font: 'inherit',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 600,
+                                    color: 'primary.light',
+                                    cursor: 'pointer',
+                                    px: 0.5,
+                                    py: 0.25,
+                                    borderRadius: '4px',
+                                    '&:hover': {
+                                      color: 'primary.main',
+                                      bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                    },
+                                  }}
+                                >
+                                  Edit
+                                </Box>
+                              )}
+                            </Box>
+                          </Box>
+                        );
+                      })}
+                      {/* Group footer suggest — when many tags in this group lack defs */}
+                      {suggestionsAvailable &&
+                        groupMissing.length >= 3 && (
+                          <Box
+                            sx={{
+                              borderTop: `1px solid ${theme.palette.divider}`,
+                              px: 1.5,
+                              py: 1,
+                              display: 'flex',
+                              justifyContent: 'flex-end',
+                            }}
+                          >
+                            <Box
+                              component="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSuggest(groupMissing);
+                              }}
+                              sx={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 0.5,
+                                bgcolor: 'transparent',
+                                border: 0,
+                                font: 'inherit',
+                                fontSize: '0.74rem',
+                                fontWeight: 600,
+                                color: 'primary.light',
+                                cursor: 'pointer',
+                                px: 0.75,
+                                py: 0.25,
+                                borderRadius: '6px',
+                                '&:hover': {
+                                  color: 'primary.main',
+                                  bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                },
+                              }}
+                            >
+                              <SparkleIcon sx={{ fontSize: '0.78rem' }} />
+                              Suggest {groupMissing.length} in this group
+                            </Box>
+                          </Box>
+                        )}
+                    </Box>
+                  </Collapse>
+                </Box>
+              );
+            })
+          ) : (
+            (() => {
+              // Distinguish "no tags at all" (cold onboarding) from
+              // "no tags match current filter" (active filter state).
+              const isFiltering = !!searchTerm || !!selectedTagGroup;
+              const showOnboarding = allTags.length === 0 && !isFiltering;
+              return (
+                <Box
+                  sx={{
+                    // Fill the remaining vertical space so the icon + title
+                    // + description land in the optical center of the panel,
+                    // not at the top edge of a hugging box.
+                    flex: 1,
+                    minHeight: 240,
+                    px: 3,
+                    py: 5,
+                    borderRadius: '12px',
+                    border: `1px solid ${theme.palette.divider}`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    gap: 1,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: '12px',
+                      bgcolor: showOnboarding
+                        ? theme.palette.custom.tintViolet.soft
+                        : alpha(theme.palette.text.primary, 0.05),
+                      border: `1px solid ${
+                        showOnboarding
+                          ? alpha(theme.palette.primary.main, 0.25)
+                          : theme.palette.divider
+                      }`,
+                      display: 'grid',
+                      placeItems: 'center',
+                      color: showOnboarding ? 'primary.light' : 'text.disabled',
+                      mb: 0.5,
+                    }}
+                  >
+                    {showOnboarding ? (
+                      <TagIcon sx={{ fontSize: '1.4rem' }} />
+                    ) : (
+                      <SearchIcon sx={{ fontSize: '1.3rem' }} />
+                    )}
+                  </Box>
+                  <Typography
+                    sx={{
+                      fontSize: '0.95rem',
+                      fontWeight: 700,
+                      color: 'text.primary',
+                      letterSpacing: '-0.005em',
+                    }}
+                  >
+                    {showOnboarding
+                      ? isReadOnly
+                        ? 'No tags yet'
+                        : 'Start your vocabulary'
+                      : 'No matches'}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: '0.78rem',
+                      color: 'text.secondary',
+                      lineHeight: 1.55,
+                      maxWidth: 320,
+                    }}
+                  >
+                    {showOnboarding
+                      ? isReadOnly
+                        ? "This trader hasn't added any tags to this calendar."
+                        : 'Tags categorize trades by setup, mistake, or strategy. Use the + Tag button above to create your first one.'
+                      : 'Try a different search term or clear the filter to see all tags.'}
+                  </Typography>
+                  {!showOnboarding && isFiltering && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setSelectedTagGroup('');
+                      }}
+                      sx={{
+                        mt: 1.25,
+                        height: 30,
+                        px: 1.5,
+                        borderRadius: '8px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        borderColor: theme.palette.divider,
+                        color: 'text.secondary',
+                        '&:hover': {
+                          borderColor: alpha(theme.palette.primary.main, 0.4),
+                          color: 'primary.main',
+                          bgcolor: alpha(theme.palette.primary.main, 0.06),
+                        },
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  )}
+                </Box>
+              );
+            })()
+          )}
         </Box>
       </Box>
-      </Box>{/* end scrollable content */}
+      {/* end scrollable content */}
 
-      {/* Footer — panel mode only */}
-      {showFooter && !isReadOnly && (
-        <Box sx={{
-          p: 1.5,
-          borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          bgcolor: 'background.paper',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          flexShrink: 0,
-        }}>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<AddIcon />}
-            onClick={() => setIsCreateDialogOpen(true)}
-          >
-            Add Tag
-          </Button>
-        </Box>
-      )}
+      {/* The footer "Add Tag" was removed — the coverage card already exposes
+          a "+ Tag" affordance, and the parent panel/drawer's `onCreateReady`
+          hook lets host chrome trigger creation from a header button. */}
 
       {tagToEdit && (
-        <TagEditDialog
+        <TagFormDialog
           open={!!tagToEdit}
-          onClose={(definitionUpdated) => {
+          onClose={(changed) => {
             setTagToEdit(null);
-            if (definitionUpdated) {
-              fetchTagDefinitions();
-            }
+            if (changed) fetchTagDefinitions();
           }}
-          tag={tagToEdit}
+          editTag={tagToEdit}
           calendarId={calendarId}
-          onSuccess={handleTagEditSuccess}
+          allTags={allTags}
+          onEditSuccess={handleTagEditSuccess}
           onDelete={handleTagDelete}
           onTagUpdated={onTagUpdated}
           initialDefinition={tagDefinitions[tagToEdit] || ''}
         />
       )}
 
-      <TagCreateDialog
+      <TagFormDialog
         open={isCreateDialogOpen}
         onClose={(created) => {
           setIsCreateDialogOpen(false);
@@ -546,6 +1331,54 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
         calendarId={calendarId}
         allTags={allTags}
         onTagCreated={handleTagCreated}
+      />
+
+      {suggestTags && suggestTags.length > 0 && (
+        <TagSuggestionReviewDialog
+          open={!!suggestTags}
+          tags={suggestTags}
+          existingDefinitions={tagDefinitions}
+          onClose={() => setSuggestTags(null)}
+          onSaved={() => {
+            setSuggestTags(null);
+            fetchTagDefinitions();
+          }}
+        />
+      )}
+
+      {/* Required-groups picker. Items derived from tag groups; per-group meta
+          shows the tag count so users can see how many tags they're committing
+          to require at least one of. Color-coded chips match the group theme. */}
+      <TagSelectionDialog
+        open={isRequiredDialogOpen}
+        onClose={() => setIsRequiredDialogOpen(false)}
+        title="Required for new trades"
+        description="Mark a tag group as required and every new trade must include at least one tag from it."
+        icon={<StarIcon sx={{ fontSize: 18, color: '#f59e0b' }} />}
+        accent="warning"
+        selectedLabel="Required"
+        actionVerb="Require"
+        items={tagGroups.map<SelectableItem>((group) => {
+          const groupTagCount = allTags.filter(
+            (t) => isGroupedTag(t) && getTagGroup(t) === group,
+          ).length;
+          const color = getTagColor(`${group}:_`);
+          return {
+            id: group,
+            label: group,
+            meta: `${groupTagCount} tag${groupTagCount === 1 ? '' : 's'}`,
+            chipSx: {
+              bgcolor: alpha(color, isDark ? 0.18 : 0.14),
+              color,
+              border: `1px solid ${alpha(color, 0.3)}`,
+              fontWeight: 600,
+            },
+          };
+        })}
+        selected={localRequiredGroups}
+        onChange={handleRequiredTagGroupsChange}
+        searchPlaceholder="Search groups…"
+        emptyText="No tag groups yet — create grouped tags (e.g. Setup:Order Block) first."
       />
 
       {/* Tag View Dialog */}

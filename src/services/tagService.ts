@@ -1,6 +1,11 @@
 import { supabase } from '../config/supabase';
 import { logger } from '../utils/logger';
 
+export interface TagSuggestion {
+  tag: string;
+  definition: string;
+}
+
 /**
  * Service for managing tag definitions and metadata
  */
@@ -99,6 +104,44 @@ export const tagService = {
       }
     } catch (err) {
       logger.error('Error saving tag definition:', err);
+      throw err;
+    }
+  },
+
+  /**
+   * Generates AI-drafted definitions for the given tags via the
+   * suggest-tag-definition edge function. The caller decides whether to
+   * persist any of the results — this method never writes to the DB.
+   *
+   * `voiceExamples` are existing definitions from this trader that the model
+   * uses to match tone. Pass a handful — the function caps at 5 server-side.
+   */
+  async suggestTagDefinitions(
+    tags: string[],
+    voiceExamples?: TagSuggestion[]
+  ): Promise<TagSuggestion[]> {
+    if (!tags || tags.length === 0) return [];
+
+    try {
+      const { data, error } = await supabase.functions.invoke('suggest-tag-definition', {
+        body: { tags, examples: voiceExamples ?? [] },
+      });
+
+      if (error) {
+        logger.error('suggest-tag-definition invoke error:', error);
+        throw new Error(error.message || 'Failed to generate suggestions');
+      }
+
+      if (!data?.success || !Array.isArray(data.suggestions)) {
+        const message = data?.error || 'AI did not return suggestions';
+        throw new Error(message);
+      }
+
+      return (data.suggestions as TagSuggestion[]).filter(
+        (s) => s && typeof s.tag === 'string' && typeof s.definition === 'string'
+      );
+    } catch (err) {
+      logger.error('Error generating tag suggestions:', err);
       throw err;
     }
   },
