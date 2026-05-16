@@ -33,7 +33,6 @@ import {
 
   FilterAlt,
   Clear,
-  PushPin as PinIcon,
   Info as InfoIcon,
   LocalOffer as TagIcon,
   Search as SearchIcon,
@@ -90,7 +89,6 @@ import PageActionBar from '../components/common/PageActionBar';
 import { Calendar } from '../types/calendar';
 import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
-import PinnedTradesDrawer from '../components/PinnedTradesDrawer';
 import ShareButton from '../components/sharing/ShareButton';
 import { exportTrades } from '../utils/tradeExportImport';
 import { useAIChat } from '../contexts/AIChatContext';
@@ -132,10 +130,14 @@ import {
   AIAnalysisView,
 } from '../contexts/SidePanelContext';
 import { usePanelMutexSlot } from '../contexts/PanelMutexContext';
+import { SearchPanelStateProvider } from '../contexts/SearchPanelStateContext';
+import { OverviewPanelStateProvider } from '../contexts/OverviewPanelStateContext';
+import { EventsPanelStateProvider } from '../contexts/EventsPanelStateContext';
+import { NotesPanelStateProvider } from '../contexts/NotesPanelStateContext';
+import { TagsPanelStateProvider } from '../contexts/TagsPanelStateContext';
 import SidePanel from '../components/sidePanel/SidePanel';
 import AIChatContent from '../components/sidePanel/content/AIChatContent';
 import SearchContent from '../components/sidePanel/content/SearchContent';
-import PinnedContent from '../components/sidePanel/content/PinnedContent';
 import TagManagementContent from '../components/sidePanel/content/TagManagementContent';
 import DayTradesContent from '../components/sidePanel/content/DayTradesContent';
 import StatsContent from '../components/sidePanel/content/StatsContent';
@@ -666,7 +668,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     []
   );
   const [showFloatingMonthNav, setShowFloatingMonthNav] = useState(false);
-  const [pinnedTradesDrawerOpen, setPinnedTradesDrawerOpen] = useState(false);
 
   // Calendar edit dialog state
   const [isCalendarEditOpen, setIsCalendarEditOpen] = useState(false);
@@ -761,7 +762,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     const closeAllDrawers = () => {
       setIsNotesDrawerOpen(false);
       setIsSearchDrawerOpen(false);
-      setPinnedTradesDrawerOpen(false);
       setIsTagManagementDrawerOpen(false);
       setIsEconomicCalendarOpen(false);
       setIsStatsDrawerOpen(false);
@@ -777,9 +777,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           break;
         case 'search':
           setIsSearchDrawerOpen(true);
-          break;
-        case 'pinned':
-          setPinnedTradesDrawerOpen(true);
           break;
         case 'tags':
           setIsTagManagementDrawerOpen(true);
@@ -863,7 +860,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     }
   };
 
-  // Generic panel/drawer toggle — reused by Notes, Events, Pinned, Filter, Tags
+  // Generic panel/drawer toggle — reused by Notes, Events, Filter, Tags
   const togglePanel = useCallback((
     panelId: SidePanelView['id'],
     toggleDrawer: React.Dispatch<React.SetStateAction<boolean>>
@@ -1301,15 +1298,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             title: 'Notes',
             icon: <NotesIcon fontSize="small" />,
             component: (
-              <CalendarNotesPanel
-                calendarId={calendarId}
-                isReadOnly={isReadOnly}
-                isActive={
-                  isPanelOpen && currentView.id === 'notes'
-                }
-                availableTradeTags={allTags}
-                pinnedEvents={userPinnedEvents}
-              />
+              <CalendarNotesPanel />
             ),
           };
         case 'search':
@@ -1325,34 +1314,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 }
                 selectedTags={selectedTags}
                 onTagsChange={handleTagsChange}
-                onTradeClick={(trade) => {
-                  tradeViewer.openGallery({
-                    trades,
-                    initialTradeId: trade.id,
-                    title: 'Search Results',
-                  });
-                }}
-              />
-            ),
-          };
-        case 'pinned':
-          return {
-            title: 'Pinned',
-            icon: <PinIcon fontSize="small" />,
-            component: (
-              <PinnedContent
-                calendarId={calendarId}
-                tradeOperations={tradeOperations}
-                isActive={
-                  isPanelOpen && currentView.id === 'pinned'
-                }
-                onTradeClick={(trade, allTrades, title) => {
-                  tradeViewer.openGallery({
-                    trades: allTrades,
-                    initialTradeId: trade.id,
-                    title,
-                  });
-                }}
               />
             ),
           };
@@ -1398,7 +1359,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         }
         case 'stats': {
           return {
-            title: 'Stats',
+            title: 'Overview',
             icon: <InsightsIcon fontSize="small" />,
             component: (
               <StatsContent
@@ -1639,8 +1600,33 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       </Menu>
     </Box>
   );
-
+  
   return (
+    <SearchPanelStateProvider
+      calendarId={calendarId}
+      selectedTags={selectedTags}
+      onTagsChange={handleTagsChange}
+    >
+    <NotesPanelStateProvider
+      calendarId={calendarId}
+      isReadOnly={isReadOnly}
+      availableTradeTags={allTags}
+      pinnedEvents={userPinnedEvents}
+      isActive={
+        (isPanelOpen && currentView.id === 'notes') || isNotesDrawerOpen
+      }
+    >
+    <OverviewPanelStateProvider>
+    <EventsPanelStateProvider>
+    <TagsPanelStateProvider
+      calendarId={calendarId}
+      allTags={allTags}
+      requiredTagGroups={requiredTagGroups ?? []}
+      isReadOnly={isReadOnly}
+      calendarOwnerId={calendar?.user_id}
+      onTagUpdated={handleTagUpdated}
+      onUpdateCalendarProperty={onUpdateCalendarProperty}
+    >
     <Box sx={{
       bgcolor: 'custom.pageBackground',
       position: 'relative',
@@ -1752,7 +1738,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               },
             }}
           >
-            Stats
+            Overview
           </Button>
         }
         rightContent={breadcrumbRightContent}
@@ -2008,44 +1994,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 justifyContent: 'center',
                 width: { xs: '100%', sm: 'auto' }
               }}>
-                <Button
-                  startIcon={<PinIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                  onClick={() => togglePanel('pinned', setPinnedTradesDrawerOpen)}
-                  variant="outlined"
-                  size="small"
-                  sx={{
-                    flex: { xs: 1, sm: 'none' },
-                    minWidth: { xs: 'auto', sm: '100px' },
-                    borderRadius: 2,
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-                    py: { xs: 0.75, sm: 1 },
-                    px: { xs: 1.5, sm: 2 },
-                    borderColor: (isLgUp
-                      ? isPanelOpen && currentView.id === 'pinned'
-                      : pinnedTradesDrawerOpen
-                    ) ? 'info.main' : alpha(theme.palette.text.secondary, 0.3),
-                    color: (isLgUp
-                      ? isPanelOpen && currentView.id === 'pinned'
-                      : pinnedTradesDrawerOpen
-                    ) ? 'info.main' : 'text.secondary',
-                    bgcolor: (isLgUp
-                      ? isPanelOpen && currentView.id === 'pinned'
-                      : pinnedTradesDrawerOpen
-                    ) ? alpha(theme.palette.info.main, 0.1) : 'transparent',
-                    '&:hover': {
-                      borderColor: 'info.main',
-                      bgcolor: alpha(theme.palette.info.main, 0.1),
-                      color: 'info.main',
-                      transform: 'translateY(-1px)'
-                    },
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                  }}
-                >
-                  Pinned
-                </Button>
-
                 <TagFilter
                   allTags={allTags}
                   selectedTags={selectedTags}
@@ -2383,34 +2331,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             allTags={allTags}
             selectedTags={selectedTags}
             onTagsChange={handleTagsChange}
-            onTradeClick={(trade) => {
-              // Close search drawer and open the trade in gallery mode
-              setIsSearchDrawerOpen(false);
-              tradeViewer.openGallery({
-                trades,
-                initialTradeId: trade.id,
-                title: 'Search Results',
-              });
-            }}
-          />
-        )}
-
-        {/* Pinned Trades Drawer — <lg only */}
-        {!isLgUp && (
-          <PinnedTradesDrawer
-            open={pinnedTradesDrawerOpen}
-            onClose={() => setPinnedTradesDrawerOpen(false)}
-            calendarId={calendarId}
-            onTradeClick={(trade, allTrades, title) => {
-              // Close drawer and open the trade in gallery mode
-              setPinnedTradesDrawerOpen(false);
-              tradeViewer.openGallery({
-                trades: allTrades,
-                initialTradeId: trade.id,
-                title,
-              });
-            }}
-            tradeOperations={tradeOperations}
           />
         )}
 
@@ -2477,13 +2397,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           keepMounted
           contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
         >
-          <CalendarNotesPanel
-            calendarId={calendarId}
-            isActive={isNotesDrawerOpen}
-            isReadOnly={isReadOnly}
-            availableTradeTags={allTags}
-            pinnedEvents={userPinnedEvents}
-          />
+          <CalendarNotesPanel />
         </UnifiedDrawer>
       )}
 
@@ -2607,6 +2521,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       )}
 
     </Box>
+    </TagsPanelStateProvider>
+    </EventsPanelStateProvider>
+    </OverviewPanelStateProvider>
+    </NotesPanelStateProvider>
+    </SearchPanelStateProvider>
   );
 };
 

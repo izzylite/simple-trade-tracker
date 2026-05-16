@@ -61,6 +61,13 @@ export interface UseNotesResult {
   hasMore: boolean;
   total: number;
   /**
+   * Per-tab counts (all / pinned / archived) for the current scope filters.
+   * Refreshes whenever calendar / creator / search changes and on every
+   * realtime insert/update/delete. Lets tab badges render without forcing
+   * the user to select each tab first.
+   */
+  tabCounts: { all: number; pinned: number; archived: number };
+  /**
    * True once an initial fetch cycle has settled (success, error, or
    * cache-hit silent revalidate). Lets pages gate full-page loaders
    * without watching fragile loading-state transitions.
@@ -137,6 +144,12 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
   const [total, setTotal] = useState(initialCache?.total ?? 0);
   // Cache hit on mount counts as already-loaded — no need to gate UI again.
   const [hasLoaded, setHasLoaded] = useState<boolean>(!!initialCache);
+  const [tabCounts, setTabCounts] = useState<{ all: number; pinned: number; archived: number }>({
+    all: 0, pinned: 0, archived: 0,
+  });
+  // Bumped after CRUD or realtime changes to retrigger the tab-counts effect.
+  const [countsTick, setCountsTick] = useState(0);
+  const bumpCounts = useCallback(() => setCountsTick((t) => t + 1), []);
 
   // Use ref for offset to avoid it being in dependency array
   const offsetRef = useRef(initialCache?.offset ?? 0);
@@ -336,6 +349,49 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
     loadNotes(false);
   }, [loadNotes]);
 
+  // Per-tab counts — independent of activeTab so the badges stay populated
+  // when the user switches tabs. Scoped by the same calendar / creator /
+  // search filters as the main list.
+  useEffect(() => {
+    if (!isOpen || !userId) return;
+
+    let cancelled = false;
+    const effectiveCalendarId =
+      calendarId ||
+      (selectedCalendarFilter !== 'all' ? selectedCalendarFilter : undefined);
+    const byAssistant =
+      creatorFilter === 'assistant'
+        ? true
+        : creatorFilter === 'me'
+          ? false
+          : undefined;
+
+    const handle = setTimeout(() => {
+      notesService
+        .countNoteTabs(
+          { userId, calendarId: effectiveCalendarId },
+          { byAssistant, searchQuery: (searchQuery ?? '').trim() || undefined },
+        )
+        .then((counts) => {
+          if (!cancelled) setTabCounts(counts);
+        })
+        .catch((err) => logger.error('Failed to count note tabs', err));
+    }, searchQuery ? 500 : 0);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [
+    isOpen,
+    userId,
+    calendarId,
+    selectedCalendarFilter,
+    creatorFilter,
+    searchQuery,
+    countsTick,
+  ]);
+
   const writeListToCache = useCallback(
     (list: Note[]) => {
       const key = makeNotesKey(
@@ -363,7 +419,9 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
       writeListToCache(next);
       return next;
     });
-  }, [writeListToCache]);
+    // is_pinned / is_archived changes shift counts across tabs.
+    bumpCounts();
+  }, [writeListToCache, bumpCounts]);
 
   const removeNote = useCallback((noteId: string) => {
     setNotes((prev) => {
@@ -371,7 +429,8 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
       writeListToCache(next);
       return next;
     });
-  }, [writeListToCache]);
+    bumpCounts();
+  }, [writeListToCache, bumpCounts]);
 
   const addNote = useCallback((note: Note) => {
     setNotes((prev) => {
@@ -379,7 +438,8 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
       writeListToCache(next);
       return next;
     });
-  }, [writeListToCache]);
+    bumpCounts();
+  }, [writeListToCache, bumpCounts]);
 
   // Real-time updates via postgres_changes
   const channelIdRef = useRef(
@@ -428,9 +488,11 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
               updated[idx] = { ...updated[idx], ...newNote };
               return updated;
             });
+            bumpCounts();
           } else if (eventType === 'DELETE' && oldNote?.id) {
             setNotes((prev) => prev.filter((n) => n.id !== oldNote.id));
             setTotal((t) => Math.max(0, t - 1));
+            bumpCounts();
           } else if (eventType === 'INSERT' && newNote) {
             // Reject inserts that don't match the current view's filters.
             // Skip during active search — the next debounce will refetch.
@@ -470,6 +532,7 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
               // pagination).
               offsetRef.current += 1;
               setTotal((t) => t + 1);
+              bumpCounts();
             }
           }
         }
@@ -489,6 +552,7 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
     loadingMore,
     hasMore,
     total,
+    tabCounts,
     hasLoaded,
     loadNotes,
     loadMore,

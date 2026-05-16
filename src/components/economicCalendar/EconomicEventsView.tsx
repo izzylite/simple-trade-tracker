@@ -11,7 +11,7 @@
  * pages themselves. This component only renders the reusable core.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   Box,
   ButtonBase,
@@ -27,6 +27,7 @@ import type { Theme } from '@mui/material/styles';
 import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
+  Close as CloseIcon,
   PushPin as PinIcon,
   PushPinOutlined as UnpinIcon,
   EventNote as EventsIcon,
@@ -44,7 +45,6 @@ import {
   isAfter,
   isSameDay,
   parseISO,
-  startOfWeek,
   endOfWeek,
 } from 'date-fns';
 
@@ -52,6 +52,7 @@ import { useEconomicEvents } from '../../hooks/useEconomicEvents';
 import { useEventCountdownTime } from '../../hooks/useCurrentTime';
 import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
 import { useUserTradeEventCounts } from '../../hooks/useUserTradeEventCounts';
+import { useEventsPanelState } from '../../contexts/EventsPanelStateContext';
 import { Calendar } from '../../types/calendar';
 import { Currency, EconomicEvent, ImpactLevel } from '../../types/economicCalendar';
 import { TradeOperationsProps } from '../../types/tradeOperations';
@@ -212,17 +213,23 @@ const impactColor = (impact: ImpactLevel, theme: Theme): string => {
 export const FilterPill: React.FC<{
   selected: ImpactLevel[];
   onToggle: (v: ImpactLevel) => void;
-  onSelectAll: () => void;
+  /** Kept in the API for the page variant — compact panel hides the All button. */
+  onSelectAll?: () => void;
   theme: Theme;
-}> = ({ selected, onToggle, onSelectAll, theme }) => {
+  compact?: boolean;
+}> = ({ selected, onToggle, onSelectAll, theme, compact = false }) => {
   const allActive =
     selected.length === ALL_IMPACTS.length &&
     ALL_IMPACTS.every((i) => selected.includes(i));
 
+  const px = compact ? 1 : 1.5;
+  const py = compact ? 0.5 : 0.75;
+  const fontSize = compact ? '0.72rem' : '0.8rem';
+
   const impactButtonSx = (active: boolean, color: string) => ({
-    px: 1.5, py: 0.75,
+    px, py,
     borderRadius: 0.875,
-    fontSize: '0.8rem', fontWeight: 600,
+    fontSize, fontWeight: 600,
     color: active ? '#fff' : color,
     bgcolor: active ? color : 'transparent',
     transition: 'background 150ms, color 150ms',
@@ -233,9 +240,9 @@ export const FilterPill: React.FC<{
   });
 
   const allButtonSx = (active: boolean) => ({
-    px: 1.5, py: 0.75,
+    px, py,
     borderRadius: 0.875,
-    fontSize: '0.8rem', fontWeight: 600,
+    fontSize, fontWeight: 600,
     color: active ? theme.palette.primary.contrastText : theme.palette.text.secondary,
     bgcolor: active ? 'primary.main' : 'transparent',
     transition: 'background 150ms, color 150ms',
@@ -248,9 +255,9 @@ export const FilterPill: React.FC<{
   return (
     <Stack
       direction="row"
-      spacing={0.5}
+      spacing={compact ? 0.25 : 0.5}
       sx={{
-        p: 0.5,
+        p: compact ? 0.375 : 0.5,
         borderRadius: 1.25,
         border: `1px solid ${theme.palette.divider}`,
         bgcolor: alpha(theme.palette.background.paper, 0.4),
@@ -269,7 +276,9 @@ export const FilterPill: React.FC<{
           </ButtonBase>
         );
       })}
-      <ButtonBase onClick={onSelectAll} sx={allButtonSx(allActive)}>All</ButtonBase>
+      {!compact && onSelectAll && (
+        <ButtonBase onClick={onSelectAll} sx={allButtonSx(allActive)}>All</ButtonBase>
+      )}
     </Stack>
   );
 };
@@ -280,10 +289,21 @@ export const CurrencyChips: React.FC<{
   selected: Currency[];
   onToggle: (c: Currency) => void;
   theme: Theme;
-}> = ({ selected, onToggle, theme }) => {
+  /** Compact mode: tighter chip padding/font. Wrap behavior is the same. */
+  compact?: boolean;
+}> = ({ selected, onToggle, theme, compact = false }) => {
   const allOff = selected.length === 0;
   return (
-    <Stack direction="row" spacing={0.625} flexWrap="wrap" sx={{ rowGap: 0.625 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: compact ? 0.5 : 0.625,
+        rowGap: compact ? 0.5 : 0.625,
+        minWidth: 0,
+      }}
+    >
       {CURRENCY_OPTIONS.map((c) => {
         const active = selected.includes(c);
         const showAsActive = !allOff && active;
@@ -292,8 +312,13 @@ export const CurrencyChips: React.FC<{
             key={c}
             onClick={() => onToggle(c)}
             sx={{
-              px: 1.25, py: 0.5, borderRadius: 999,
-              fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em',
+              flexShrink: 0,
+              px: compact ? 1 : 1.25,
+              py: compact ? 0.375 : 0.5,
+              borderRadius: 999,
+              fontSize: compact ? '0.68rem' : '0.72rem',
+              fontWeight: 700,
+              letterSpacing: '0.02em',
               fontFamily: 'inherit',
               border: `1px solid ${
                 showAsActive ? alpha(theme.palette.primary.main, 0.45) : theme.palette.divider
@@ -312,19 +337,30 @@ export const CurrencyChips: React.FC<{
         );
       })}
       {!allOff && (
-        <ButtonBase
-          onClick={() => selected.forEach((c) => onToggle(c))}
-          sx={{
-            px: 1, py: 0.5, borderRadius: 999,
-            fontSize: '0.72rem', fontWeight: 600,
-            color: theme.palette.text.disabled,
-            '&:hover': { color: theme.palette.text.primary },
-          }}
-        >
-          Clear
-        </ButtonBase>
+        <Tooltip title="Clear currency filter" placement="top" arrow>
+          <IconButton
+            size="small"
+            onClick={() => selected.forEach((c) => onToggle(c))}
+            aria-label="Clear currency filter"
+            sx={{
+              flexShrink: 0,
+              width: compact ? 22 : 26,
+              height: compact ? 22 : 26,
+              borderRadius: 999,
+              color: theme.palette.text.disabled,
+              border: `1px solid ${theme.palette.divider}`,
+              '&:hover': {
+                color: theme.palette.text.primary,
+                borderColor: alpha(theme.palette.primary.main, 0.4),
+                bgcolor: alpha(theme.palette.primary.main, 0.06),
+              },
+            }}
+          >
+            <CloseIcon sx={{ fontSize: compact ? 13 : 15 }} />
+          </IconButton>
+        </Tooltip>
       )}
-    </Stack>
+    </Box>
   );
 };
 
@@ -335,12 +371,14 @@ export const HubTabs: React.FC<{
   onChange: (v: HubTab) => void;
   disabled?: Partial<Record<HubTab, boolean>>;
   theme: Theme;
-}> = ({ value, onChange, disabled, theme }) => (
+  compact?: boolean;
+}> = ({ value, onChange, disabled, theme, compact = false }) => (
   <Stack
     direction="row"
-    spacing={0.5}
+    spacing={compact ? 0.25 : 0.5}
     sx={{
-      p: 0.5, borderRadius: 1.5,
+      p: compact ? 0.375 : 0.5,
+      borderRadius: 1.5,
       border: `1px solid ${theme.palette.divider}`,
       bgcolor: alpha(theme.palette.background.paper, 0.4),
     }}
@@ -354,8 +392,11 @@ export const HubTabs: React.FC<{
           onClick={isDisabled ? undefined : () => onChange(opt.value)}
           disabled={isDisabled}
           sx={{
-            px: 2, py: 1, borderRadius: 1,
-            fontSize: '0.85rem', fontWeight: 600,
+            px: compact ? 1.25 : 2,
+            py: compact ? 0.5 : 1,
+            borderRadius: 1,
+            fontSize: compact ? '0.76rem' : '0.85rem',
+            fontWeight: 600,
             color: active
               ? theme.palette.primary.contrastText
               : isDisabled
@@ -443,12 +484,13 @@ export const DayRail: React.FC<{
    * drawer). No horizontal scroll — all 7 fit, content compresses.
    */
   layout?: 'column' | 'row';
-}> = ({ days, selectedDay, onSelect, eventsByDate, theme, layout = 'column' }) => {
+  compact?: boolean;
+}> = ({ days, selectedDay, onSelect, eventsByDate, theme, layout = 'column', compact = false }) => {
   const isRow = layout === 'row';
   return (
     <Stack
       component="aside"
-      spacing={isRow ? 0.5 : 0.5}
+      spacing={compact && isRow ? 0.375 : 0.5}
       direction={isRow ? 'row' : 'column'}
       sx={{ width: '100%' }}
     >
@@ -473,13 +515,13 @@ export const DayRail: React.FC<{
           flexDirection: 'column' as const,
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 0.25,
-          px: 0.5,
-          py: 1,
+          gap: compact ? 0.125 : 0.25,
+          px: compact ? 0.375 : 0.5,
+          py: compact ? 0.75 : 1,
           borderRadius: 1.25,
           flex: 1,
           minWidth: 0,
-          height: 64,
+          height: compact ? 52 : 64,
           opacity: isWeekend && dayEvents.length === 0 ? 0.55 : 1,
           bgcolor: isActive
             ? alpha(theme.palette.primary.main, 0.16)
@@ -522,7 +564,8 @@ export const DayRail: React.FC<{
               <>
                 <Typography
                   sx={{
-                    fontSize: '0.62rem', fontWeight: 700,
+                    fontSize: compact ? '0.58rem' : '0.62rem',
+                    fontWeight: 700,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
                     color: 'text.secondary',
@@ -533,7 +576,8 @@ export const DayRail: React.FC<{
                 </Typography>
                 <Typography
                   sx={{
-                    fontSize: '1.05rem', fontWeight: 700,
+                    fontSize: compact ? '0.95rem' : '1.05rem',
+                    fontWeight: 700,
                     fontFeatureSettings: "'tnum' on",
                     color: isActive ? 'primary.main' : 'text.primary',
                     lineHeight: 1.1,
@@ -543,9 +587,11 @@ export const DayRail: React.FC<{
                 </Typography>
                 <Box
                   sx={{
-                    width: 5, height: 5, borderRadius: '50%',
+                    width: compact ? 4 : 5,
+                    height: compact ? 4 : 5,
+                    borderRadius: '50%',
                     bgcolor: dotColor ?? 'transparent',
-                    mt: 0.25,
+                    mt: compact ? 0.125 : 0.25,
                   }}
                 />
               </>
@@ -900,9 +946,10 @@ export const EventList: React.FC<{
   onUnpin: (e: EconomicEvent) => Promise<void> | void;
   onClickRow: (e: EconomicEvent) => void;
   theme: Theme;
+  compact?: boolean;
 }> = ({
   label, events, loading, error, currentTime, isPinned, getTradeCount,
-  pinningEventId, onPin, onUnpin, onClickRow, theme,
+  pinningEventId, onPin, onUnpin, onClickRow, theme, compact = false,
 }) => {
   const highCount = events.filter((e) => e.impact === 'High').length;
 
@@ -923,31 +970,41 @@ export const EventList: React.FC<{
         overflow: 'hidden',
         display: 'flex', flexDirection: 'column',
         flex: 1,
-        minHeight: 360,
+        minHeight: compact ? 240 : 360,
         height: '100%',
       }}
     >
-      <Stack direction="row" alignItems="center" spacing={1.25}
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={compact ? 1 : 1.25}
         sx={{
-          px: 2.25, py: 1.75,
+          px: compact ? 1.5 : 2.25,
+          py: compact ? 1.125 : 1.75,
           borderBottom: `1px solid ${theme.palette.divider}`,
           flexShrink: 0,
-        }}>
+        }}
+      >
         <Box
           sx={{
-            width: 26, height: 26, borderRadius: 1,
+            width: compact ? 22 : 26,
+            height: compact ? 22 : 26,
+            borderRadius: 1,
             bgcolor: alpha(theme.palette.primary.main, 0.16),
             color: 'primary.main',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <EventsIcon sx={{ fontSize: 16 }} />
+          <EventsIcon sx={{ fontSize: compact ? 13 : 16 }} />
         </Box>
-        <Typography sx={{ fontWeight: 600, fontSize: '0.95rem' }}>{label}</Typography>
+        <Typography sx={{ fontWeight: 600, fontSize: compact ? '0.85rem' : '0.95rem' }}>
+          {label}
+        </Typography>
         <Box sx={{ flex: 1 }} />
         <Typography
           sx={{
-            fontSize: '0.75rem', color: 'text.secondary',
+            fontSize: compact ? '0.7rem' : '0.75rem',
+            color: 'text.secondary',
             fontFeatureSettings: "'tnum' on",
           }}
         >
@@ -1031,20 +1088,26 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
   const theme = useTheme();
   const compact = variant === 'compact';
 
-  const initialAnchor = initialDate || new Date();
-  const [weekStart, setWeekStart] = useState<Date>(() =>
-    startOfWeek(initialAnchor, { weekStartsOn: 0 })
-  );
-  const [selectedDay, setSelectedDay] = useState<Date>(() => initialAnchor);
-  const [hubTab, setHubTab] = useState<HubTab>('all');
+  const {
+    weekStart,
+    setWeekStart,
+    selectedDay,
+    setSelectedDay,
+    hubTab,
+    setHubTab,
+    internalSelected,
+    setInternalSelected,
+    goToWeek,
+    goToThisWeek,
+    handleDatePick,
+    anchorToDate,
+  } = useEventsPanelState();
 
-  // Track when consumers swap calendars / initialDate so we re-anchor.
+  // Re-anchor when consumers pass a new `initialDate` (e.g. user clicks a
+  // specific calendar day to open events for that day).
   useEffect(() => {
-    if (initialDate) {
-      setWeekStart(startOfWeek(initialDate, { weekStartsOn: 0 }));
-      setSelectedDay(initialDate);
-    }
-  }, [initialDate?.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (initialDate) anchorToDate(initialDate);
+  }, [initialDate?.getTime(), anchorToDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Filter read/write — calendar-level source of truth ────────────────────
   const filterSettings: EconomicCalendarFilterSettings =
@@ -1153,29 +1216,6 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
     return `${start} – ${end}`;
   }, [weekStart]);
 
-  const goToWeek = (delta: number) => {
-    const next = addWeeks(weekStart, delta);
-    setWeekStart(next);
-    const offset = Math.max(
-      0,
-      Math.min(
-        6,
-        Math.round((selectedDay.getTime() - weekStart.getTime()) / 86_400_000)
-      )
-    );
-    setSelectedDay(addDays(next, offset));
-  };
-  const goToThisWeek = () => {
-    const today = new Date();
-    setWeekStart(startOfWeek(today, { weekStartsOn: 0 }));
-    setSelectedDay(today);
-  };
-  const handleDatePick = (d: Date | null) => {
-    if (!d) return;
-    setWeekStart(startOfWeek(d, { weekStartsOn: 0 }));
-    setSelectedDay(d);
-  };
-
   // Edge-of-rail click shifts week so users can navigate without the
   // chevron. Clicking Sun (idx 0) rewinds; clicking Sat (idx 6) advances.
   const handleDaySelect = useCallback(
@@ -1192,38 +1232,45 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
         setSelectedDay(d);
       }
     },
-    [weekStart]
+    [weekStart, setWeekStart, setSelectedDay],
   );
 
   // Internal detail dialog used when no external onEventClick is wired up.
-  const [internalSelected, setInternalSelected] = useState<EconomicEvent | null>(null);
   const handleEventClick = useCallback(
     (ev: EconomicEvent) => {
       if (onEventClick) onEventClick(ev);
       else setInternalSelected(ev);
     },
-    [onEventClick]
+    [onEventClick, setInternalSelected],
   );
-  const closeInternalDialog = useCallback(() => setInternalSelected(null), []);
+  const closeInternalDialog = useCallback(
+    () => setInternalSelected(null),
+    [setInternalSelected],
+  );
 
   return (
     <Box
       sx={{
         flex: 1, minWidth: 0, minHeight: 0,
         display: 'flex', flexDirection: 'column',
-        p: compact ? 2 : 0,
+        p: compact ? 1.5 : 0,
       }}
     >
-      {/* Row 1: Tabs (left) + FilterPill + notifications (right) */}
-      <Stack direction="row" alignItems="center" spacing={1.5}
-        sx={{ mb: 1.75, flexWrap: 'wrap', rowGap: 1 }}>
-        <HubTabs value={hubTab} onChange={setHubTab} theme={theme} />
+      {/* Row 1: Tabs (left) + Impact filter + notifications (right) */}
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        sx={{ mb: compact ? 1 : 1.75, flexWrap: 'wrap', rowGap: 0.75 }}
+      >
+        <HubTabs value={hubTab} onChange={setHubTab} theme={theme} compact={compact} />
         <Box sx={{ flex: 1 }} />
         <FilterPill
           selected={selectedImpacts}
           onToggle={toggleImpact}
-          onSelectAll={setAllImpacts}
+          onSelectAll={compact ? undefined : setAllImpacts}
           theme={theme}
+          compact={compact}
         />
         <Tooltip
           title={
@@ -1255,15 +1302,13 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
         </Tooltip>
       </Stack>
 
-      {/* Row 2: Currency chips */}
-      <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap"
-        sx={{ mb: 1.75, rowGap: 1 }}>
-        <CurrencyChips selected={selectedCurrencies} onToggle={toggleCurrency} theme={theme} />
-      </Stack>
-
-      {/* Row 3: Date range (left) + week nav (right) */}
-      <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap"
-        sx={{ mb: 2.75, rowGap: 1 }}>
+      {/* Row 2: Date range pill (left) + week nav (right) */}
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        sx={{ mb: compact ? 1 : 1.75, flexWrap: 'wrap', rowGap: 0.75 }}
+      >
         <DatePicker
           value={selectedDay}
           onChange={handleDatePick}
@@ -1278,8 +1323,11 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
           <ButtonBase
             onClick={goToThisWeek}
             sx={{
-              px: 1.25, py: 0.5, borderRadius: 1,
-              fontSize: '0.8rem', fontWeight: 600,
+              px: compact ? 1 : 1.25,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: compact ? '0.74rem' : '0.8rem',
+              fontWeight: 600,
               color: 'text.secondary',
               '&:hover': { color: 'text.primary' },
             }}
@@ -1292,6 +1340,16 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
         </Stack>
       </Stack>
 
+      {/* Row 3: Currency strip — full width, horizontal scroll in compact */}
+      <Box sx={{ mb: compact ? 1.25 : 2.75, minWidth: 0 }}>
+        <CurrencyChips
+          selected={selectedCurrencies}
+          onToggle={toggleCurrency}
+          theme={theme}
+          compact={compact}
+        />
+      </Box>
+
       {/* DayRail + EventList */}
       <Box
         sx={{
@@ -1300,7 +1358,7 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
             ? '1fr'
             : { xs: '1fr', md: '200px 1fr' },
           gridAutoRows: compact ? 'auto 1fr' : undefined,
-          gap: { xs: 2, md: 3 },
+          gap: compact ? 1.25 : { xs: 2, md: 3 },
           alignItems: 'stretch',
           flex: 1,
           minHeight: 0,
@@ -1313,6 +1371,7 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
           eventsByDate={eventsByDate}
           theme={theme}
           layout={compact ? 'row' : 'column'}
+          compact={compact}
         />
         <EventList
           label={format(selectedDay, 'EEE, MMM d')}
@@ -1327,6 +1386,7 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
           onUnpin={unpin}
           onClickRow={handleEventClick}
           theme={theme}
+          compact={compact}
         />
       </Box>
 

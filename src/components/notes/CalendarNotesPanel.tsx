@@ -4,6 +4,11 @@
  * View/edit-only notes panel for a single calendar. Reuses the same
  * NoteListPanel that NotesPage uses so the UX stays in lockstep.
  *
+ * All user-meaningful panel state (tab, pill, search, expanded row,
+ * selected note) lives in NotesPanelStateContext so it survives the
+ * lg↔︎drawer breakpoint swap. This component is now a thin renderer
+ * that wires the context into the shared list + editor surfaces.
+ *
  * Differences vs the standalone /notes page:
  *   - Scoped to one calendarId (no calendar picker)
  *   - No create-note affordance (read + edit existing only)
@@ -12,47 +17,31 @@
  *   - Click a note → NoteEditorDialog opens for view/edit
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Box } from '@mui/material';
 
-import { Note } from '../../types/note';
-import type { Currency, ImpactLevel } from '../../types/economicCalendar';
-import { useAuthState } from '../../contexts/AuthStateContext';
-import { useNotes } from '../../hooks/useNotes';
-import * as notesService from '../../services/notesService';
-import { logger } from '../../utils/logger';
+import { useNotesPanelState } from '../../contexts/NotesPanelStateContext';
 
-import NoteListPanel, { NotesTab, NotesTagPill } from './NoteListPanel';
+import NoteListPanel from './NoteListPanel';
 import NoteEditorDialog from './NoteEditorDialog';
 
-export interface CalendarNotesPanelProps {
-  calendarId?: string;
-  isActive?: boolean;
-  isReadOnly?: boolean;
-  availableTradeTags?: string[];
-  pinnedEvents?: Array<{
-    event_id: string;
-    event: string;
-    currency?: Currency;
-    impact?: ImpactLevel;
-  }>;
-}
-
-const CalendarNotesPanel: React.FC<CalendarNotesPanelProps> = ({
-  calendarId,
-  isActive = true,
-  isReadOnly = false,
-  availableTradeTags = [],
-  pinnedEvents,
-}) => {
-  const { user } = useAuthState();
-
-  const [tab, setTab] = useState<NotesTab>('all');
-  const [pill, setPill] = useState<NotesTagPill>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
-
+const CalendarNotesPanel: React.FC = () => {
   const {
+    calendarId,
+    isReadOnly,
+    availableTradeTags,
+    pinnedEvents,
+    tab,
+    setTab,
+    pill,
+    setPill,
+    searchQuery,
+    setSearchQuery,
+    expandedId,
+    setExpandedId,
+    selectedNote,
+    openNote,
+    closeNote,
     notes,
     loading,
     loadingMore,
@@ -62,47 +51,9 @@ const CalendarNotesPanel: React.FC<CalendarNotesPanelProps> = ({
     loadMore,
     updateNote,
     removeNote,
-  } = useNotes({
-    userId: user?.uid,
-    calendarId,
-    isOpen: isActive,
-    activeTab: tab,
-    searchQuery,
-    selectedCalendarFilter: calendarId || 'all',
-    creatorFilter: 'me',
-  });
-
-  const handleNoteClick = (note: Note) => {
-    setSelectedNote(note);
-  };
-
-  const handleEditorClose = () => {
-    setSelectedNote(null);
-  };
-
-  const handleTogglePin = async (note: Note) => {
-    const next = !note.is_pinned;
-    updateNote(note.id, { is_pinned: next });
-    try {
-      if (next) await notesService.pinNote(note.id);
-      else await notesService.unpinNote(note.id);
-    } catch (err) {
-      logger.error('Error toggling pin:', err);
-      updateNote(note.id, { is_pinned: !next });
-    }
-  };
-
-  const handleToggleArchive = async (note: Note) => {
-    const next = !note.is_archived;
-    updateNote(note.id, { is_archived: next });
-    try {
-      if (next) await notesService.archiveNote(note.id);
-      else await notesService.unarchiveNote(note.id);
-    } catch (err) {
-      logger.error('Error toggling archive:', err);
-      updateNote(note.id, { is_archived: !next });
-    }
-  };
+    handleTogglePin,
+    handleToggleArchive,
+  } = useNotesPanelState();
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -115,7 +66,7 @@ const CalendarNotesPanel: React.FC<CalendarNotesPanelProps> = ({
         selectedNoteId={selectedNote?.id}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onNoteClick={handleNoteClick}
+        onNoteClick={openNote}
         onTogglePin={isReadOnly ? undefined : handleTogglePin}
         onToggleArchive={isReadOnly ? undefined : handleToggleArchive}
         tab={tab}
@@ -125,12 +76,14 @@ const CalendarNotesPanel: React.FC<CalendarNotesPanelProps> = ({
         total={total}
         tabCounts={tabCounts}
         showHeader={false}
+        expandedId={expandedId}
+        onExpandedIdChange={setExpandedId}
       />
 
       {selectedNote && !isReadOnly && (
         <NoteEditorDialog
           open={!!selectedNote}
-          onClose={handleEditorClose}
+          onClose={closeNote}
           note={selectedNote}
           calendarId={selectedNote.calendar_id || calendarId || ''}
           onSave={(note) => {
@@ -138,7 +91,7 @@ const CalendarNotesPanel: React.FC<CalendarNotesPanelProps> = ({
           }}
           onDelete={(noteId) => {
             removeNote(noteId);
-            setSelectedNote(null);
+            closeNote();
           }}
           availableTradeTags={availableTradeTags}
           calendarNotes={notes.map((n) => ({ id: n.id, title: n.title }))}

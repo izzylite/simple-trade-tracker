@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -44,9 +44,7 @@ import {
   getUniqueTagGroups,
 } from '../../../utils/tagColors';
 import { Calendar } from '../../../types/calendar';
-import { logger } from '../../../utils/logger';
-import { tagService } from '../../../services/tagService';
-import { useAuthState } from '../../../contexts/AuthStateContext';
+import { useTagsPanelState } from '../../../contexts/TagsPanelStateContext';
 
 export interface TagManagementContentProps {
   allTags: string[];
@@ -168,96 +166,55 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
   onSuggestDefinitions,
 }) => {
   const theme = useTheme();
-  const { user } = useAuthState();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTagGroup, setSelectedTagGroup] = useState<string>('');
-  const [tagToEdit, setTagToEdit] = useState<string | null>(null);
-  const [tagToView, setTagToView] = useState<string | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [localRequiredGroups, setLocalRequiredGroups] = useState<string[]>(requiredTagGroups);
-  const [tagDefinitions, setTagDefinitions] = useState<Record<string, string>>({});
-  const [definitionsLoading, setDefinitionsLoading] = useState(false);
-  const [definitionsLoaded, setDefinitionsLoaded] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-  const [suggestTags, setSuggestTags] = useState<string[] | null>(null);
-  const [isRequiredDialogOpen, setIsRequiredDialogOpen] = useState(false);
+  const {
+    searchTerm,
+    setSearchTerm,
+    selectedTagGroup,
+    setSelectedTagGroup,
+    collapsedGroups,
+    toggleGroup,
+    tagToEdit,
+    setTagToEdit,
+    tagToView,
+    setTagToView,
+    isCreateDialogOpen,
+    setIsCreateDialogOpen,
+    suggestTags,
+    setSuggestTags,
+    isRequiredDialogOpen,
+    setIsRequiredDialogOpen,
+    localRequiredGroups,
+    handleRequiredTagGroupsChange,
+    tagDefinitions,
+    definitionsLoading,
+    definitionsLoaded,
+    fetchTagDefinitions,
+    setActive,
+    handleTagEditSuccess,
+    handleTagDelete,
+    handleTagCreated,
+    handleSuggest,
+  } = useTagsPanelState();
 
   // Suggestions are available unless we're in read-only mode (shared calendar).
   const suggestionsAvailable = !isReadOnly;
 
-  const handleSuggest = useCallback(
-    (tagsToSuggest: string[]) => {
-      if (!suggestionsAvailable || tagsToSuggest.length === 0) return;
-      if (onSuggestDefinitions) {
-        onSuggestDefinitions(tagsToSuggest);
-        return;
-      }
-      setSuggestTags(tagsToSuggest);
-    },
-    [suggestionsAvailable, onSuggestDefinitions],
-  );
+  // Signal active status to the provider so it fetches definitions once.
+  useEffect(() => {
+    setActive(!!isActive);
+  }, [isActive, setActive]);
 
   // Expose create trigger to parent (for drawer headerActions)
   useEffect(() => {
     if (onCreateReady) {
       onCreateReady(() => setIsCreateDialogOpen(true));
     }
-  }, [onCreateReady]);
-
-  /**
-   * Groups start collapsed (a fresh entry resolves to `true`), so the panel
-   * opens as a tight scannable list rather than a 1000-line scroll. First
-   * click on a group flips it to expanded.
-   */
-  const toggleGroup = (group: string) => {
-    setCollapsedGroups(prev => ({
-      ...prev,
-      [group]: !(prev[group] ?? true)
-    }));
-  };
-
-  // Update local state when props change
-  useEffect(() => {
-    setLocalRequiredGroups(requiredTagGroups);
-  }, [requiredTagGroups]);
-
-  // Fetch tag definitions
-  // In read-only mode, fetch from the calendar owner's definitions
-  const fetchTagDefinitions = useCallback(async () => {
-    // Use calendarOwnerId for shared calendars, otherwise use current user
-    const userId = isReadOnly ? calendarOwnerId : user?.id;
-    if (!userId) return;
-
-    setDefinitionsLoading(true);
-    try {
-      const definitions = await tagService.fetchTagDefinitions(userId);
-      setTagDefinitions(definitions);
-      setDefinitionsLoaded(true);
-    } catch (err) {
-      logger.error('Error fetching tag definitions:', err);
-    } finally {
-      setDefinitionsLoading(false);
-    }
-  }, [user?.id, isReadOnly, calendarOwnerId]);
-
-  // Fetch tag definitions when content becomes active
-  useEffect(() => {
-    if (isActive) {
-      fetchTagDefinitions();
-    }
-  }, [isActive, fetchTagDefinitions]);
+  }, [onCreateReady, setIsCreateDialogOpen]);
 
   // Get all unique tag groups
   const tagGroups = useMemo(() => {
     return getUniqueTagGroups(allTags);
   }, [allTags]);
-
-  // Reset selected tag group if it no longer exists in the available tag groups
-  useEffect(() => {
-    if (selectedTagGroup && !tagGroups.includes(selectedTagGroup)) {
-      setSelectedTagGroup('');
-    }
-  }, [tagGroups, selectedTagGroup]);
 
   // Filter tags based on search term and selected group
   const filteredTags = useMemo(() => {
@@ -303,73 +260,6 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
 
     return groups;
   }, [filteredTags]);
-
-  const handleTagEditSuccess = (oldTag: string, newTag: string, tradesUpdated: number) => {
-    logger.log(`Tag update completed: ${oldTag} -> ${newTag}, ${tradesUpdated} trades updated`);
-
-    // Check if this was a tag group name change
-    const oldGroup = isGroupedTag(oldTag) ? getTagGroup(oldTag) : null;
-    const newGroup = isGroupedTag(newTag) ? getTagGroup(newTag) : null;
-
-    // If the selected tag group was the old group name, update it to the new group name
-    if (oldGroup && newGroup && oldGroup !== newGroup && selectedTagGroup === oldGroup) {
-      setSelectedTagGroup(newGroup);
-    }
-
-    if (onTagUpdated) {
-      onTagUpdated(oldTag, newTag);
-    }
-  };
-
-  const handleTagDelete = (deletedTag: string, tradesUpdated: number) => {
-    logger.log(`Tag deletion completed: ${deletedTag}, ${tradesUpdated} trades updated`);
-
-    // Check if the deleted tag was from a group we're currently filtering by
-    const deletedGroup = isGroupedTag(deletedTag) ? getTagGroup(deletedTag) : null;
-
-    // If we were filtering by the deleted tag's group, reset the filter to show all groups
-    if (deletedGroup && selectedTagGroup === deletedGroup) {
-      // Check if there are any other tags in this group
-      const otherTagsInGroup = allTags.filter(tag =>
-        tag !== deletedTag && isGroupedTag(tag) && getTagGroup(tag) === deletedGroup
-      );
-
-      // If no other tags in this group, reset the filter
-      if (otherTagsInGroup.length === 0) {
-        setSelectedTagGroup('');
-      }
-    }
-
-    if (onTagUpdated) {
-      onTagUpdated(deletedTag, ''); // Pass empty string to indicate deletion
-    }
-  };
-
-  const handleRequiredTagGroupsChange = (groups: string[]) => {
-    setLocalRequiredGroups(groups);
-
-    if (onUpdateCalendarProperty) {
-      onUpdateCalendarProperty(calendarId, (calendar) => ({
-        ...calendar,
-        required_tag_groups: groups
-      }));
-    }
-  };
-
-  const handleTagCreated = async (newTag: string) => {
-    if (onUpdateCalendarProperty) {
-      await onUpdateCalendarProperty(calendarId, (calendar) => {
-        const currentTags = calendar.tags || [];
-        if (currentTags.includes(newTag)) return calendar;
-        return {
-          ...calendar,
-          tags: [...currentTags, newTag]
-        };
-      });
-      // Refresh definitions to include the new one
-      fetchTagDefinitions();
-    }
-  };
 
   const groupEntries = Object.entries(groupedTags);
   const isDark = theme.palette.mode === 'dark';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Stack } from '@mui/material';
+import { Box, Stack, Typography } from '@mui/material';
 import AccountStats from '../../AccountStats';
 import MonthlyStats from '../../MonthlyStats';
 import PerformanceCharts from '../../PerformanceCharts';
@@ -8,6 +8,7 @@ import { DynamicRiskSettings } from '../../../utils/dynamicRiskUtils';
 import { EconomicCalendarFilterSettings } from '../../../hooks/useEconomicCalendarFilters';
 import { scrollbarStyles } from '../../../styles/scrollbarStyles';
 import { useTheme } from '@mui/material/styles';
+import { useOverviewPanelState } from '../../../contexts/OverviewPanelStateContext';
 
 export interface StatsContentProps {
   // Account stats
@@ -80,12 +81,13 @@ const StatsContent: React.FC<StatsContentProps> = ({
   economicFilter,
 }) => {
   const theme = useTheme();
+  const { timePeriod, setTimePeriod } = useOverviewPanelState();
   return (
     <Box
       sx={{
         flex: 1,
         overflowY: 'auto',
-        px: 2,
+        px: 1,
         py: 2,
         ...scrollbarStyles(theme),
       }}
@@ -126,24 +128,41 @@ const StatsContent: React.FC<StatsContentProps> = ({
         )}
 
         {calendarId && (
-          <PerformanceCharts
-            calendarId={calendarId}
-            selectedDate={currentDate}
-            accountBalance={balance}
-            maxDailyDrawdown={maxDailyDrawdown}
-            monthlyTarget={monthlyTarget}
-            calendar={calendar}
-            dynamicRiskSettings={dynamicRiskSettings}
-            onEditTrade={onEditTrade}
-            onDeleteTrade={onDeleteTrade}
-            onUpdateTradeProperty={onUpdateTradeProperty}
-            onUpdateCalendarProperty={onUpdateCalendarProperty}
-            economicFilter={economicFilter}
-            onOpenGalleryMode={onOpenGalleryMode}
-            isReadOnly={isReadOnly}
-            tabSize="small"
-            basicOnly
-          />
+          <Box>
+            <Typography
+              sx={{
+                px: 1,
+                pb: 0.75,
+                fontSize: '0.66rem',
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'text.secondary',
+              }}
+            >
+              Stats
+            </Typography>
+            <PerformanceCharts
+              calendarId={calendarId}
+              selectedDate={currentDate}
+              accountBalance={balance}
+              maxDailyDrawdown={maxDailyDrawdown}
+              monthlyTarget={monthlyTarget}
+              calendar={calendar}
+              dynamicRiskSettings={dynamicRiskSettings}
+              onEditTrade={onEditTrade}
+              onDeleteTrade={onDeleteTrade}
+              onUpdateTradeProperty={onUpdateTradeProperty}
+              onUpdateCalendarProperty={onUpdateCalendarProperty}
+              economicFilter={economicFilter}
+              onOpenGalleryMode={onOpenGalleryMode}
+              isReadOnly={isReadOnly}
+              tabSize="small"
+              basicOnly
+              timePeriod={timePeriod}
+              onTimePeriodChange={setTimePeriod}
+            />
+          </Box>
         )}
       </Stack>
     </Box>
