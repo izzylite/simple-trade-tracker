@@ -7,7 +7,7 @@ import {
   getTagDisplayLabel,
   getTagSubtitle,
   getTagIcon,
-} from './NoteEditorDialog';
+} from './NoteEditorDialogTags';
 import { Note } from '../../types/note';
 import { Calendar } from '../../types/calendar';
 

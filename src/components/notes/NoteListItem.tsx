@@ -28,7 +28,7 @@ import {
 import { convertFromRaw } from 'draft-js';
 import { Note } from '../../types/note';
 import { Calendar } from '../../types/calendar';
-import { getTagDisplayLabel } from './NoteEditorDialog';
+import { getTagDisplayLabel } from './NoteEditorDialogTags';
 import ConfirmationDialog from '../common/ConfirmationDialog';
 
 interface NoteListItemProps {

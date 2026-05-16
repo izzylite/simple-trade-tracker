@@ -23,7 +23,7 @@ import { formatDistanceToNow, format } from 'date-fns';
 
 import { Note } from '../../types/note';
 import { Trade } from '../../types/dualWrite';
-import { getTagDisplayLabel } from './NoteEditorDialog';
+import { getTagDisplayLabel } from './NoteEditorDialogTags';
 import RichTextViewer from '../common/RichTextEditor/RichTextViewer';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { getSharedTrade } from '../../services/sharingService';
