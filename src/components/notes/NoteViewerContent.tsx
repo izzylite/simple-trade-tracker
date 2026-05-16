@@ -4,7 +4,7 @@
  * NoteViewerDialog (modal) and NoteViewerPanel (inline slide-in).
  */
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Box,
   Typography,
@@ -15,8 +15,13 @@ import {
 } from '@mui/material';
 import { format } from 'date-fns';
 import { Note } from '../../types/note';
+import { Trade } from '../../types/dualWrite';
 import { getTagDisplayLabel } from './NoteEditorDialogTags';
 import RichTextViewer from '../common/RichTextEditor/RichTextViewer';
+import { getSharedTrade } from '../../services/sharingService';
+import { logger } from '../../utils/logger';
+import TradeGalleryDialog from '../TradeGalleryDialog';
+import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 
 interface NoteViewerContentProps {
   note: Note;
@@ -24,6 +29,29 @@ interface NoteViewerContentProps {
 
 const NoteViewerContent: React.FC<NoteViewerContentProps> = ({ note }) => {
   const theme = useTheme();
+
+  // Shared-trade preview triggered by clicking a TRADE_LINK chip in the
+  // body. Same pattern as NoteEditorBody / NoteViewPanel / NoteMetaPanel —
+  // worth extracting to a useSharedTradePreview hook once 5+ call sites
+  // exist; left inline here to keep this commit a pure bug fix.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewTrade, setPreviewTrade] = useState<Trade | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
+
+  const handleSharedTradeClick = useCallback(async (shareId: string) => {
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewTrade(null);
+    try {
+      const data = await getSharedTrade(shareId);
+      if (data?.trade) setPreviewTrade(data.trade);
+    } catch (err) {
+      logger.error('Error loading shared trade in note viewer:', err);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, []);
 
   const formattedDate = note.updated_at
     ? format(new Date(note.updated_at), 'MMM d, yyyy')
@@ -96,7 +124,10 @@ const NoteViewerContent: React.FC<NoteViewerContentProps> = ({ note }) => {
 
         <Box sx={{ mt: 3 }}>
           {note.content ? (
-            <RichTextViewer content={note.content} />
+            <RichTextViewer
+              content={note.content}
+              onSharedTradeClick={handleSharedTradeClick}
+            />
           ) : (
             <Typography
               variant="body1"
@@ -108,6 +139,41 @@ const NoteViewerContent: React.FC<NoteViewerContentProps> = ({ note }) => {
           )}
         </Box>
       </Box>
+
+      {previewOpen && (
+        <TradeGalleryDialog
+          open={previewOpen}
+          onClose={() => { setPreviewOpen(false); setPreviewTrade(null); }}
+          trades={previewTrade ? [previewTrade] : []}
+          initialTradeId={previewTrade?.id}
+          loading={previewLoading}
+          setZoomedImage={(url, allImages, initialIndex) => {
+            setZoomedImages({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
+          }}
+          title={previewTrade?.name || 'Trade Preview'}
+          isReadOnly
+          tradeOperations={{
+            onZoomImage: (url, allImages, initialIndex) => {
+              setZoomedImages({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
+            },
+            onUpdateTradeProperty: undefined,
+            calendarId: undefined,
+            onOpenGalleryMode: undefined,
+            economicFilter: undefined,
+            onOpenAIChat: undefined,
+            isTradeUpdating: undefined,
+            isReadOnly: true,
+          }}
+        />
+      )}
+
+      {zoomedImages && (
+        <ImageZoomDialog
+          open={!!zoomedImages}
+          onClose={() => setZoomedImages(null)}
+          imageProp={zoomedImages}
+        />
+      )}
     </>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Box,
@@ -20,8 +20,13 @@ import RichTextViewer from
   '../components/common/RichTextEditor/RichTextViewer';
 import {
   getSharedNote,
+  getSharedTrade,
   SharedNoteData,
 } from '../services/sharingService';
+import { Trade } from '../types/dualWrite';
+import TradeGalleryDialog from '../components/TradeGalleryDialog';
+import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
+import { logger } from '../utils/logger';
 
 const SharedNotePage: React.FC = () => {
   const { shareId } = useParams<{ shareId: string }>();
@@ -44,6 +49,28 @@ const SharedNotePage: React.FC = () => {
     () => createTheme(createAppTheme(mode)),
     [mode]
   );
+
+  // Embedded TRADE_LINK chip → fetch the trade via the public share-link
+  // edge function and surface it in a read-only TradeGalleryDialog. This
+  // is a PUBLIC page, so all access must go through getSharedTrade.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewTrade, setPreviewTrade] = useState<Trade | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
+
+  const handleSharedTradeClick = useCallback(async (shareId: string) => {
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewTrade(null);
+    try {
+      const data = await getSharedTrade(shareId);
+      if (data?.trade) setPreviewTrade(data.trade);
+    } catch (err) {
+      logger.error('Error loading shared trade on shared-note page:', err);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!shareId) return;
@@ -218,6 +245,7 @@ const SharedNotePage: React.FC = () => {
                 {note.content ? (
                   <RichTextViewer
                     content={note.content}
+                    onSharedTradeClick={handleSharedTradeClick}
                   />
                 ) : (
                   <Typography
@@ -232,6 +260,41 @@ const SharedNotePage: React.FC = () => {
             </Box>
           )}
         </Container>
+
+        {previewOpen && (
+          <TradeGalleryDialog
+            open={previewOpen}
+            onClose={() => { setPreviewOpen(false); setPreviewTrade(null); }}
+            trades={previewTrade ? [previewTrade] : []}
+            initialTradeId={previewTrade?.id}
+            loading={previewLoading}
+            setZoomedImage={(url, allImages, initialIndex) => {
+              setZoomedImages({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
+            }}
+            title={previewTrade?.name || 'Trade Preview'}
+            isReadOnly
+            tradeOperations={{
+              onZoomImage: (url, allImages, initialIndex) => {
+                setZoomedImages({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
+              },
+              onUpdateTradeProperty: undefined,
+              calendarId: undefined,
+              onOpenGalleryMode: undefined,
+              economicFilter: undefined,
+              onOpenAIChat: undefined,
+              isTradeUpdating: undefined,
+              isReadOnly: true,
+            }}
+          />
+        )}
+
+        {zoomedImages && (
+          <ImageZoomDialog
+            open={!!zoomedImages}
+            onClose={() => setZoomedImages(null)}
+            imageProp={zoomedImages}
+          />
+        )}
       </Box>
     </ThemeProvider>
   );
